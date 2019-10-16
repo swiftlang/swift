@@ -1926,7 +1926,19 @@ class PatternBindingEntry {
 
   friend class PatternBindingInitializer;
 
+  // FIXME: This API is transitional. Once the callers of
+  // typeCheckPatternBinding are requestified, merge this bit with
+  // Flags::Checked.
+  friend class PatternBindingEntryRequest;
+
   bool IsFullyValidated = false;
+
+  bool isFullyValidated() const {
+    return IsFullyValidated;
+  }
+  void setFullyValidated() {
+    IsFullyValidated = true;
+  }
 
 public:
   /// \p E is the initializer as parsed.
@@ -1995,13 +2007,6 @@ public:
   }
   void setInitializerChecked() {
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
-  }
-
-  bool isFullyValidated() const {
-    return IsFullyValidated;
-  }
-  void setFullyValidated() {
-    IsFullyValidated = true;
   }
 
   bool isInitializerSubsumed() const {
@@ -4800,6 +4805,7 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
+  friend class NamingPatternRequest;
   NamedPattern *NamingPattern = nullptr;
 
 public:
@@ -4921,8 +4927,8 @@ public:
     Parent = v;
   }
 
-  NamedPattern *getNamingPattern() const { return NamingPattern; }
-  void setNamingPattern(NamedPattern *Pat) { NamingPattern = Pat; }
+  NamedPattern *getNamingPattern() const;
+  void setNamingPattern(NamedPattern *Pat);
 
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's

@@ -186,7 +186,7 @@ struct XCollectionLikeP0b : CollectionLikeP0 {
 // expected-error@-1 {{type 'XCollectionLikeP0b' does not conform to protocol 'CollectionLikeP0'}}
   var startIndex: XCollectionLikeP0b.Index
   // expected-error@-1{{circular reference}}
-  // expected-error@-2{{variable 'startIndex' is not bound by any pattern}}
+  // expected-note@-2{{through reference here}}
   var startElement: XCollectionLikeP0b.Element
 }
 

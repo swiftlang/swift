@@ -10,7 +10,7 @@ protocol P {
 struct S : P {
   static var x = 0
   var x = S.x // expected-error {{circular reference}}
-  // expected-error@-1 {{variable 'x' is not bound by any pattern}}
+  // expected-note@-1 {{through reference here}}
 }
 
 // FIXME: Lousy diagnostics on this case.

@@ -32,6 +32,7 @@ class GenericTypeParamType;
 class InfixOperatorDecl;
 class IterableDeclContext;
 class ModuleDecl;
+class NamedPattern;
 class NominalTypeDecl;
 class OperatorDecl;
 class OpaqueTypeDecl;

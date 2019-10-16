@@ -5309,6 +5309,17 @@ Pattern *VarDecl::getParentPattern() const {
   return nullptr;
 }
 
+NamedPattern *VarDecl::getNamingPattern() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           NamingPatternRequest{const_cast<VarDecl *>(this)},
+                           nullptr);
+}
+
+void VarDecl::setNamingPattern(NamedPattern *Pat) {
+  getASTContext().evaluator.cacheOutput(NamingPatternRequest{this},
+                                        std::move(Pat));
+}
+
 TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
   if (auto *param = dyn_cast<ParamDecl>(this))
     return param->getTypeRepr();

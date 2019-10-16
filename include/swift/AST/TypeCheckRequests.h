@@ -1407,6 +1407,26 @@ public:
   void cacheResult(const PatternBindingEntry *value) const;
 };
 
+class NamingPatternRequest
+    : public SimpleRequest<NamingPatternRequest, NamedPattern *(VarDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<NamedPattern *> evaluate(Evaluator &evaluator,
+                                          VarDecl *VD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<NamedPattern *> getCachedResult() const;
+  void cacheResult(NamedPattern *P) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

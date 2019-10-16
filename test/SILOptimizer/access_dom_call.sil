@@ -98,7 +98,7 @@ bb0:
 // Accessors
 
 public class C {
-  @_hasInitialValue @_hasStorage public var field: Int64 { get set }
+  @_hasStorage @_hasInitialValue public var field: Int64 { get set }
 }
 
 sil_property #C.field ()

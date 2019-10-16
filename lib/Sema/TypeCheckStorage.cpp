@@ -237,18 +237,6 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     }
   }
 
-  if (pbe.isInitialized()) {
-    // Add the attribute that preserves the "has an initializer" value across
-    // module generation, as required for TBDGen.
-    pattern->forEachVariable([&](VarDecl *VD) {
-      if (VD->hasStorage() &&
-          !VD->getAttrs().hasAttribute<HasInitialValueAttr>()) {
-        auto *attr = new (Context) HasInitialValueAttr(/*IsImplicit=*/true);
-        VD->getAttrs().add(attr);
-      }
-    });
-  }
-
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {

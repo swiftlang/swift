@@ -9,7 +9,7 @@ import Swift
 import SwiftShims
 
 class C {
-  @_hasInitialValue @_hasStorage var field: Int { get set }
+  @_hasStorage @_hasInitialValue var field: Int { get set }
   @objc deinit
     init()
 }

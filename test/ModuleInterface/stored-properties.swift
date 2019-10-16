@@ -53,7 +53,7 @@ public struct HasStoredProperties {
   // RESILIENT-NOT: private var privateVar: Swift.Bool
   private var privateVar: Bool
 
-  // CHECK: {{@_hasInitialValue @_hasStorage|@_hasStorage @_hasInitialValue}} public var storedWithObserversInitialValue: Swift.Int {
+  // CHECK: @_hasStorage @_hasInitialValue public var storedWithObserversInitialValue: Swift.Int {
   // RESILIENT: {{^}}  public var storedWithObserversInitialValue: Swift.Int {
   // COMMON-NEXT: get
   // COMMON-NEXT: set

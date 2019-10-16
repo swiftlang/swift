@@ -69,6 +69,8 @@ let a = b ; let b = a
 // expected-error@-1 {{variable 'a' is not bound by any pattern}}
 // expected-error@-2 {{circular reference}}
 // expected-note@-3 {{through reference here}}
+// expected-note@-4 {{through reference here}}
+// expected-note@-5 {{through reference here}}
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
 let uselessValue : String?

@@ -2410,9 +2410,20 @@ public:
       entry->getPattern()->forEachVariable([&](VarDecl *var) {
         this->visitBoundVariable(var);
 
+        if (entry->isInitialized()) {
+          // Add the attribute that preserves the "has an initializer" value
+          // across module generation, as required for TBDGen.
+          if (var->hasStorage() &&
+              !var->getAttrs().hasAttribute<HasInitialValueAttr>()) {
+            var->getAttrs().add(new (TC.Context)
+                                    HasInitialValueAttr(/*IsImplicit=*/true));
+          }
+          return;
+        }
+
         // If this is a declaration without an initializer, reject code if
         // uninitialized vars are not allowed.
-        if (entry->isInitialized() || isInSILMode) return;
+        if (isInSILMode) return;
 
         // If the variable has no storage, it never needs an initializer.
         if (!var->hasStorage())
@@ -4187,52 +4198,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
-    auto *PBD = VD->getParentPatternBinding();
-    if (PBD) {
-      // FIXME: Sink this into a request for the naming pattern.
-      unsigned i = PBD->getPatternEntryIndexForVarDecl(VD);
-      (void)evaluateOrDefault(Context.evaluator,
-                              PatternBindingEntryRequest{PBD, i},
-                              nullptr);
-      if (PBD->isInvalid()) {
-        VD->getParentPattern()->setType(ErrorType::get(Context));
-        setBoundVarsTypeError(VD->getParentPattern(), Context);
-        break;
-      }
-    } else if (!VD->getParentPatternStmt() && !VD->getParentVarDecl()) {
-      // No parent?  That's an error.
-      VD->setInterfaceType(ErrorType::get(Context));
-      break;
-    }
-
-    // Go digging for the named pattern that declares this variable.
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
-      auto *canVD = VD->getCanonicalVarDecl();
-      namingPattern = canVD->getNamingPattern();
-
-      // HACK: If no other diagnostic applies, emit a generic diagnostic about
-      // a variable being unbound. We can't do better than this at the
-      // moment because TypeCheckPattern does not reliably invalidate parts of
-      // the pattern AST on failure.
-      //
-      // Once that's through, this will only fire during circular validation.
-      if (!namingPattern) {
-        if (!VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
-          VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
-        }
-
-        VD->getParentPattern()->setType(ErrorType::get(Context));
-        setBoundVarsTypeError(VD->getParentPattern(), Context);
-        VD->setInterfaceType(ErrorType::get(Context));
-        break;
-      }
-    }
-    assert(namingPattern && "Bound variable with no naming pattern!");
-
-    if (!namingPattern->hasType()) {
-      namingPattern->setType(ErrorType::get(Context));
-      setBoundVarsTypeError(namingPattern, Context);
+      VD->setInterfaceType(ErrorType::get(Context));
+      break;
     }
 
     Type interfaceType = namingPattern->getType();
@@ -4310,6 +4279,63 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   assert(D->hasInterfaceType());
+}
+
+llvm::Expected<NamedPattern *>
+NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
+  auto &Context = VD->getASTContext();
+  auto *PBD = VD->getParentPatternBinding();
+  // FIXME: In order for this request to properly express its dependencies,
+  // all of the places that allow variable bindings need to also use pattern
+  // binding decls. Otherwise, we'll have to go digging around in case
+  // statements and patterns to find named patterns.
+  if (PBD) {
+    // FIXME: For now, this works because PatternBindingEntryRequest fills in
+    // the naming pattern as a side effect in this case, and TypeCheckStmt
+    // and TypeCheckPattern handle the others. But that's all really gross.
+    unsigned i = PBD->getPatternEntryIndexForVarDecl(VD);
+    (void)evaluateOrDefault(evaluator,
+                            PatternBindingEntryRequest{PBD, i},
+                            nullptr);
+    if (PBD->isInvalid()) {
+      VD->getParentPattern()->setType(ErrorType::get(Context));
+      setBoundVarsTypeError(VD->getParentPattern(), Context);
+      return nullptr;
+    }
+  } else if (!VD->getParentPatternStmt() && !VD->getParentVarDecl()) {
+    // No parent?  That's an error.
+    return nullptr;
+  }
+
+  // Go digging for the named pattern that declares this variable.
+  auto *namingPattern = VD->NamingPattern;
+  if (!namingPattern) {
+    auto *canVD = VD->getCanonicalVarDecl();
+    namingPattern = canVD->NamingPattern;
+
+    // HACK: If no other diagnostic applies, emit a generic diagnostic about
+    // a variable being unbound. We can't do better than this at the
+    // moment because TypeCheckPattern does not reliably invalidate parts of
+    // the pattern AST on failure.
+    //
+    // Once that's through, this will only fire during circular validation.
+    if (!namingPattern) {
+      if (!VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+        VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
+      }
+
+      VD->getParentPattern()->setType(ErrorType::get(Context));
+      setBoundVarsTypeError(VD->getParentPattern(), Context);
+      return nullptr;
+    }
+  }
+
+  if (!namingPattern->hasType()) {
+    namingPattern->setType(ErrorType::get(Context));
+    setBoundVarsTypeError(namingPattern, Context);
+  }
+
+  return namingPattern;
 }
 
 llvm::Expected<DeclRange>

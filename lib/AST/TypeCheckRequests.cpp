@@ -984,3 +984,20 @@ void PatternBindingEntryRequest::cacheResult(
   auto idx = std::get<1>(getStorage());
   PBD->getMutablePatternList()[idx].setFullyValidated();
 }
+
+//----------------------------------------------------------------------------//
+// NamingPatternRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
+  auto *VD = std::get<0>(getStorage());
+  if (auto *Pat = VD->NamingPattern) {
+    return Pat;
+  }
+  return None;
+}
+
+void NamingPatternRequest::cacheResult(NamedPattern *value) const {
+  auto *VD = std::get<0>(getStorage());
+  VD->NamingPattern = value;
+}
