@@ -304,11 +304,11 @@ STMT_NODES = [
              Child('Colon', kind='ColonToken'),
          ]),
 
-    # case-item -> pattern where-clause? ','?
+    # case-item -> pattern? where-clause? ','?
     Node('CaseItem', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
-             Child('Pattern', kind='Pattern'),
+             Child('Pattern', kind='Pattern', is_optional=True),
              Child('WhereClause', kind='WhereClause',
                    is_optional=True),
              Child('TrailingComma', kind='CommaToken',
