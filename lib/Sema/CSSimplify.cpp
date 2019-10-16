@@ -7980,9 +7980,11 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   auto subscript = dyn_cast_or_null<SubscriptExpr>(anchor);
   if (!subscript)
     return;
-  
-  assert(path.size() == 1 &&
-         path[0].getKind() == ConstraintLocator::SubscriptMember);
+
+  assert((path.size() == 1 &&
+          path[0].getKind() == ConstraintLocator::SubscriptMember) ||
+         (path.size() == 2 &&
+          path[1].getKind() == ConstraintLocator::KeyPathDynamicMember));
   auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
   if (!indexTuple || indexTuple->getNumElements() != 1)
     return;
