@@ -13,7 +13,7 @@ struct DenseLayer : Equatable {
   let b: Float
 }
 
-extension DenseLayer : Differentiable, VectorProtocol {
+extension DenseLayer : Differentiable, AdditiveArithmetic {
   typealias TangentVector = DenseLayer
   typealias Scalar = Float
   static var zero: DenseLayer {
@@ -50,7 +50,7 @@ struct Model : Equatable {
   let l3: DenseLayer
 }
 
-extension Model : Differentiable, VectorProtocol {
+extension Model : Differentiable, AdditiveArithmetic {
   typealias TangentVector = Model
   typealias Scalar = Float
   static var zero: Model {

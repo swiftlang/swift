@@ -7,7 +7,7 @@ public class NonTrivialStuff : Equatable {
 }
 
 @frozen
-public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equatable {
+public struct Vector : AdditiveArithmetic, Differentiable, Equatable {
   public var x: Float
   public var y: Float
   public var nonTrivialStuff = NonTrivialStuff()

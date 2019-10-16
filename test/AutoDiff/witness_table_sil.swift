@@ -11,7 +11,7 @@ protocol Proto : Differentiable {
   func function3(_ x: Float, _ y: Double) -> Double
 }
 
-struct S : Proto, VectorProtocol {
+struct S : Proto, AdditiveArithmetic {
   typealias Scalar = Float
 
   @differentiable

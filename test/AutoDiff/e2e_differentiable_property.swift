@@ -8,7 +8,7 @@ import StdlibUnittest
 
 var E2EDifferentiablePropertyTests = TestSuite("E2EDifferentiableProperty")
 
-struct TangentSpace : VectorProtocol {
+struct TangentSpace : AdditiveArithmetic {
   let x, y: Float
 }
 
@@ -81,7 +81,7 @@ E2EDifferentiablePropertyTests.test("generic stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-struct ProductSpaceSelfTangent : VectorProtocol {
+struct ProductSpaceSelfTangent : AdditiveArithmetic {
   let x, y: Float
 }
 
@@ -97,7 +97,7 @@ E2EDifferentiablePropertyTests.test("fieldwise product space, self tangent") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-struct ProductSpaceOtherTangentTangentSpace : VectorProtocol {
+struct ProductSpaceOtherTangentTangentSpace : AdditiveArithmetic {
   let x, y: Float
 }
 
