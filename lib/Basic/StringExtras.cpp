@@ -498,8 +498,7 @@ StringRef camel_case::toLowercaseWord(StringRef string,
 
 /// Omit needless words from the beginning of a name.
 static StringRef omitNeedlessWordsFromPrefix(StringRef name,
-                                             OmissionTypeName type,
-                                             StringScratchSpace &scratch){
+                                             OmissionTypeName type) {
   if (type.empty())
     return name;
 
@@ -520,11 +519,11 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
       if (nextWord.endswith("ing")) {
-        return toLowercaseWord(newName.substr(firstWord.size()), scratch);
+        return newName.substr(firstWord.size());
       }
     }
 
-    return toLowercaseWord(newName, scratch);
+    return newName;
   }
 
   return name;
@@ -1255,8 +1254,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   // prefix of the name.
   bool resultTypeMatchesContext = (resultType == contextType);
   if (resultTypeMatchesContext) {
-    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType,
-                                                        scratch);
+    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;
