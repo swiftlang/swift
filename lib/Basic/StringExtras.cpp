@@ -978,10 +978,6 @@ static bool wordConflictsAfterPreposition(StringRef word,
       return true;
   }
 
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "and") &&
-      camel_case::sameWordIgnoreFirstCase(word, "return"))
-    return true;
-
   return false;
 }
 
