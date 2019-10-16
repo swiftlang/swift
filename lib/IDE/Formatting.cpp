@@ -221,7 +221,10 @@ public:
   }
 
   bool isCaseContext() {
-    return isStmtContext<CaseStmt>();
+    if (Cursor == Stack.rend())
+      return false;
+    auto caseStmt = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt());
+    return caseStmt && caseStmt->getParentKind() == CaseParentKind::Switch;
   }
 
   bool isSwitchContext() {
@@ -321,13 +324,15 @@ public:
 
     // Handle switch / case, indent unless at a case label.
     if (auto *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
-      auto LabelItems = Case->getCaseLabelItems();
-      SourceLoc Loc;
-      if (!LabelItems.empty())
-        Loc = LabelItems.back().getPattern()->getLoc();
-      if (Loc.isValid())
-        return Line > SM.getLineAndColumn(Loc).first;
-      return true;
+      if (Case->getParentKind() == CaseParentKind::Switch) {
+        auto LabelItems = Case->getCaseLabelItems();
+        SourceLoc Loc;
+        if (!LabelItems.empty())
+          Loc = LabelItems.back().getPattern()->getLoc();
+        if (Loc.isValid())
+          return Line > SM.getLineAndColumn(Loc).first;
+        return true;
+      }
     }
     if (isSwitchContext()) {
       // If we're at the start of a case label, don't add indent.
@@ -412,8 +417,9 @@ public:
         // } <-- No indent here, close brace should be at same level as do.
         // catch {
         // }
-        if (isa<CaseStmt>(AtStmtEnd))
-          return false;
+        if (auto caseStmt = dyn_cast<CaseStmt>(AtStmtEnd))
+          if (caseStmt->getParentKind() == CaseParentKind::DoCatch)
+            return false;
       }
     }
 
@@ -705,8 +711,11 @@ class FormatWalker : public SourceEntityWalker {
       }
       // Case label items in a case statement are siblings.
       if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
-        for (const CaseLabelItem& Item : CS->getCaseLabelItems()) {
-          addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()), tok::comma);
+        if (CS->getParentKind() == CaseParentKind::Switch) {
+          for (const CaseLabelItem &Item : CS->getCaseLabelItems()) {
+            addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()),
+                    tok::comma);
+          }
         }
       }
     };
