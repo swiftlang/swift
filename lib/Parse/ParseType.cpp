@@ -218,11 +218,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     ParsedMetatypeTypeSyntaxBuilder Builder(*SyntaxContext);
     auto TypeOrProtocol = SyntaxContext->popToken();
     auto Period = SyntaxContext->popToken();
-    auto BaseType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+    auto BaseType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
     Builder
-      .useTypeOrProtocol(TypeOrProtocol)
-      .usePeriod(Period)
-      .useBaseType(BaseType);
+      .useTypeOrProtocol(std::move(TypeOrProtocol))
+      .usePeriod(std::move(Period))
+      .useBaseType(std::move(BaseType));
     SyntaxContext->addSyntax(Builder.build());
   };
   
@@ -431,24 +431,24 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
     if (SyntaxContext->isEnabled()) {
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
-      Builder.useReturnType(SyntaxContext->popIf<ParsedTypeSyntax>().getValue());
+      Builder.useReturnType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid())
         Builder.useThrowsOrRethrowsKeyword(SyntaxContext->popToken());
 
-      auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
         // Decompose TupleTypeSyntax and repack into FunctionType.
         auto LeftParen = TupleTypeNode->getDeferredLeftParen();
         auto Arguments = TupleTypeNode->getDeferredElements();
         auto RightParen = TupleTypeNode->getDeferredRightParen();
         Builder
-          .useLeftParen(LeftParen)
-          .useArguments(Arguments)
-          .useRightParen(RightParen);
+          .useLeftParen(std::move(LeftParen))
+          .useArguments(std::move(Arguments))
+          .useRightParen(std::move(RightParen));
       } else {
         Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
-            InputNode, /*TrailingComma=*/None, *SyntaxContext));
+            std::move(InputNode), /*TrailingComma=*/None, *SyntaxContext));
       }
       SyntaxContext->addSyntax(Builder.build());
     }
@@ -782,8 +782,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
         ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
         auto Ampersand = SyntaxContext->popToken();
         Builder
-          .useAmpersand(Ampersand)
-          .useType(Type.getValue());
+          .useAmpersand(std::move(Ampersand))
+          .useType(std::move(*Type));
         SyntaxContext->addSyntax(Builder.build());
       }
     } else {
@@ -813,8 +813,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   if (SyntaxContext->isEnabled()) {
     if (auto synType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
       auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
-          synType.getValue(), None, *SyntaxContext);
-      SyntaxContext->addSyntax(LastNode);
+          std::move(*synType), None, *SyntaxContext);
+      SyntaxContext->addSyntax(std::move(LastNode));
     }
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
@@ -905,7 +905,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       // Need parenthesis if the next token looks like postfix TypeRepr.
       // i.e. '?', '!', '.Type', '.Protocol'
       bool needParen = false;
-      needParen |= !Tok.isAtStartOfLine() && 
+      needParen |= !Tok.isAtStartOfLine() &&
           (isOptionalToken(Tok) || isImplicitlyUnwrappedOptionalToken(Tok));
       needParen |= Tok.isAny(tok::period, tok::period_prefix);
       if (needParen) {
@@ -943,12 +943,13 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     identifier? identifier ':' type
 ///     type
 ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
+  // Force the context to create deferred nodes, as we might need to
+  // de-structure the tuple type to create a function type.
+  DeferringContextRAII Deferring(*SyntaxContext);
   SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
-  // Create it as deferred because when parseType gets this it may need to turn
-  // it into a FunctionType.
-  TypeContext.setDeferSyntax(SyntaxKind::TupleType);
+  TypeContext.setCreateSyntax(SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
-   
+
   if (ParsingTypeTuple.isFailed()) {
     return makeParserError();
   }
@@ -1224,16 +1225,16 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     if (SyntaxContext->isEnabled()) {
       ParsedDictionaryTypeSyntaxBuilder Builder(*SyntaxContext);
       auto RightSquareBracket = SyntaxContext->popToken();
-      auto ValueType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto ValueType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       auto Colon = SyntaxContext->popToken();
-      auto KeyType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto KeyType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       auto LeftSquareBracket = SyntaxContext->popToken();
       Builder
-        .useRightSquareBracket(RightSquareBracket)
-        .useValueType(ValueType)
-        .useColon(Colon)
-        .useKeyType(KeyType)
-        .useLeftSquareBracket(LeftSquareBracket);
+        .useRightSquareBracket(std::move(RightSquareBracket))
+        .useValueType(std::move(ValueType))
+        .useColon(std::move(Colon))
+        .useKeyType(std::move(KeyType))
+        .useLeftSquareBracket(std::move(LeftSquareBracket));
       SyntaxNode.emplace(Builder.build());
     }
   } else {
@@ -1242,17 +1243,17 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     if (SyntaxContext->isEnabled()) {
       ParsedArrayTypeSyntaxBuilder Builder(*SyntaxContext);
       auto RightSquareBracket = SyntaxContext->popToken();
-      auto ElementType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+      auto ElementType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       auto LeftSquareBracket = SyntaxContext->popToken();
       Builder
-        .useRightSquareBracket(RightSquareBracket)
-        .useElementType(ElementType)
-        .useLeftSquareBracket(LeftSquareBracket);
+        .useRightSquareBracket(std::move(RightSquareBracket))
+        .useElementType(std::move(ElementType))
+        .useLeftSquareBracket(std::move(LeftSquareBracket));
       SyntaxNode.emplace(Builder.build());
     }
   }
     
-  return makeSyntaxResult(Status, SyntaxNode, TyR);
+  return makeSyntaxResult(Status, std::move(SyntaxNode), TyR);
 }
 
 bool Parser::isOptionalToken(const Token &T) const {
@@ -1307,15 +1308,15 @@ Parser::parseTypeOptional(TypeRepr *base) {
     if (auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
       ParsedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder
-        .useQuestionMark(QuestionMark)
-        .useWrappedType(WrappedType.getValue());
+        .useQuestionMark(std::move(QuestionMark))
+        .useWrappedType(std::move(*WrappedType));
       SyntaxNode.emplace(Builder.build());
     } else {
       // Undo the popping of the question mark
-      SyntaxContext->addSyntax(QuestionMark);
+      SyntaxContext->addSyntax(std::move(QuestionMark));
     }
   }
-  return makeSyntaxResult(SyntaxNode, TyR);
+  return makeSyntaxResult(std::move(SyntaxNode), TyR);
 }
 
 /// Parse a single implicitly unwrapped optional suffix, given that we
@@ -1329,13 +1330,13 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   if (SyntaxContext->isEnabled()) {
     ParsedImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
     auto ExclamationMark = SyntaxContext->popToken();
-    auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+    auto WrappedType(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
     Builder
-      .useExclamationMark(ExclamationMark)
-      .useWrappedType(WrappedType);
+      .useExclamationMark(std::move(ExclamationMark))
+      .useWrappedType(std::move(WrappedType));
     SyntaxNode.emplace(Builder.build());
   }
-  return makeSyntaxResult(SyntaxNode, TyR);
+  return makeSyntaxResult(std::move(SyntaxNode), TyR);
 }
 
 //===----------------------------------------------------------------------===//

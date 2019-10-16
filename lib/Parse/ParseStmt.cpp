@@ -123,6 +123,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
+    SyntaxParsingContext CCCtxt(SyntaxContext, SyntaxContextKind::Decl);
     consumeToken();
     if (CodeCompletion)
       CodeCompletion->completeAfterPoundDirective();
@@ -250,6 +251,8 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
+  SyntaxParsingContext Discarding(SyntaxContext);
+  Discarding.disable();
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
