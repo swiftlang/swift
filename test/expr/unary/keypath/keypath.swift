@@ -504,10 +504,10 @@ func testLabeledSubscript() {
   let k = \AA.[labeled: 0]
 
   // TODO: These ought to work without errors.
-  let _ = \AA.[keyPath: k] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  let _ = \AA.[keyPath: k] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 
-  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 }
 

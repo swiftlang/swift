@@ -593,13 +593,16 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
 }
 
-struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
+struct Rule {
   var target: String
   var dependencies: String
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{missing argument for parameter 'dependencies' in call}}
+// FIXME(diagnostics): To be able to suggest different candidates here we need to teach the solver how to figure out to which parameter
+// does argument belong to in this case. If the `target` was of a different type, we currently suggest to add an argument for `dependencies:`
+// which is incorrect.
+ruleVar = Rule("a") // expected-error {{cannot convert value of type 'String' to expected argument type '(target: String, dependencies: String)'}}
 
 
 class C {
