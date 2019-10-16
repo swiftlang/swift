@@ -34,7 +34,5 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
 }
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
-  AutoDiffConfig config{parameterIndices, resultIndices,
-                        derivativeGenericSignature};
-  return std::make_pair(originalFunction->getName(), config);
+  return std::make_pair(originalFunction->getName(), getConfig());
 }
