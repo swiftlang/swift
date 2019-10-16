@@ -42,6 +42,7 @@ SupersetVJPTests.test("SubsetOfSubset") {
 }
 
 SupersetVJPTests.test("ApplySubset") {
+  // TF-914
   @differentiable(wrt: x)
   func foo<T: Differentiable>(_ x: T, _ y: T, apply: @differentiable (T, T) -> T) -> T {
     return apply(x, y)
@@ -53,26 +54,21 @@ SupersetVJPTests.test("ApplySubset") {
 // forms a curry thunk of `Float.+` before conversion to @differentiable, and AD
 // doesn't know how to differentiate the curry thunk, so it produces a
 // "function is not differentiable" error.
-// FIXME: Propagate wrt indices correctly so that this actually takes the
-// gradient wrt only the first parameter, as intended.
 // SupersetVJPTests.test("CrossModule") {
-//   expectEqual(1, gradient(at: 1, 2, in: (+) as @differentiable (Float, @nondiff Float) -> Float))
+//   let grad = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @nondiff Float) -> Float)
+//   expectEqual(Float(1), grad)
 // }
 
-// FIXME: Unbreak this one.
-//
-// @differentiable(wrt: (.0, .1), vjp: dx_T)
-// func x_T<T : Differentiable>(_ x: Float, _ y: T) -> Float {
-//   if x > 1000 {
-//     return x
-//   }
-//   return x
-// }
-// func dx_T<T>(_ x: Float, _ y: T) -> (Float, (Float) -> (Float, T.TangentVector)) {
-//   return (x_T(x, y), { seed in (x, y) })
-// }
-// SupersetVJPTests.test("IndirectResults") {
-//   expectEqual(3, gradient(at: 2) { x in x_T(x, Float(3)) })
-// }
+SupersetVJPTests.test("IndirectResults") {
+  @differentiable(wrt: (x, y), vjp: dx_T)
+  func x_T<T : Differentiable>(_ x: Float, _ y: T) -> Float {
+    if x > 1000 { return x }
+    return x
+  }
+  func dx_T<T : Differentiable>(_ x: Float, _ y: T) -> (Float, (Float) -> (Float, T.TangentVector)) {
+    return (x_T(x, y), { v in (x * v, .zero) })
+  }
+  expectEqual(2, gradient(at: 2) { x in x_T(x, Float(3)) })
+}
 
 runAllTests()
