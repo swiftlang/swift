@@ -1892,7 +1892,7 @@ class PatternBindingEntry {
     /// Whether the contents of this initializer were subsumed by
     /// some other initialization, e.g., a lazy property's initializer
     /// gets subsumed by the getter body.
-    Subsumed    = 1 << 2,
+    Subsumed = 1 << 2,
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1918,8 +1918,13 @@ class PatternBindingEntry {
     StringRef InitStringRepresentation;
   };
 
+  enum class PatternFlags {
+    IsText = 1 << 0,
+    IsFullyValidated = 1 << 1,
+  };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 1, bool> InitContextAndIsText;
+  llvm::PointerIntPair<DeclContext *, 2, OptionSet<PatternFlags>>
+      InitContextAndFlags;
 
   /// Values captured by this initializer.
   CaptureInfo Captures;
@@ -1931,22 +1936,21 @@ class PatternBindingEntry {
   // Flags::Checked.
   friend class PatternBindingEntryRequest;
 
-  bool IsFullyValidated = false;
-
   bool isFullyValidated() const {
-    return IsFullyValidated;
+    return InitContextAndFlags.getInt().contains(
+        PatternFlags::IsFullyValidated);
   }
   void setFullyValidated() {
-    IsFullyValidated = true;
+    InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
+                               PatternFlags::IsFullyValidated);
   }
 
 public:
   /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
-      InitContextAndIsText({InitContext, false}) {
-  }
+      : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
+        InitContextAndFlags({InitContext, None}) {}
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
@@ -1956,7 +1960,7 @@ public:
 
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
-        InitContextAndIsText.getInt())
+        InitContextAndFlags.getInt().contains(PatternFlags::IsText))
       return nullptr;
     return InitExpr.initAfterSynthesis;
   }
@@ -1976,7 +1980,8 @@ public:
   /// deserialized from a partial module.
   void setInitStringRepresentation(StringRef str) {
     InitStringRepresentation = str;
-    InitContextAndIsText.setInt(true);
+    InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
+                               PatternFlags::IsText);
   }
 
   /// Whether this pattern entry can generate a string representation of its
@@ -1985,12 +1990,14 @@ public:
 
   /// Retrieve the location of the equal '=' token.
   SourceLoc getEqualLoc() const {
-    return InitContextAndIsText.getInt() ? SourceLoc() : InitExpr.EqualLoc;
+    return InitContextAndFlags.getInt().contains(PatternFlags::IsText)
+               ? SourceLoc()
+               : InitExpr.EqualLoc;
   }
 
   /// Set the location of the equal '=' token.
   void setEqualLoc(SourceLoc equalLoc) {
-    assert(!InitContextAndIsText.getInt() &&
+    assert(!InitContextAndFlags.getInt().contains(PatternFlags::IsText) &&
            "cannot set equal loc for textual initializer");
     InitExpr.EqualLoc = equalLoc;
   }
@@ -2021,13 +2028,11 @@ public:
 
   // Retrieve the declaration context for the initializer.
   DeclContext *getInitContext() const {
-    return InitContextAndIsText.getPointer();
+    return InitContextAndFlags.getPointer();
   }
 
   /// Override the initializer context.
-  void setInitContext(DeclContext *dc) {
-    InitContextAndIsText.setPointer(dc);
-  }
+  void setInitContext(DeclContext *dc) { InitContextAndFlags.setPointer(dc); }
 
   SourceLoc getStartLoc() const;
 

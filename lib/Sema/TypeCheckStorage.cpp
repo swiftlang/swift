@@ -217,7 +217,6 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
 
   if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     swift::setBoundVarsTypeError(pattern, Context);
-    setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
     pattern->setType(ErrorType::get(Context));
     return &pbe;
@@ -241,10 +240,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
     if (TC->typeCheckPatternBinding(binding, entryNumber)) {
-      swift::setBoundVarsTypeError(pattern, Context);
-      setBoundVarsTypeError(pattern, Context);
       binding->setInvalid();
-      pattern->setType(ErrorType::get(Context));
       return &pbe;
     }
 
