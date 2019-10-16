@@ -174,7 +174,6 @@ UID_KEYS = [
     KEY('VFSName', 'key.vfs.name'),
     KEY('VFSOptions', 'key.vfs.options'),
     KEY('Files', 'key.files'),
-    KEY('IgnoreSourceInfoFile', 'key.ignore_source_info_file'),
 ]
 
 
