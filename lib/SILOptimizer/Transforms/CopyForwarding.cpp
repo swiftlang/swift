@@ -1645,7 +1645,8 @@ bool TempRValueOptPass::collectLoads(
                             << *user);
     return false;
 
-  case SILInstructionKind::ApplyInst: {
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
 
     // Check if the function can just read from userOp.
