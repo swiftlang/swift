@@ -75,7 +75,7 @@ class PrintTypeInfo {
     printField("alignment", std::to_string(TI.getAlignment()));
     printField("stride", std::to_string(TI.getStride()));
     printField("num_extra_inhabitants", std::to_string(TI.getNumExtraInhabitants()));
-    printField("bitwise_takable", TI.isBitwiseTakable() ? "true" : "false");
+    printField("bitwise_takable", TI.isBitwiseTakable() ? "1" : "0");
   }
 
   void printFields(const RecordTypeInfo &TI) {
