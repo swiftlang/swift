@@ -787,9 +787,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
   } else if (Tok.is(tok::kw_try)) {
-    diagnose(Tok.getLoc(), diag::throw_in_function_type)
-        .fixItReplace(Tok.getLoc(), "throws");
-    ignoreToken();
+    SourceLoc tryLoc = consumeToken();
+    diagnose(tryLoc, diag::throw_in_function_type)
+        .fixItReplace(tryLoc, "throws");
   }
 
   SourceLoc arrowLoc;

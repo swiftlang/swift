@@ -409,9 +409,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
     }
-    if (Tok.isNot(tok::try)) {
-      throwsLoc = consumeToken();
-    }
+    throwsLoc = consumeToken();
   }
 
   if (Tok.is(tok::arrow)) {
