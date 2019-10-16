@@ -1363,12 +1363,8 @@ private:
 
   bool isContextualMismatch() const {
     auto *locator = getLocator();
-    auto path = locator->getPath();
-
-    assert(!path.empty());
-    const auto &last = path.back();
-    return last.getKind() == ConstraintLocator::ContextualType ||
-           last.getKind() == ConstraintLocator::ApplyArgToParam;
+    return locator->isLastElement<LocatorPathElt::ContextualType>() ||
+           locator->isLastElement<LocatorPathElt::ApplyArgToParam>();
   }
 };
 
