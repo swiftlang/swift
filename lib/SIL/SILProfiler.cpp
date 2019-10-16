@@ -239,7 +239,14 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      mapRegion(CS);
+      switch (CS->getParentKind()) {
+      case CaseParentKind::Switch:
+        mapRegion(CS);
+        break;
+      case CaseParentKind::DoCatch:
+        mapRegion(CS->getBody());
+        break;
+      }
     }
     return {true, S};
   }
@@ -595,9 +602,21 @@ struct PGOMapping : public ASTWalker {
       auto ssCount = loadExecutionCount(SS);
       LoadedCounterMap[SS] = ssCount;
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      CounterMap[CS] = NextCounter++;
-      auto csCount = loadExecutionCount(CS);
-      LoadedCounterMap[CS] = csCount;
+      switch (CS->getParentKind()) {
+      case CaseParentKind::Switch: {
+        CounterMap[CS] = NextCounter++;
+        auto csCount = loadExecutionCount(CS);
+        LoadedCounterMap[CS] = csCount;
+        break;
+      }
+      case CaseParentKind::DoCatch: {
+        auto csBody = CS->getBody();
+        CounterMap[csBody] = NextCounter++;
+        auto csBodyCount = loadExecutionCount(csBody);
+        LoadedCounterMap[csBody] = csBodyCount;
+        break;
+      }
+      }
     }
     return {true, S};
   }
@@ -749,9 +768,11 @@ private:
     CounterExpr *JumpsToLabel = nullptr;
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
-      if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt) ||
-          isa<CaseStmt>(ParentStmt))
+      if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt))
         return;
+      if (auto catchClause = dyn_cast<CaseStmt>(ParentStmt))
+        if (catchClause->getParentKind() == CaseParentKind::DoCatch)
+          return;
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
         JumpsToLabel = &getCounter(LS);
     }
@@ -946,9 +967,9 @@ public:
       for (CaseStmt *Case : SS->getCases())
         assignCounter(Case);
 
-    } else if (isa<CaseStmt>(S)) {
-      pushRegion(S);
-
+    } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
+      if (caseStmt->getParentKind() == CaseParentKind::Switch)
+        pushRegion(S);
     } else if (auto *DS = dyn_cast<DoStmt>(S)) {
       assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
       assignCounter(DS);
@@ -957,11 +978,13 @@ public:
       // The do-catch body is visited the same number of times as its parent.
       assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
 
+      for (CaseStmt *Catch : DCS->getCatches())
+        assignCounter(Catch->getBody());
+
       // Initialize the exit count of the do-catch to the entry count, then
       // subtract off non-local exits as they are visited.
       assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
       DoCatchStack.push_back(DCS);
-
     }
     return {true, S};
   }
@@ -1019,8 +1042,9 @@ public:
     } else if (isa<SwitchStmt>(S)) {
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
-    } else if (isa<CaseStmt>(S)) {
-      popRegions(S);
+    } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
+      if (caseStmt->getParentKind() == CaseParentKind::Switch)
+        popRegions(S);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
