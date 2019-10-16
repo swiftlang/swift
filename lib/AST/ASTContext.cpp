@@ -47,7 +47,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Parse/Lexer.h" // bad dependency
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
