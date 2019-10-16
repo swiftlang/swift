@@ -1981,6 +1981,9 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
       GuardedPattern PatternResult;
       parseGuardedPattern(*this, PatternResult, status, boundDecls,
                           GuardedPatternContext::Catch, isFirst);
+      if (status.hasCodeCompletion()) {
+        return makeParserCodeCompletionResult<CaseStmt>();
+      }
       caseLabelItems.emplace_back(PatternResult.ThePattern,
                                   PatternResult.WhereLoc, PatternResult.Guard);
       isFirst = false;
