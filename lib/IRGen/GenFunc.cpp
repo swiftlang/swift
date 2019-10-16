@@ -735,6 +735,16 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // The witness method self argument comes after polymorphic arguments (and is
+  // followed by the self type and the witness table). However, we may encounter
+  // the witness method self value before reaching the polymorphic arguments. So
+  // we create a special explosion for storing the witness method self value
+  // until it's time to add it to 'args'.
+  bool isWitnessMethodCallee = origType->getRepresentation() ==
+                               SILFunctionTypeRepresentation::WitnessMethod;
+  Explosion witnessMethodSelfValue;
+
   Address resultValueAddr;
 
   {
@@ -775,6 +785,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
+      // SWIFT_ENABLE_TENSORFLOW
+      bool isWitnessMethodCalleeSelf =
+          (isWitnessMethodCallee && i + 1 == origType->getParameters().size());
+
       auto origParamInfo = origType->getParameters()[i];
       auto &ti = IGM.getTypeInfoForLowered(origParamInfo.getType());
       auto schema = ti.getSchema();
@@ -788,7 +802,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         if (addr->getType() != ti.getStorageType()->getPointerTo())
           addr = subIGF.Builder.CreateBitCast(addr,
                                            ti.getStorageType()->getPointerTo());
-        args.add(addr);
+        // SWIFT_ENABLE_TENSORFLOW
+        (isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args).add(addr);
         continue;
       }
 
@@ -796,8 +811,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // Indirect parameters need no mapping through the native calling
       // convention.
       if (isIndirectParam) {
-        emitApplyArgument(subIGF, origParamInfo, outTypeParamInfo, origParams,
-                          args);
+        emitApplyArgument(
+            subIGF, origParamInfo, outTypeParamInfo, origParams,
+            // SWIFT_ENABLE_TENSORFLOW
+            (isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args));
         continue;
       }
 
@@ -824,7 +841,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       Explosion nativeApplyArg = nativeSchemaOrigParam.mapIntoNative(
           subIGF.IGM, subIGF, nonNativeApplyArg, origParamSILType, false);
       assert(nonNativeApplyArg.empty());
-      nativeApplyArg.transferInto(args, nativeApplyArg.size());
+      // SWIFT_ENABLE_TENSORFLOW
+      nativeApplyArg.transferInto(
+          (isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args),
+          nativeApplyArg.size());
     }
   }
 
@@ -933,13 +953,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   auto haveContextArgument =
       calleeHasContext || hasSelfContextParameter(origType);
-
-  // Witness method calls expect self, followed by the self type followed by,
-  // the witness table at the end of the parameter list. But polymorphic
-  // arguments come before this.
-  bool isWitnessMethodCallee = origType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod;
-  Explosion witnessMethodSelfValue;
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
