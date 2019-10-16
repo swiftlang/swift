@@ -782,14 +782,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   } else if (Tok.is(tok::kw_rethrows)) {
     throwsLoc = consumeToken();
     rethrows = true;
-  } else if (Tok.is(tok::kw_throw)) {
+  } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
     throwsLoc = consumeToken();
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
-  } else if (Tok.is(tok::kw_try)) {
-    SourceLoc tryLoc = consumeToken();
-    diagnose(tryLoc, diag::throw_in_function_type)
-        .fixItReplace(tryLoc, "throws");
   }
 
   SourceLoc arrowLoc;
