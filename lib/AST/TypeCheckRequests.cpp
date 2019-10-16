@@ -1001,3 +1001,28 @@ void NamingPatternRequest::cacheResult(NamedPattern *value) const {
   auto *VD = std::get<0>(getStorage());
   VD->NamingPattern = value;
 }
+
+//----------------------------------------------------------------------------//
+// InterfaceTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> InterfaceTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto Ty = decl->TypeAndAccess.getPointer()) {
+    return Ty;
+  }
+  return None;
+}
+
+void InterfaceTypeRequest::cacheResult(Type type) const {
+  auto *decl = std::get<0>(getStorage());
+  if (type) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+    assert(!type->hasArchetype() && "Archetype in interface type");
+
+    if (type->hasError())
+      decl->setInvalid();
+  }
+  decl->TypeAndAccess.setPointer(type);
+}

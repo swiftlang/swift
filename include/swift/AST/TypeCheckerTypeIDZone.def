@@ -67,6 +67,8 @@ SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               SeparatelyCached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, InitKindRequest,
               CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
+              Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
