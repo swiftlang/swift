@@ -32,7 +32,7 @@
 
 // 2) Baseline check: Make sure we use the interface when not passing the prebuilt module cache path
 //
-// RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies -emit-loaded-module-trace-path %t/trace.json %s
 //
 // Check SdkLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/ExportedLib-*.swiftmodule
@@ -58,13 +58,23 @@
 // DEPFILE-DAG: ExportedLib.swiftinterface
 // DEPFILE-DAG: SDKDependencies.swift
 //
+// Check we didn't emit anything from the cache in the trace file either
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE-NEGATIVE
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE
+//
+// TRACEFILE-NEGATIVE-NOT: {{[/\\]MCP[/\\]}}
+// TRACEFILE-NEGATIVE-NOT: {{[/\\]prebuilt-cache[/\\]}}
+//
+// TRACEFILE-DAG: SdkLib.swiftinterface
+// TRACEFILE-DAG: ExportedLib.swiftinterface
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '2: PASSED'
 
 
 // 3) Baseline check: Make sure we use the the prebuilt module cache when using the SDK it was built with
 //
-// RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-sdk -sdk %t/my-sdk -prebuilt-module-cache-path %t/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies  -emit-loaded-module-trace-path %t/trace.json %s
 //
 // Check SdkLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
@@ -99,6 +109,10 @@
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
+// Check we didn't emit anything from the cache in the trace file either
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE-NEGATIVE
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '3: PASSED'
 
@@ -108,7 +122,7 @@
 // RUN: mv %t/my-sdk %t/my-new-sdk
 // RUN: mkdir %t/new-dir
 // RUN: mv %t/prebuilt-cache %t/new-dir/
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies -emit-loaded-module-trace-path %t/trace.json %s
 //
 // Check SdkLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
@@ -136,6 +150,10 @@
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
 //
+// Check we didn't emit anything from the cache in the trace file either
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE-NEGATIVE
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE
+//
 // RUN: %empty-directory(%t/MCP)
 // RUN: echo '4: PASSED'
 
@@ -143,7 +161,7 @@
 // 5) Now change the SDK's content and check it no longer uses the prebuilt modules
 //
 // RUN: echo "// size change" >> %t/my-new-sdk/SdkLib.swiftinterface
-// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies %s
+// RUN: %target-swift-frontend -typecheck -I %t/my-new-sdk -sdk %t/my-new-sdk -prebuilt-module-cache-path %t/new-dir/prebuilt-cache -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d -track-system-dependencies -emit-loaded-module-trace-path %t/trace.json %s
 //
 // Check SDKLib and ExportedLib are in the module cache
 // RUN: test -f %t/MCP/SdkLib-*.swiftmodule
@@ -180,6 +198,10 @@
 // Check we didn't emit anything from the cache in the .d file either
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE-NEGATIVE
 // RUN: cat %t/dummy.d | %FileCheck %s -check-prefix=DEPFILE
+//
+// Check we didn't emit anything from the cache in the trace file either
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE-NEGATIVE
+// RUN: cat %t/trace.json | %FileCheck %s -check-prefix=TRACEFILE
 //
 // RUN: echo '5: PASSED'
 
