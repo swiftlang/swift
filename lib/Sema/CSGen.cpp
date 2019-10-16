@@ -1299,6 +1299,8 @@ namespace {
       // error recovery within a ClosureExpr.  Just create a new type variable
       // for the decl that isn't bound to anything.  This will ensure that it
       // is considered ambiguous.
+      auto locator = CS.getConstraintLocator(E);
+
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         if (VD->hasInterfaceType() &&
             VD->getInterfaceType()->is<UnresolvedType>()) {
@@ -1313,19 +1315,17 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      auto oldInterfaceTy = E->getDecl()->getInterfaceType();
       if (E->getDecl()->isInvalid()) {
-        CS.setType(E, oldInterfaceTy);
+        CS.setType(E, E->getDecl()->getInterfaceType());
         return nullptr;
       }
-
-      auto locator = CS.getConstraintLocator(E);
 
       // If this is a 'var' or 'let' declaration with already
       // resolved type, let's favor it.
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        Type type;
-        if (VD->hasInterfaceType()) {
+        Type type = CS.getTypeIfAvailable(VD);
+
+        if (!type && VD->hasInterfaceType()) {
           type = VD->getInterfaceType();
           if (type->hasTypeParameter())
             type = VD->getDeclContext()->mapTypeIntoContext(type);

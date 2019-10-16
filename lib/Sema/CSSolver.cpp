@@ -166,18 +166,13 @@ Solution ConstraintSystem::finalize() {
                                        DefaultedConstraints.end());
 
   for (auto &nodeType : addedNodeTypes) {
-    solution.addedNodeTypes.push_back(nodeType);
+    solution.addedNodeTypes.insert(nodeType);
   }
 
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
   for (const auto &transformed : builderTransformedClosures) {
-    auto known =
-        solution.builderTransformedClosures.find(transformed.first);
-    if (known != solution.builderTransformedClosures.end()) {
-      assert(known->second.singleExpr == transformed.second.singleExpr);
-    }
     solution.builderTransformedClosures.insert(transformed);
   }
 

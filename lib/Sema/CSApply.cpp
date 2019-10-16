@@ -4674,6 +4674,14 @@ namespace {
       return result;
     }
 
+    const AppliedBuilderTransform *getAppliedBuilderTransform(
+       ClosureExpr *closure) {
+      auto known = solution.builderTransformedClosures.find(closure);
+      return known != solution.builderTransformedClosures.end()
+          ? &known->second
+          : nullptr;
+    }
+
     void finalize(Expr *&result) {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
@@ -6157,11 +6165,11 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
   return forceBridgeFromObjectiveC(expr, toType);
 }
 
-static Expr *addImplicitLoadExpr(ConstraintSystem &cs, Expr *expr) {
-  auto &tc = cs.getTypeChecker();
+Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
+  auto &tc = getTypeChecker();
   return tc.addImplicitLoadExpr(
-      expr, [&cs](Expr *expr) { return cs.getType(expr); },
-      [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
+      expr, [this](Expr *expr) { return getType(expr); },
+      [this](Expr *expr, Type type) { setType(expr, type); });
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
@@ -6417,7 +6425,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto fromLValue = cast<LValueType>(desugaredFromType);
     auto toIO = toType->getAs<InOutType>();
     if (!toIO)
-      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
+      return coerceToType(cs.addImplicitLoadExpr(expr), toType, locator);
 
     // In an 'inout' operator like "i += 1", the operand is converted from
     // an implicit lvalue to an inout argument.
@@ -7458,21 +7466,6 @@ namespace {
         auto *params = closure->getParameters();
         tc.coerceParameterListToType(params, closure, fnType);
 
-        // If this closure had a function builder applied, rewrite it to a
-        // closure with a single expression body containing the builder
-        // invocations.
-        auto builder =
-            Rewriter.solution.builderTransformedClosures.find(closure);
-        if (builder != Rewriter.solution.builderTransformedClosures.end()) {
-          auto singleExpr = builder->second.singleExpr;
-          auto returnStmt = new (tc.Context) ReturnStmt(
-             singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
-          auto braceStmt = BraceStmt::create(
-              tc.Context, returnStmt->getStartLoc(), ASTNode(returnStmt),
-              returnStmt->getEndLoc(), /*implicit=*/true);
-          closure->setBody(braceStmt, /*isSingleExpression=*/true);
-        }
-
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
         if (closure->hasSingleExpressionBody()) {
@@ -7507,6 +7500,22 @@ namespace {
               closure->setSingleExpressionBody(body);
             }
           }
+        } else if (auto transform =
+                       Rewriter.getAppliedBuilderTransform(closure)) {
+          // Apply the function builder to the closure. We want to be in the
+          // context of the closure for subsequent transforms.
+          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
+          auto newBody = applyFunctionBuilderTransform(
+              Rewriter.solution, *transform, closure->getBody(), closure,
+              [&](Expr *expr) {
+                Expr *result = expr->walk(*this);
+                if (result)
+                  cs.setExprTypes(result);
+                return result;
+              });
+          closure->setBody(newBody, /*isSingleExpression=*/false);
+
+          cs.setExprTypes(closure);
         } else {
           // For other closures, type-check the body once we've finished with
           // the expression.
@@ -7586,6 +7595,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       if (E == root)
         return {true, E};
 
+#if false
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         auto result = solution.builderTransformedClosures.find(closure);
         if (result != solution.builderTransformedClosures.end()) {
@@ -7596,6 +7606,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
           return {false, E};
         }
       }
+#endif
 
       diagnose(E);
       return {true, E};
