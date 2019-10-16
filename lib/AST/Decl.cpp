@@ -490,7 +490,7 @@ const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
-    static const Decl::CachedExternalSourceLocs NullLocs;
+    static const Decl::CachedExternalSourceLocs NullLocs{};
     return &NullLocs;
   }
   auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
