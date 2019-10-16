@@ -1177,9 +1177,14 @@ ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
 // SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-908): Remove this diagnostic once linear-to-differentiable conversion
+// is supported.
+ERROR(unsupported_linear_to_differentiable_conversion,none,
+      "conversion from '@differentiable(linear)' to '@differentiable' is not "
+      "yet supported", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
-      "a '@differentiable' function can only be formed from a reference to a "
-      "'func' or a literal closure", ())
+      "a '@differentiable%select{|(linear)}0' function can only be formed from "
+      "a reference to a 'func' or a literal closure", (bool))
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_forwarding,none,
@@ -2859,8 +2864,7 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_associated_function_protocol,none,
-      "cannot specify associated differentiation function on protocol "
-      "requirement", ())
+      "cannot specify derivative functions on protocol requirements", ())
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_no_currying,none,
@@ -2874,7 +2878,7 @@ NOTE(differentiable_attr_duplicate_note,none,
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,
-      "%0 is not a function to be used as associated differentiation function",
+      "%0 is not a function to be used as derivative function",
       (DeclName))
 ERROR(differentiable_attr_class_derivative_not_final,none,
       "class member derivative must be final", ())
@@ -2882,9 +2886,9 @@ ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in '@differentiable' "
       "attribute", (DeclName))
 ERROR(differentiable_attr_invalid_access,none,
-      "associated differentiation function %0 is required to either be public "
-      "or @usableFromInline because the original function %1 is public or "
-      "@usableFromInline", (DeclName, DeclName))
+      "derivative function %0 is required to either be public or "
+      "'@usableFromInline' because the original function %1 is public or "
+      "'@usableFromInline'", (DeclName, DeclName))
 ERROR(differentiable_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
@@ -2914,8 +2918,6 @@ ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
-ERROR(linear_differentiable_type_disabled,none,
-      "'@differentiable(linear)' types are not yet supported", ())
 
 // @differentiating
 ERROR(differentiating_attr_expected_result_tuple,none,

@@ -3099,11 +3099,11 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
-  /// of the corresponding autodiff associated function.
+  /// Given `indices` and `kind`, calculates the type of the corresponding
+  /// autodiff derivative function.
   ///
   /// By default, if the original type has a self parameter list and parameter
-  /// indices include self, the computed associated function type will return a
+  /// indices include self, the computed derivative function type will return a
   /// linear map taking/returning self's tangent *last* instead of first, for
   /// consistency with SIL.
   ///
@@ -3114,22 +3114,22 @@ public:
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original
   /// function, including `@differentiable`.
-  AnyFunctionType *getAutoDiffAssociatedFunctionType(
-      AutoDiffIndexSubset *indices, unsigned resultIndex,
-      unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
+  AnyFunctionType *getAutoDiffDerivativeFunctionType(
+      IndexSubset *indices, unsigned resultIndex,
+      AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature whereClauseGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
 
-  /// Given the type of an autodiff associated function, returns the
+  /// Given the type of an autodiff derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
   
-  /// Given the type of a transposing associated function, returns the
+  /// Given the type of a transposing derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *
   getTransposeOriginalFunctionType(TransposingAttr *attr,
-                                   AutoDiffIndexSubset *wrtParamIndices,
+                                   IndexSubset *wrtParamIndices,
                                    bool wrtSelf);
 
   AnyFunctionType *getWithoutDifferentiability() const;
@@ -4216,23 +4216,28 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices);
+      DifferentiabilityKind kind, IndexSubset *parameterIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
-  /// Returns the type of a differentiation function that is associated with
-  /// a function of this type.
-  CanSILFunctionType getAutoDiffAssociatedFunctionType(
-      AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
-      unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      Lowering::TypeConverter &TC, LookupConformanceFn lookupConformance,
-      CanGenericSignature associatedFunctionGenericSignature = nullptr);
+  /// Returns the type of the derivative function.
+  CanSILFunctionType getAutoDiffDerivativeFunctionType(
+      IndexSubset *parameterIndices, unsigned resultIndex,
+      AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr);
+
+  /// Returns the type of the transpose function.
+  CanSILFunctionType getAutoDiffTransposeFunctionType(
+      IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.
   /// which parameters are not `@nondiff`). The function type must be
   /// differentiable.
-  AutoDiffIndexSubset *getDifferentiationParameterIndices();
+  IndexSubset *getDifferentiationParameterIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
@@ -4284,6 +4289,10 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
+  }
+
   bool isDifferentiable() const {
     return getExtInfo().isDifferentiable();
   }

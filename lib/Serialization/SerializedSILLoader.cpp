@@ -127,6 +127,19 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   return nullptr;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+SILDifferentiabilityWitness *
+SerializedSILLoader::lookupDifferentiabilityWitness(
+    SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  for (auto &Des : LoadedSILSections)
+    if (auto *diffWitness = Des->lookupDifferentiabilityWitness(mangledKey))
+      return diffWitness;
+  return nullptr;
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)
     Des->invalidateFunctionCache();
@@ -185,3 +198,10 @@ void SerializedSILLoader::getAllProperties() {
     Des->getAllProperties();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Deserialize all DifferentiabilityWitnesses in all SILModules.
+void SerializedSILLoader::getAllDifferentiabilityWitnesses() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDifferentiabilityWitnesses();
+}
+// SWIFT_ENABLE_TENSORFLOW END

@@ -94,6 +94,9 @@ bool Parser::parseTopLevel() {
     CASE_SIL(sil_global, SILGlobal)
     CASE_SIL(sil_witness_table, SILWitnessTable)
     CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    // SWIFT_ENABLE_TENSORFLOW
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
+    // SWIFT_ENABLE_TENSORFLOW END
     CASE_SIL(sil_coverage_map, SILCoverageMap)
     CASE_SIL(sil_property, SILProperty)
     CASE_SIL(sil_scope, SILScope)
@@ -2554,7 +2557,8 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       // or '@differentiable (linear) -> U'.
       if (Tok.getText() == "linear") {
         auto linearIdentifier = consumeTokenSyntax(tok::identifier);
-        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
+        if (Tok.is(tok::r_paren) &&
+            peekToken().isAny(tok::l_paren, tok::at_sign, tok::identifier)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
           backtrack.cancelBacktrack();

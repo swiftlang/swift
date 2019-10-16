@@ -4032,6 +4032,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Attempt to infer the type using initializer expressions.
     validatePatternBindingEntries(*this, PBD);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(VD);
+    // SWIFT_ENABLE_TENSORFLOW END
+
     auto parentPattern = VD->getParentPattern();
     if (PBD->isInvalid() || !parentPattern->hasType()) {
       parentPattern->setType(ErrorType::get(Context));
@@ -4127,8 +4132,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
 
-    // TODO(TF-789): Figure out the proper way to typecheck these.
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
     checkDeclDifferentiableAttributes(FD);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     // If the function is exported to C, it must be representable in (Obj-)C.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
@@ -4153,6 +4160,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeCheckParameterList(CD->getParameters(), CD,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(CD);
+    // SWIFT_ENABLE_TENSORFLOW END
     break;
   }
 
@@ -4176,6 +4187,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                            TypeResolverContext::SubscriptDecl);
     validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(SD);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     break;
   }

@@ -58,6 +58,13 @@ namespace swift {
     MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    std::unique_ptr<SerializedFuncTable> DifferentiabilityWitnessList;
+    MutableArrayRef<
+        ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
+        DifferentiabilityWitnesses;
+    // SWIFT_ENABLE_TENSORFLOW END
+
     /// A declaration will only
     llvm::DenseMap<NormalProtocolConformance *, SILWitnessTable *>
     ConformanceToWitnessTableMap;
@@ -126,6 +133,10 @@ namespace swift {
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
+    // SWIFT_ENABLE_TENSORFLOW
+    SILDifferentiabilityWitness *
+    readDifferentiabilityWitness(serialization::DeclID);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
@@ -145,6 +156,10 @@ public:
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    // SWIFT_ENABLE_TENSORFLOW
+    SILDifferentiabilityWitness *
+    lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Invalidate all cached SILFunctions.
     void invalidateFunctionCache();
@@ -169,6 +184,9 @@ public:
       getAllWitnessTables();
       getAllDefaultWitnessTables();
       getAllProperties();
+      // SWIFT_ENABLE_TENSORFLOW
+      getAllDifferentiabilityWitnesses();
+      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     /// Deserialize all SILFunctions inside the module and add them to SILMod.
@@ -191,6 +209,12 @@ public:
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.
     void getAllProperties();
+
+    // SWIFT_ENABLE_TENSORFLOW
+    /// Deserialize all DifferentiabilityWitnesses inside the module and add
+    /// them to SILMod.
+    void getAllDifferentiabilityWitnesses();
+    // SWIFT_ENABLE_TENSORFLOW END
 
     SILDeserializer(ModuleFile *MF, SILModule &M,
                     DeserializationNotificationHandlerSet *callback);

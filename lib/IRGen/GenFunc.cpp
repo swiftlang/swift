@@ -480,8 +480,14 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   // SWIFT_ENABLE_TENSORFLOW
-  if (T->isDifferentiable())
-    return convertDifferentiableFunctionType(T);
+  switch (T->getDifferentiabilityKind()) {
+  case DifferentiabilityKind::Normal:
+    return convertNormalDifferentiableFunctionType(T);
+  case DifferentiabilityKind::Linear:
+    return convertLinearDifferentiableFunctionType(T);
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  }
 
   switch (T->getRepresentation()) {
   case SILFunctionType::Representation::Block:

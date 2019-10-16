@@ -3791,7 +3791,6 @@ public:
 
     // SWIFT_ENABLE_TENSORFLOW
     if (!Options.excludeAttrKind(TAK_differentiable) && info.isDifferentiable()) {
-      // FIXME(rxwei): Print differentiation order.
       if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
         Printer << "@differentiable(linear) ";
       } else {
@@ -3845,7 +3844,6 @@ public:
 
     // SWIFT_ENABLE_TENSORFLOW
     if (!Options.excludeAttrKind(TAK_differentiable) && info.isDifferentiable()) {
-      // FIXME(rxwei): Print differentiation order.
       if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
         Printer << "@differentiable(linear) ";
       } else {

@@ -538,7 +538,7 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
-static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
+static bool haveProfiledDerivativeFunction(SILDeclRef constant) {
   return constant.isDefaultArgGenerator() || constant.isForeign ||
          constant.isCurried;
 }
@@ -550,7 +550,7 @@ static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
     return;
 
   ASTNode profiledNode;
-  if (!haveProfiledAssociatedFunction(constant)) {
+  if (!haveProfiledDerivativeFunction(constant)) {
     if (constant.hasDecl()) {
       if (auto *fd = constant.getFuncDecl()) {
         if (fd->hasBody()) {
@@ -750,85 +750,133 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              F->print(llvm::dbgs()));
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Create self-reordering thunks for JVPs/VJPs of `@differentiable` methods.
-  if (constant.hasDecl() && constant.getAbstractFunctionDecl()) {
+  // Visit `@differentiable` attributes and generate SIL differentiability
+  // witnesses.
+  // TODO(TF-835): Visit `@differentiating` attributes when type-checking no
+  // longer generates implicit `@differentiable` attributes. See TF-835 for
+  // replacement code.
+  // Skip if the SILDeclRef is a:
+  // - Default argument generator function.
+  // - Thunk.
+  if (constant.hasDecl() && constant.getAbstractFunctionDecl() &&
+      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
+      !constant.isThunk()) {
     auto *AFD = constant.getAbstractFunctionDecl();
-    auto origFnType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-    auto origSilFnType = F->getLoweredFunctionType();
-    // Jointly iterate over AST `@differentiable` attributes and SIL
-    // `[differentiable]` attributes.
-    auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
-    auto silDiffAttrs = F->getDifferentiableAttrs();
-    for (auto pair : llvm::zip(diffAttrs, silDiffAttrs)) {
-      auto *diffAttr = const_cast<DifferentiableAttr *>(std::get<0>(pair));
-      auto *silDiffAttr = std::get<1>(pair);
-      // Compute lowered parameter indices.
-      auto *paramIndices = diffAttr->getParameterIndices();
-      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-          paramIndices, origFnType);
-      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-      assert(silDiffAttr->getIndices() == indices &&
-             "Expected matching @differentiable and [differentiable]");
-
-      auto lookUpConformance = LookUpConformanceInModule(M.getSwiftModule());
-      auto expectedJVPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
-          AutoDiffAssociatedFunctionKind::JVP, Types, lookUpConformance);
-      auto expectedVJPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
-          AutoDiffAssociatedFunctionKind::VJP, Types, lookUpConformance);
-
-      // Self reordering is necessary if wrt at least two parameters, including
-      // self.
-      auto shouldReorderSelf = [&]() {
-        if (!F->hasSelfParam())
-          return false;
-        auto selfParamIndex = origSilFnType->getNumParameters() - 1;
-        if (!indices.isWrtParameter(selfParamIndex))
-          return false;
-        return indices.parameters->getNumIndices() > 1;
-      };
-      bool reorderSelf = shouldReorderSelf();
-
-      // Thunk JVP method, if it is defined.
-      if (auto *jvpDecl = diffAttr->getJVPFunction()) {
-        SILFunction *jvpThunk;
-        auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
-        if (reorderSelf || jvpFn->getLoweredFunctionType() != expectedJVPType) {
-          jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
-              reorderSelf);
-        } else {
-          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-              diffAttr->getParameterIndices(), AFD->getASTContext());
-          jvpThunk = getOrCreateAutoDiffThunk(
-              constant.asAutoDiffAssociatedFunction(id), jvpFn,
-              expectedJVPType);
-        }
-        silDiffAttr->setJVPName(jvpThunk->getName());
-      }
-      // Thunk VJP method, if it is defined.
-      if (auto *vjpDecl = diffAttr->getVJPFunction()) {
-        SILFunction *vjpThunk;
-        auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
-        if (reorderSelf || vjpFn->getLoweredFunctionType() != expectedVJPType) {
-          vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
-              reorderSelf);
-        } else {
-          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-              diffAttr->getParameterIndices(), AFD->getASTContext());
-          vjpThunk = getOrCreateAutoDiffThunk(
-              constant.asAutoDiffAssociatedFunction(id), vjpFn,
-              expectedVJPType);
-        }
-        silDiffAttr->setVJPName(vjpThunk->getName());
-      }
+    // Visit all `@differentiable` attributes.
+    for (auto *diffAttr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      SILFunction *jvp = nullptr;
+      SILFunction *vjp = nullptr;
+      if (auto *jvpDecl = diffAttr->getJVPFunction())
+        jvp = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
+      if (auto *vjpDecl = diffAttr->getVJPFunction())
+        vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
+      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+      AutoDiffConfig config{diffAttr->getParameterIndices(), resultIndices,
+                            diffAttr->getDerivativeGenericSignature().getPointer()};
+      emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
     }
   }
   F->verify();
+}
+
+void SILGenModule::emitDifferentiabilityWitness(
+    AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
+    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp) {
+  auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto origSilFnType = originalFunction->getLoweredFunctionType();
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      config.parameterIndices, origFnType);
+  // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
+  // parameters corresponding to captured variables. These parameters do not
+  // appear in the type of `origFnType`.
+  // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+  // take `CaptureInfo` into account.
+  if (origSilFnType->getNumParameters() > loweredParamIndices->getCapacity())
+    loweredParamIndices = loweredParamIndices->extendingCapacity(
+        getASTContext(), origSilFnType->getNumParameters());
+  // TODO(TF-913): Replace usages of `SILAutoDiffIndices` with `AutoDiffConfig`.
+  SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
+
+  // Self reordering thunk is necessary if wrt at least two parameters,
+  // including self.
+  auto shouldReorderSelf = [&]() {
+    if (!originalFunction->hasSelfParam())
+      return false;
+    auto selfParamIndex = origSilFnType->getNumParameters() - 1;
+    if (!indices.isWrtParameter(selfParamIndex))
+      return false;
+    return indices.parameters->getNumIndices() > 1;
+  };
+  bool reorderSelf = shouldReorderSelf();
+
+  CanGenericSignature derivativeCanGenSig;
+  if (auto *derivativeGenSig = config.derivativeGenericSignature)
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  // TODO(TF-835): Use simpler derivative generic signature logic below when
+  // type-checking no longer generates implicit `@differentiable` attributes.
+  // See TF-835 for replacement code.
+  if (jvp) {
+    auto jvpCanGenSig = jvp->getLoweredFunctionType()->getGenericSignature();
+    if (!derivativeCanGenSig && jvpCanGenSig)
+      derivativeCanGenSig = jvpCanGenSig;
+    assert(derivativeCanGenSig == jvpCanGenSig);
+  }
+  if (vjp) {
+    auto vjpCanGenSig = vjp->getLoweredFunctionType()->getGenericSignature();
+    if (!derivativeCanGenSig && vjpCanGenSig)
+      derivativeCanGenSig = vjpCanGenSig;
+    assert(derivativeCanGenSig == vjpCanGenSig);
+  }
+  // Create new SIL differentiability witness.
+  // Witness JVP and VJP are set below.
+  // TODO(TF-919): Explore creating serialized differentiability witnesses.
+  // Currently, differentiability witnesses are never serialized to avoid
+  // deserialization issues where JVP/VJP functions cannot be found.
+  auto *diffWitness = SILDifferentiabilityWitness::create(
+      M, originalFunction->getLinkage(), originalFunction,
+      loweredParamIndices, config.resultIndices, derivativeCanGenSig,
+      /*jvp*/ nullptr, /*vjp*/ nullptr, /*isSerialized*/ false);
+
+  // Set derivative function in differentiability witness.
+  auto setDerivativeInDifferentiabilityWitness =
+      [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
+    auto expectedDerivativeType =
+        origSilFnType->getAutoDiffDerivativeFunctionType(
+            indices.parameters, indices.source, kind, Types,
+            LookUpConformanceInModule(M.getSwiftModule()));
+    // Thunk derivative function.
+    SILFunction *derivativeThunk;
+    if (reorderSelf ||
+        derivative->getLoweredFunctionType() != expectedDerivativeType) {
+      derivativeThunk = getOrCreateAutoDiffDerivativeFunctionThunk(
+          originalFunction, indices, derivative, kind, reorderSelf);
+    } else {
+      // Note: `AutoDiffDerivativeFunctionIdentifier` must be constructed with
+      // the AST-level parameter indices, not the SIL-level ones.
+      auto *id = AutoDiffDerivativeFunctionIdentifier::get(
+          kind, config.parameterIndices, getASTContext());
+      derivativeThunk = getOrCreateAutoDiffThunk(
+          SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
+          expectedDerivativeType);
+    }
+    // Check for existing same derivative.
+    // TODO(TF-835): Remove condition below and simplify assertion to
+    // `!diffWitness->getDerivative(kind)` after `@differentiating` attribute
+    // type-checking no longer generates implicit `@differentiable` attributes.
+    auto *existingDerivative = diffWitness->getDerivative(kind);
+    if (existingDerivative && existingDerivative == derivativeThunk)
+      return;
+    assert(!existingDerivative &&
+           "SIL differentiability witness already has a different existing "
+           "derivative");
+    diffWitness->setDerivative(kind, derivativeThunk);
+  };
+  if (jvp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::JVP,
+                                            jvp);
+  if (vjp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::VJP,
+                                            vjp);
 }
 
 void SILGenModule::
@@ -873,10 +921,6 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
   }
-
-  // TODO: Handle SILGen for `@differentiating` attribute.
-  // Tentative solution: SILGen derivative function normally but also emit
-  // mangled redirection thunk for retroactive differentiation.
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {

@@ -89,8 +89,12 @@ public:
   bool isValid() const { return AtLoc.isValid(); }
   
   // SWIFT_ENABLE_TENSORFLOW
-  bool isLinear() const { return linear; }
-  
+  bool isLinear() const {
+    assert(!linear || (linear && has(TAK_differentiable)) &&
+           "Linear shouldn't have been true if there's no `@differentiable`");
+    return linear;
+  }
+
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
   }
@@ -1537,8 +1541,8 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// Whether this function is linear (optional).
-  bool linear;
+  /// Whether this function is linear.
+  bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
@@ -1552,10 +1556,10 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndices = nullptr;
+  IndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
-  /// The generic signature for autodiff associated functions. Resolved by the
+  /// The generic signature for autodiff derivative functions. Resolved by the
   /// type checker based on the original function's generic signature and the
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
@@ -1571,7 +1575,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              bool linear, AutoDiffIndexSubset *indices,
+                              bool linear, IndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
@@ -1587,7 +1591,7 @@ public:
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear, AutoDiffIndexSubset *indices,
+                                    bool linear, IndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
@@ -1602,10 +1606,10 @@ public:
   /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffIndexSubset *getParameterIndices() const {
+  IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndices = pi;
   }
 
@@ -1620,8 +1624,8 @@ public:
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
   }
-
-  bool isLinear() const { return linear; }
+                                      
+  bool isLinear() const { return Linear; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
@@ -1650,10 +1654,10 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
   void print(llvm::raw_ostream &OS, const Decl *D,
              bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1676,12 +1680,12 @@ class DifferentiatingAttr final
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
   FuncDecl *OriginalFunction = nullptr;
-  /// Whether this function is linear (optional).
-  bool linear;
+  /// Whether this function is linear.
+  bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndices = nullptr;
+  IndexSubset *ParameterIndices = nullptr;
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
@@ -1691,7 +1695,7 @@ class DifferentiatingAttr final
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
                                DeclNameWithLoc original, bool linear,
-                               AutoDiffIndexSubset *indices);
+                               IndexSubset *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
@@ -1702,11 +1706,11 @@ public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
                                      DeclNameWithLoc original, bool linear,
-                                     AutoDiffIndexSubset *indices);
+                                     IndexSubset *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
                                       
-  bool isLinear() const { return linear; }
+  bool isLinear() const { return Linear; }
 
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
@@ -1723,10 +1727,10 @@ public:
     return NumParsedParameters;
   }
 
-  AutoDiffIndexSubset *getParameterIndices() const {
+  IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndices = pi;
   }
 
@@ -1757,7 +1761,7 @@ class TransposingAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndexSubset = nullptr;
+  IndexSubset *ParameterIndexSubset = nullptr;
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
@@ -1767,7 +1771,7 @@ class TransposingAttr final
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            TypeRepr *baseType, DeclNameWithLoc original,
-                           AutoDiffIndexSubset *indices);
+                           IndexSubset *indices);
   
 public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
@@ -1778,7 +1782,7 @@ public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  TypeRepr *baseType, DeclNameWithLoc original,
-                                 AutoDiffIndexSubset *indices);
+                                 IndexSubset *indices);
   
   TypeRepr *getBaseType() const { return BaseType; }
   DeclNameWithLoc getOriginal() const { return Original; }
@@ -1798,10 +1802,10 @@ public:
     return NumParsedParameters;
   }
   
-  AutoDiffIndexSubset *getParameterIndexSubset() const {
+  IndexSubset *getParameterIndexSubset() const {
     return ParameterIndexSubset;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndexSubset = pi;
   }
   

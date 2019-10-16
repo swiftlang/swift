@@ -14,7 +14,6 @@ let _: @differentiable (NonDiffType) -> Float
 // expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
 let _: @differentiable (Float) -> NonDiffType
 
-// expected-error @+1 {{'@differentiable(linear)' types are not yet supported}}
 let _: @differentiable(linear) (Float) -> Float
 
 //===----------------------------------------------------------------------===//
@@ -50,6 +49,17 @@ extension Float {
 }
 _ = gradient(of: Float.addOne) // okay
 _ = gradient(of: Float(1.0).addOne) // okay
+
+// TODO(TF-908): Remove this test once linear-to-differentiable conversion is supported.
+func linearToDifferentiable(_ f: @escaping @differentiable(linear) (Float) -> Float) {
+  // expected-error @+1 {{conversion from '@differentiable(linear)' to '@differentiable' is not yet supported}}
+  _ = f as @differentiable (Float) -> Float
+}
+
+func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
+  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or a literal closure}}
+  _ = f as @differentiable(linear) (Float) -> Float
+}
 
 //===----------------------------------------------------------------------===//
 // Parameter selection (@nondiff)
@@ -92,7 +102,7 @@ extension Vector: Differentiable where T: Differentiable {}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
 func nondiffVectorFunc(x: Vector<Int>) -> Vector<Int> {}
-// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
+// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to '_Differentiable}}
 inferredConformancesGeneric(nondiffVectorFunc)
 
 func diffVectorFunc(x: Vector<Float>) -> Vector<Float> {}

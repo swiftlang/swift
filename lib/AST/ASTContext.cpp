@@ -28,6 +28,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
@@ -446,12 +447,13 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// A cache of tangent spaces per type.
   llvm::DenseMap<CanType, Optional<VectorSpace>> VectorSpaces;
 
-  /// For uniquifying `AutoDiffIndexSubset` allocations.
-  llvm::FoldingSet<AutoDiffIndexSubset> AutoDiffIndexSubsets;
+  /// For uniquifying `IndexSubset` allocations.
+  llvm::FoldingSet<IndexSubset> IndexSubsets;
 
-  /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
-  llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
-      AutoDiffAssociatedFunctionIdentifiers;
+  /// For uniquifying `AutoDiffDerivativeFunctionIdentifier` allocations.
+  llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
+      AutoDiffDerivativeFunctionIdentifiers;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -4807,9 +4809,9 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
-  auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
+IndexSubset *
+IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
+  auto &foldingSet = ctx.getImpl().IndexSubsets;
   llvm::FoldingSetNodeID id;
   unsigned capacity = indices.size();
   id.AddInteger(capacity);
@@ -4819,24 +4821,23 @@ AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
     return existing;
-  auto sizeToAlloc = sizeof(AutoDiffIndexSubset) +
+  auto sizeToAlloc = sizeof(IndexSubset) +
       getNumBitWordsNeededForCapacity(capacity);
-  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
-      ctx.Allocate(sizeToAlloc, alignof(AutoDiffIndexSubset)));
-  auto *newNode = new (buf) AutoDiffIndexSubset(indices);
+  auto *buf = reinterpret_cast<IndexSubset *>(
+      ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
+  auto *newNode = new (buf) IndexSubset(indices);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }
 
-AutoDiffAssociatedFunctionIdentifier *
-AutoDiffAssociatedFunctionIdentifier::get(
-    AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
-    AutoDiffIndexSubset *parameterIndices, ASTContext &C) {
+AutoDiffDerivativeFunctionIdentifier *
+AutoDiffDerivativeFunctionIdentifier::get(
+    AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+    ASTContext &C) {
   assert(parameterIndices);
-  auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
+  auto &foldingSet = C.getImpl().AutoDiffDerivativeFunctionIdentifiers;
   llvm::FoldingSetNodeID id;
   id.AddInteger((unsigned)kind);
-  id.AddInteger(differentiationOrder);
   id.AddPointer(parameterIndices);
 
   void *insertPos;
@@ -4844,10 +4845,10 @@ AutoDiffAssociatedFunctionIdentifier::get(
   if (existing)
     return existing;
 
-  void *mem = C.Allocate(sizeof(AutoDiffAssociatedFunctionIdentifier),
-                         alignof(AutoDiffAssociatedFunctionIdentifier));
-  auto *newNode = ::new (mem) AutoDiffAssociatedFunctionIdentifier(
-      kind, differentiationOrder, parameterIndices);
+  void *mem = C.Allocate(sizeof(AutoDiffDerivativeFunctionIdentifier),
+                         alignof(AutoDiffDerivativeFunctionIdentifier));
+  auto *newNode = ::new (mem) AutoDiffDerivativeFunctionIdentifier(
+      kind, parameterIndices);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

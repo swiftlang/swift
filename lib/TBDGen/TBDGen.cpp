@@ -235,14 +235,14 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // function with a `@differentiable` attribute.
   auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    auto *jvpId = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-        DA->getParameterIndices(), AFD->getASTContext());
-    addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(jvpId));
-    auto *vjpId = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-        DA->getParameterIndices(), AFD->getASTContext());
-    addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(vjpId));
+    auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
+        AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
+        AFD->getASTContext());
+    addSymbol(SILDeclRef(AFD).asAutoDiffDerivativeFunction(jvpId));
+    auto *vjpId = AutoDiffDerivativeFunctionIdentifier::get(
+        AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
+        AFD->getASTContext());
+    addSymbol(SILDeclRef(AFD).asAutoDiffDerivativeFunction(vjpId));
   }
 
   visitDefaultArguments(AFD, AFD->getParameters());
@@ -298,16 +298,16 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // var/subscript with a `@differentiable` attribute.
   auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    auto *jvpId = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-        DA->getParameterIndices(), ASD->getASTContext());
+    auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
+        AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
+        ASD->getASTContext());
     addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
-                  .asAutoDiffAssociatedFunction(jvpId));
-    auto *vjpId = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-        DA->getParameterIndices(), ASD->getASTContext());
+                  .asAutoDiffDerivativeFunction(jvpId));
+    auto *vjpId = AutoDiffDerivativeFunctionIdentifier::get(
+        AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
+        ASD->getASTContext());
     addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
-                  .asAutoDiffAssociatedFunction(vjpId));
+                  .asAutoDiffDerivativeFunction(vjpId));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

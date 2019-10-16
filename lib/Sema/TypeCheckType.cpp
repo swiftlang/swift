@@ -2169,7 +2169,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
       
       // SWIFT_ENABLE_TENSORFLOW
-      auto diffkind = DifferentiabilityKind::NonDifferentiable;
+      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
         diffkind = attrs.linear
             ? DifferentiabilityKind::Linear
@@ -2229,15 +2229,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // SWIFT_ENABLE_TENSORFLOW
       DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
-        if (attrs.linear) {
-          // FIXME(bartchr): allow types to be marked
-          // as `@differentiable(linear)`.
-          diagnose(attrs.getLoc(TAK_differentiable),
-                   diag::linear_differentiable_type_disabled);
-          attrs.clearAttribute(TAK_differentiable);
-        } else {
-          diffkind = DifferentiabilityKind::Normal;
-        }
+        diffkind = attrs.linear
+            ? DifferentiabilityKind::Linear
+            : DifferentiabilityKind::Normal;
       }
       
       // Resolve the function type directly with these attributes.

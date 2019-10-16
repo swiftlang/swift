@@ -511,28 +511,42 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation loc, AutoDiffIndexSubset *parameterIndices,
-      unsigned differentiationOrder, SILValue original,
-      ArrayRef<SILValue> associatedFunctions = {}) {
+      SILLocation Loc, IndexSubset *ParameterIndices,
+      SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(
-        getModule(), getSILDebugLocation(loc), parameterIndices,
-        differentiationOrder, original, associatedFunctions));
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
+  }
+
+  LinearFunctionInst *createLinearFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<SILValue> TransposeFunction = None) {
+    return insert(LinearFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, TransposeFunction, hasOwnership()));
   }
   
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
-      SILLocation loc, DifferentiableFunctionExtractee extractee,
-      unsigned differentiationOrder, SILValue theFunction) {
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc), extractee, differentiationOrder,
-        theFunction));
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+  }
+
+  LinearFunctionExtractInst *createLinearFunctionExtract(
+      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction) {
+    return insert(new (getModule()) LinearFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
   }
 
   DifferentiableFunctionExtractInst *
-  createDifferentiableFunctionExtractOriginal(SILLocation loc,
-                                              SILValue theFunction) {
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc),
-        DifferentiableFunctionExtractee::Original, 0, theFunction));
+        getModule(), getSILDebugLocation(Loc),
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
