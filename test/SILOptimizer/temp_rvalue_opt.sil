@@ -471,3 +471,110 @@ bb0(%0 : $*Klass):
   return %12 : $()
 }
 
+protocol P {
+  func foo()
+}
+
+sil @getP : $@convention(thin) () -> @out Optional<P>
+
+// CHECK-LABEL: sil @handle_open_existential_addr : $@convention(thin) () -> () {
+// CHECK: [[P:%.*]] = unchecked_take_enum_data_addr
+// CHECK-NOT: copy_addr
+// CHECK: open_existential_addr immutable_access [[P]]
+// CHECK: }
+sil @handle_open_existential_addr : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Optional<P>
+  %3 = function_ref @getP : $@convention(thin) () -> @out Optional<P>
+  %4 = apply %3(%2) : $@convention(thin) () -> @out Optional<P>
+  cond_br undef, bb1, bb3
+
+bb1:
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %10 = alloc_stack $P
+  copy_addr %9 to [initialization] %10 : $*P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %2 : $*Optional<P>
+  destroy_addr %10 : $*P
+  dealloc_stack %10 : $*P
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+
+bb2:
+  %23 = tuple ()
+  return %23 : $()
+
+bb3:
+  destroy_addr %2 : $*Optional<P>
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+}
+// CHECK-LABEL: sil @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
+// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: copy_addr {{.*}} to [initialization] [[P]]
+// CHECK: }
+sil @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Optional<P>
+  %3 = function_ref @getP : $@convention(thin) () -> @out Optional<P>
+  %4 = apply %3(%2) : $@convention(thin) () -> @out Optional<P>
+  cond_br undef, bb1, bb3
+
+bb1:
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %10 = alloc_stack $P
+  copy_addr %9 to [initialization] %10 : $*P
+  destroy_addr %2 : $*Optional<P>
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %10 : $*P
+  dealloc_stack %10 : $*P
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+
+bb2:
+  %23 = tuple ()
+  return %23 : $()
+
+bb3:
+  destroy_addr %2 : $*Optional<P>
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+}
+
+// CHECK-LABEL: sil @witness_method_blocks_optimization : $@convention(thin) () -> () {
+// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: copy_addr {{.*}} to [initialization] [[P]]
+// CHECK: }
+sil @witness_method_blocks_optimization : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Optional<P>
+  %3 = function_ref @getP : $@convention(thin) () -> @out Optional<P>
+  %4 = apply %3(%2) : $@convention(thin) () -> @out Optional<P>
+  cond_br undef, bb1, bb3
+
+bb1:
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %10 = alloc_stack $P
+  copy_addr %9 to [initialization] %10 : $*P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  destroy_addr %2 : $*Optional<P>
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %10 : $*P
+  dealloc_stack %10 : $*P
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+
+bb2:
+  %23 = tuple ()
+  return %23 : $()
+
+bb3:
+  destroy_addr %2 : $*Optional<P>
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+}
