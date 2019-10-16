@@ -134,9 +134,11 @@ normalize_boolean_spelling(SWIFT_AST_VERIFIER)
 normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 # SWIFT_ENABLE_TENSORFLOW
 normalize_boolean_spelling(SWIFT_ENABLE_TENSORFLOW)
 normalize_boolean_spelling(SWIFT_ENABLE_TENSORFLOW_GPU)
+# SWIFT_ENABLE_TENSORFLOW END
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -316,6 +318,10 @@ _Block_release(void) { }\n")
       endif()
 
       list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+        list(APPEND LIT_ARGS "--param" "differentiable_programming")
+      endif()
 
       foreach(test_subset ${TEST_SUBSETS})
         set(directories)

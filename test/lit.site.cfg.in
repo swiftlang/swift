@@ -126,6 +126,9 @@ if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
 if "@SWIFT_SOURCEKIT_USE_INPROC_LIBRARY@" == "TRUE":
     config.available_features.add('sourcekit_use_inproc_library')
 
+if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
+    config.available_features.add('differentiable_programming')
+
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

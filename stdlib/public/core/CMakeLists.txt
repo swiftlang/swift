@@ -197,15 +197,16 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   UnsafeRawBufferPointer.swift.gyb
   )
 
+# SWIFT_ENABLE_TENSORFLOW
 # Compile differentiable programming sources only if enabled.
 set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES)
 if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES
-    Differentiable.swift
-    # SWIFT_ENABLE_TENSORFLOW
-    DifferentiationSupport.swift)
+    ../Differentiation/Differentiable.swift
+    ../Differentiation/DifferentiationSupport.swift)
   message(STATUS "Differentiable programming standard library additions enabled.")
 endif()
+# SWIFT_ENABLE_TENSORFLOW END
 
 # The complete list of sources in the core standard library.  Includes
 # all the essential sources listed above.
@@ -225,7 +226,9 @@ set(SWIFTLIB_SOURCES
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+  # SWIFT_ENABLE_TENSORFLOW
   ${SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES}
+  # SWIFT_ENABLE_TENSORFLOW END
   )
 
 set(SWIFTLIB_GYB_SOURCES
