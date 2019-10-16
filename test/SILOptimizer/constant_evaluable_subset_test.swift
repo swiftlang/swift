@@ -785,6 +785,24 @@ func interpretArrayAppendNonEmpty() -> [String] {
   return testArrayAppendNonEmpty("mkdir")
 }
 
+struct StructContaningArray {
+  var array: [Int]
+}
+
+// CHECK-LABEL: @testArrayFieldAppend
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayFieldAppend(_ x: Int) -> StructContaningArray {
+  var s = StructContaningArray(array: [])
+  s.array.append(x)
+  return s
+}
+
+@_semantics("test_driver")
+func interpretArrayFieldAppend() -> StructContaningArray {
+  return testArrayFieldAppend(0)
+}
+
 // CHECK-LABEL: @testClosureInit
 // CHECK-NOT: error:
 @_semantics("constant_evaluable")
@@ -832,4 +850,45 @@ func testAutoClosure(_ x: @escaping @autoclosure () -> Int) -> () -> Int {
 @_semantics("test_driver")
 func interpretAutoClosure(_ x: Int) -> () -> Int {
   return testAutoClosure(x)
+}
+
+// Test thin-to-thick function conversion.
+
+func someFunction(_ x: Int) -> Int {
+  return x + 1
+}
+
+// CHECK-LABEL: @testThinToThick
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testThinToThick() -> (Int) -> Int {
+  return someFunction
+}
+
+@_semantics("test_driver")
+func interpretThinToThick() -> (Int) -> Int {
+  return testThinToThick()
+}
+
+// Test closures and arrays combination.
+
+// CHECK-LABEL: @testArrayOfClosures
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayOfClosures(_ byte: @escaping () -> Int) -> [(Int) -> Int] {
+  var closureArray: [(Int) -> Int] = []
+  // Append a simple closure.
+  closureArray.append({ arg in
+    return 0
+  })
+  // Append a closure that does computation.
+  closureArray.append({ arg in
+    return byte() + arg
+  })
+  return closureArray
+}
+
+@_semantics("test_driver")
+func interpretArrayOfClosures() -> [(Int) -> Int] {
+  return testArrayOfClosures({ 10 })
 }
