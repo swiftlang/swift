@@ -324,8 +324,9 @@ STMT_NODES = [
              Child('Colon', kind='ColonToken'),
          ]),
 
-    # catch-clause 'catch' pattern? where-clause? code-block
+    # catch-clause 'catch' case-item-list? code-block
     Node('CatchClause', kind='Syntax',
+         traits=['WithCodeBlock'],
          children=[
              Child('CatchKeyword', kind='CatchToken'),
              Child('CaseItems', kind='CaseItemList',
