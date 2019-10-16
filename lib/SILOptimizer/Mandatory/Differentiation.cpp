@@ -1225,6 +1225,10 @@ ADContext::emitNondifferentiabilityError(SILValue value,
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   auto valueLoc = value.getLoc().getSourceLoc();
+  // If instruction does not have a valid location, use the function location
+  // as a fallback. Improves diagnostics in some cases.
+  if (valueLoc.isInvalid())
+    valueLoc = value->getFunction()->getLocation().getSourceLoc();
   return emitNondifferentiabilityError(valueLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }
