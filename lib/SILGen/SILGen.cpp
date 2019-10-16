@@ -811,7 +811,6 @@ void SILGenModule::emitDifferentiabilityWitness(
   };
   bool reorderSelf = shouldReorderSelf();
 
-  // Get or create differentiability witness.
   CanGenericSignature derivativeCanGenSig;
   if (auto *derivativeGenSig = config.derivativeGenericSignature)
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
