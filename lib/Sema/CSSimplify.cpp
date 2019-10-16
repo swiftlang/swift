@@ -998,6 +998,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
     auto extraArguments = listener.getExtraneousArguments();
     if (!extraArguments.empty()) {
+      if (RemoveExtraneousArguments::isMinMaxNameShadowing(cs, locator))
+        return cs.getTypeMatchFailure(locator);
+
       // First let's see whether this is a situation where a single
       // parameter is a tuple, but N distinct arguments were passed in.
       if (AllowTupleSplatForSingleParameter::attempt(

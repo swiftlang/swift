@@ -499,6 +499,26 @@ bool RemoveExtraneousArguments::diagnose(Expr *root, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool RemoveExtraneousArguments::isMinMaxNameShadowing(
+    ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+  auto *anchor = dyn_cast_or_null<CallExpr>(locator.getAnchor());
+  if (!anchor)
+    return false;
+
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor->getFn())) {
+    if (auto *baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+      auto *decl = baseExpr->getDecl();
+      if (baseExpr->isImplicit() && decl &&
+          decl->getFullName() == cs.getASTContext().Id_self) {
+        auto memberName = UDE->getName();
+        return memberName.isSimpleName("min") || memberName.isSimpleName("max");
+      }
+    }
+  }
+
+  return false;
+}
+
 RemoveExtraneousArguments *RemoveExtraneousArguments::create(
     ConstraintSystem &cs, FunctionType *contextualType,
     llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator) {

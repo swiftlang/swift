@@ -1068,6 +1068,15 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
+  /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
+  /// logic would be obsolete.
+  ///
+  /// Determine whether presence of extraneous arguments indicates
+  /// potential name shadowing problem with local `min`/`max` shadowing
+  /// global definitions with different number of arguments.
+  static bool isMinMaxNameShadowing(ConstraintSystem &cs,
+                                    ConstraintLocatorBuilder locator);
+
   static RemoveExtraneousArguments *
   create(ConstraintSystem &cs, FunctionType *contextualType,
          llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator);
