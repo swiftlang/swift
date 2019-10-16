@@ -4504,6 +4504,10 @@ namespace {
       outerClosure->setType(outerClosureTy);
       cs.cacheType(outerClosure);
 
+      // The inner closure at least will definitely have a capture.
+      cs.TC.ClosuresWithUncomputedCaptures.push_back(outerClosure);
+      cs.TC.ClosuresWithUncomputedCaptures.push_back(closure);
+
       // let outerApply = "\( outerClosure )( \(E) )"
       auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
       outerApply->setType(closureTy);
