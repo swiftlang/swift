@@ -8566,6 +8566,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
           thunkBuilder.createReturn(loc, dfi);
           retInst->eraseFromParent();
 
+          getGeneratedFunctions().push_back(newThunk);
           getDifferentiableFunctionInsts().push_back(dfi);
           if (processDifferentiableFunctionInst(dfi))
             return nullptr;

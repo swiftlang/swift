@@ -332,6 +332,11 @@ struct TF_675 : Differentiable {
 // expected-error @+1 {{function is not differentiable}}
 let _: @differentiable (Float) -> Float = TF_675().method
 
+// TF-918: test parameter subset thunk + partially-applied original function.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
+_ = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @nondiff Float) -> Float)
+
 //===----------------------------------------------------------------------===//
 // Conversion to `@differentiable(linear)` (not yet supported)
 //===----------------------------------------------------------------------===//
