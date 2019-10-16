@@ -5696,7 +5696,7 @@ linear_function_extract
                       sil-value ':' sil-type
 
   sil-linear-function-extractee ::=
-      '[' sil-linear-function-extractee ']'
+      '[' sil-linear-function-extractee-name ']'
   sil-linear-function-extractee-name ::= 'original' | 'transpose'
 
   linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
@@ -5705,6 +5705,49 @@ linear_function_extract
 Extracts the original function or a transpose function from the given
 ``@differentiable(linear)`` function. It must be provided with an extractee:
 ``[original]`` or ``[transpose]``.
+
+
+differentiability_witness_function
+``````````````````````````````````
+
+::
+
+  sil-instruction ::= 'differentiability_witness_function'
+                      sil-differentiability-witness-function-kind
+                      '[' 'parameters' sil-differentiability-witness-indices ']'
+                      '[' 'results' sil-differentiability-witness-indices ']'
+                      generic-parameter-clause?
+                      sil-function-name ':' sil-type
+
+  sil-differentiability-witness-function-kind ::=
+      '[' sil-differentiability-witness-function-kind-name ']'
+  sil-differentiability-witness-function-kind-name ::=
+      'jvp' | 'vjp' | 'transpose'
+  sil-differentiability-witness-indices ::= [0-9]+ (' ' [0-9]+)*
+  generic-parameter-clause ::=
+      '<' generic-parameter-list generic-where-clause '>'
+  generic-where-clause ::=
+      'where' generic-requirement (',' generic-requirement)*
+  generic-requirement ::=
+      type '==' type | type ':' type | type ':' layout-constraint
+
+  differentiability_witness_function [jvp] [parameters 0] [results 0] \
+    <T where T: Differentiable> @foo : $(T) -> T
+
+Looks up the differentiability witness function for the referenced function
+using SIL differentiability witnesses.
+
+The differentiability witness function kind identifies the witness function to
+look up: ``[jvp]``, ``[vjp]``, or ``[transpose]``.
+
+The remaining components identify the SIL differentiability witness:
+
+- Original function name.
+- Parameter indices.
+- Result indices.
+- Witness generic parameter clause (optional). When parsing SIL, the parsed
+  witness generic parameter clause is combined with the original function's
+  generic signature to form the full witness generic signature.
 
 
 Assertion configuration

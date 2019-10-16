@@ -1029,7 +1029,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            // SWIFT_ENABLE_TENSORFLOW
-           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
+           Attr = 0, Attr2 = 0, Attr3 = 0, NumSubs = 0, NumConformances = 0,
            IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
@@ -1154,6 +1154,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
+  case SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION:
+    SILInstDifferentiabilityWitnessFunctionLayout::readRecord(
+        scratch, /*originalFunctionName*/ ValID, /*witnessKind*/ Attr,
+        /*witnessGenSig*/ ValID2, /*numParams*/ Attr2, /*numResults*/ Attr3,
+        ListOfValues);
+    RawOpCode =
+        (unsigned)SILInstructionKind::DifferentiabilityWitnessFunctionInst;
+    break;
+  // SWIFT_ENABLE_TENSORFLOW END
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
     break;
@@ -1610,6 +1619,32 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto val = getLocalValue(ValID, silTy);
     LinearDifferentiableFunctionTypeComponent extractee(Attr);
     ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
+    break;
+  }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto originalName = MF->getIdentifierText(ValID);
+    auto *original = getFuncForReference(originalName);
+    assert(original && "Original function must be found");
+    DifferentiabilityWitnessFunctionKind witnessKind(Attr);
+    auto numParameterIndices = Attr2;
+    auto numResultIndices = Attr3;
+    SmallVector<unsigned, 8> parameterAndResultIndices(ListOfValues.begin(),
+                                                       ListOfValues.end());
+    assert(parameterAndResultIndices.size() ==
+               numParameterIndices + numResultIndices &&
+           "Parameter/result indices count mismatch");
+    auto *parameterIndices = IndexSubset::get(
+        MF->getContext(), original->getLoweredFunctionType()->getNumParameters(),
+        ArrayRef<unsigned>(parameterAndResultIndices)
+            .take_front(numParameterIndices));
+    auto *resultIndices = IndexSubset::get(
+        MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
+        ArrayRef<unsigned>(parameterAndResultIndices)
+            .take_back(numResultIndices));
+    auto *witnessGenSig = MF->getGenericSignature(ValID2);
+    ResultVal = Builder.createDifferentiabilityWitnessFunction(
+        Loc, original, witnessKind, parameterIndices, resultIndices,
+        witnessGenSig);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

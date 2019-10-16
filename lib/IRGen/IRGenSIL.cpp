@@ -925,6 +925,8 @@ public:
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *i);
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *i);
   // SWIFT_ENABLE_TENSORFLOW END
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
@@ -1926,6 +1928,13 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   (void)diffFnExp.claimAll();
   setLoweredExplosion(i, e);
 }
+
+void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
+DifferentiabilityWitnessFunctionInst *i) {
+  // TODO(TF-916): Implement IRGen for `differentiability_witness_function`.
+  llvm_unreachable("unimplemented");
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();

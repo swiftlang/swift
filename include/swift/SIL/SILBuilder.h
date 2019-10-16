@@ -549,6 +549,18 @@ public:
         NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
   }
 
+  DifferentiabilityWitnessFunctionInst *
+  createDifferentiabilityWitnessFunction(
+      SILLocation Loc, SILFunction *OriginalFunction,
+      DifferentiabilityWitnessFunctionKind WitnessKind,
+      IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
+      GenericSignature *WitnessGenericSignature) {
+    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
+        getModule(), getSILDebugLocation(Loc), OriginalFunction, WitnessKind,
+        ParameterIndices, ResultIndices, WitnessGenericSignature));
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {

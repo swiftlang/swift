@@ -714,6 +714,39 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
+
+SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
+    SILModule &module, SILFunction *originalFunction,
+    DifferentiabilityWitnessFunctionKind witnessKind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    GenericSignature *witnessGenSig) {
+  auto fnTy = originalFunction->getLoweredFunctionType();
+  CanGenericSignature witnessCanGenSig;
+  if (witnessGenSig)
+    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
+    auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
+       parameterIndices, *resultIndices->begin(), *derivativeKind, module.Types,
+       LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+    return SILType::getPrimitiveObjectType(diffFnTy);
+  }
+  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
+  auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
+      parameterIndices, module.Types,
+      LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+  return SILType::getPrimitiveObjectType(transposeFnTy);
+}
+
+DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc, SILFunction *originalFunction,
+    DifferentiabilityWitnessFunctionKind witnessKind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    GenericSignature *witnessGenSig)
+    : InstructionBase(debugLoc, getDifferentiabilityWitnessType(
+          module, originalFunction, witnessKind, parameterIndices,
+          resultIndices, witnessGenSig)),
+      originalFunction(originalFunction), witnessKind(witnessKind),
+      config({parameterIndices, resultIndices, witnessGenSig}) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
