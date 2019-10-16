@@ -512,6 +512,9 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
 #include "swift/AST/DeclNodes.def"
   if (isa<ModuleDecl>(this))
     return SourceLoc();
+  // When the decl is context-free, we should get loc from source buffer.
+  if (!getDeclContext())
+    return getLocFromSource();
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   switch(File->getKind()) {
   case FileUnitKind::Source:
