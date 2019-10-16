@@ -3016,6 +3016,9 @@ void SILDeserializer::readWitnessTableEntries(
   // Another record means the end of this WitnessTable.
   while (kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
+         // SWIFT_ENABLE_TENSORFLOW
+         kind != SIL_DIFFERENTIABILITY_WITNESS &&
+         // SWIFT_ENABLE_TENSORFLOW END
          kind != SIL_FUNCTION) {
     if (kind == SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY) {
       witnessEntries.push_back(SILDefaultWitnessTable::Entry());

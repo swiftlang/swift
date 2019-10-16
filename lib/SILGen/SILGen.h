@@ -318,6 +318,16 @@ public:
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Emit the differentiability witness for the given original function
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
+  /// functions (null if undefined).
+  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
+                                    SILFunction *originalFunction,
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp);
+  // SWIFT_ENABLE_TENSORFLOW END
+
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
