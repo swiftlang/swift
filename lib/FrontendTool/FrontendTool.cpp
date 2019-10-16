@@ -301,17 +301,8 @@ static void computeSwiftModuleTraceInfo(
 
       ModuleDecl *depMod = dep->second;
       if(depMod->isResilient() && !isSwiftinterface) {
-        SmallString<256> moduleAdjacentInterfacePath(depPath);
-        computeAdjacentInterfacePath(moduleAdjacentInterfacePath);
-        // FIXME: The behavior of fs::exists for relative paths is undocumented.
-        // Use something else instead?
-        if (!fs::exists(moduleAdjacentInterfacePath)) {
-          err << "The module " << depMod->getName().str() << " has library"
-              << " evolution enabled but we're recording a non-adjacent"
-              << " swiftmodule at\n" << depPath << "\nin the trace.";
-          llvm::report_fatal_error(err.str());
-        }
-        buffer.clear();
+        // FIXME: Ideally, we would check that the swiftmodule has a
+        // swiftinterface next to it. Tracked by rdar://problem/56351399.
       }
 
       // FIXME: Better error handling
