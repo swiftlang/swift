@@ -84,6 +84,11 @@ public:
     /// Its offset in the aggregate is always statically zero.
     Empty,
 
+    /// The element is known to require no storage in the aggregate.
+    /// But it has an offset in the aggregate. This is to support getting the
+    /// offset of tail allocated storage using MemoryLayout<>.offset(of:).
+    EmptyTailAllocatedCType,
+
     /// The element can be positioned at a fixed offset within the
     /// aggregate.
     Fixed,
@@ -163,6 +168,15 @@ public:
     assert(getByteOffset() == byteOffset);
   }
 
+  void completeEmptyTailAllocatedCType(IsPOD_t isPOD, Size byteOffset) {
+    TheKind = unsigned(Kind::EmptyTailAllocatedCType);
+    IsPOD = unsigned(isPOD);
+    ByteOffset = byteOffset.getValue();
+    Index = 0;
+
+    assert(getByteOffset() == byteOffset);
+  }
+
   /// Complete this element layout with a non-fixed offset.
   ///
   /// \param nonFixedElementIndex - the index into the elements array
@@ -181,7 +195,8 @@ public:
 
   /// Is this element known to be empty?
   bool isEmpty() const {
-    return getKind() == Kind::Empty;
+    return getKind() == Kind::Empty ||
+           getKind() == Kind::EmptyTailAllocatedCType;
   }
 
   /// Is this element known to be POD?
@@ -194,6 +209,7 @@ public:
   bool hasByteOffset() const {
     switch (getKind()) {
     case Kind::Empty:
+    case Kind::EmptyTailAllocatedCType:
     case Kind::Fixed:
       return true;
 
