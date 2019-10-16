@@ -257,34 +257,6 @@ extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector
   }
 }
 
-extension Tracked : VectorProtocol where T : SignedNumeric, T == T.Magnitude {
-  public typealias VectorSpaceScalar = Self
-
-  public func adding(_ x: Self) -> Self {
-    self + x
-  }
-
-  public mutating func add(_ x: Self) {
-    self += x
-  }
-
-  public func subtracting(_ x: Self) -> Self {
-    self - x
-  }
-
-  public mutating func subtract(_ x: Self) {
-    self -= x
-  }
-
-  public func scaled(by scalar: Self) -> Self {
-    self * scalar
-  }
-
-  public mutating func scale(by scalar: Self) {
-    self *= scalar
-  }
-}
-
 // Differential operators for `Tracked<Float>`.
 public func gradient(
   at x: Tracked<Float>, in f: @differentiable (Tracked<Float>) -> Tracked<Float>

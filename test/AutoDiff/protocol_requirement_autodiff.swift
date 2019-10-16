@@ -19,7 +19,7 @@ extension DiffReq where TangentVector : AdditiveArithmetic {
   }
 }
 
-struct Quadratic : DiffReq, VectorProtocol {
+struct Quadratic : DiffReq, AdditiveArithmetic {
   typealias TangentVector = Quadratic
 
   @differentiable
