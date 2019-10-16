@@ -738,10 +738,12 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   // If we're acessing a property wrapper, determine if the
   // intermediate access requires an lvalue.
-  if (underlyingVars.size() > 0) {
-    isMemberLValue = underlyingVars[0]->isGetterMutating();
-    if (isLValue)
-      isMemberLValue |= underlyingVars[0]->isSetterMutating();
+  if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
+    if (auto mut = var->getPropertyWrapperMutability()) {
+      isMemberLValue = mut->Getter == PropertyWrapperMutability::Mutating;
+      if (isLValue)
+        isMemberLValue |= mut->Setter == PropertyWrapperMutability::Mutating;
+    }
   }
 
   bool isSelfLValue = storage->isGetterMutating();
