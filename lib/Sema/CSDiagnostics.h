@@ -559,15 +559,6 @@ private:
   bool diagnoseParameterUse() const;
 };
 
-class MissingForcedDowncastFailure final : public FailureDiagnostic {
-public:
-  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
@@ -1868,6 +1859,16 @@ protected:
   bool diagnoseMisplacedMissingArgument() const;
 
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class MissingForcedDowncastFailure final : public ContextualFailure {
+public:
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs, Type fromType,
+                               Type toType, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

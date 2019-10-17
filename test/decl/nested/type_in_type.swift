@@ -192,7 +192,7 @@ class X6<T> {
 // ---------------------------------------------
 // Unbound name references within a generic type
 // ---------------------------------------------
-struct GS<T> {
+struct GS<T> { //expected-note {{arguments to generic parameter 'T' ('T' and 'Int') are expected to be equal}}
   func f() -> GS {
     let gs = GS()
     return gs
@@ -224,7 +224,7 @@ extension GS {
   }
 
   func h() {
-    _ = GS() as GS<Int> // expected-error{{'GS<T>' is not convertible to 'GS<Int>'; did you mean to use 'as!' to force downcast?}}
+    _ = GS() as GS<Int> // expected-error{{cannot convert value of type 'GS<T>' to type 'GS<Int>' in coercion}}
   }
 }
 
