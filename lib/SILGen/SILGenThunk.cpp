@@ -86,6 +86,8 @@ SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef derivativeFnDeclRef,
   auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
       originalLinkage, /*isDerivativeFnExported*/ true);
   auto name = derivativeFnDeclRef.mangle();
+  // This thunk is publicly exposed and cannot be transparent.
+  // TODO(TF-925): Mark the thunks as "always inline" for optimization.
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsNotTransparent,
       derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
