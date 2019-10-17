@@ -447,6 +447,51 @@ void SILType::dump() const {
   llvm::errs() << '\n';
 }
 
+// TODO(TF-893): Use this helper to dedupe the same logic in
+// `SILFunction::print`.
+static void printSILFunctionNameAndType(
+    llvm::raw_ostream &OS, SILFunction *function) {
+  function->printName(OS);
+  OS << " : $";
+  llvm::DenseMap<CanType, Identifier> Aliases;
+  llvm::DenseSet<Identifier> UsedNames;
+  auto sig = function->getLoweredFunctionType()->getGenericSignature();
+  auto env = function->getGenericEnvironment();
+  if (sig && env) {
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : sig->getGenericParams()) {
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
+      while (!UsedNames.insert(name).second) {
+        disambiguatedNameBuf.clear();
+        {
+          llvm::raw_svector_ostream names(disambiguatedNameBuf);
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
+        }
+        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
+      }
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
+    }
+  }
+
+  {
+    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
+    withGenericEnvironment.GenericEnv = env;
+    withGenericEnvironment.AlternativeTypeNames =
+      Aliases.empty() ? nullptr : &Aliases;
+    function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
+  }
+}
+
 namespace {
   
 class SILPrinter;
@@ -1221,6 +1266,36 @@ public:
     *this << "] ";
     *this << getIDAndType(lfei->getFunctionOperand());
   }
+
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    *this << '[';
+    switch (dwfi->getWitnessKind()) {
+    case DifferentiabilityWitnessFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    case DifferentiabilityWitnessFunctionKind::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] [parameters";
+    for (auto i : dwfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] [results";
+    for (auto i : dwfi->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+    if (auto witnessGenSig = dwfi->getWitnessGenericSignature()) {
+      auto subPrinter = PrintOptions::printSIL();
+      witnessGenSig->print(PrintState.OS, subPrinter);
+      *this << " ";
+    }
+    printSILFunctionNameAndType(PrintState.OS, dwfi->getOriginalFunction());
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
@@ -3083,51 +3158,6 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
 void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
-}
-
-// TODO(TF-893): Use this helper to dedupe the same logic in
-// `SILFunction::print`.
-static void printSILFunctionNameAndType(
-    llvm::raw_ostream &OS, SILFunction *function) {
-  function->printName(OS);
-  OS << " : $";
-  llvm::DenseMap<CanType, Identifier> Aliases;
-  llvm::DenseSet<Identifier> UsedNames;
-  auto sig = function->getLoweredFunctionType()->getGenericSignature();
-  auto *env = function->getGenericEnvironment();
-  if (sig && env) {
-    llvm::SmallString<16> disambiguatedNameBuf;
-    unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : sig->getGenericParams()) {
-      auto sugaredTy = env->getSugaredType(paramTy);
-      Identifier name = sugaredTy->getName();
-      while (!UsedNames.insert(name).second) {
-        disambiguatedNameBuf.clear();
-        {
-          llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << sugaredTy->getName() << disambiguatedNameCounter++;
-        }
-        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
-      }
-      if (name != sugaredTy->getName()) {
-        Aliases[paramTy->getCanonicalType()] = name;
-
-        // Also for the archetype
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)
-            ->getAs<ArchetypeType>();
-        if (archetypeTy)
-          Aliases[archetypeTy->getCanonicalType()] = name;
-      }
-    }
-  }
-
-  {
-    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
-    withGenericEnvironment.GenericEnv = env;
-    withGenericEnvironment.AlternativeTypeNames =
-      Aliases.empty() ? nullptr : &Aliases;
-    function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
-  }
 }
 
 // SWIFT_ENABLE_TENSORFLOW

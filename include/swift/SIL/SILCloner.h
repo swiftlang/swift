@@ -1011,6 +1011,17 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
                 getOpLocation(Inst->getLoc()), Inst->getExtractee(),
                 getOpValue(Inst->getFunctionOperand())));
 }
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitDifferentiabilityWitnessFunctionInst(
+    DifferentiabilityWitnessFunctionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDifferentiabilityWitnessFunction(
+                getOpLocation(Inst->getLoc()), Inst->getOriginalFunction(),
+                Inst->getWitnessKind(), Inst->getParameterIndices(),
+                Inst->getResultIndices(), Inst->getWitnessGenericSignature()));
+}
 // SWIFT_ENABLE_TENSORFLOW END
 
 template<typename ImplClass>

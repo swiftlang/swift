@@ -1620,6 +1620,13 @@ ERROR(sil_inst_autodiff_expected_linear_extractee_kind,PointsToFirstBadToken,
       "and '[transpose]'", ())
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
+ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
+      "expected a differentiability witness kind, which can be one of '[jvp]', "
+      "'[vjp]', or '[transpose]'", ())
+ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
+      "expected witness_generic signature '%0' does not have same generic "
+      "parameters as original function generic signature '%1'",
+      (StringRef, StringRef))
 
 // Quoted attribute.
 ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,

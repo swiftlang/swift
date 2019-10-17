@@ -758,6 +758,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::LinearFunctionExtractInst:
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocExistentialBoxInst:
