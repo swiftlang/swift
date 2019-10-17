@@ -773,8 +773,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
       if (auto *vjpDecl = diffAttr->getVJPFunction())
         vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
       auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
-      AutoDiffConfig config{diffAttr->getParameterIndices(), resultIndices,
-                            diffAttr->getDerivativeGenericSignature()};
+      AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
+                            diffAttr->getDerivativeGenericSignature());
       emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
     }
   }

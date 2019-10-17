@@ -5602,7 +5602,6 @@ Automatic Differentiation
 
 differentiable_function
 ```````````````````````
-
 ::
 
   sil-instruction ::= 'differentiable_function'
@@ -5638,7 +5637,6 @@ clause. In canonical SIL, a ``with_derivative`` clause is mandatory.
 
 linear_function
 ```````````````
-
 ::
 
   sil-instruction ::= 'linear_function'
@@ -5670,7 +5668,6 @@ In canonical SIL, a ``with`` clause is mandatory.
 
 differentiable_function_extract
 ```````````````````````````````
-
 ::
 
   sil-instruction ::= 'differentiable_function_extract'
@@ -5692,7 +5689,6 @@ Extracts the original function or a derivative function from the given
 
 linear_function_extract
 ```````````````````````
-
 ::
 
   sil-instruction ::= 'linear_function_extract'

@@ -39,7 +39,7 @@ class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
-enum class DifferentiabilityKind: uint8_t {
+enum class DifferentiabilityKind : uint8_t {
   NonDifferentiable = 0,
   Normal = 1,
   Linear = 2
@@ -62,10 +62,10 @@ struct AutoDiffLinearMapKind {
 /// The kind of a derivative function.
 struct AutoDiffDerivativeFunctionKind {
   enum innerty : uint8_t {
-   // The Jacobian-vector products function.
-   JVP = 0,
-   // The vector-Jacobian products function.
-   VJP = 1
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1
   } rawValue;
 
   AutoDiffDerivativeFunctionKind() = default;
@@ -91,8 +91,8 @@ struct NormalDifferentiableFunctionTypeComponent {
       : rawValue(rawValue) {}
   NormalDifferentiableFunctionTypeComponent(
       AutoDiffDerivativeFunctionKind kind);
-  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue) :
-      NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
   explicit NormalDifferentiableFunctionTypeComponent(StringRef name);
   operator innerty() const { return rawValue; }
 
@@ -108,8 +108,8 @@ struct LinearDifferentiableFunctionTypeComponent {
   LinearDifferentiableFunctionTypeComponent() = default;
   LinearDifferentiableFunctionTypeComponent(innerty rawValue)
       : rawValue(rawValue) {}
-  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue) :
-      LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
   explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
   operator innerty() const { return rawValue; }
 };
@@ -132,10 +132,10 @@ private:
 
 public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
-    : Loc(loc), Kind(kind), V(value) {}
+      : Loc(loc), Kind(kind), V(value) {}
   
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
-  : Loc(loc), Kind(kind), V(index) {}
+      : Loc(loc), Kind(kind), V(index) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
                                                    Identifier name) {
@@ -251,6 +251,12 @@ struct AutoDiffConfig {
   IndexSubset *parameterIndices;
   IndexSubset *resultIndices;
   GenericSignature *derivativeGenericSignature;
+
+  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
+                              IndexSubset *resultIndices,
+                              GenericSignature *derivativeGenericSignature)
+      : parameterIndices(parameterIndices), resultIndices(resultIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
 };
 
 /// In conjunction with the original function declaration, identifies an
