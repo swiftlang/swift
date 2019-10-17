@@ -5671,12 +5671,10 @@ differentiable_function_extract
 ::
 
   sil-instruction ::= 'differentiable_function_extract'
-                      sil-differentiable-function-extractee
+                      '[' sil-differentiable-function-extractee ']'
                       sil-value ':' sil-type
 
-  sil-differentiable-function-extractee ::=
-      '[' sil-differentiable-function-extractee ']'
-  sil-differentiable-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
+  sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
 
   differentiable_function_extract [original] %0 : $@differentiable (T) -> T
   differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
@@ -5692,12 +5690,10 @@ linear_function_extract
 ::
 
   sil-instruction ::= 'linear_function_extract'
-                      sil-linear-function-extractee
+                      '[' sil-linear-function-extractee ']'
                       sil-value ':' sil-type
 
-  sil-linear-function-extractee ::=
-      '[' sil-linear-function-extractee-name ']'
-  sil-linear-function-extractee-name ::= 'original' | 'transpose'
+  sil-linear-function-extractee ::= 'original' | 'transpose'
 
   linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
   linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
@@ -5711,15 +5707,15 @@ differentiability_witness_function
 ``````````````````````````````````
 ::
 
-  sil-instruction ::= 'differentiability_witness_function'
-                      '[' sil-differentiability-witness-function-kind ']'
-                      '[' 'parameters' sil-differentiability-witness-indices ']'
-                      '[' 'results' sil-differentiability-witness-indices ']'
-                      generic-parameter-clause?
-                      sil-function-name ':' sil-type
+  sil-instruction ::=
+      'differentiability_witness_function'
+      '[' sil-differentiability-witness-function-kind ']'
+      '[' 'parameters' sil-differentiability-witness-function-index-list ']'
+      '[' 'results' sil-differentiability-witness-function-index-list ']'
+      generic-parameter-clause?
+      sil-function-name ':' sil-type
 
-  sil-differentiability-witness-function-kind ::=
-      'jvp' | 'vjp' | 'transpose'
+  sil-differentiability-witness-function-kind ::= 'jvp' | 'vjp' | 'transpose'
   sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
 
   differentiability_witness_function [jvp] [parameters 0] [results 0] \
