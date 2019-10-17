@@ -4210,7 +4210,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // In SIL mode, VarDecls are written as having reference storage types.
     if (!interfaceType->is<ReferenceStorageType>()) {
       if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-        interfaceType = checkReferenceOwnershipAttr(VD, interfaceType, attr);
+        interfaceType =
+            TypeChecker::checkReferenceOwnershipAttr(VD, interfaceType, attr);
     }
     VD->setInterfaceType(interfaceType);
 

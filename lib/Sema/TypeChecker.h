@@ -1020,8 +1020,8 @@ public:
   void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
-  Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
-                                   ReferenceOwnershipAttr *attr);
+  static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
+                                          ReferenceOwnershipAttr *attr);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
