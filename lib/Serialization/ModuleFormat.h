@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 520; // store generic signature in AST/SIL differentiable attributes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 523; // differentiable_function and differentiable_function_extract instructions
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -327,6 +327,15 @@ enum class ParameterConvention : uint8_t {
 using ParameterConventionField = BCFixed<4>;
 
 // SWIFT_ENABLE_TENSORFLOW
+// These IDs must \em not be renumbered or reordered without incrementing the
+// module version.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
+};
+using DifferentiabilityKindField = BCFixed<2>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SILParameterDifferentiability : uint8_t {
@@ -951,7 +960,7 @@ namespace decls_block {
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     // SWIFT_ENABLE_TENSORFLOW
-    BCFixed<1>,            // differentiable?
+    DifferentiabilityKindField, // differentiability kind
     BCFixed<1>,            // error result?
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields

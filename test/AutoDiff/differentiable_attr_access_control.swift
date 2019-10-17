@@ -20,6 +20,6 @@ private func foo3(_ x: Float) -> Float { return 1 }
 private func dfoo3(_ x: Float) -> (Float, (Float) -> Float) { return (1, {$0}) }
 
 // Error: vjp not exported.
-@differentiable(vjp: dbar1) // expected-error {{associated differentiation function 'dbar1' is required to either be public or @usableFromInline because the original function 'bar1' is public or @usableFromInline}}
+@differentiable(vjp: dbar1) // expected-error {{derivative function 'dbar1' is required to either be public or '@usableFromInline' because the original function 'bar1' is public or '@usableFromInline'}}
 public func bar1(_ x: Float) -> Float { return 1 }
 private func dbar1(_ x: Float) -> (Float, (Float) -> Float) { return (1, {$0}) }

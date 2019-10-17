@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
+// This file tests SIL diagnostics during the differentiation transform.
+
 //===----------------------------------------------------------------------===//
 // Basic function
 //===----------------------------------------------------------------------===//
@@ -329,3 +331,10 @@ struct TF_675 : Differentiable {
 }
 // expected-error @+1 {{function is not differentiable}}
 let _: @differentiable (Float) -> Float = TF_675().method
+
+//===----------------------------------------------------------------------===//
+// Conversion to `@differentiable(linear)` (not yet supported)
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{conversion to '@differentiable(linear)' function type is not yet supported}}
+let _: @differentiable(linear) (Float) -> Float = { x in x }

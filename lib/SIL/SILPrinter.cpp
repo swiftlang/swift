@@ -349,20 +349,19 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffAssociatedFunctionIdentifier) {
-    auto *autoDiffFuncId = autoDiffAssociatedFunctionIdentifier;
+  if (autoDiffDerivativeFunctionIdentifier) {
+    auto *autoDiffFuncId = autoDiffDerivativeFunctionIdentifier;
     OS << ((isDot || uncurryLevel != 0 || isForeign || isDirectReference)
                ? '.' : '!');
     switch (autoDiffFuncId->getKind()) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       OS << "jvp.";
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       OS << "vjp.";
       break;
     }
-    OS << autoDiffFuncId->getDifferentiationOrder() << "."
-       << autoDiffFuncId->getParameterIndices()->getString();
+    OS << autoDiffFuncId->getParameterIndices()->getString();
   }
 }
 
@@ -1164,21 +1163,30 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     if (!dfi->getParameterIndices()->isEmpty()) {
-      *this << "[wrt";
+      *this << "[parameters";
       for (auto i : dfi->getParameterIndices()->getIndices())
         *this << ' ' << i;
       *this << "] ";
     }
-    *this << "[order " << dfi->getDifferentiationOrder() << "] ";
     *this << getIDAndType(dfi->getOriginalFunction());
-    if (!dfi->getAssociatedFunctions().empty()) {
-      *this << " with ";
-      interleave(range(1, dfi->getDifferentiationOrder() + 1),
-                 [&](unsigned order) {
-                   auto pair = dfi->getAssociatedFunctionPair(order);
-                   *this << '{' << getIDAndType(pair.first) << ", "
-                         << getIDAndType(pair.second) << '}';
-                 }, [this] { *this << ", "; });
+    if (dfi->hasDerivativeFunctions()) {
+      *this << " with_derivative ";
+      *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
+            << getIDAndType(dfi->getVJPFunction()) << '}';
+    }
+  }
+
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    if (!lfi->getParameterIndices()->isEmpty()) {
+      *this << "[parameters";
+      for (auto i : lfi->getParameterIndices()->getIndices())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
     }
   }
 
@@ -1186,21 +1194,32 @@ public:
       DifferentiableFunctionExtractInst *dfei) {
     *this << '[';
     switch (dfei->getExtractee()) {
-    case DifferentiableFunctionExtractee::Original:
+    case NormalDifferentiableFunctionTypeComponent::Original:
       *this << "original";
       break;
-    case DifferentiableFunctionExtractee::JVP:
+    case NormalDifferentiableFunctionTypeComponent::JVP:
       *this << "jvp";
       break;
-    case DifferentiableFunctionExtractee::VJP:
+    case NormalDifferentiableFunctionTypeComponent::VJP:
       *this << "vjp";
       break;
     }
     *this << "] ";
-    auto order = dfei->getDifferentiationOrder();
-    if (order > 0)
-      *this << "[order " << order << "] ";
     *this << getIDAndType(dfei->getFunctionOperand());
+  }
+
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    *this << '[';
+    switch (lfei->getExtractee()) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      *this << "original";
+      break;
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(lfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -2704,6 +2723,33 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
     wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static void printSILDifferentiabilityWitnesses(
+    SILPrintContext &Ctx,
+    const SILModule::DifferentiabilityWitnessListType &diffWitnesses) {
+  if (!Ctx.sortSIL()) {
+    for (auto &dw : diffWitnesses)
+      dw.print(Ctx.OS(), Ctx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILDifferentiabilityWitness *> sortedDiffWitnesses;
+  sortedDiffWitnesses.reserve(diffWitnesses.size());
+  for (auto &dw : diffWitnesses)
+    sortedDiffWitnesses.push_back(&dw);
+  std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
+    [] (const SILDifferentiabilityWitness *w1,
+        const SILDifferentiabilityWitness *w2) -> bool {
+      // TODO(TF-893): Sort based on more criteria for deterministic ordering.
+      return w1->getOriginalFunction()->getName()
+          .compare(w2->getOriginalFunction()->getName());
+    }
+  );
+  for (auto *dw : sortedDiffWitnesses)
+    dw->print(Ctx.OS(), Ctx.printVerbose());
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapCollectionType &CoverageMaps) {
@@ -2821,6 +2867,10 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
+  // SWIFT_ENABLE_TENSORFLOW
+  printSILDifferentiabilityWitnesses(PrintCtx,
+                                     getDifferentiabilityWitnessList());
+  // SWIFT_ENABLE_TENSORFLOW END
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
@@ -3034,6 +3084,125 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
+
+// TODO(TF-893): Use this helper to dedupe the same logic in
+// `SILFunction::print`.
+static void printSILFunctionNameAndType(
+    llvm::raw_ostream &OS, SILFunction *function) {
+  function->printName(OS);
+  OS << " : $";
+  llvm::DenseMap<CanType, Identifier> Aliases;
+  llvm::DenseSet<Identifier> UsedNames;
+  auto sig = function->getLoweredFunctionType()->getGenericSignature();
+  auto *env = function->getGenericEnvironment();
+  if (sig && env) {
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : sig->getGenericParams()) {
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
+      while (!UsedNames.insert(name).second) {
+        disambiguatedNameBuf.clear();
+        {
+          llvm::raw_svector_ostream names(disambiguatedNameBuf);
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
+        }
+        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
+      }
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
+    }
+  }
+
+  {
+    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
+    withGenericEnvironment.GenericEnv = env;
+    withGenericEnvironment.AlternativeTypeNames =
+      Aliases.empty() ? nullptr : &Aliases;
+    function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
+  }
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void SILDifferentiabilityWitness::print(
+    llvm::raw_ostream &OS, bool verbose) const {
+  OS << "// differentiability witness for "
+     << demangleSymbol(originalFunction->getName()) << '\n';
+  PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  // sil_differentiability_witness (linkage)?
+  OS << "sil_differentiability_witness ";
+  printLinkage(OS, linkage, ForDefinition);
+  // ([serialized])?
+  if (isSerialized())
+    OS << "[serialized] ";
+  // [parameters ...]
+  OS << "[parameters ";
+  interleave(getParameterIndices()->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ' '; });
+  // [results ...]
+  OS << "] [results ";
+  interleave(getResultIndices()->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ' '; });
+  OS << "] ";
+  // ([where ...])?
+  if (auto derivativeGenSig = getDerivativeGenericSignature()) {
+    ArrayRef<Requirement> requirements;
+    SmallVector<Requirement, 4> requirementsScratch;
+    auto *origGenEnv = originalFunction->getGenericEnvironment();
+    if (derivativeGenSig) {
+      if (origGenEnv) {
+        requirementsScratch = derivativeGenSig->requirementsNotSatisfiedBy(
+            origGenEnv->getGenericSignature());
+        requirements = requirementsScratch;
+      } else {
+        requirements = derivativeGenSig->getRequirements();
+      }
+    }
+    if (!requirements.empty()) {
+      OS << "[where ";
+      auto subPrinter = PrintOptions::printSIL();
+      subPrinter.GenericEnv = origGenEnv;
+      interleave(requirements,
+                 [&](Requirement req) {
+                   req.print(OS, subPrinter);
+                 },
+                 [&] { OS << ", "; });
+      OS << "] ";
+    }
+  }
+  // @original-function-name : $original-sil-type
+  printSILFunctionNameAndType(OS, originalFunction);
+  // {
+  //   jvp: @jvp-function-name : $jvp-sil-type
+  //   vjp: @vjp-function-name : $vjp-sil-type
+  // }
+  OS << " {\n";
+  if (jvp) {
+    OS << "  jvp: ";
+    printSILFunctionNameAndType(OS, jvp);
+    OS << '\n';
+  }
+  if (vjp) {
+    OS << "  vjp: ";
+    printSILFunctionNameAndType(OS, vjp);
+    OS << '\n';
+  }
+  OS << "}\n\n";
+}
+
+void SILDifferentiabilityWitness::dump() const {
+  print(llvm::errs());
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();

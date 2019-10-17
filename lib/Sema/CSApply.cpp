@@ -5887,9 +5887,21 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
   auto &tc = cs.getTypeChecker();
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
+  auto isToTypeLinear =
+      toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear;
+  // Conversion from a `@differentiable` function to a `@differentiable(linear)`
+  // function is not allowed, because the from-expression will never be a
+  // closure expression or a declaration/member reference.
+  if (fromFnType->getDifferentiabilityKind() == DifferentiabilityKind::Normal &&
+      toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+    tc.diagnose(expr->getLoc(),
+                diag::invalid_differentiable_function_conversion_expr,
+                isToTypeLinear);
+    return;
+  }
   // Conversion from a non-`@differentiable` function to a `@differentiable` is
   // only allowed from a closure expression or a declaration/member reference.
-  if (toType->isDifferentiable() && !fromFnType->isDifferentiable()) {
+  if (!fromFnType->isDifferentiable() && toType->isDifferentiable()) {
     auto maybeDiagnoseFunctionRef = [&](Expr *semanticExpr) {
       if (auto *capture = dyn_cast<CaptureListExpr>(semanticExpr))
         semanticExpr = capture->getClosureBody();
@@ -5901,20 +5913,15 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         // note with a fix-it.
         if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
           tc.diagnose(expr->getLoc(),
-                      diag::invalid_differentiable_function_conversion_expr);
+                      diag::invalid_differentiable_function_conversion_expr,
+                      isToTypeLinear);
           if (paramDecl->getType()->is<AnyFunctionType>()) {
             auto *typeRepr = paramDecl->getTypeLoc().getTypeRepr();
             while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
               typeRepr = attributed->getTypeRepr();
             std::string attributeString = "@differentiable";
-            switch (toType->getDifferentiabilityKind()) {
-            case DifferentiabilityKind::Linear:
+            if (isToTypeLinear)
               attributeString += "(linear)";
-              break;
-            case DifferentiabilityKind::Normal:
-            case DifferentiabilityKind::NonDifferentiable:
-              break;
-            }
             auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);
             auto paramListLoc = funcTypeRepr->getArgsTypeRepr()->getStartLoc();
             tc.diagnose(paramDecl->getLoc(),
@@ -5934,7 +5941,8 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
           return;
       }
       tc.diagnose(expr->getLoc(),
-                  diag::invalid_differentiable_function_conversion_expr);
+                  diag::invalid_differentiable_function_conversion_expr,
+                  isToTypeLinear);
     };
     maybeDiagnoseFunctionRef(getSemanticExprForDeclOrMemberRef(expr));
   }
@@ -6587,23 +6595,55 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     // SWIFT_ENABLE_TENSORFLOW
     auto fromEI = fromFunc->getExtInfo();
+    auto isFromDifferentiable = fromEI.isDifferentiable();
+    auto isToDifferentiable = toEI.isDifferentiable();
     // Handle implicit conversion from @differentiable.
-    if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
+    if (isFromDifferentiable && !isToDifferentiable) {
       fromFunc = fromFunc->getWithoutDifferentiability()
           ->castTo<FunctionType>();
-      expr = cs.cacheType(new (tc.Context)
-          DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
+      switch (fromEI.getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
+        expr = cs.cacheType(new (tc.Context)
+            DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
+        break;
+      case DifferentiabilityKind::Linear:
+        expr = cs.cacheType(new (tc.Context)
+            LinearFunctionExtractOriginalExpr(expr, fromFunc));
+        break;
+      case DifferentiabilityKind::NonDifferentiable:
+        llvm_unreachable("Cannot be NonDifferentiable");
+      }
     }
-    // Handle implicit conversion to @differentiable.
+    // Handle implicit conversion from @differentiable(linear) to
+    // @differentiable.
+    else if (fromEI.getDifferentiabilityKind() ==
+                 DifferentiabilityKind::Linear &&
+             toEI.getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
+      // TODO(TF-908): Create a `LinearToDifferentiableFunctionExpr` and SILGen
+      // it as thunk application. Remove the diagnostic.
+      tc.diagnose(expr->getLoc(),
+                  diag::unsupported_linear_to_differentiable_conversion);
+    }
+    // Handle implicit conversion from non-@differentiable to @differentiable.
     maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
-    if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
+    if (!isFromDifferentiable && isToDifferentiable) {
       auto newEI =
           fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
       fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
           ->withExtInfo(newEI)
           ->castTo<FunctionType>();
-      expr = cs.cacheType(new (tc.Context)
-                              DifferentiableFunctionExpr(expr, fromFunc));
+      switch (toEI.getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
+        expr = cs.cacheType(new (tc.Context)
+                            DifferentiableFunctionExpr(expr, fromFunc));
+        break;
+      case DifferentiabilityKind::Linear:
+        expr = cs.cacheType(new (tc.Context)
+                            LinearFunctionExpr(expr, fromFunc));
+        break;
+      case DifferentiabilityKind::NonDifferentiable:
+        llvm_unreachable("Cannot be NonDifferentiable");
+      }
     }
 
     // If we have a ClosureExpr, then we can safely propagate the 'no escape'

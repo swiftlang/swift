@@ -4567,10 +4567,9 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
   return cache(None);
 }
 
-AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
-    AutoDiffIndexSubset *indices, unsigned resultIndex,
-    unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    LookupConformanceFn lookupConformance,
+AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
+    IndexSubset *indices, unsigned resultIndex,
+    AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
     GenericSignature whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
@@ -4581,7 +4580,6 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // "Closure" and then use common code to wrap "Closure" in the outer function
   // type.
 
-  assert(differentiationOrder == 1 && "only order 1 currently supported");
   assert(!indices->isEmpty() && "there must be at least one wrt index");
 
   auto &ctx = getASTContext();
@@ -4608,7 +4606,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // JVP or VJP.
   Type closure;
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP: {
+  case AutoDiffDerivativeFunctionKind::JVP: {
     // closure is the JVP "differential":
     //   (T.TangentVector...) -> (R.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
@@ -4637,7 +4635,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     closure = FunctionType::get(differentialParams, differentialResult);
     break;
   }
-  case AutoDiffAssociatedFunctionKind::VJP: {
+  case AutoDiffDerivativeFunctionKind::VJP: {
     // closure is the VJP "pullback":
     //   (R.TangentVector...) -> (T.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> pullbackParams;
@@ -4675,22 +4673,22 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   retElts.push_back(originalResult);
   retElts.push_back(closure);
   auto retTy = TupleType::get(retElts, ctx);
-  auto *associatedFunction = makeFunctionType(
+  auto *derivativeFunction = makeFunctionType(
       curryLevels.back(), curryLevels.back()->getParams(), retTy,
       curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
 
-  // Wrap the associated function type in additional curry levels.
+  // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
-    associatedFunction = makeFunctionType(
-        curryLevel, curryLevel->getParams(), associatedFunction,
+    derivativeFunction = makeFunctionType(
+        curryLevel, curryLevel->getParams(), derivativeFunction,
         i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr);
   }
 
-  return associatedFunction;
+  return derivativeFunction;
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -4718,7 +4716,7 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
       curryLevels.back(), curryLevels.back()->getParams(), originalResult,
       curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
 
-  // Wrap the associated function type in additional curry levels.
+  // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
@@ -4744,7 +4742,7 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
 // Compute the original function type corresponding to the given transpose
 // function type.
 AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
-    TransposingAttr *attr, AutoDiffIndexSubset *wrtParamIndices, bool wrtSelf) {
+    TransposingAttr *attr, IndexSubset *wrtParamIndices, bool wrtSelf) {
   unsigned transposeParamsIndex = 0;
   bool isCurried = getResult()->is<AnyFunctionType>();
   

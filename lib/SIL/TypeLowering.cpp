@@ -146,27 +146,6 @@ namespace {
                        ResilienceExpansion Expansion)
       : TC(TC), Sig(Sig), Expansion(Expansion) {}
 
-    // SWIFT_ENABLE_TENSORFLOW
-    RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
-        CanSILFunctionType type) {
-      assert(type->isDifferentiable());
-      auto &M = TC.M;
-      auto origTy = type->getWithoutDifferentiability();
-      auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M));
-      auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M));
-      RecursiveProperties props;
-      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
-      return props;
-    }
-
   public:
     // The subclass should implement:
     //   // Trivial, fixed-layout, and non-address-only.
@@ -248,8 +227,18 @@ namespace {
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
       // SWIFT_ENABLE_TENSORFLOW
-      if (type->isDifferentiable())
-        return asImpl().visitDifferentiableSILFunctionType(type);
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
+        return asImpl().visitNormalDifferentiableSILFunctionType(
+            type,
+            getNormalDifferentiableSILFunctionTypeRecursiveProperties(type));
+      case DifferentiabilityKind::Linear:
+        return asImpl().visitLinearDifferentiableSILFunctionType(
+            type,
+            getLinearDifferentiableSILFunctionTypeRecursiveProperties(type));
+      case DifferentiabilityKind::NonDifferentiable:
+        break;
+      }
 
       // Only escaping closures are references.
       bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
@@ -262,10 +251,48 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    RetTy visitDifferentiableSILFunctionType(CanSILFunctionType type) {
-      assert(type->isDifferentiable());
-      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
-      return asImpl().handleAggregateByProperties(type, props);
+    RecursiveProperties
+    getNormalDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type) {
+      auto &M = TC.M;
+      auto origTy = type->getWithoutDifferentiability();
+      auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
+          LookUpConformanceInModule(&M));
+      auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
+          LookUpConformanceInModule(&M));
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
+      props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
+      props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
+      return props;
+    }
+
+    RecursiveProperties
+    getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type) {
+      auto &M = TC.M;
+      auto origTy = type->getWithoutDifferentiability();
+      auto transTy = origTy->getAutoDiffTransposeFunctionType(
+          type->getDifferentiationParameterIndices(), TC,
+          LookUpConformanceInModule(&M));
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
+      props.addSubobject(classifyType(transTy, TC, Sig, Expansion));
+      return props;
+    }
+
+    RetTy visitNormalDifferentiableSILFunctionType(
+        CanSILFunctionType type, RecursiveProperties props) {
+      return handleAggregateByProperties(type, props);
+    }
+
+    RetTy visitLinearDifferentiableSILFunctionType(
+        CanSILFunctionType type, RecursiveProperties props) {
+      return handleAggregateByProperties(type, props);
     }
 
     RetTy visitLValueType(CanLValueType type) {
@@ -862,62 +889,101 @@ namespace {
   };
 
   // SWIFT_ENABLE_TENSORFLOW
-  using DifferentiableSILFunctionTypeIndex =
-      std::pair<DifferentiableFunctionExtractee, unsigned>;
-  class DifferentiableSILFunctionTypeLowering final
-      : public LoadableAggTypeLowering<DifferentiableSILFunctionTypeLowering,
-                                       DifferentiableSILFunctionTypeIndex> {
+  class NormalDifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<
+                   NormalDifferentiableSILFunctionTypeLowering,
+                   NormalDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
 
-    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
-                               SILValue tupleValue,
-                               DifferentiableSILFunctionTypeIndex index,
-                               const TypeLowering &eltLowering) const {
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        NormalDifferentiableFunctionTypeComponent extractee,
+        const TypeLowering &eltLowering) const {
       return B.createDifferentiableFunctionExtract(
-          loc, index.first, index.second, tupleValue);
+          loc, extractee, tupleValue);
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                               ArrayRef<SILValue> values) const override {
+      assert(values.size() == 3);
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
-      // TODO: Retrieve the differentiation order when that is properly stored
-      // in the function type.
-      unsigned maxOrder = 1;
       return B.createDifferentiableFunction(
-          loc, paramIndices, maxOrder, values.front(), values.drop_front());
+          loc, paramIndices, values[0], std::make_pair(values[1], values[2]));
     }
 
     void lowerChildren(TypeConverter &TC,
                        SmallVectorImpl<Child> &children) const override {
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
-      // TODO: Retrieve the differentiation order when that is properly stored
-      // in the function type.
-      auto maxOrder = 1;
-      auto numAssocFns = autodiff::getNumAutoDiffAssociatedFunctions(maxOrder);
-      children.reserve(numAssocFns + 1);
+      auto numDerivativeFns = 2;
+      children.reserve(numDerivativeFns + 1);
       auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
-        {DifferentiableFunctionExtractee::Original, 0},
+        NormalDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
-      for (auto order : range(1, maxOrder + 1)) {
-        for (AutoDiffAssociatedFunctionKind kind
-                 : {AutoDiffAssociatedFunctionKind::JVP,
-                    AutoDiffAssociatedFunctionKind::VJP}) {
-          auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
-              paramIndices, 0, order, kind, TC,
-              LookUpConformanceInModule(&TC.M));
-          auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
-          children.push_back(Child{
-            {DifferentiableFunctionExtractee(kind), order},
-            TC.getTypeLowering(silTy, getResilienceExpansion())
-          });
-        }
+      for (AutoDiffDerivativeFunctionKind kind :
+               {AutoDiffDerivativeFunctionKind::JVP,
+                AutoDiffDerivativeFunctionKind::VJP}) {
+        auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+            paramIndices, 0, kind, TC,
+            LookUpConformanceInModule(&TC.M));
+        auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
+        NormalDifferentiableFunctionTypeComponent extractee(kind);
+        // Assert that we have the right extractee. A terrible bug in the past
+        // was caused by implicit conversions from `unsigned` to
+        // `NormalDifferentiableFunctionTypeComponent` which resulted into a
+        // wrong extractee.
+        assert(extractee.getAsDerivativeFunctionKind() == kind);
+        children.push_back(Child{
+            extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
       }
-      assert(children.size() == numAssocFns + 1);
+      assert(children.size() == 3);
+    }
+  };
+
+  class LinearDifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<
+                   LinearDifferentiableSILFunctionTypeLowering,
+                   LinearDifferentiableFunctionTypeComponent> {
+  public:
+    using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        LinearDifferentiableFunctionTypeComponent component,
+        const TypeLowering &eltLowering) const {
+      return B.createLinearFunctionExtract(loc, component, tupleValue);
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      assert(values.size() == 3);
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      return B.createLinearFunction(loc, paramIndices, values[0], values[1]);
+    }
+
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      children.reserve(2);
+      auto origFnTy = fnTy->getWithoutDifferentiability();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      children.push_back(Child{
+        LinearDifferentiableFunctionTypeComponent::Original,
+        TC.getTypeLowering(origFnTy, getResilienceExpansion())
+      });
+      auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
+          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+      auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
+      children.push_back(Child{
+        LinearDifferentiableFunctionTypeComponent::Transpose,
+        TC.getTypeLowering(transposeSILFnTy, getResilienceExpansion())
+      });
+      assert(children.size() == 2);
     }
   };
 
@@ -1417,11 +1483,17 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     TypeLowering *
-    visitDifferentiableSILFunctionType(CanSILFunctionType type) {
-      assert(type->isDifferentiable());
-      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
-      return handleAggregateByProperties<DifferentiableSILFunctionTypeLowering>(
-          type, props);
+    visitNormalDifferentiableSILFunctionType(CanSILFunctionType type,
+                                             RecursiveProperties props) {
+      return handleAggregateByProperties
+          <NormalDifferentiableSILFunctionTypeLowering>(type, props);
+    }
+
+    TypeLowering *
+    visitLinearDifferentiableSILFunctionType(CanSILFunctionType type,
+                                             RecursiveProperties props) {
+      return handleAggregateByProperties
+          <LinearDifferentiableSILFunctionTypeLowering>(type, props);
     }
 
     template <class LoadableLoweringClass>
@@ -2012,13 +2084,12 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   // SWIFT_ENABLE_TENSORFLOW
-  if (auto *autoDiffFuncId = c.autoDiffAssociatedFunctionIdentifier) {
+  if (auto *autoDiffFuncId = c.autoDiffDerivativeFunctionIdentifier) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
-    auto *fnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
+    auto *fnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
         autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
-        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
-        LookUpConformanceInModule(&M));
+        autoDiffFuncId->getKind(), LookUpConformanceInModule(&M));
     return cast<AnyFunctionType>(fnTy->getCanonicalType());
   }
 

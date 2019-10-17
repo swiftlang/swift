@@ -183,6 +183,14 @@ namespace {
     /// Holds the list of Properties.
     std::vector<BitOffset> PropertyOffset;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// Maps differentiability witness identifier to an ID.
+    Table DifferentiabilityWitnessList;
+    /// Holds the list of SIL differentiability witnesses.
+    std::vector<BitOffset> DifferentiabilityWitnessOffset;
+    uint32_t /*DeclID*/ NextDifferentiabilityWitnessID = 1;
+    // SWIFT_ENABLE_TENSORFLOW END
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
 
@@ -232,6 +240,10 @@ namespace {
     void writeSILWitnessTable(const SILWitnessTable &wt);
     void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
+    // SWIFT_ENABLE_TENSORFLOW
+    void writeSILDifferentiabilityWitness(
+        const SILDifferentiabilityWitness &dw);
+    // SWIFT_ENABLE_TENSORFLOW END
     void writeSILProperty(const SILProperty &prop);
 
     void writeSILBlock(const SILModule *SILMod);
@@ -1000,8 +1012,26 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
-        dfi->getDifferentiationOrder(), paramIndices->getCapacity(),
-        dfi->getNumOperands(), trailingInfo);
+        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    auto *lfi = cast<LinearFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = lfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : lfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstLinearFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionLayout::Code],
+        paramIndices->getCapacity(), lfi->hasTransposeFunction(),
+        trailingInfo);
     break;
   }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
@@ -1013,7 +1043,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, dfei->getDifferentiationOrder());
+        rawExtractee);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto *lfei = cast<LinearFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(lfei->getFunctionOperand());
+    auto operandType = lfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)lfei->getExtractee();
+    SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee);
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -2215,7 +2257,13 @@ static void writeIndexTable(Serializer &S,
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
-          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) &&
+          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+          // SWIFT_ENABLE_TENSORFLOW
+          // TODO(TF-893): Update surrounding comment/assertion text when
+          // upstreaming code to master. Comments/assertions have not been
+          // updated to keep the code diff small.
+          kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) &&
+          // SWIFT_ENABLE_TENSORFLOW END
          "SIL function table, global, vtable and (default) witness table "
          "are supported");
   llvm::SmallString<4096> hashTableBlob;
@@ -2273,11 +2321,22 @@ void SILSerializer::writeIndexTables() {
                 DefaultWitnessTableOffset);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!DifferentiabilityWitnessList.empty()) {
+    writeIndexTable(S, List,
+                    sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
+                    DifferentiabilityWitnessList);
+    Offset.emit(ScratchRecord,
+                sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+                DifferentiabilityWitnessOffset);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+
   if (!PropertyOffset.empty()) {
     Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
                 PropertyOffset);
   }
-  
+
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
@@ -2469,6 +2528,53 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void SILSerializer::
+writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
+  Mangle::ASTMangler mangler;
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(dw.getKey());
+  size_t nameLength = mangledKey.size();
+  char *stringStorage =
+      static_cast<char *>(StringTable.Allocate(nameLength, 1));
+  std::memcpy(stringStorage, mangledKey.data(), nameLength);
+  DifferentiabilityWitnessList[StringRef(stringStorage, nameLength)] =
+      NextDifferentiabilityWitnessID++;
+  DifferentiabilityWitnessOffset.push_back(Out.GetCurrentBitNo());
+
+  auto *original = dw.getOriginalFunction();
+  IdentifierID jvpID = 0;
+  IdentifierID vjpID = 0;
+  if (auto *jvp = dw.getJVP())
+    jvpID = addSILFunctionRef(jvp);
+  if (auto *vjp = dw.getVJP())
+    vjpID = addSILFunctionRef(vjp);
+  SmallVector<unsigned, 8> parameterAndResultIndices(
+      dw.getParameterIndices()->begin(), dw.getParameterIndices()->end());
+  parameterAndResultIndices.append(dw.getResultIndices()->begin(),
+                                   dw.getResultIndices()->end());
+  auto originalFnType = original->getLoweredFunctionType();
+  assert(originalFnType->getNumParameters() ==
+         dw.getParameterIndices()->getCapacity() &&
+         "Original function parameter count should match differentiability "
+         "witness parameter indices capacity");
+  assert(originalFnType->getNumResults() ==
+         dw.getResultIndices()->getCapacity() &&
+         "Original function result count should match differentiability "
+         "witness result indices capacity");
+
+  DifferentiabilityWitnessLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
+      addSILFunctionRef(original),
+      toStableSILLinkage(dw.getLinkage()),
+      dw.isSerialized(),
+      S.addGenericSignatureRef(dw.getDerivativeGenericSignature()),
+      jvpID, vjpID,
+      dw.getParameterIndices()->getNumIndices(),
+      dw.getResultIndices()->getNumIndices(),
+      parameterAndResultIndices);
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Helper function for whether to emit a function body.
 bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
                                            bool isReference) {
@@ -2529,6 +2635,9 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
+  registerSILAbbr<DifferentiabilityWitnessLayout>();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
@@ -2536,7 +2645,10 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILDifferentiableAttrLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionLayout>();
+  registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
+  registerSILAbbr<SILInstLinearFunctionExtractLayout>();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
@@ -2588,6 +2700,17 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
                                                               wt.getProtocol()))
       writeSILDefaultWitnessTable(wt);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Write out differentiability witnesses.
+  for (const auto &diffWitness : SILMod->getDifferentiabilityWitnessList()) {
+    // TODO(TF-893): Consider checking
+    // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
+    // functions.
+    if ((ShouldSerializeAll || diffWitness.isSerialized()))
+      writeSILDifferentiabilityWitness(diffWitness);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Emit only declarations if it is a module with pre-specializations.
   // And only do it in optimized builds.

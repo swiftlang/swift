@@ -917,8 +917,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *i);
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   // SWIFT_ENABLE_TENSORFLOW END
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
@@ -1865,21 +1867,28 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 // SWIFT_ENABLE_TENSORFLOW
 void IRGenSILFunction::
 visitDifferentiableFunctionInst(DifferentiableFunctionInst *i) {
-  // The original function and associated functions can be thin or thick.
   auto origExp = getLoweredExplosion(i->getOriginalFunction());
   Explosion e;
   e.add(origExp.claimAll());
-  for (auto &assocFnOp : i->getAssociatedFunctions())
-    e.add(getLoweredExplosion(assocFnOp.get()).claimAll());
+  assert(i->hasDerivativeFunctions());
+  for (auto &derivFnOperand : i->getDerivativeFunctionArray())
+    e.add(getLoweredExplosion(derivFnOperand.get()).claimAll());
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionInst(LinearFunctionInst *i) {
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  assert(i->hasTransposeFunction());
+  e.add(getLoweredExplosion(i->getTransposeFunction()).claimAll());
   setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::
 visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i) {
-  unsigned structFieldOffset = 0;
-  if (i->getExtractee() != DifferentiableFunctionExtractee::Original)
-    structFieldOffset = 1 + autodiff::getOffsetForAutoDiffAssociatedFunction(
-      i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
+  unsigned structFieldOffset = i->getExtractee().rawValue;
   unsigned fieldSize = 1;
   auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
   if (fnRepr == SILFunctionTypeRepresentation::Thick) {
@@ -1887,6 +1896,24 @@ visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i) {
     fieldSize = 2;
   }
   auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  assert(diffFnExp.size() == fieldSize * 3);
+  Explosion e;
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
+  unsigned structFieldOffset = i->getExtractee().rawValue;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  assert(diffFnExp.size() == fieldSize * 2);
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)diffFnExp.claimAll();

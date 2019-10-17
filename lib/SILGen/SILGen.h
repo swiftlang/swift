@@ -148,18 +148,18 @@ public:
                                CanSILFunctionType constantTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff associated function thunk for the given
-  /// SILDeclRef, SILFunction, and associated function type.
-  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef assocFnRef,
-                                        SILFunction *assocFn,
-                                        CanSILFunctionType assocFnTy);
+  /// Get or create an autodiff derivative function thunk for the given
+  /// SILDeclRef, SILFunction, and derivative function type.
+  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef derivativeFnRef,
+                                        SILFunction *derivativeFn,
+                                        CanSILFunctionType derivativeFnTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff associated function vtable entry thunk for the
-  /// given SILDeclRef and associated function type.
+  /// Get or create an autodiff derivative function vtable entry thunk for the
+  /// given SILDeclRef and derivative function type.
   SILFunction *
-  getOrCreateAutoDiffClassMethodThunk(SILDeclRef assocFnRef,
-                                      CanSILFunctionType assocFnTy);
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
+                                      CanSILFunctionType derivativeFnTy);
 
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
@@ -185,10 +185,10 @@ public:
   /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
+  SILFunction *getOrCreateAutoDiffDerivativeFunctionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
-      SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
-      bool reorderSelf);
+      SILFunction *derivativeFn,
+      AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -317,6 +317,16 @@ public:
 
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Emit the differentiability witness for the given original function
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
+  /// functions (null if undefined).
+  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
+                                    SILFunction *originalFunction,
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.

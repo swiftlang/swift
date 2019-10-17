@@ -301,7 +301,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
 
   // SWIFT_ENABLE_TENSORFLOW
   if (hasAttr(TAK_differentiable)) {
-    if (Attrs.isLinear()) {
+    if (Attrs.linear) {
       Printer.printSimpleAttr("@differentiable(linear)") << " ";
     } else {
       Printer.printSimpleAttr("@differentiable") << " ";

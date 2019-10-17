@@ -91,15 +91,15 @@ template <class T> class SILVTableVisitor {
     // SWIFT_ENABLE_TENSORFLOW
     for (auto *DA : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
-      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+      auto jvpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
               DA->getParameterIndices(), fd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
-      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+      auto vjpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
               DA->getParameterIndices(), fd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
@@ -118,15 +118,15 @@ template <class T> class SILVTableVisitor {
     // SWIFT_ENABLE_TENSORFLOW
     for (auto *DA : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
-      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+      auto jvpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
               DA->getParameterIndices(), cd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
-      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+      auto vjpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
               DA->getParameterIndices(), cd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }

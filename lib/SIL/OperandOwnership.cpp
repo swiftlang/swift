@@ -340,7 +340,7 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
-FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunctionExtract)
+FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -360,6 +360,11 @@ FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunctionExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                            StructExtract)
+// SWIFT_ENABLE_TENSORFLOW
+FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
+                                           DifferentiableFunctionExtract)
+FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
+                                           LinearFunctionExtract)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 OperandOwnershipKindMap

@@ -1493,59 +1493,78 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
-    require(dfi->getDifferentiationOrder() > 0,
-            "The differentiation order must be non-zero");
     auto origTy =
         dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
             "The original function must not be @differentiable");
     if (F.getModule().getStage() == SILStage::Canonical ||
-        dfi->hasAssociatedFunctions()) {
-      for (auto order : range(1, dfi->getDifferentiationOrder() + 1)) {
-        auto pair = dfi->getAssociatedFunctionPair(order);
-        auto jvpType = pair.first->getType().getAs<SILFunctionType>();
-        require(jvpType, "The JVP function must have a function type");
-        require(!jvpType->isDifferentiable(),
-                "The JVP function must not be @differentiable");
-        auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
-            dfi->getParameterIndices(), /*resultIndex*/ 0, order,
-            AutoDiffAssociatedFunctionKind::JVP, TC,
-            LookUpConformanceInModule(M));
-        requireSameType(SILType::getPrimitiveObjectType(jvpType),
-                        SILType::getPrimitiveObjectType(expectedJVPType),
-                        "JVP type does not match expected JVP type");
-        auto vjpType = pair.second->getType().getAs<SILFunctionType>();
-        require(vjpType, "The VJP function must have a function type");
-        require(!vjpType->isDifferentiable(),
-                "The VJP function must not be @differentiable");
-        auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
-            dfi->getParameterIndices(), /*resultIndex*/ 0, order,
-            AutoDiffAssociatedFunctionKind::VJP, TC,
-            LookUpConformanceInModule(M));
-        requireSameType(SILType::getPrimitiveObjectType(vjpType),
-                        SILType::getPrimitiveObjectType(expectedVJPType),
-                        "VJP type does not match expected VJP type");
-      }
+        dfi->hasDerivativeFunctions()) {
+      auto jvp = dfi->getJVPFunction();
+      auto jvpType = jvp->getType().getAs<SILFunctionType>();
+      require(jvpType, "The JVP function must have a function type");
+      require(!jvpType->isDifferentiable(),
+              "The JVP function must not be @differentiable");
+      auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
+          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
+          LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(jvpType),
+                      SILType::getPrimitiveObjectType(expectedJVPType),
+                      "JVP type does not match expected JVP type");
+      auto vjp = dfi->getVJPFunction();
+      auto vjpType = vjp->getType().getAs<SILFunctionType>();
+      require(vjpType, "The VJP function must have a function type");
+      require(!vjpType->isDifferentiable(),
+              "The VJP function must not be @differentiable");
+      auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
+          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
+          LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(vjpType),
+                      SILType::getPrimitiveObjectType(expectedVJPType),
+                      "VJP type does not match expected VJP type");
+    }
+  }
+
+  void checkLinearFunctionInst(LinearFunctionInst *lfi) {
+    auto origTy =
+        lfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
+    require(origTy, "The original function must have a function type");
+    require(!origTy->isDifferentiable(),
+            "The original function must not be differentiable");
+    if (F.getModule().getStage() == SILStage::Canonical ||
+        lfi->hasTransposeFunction()) {
+      auto transpose = lfi->getTransposeFunction();
+      auto transposeType = transpose->getType().getAs<SILFunctionType>();
+      require(transposeType,
+              "The transpose function must have a function type");
+      require(!transposeType->isDifferentiable(),
+              "The transpose function must not be differentiable");
+      auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
+          lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(transposeType),
+                      SILType::getPrimitiveObjectType(expectedTransposeType),
+                      "Transpose type does not match expected transpose type");
     }
   }
   
   void checkDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
-    if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
-      require(dfei->getDifferentiationOrder() == 0,
-              "Differentiation order should not have been set when the "
-              "original function is being extracted");
-    else
-      require(dfei->getDifferentiationOrder() > 0,
-              "Extraction of associated functions requires a differentiation "
-              "order");
     auto fnTy = dfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
-    require(fnTy->isDifferentiable(),
-            "The function operand must be an '@differentiable' function");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
+            "The function operand must be a '@differentiable' function");
   }
-  // SWIFT_ENABLE_TENSORFLOW
+
+  void checkLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    auto fnTy = lfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear,
+            "The function operand must be a '@differentiable(linear)' "
+            "function");
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
     // Certain llvm intrinsic require constant values as their operands.
@@ -5095,8 +5114,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto *RDiffAttr : F->getDifferentiableAttrs())
-      verifyDifferentiableAttr(F, *RDiffAttr);
+    for (auto *DiffAttr : F->getDifferentiableAttrs())
+      verifyDifferentiableAttr(F, *DiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())
@@ -5361,6 +5380,56 @@ void SILGlobalVariable::verify() const {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Verify that a differentiability witness follows invariants.
+void SILDifferentiabilityWitness::verify(const SILModule &M) const {
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
+  auto origFnType = originalFunction->getLoweredFunctionType();
+  CanGenericSignature derivativeCanGenSig;
+  if (auto derivativeGenSig = getDerivativeGenericSignature())
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto requireSameType =
+      [&](CanSILFunctionType type1, CanSILFunctionType type2,
+          const Twine &complaint) {
+    if (type1 == type2)
+      return;
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    llvm::dbgs() << "  " << type1 << "\n  " << type2 << "\n\n";
+    llvm::dbgs() << "In differentiability witness:\n";
+    print(llvm::dbgs());
+    // We abort by default because we want to always crash in
+    // the debugger.
+    if (AbortOnFailure)
+      abort();
+    else
+      exit(1);
+  };
+  if (jvp) {
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to accept result indices.
+    auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
+        AutoDiffDerivativeFunctionKind::JVP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+    requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
+                    "JVP type does not match expected JVP type");
+  }
+  if (vjp) {
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to result indices.
+    auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
+        AutoDiffDerivativeFunctionKind::VJP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+    requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
+                    "VJP type does not match expected VJP type");
+  }
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Verify the module.
 void SILModule::verify() const {
 #ifdef NDEBUG
@@ -5444,6 +5513,22 @@ void SILModule::verify() const {
     }
     wt.verify(*this);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Check all differentiability witnesses.
+  LLVM_DEBUG(llvm::dbgs() <<
+             "*** Checking differentiability witnesses for duplicates ***\n");
+  llvm::DenseSet<SILDifferentiabilityWitnessKey> diffWitnesses;
+  for (auto &dw : getDifferentiabilityWitnesses()) {
+    LLVM_DEBUG(llvm::dbgs() << "Differentiability Witness:\n"; dw.dump());
+    if (!diffWitnesses.insert(dw.getKey()).second) {
+      llvm::errs() << "Differentiability witness redefined: ";
+      dw.dump();
+      assert(false && "triggering standard assertion failure routine");
+    }
+    dw.verify(*this);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   
   // Check property descriptors.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
