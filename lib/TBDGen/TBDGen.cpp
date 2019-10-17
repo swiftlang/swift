@@ -247,10 +247,15 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     // Add symbol for SIL differentiability witness.
     Mangle::ASTMangler mangler;
     auto *resultIndices = IndexSubset::get(AFD->getASTContext(), 1, {0});
-    AutoDiffConfig config{DA->getParameterIndices(), resultIndices,
+    auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+        DA->getParameterIndices(),
+        AFD->getInterfaceType()->castTo<AnyFunctionType>());
+    AutoDiffConfig config{loweredParamIndices, resultIndices,
                           DA->getDerivativeGenericSignature()};
     SILDifferentiabilityWitnessKey key(SILDeclRef(AFD).mangle(), config);
-    addSymbol(mangler.mangleSILDifferentiabilityWitnessKey(key));
+    auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
+    addSymbol(mangledName);
+    llvm::errs() << "TBDGEN SIL DIFF WITNESS: " << mangledName << "\n";
   }
   // NOTE: This logic is not relevant until `@differentiating` no longer
   // generates implicit `@differentiable` attributes.
@@ -341,10 +346,15 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     // Add symbol for SIL differentiability witness.
     Mangle::ASTMangler mangler;
     auto *resultIndices = IndexSubset::get(ASD->getASTContext(), 1, {0});
-    AutoDiffConfig config{DA->getParameterIndices(), resultIndices,
+    auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+        DA->getParameterIndices(),
+        getterDecl->getInterfaceType()->castTo<AnyFunctionType>());
+    AutoDiffConfig config{loweredParamIndices, resultIndices,
                           DA->getDerivativeGenericSignature()};
     SILDifferentiabilityWitnessKey key(SILDeclRef(getterDecl).mangle(), config);
-    addSymbol(mangler.mangleSILDifferentiabilityWitnessKey(key));
+    auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
+    addSymbol(mangledName);
+    llvm::errs() << "TBDGEN SIL DIFF WITNESS: " << mangledName << "\n";
   }
   // NOTE: This logic is not relevant until `@differentiating` no longer
   // generates implicit `@differentiable` attributes.

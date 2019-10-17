@@ -210,7 +210,8 @@ public func withoutDerivative<T, R>(at x: T, in body: (T) -> R) -> R {
 //===----------------------------------------------------------------------===//
 
 /// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
+// TODO(!!!): Investigate robust fix.
+// @inlinable
 public func differentiableFunction<T : Differentiable, R : Differentiable>(
   from vjp: @escaping (T)
            -> (value: R, pullback: (R.TangentVector) -> T.TangentVector)
@@ -227,7 +228,8 @@ public func differentiableFunction<T : Differentiable, R : Differentiable>(
 }
 
 /// Create a differentiable function from a vector-Jacobian products function.
-@inlinable
+// TODO(!!!): Investigate robust fix.
+// @inlinable
 public func differentiableFunction<T, U, R>(
   from vjp: @escaping (T, U)
            -> (value: R, pullback: (R.TangentVector)
