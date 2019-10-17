@@ -228,6 +228,12 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
   Opts.SkipNonInlinableFunctionBodies |=
       Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies);
+
+  // If asked to perform InstallAPI, go ahead and enable non-inlinable function
+  // body skipping.
+  Opts.SkipNonInlinableFunctionBodies |=
+      Args.hasArg(OPT_tbd_is_installapi);
+
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
     if (Args.getLastArg(OPT_trace_stats_events)) {
