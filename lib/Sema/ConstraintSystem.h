@@ -721,7 +721,8 @@ public:
   Type getFixedType(TypeVariableType *typeVar) const;
 
   /// Try to resolve the given locator to a declaration within this
-  /// solution.
+  /// solution. Note that this only returns a decl for a direct reference such
+  /// as \c x.foo and will not return a decl for \c x.foo().
   ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
 
   /// Retrieve the overload choice associated with the given
