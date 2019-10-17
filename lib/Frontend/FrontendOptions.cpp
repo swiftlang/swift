@@ -269,6 +269,10 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   llvm_unreachable("unhandled action");
 }
 
+bool FrontendOptions::canActionEmitUnparsedRanges(ActionType action) {
+  return canActionEmitReferenceDependencies(action);
+}
+
 bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:

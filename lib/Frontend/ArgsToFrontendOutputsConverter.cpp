@@ -287,6 +287,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_dependencies_path);
   auto referenceDependenciesFile = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_reference_dependencies_path);
+  auto unparsedRangesFile = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_unparsed_ranges_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
   auto fixItsOutput = getSupplementaryFilenamesFromArguments(
@@ -316,6 +318,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleDocOutputPath = (*moduleDocOutput)[i];
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
+    sop.UnparsedRangesFilePath = (*unparsedRangesFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
@@ -367,6 +370,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_emit_reference_dependencies,
       pathsFromArguments.ReferenceDependenciesFilePath,
       file_types::TY_SwiftDeps, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  auto unparsedRangesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_unparsed_ranges, pathsFromArguments.UnparsedRangesFilePath,
+      file_types::TY_UnparsedRanges, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
@@ -422,6 +430,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleDocOutputPath = moduleDocOutputPath;
   sop.DependenciesFilePath = dependenciesFilePath;
   sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
+  sop.UnparsedRangesFilePath = unparsedRangesFilePath;
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
@@ -500,12 +509,12 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SwiftSourceInfoFile, paths.ModuleSourceInfoOutputPath},
       {file_types::TY_Dependencies, paths.DependenciesFilePath},
       {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
+      {file_types::TY_UnparsedRanges, paths.UnparsedRangesFilePath},
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},
       {file_types::TY_SwiftModuleInterfaceFile,
-       paths.ModuleInterfaceOutputPath}
-  };
+       paths.ModuleInterfaceOutputPath}};
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
     auto const out = map->find(typeAndString.first);
@@ -522,6 +531,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_module_doc_path,
         options::OPT_emit_dependencies_path,
         options::OPT_emit_reference_dependencies_path,
+        options::OPT_emit_unparsed_ranges_path,
         options::OPT_serialize_diagnostics_path,
         options::OPT_emit_loaded_module_trace_path,
         options::OPT_emit_module_interface_path,

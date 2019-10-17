@@ -152,6 +152,9 @@ public:
     MarkedPos = ParserPosition();
     return Pos;
   }
+
+  void forEachDelayedSourceRange(const SourceFile *primaryFile,
+                                 function_ref<void(SourceRange)>) const;
 };
 
 } // end namespace swift

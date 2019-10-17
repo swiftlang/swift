@@ -58,6 +58,14 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
+
+  def emit_unparsed_ranges : Flag<["-"], "emit-unparsed-ranges">,
+    HelpText<"Emit unparsed source ranges">;
+  def emit_unparsed_ranges_path
+    : Separate<["-"], "emit-unparsed-ranges-path">, MetaVarName<"<path>">,
+      HelpText<"Output unparsed ranges to <path>">;
+
+
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;

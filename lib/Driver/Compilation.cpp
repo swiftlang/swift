@@ -1197,6 +1197,12 @@ namespace driver {
           if (DependenciesFile.empty())
             continue;
 
+          StringRef UnparsedRangesFile =
+              Cmd->getOutput().getAdditionalOutputForType(
+                  file_types::TY_UnparsedRanges);
+          if (UnparsedRangesFile.empty())
+            continue;
+
           // Don't worry about commands that finished or weren't going to run.
           if (FinishedCommands.count(Cmd))
             continue;

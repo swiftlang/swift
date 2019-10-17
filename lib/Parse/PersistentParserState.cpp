@@ -52,3 +52,27 @@ void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
   delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
             PreviousLoc);
 }
+
+void PersistentParserState::forEachDelayedSourceRange(
+    const SourceFile *primaryFile, function_ref<void(SourceRange)> fn) const {
+  // FIXME: separate out unparsed ranges by primary file
+  for (const auto &afdAndState : DelayedFunctionBodies) {
+    const auto sr = afdAndState.getFirst()->getBodySourceRange();
+    if (sr.isValid())
+      fn(sr);
+  }
+  for (const auto *idc : DelayedDeclLists) {
+    const auto *d = idc->getDecl();
+    SourceRange sr;
+    if (auto *nt = dyn_cast<NominalTypeDecl>(d))
+      sr = nt->getBraces();
+    else if (auto *e = dyn_cast<ExtensionDecl>(d))
+      sr = e->getBraces();
+    if (sr.isValid())
+      fn(sr);
+  }
+  if (auto *dds = CodeCompletionDelayedDeclState.get()) {
+    if (dds->BodyPos.Loc.isValid() && dds->BodyEnd.isValid())
+      fn(SourceRange(dds->BodyPos.Loc, dds->BodyEnd));
+  }
+}

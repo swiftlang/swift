@@ -412,6 +412,12 @@ bool FrontendInputsAndOutputs::hasReferenceDependenciesPath() const {
         return outs.ReferenceDependenciesFilePath;
       });
 }
+bool FrontendInputsAndOutputs::hasUnparsedRangesPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.UnparsedRangesFilePath;
+      });
+}
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

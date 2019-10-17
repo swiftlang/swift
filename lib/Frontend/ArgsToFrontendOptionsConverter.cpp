@@ -529,6 +529,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
+  if (!FrontendOptions::canActionEmitUnparsedRanges(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasUnparsedRangesPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_unparsed_ranges);
+    return true;
+  }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);

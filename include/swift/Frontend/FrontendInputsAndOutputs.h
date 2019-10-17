@@ -231,6 +231,7 @@ public:
 
   bool hasDependenciesPath() const;
   bool hasReferenceDependenciesPath() const;
+  bool hasUnparsedRangesPath() const;
   bool hasObjCHeaderOutputPath() const;
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;

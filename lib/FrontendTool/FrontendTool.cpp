@@ -972,6 +972,26 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
   }
 }
 
+static void
+emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasUnparsedRangesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_unparsed_ranges_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &unparsedRangesFilePath =
+        Invocation.getUnparsedRangesFilePathForPrimary(SF->getFilename());
+    if (!unparsedRangesFilePath.empty()) {
+      Instance.emitUnparsedRanges(Instance.getASTContext().Diags, SF,
+                                  unparsedRangesFilePath);
+    }
+  }
+}
+
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
   const auto &frontendOpts = Invocation.getFrontendOptions();
@@ -1203,6 +1223,8 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+
+  emitUnparsedRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.

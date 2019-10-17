@@ -116,6 +116,8 @@ ERROR(error_mode_cannot_emit_dependencies,none,
       "this mode does not support emitting dependency files", ())
 ERROR(error_mode_cannot_emit_reference_dependencies,none,
       "this mode does not support emitting reference dependency files", ())
+ERROR(error_mode_cannot_emit_unparsed_ranges,none,
+"this mode does not support emitting unparsed ranges files", ())
 ERROR(error_mode_cannot_emit_header,none,
       "this mode does not support emitting Objective-C headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
@@ -134,6 +136,8 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+WARNING(emit_unparsed_ranges_without_primary_file,none,
+"ignoring -emit-unparsed-ranges (requires -primary-file)", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
