@@ -97,6 +97,14 @@ class eight {
   }()
 }
 
+func multiPattern() {
+  do {
+    throw opaque_error()
+  } catch MSV.Foo, _ {
+    _ = e
+  }
+}
+
 protocol ThrowingProto {
   func foo() throws
   static func bar() throws

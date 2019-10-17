@@ -55,6 +55,12 @@ func one() {
 #endif
   } catch {    // don't warn, #if code should be scanned.
   }
+  
+  do {
+    throw opaque_error()
+  } catch MSV.Foo, MSV.CarriesInt(let num) { // expected-error {{'num' must be bound in every pattern}}
+  } catch {
+  }
 }
 
 func takesAutoclosure(_ fn : @autoclosure () -> Int) {}

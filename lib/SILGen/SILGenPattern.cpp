@@ -441,7 +441,7 @@ public:
 
   JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
 
-  void emitSharedCaseBlocks(Optional<JumpDest> catchFallthroughDest);
+  void emitSharedCaseBlocks(llvm::function_ref<void(CaseStmt *)> bodyEmitter);
 
   void emitCaseBody(CaseStmt *caseBlock);
 
@@ -2393,7 +2393,7 @@ emitAddressOnlyInitialization(VarDecl *dest, SILValue value) {
 
 /// Emit all the shared case statements.
 void PatternMatchEmission::emitSharedCaseBlocks(
-    Optional<JumpDest> catchFallthroughDest) {
+    llvm::function_ref<void(CaseStmt *)> bodyEmitter) {
   for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
     SILBasicBlock *caseBB = entry.second.first;
@@ -2489,17 +2489,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
 
     // Now that we have setup all of the VarLocs correctly, emit the shared case
     // body.
-    if (caseBlock->getParentKind() == CaseParentKind::Switch)
-      emitCaseBody(caseBlock);
-    else {
-      SGF.emitStmt(caseBlock->getBody());
-
-      // If we fell out of the catch clause, branch to the fallthrough dest.
-      if (SGF.B.hasValidInsertionPoint()) {
-        SGF.Cleanups.emitBranchAndCleanups(*catchFallthroughDest,
-                                           caseBlock->getBody());
-      }
-    }
+    bodyEmitter(caseBlock);
   }
 }
 
@@ -2858,7 +2848,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   switchScope.pop();
 
   // Then emit the case blocks shared by multiple pattern cases.
-  emission.emitSharedCaseBlocks(None);
+  emission.emitSharedCaseBlocks(
+      [&](CaseStmt *caseStmt) { emission.emitCaseBody(caseStmt); });
 
   // Bookkeeping.
   SwitchStack.pop_back();
@@ -3115,5 +3106,12 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   switchScope.pop();
 
   // Then emit the case blocks shared by multiple pattern cases.
-  emission.emitSharedCaseBlocks(catchFallthroughDest);
+  emission.emitSharedCaseBlocks([&](CaseStmt *caseStmt) {
+    emitStmt(caseStmt->getBody());
+
+    // If we fell out of the catch clause, branch to the fallthrough dest.
+    if (B.hasValidInsertionPoint()) {
+      Cleanups.emitBranchAndCleanups(catchFallthroughDest, caseStmt->getBody());
+    }
+  });
 }

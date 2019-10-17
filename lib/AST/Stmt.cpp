@@ -416,7 +416,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
   assert(
-      !(parentKind == CaseParentKind::Switch && fallthroughStmt.isNonNull()) &&
+      !(parentKind == CaseParentKind::DoCatch && fallthroughStmt.isNonNull()) &&
       "Only switch cases can have a fallthrough.");
   if (hasFallthroughDest()) {
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
