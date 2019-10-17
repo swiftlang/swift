@@ -21,12 +21,9 @@
 #include "clang/Basic/CharInfo.h"
 using namespace swift;
 
-void *DeclBaseName::SubscriptIdentifierData =
-    &DeclBaseName::SubscriptIdentifierData;
-void *DeclBaseName::ConstructorIdentifierData =
-    &DeclBaseName::ConstructorIdentifierData;
-void *DeclBaseName::DestructorIdentifierData =
-    &DeclBaseName::DestructorIdentifierData;
+constexpr const Identifier::Aligner DeclBaseName::SubscriptIdentifierData{};
+constexpr const Identifier::Aligner DeclBaseName::ConstructorIdentifierData{};
+constexpr const Identifier::Aligner DeclBaseName::DestructorIdentifierData{};
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
   if (I.get() == nullptr)

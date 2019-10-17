@@ -806,7 +806,7 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
   const Bits &nonTrivialLocations = locations.getNonTrivialLocations();
   Bits bits(locations.getNumLocations());
   for (BlockState &st : dataFlow) {
-    if (!st.reachableFromEntry)
+    if (!st.reachableFromEntry || !st.exitReachable)
       continue;
 
     // Check all instructions in the block.
@@ -976,6 +976,7 @@ void MemoryLifetimeVerifier::verify() {
   if (locations.getNumLocations() > 0) {
     MemoryDataflow dataFlow(function, locations.getNumLocations());
     dataFlow.entryReachabilityAnalysis();
+    dataFlow.exitReachableAnalysis();
     initDataflow(dataFlow);
     dataFlow.solveForwardWithIntersect();
     checkFunction(dataFlow);

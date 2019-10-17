@@ -109,7 +109,6 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
-  currAddressDecl->setValidationToChecked();
 
   Pattern *currAddressPat = new (C)
       NamedPattern(currAddressDecl, /*implicit*/ true);
@@ -245,7 +244,6 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  funcDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({funcDecl});
   C.addSynthesizedDecl(funcDecl);
@@ -471,7 +469,6 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
-  currAddressDecl->setValidationToChecked();
 
   Pattern *currAddressPat = new (C)
       NamedPattern(currAddressDecl, /*implicit*/ true);
@@ -648,7 +645,6 @@ static ValueDecl
   initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  initDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({initDecl});
   C.addSynthesizedDecl(initDecl);

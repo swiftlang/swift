@@ -374,6 +374,7 @@ DECL_NODES = [
     #                       | 'weak'
     # mutation-modifier -> 'mutating' | 'nonmutating'
     Node('ModifierList', kind='SyntaxCollection',
+         omit_when_empty=True,
          element='DeclModifier',
          element_name='Modifier'),
 

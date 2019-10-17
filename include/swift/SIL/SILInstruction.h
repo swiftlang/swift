@@ -8050,20 +8050,20 @@ private:
       SILModule &module, SILFunction *originalFunction,
       DifferentiabilityWitnessFunctionKind witnessKind,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *witnessGenericSignature);
+      GenericSignature witnessGenericSignature);
 
 public:
   DifferentiabilityWitnessFunctionInst(
       SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
       DifferentiabilityWitnessFunctionKind witnessKind,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *witnessGenericSignature);
+      GenericSignature witnessGenericSignature);
 
   static DifferentiabilityWitnessFunctionInst *create(
       SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
       DifferentiabilityWitnessFunctionKind witnessKind,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *witnessGenericSignature);
+      GenericSignature witnessGenericSignature);
 
   DifferentiabilityWitnessFunctionKind getWitnessKind() const {
     return witnessKind;
@@ -8072,7 +8072,7 @@ public:
   AutoDiffConfig const &getConfig() const { return config; }
   IndexSubset *getParameterIndices() const { return config.parameterIndices; }
   IndexSubset *getResultIndices() const { return config.resultIndices; }
-  GenericSignature *getWitnessGenericSignature() const {
+  GenericSignature getWitnessGenericSignature() const {
     return config.derivativeGenericSignature;
   }
 

@@ -202,7 +202,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       return true;
 
     // Build a generic signature.
-    auto *extensionSig = extension->getGenericSignature();
+    auto extensionSig = extension->getGenericSignature();
     
     // The condition here is a bit more fickle than
     // `isExtensionApplied`. That check would prematurely reject
@@ -492,8 +492,11 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->getInterfaceType())
+  if (witness->isRecursiveValidation())
     return Type();
+
+  // FIXME: This is here to trigger the isInvalid() computation.
+  (void) witness->getInterfaceType();
 
   if (witness->isInvalid())
     return Type();
@@ -926,7 +929,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   }
 
   // If there is a generic parameter of the named type, use that.
-  if (auto *genericSig = dc->getGenericSignatureOfContext()) {
+  if (auto genericSig = dc->getGenericSignatureOfContext()) {
     for (auto gp : genericSig->getInnermostGenericParams()) {
       if (gp->getName() == assocType->getName())
         return dc->mapTypeIntoContext(gp);

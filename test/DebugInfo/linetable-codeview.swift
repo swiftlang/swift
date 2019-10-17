@@ -64,7 +64,7 @@ func foo() {
   // CHECK: br label %[[RETLABEL:[0-9]+]], !dbg ![[CASE:[0-9]+]]
   // CHECK: call { i64, i1 } @llvm.sadd.with.overflow.i64{{.*}}
   // CHECK: br label %[[RETLABEL]], !dbg ![[DEFAULTCLEANUP:[0-9]+]]
-  // CHECK: ; <label>:[[RETLABEL]]:
+  // CHECK: [[RETLABEL]]:
   // CHECK-NEXT: ret void
 
 // func foo()

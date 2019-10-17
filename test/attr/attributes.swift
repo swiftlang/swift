@@ -56,7 +56,7 @@ func zim() {}
 func zung<T>(_: T) {}
 @_transparent // expected-error{{'@_transparent' attribute cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
-func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
+func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}}
 protocol ProtoWithTransparent {
   @_transparent// expected-error{{'@_transparent' attribute is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()

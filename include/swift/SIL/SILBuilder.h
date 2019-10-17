@@ -554,10 +554,10 @@ public:
       SILLocation Loc, SILFunction *OriginalFunction,
       DifferentiabilityWitnessFunctionKind WitnessKind,
       IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
-      GenericSignature *WitnessGenericSignature) {
+      GenericSignature WitnessGenericSignature) {
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
         getModule(), getSILDebugLocation(Loc), OriginalFunction, WitnessKind,
-        ParameterIndices, ResultIndices, WitnessGenericSignature));
+        ParameterIndices, ResultIndices, WitnessGenericSignature.getPointer()));
   }
   // SWIFT_ENABLE_TENSORFLOW END
 

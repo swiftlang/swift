@@ -433,7 +433,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->computeType();
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
-  initDecl->setValidationToChecked();
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.

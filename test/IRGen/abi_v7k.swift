@@ -205,7 +205,7 @@ func testMultiP(x: MultiPayload) -> Double {
 // CHECK: entry:
 // CHECK: [[TR:%.*]] = trunc i8 %1
 // CHECK: br i1 [[TR]], {{.*}}, label %[[PAYLOADLABEL:.*]]
-// CHECK: <label>:[[PAYLOADLABEL]]
+// CHECK: [[PAYLOADLABEL]]:
 // CHECK: [[ID:%[0-9]+]] = bitcast i32 %0 to float
 // CHECK: ret float
 // V7K-LABEL: _$s8test_v7k0A3Opt

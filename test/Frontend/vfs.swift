@@ -2,6 +2,7 @@
 // RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/vfsoverlay.yaml > %t/overlay.yaml
 // RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/secondary-vfsoverlay.yaml > %t/secondary-overlay.yaml
 // RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/tertiary-vfsoverlay.yaml > %t/tertiary-overlay.yaml
+// RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/vfs/quaternary-vfsoverlay.yaml > %t/quaternary-vfsoverlay.yaml
 
 // RUN: not %target-swift-frontend -vfsoverlay %/t/overlay.yaml -typecheck %s %/t/mapped-file.swift -serialize-diagnostics-path %/t/basic.dia 2>&1 | %FileCheck -check-prefix=BASIC_MAPPING_ERROR %s
 // RUN: c-index-test -read-diagnostics %/t/basic.dia 2>&1 | %FileCheck -check-prefix=BASIC_MAPPING_ERROR %s
@@ -20,10 +21,11 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %/t -DTEST_VFS_CLANG_IMPORTER -Xcc -ivfsoverlay -Xcc %/t/overlay.yaml -typecheck %/s
 
 // If we see -ivfsoverlay and -vfsoverlay, we'll clobber Clang's VFS with our own.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %/t -DTEST_VFS_CLANG_IMPORTER -vfsoverlay %/t/overlay.yaml -Xcc -ivfsoverlay -Xcc %/t/overlay.yaml -typecheck %/s  2>&1 | %FileCheck -check-prefix=WARN_VFS_CLOBBERED %s
-
-// WARN_VFS_CLOBBERED: warning: ignoring '-ivfsoverlay' options provided to '-Xcc' in favor of '-vfsoverlay'
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %/t -DTEST_VFS_CLANG_IMPORTER -DTEST_VFS_CLANG_IMPORTER_MERGE -vfsoverlay %/t/overlay.yaml -Xcc -ivfsoverlay -Xcc %/t/quaternary-vfsoverlay.yaml -typecheck %/s  2>&1
 
 #if TEST_VFS_CLANG_IMPORTER
 import VFSMappedModule
+#if TEST_VFS_CLANG_IMPORTER_MERGE
+import YetAnotherVFSMappedModule
+#endif
 #endif

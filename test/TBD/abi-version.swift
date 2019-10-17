@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // RUN: %empty-directory(%t)
 
 // This test ensures that we see the same Swift ABI Version flag in the LLVM IR

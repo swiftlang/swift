@@ -48,7 +48,7 @@ struct S {
 
 let s = S()
 var y = s.hugeStructReturn
-// CHECK-LABEL: define internal swiftcc { i64, i64, i64, i64 } @"$s21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFFTA"(i64, i64, i64, i64, %swift.refcounted* swiftself) {{.*}} {
+// CHECK-LABEL: define internal swiftcc { i64, i64, i64, i64 } @"$s21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFFTA"(i64, i64, i64, i64, %swift.refcounted* swiftself) #0 {
 // CHECK: entry:
 // CHECK:   %5 = tail call swiftcc { i64, i64, i64, i64 } @"$s21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFF"(i64 %0, i64 %1, i64 %2, i64 %3)
 // CHECK:   ret { i64, i64, i64, i64 } %5

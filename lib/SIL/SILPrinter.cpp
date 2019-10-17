@@ -1122,7 +1122,7 @@ public:
   }
 
   void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
+                          GenericSignature Sig = GenericSignature()) {
     if (!Subs.hasAnySubstitutableParams()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses
@@ -1288,7 +1288,7 @@ public:
     for (auto i : dwfi->getResultIndices()->getIndices())
       *this << ' ' << i;
     *this << "] ";
-    if (auto *witnessGenSig = dwfi->getWitnessGenericSignature()) {
+    if (auto witnessGenSig = dwfi->getWitnessGenericSignature()) {
       auto subPrinter = PrintOptions::printSIL();
       witnessGenSig->print(PrintState.OS, subPrinter);
       *this << " ";
@@ -3184,7 +3184,7 @@ void SILDifferentiabilityWitness::print(
              [&] { OS << ' '; });
   OS << "] ";
   // ([where ...])?
-  if (auto *derivativeGenSig = getDerivativeGenericSignature()) {
+  if (auto derivativeGenSig = getDerivativeGenericSignature()) {
     ArrayRef<Requirement> requirements;
     SmallVector<Requirement, 4> requirementsScratch;
     auto *origGenEnv = originalFunction->getGenericEnvironment();

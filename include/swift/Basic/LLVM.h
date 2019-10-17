@@ -42,8 +42,7 @@ namespace llvm {
   template<typename T> class MutableArrayRef;
   template<typename T> class TinyPtrVector;
   template<typename T> class Optional;
-  template <typename PT1, typename PT2> class PointerUnion;
-  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
+  template <typename ...PTs> class PointerUnion;
   class SmallBitVector;
 
   // Other common classes.
@@ -68,7 +67,6 @@ namespace swift {
   using llvm::None;
   using llvm::Optional;
   using llvm::PointerUnion;
-  using llvm::PointerUnion3;
   using llvm::SmallBitVector;
   using llvm::SmallPtrSet;
   using llvm::SmallPtrSetImpl;

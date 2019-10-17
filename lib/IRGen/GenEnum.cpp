@@ -1128,7 +1128,7 @@ namespace {
     int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
       // raw values from C.
-      assert(target->hasRawValueExpr()
+      assert(target->getRawValueExpr()
              && "c-compatible enum elt has no raw value?!");
       auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
       auto intType = getDiscriminatorType();

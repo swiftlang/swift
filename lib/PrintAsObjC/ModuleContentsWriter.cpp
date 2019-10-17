@@ -66,7 +66,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
 
   /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
-  static bool isConstrained(GenericSignature *sig,
+  static bool isConstrained(GenericSignature sig,
                             GenericTypeParamType *paramTy) {
     if (sig->getSuperclassBound(paramTy))
       return true;
@@ -83,7 +83,7 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     NeedsDefinition = false;
 
     bool isObjCGeneric = decl->hasClangNode();
-    auto *sig = decl->getGenericSignature();
+    auto sig = decl->getGenericSignature();
 
     for_each(boundGeneric->getGenericArgs(),
              sig->getInnermostGenericParams(),

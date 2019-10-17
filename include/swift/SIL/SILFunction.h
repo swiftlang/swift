@@ -71,7 +71,7 @@ public:
   };
 
   static SILSpecializeAttr *create(SILModule &M,
-                                   GenericSignature *specializedSignature,
+                                   GenericSignature specializedSignature,
                                    bool exported, SpecializationKind kind);
 
   bool isExported() const {
@@ -90,7 +90,7 @@ public:
     return kind;
   }
 
-  GenericSignature *getSpecializedSignature() const {
+  GenericSignature getSpecializedSignature() const {
     return specializedSignature;
   }
 
@@ -103,11 +103,11 @@ public:
 private:
   SpecializationKind kind;
   bool exported;
-  GenericSignature *specializedSignature;
+  GenericSignature specializedSignature;
   SILFunction *F = nullptr;
 
   SILSpecializeAttr(bool exported, SpecializationKind kind,
-                    GenericSignature *specializedSignature);
+                    GenericSignature specializedSignature);
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
@@ -137,7 +137,7 @@ private:
   /// `DerivativeGenericSignature` by the SIL parser.
   TrailingWhereClause *WhereClause = nullptr;
   /// The derivative generic signature (optional).
-  GenericSignature *DerivativeGenericSignature = nullptr;
+  GenericSignature DerivativeGenericSignature = GenericSignature();
   /// The original function.
   SILFunction *Original = nullptr;
 
@@ -149,7 +149,7 @@ private:
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                         StringRef jvpName,
                         StringRef vjpName,
-                        GenericSignature *derivativeGenSig);
+                        GenericSignature derivativeGenSig);
 
 public:
   static SILDifferentiableAttr *create(
@@ -160,7 +160,7 @@ public:
   static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
       StringRef jvpName = StringRef(), StringRef vjpName = StringRef(),
-      GenericSignature *derivativeGenSig = nullptr);
+      GenericSignature derivativeGenSig = GenericSignature());
 
   bool hasJVP() const { return !JVPName.empty(); }
   StringRef getJVPName() const { assert(hasJVP()); return JVPName; }
@@ -179,10 +179,10 @@ public:
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  GenericSignature *getDerivativeGenericSignature() const {
+  GenericSignature getDerivativeGenericSignature() const {
     return DerivativeGenericSignature;
   }
-  void setDerivativeGenericSignature(GenericSignature *derivativeGenSig) {
+  void setDerivativeGenericSignature(GenericSignature derivativeGenSig) {
     DerivativeGenericSignature = derivativeGenSig;
   };
 

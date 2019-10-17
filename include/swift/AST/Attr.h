@@ -1294,27 +1294,27 @@ public:
 
 private:
   TrailingWhereClause *trailingWhereClause;
-  GenericSignature *specializedSignature;
+  GenericSignature specializedSignature;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind,
-                 GenericSignature *specializedSignature);
+                 GenericSignature specializedSignature);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
                                 bool exported, SpecializationKind kind,
-                                GenericSignature *specializedSignature
+                                GenericSignature specializedSignature
                                     = nullptr);
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature *getSpecializedSgnature() const {
+  GenericSignature getSpecializedSgnature() const {
     return specializedSignature;
   }
 
-  void setSpecializedSignature(GenericSignature *newSig) {
+  void setSpecializedSignature(GenericSignature newSig) {
     specializedSignature = newSig;
   }
 
@@ -1563,7 +1563,7 @@ class DifferentiableAttr final
   /// type checker based on the original function's generic signature and the
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
-  GenericSignature *DerivativeGenericSignature = nullptr;
+  GenericSignature DerivativeGenericSignature = GenericSignature();
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
@@ -1578,7 +1578,7 @@ class DifferentiableAttr final
                               bool linear, IndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
-                              GenericSignature *derivativeGenericSignature);
+                              GenericSignature derivativeGenericSignature);
 
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
@@ -1594,7 +1594,7 @@ public:
                                     bool linear, IndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
-                                    GenericSignature *derivativeGenSig);
+                                    GenericSignature derivativeGenSig);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
@@ -1629,11 +1629,11 @@ public:
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  GenericSignature *getDerivativeGenericSignature() const {
+  GenericSignature getDerivativeGenericSignature() const {
     return DerivativeGenericSignature;
   }
   void setDerivativeGenericSignature(ASTContext &context,
-                                     GenericSignature* derivativeGenSig) {
+                                     GenericSignature derivativeGenSig) {
     DerivativeGenericSignature = derivativeGenSig;
   }
 

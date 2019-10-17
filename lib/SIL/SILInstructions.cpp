@@ -719,7 +719,7 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, SILFunction *originalFunction,
     DifferentiabilityWitnessFunctionKind witnessKind,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature *witnessGenSig) {
+    GenericSignature witnessGenSig) {
   auto fnTy = originalFunction->getLoweredFunctionType();
   CanGenericSignature witnessCanGenSig;
   if (witnessGenSig)
@@ -741,12 +741,12 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
     SILModule &module, SILDebugLocation debugLoc, SILFunction *originalFunction,
     DifferentiabilityWitnessFunctionKind witnessKind,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature *witnessGenSig)
+    GenericSignature witnessGenSig)
     : InstructionBase(debugLoc, getDifferentiabilityWitnessType(
           module, originalFunction, witnessKind, parameterIndices,
           resultIndices, witnessGenSig)),
       originalFunction(originalFunction), witnessKind(witnessKind),
-      config({parameterIndices, resultIndices, witnessGenSig}) {}
+      config({parameterIndices, resultIndices, witnessGenSig.getPointer()}) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

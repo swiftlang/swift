@@ -13,9 +13,9 @@
 
 #define DEBUG_TYPE "sil-destroy-hoisting"
 #include "swift/SIL/MemoryLifetime.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

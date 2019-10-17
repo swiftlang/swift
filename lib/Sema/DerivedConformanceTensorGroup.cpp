@@ -175,7 +175,6 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
-  currAddressDecl->setValidationToChecked();
 
   Pattern *currAddressPat = new (C)
       NamedPattern(currAddressDecl, /*implicit*/ true);
@@ -341,7 +340,6 @@ static ValueDecl *deriveTensorGroup_constructor(
   initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  initDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({initDecl});
   C.addSynthesizedDecl(initDecl);

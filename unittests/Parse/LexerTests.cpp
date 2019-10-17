@@ -825,7 +825,9 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
 // This test requires mmap because llvm::sys::Memory doesn't support protecting
 // pages to have no permissions.
 TEST_F(LexerTest, EncodedStringSegmentPastTheEnd) {
-  size_t PageSize = llvm::sys::Process::getPageSize();
+  Expected<size_t> ExptPageSize = llvm::sys::Process::getPageSize();
+  ASSERT_TRUE(bool(ExptPageSize));
+  size_t PageSize = *ExptPageSize;
 
   void *FirstPage = mmap(/*addr*/nullptr, PageSize * 2, PROT_NONE,
                          MAP_PRIVATE | MAP_ANON, /*fd*/-1, /*offset*/0);

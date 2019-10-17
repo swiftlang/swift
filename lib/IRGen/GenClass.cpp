@@ -1998,6 +1998,7 @@ namespace {
       case llvm::Triple::MachO:
         var->setSection("__DATA, __objc_const");
         break;
+      case llvm::Triple::XCOFF:
       case llvm::Triple::COFF:
         var->setSection(".data");
         break;

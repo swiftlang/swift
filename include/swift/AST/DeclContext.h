@@ -357,7 +357,7 @@ public:
 
   /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
-  GenericSignature *getGenericSignatureOfContext() const;
+  GenericSignature getGenericSignatureOfContext() const;
 
   /// Retrieve the innermost archetypes of this context or any
   /// of its parents.

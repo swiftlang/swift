@@ -17,27 +17,27 @@ func useFoo(_ x: Foo) -> Int32 {
   // CHECK: ]
 
   switch x {
-    // CHECK: <label>:[[CASE_B]]
+    // CHECK: [[CASE_B]]:
     // CHECK-NEXT: br label %[[FINAL:.+]]
   case .B:
     return 11
 
-    // CHECK: <label>:[[CASE_C]]
+    // CHECK: [[CASE_C]]:
     // CHECK-NEXT: br label %[[FINAL]]
   case .C:
     return 15
 
-    // CHECK: <label>:[[CASE_A]]
+    // CHECK: [[CASE_A]]:
     // CHECK-NEXT: br label %[[FINAL]]
   case .A:
     return 10
   }
 
-  // CHECK: <label>:[[DEFAULT]]
+  // CHECK: [[DEFAULT]]:
   // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$s{{.+}}3FooON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$ss5Int32VN")
   // CHECK-NEXT: unreachable
 
-  // CHECK: <label>:[[FINAL]]
+  // CHECK: [[FINAL]]:
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
 }
@@ -51,27 +51,27 @@ func useBar(_ x: Bar) -> Int32 {
   // CHECK: ]
 
   switch x {
-  // CHECK: <label>:[[CASE_B]]
+  // CHECK: [[CASE_B]]:
   // CHECK-NEXT: br label %[[FINAL:.+]]
   case .B:
     return 11
 
-  // CHECK: <label>:[[CASE_C]]
+  // CHECK: [[CASE_C]]:
   // CHECK-NEXT: br label %[[FINAL]]
   case .C:
     return 15
 
-  // CHECK: <label>:[[CASE_A]]
+  // CHECK: [[CASE_A]]:
   // CHECK-NEXT: br label %[[FINAL]]
   case .A:
     return 10
   }
 
-  // CHECK: <label>:[[DEFAULT]]
+  // CHECK: [[DEFAULT]]:
   // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$s{{.+}}3BarON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$ss5Int32VN")
   // CHECK-NEXT: unreachable
 
-  // CHECK: <label>:[[FINAL]]
+  // CHECK: [[FINAL]]:
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
 }

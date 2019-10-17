@@ -26,7 +26,6 @@
 
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 
 namespace swift {
 

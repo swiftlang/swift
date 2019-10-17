@@ -32,11 +32,11 @@ using namespace swift;
 using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
-                                     GenericSignature *specializedSig)
+                                     GenericSignature specializedSig)
     : kind(kind), exported(exported), specializedSignature(specializedSig) { }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             GenericSignature *specializedSig,
+                                             GenericSignature specializedSig,
                                              bool exported,
                                              SpecializationKind kind) {
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
@@ -63,7 +63,7 @@ SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                       StringRef jvpName,
                       StringRef vjpName,
-                      GenericSignature *derivativeGenSig)
+                      GenericSignature derivativeGenSig)
   : indices(indices), JVPName(jvpName), VJPName(vjpName),
     DerivativeGenericSignature(derivativeGenSig) {}
 
@@ -84,7 +84,7 @@ SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
                               StringRef jvpName,
                               StringRef vjpName,
-                              GenericSignature *derivativeGenSig) {
+                              GenericSignature derivativeGenSig) {
   void *mem =
       M.allocate(sizeof(SILDifferentiableAttr), alignof(SILDifferentiableAttr));
   return ::new (mem)
@@ -277,7 +277,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   auto genericSig = getGenericSignature()->getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInSignature(*genericSig),
+                    LookUpConformanceInSignature(genericSig.getPointer()),
                     genericSig);
 }
 

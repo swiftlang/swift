@@ -40,7 +40,7 @@
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {
-  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
+  template <typename...  PTs> class PointerUnion;
 }
 
 namespace swift {
@@ -902,9 +902,9 @@ public:
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
                             const Diagnostic &D);
 
-  llvm::Optional<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
-                           SourceLoc OtherLoc);
+  ParsedSyntaxResult<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                           bool silenceDiag = false);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
@@ -926,7 +926,6 @@ public:
                          llvm::function_ref<ParserStatus()> callback);
   ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
                                llvm::Optional<ParsedTokenSyntax> &LastComma,
-                               SourceLoc &RightLoc,
                                llvm::Optional<ParsedTokenSyntax> &Right,
                                llvm::SmallVectorImpl<ParsedSyntax>& Junk,
                                bool AllowSepAfterLast, Diag<> ErrorDiag,
@@ -1011,12 +1010,28 @@ public:
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                             IterableDeclContext *IDC);
 
+  ParsedSyntaxResult<ParsedTypeInheritanceClauseSyntax>
+  parseTypeInheritanceClauseSyntax(bool allowClassRequirement,
+                                   bool allowAnyObject);
+
+  ParsedSyntaxResult<ParsedDeclSyntax>
+  parseDeclAssociatedTypeSyntax(ParseDeclOptions flags,
+                                Optional<ParsedAttributeListSyntax> attrs,
+                                Optional<ParsedModifierListSyntax> modifiers);
+
+  ParsedSyntaxResult<ParsedDeclSyntax>
+  parseDeclTypeAliasSyntax(ParseDeclOptions flags,
+                           Optional<ParsedAttributeListSyntax> attrs,
+                           Optional<ParsedModifierListSyntax> modifiers);
+
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
-                                            DeclAttributes &Attributes);
+                                            DeclAttributes &Attributes,
+                                            SourceLoc leadingLoc);
 
   ParserResult<TypeDecl> parseDeclAssociatedType(ParseDeclOptions Flags,
-                                                 DeclAttributes &Attributes);
-  
+                                                 DeclAttributes &Attributes,
+                                                 SourceLoc leadingLoc);
+
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
   ParserResult<IfConfigDecl> parseIfConfig(
@@ -1107,27 +1122,16 @@ public:
   /// an error parsing.
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
-
   bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                               SourceLoc &SpecifierLoc,
-                              TypeAttributes &Attributes) {
-    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
-        (Tok.is(tok::identifier) &&
-         (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
-    return false;
-  }
-  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                     SourceLoc &SpecifierLoc,
-                                     TypeAttributes &Attributes);
-  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
-                          bool justChecking = false);
-  
-  
+                              TypeAttributes &Attributes);
+  ParserStatus parseTypeAttributeListSyntax(Optional<ParsedTokenSyntax> &specifier,
+                                            Optional<ParsedAttributeListSyntax> &attrs);
+  ParsedSyntaxResult<ParsedAttributeSyntax> parseTypeAttributeSyntax();
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
-  ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
+  ParserStatus parseInheritance(MutableArrayRef<TypeLoc> &Inherited,
                                 bool allowClassRequirement,
                                 bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
@@ -1215,34 +1219,33 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
 
-  using TypeASTResult = ParserResult<TypeRepr>;
-  using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
+  ParserResult<TypeRepr> parseType();
+  ParserResult<TypeRepr> parseType(Diag<> MessageID,
+                                   bool HandleCodeCompletion = true,
+                                   bool IsSILFuncDecl = false);
+  ParserStatus parseGenericArguments(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
+                                     SourceLoc &LAngleLoc,
+                                     SourceLoc &RAngleLoc);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
+                                 ParamDecl::Specifier Specifier,
+                                 SourceLoc SpecifierLoc);
+  ParserResult<TypeRepr> parseAnyTypeAST();
 
   ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
   parseLayoutConstraintSyntax();
 
-  TypeResult parseTypeSyntax();
-  TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
-                             bool IsSILFuncDecl = false);
-
-  TypeASTResult parseType();
-  TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
-                          bool IsSILFuncDecl = false);
-  ParserStatus
-  parseGenericArgumentsAST(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
-                           SourceLoc &LAngleLoc, SourceLoc &RAngleLoc);
-  TypeASTResult parseSILBoxType(GenericParamList *generics,
-                                const TypeAttributes &attrs,
-                                Optional<Scope> &GenericsScope);
-  TypeASTResult parseTypeSimpleOrCompositionAST(Diag<> MessageID,
-                                                bool HandleCodeCompletion);
-  TypeASTResult parseAnyTypeAST();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax();
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
+                  bool IsSILFuncDecl = false);
 
   ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
   parseGenericArgumentClauseSyntax();
 
-  TypeResult parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
-  TypeResult parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
   // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
   /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
   ///
@@ -1254,16 +1257,20 @@ public:
   ///   positioned at '.f'.
   /// - If there is no type qualification (e.g. when parsing just 'f'), returns
   ///   an empty parser error.
-  TypeResult parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
-  TypeResult parseAnyType();
-  TypeResult parseTypeTupleBody();
-  TypeResult parseTypeCollection();
-  TypeResult parseMetatypeType(ParsedTypeSyntax Base);
-  TypeResult parseOptionalType(ParsedTypeSyntax Base);
-  TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseAnyType();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeTupleBody();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeCollection();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseMetatypeType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseOptionalType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseSILBoxTypeSyntax(
+      Optional<ParsedGenericParameterClauseListSyntax> genericParams);
 
-  TypeResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
-  TypeResult parseOldStyleProtocolComposition();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeArray(ParsedTypeSyntax Base,
+                                                      SourceLoc BaseLoc);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
   ParsedTokenSyntax consumeOptionalTokenSyntax();
@@ -1273,9 +1280,10 @@ public:
   ParsedTokenSyntax consumeImplicitlyUnwrappedOptionalTokenSyntax();
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&ty,
+                             Optional<ParsedTokenSyntax> specifier,
+                             Optional<ParsedAttributeListSyntax> attrs);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1526,6 +1534,8 @@ public:
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  bool parseOptionalArgumentLabelSyntax(Optional<ParsedTokenSyntax> &name,
+                                        Optional<ParsedTokenSyntax> &colon);
 
   /// Parse an unqualified-decl-name.
   ///
@@ -1544,10 +1554,20 @@ public:
                                     bool allowOperators=false,
                                     bool allowZeroArgCompoundNames=false,
                                     bool allowDeinitAndSubscript=false);
+  ParserStatus
+  parseUnqualifiedDeclNameSyntax(Optional<ParsedTokenSyntax> &identTok,
+                                 Optional<ParsedDeclNameArgumentsSyntax> &declNameArg,
+                                 bool afterDot, const Diagnostic &diag,
+                                 bool allowOperators=false,
+                                 bool allowZeroArgCompoundNames=false,
+                                 bool allowDeinitAndSubscript=false);
+
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprIdentifierSyntax();
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprSpecializeSyntax(ParsedExprSyntax &&);
 
   Expr *parseExprIdentifier();
-  Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
-                                   Identifier PlaceholderId);
+  Expr *parseExprEditorPlaceholder(SourceLoc loc, StringRef text);
 
   /// Parse a closure expression after the opening brace.
   ///
@@ -1682,6 +1702,9 @@ public:
   ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
+  void
+  diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams,
+                                        SourceLoc whereLoc);
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 
