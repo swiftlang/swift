@@ -2,40 +2,44 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import DifferentiationUnittest
 
 var SupersetVJPTests = TestSuite("SupersetVJP")
 
 @differentiable(wrt: (x, y), vjp: dmulxy)
-func mulxy(_ x: Float, _ y: Float) -> Float {
+func mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   // use control flow to prevent AD; NB fix when control flow is supported
   if x > 1000 {
     return y
   }
   return x * y
 }
-func dmulxy(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)) {
+func dmulxy(
+  _ x: Tracked<Float>,
+  _ y: Tracked<Float>
+) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
   return (mulxy(x, y), { v in (y * v, x * v) })
 }
 
-func calls_mulxy(_ x: Float, _ y: Float) -> Float {
+func calls_mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   return mulxy(x, y)
 }
 
-SupersetVJPTests.test("Superset") {
+SupersetVJPTests.testWithLeakChecking("Superset") {
   expectEqual(3, gradient(at: 2) { x in mulxy(x, 3) })
 }
 
-SupersetVJPTests.test("SupersetNested") {
+SupersetVJPTests.testWithLeakChecking("SupersetNested") {
   expectEqual(2, gradient(at: 3) { y in calls_mulxy(2, y) })
 }
 
-SupersetVJPTests.test("CrossModuleClosure") {
-  expectEqual(1, gradient(at: Float(1)) { x in x + 2 })
+SupersetVJPTests.testWithLeakChecking("CrossModuleClosure") {
+  expectEqual(1, gradient(at: Tracked<Float>(1)) { x in x + 2 })
 }
 
-SupersetVJPTests.test("SubsetOfSubset") {
+SupersetVJPTests.testWithLeakChecking("SubsetOfSubset") {
   @differentiable(wrt: (x, z))
-  func foo(_ x: Float, _ y: Float, _ z: Float) -> Float {
+  func foo(_ x: Tracked<Float>, _ y: Tracked<Float>, _ z: Tracked<Float>) -> Tracked<Float> {
     withoutDerivative(at: 0)
   }
   expectEqual(0, gradient(at: 0, in: { x in foo(x, 0, 0) }))
