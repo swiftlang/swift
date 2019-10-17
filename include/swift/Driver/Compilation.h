@@ -220,6 +220,12 @@ private:
   /// Experiment with inter-file dependencies
   const bool ExperimentalDependenciesIncludeIntrafileOnes;
 
+  /// Experiment with source-range-based dependencies
+  const bool EnableSourceRangeDependencies;
+
+  /// May not actually use them if e.g. there is a new input
+  bool UseSourceRangeDependencies;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -253,7 +259,8 @@ public:
               bool EnableExperimentalDependencies = false,
               bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
               bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
-              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+              bool ExperimentalDependenciesIncludeIntrafileOnes = false,
+              bool EnableSourceRangeDependencies = false);
   // clang-format on
   ~Compilation();
 
@@ -284,6 +291,11 @@ public:
     return llvm::makeArrayRef(Jobs);
   }
   Job *addJob(std::unique_ptr<Job> J);
+
+  /// To send job list to places that don't truck in fancy array views.
+  std::vector<const Job *> getJobsSimply() const {
+    return std::vector<const Job *>(getJobs().begin(), getJobs().end());
+  }
 
   void addTemporaryFile(StringRef file,
                         PreserveOnSignal preserve = PreserveOnSignal::No) {
@@ -323,6 +335,18 @@ public:
 
   bool getExperimentalDependenciesIncludeIntrafileOnes() const {
     return ExperimentalDependenciesIncludeIntrafileOnes;
+  }
+
+  bool getEnableSourceRangeDependencies() const {
+    return EnableSourceRangeDependencies;
+  }
+
+  bool getUseSourceRangeDependencies() const {
+    return UseSourceRangeDependencies;
+  }
+
+  void setUseSourceRangeDependencies(bool use) {
+    UseSourceRangeDependencies = use;
   }
 
   bool getBatchModeEnabled() const {
