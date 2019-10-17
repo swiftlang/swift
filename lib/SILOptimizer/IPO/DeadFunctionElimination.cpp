@@ -365,6 +365,7 @@ protected:
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);
         }
+        // TODO: Add support for `differentiability_witness_function_inst`?
       }
     }
   }
