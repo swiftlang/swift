@@ -457,7 +457,7 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
 }
 
 void SwiftLangSupport::printFullyAnnotatedGenericReq(
-    const swift::GenericSignature *Sig, llvm::raw_ostream &OS) {
+    const swift::GenericSignature Sig, llvm::raw_ostream &OS) {
   assert(Sig);
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();

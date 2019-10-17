@@ -965,7 +965,6 @@ ASTUnitRef ASTProducer::createASTUnit(
 
   if (fileSystem != llvm::vfs::getRealFileSystem()) {
     CompIns.getSourceMgr().setFileSystem(fileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CompIns.setup(Invocation)) {

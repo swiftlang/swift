@@ -5389,7 +5389,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
 #endif
   auto origFnType = originalFunction->getLoweredFunctionType();
   CanGenericSignature derivativeCanGenSig;
-  if (auto *derivativeGenSig = getDerivativeGenericSignature())
+  if (auto derivativeGenSig = getDerivativeGenericSignature())
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
   auto requireSameType =
       [&](CanSILFunctionType type1, CanSILFunctionType type2,

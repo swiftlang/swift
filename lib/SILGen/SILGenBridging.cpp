@@ -712,7 +712,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
         SGF.getASTContext().getBridgeAnythingToObjectiveC()) {
-    auto *genericSig = bridgeAnything->getGenericSignature();
+    auto genericSig = bridgeAnything->getGenericSignature();
     auto subMap = SubstitutionMap::get(
       genericSig,
       [&](SubstitutableType *t) -> Type {

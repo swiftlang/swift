@@ -107,8 +107,6 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    assert(fd->hasInterfaceType() && "bridging functions must be type-checked");
-
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
@@ -774,7 +772,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
       auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
       AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
-                            diffAttr->getDerivativeGenericSignature());
+                            diffAttr->getDerivativeGenericSignature().getPointer());
       emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
     }
   }

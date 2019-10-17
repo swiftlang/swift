@@ -440,12 +440,6 @@ static bool findNonMembers(TypeChecker &TC,
     if (!isValid(D))
       return false;
 
-    // FIXME: Circularity hack.
-    if (!D->getInterfaceType()) {
-      AllDeclRefs = false;
-      continue;
-    }
-
     if (matchesDeclRefKind(D, refKind))
       ResultValues.push_back(D);
   }
@@ -1356,8 +1350,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   bool hadParameterError = false;
 
-  auto resolution = TypeResolution::forContextual(closure);
-  if (TC.typeCheckParameterList(PL, resolution, options)) {
+  if (TC.typeCheckParameterList(PL, closure, options)) {
     // If we encounter an error validating the parameter list, don't bail.
     // Instead, go on to validate any potential result type, and bail
     // afterwards.  This allows for better diagnostics, and keeps the
@@ -1367,8 +1360,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(TC.Context, closure->getExplicitResultTypeLoc(),
-                                resolution,
+      TypeChecker::validateType(TC.Context,
+                                closure->getExplicitResultTypeLoc(),
+                                TypeResolution::forContextual(closure),
                                 TypeResolverContext::InExpression)) {
     return false;
   }

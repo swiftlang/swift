@@ -278,7 +278,7 @@ public:
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
   
   virtual OpaqueTypeDecl *
-  lookupOpaqueResultType(StringRef MangledName, LazyResolver *resolver) override;
+  lookupOpaqueResultType(StringRef MangledName) override;
 
   virtual TypeDecl *
   lookupNestedType(Identifier name,
@@ -349,7 +349,7 @@ public:
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
   virtual bool getAllGenericSignatures(
-                   SmallVectorImpl<GenericSignature*> &genericSignatures)
+                   SmallVectorImpl<GenericSignature> &genericSignatures)
                 override;
 
   static bool classof(const FileUnit *file) {

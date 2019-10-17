@@ -47,8 +47,8 @@ associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->getInterfaceType())
-      continue;
+    // FIXME: Remove this once getInterfaceType() on a ParamDecl works.
+    (void) elt->getInterfaceType();
     
     auto PL = elt->getParameterList();
     if (!PL)
@@ -771,7 +771,6 @@ deriveEquatable_eq(
   eqDecl->computeType();
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  eqDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(eqDecl);
 
@@ -896,7 +895,6 @@ deriveHashable_hashInto(
   hashDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
-  hashDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(hashDecl);
 
@@ -1247,14 +1245,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
-  getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setValidationToChecked();
   hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,

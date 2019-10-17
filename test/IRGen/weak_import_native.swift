@@ -239,15 +239,15 @@ public func test_not_hoist_weakly_linked4() {
 // CHECK:  [[IS_STRONG:%.*]] = icmp eq i32 [[TAG]], [[STRONG_CASE]]
 // CHECK:  br i1 [[IS_STRONG]], label %[[BB0:[0-9]+]], label %[[BB1:[0-9]+]]
 //
-// CHECK:  <label>:[[BB1]]:
+// CHECK:  [[BB1]]:
 // CHECK:  br i1 icmp eq ({{.*}} ptrtoint (i32* @"$s25weak_import_native_helper1EO0A0yA2CmFWC" to {{.*}}), {{.*}} 0), label %[[BB2:[0-9]+]], label %[[BB3:[0-9]+]]
 //
-// CHECK:; <label>:[[BB3]]:
+// CHECK:  [[BB3]]:
 // CHECK:  [[WEAK_CASE:%.*]] = load i32, i32* @"$s25weak_import_native_helper1EO0A0yA2CmFWC"
 // CHECK:  [[IS_WEAK:%.*]] = icmp eq i32 [[TAG]], [[WEAK_CASE]]
 // CHECK:  br label %[[BB2]]
 //
-// CHECK:; <label>:[[BB2]]:
+// CHECK:  [[BB2]]:
 // CHECK:  = phi i1 [ false, %[[BB1]] ], [ [[IS_WEAK]], %[[BB3]] ]
 public func test_weakly_linked_enum_cases(e: E) -> Int {
   switch e {

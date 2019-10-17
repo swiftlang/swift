@@ -961,8 +961,7 @@ TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
 }
 
 OpaqueTypeDecl *
-SerializedASTFile::lookupOpaqueResultType(StringRef MangledName,
-                                          LazyResolver *resolver) {
+SerializedASTFile::lookupOpaqueResultType(StringRef MangledName) {
   return File.lookupOpaqueResultType(MangledName);
 }
 

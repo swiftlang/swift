@@ -21,7 +21,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -65,6 +64,8 @@ namespace swift {
 
   public:
     StringRef copyString(StringRef string);
+
+    llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
   };
 
   namespace camel_case {
@@ -430,11 +431,13 @@ StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
 /// Describes a set of names with an inheritance relationship.
 class InheritedNameSet {
   const InheritedNameSet *Parent;
-  llvm::StringSet<> Names;
+  llvm::StringSet<llvm::BumpPtrAllocator &> Names;
 
 public:
   /// Construct a new inherited name set with the given parent.
-  explicit InheritedNameSet(const InheritedNameSet *parent) : Parent(parent) { }
+  InheritedNameSet(const InheritedNameSet *parent,
+                   llvm::BumpPtrAllocator &allocator)
+      : Parent(parent), Names(allocator) { }
 
   // Add a new name to the set.
   void add(StringRef name);

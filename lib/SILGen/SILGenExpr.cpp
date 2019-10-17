@@ -1335,7 +1335,7 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
     SGM.SwiftModule, toDecl);
 
   // Form type parameter substitutions.
-  auto *genericSig = fn->getGenericSignature();
+  auto genericSig = fn->getGenericSignature();
   unsigned fromParamCount = fromDecl->getGenericSignature()
     ->getGenericParams().size();
 
@@ -3281,7 +3281,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(*genericSig));
+          LookUpConformanceInSignature(genericSig.getPointer()));
       }
 
       // Set up a substitution of Self => IndexType.
@@ -5346,7 +5346,7 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
       M, getPointerProtocol());
 
-  auto *genericSig = converter->getGenericSignature();
+  auto genericSig = converter->getGenericSignature();
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
       firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
       genericSig);

@@ -868,7 +868,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
-  if (!VD || !VD->getInterfaceType())
+  if (!VD)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -1917,7 +1917,7 @@ public:
   /// protocol compositions.
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature *genericSig) {
+  Type eraseArchetypes(Type type, GenericSignature genericSig) {
     if (!genericSig)
       return type;
 
@@ -2042,7 +2042,7 @@ public:
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-    auto *GenericSig = VD->getInnermostDeclContext()
+    auto GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
     Type T = VD->getInterfaceType();

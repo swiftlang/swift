@@ -19,6 +19,7 @@
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
@@ -250,11 +251,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
 struct AutoDiffConfig {
   IndexSubset *parameterIndices;
   IndexSubset *resultIndices;
-  GenericSignature *derivativeGenericSignature;
+  GenericSignatureImpl* derivativeGenericSignature;
 
   /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
                               IndexSubset *resultIndices,
-                              GenericSignature *derivativeGenericSignature)
+                              GenericSignatureImpl *derivativeGenericSignature)
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
 };
@@ -420,7 +421,7 @@ namespace llvm {
 
 using swift::AutoDiffConfig;
 using swift::AutoDiffDerivativeFunctionKind;
-using swift::GenericSignature;
+using swift::GenericSignatureImpl;
 using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
 
@@ -430,13 +431,13 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            static_cast<GenericSignature *>(ptr)};
+            static_cast<GenericSignatureImpl *>(ptr)};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            static_cast<GenericSignature *>(ptr)};
+            static_cast<GenericSignatureImpl *>(ptr)};
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {

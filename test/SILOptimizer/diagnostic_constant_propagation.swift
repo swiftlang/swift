@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-ownership-stripping-after-serialization -primary-file %s -o /dev/null -verify
 //
 // These are tests for diagnostics produced by constant propagation pass.
 // Due to the change in the implementation of Integer initializers some of the
@@ -7,6 +8,9 @@
 // to be addressed in the future.
 // References: <rdar://problem/29937936>,
 // <https://bugs.swift.org/browse/SR-5964>
+
+// TODO(TF-799): Re-enable RUN lines after SR-11336 is fixed.
+// XFAIL: *
 
 import StdlibUnittest
 

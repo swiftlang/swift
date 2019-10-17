@@ -1267,22 +1267,26 @@ Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
   return None;
 }
 
-Optional<ParsedTokenSyntax>
-Parser::parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag, SourceLoc OtherLoc) {
-  Diag<> OtherNote;
-  switch (K) {
-  case tok::r_paren:  OtherNote = diag::opening_paren; break;
-  case tok::r_square: OtherNote = diag::opening_bracket; break;
-  case tok::r_brace:  OtherNote = diag::opening_brace; break;
-  default: llvm_unreachable("unknown matching token!");
-  }
+ParsedSyntaxResult<ParsedTokenSyntax>
+Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                                 bool silenceDiag) {
+  if (Tok.is(K))
+    return makeParsedResult(consumeTokenSyntax(K));
+  checkForInputIncomplete();
 
-  auto Token = parseTokenSyntax(K, TokLoc, ErrorDiag);
-  if (!Token) {
-    TokLoc = getLocForMissingMatchingToken();
+  if (!silenceDiag) {
+    diagnose(Tok, ErrorDiag);
+
+    Diag<> OtherNote;
+    switch (K) {
+    case tok::r_paren:  OtherNote = diag::opening_paren; break;
+    case tok::r_square: OtherNote = diag::opening_bracket; break;
+    case tok::r_brace:  OtherNote = diag::opening_brace; break;
+    default: llvm_unreachable("unknown matching token!");
+    }
     diagnose(OtherLoc, OtherNote);
   }
-  return Token;
+  return makeParserError();
 }
 
 SourceLoc Parser::getLocForMissingMatchingToken() const {
@@ -1308,14 +1312,12 @@ SourceLoc Parser::getErrorOrMissingLoc() const {
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   switch (ListKind) {
-  case SyntaxKind::FunctionCallArgumentList:
-    return SyntaxKind::FunctionCallArgument;
+  case SyntaxKind::TupleExprElementList:
+    return SyntaxKind::TupleExprElement;
   case SyntaxKind::ArrayElementList:
     return SyntaxKind::ArrayElement;
   case SyntaxKind::DictionaryElementList:
     return SyntaxKind::DictionaryElement;
-  case SyntaxKind::TupleElementList:
-    return SyntaxKind::TupleElement;
   case SyntaxKind::FunctionParameterList:
     return SyntaxKind::FunctionParameter;
   case SyntaxKind::TupleTypeElementList:
@@ -1330,7 +1332,6 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 ParserStatus
 Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
                         Optional<ParsedTokenSyntax> &LastComma,
-                        SourceLoc &RightLoc,
                         Optional<ParsedTokenSyntax> &Right,
                         SmallVectorImpl<ParsedSyntax>& Junk,
                         bool AllowSepAfterLast, Diag<> ErrorDiag,
@@ -1340,13 +1341,11 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
   };
 
   if (Tok.is(RightK)) {
-    RightLoc = Tok.getLoc();
     Right = consumeTokenSyntax(RightK);
     return makeParserSuccess();
   }
   if (TokIsStringInterpolationEOF()) {
     Tok.setKind(RightK);
-    RightLoc = Tok.getLoc();
     Right = consumeTokenSyntax();
     return makeParserSuccess();
   }
@@ -1369,7 +1368,6 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
     // Just accept the ")" and build the tuple as we usually do.
     if (TokIsStringInterpolationEOF()) {
       Tok.setKind(RightK);
-      RightLoc = Tok.getLoc();
       Right = consumeTokenSyntax();
       return Status;
     }
@@ -1406,20 +1404,10 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
     Status.setIsParseError();
   }
 
-  if (Status.isError()) {
-    // If we've already got errors, don't emit missing RightK diagnostics.
-    if (Tok.is(RightK)) {
-      RightLoc = Tok.getLoc();
-      Right = consumeTokenSyntax(RightK);
-    } else {
-      RightLoc = getLocForMissingMatchingToken();
-    }
-  } else {
-    Right = parseMatchingTokenSyntax(RightK, RightLoc, ErrorDiag, LeftLoc);
-    if (!Right)
-      Status.setIsParseError();
-  }
-
+  auto RightResult = parseMatchingTokenSyntax(RightK, ErrorDiag, LeftLoc,
+                                              Status.isError());
+  Status |= RightResult.getStatus();
+  Right = RightResult.getOrNull();
   return Status;
 }
 

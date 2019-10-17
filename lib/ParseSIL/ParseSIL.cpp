@@ -3536,7 +3536,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    CanGenericSignature canSig = nullptr;
+    CanGenericSignature canSig = CanGenericSignature();
     if (patternEnv && patternEnv->getGenericSignature()) {
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
     }
@@ -5835,13 +5835,14 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
           // Resolve types and convert requirements.
           FunctionState.convertRequirements(FunctionState.F,
                                             Attr.requirements, requirements);
-          GenericSignature *genericSig = evaluateOrDefault(
+          auto *fenv = FunctionState.F->getGenericEnvironment();
+          auto genericSig = evaluateOrDefault(
               P.Context.evaluator,
               AbstractGenericSignatureRequest{
-                FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+                fenv->getGenericSignature().getPointer(),
                 /*addedGenericParams=*/{ },
                 std::move(requirements)},
-                nullptr);
+                GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
               Attr.kind));
@@ -5858,10 +5859,10 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         FunctionState.convertRequirements(
             FunctionState.F, attr->getWhereClause()->getRequirements(),
             requirements);
-        auto *derivativeGenSig = evaluateOrDefault(
+        auto derivativeGenSig = evaluateOrDefault(
             P.Context.evaluator,
             AbstractGenericSignatureRequest{
-              FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+              FunctionState.F->getGenericEnvironment()->getGenericSignature().getPointer(),
               /*addedGenericParams=*/{},
               std::move(requirements)},
               nullptr);
@@ -6920,7 +6921,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
 
   // Parse a trailing 'where' clause (optional).
   // This represents derivative generic signature requirements.
-  GenericSignature *derivativeGenSig = nullptr;
+  GenericSignature derivativeGenSig = GenericSignature();
   SourceLoc whereLoc;
   SmallVector<RequirementRepr, 4> derivativeRequirementReprs;
   if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::kw_where)) {
@@ -6952,7 +6953,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     derivativeGenSig = evaluateOrDefault(
         P.Context.evaluator,
         AbstractGenericSignatureRequest{
-            originalFn->getLoweredFunctionType()->getGenericSignature(),
+            originalFn->getLoweredFunctionType()->getGenericSignature().getPointer(),
             /*addedGenericParams=*/{},
             std::move(requirements)},
             nullptr);

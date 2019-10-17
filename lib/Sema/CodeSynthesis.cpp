@@ -362,7 +362,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
            /*isTypeChecked=*/true };
 }
 
-static std::tuple<GenericSignature *, GenericParamList *, SubstitutionMap>
+static std::tuple<GenericSignature, GenericParamList *, SubstitutionMap>
 configureGenericDesignatedInitOverride(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
@@ -373,7 +373,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   auto subMap = superclassTy->getContextSubstitutionMap(
       moduleDecl, superclassDecl);
 
-  GenericSignature *genericSig;
+  GenericSignature genericSig;
 
   // Inheriting initializers that have their own generic parameters
   auto *genericParams = superclassCtor->getGenericParams();
@@ -384,7 +384,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     // but change the depth of the generic parameters to be one greater
     // than the depth of the subclass.
     unsigned depth = 0;
-    if (auto *genericSig = classDecl->getGenericSignature())
+    if (auto genericSig = classDecl->getGenericSignature())
       depth = genericSig->getGenericParams().back()->getDepth() + 1;
 
     for (auto *param : genericParams->getParams()) {
@@ -414,10 +414,10 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
           newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
     }
 
-    auto *superclassSig = superclassCtor->getGenericSignature();
+    auto superclassSig = superclassCtor->getGenericSignature();
 
     unsigned superclassDepth = 0;
-    if (auto *genericSig = superclassDecl->getGenericSignature())
+    if (auto genericSig = superclassDecl->getGenericSignature())
       superclassDepth = genericSig->getGenericParams().back()->getDepth() + 1;
 
     // We're going to be substituting the requirements of the base class
@@ -454,11 +454,11 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     genericSig = evaluateOrDefault(
         ctx.evaluator,
         AbstractGenericSignatureRequest{
-          classDecl->getGenericSignature(),
+          classDecl->getGenericSignature().getPointer(),
           std::move(newParamTypes),
           std::move(requirements)
         },
-        nullptr);
+        GenericSignature());
   } else {
     genericSig = classDecl->getGenericSignature();
   }
@@ -642,7 +642,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     return nullptr;
   }
 
-  GenericSignature *genericSig;
+  GenericSignature genericSig;
   GenericParamList *genericParams;
   SubstitutionMap subMap;
 
@@ -698,8 +698,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
 
-  ctor->setValidationToChecked();
-
   configureInheritedDesignatedInitAttributes(classDecl, ctor,
                                              superclassCtor, ctx);
 
@@ -710,8 +708,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // Note that this is a stub implementation.
     ctor->setStubImplementation(true);
 
-    // Stub constructors don't appear in the vtable.
-    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 
@@ -851,18 +847,6 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
   assert(!decl->hasUnreferenceableStorage() &&
          "User-defined structs cannot have unreferenceable storage");
 
-  // Bail out if we're validating one of our stored properties already;
-  // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
-
-      if (!var->getInterfaceType())
-        return;
-    }
-  }
-
   decl->setAddedImplicitInitializers();
 
   // Check whether there is a user-declared constructor or an instance
@@ -923,7 +907,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->getInterfaceType())
+        if (ctor->isRecursiveValidation())
           return;
       }
     }

@@ -59,9 +59,9 @@ static bool isOpenedAnyObject(Type type) {
 }
 
 SubstitutionMap Solution::computeSubstitutions(
-                               GenericSignature *sig,
+                               GenericSignature sig,
                                ConstraintLocatorBuilder locatorBuilder) const {
-  if (sig == nullptr)
+  if (sig.isNull())
     return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.
@@ -2548,15 +2548,19 @@ namespace {
             auto baseTyUnwrappedName = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
             auto startLoc = DSCE->getStartLoc();
-            
-            tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                        baseTyName, baseTyUnwrappedName, memberName.str());
-            
-            tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
-              .fixItInsert(startLoc, "Optional");
-            tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+            tc.diagnoseWithNotes(
+                tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                            baseTyName, baseTyUnwrappedName, memberName.str()),
+                [&]() {
+                  tc.diagnose(loc,
+                              swift::diag::optional_fixit_ambiguous_case_ref)
+                      .fixItInsert(startLoc, "Optional");
+                  tc.diagnose(
+                        loc,
+                        swift::diag::type_fixit_optional_ambiguous_case_ref,
                         baseTyUnwrappedName, memberName.str())
-              .fixItInsert(startLoc, baseTyUnwrappedName);
+                      .fixItInsert(startLoc, baseTyUnwrappedName);
+                });
           }
         }
       }

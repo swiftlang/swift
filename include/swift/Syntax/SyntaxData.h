@@ -186,7 +186,7 @@ public:
                              CursorIndex IndexInParent = 0);
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> getRaw() const {
+  const RC<RawSyntax> &getRaw() const {
     return Raw;
   }
 

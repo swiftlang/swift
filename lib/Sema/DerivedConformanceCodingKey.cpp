@@ -146,7 +146,6 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   initDecl->computeType();
 
   initDecl->setAccess(derived.Nominal->getFormalAccess());
-  initDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(initDecl);
 
