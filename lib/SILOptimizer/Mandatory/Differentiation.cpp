@@ -878,10 +878,9 @@ private:
   /// Saved for deletion during cleanup.
   SmallVector<SILFunction *, 32> generatedFunctions;
 
-  /// List of derivative function references, generated via
-  /// `emitDerivativeFunctionReference`.
+  /// List of references to generated functions.
   /// Saved for deletion during cleanup.
-  SmallVector<SILValue, 32> generatedDerivativeFunctionReferences;
+  SmallVector<SILValue, 32> generatedFunctionReferences;
 
   /// The AdditiveArithmetic protocol in the standard library.
   ProtocolDecl *additiveArithmeticProtocol =
@@ -933,8 +932,8 @@ public:
     return generatedFunctions;
   }
 
-  SmallVector<SILValue, 32> &getGeneratedDerivativeFunctionReferences() {
-    return generatedDerivativeFunctionReferences;
+  SmallVector<SILValue, 32> &getGeneratedFunctionReferences() {
+    return generatedFunctionReferences;
   }
 
   ProtocolDecl *getAdditiveArithmeticProtocol() const {
@@ -969,11 +968,11 @@ public:
       original->removeDifferentiableAttr(attr);
     }
     // Delete all references to generated functions.
-    for (auto derivativeFn : generatedDerivativeFunctionReferences) {
-      if (auto *fnRef =
-              peerThroughFunctionConversions<FunctionRefInst>(derivativeFn)) {
-        fnRef->replaceAllUsesWithUndef();
-        fnRef->eraseFromParent();
+    for (auto fnRef : generatedFunctionReferences) {
+      if (auto *fnRefInst =
+              peerThroughFunctionConversions<FunctionRefInst>(fnRef)) {
+        fnRefInst->replaceAllUsesWithUndef();
+        fnRefInst->eraseFromParent();
       }
     }
     // Delete all generated functions.
@@ -1226,6 +1225,10 @@ ADContext::emitNondifferentiabilityError(SILValue value,
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   auto valueLoc = value.getLoc().getSourceLoc();
+  // If instruction does not have a valid location, use the function location
+  // as a fallback. Improves diagnostics in some cases.
+  if (valueLoc.isInvalid())
+    valueLoc = value->getFunction()->getLocation().getSourceLoc();
   return emitNondifferentiabilityError(valueLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }
@@ -8566,6 +8569,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
           thunkBuilder.createReturn(loc, dfi);
           retInst->eraseFromParent();
 
+          getGeneratedFunctions().push_back(newThunk);
           getDifferentiableFunctionInsts().push_back(dfi);
           if (processDifferentiableFunctionInst(dfi))
             return nullptr;
@@ -8573,6 +8577,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
 
         // Apply the new curry thunk.
         auto *newThunkRef = builder.createFunctionRef(loc, newThunk);
+        getGeneratedFunctionReferences().push_back(newThunkRef);
         SmallVector<SILValue, 8> newArgs;
         SmallVector<SILValue, 8> newArgsToDestroy;
         SmallVector<AllocStackInst *, 1> newBuffersToDealloc;
@@ -8608,7 +8613,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
       return nullptr;
 
     auto derivativeFn = derivativeFnAndIndices->first;
-    getGeneratedDerivativeFunctionReferences().push_back(derivativeFn);
+    getGeneratedFunctionReferences().push_back(derivativeFn);
 
     // If desired indices are a subset of actual indices, create a "subset
     // indices thunk" and destroy the emitted derivative function reference.
