@@ -87,11 +87,12 @@ SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
       originalLinkage, /*isDerivativeFnExported*/ true);
   auto name = derivativeFnDeclRef.mangle();
   // This thunk is publicly exposed and cannot be transparent.
-  // TODO(TF-925): Mark the thunks as "always inline" for optimization.
+  // Instead, mark it as "always inline" for optimization.
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsNotTransparent,
       derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
       IsThunk);
+  thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;
 
