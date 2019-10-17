@@ -44,16 +44,13 @@ bool swift::canBeMemberName(StringRef identifier) {
     .Default(true);
 }
 
-PrepositionKind swift::getPrepositionKind(StringRef word) {
-#define DIRECTIONAL_PREPOSITION(Word)           \
-  if (word.equals_lower(#Word))                 \
-    return PK_Directional;
+bool swift::isPreposition(StringRef word) {
 #define PREPOSITION(Word)                       \
   if (word.equals_lower(#Word))                 \
-    return PK_Nondirectional;
+    return true;
 #include "PartsOfSpeech.def"
 
-  return PK_None;
+  return false;
 }
 
 PartOfSpeech swift::getPartOfSpeech(StringRef word) {
@@ -68,7 +65,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 
   // Identify gerunds, which always end in "ing".
   if (word.endswith("ing") && word.size() > 4) {
-    StringRef possibleVerb = word.substr(0, word.size()-3);
+    StringRef possibleVerb = word.drop_back(3);
 
     // If what remains is a verb, we have a gerund.
     if (getPartOfSpeech(possibleVerb) == PartOfSpeech::Verb)
@@ -87,7 +84,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
     // instance of that letter and try again.
     unsigned count = possibleVerb.size();
     if (possibleVerb[count-1] == possibleVerb[count-2] &&
-        getPartOfSpeech(possibleVerb.substr(0, count-1)) == PartOfSpeech::Verb)
+        getPartOfSpeech(possibleVerb.drop_back()) == PartOfSpeech::Verb)
       return PartOfSpeech::Gerund;
   }
 
@@ -501,8 +498,7 @@ StringRef camel_case::toLowercaseWord(StringRef string,
 
 /// Omit needless words from the beginning of a name.
 static StringRef omitNeedlessWordsFromPrefix(StringRef name,
-                                             OmissionTypeName type,
-                                             StringScratchSpace &scratch){
+                                             OmissionTypeName type) {
   if (type.empty())
     return name;
 
@@ -523,11 +519,11 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
       if (nextWord.endswith("ing")) {
-        return toLowercaseWord(newName.substr(firstWord.size()), scratch);
+        return newName.substr(firstWord.size());
       }
     }
 
-    return toLowercaseWord(newName, scratch);
+    return newName;
   }
 
   return name;
@@ -813,8 +809,6 @@ omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
   if (matchIter == nameWords.end())
     return name;
 
-  StringRef origName = name;
-
   // Handle complete name matches.
   if (matchIter == nameWords.begin()) {
     // If we're doing a partial match or we have an initial
@@ -833,59 +827,62 @@ omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
   switch (role) {
   case NameRole::Property:
     // Always strip off type information.
-    name = matchIter.getPriorStr();
     break;
 
-  case NameRole::BaseName:
   case NameRole::FirstParameter:
   case NameRole::Partial:
-  case NameRole::SubsequentParameter:
+  case NameRole::SubsequentParameter: {
+    // Classify the part of speech of the word before the type information we
+    // would strip off. We only want to strip it if the previous word is a
+    // preposition, verb, or gerund.
+    auto previousWordIter = std::prev(matchIter);
+    if (getPartOfSpeech(*previousWordIter) == PartOfSpeech::Unknown)
+      return name;
+    break;
+  }
+
+  case NameRole::BaseName: {
     // Classify the part of speech of the word before the type
     // information we would strip off.
     auto previousWordIter = std::prev(matchIter);
     switch (getPartOfSpeech(*previousWordIter)) {
     case PartOfSpeech::Preposition:
-      if (role == NameRole::BaseName) {
-        // Strip off the part of the name that is redundant with
-        // type information, so long as there's something preceding the
-        // preposition.
-        if (previousWordIter != nameWords.begin())
-          name = matchIter.getPriorStr();
-        break;
-      }
-
-      LLVM_FALLTHROUGH;
+      // If there's nothing preceding the preposition, don't strip anything.
+      if (previousWordIter == nameWords.begin())
+        return name;
+      break;
 
     case PartOfSpeech::Verb:
     case PartOfSpeech::Gerund:
       // Don't prune redundant type information from the base name if
       // there is a corresponding property (either singular or plural).
-      if (role == NameRole::BaseName &&
-          textMatchesPropertyName(matchIter.getRestOfStr(), allPropertyNames))
+      if (textMatchesPropertyName(matchIter.getRestOfStr(), allPropertyNames))
         return name;
-
-      // Strip off the part of the name that is redundant with
-      // type information.
-      name = matchIter.getPriorStr();
       break;
 
     case PartOfSpeech::Unknown:
       // Assume it's a noun or adjective; don't strip anything.
-      break;
+      return name;
     }
+
     break;
   }
+  }
+
+  // Strip off the part of the name that is redundant with
+  // type information.
+  StringRef newName = matchIter.getPriorStr();
 
   switch (role) {
   case NameRole::BaseName:
   case NameRole::Property:
     // If we ended up with something that can't be a member name, do nothing.
-    if (!canBeMemberName(name))
-      return origName;
+    if (!canBeMemberName(newName))
+      return name;
 
     // If we ended up with a vacuous name like "get" or "set", do nothing.
-    if (isVacuousName(name))
-      return origName;
+    if (isVacuousName(newName))
+      return name;
 
     break;
 
@@ -896,7 +893,7 @@ omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
   }
 
   // We're done.
-  return name;
+  return newName;
 }
 
 StringRef camel_case::toLowercaseInitialisms(StringRef string,
@@ -921,7 +918,8 @@ camel_case::toLowercaseInitialisms(StringRef string,
 
   // Lowercase until we hit the an uppercase letter followed by a
   // non-uppercase letter.
-  llvm::SmallString<32> scratchStr;
+  scratch.clear();
+  scratch.reserve(string.size());
   for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
@@ -930,19 +928,18 @@ camel_case::toLowercaseInitialisms(StringRef string,
       // lowercase the character we're on.
       if (i == 0 || !clang::isLetter(string[i+1]) ||
           isPluralSuffix(camel_case::getFirstWord(string.substr(i+1)))) {
-        scratchStr.push_back(clang::toLowercase(string[i]));
+        scratch.push_back(clang::toLowercase(string[i]));
         ++i;
       }
 
-      scratchStr.append(string.substr(i));
+      scratch.append(string.substr(i).begin(), string.substr(i).end());
       break;
     }
 
-    scratchStr.push_back(clang::toLowercase(string[i]));
+    scratch.push_back(clang::toLowercase(string[i]));
   }
 
-  scratch = scratchStr;
-  return {scratch.begin(), scratch.size()};
+  return {scratch.data(), scratch.size()};
 }
 
 /// Determine whether the given word occurring before the given
@@ -978,10 +975,6 @@ static bool wordConflictsAfterPreposition(StringRef word,
     if (camel_case::sameWordIgnoreFirstCase(word, "backing"))
       return true;
   }
-
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "and") &&
-      camel_case::sameWordIgnoreFirstCase(word, "return"))
-    return true;
 
   return false;
 }
@@ -1196,7 +1189,7 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
   // Try splitting a Boolean "Animated".
   if (paramType.isBoolean() &&
       camel_case::getLastWord(baseName) == "Animated") {
-    baseName = baseName.substr(0, baseName.size() - strlen("Animated"));
+    baseName = baseName.drop_back(strlen("Animated"));
     argName = "animated";
     return true;
   }
@@ -1255,8 +1248,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   // prefix of the name.
   bool resultTypeMatchesContext = (resultType == contextType);
   if (resultTypeMatchesContext) {
-    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType,
-                                                        scratch);
+    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;

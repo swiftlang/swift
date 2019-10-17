@@ -6404,8 +6404,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     scratch += "init";
 
     // If the first argument name doesn't start with a preposition, add "with".
-    if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-          == PK_None) {
+    if (!isPreposition(camel_case::getFirstWord(firstName.str()))) {
       camel_case::appendSentenceCase(scratch, "With");
     }
 
@@ -6464,10 +6463,8 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
       // If the first argument name doesn't start with a preposition, and the
       // method name doesn't end with a preposition, add "with".
       auto firstName = argNames[argIndex++];
-      if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-            == PK_None &&
-          getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
-            == PK_None) {
+      if (!isPreposition(camel_case::getFirstWord(firstName.str())) &&
+          !isPreposition(camel_case::getLastWord(firstPiece.str()))) {
         camel_case::appendSentenceCase(scratch, "With");
       }
 
