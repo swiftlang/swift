@@ -42,6 +42,13 @@ class Product(object):
         """
         return True
 
+    def shall_build(self, host_target):
+        """shall_build() -> Bool
+
+        Whether or not this product shall be built with the given arguments.
+        """
+        raise NotImplementedError
+
     def build(self, host_target):
         """build() -> void
 
@@ -49,10 +56,24 @@ class Product(object):
         """
         raise NotImplementedError
 
+    def shall_test(self, host_target):
+        """shall_test() -> Bool
+
+        Whether or not this product shall be tested with the given arguments.
+        """
+        raise NotImplementedError
+
     def test(self, host_target):
         """test() -> void
 
         Run the tests, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
+    def shall_install(self, host_target):
+        """shall_install() -> Bool
+
+        Whether or not this product shall be installed with the given arguments
         """
         raise NotImplementedError
 

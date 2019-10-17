@@ -27,12 +27,20 @@ class IndexStoreDB(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
+    def shall_build(self, host_target):
+        return True
+
     def build(self, host_target):
         run_build_script_helper('build', host_target, self, self.args)
 
+    def shall_test(self, host_target):
+        return self.args.test_indexstoredb
+
     def test(self, host_target):
-        if self.args.test and self.args.test_indexstoredb:
-            run_build_script_helper('test', host_target, self, self.args)
+        run_build_script_helper('test', host_target, self, self.args)
+
+    def shall_install(self, host_target):
+        return False
 
     def install(self, host_target):
         pass
