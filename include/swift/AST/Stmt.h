@@ -881,9 +881,10 @@ public:
 
 enum CaseParentKind { Switch, DoCatch };
 
-/// A 'case' or 'default' block of a switch statement.  Only valid as the
-/// substatement of a SwitchStmt.  A case block begins either with one or more
-/// CaseLabelItems or a single 'default' label.
+/// A 'case' or 'default' block of a switch statement, or a 'catch' clause of a
+/// do-catch statement.  Only valid as the substatement of a SwitchStmt or
+/// DoCatchStmt.  A case block begins either with one or more CaseLabelItems or
+/// a single 'default' label.
 ///
 /// Some examples:
 /// \code
@@ -901,26 +902,26 @@ class CaseStmt final
   friend TrailingObjects;
 
   SourceLoc UnknownAttrLoc;
-  SourceLoc CaseLoc;
-  SourceLoc ColonLoc;
+  SourceLoc ItemIntroducerLoc;
+  SourceLoc ItemTerminatorLoc;
   CaseParentKind ParentKind;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasFallthrough;
 
   Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
-  CaseStmt(CaseParentKind ParentKind, SourceLoc CaseLoc,
+  CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
-           SourceLoc ColonLoc, Stmt *Body,
+           SourceLoc ItemTerminatorLoc, Stmt *Body,
            Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
            Optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
   static CaseStmt *
-  create(ASTContext &C, CaseParentKind ParentKind, SourceLoc CaseLoc,
+  create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
-         SourceLoc ColonLoc, Stmt *Body,
+         SourceLoc ItemTerminatorLoc, Stmt *Body,
          Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
@@ -955,8 +956,9 @@ public:
   /// True if the case block declares any patterns with local variable bindings.
   bool hasBoundDecls() const { return CaseBodyVariables.hasValue(); }
 
-  /// Get the source location of the 'case' or 'default' of the first label.
-  SourceLoc getLoc() const { return CaseLoc; }
+  /// Get the source location of the 'case', 'default', or 'catch' of the first
+  /// label.
+  SourceLoc getLoc() const { return ItemIntroducerLoc; }
 
   SourceLoc getStartLoc() const {
     if (UnknownAttrLoc.isValid())
@@ -965,7 +967,9 @@ public:
   }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
   SourceRange getLabelItemsRange() const {
-    return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
+    return ItemTerminatorLoc.isValid()
+               ? SourceRange(getLoc(), ItemTerminatorLoc)
+               : getSourceRange();
   }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }

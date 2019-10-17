@@ -400,21 +400,24 @@ SourceLoc CaseLabelItem::getEndLoc() const {
   return CasePattern->getEndLoc();
 }
 
-CaseStmt::CaseStmt(CaseParentKind ParentKind, SourceLoc caseLoc,
+CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
-                   SourceLoc unknownAttrLoc, SourceLoc colonLoc, Stmt *body,
+                   SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
+                   Stmt *body,
                    Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
                    Optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
-    : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, caseLoc)),
-      ParentKind(ParentKind), UnknownAttrLoc(unknownAttrLoc), CaseLoc(caseLoc),
-      ColonLoc(colonLoc),
+    : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
+      UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
+      ItemTerminatorLoc(itemTerminatorLoc), ParentKind(parentKind),
       BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
       CaseBodyVariables(caseBodyVariables) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
-
+  assert(
+      !(parentKind == CaseParentKind::Switch && fallthroughStmt.isNonNull()) &&
+      "Only switch cases can have a fallthrough.");
   if (hasFallthroughDest()) {
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
   }
