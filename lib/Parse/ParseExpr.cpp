@@ -1183,7 +1183,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                Tok.getLoc(), *SyntaxContext));
+                leadingTriviaLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -1588,7 +1588,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                Tok.getLoc(), *SyntaxContext));
+                leadingTriviaLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -2102,7 +2102,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
           ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
-            Tok.getLoc(), *SyntaxContext));
+              leadingTriviaLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -3304,9 +3304,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankArrayElementList(
-                                Tok.getLoc(), *SyntaxContext));
+      SyntaxContext->addSyntax(ParsedSyntaxRecorder::makeBlankArrayElementList(
+          leadingTriviaLoc(), *SyntaxContext));
     RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(

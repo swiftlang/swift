@@ -114,9 +114,6 @@ ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
 %       end
 %     end
   };
-  #ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(layout);
-  #endif
   if (SPCtx.shouldDefer())
     return defer${node.syntax_kind}(layout, SPCtx);
   return record${node.syntax_kind}(layout, SPCtx.getRecorder());

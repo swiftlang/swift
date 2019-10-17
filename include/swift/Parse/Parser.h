@@ -532,6 +532,10 @@ public:
     return consumeToken();
   }
 
+  SourceLoc leadingTriviaLoc() {
+    return Tok.getLoc().getAdvancedLoc(-LeadingTrivia.getLength());
+  }
+
   SourceLoc consumeIdentifier(Identifier *Result = nullptr,
                               bool allowDollarIdentifier = false) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));

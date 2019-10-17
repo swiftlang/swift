@@ -28,6 +28,9 @@ ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
   ParsedRawSyntaxNode *newPtr =
     ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
 
+#ifndef NDEBUG
+  ParsedRawSyntaxRecorder::verifyElementRanges(deferredNodes);
+#endif
   auto ptr = newPtr;
   for (auto &node : deferredNodes) {
     // Cached range.
