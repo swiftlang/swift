@@ -764,7 +764,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     } else if (isa<CoerceExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_CoerceOperand);
     } else {
-      assert(false && "unhandled expression type");
+      return false;
     }
   } else {
     const auto &last = path.back();
