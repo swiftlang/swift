@@ -3695,6 +3695,8 @@ SILGenModule::getOrCreateAutoDiffDerivativeFunctionThunk(
   SILGenFunctionBuilder fb(*this);
   auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
       original->getLinkage(), /*isDerivativeFnExported*/ true);
+  // This thunk is publicly exposed and cannot be transparent.
+  // TODO(TF-925): Mark the thunks as "always inline" for optimization.
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, origDerivativeFnType, IsBare, IsNotTransparent,
       derivativeFn->isSerialized(), derivativeFn->isDynamicallyReplaceable(),

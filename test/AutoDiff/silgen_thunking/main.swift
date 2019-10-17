@@ -10,6 +10,17 @@
 import StdlibUnittest
 import DifferentiationUnittest
 
+// Verify that SILGen derivative thunks are never `[transparent]`.
+@differentiable(vjp: vjpNoReabstraction)
+func noReabstraction<T: Differentiable>(_ x: T) -> T {
+  return x
+}
+func vjpNoReabstraction<T: Differentiable>(_ x: T) -> (T, (T.TangentVector) -> T.TangentVector) {
+  return (x, { $0 })
+}
+// Find the non-`[transparent]` SILGen thunk.
+// CHECK-LABEL: sil hidden [thunk] [ossa] @AD__$s4main15noReabstractionyxxs15_DifferentiableRzlF__vjp_src_0_wrt_0 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector)
+
 var DerivativeSILGenThunkTests = TestSuite("DerivativeSILGenThunks")
 
 // TF-619: Test cross-module import of `@differentiable` methods with
