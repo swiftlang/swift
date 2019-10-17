@@ -28,7 +28,7 @@ ArrayAutoDiffTests.test("ArraySubscript") {
     gradient(at: [2, 3, 4, 5, 6, 7], in: sumFirstThree))
 }
 
-ArrayAutoDiffTests.test("ArrayLiteral") {
+ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
   func twoElementLiteral(_ x: Tracked<Float>, _ y: Tracked<Float>) -> [Tracked<Float>] {
     return [x, y]
   }
@@ -90,7 +90,7 @@ ArrayAutoDiffTests.test("ArrayConcat") {
       in: sumFirstThreeConcatted))
 }
 
-ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
+ArrayAutoDiffTests.testWithLeakChecking("Array.init(repeating:count:)") {
   @differentiable
   func repeating(_ x: Tracked<Float>) -> [Tracked<Float>] {
     Array(repeating: x, count: 10)
