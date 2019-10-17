@@ -257,21 +257,23 @@ extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector
   }
 }
 
-// Differential operators for `Tracked<Float>`.
-public func gradient(
-  at x: Tracked<Float>, in f: @differentiable (Tracked<Float>) -> Tracked<Float>
-) -> Tracked<Float> {
-  return pullback(at: x, in: f)(1)
+// Differential operators for `Tracked<T>`.
+
+public func gradient<T, U>(
+  at x: T, in f: @differentiable (T) -> Tracked<U>
+) -> T.TangentVector
+where U : FloatingPoint, U.TangentVector == U {
+  return pullback(at: x, in: f)(Tracked<U>(1))
 }
 
-public func gradient(
-  at x: Tracked<Float>, _ y: Tracked<Float>,
-  in f: @differentiable (Tracked<Float>, Tracked<Float>) -> Tracked<Float>
-) -> (Tracked<Float>, Tracked<Float>) {
-  return pullback(at: x, y, in: f)(1)
+public func gradient<T, U, R>(
+  at x: T, _ y: U, in f: @differentiable (T, U) -> Tracked<R>
+) -> (T.TangentVector, U.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return pullback(at: x, y, in: f)(Tracked<R>(1))
 }
 
-public func valueWithGradient<T, U: FloatingPoint>(
+public func valueWithGradient<T, U : FloatingPoint>(
   at x: T, in f: @differentiable (T) -> Tracked<U>
 ) -> (value: Tracked<U>, gradient: T.TangentVector) {
   let (y, pullback) = valueWithPullback(at: x, in: f)
