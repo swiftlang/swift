@@ -791,7 +791,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   prepareEpilog(varType, false, CleanupLocation::get(loc));
 
   auto pbd = var->getParentPatternBinding();
-  auto entry = pbd->getPatternEntryForVarDecl(var);
+  const auto i = pbd->getPatternEntryIndexForVarDecl(var);
+  auto *anchorVar = pbd->getAnchoringVarDecl(i);
   auto subs = getForwardingSubstitutionMap();
   auto contextualType = dc->mapTypeIntoContext(interfaceType);
   auto resultType = contextualType->getCanonicalType();
@@ -805,7 +806,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     SmallVector<CleanupHandle, 4> cleanups;
     auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
 
-    emitApplyOfStoredPropertyInitializer(loc, entry, subs, resultType,
+    emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs, resultType,
                                          origResultType,
                                          SGFContext(init.get()));
 
@@ -816,7 +817,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     Scope scope(Cleanups, CleanupLocation(var));
 
     // If we have no indirect results, just return the result.
-    auto result = emitApplyOfStoredPropertyInitializer(loc, entry, subs,
+    auto result = emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs,
                                                        resultType,
                                                        origResultType,
                                                        SGFContext())

@@ -457,7 +457,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
   auto *initContext = cast_or_null<PatternBindingInitializer>(
-      decl->getPatternList()[0].getInitContext());
+      decl->getInitContext(0));
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
       return consumer.consume({selfParam},

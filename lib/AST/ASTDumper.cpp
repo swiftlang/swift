@@ -895,20 +895,20 @@ namespace {
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
 
-      for (auto entry : PBD->getPatternList()) {
+      for (auto idx : range(PBD->getNumPatternEntries())) {
         OS << '\n';
-        printRec(entry.getPattern());
-        if (entry.getOriginalInit()) {
+        printRec(PBD->getPattern(idx));
+        if (PBD->getOriginalInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
           OS << "Original init:\n";
-          printRec(entry.getOriginalInit());
+          printRec(PBD->getOriginalInit(idx));
         }
-        if (entry.getInit()) {
+        if (PBD->getInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
           OS << "Processed init:\n";
-          printRec(entry.getInit());
+          printRec(PBD->getInit(idx));
         }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';

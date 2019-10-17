@@ -2214,13 +2214,12 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
     SILLocation loc,
-    const PatternBindingEntry &entry,
+    VarDecl *var,
     SubstitutionMap subs,
     CanType resultType,
     AbstractionPattern origResultType,
     SGFContext C) {
 
-  VarDecl *var = entry.getAnchoringVarDecl();
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc, constant));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();

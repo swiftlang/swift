@@ -672,7 +672,7 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
     if (!PBD) continue;
     // Walk the initializers for all properties declared in the type with
     // an initializer.
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+    for (unsigned i : range(PBD->getNumPatternEntries())) {
       if (PBD->isInitializerSubsumed(i))
         continue;
 

@@ -2079,8 +2079,8 @@ public:
     if (!PBD) return false;
 
     bool sawMutation = false;
-    for (const auto &PBE : PBD->getPatternList()) {
-      PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
         auto it = VarDecls.find(VD);
         sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
       });
@@ -2199,8 +2199,8 @@ public:
           Decl *D = node.get<Decl *>();
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
-          for (PatternBindingEntry PBE : PBD->getPatternList()) {
-            PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+          for (auto idx : range(PBD->getNumPatternEntries())) {
+            PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
               VarDecls[VD] = RK_Read|RK_Written;
             });
           }
@@ -2496,11 +2496,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
-            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
+            !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
           SourceRange replaceRange(
               pbd->getStartLoc(),
-              pbd->getPatternList()[0].getPattern()->getEndLoc());
+              pbd->getPattern(0)->getEndLoc());
           Diags.diagnose(var->getLoc(), diag::pbd_never_used,
                          var->getName(), varKind)
             .fixItReplace(replaceRange, "_");
