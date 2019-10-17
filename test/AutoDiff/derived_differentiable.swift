@@ -44,7 +44,7 @@ struct TestNoDerivative : EuclideanDifferentiable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct TangentVector : _Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol
+// CHECK-AST:         internal struct TangentVector : _Differentiable, AdditiveArithmetic, ElementaryFunctions
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.TangentVector
 // CHECK-AST:         internal var differentiableVectorView: TestNoDerivative.TangentVector { get }
 

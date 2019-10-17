@@ -19,9 +19,9 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 struct S {
   var p: Float
 }
-extension S : Differentiable, VectorProtocol {
+extension S : Differentiable, AdditiveArithmetic {
   // Test custom `TangentVector` type with non-matching stored property name.
-  struct TangentVector: Differentiable, VectorProtocol {
+  struct TangentVector: Differentiable, AdditiveArithmetic {
     var dp: Float
   }
   typealias AllDifferentiableVariables = S

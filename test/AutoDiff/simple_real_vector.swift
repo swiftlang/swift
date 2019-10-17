@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 @frozen
-public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable {
+public struct Vector : AdditiveArithmetic, Differentiable {
   public var x: Float
   public var y: Float
 

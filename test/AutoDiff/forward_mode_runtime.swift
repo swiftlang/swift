@@ -356,7 +356,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
 //===----------------------------------------------------------------------===//
 
 struct Tensor<Scalar : FloatingPoint & Differentiable> 
-  : VectorProtocol, Differentiable {
+  : AdditiveArithmetic, Differentiable {
   // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
   // until differentiation has indirect passing support.
   var value: Float
@@ -799,7 +799,7 @@ protocol Prot : Differentiable {
   func foo(x: Float) -> Float
 }
 ForwardModeTests.test("Simple Protocol") {
-  struct Linear: Prot, VectorProtocol {
+  struct Linear: Prot, AdditiveArithmetic {
     typealias TangentVector = Linear
 
     let m: Float
@@ -832,7 +832,7 @@ extension DiffReq where TangentVector : AdditiveArithmetic {
   }
 }
 
-struct Quadratic : DiffReq, VectorProtocol {
+struct Quadratic : DiffReq, AdditiveArithmetic {
   typealias TangentVector = Quadratic
 
   @differentiable

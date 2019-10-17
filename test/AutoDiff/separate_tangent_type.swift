@@ -17,7 +17,7 @@ struct DifferentiableSubset : Differentiable {
   var b: Float
   @noDerivative var flag: Bool
 
-  struct TangentVector : Differentiable, VectorProtocol {
+  struct TangentVector : Differentiable, AdditiveArithmetic {
     typealias TangentVector = DifferentiableSubset.TangentVector
     var w: Float
     var b: Float
