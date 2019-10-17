@@ -72,9 +72,9 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *
-SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef derivativeFnDeclRef,
-                                       SILFunction *derivativeFn,
-                                       CanSILFunctionType derivativeFnTy) {
+SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
+    SILDeclRef derivativeFnDeclRef, SILFunction *derivativeFn,
+    CanSILFunctionType derivativeFnTy) {
   auto *autoDiffFuncId =
       derivativeFnDeclRef.autoDiffDerivativeFunctionIdentifier;
   assert(autoDiffFuncId);

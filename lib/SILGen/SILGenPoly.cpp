@@ -3665,7 +3665,7 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *
-SILGenModule::getOrCreateAutoDiffDerivativeFunctionThunk(
+SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
     SILFunction *original, SILAutoDiffIndices &indices,
     SILFunction *derivativeFn, AutoDiffDerivativeFunctionKind derivativeFnKind,
     bool reorderSelf) {
