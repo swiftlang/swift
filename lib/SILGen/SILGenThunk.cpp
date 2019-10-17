@@ -87,7 +87,7 @@ SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef derivativeFnDeclRef,
       originalLinkage, /*isDerivativeFnExported*/ true);
   auto name = derivativeFnDeclRef.mangle();
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsTransparent,
+      derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsNotTransparent,
       derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
       IsThunk);
   if (!thunk->empty())
