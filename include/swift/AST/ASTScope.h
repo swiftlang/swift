@@ -1432,6 +1432,7 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;

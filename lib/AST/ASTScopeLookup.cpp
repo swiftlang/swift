@@ -503,8 +503,40 @@ GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
   while (i != 0) {
     Optional<NullablePtr<DeclContext>> maybeSelfDC =
         history[--i]->computeSelfDCForParent();
-    if (maybeSelfDC)
-      return *maybeSelfDC;
+    if (maybeSelfDC) {
+      // If we've found a selfDC, we'll definitely be returning something.
+      // However, we may have captured 'self' somewhere down the tree, so we
+      // can't return outright without checking the nested scopes.
+      Optional<NullablePtr<DeclContext>> innerCapturedSelfDC = None;
+      // Start with the innermost scope.
+      size_t j = 0;
+      while (j != i) {
+        // Check if there's a DeclContext for self in this scope. If we're
+        // inside a scope for a completely different type, then we will
+        // encounter a GenericTypeOrExtensionScope somewhere up the tree that
+        // will cause us to forget any DeclContexts we find within.
+        Optional<NullablePtr<DeclContext>> maybeCapturedSelfDC =
+            history[j]->computeSelfDCForParent();
+
+        if (maybeCapturedSelfDC) {
+          // If we haven't already found a captured self context, remember the
+          // first one we see.
+          if (!innerCapturedSelfDC) {
+            innerCapturedSelfDC = maybeCapturedSelfDC;
+          }
+
+          // If there's an intervening scope that causes us to forget the self
+          // context, we should obey that.
+          if ((*maybeCapturedSelfDC).isNull()) {
+            innerCapturedSelfDC = None;
+          }
+        }
+        // Move up to the next scope.
+        j++;
+      }
+
+      return innerCapturedSelfDC ? *innerCapturedSelfDC : *maybeSelfDC;
+    }
   }
   return nullptr;
 }
@@ -615,6 +647,14 @@ PatternEntryInitializerScope::computeSelfDCForParent() const {
 Optional<NullablePtr<DeclContext>>
 MethodBodyScope::computeSelfDCForParent() const {
   return NullablePtr<DeclContext>(decl);
+}
+
+Optional<NullablePtr<DeclContext>>
+ClosureParametersScope::computeSelfDCForParent() const {
+  if (auto *VD = closureExpr->getCapturedSelfDecl())
+    if (VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>())
+      return NullablePtr<DeclContext>(closureExpr);
+  return None;
 }
 
 #pragma mark ifUnknownIsCascadingUseAccordingTo
