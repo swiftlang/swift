@@ -333,6 +333,11 @@ function(_compile_swift_files
            "-emit-module-interface-path" "${interface_file}")
     endif()
 
+    if (NOT SWIFTFILE_IS_STDLIB_CORE)
+      list(APPEND swift_module_flags
+           "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
+    endif()
+
     # If we have extra regexp flags, check if we match any of the regexps. If so
     # add the relevant flags to our swift_flags.
     if (SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS OR SWIFT_EXPERIMENTAL_EXTRA_NEGATIVE_REGEXP_FLAGS)
