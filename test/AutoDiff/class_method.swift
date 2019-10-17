@@ -14,9 +14,10 @@ ClassMethodTests.test("Final") {
   }
 
   for i in -5...5 {
-    expectEqual(Tracked<Float>(Float(i * 2)), gradient(at: Tracked<Float>(Float(i))) {
-        x in Final().method(x)
-      })
+  expectEqual(Tracked<Float>(Float(i * 2)),
+              gradient(at: Tracked<Float>(Float(i))) {
+                x in Final().method(x)
+              })
   }
 }
 
