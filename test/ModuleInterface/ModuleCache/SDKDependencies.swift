@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 
+// XFAIL: OS=windows-msvc
+
 // 1) Build a prebuilt cache for our SDK
 //
 // RUN: mkdir %t/MCP %t/prebuilt-cache %t/my-sdk
