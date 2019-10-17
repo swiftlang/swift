@@ -2226,6 +2226,9 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
+  /// Is the pattern binding entry for this variable  currently being computed?
+  bool isComputingPatternBindingEntry(const VarDecl *vd) const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
   }

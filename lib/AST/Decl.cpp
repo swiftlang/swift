@@ -1735,6 +1735,13 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   return false;
 }
 
+bool PatternBindingDecl::isComputingPatternBindingEntry(
+    const VarDecl *vd) const {
+  unsigned i = getPatternEntryIndexForVarDecl(vd);
+  return getASTContext().evaluator.hasActiveRequest(
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
+}
+
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
   return Body->getStartLoc();
 }
@@ -2761,7 +2768,7 @@ bool ValueDecl::isRecursiveValidation() const {
 
   if (auto *vd = dyn_cast<VarDecl>(this))
     if (auto *pbd = vd->getParentPatternBinding())
-      if (pbd->isBeingValidated())
+      if (pbd->isComputingPatternBindingEntry(vd))
         return true;
 
   auto *dc = getDeclContext();

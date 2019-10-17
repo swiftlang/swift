@@ -4,13 +4,12 @@
 // not crash.
 
 protocol P {
-  var x: Int { get set }
+  var x: Int { get set } // expected-note {{protocol requires property 'x' with type 'Int'; do you want to add a stub?}}
 }
 
-struct S : P {
-  static var x = 0
-  var x = S.x // expected-error {{circular reference}}
-  // expected-note@-1 {{through reference here}}
+struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
+  static var x = 0 // expected-note {{candidate operates on a type, not an instance as required}}
+  var x = S.x // expected-note {{candidate references itself}}
 }
 
 // FIXME: Lousy diagnostics on this case.
