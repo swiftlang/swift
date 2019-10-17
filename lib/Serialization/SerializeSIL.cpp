@@ -2678,6 +2678,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
+  registerSILAbbr<SILInstDifferentiabilityWitnessFunctionLayout>();
   // SWIFT_ENABLE_TENSORFLOW END
 
   // Register the abbreviation codes so these layouts can exist in both
