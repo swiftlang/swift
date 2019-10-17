@@ -2601,31 +2601,33 @@ getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
   return std::make_pair(archetype, opaqueRoot);
 }
 
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+OpaqueSubstitutionKind
+ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  return shouldPerformSubstitution(opaque, contextModule, contextExpansion);
+  return shouldPerformSubstitution(opaque, inContext->getParentModule(),
+                                   contextExpansion);
 }
-
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+OpaqueSubstitutionKind
+ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
   
   // Don't allow replacement if the naming decl is dynamically replaceable.
   if (namingDecl && namingDecl->isDynamic())
-    return false;
+    return OpaqueSubstitutionKind::DontSubstitute;
 
   // Allow replacement of opaque result types of inlineable function regardless
   // of resilience and in which context.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(namingDecl)) {
     if (afd->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      return true;
+      return OpaqueSubstitutionKind::AlwaysSubstitute;
     }
   } else if (auto *asd = dyn_cast<AbstractStorageDecl>(namingDecl)) {
     auto *getter = asd->getOpaqueAccessor(AccessorKind::Get);
     if (getter &&
         getter->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      return true;
+      return OpaqueSubstitutionKind::AlwaysSubstitute;
     }
   }
 
@@ -2635,18 +2637,47 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
   auto module = namingDecl->getModuleContext();
   if (contextExpansion == ResilienceExpansion::Maximal &&
       module == contextModule)
-    return true;
+    return OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience;
 
   // Allow general replacement from non resilient modules. Otherwise, disallow.
-  return !module->isResilient();
+  if (module->isResilient())
+    return OpaqueSubstitutionKind::DontSubstitute;
+
+  return OpaqueSubstitutionKind::SubstituteNonResilientModule;
 }
 
 static Type
-substOpaqueTypesWithUnderlyingTypes(Type ty, ModuleDecl *contextModule,
+substOpaqueTypesWithUnderlyingTypes(Type ty, DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
-                                                 contextExpansion);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+bool canSubstituteTypeInto(Type ty, DeclContext *dc,
+                           OpaqueSubstitutionKind kind) {
+  auto nominal = ty->getAnyNominal();
+  if (!nominal)
+    return true;
+
+  switch (kind) {
+  case DontSubstitute:
+    return false;
+
+  case AlwaysSubstitute:
+    return true;
+
+  case SubstituteSameModuleMaximalResilience:
+    // In the same file any visibility is okay.
+    if (!dc->isModuleContext() &&
+        nominal->getDeclContext()->getParentSourceFile() ==
+        dc->getParentSourceFile())
+      return true;
+    return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
+
+  case SubstituteNonResilientModule:
+    // Can't access types that are not public from a different module.
+    return nominal->getEffectiveAccess() > AccessLevel::Internal;
+  }
 }
 
 Type ReplaceOpaqueTypesWithUnderlyingTypes::
@@ -2658,7 +2689,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
 
-  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
+  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return maybeOpaqueType;
   }
 
@@ -2676,20 +2708,30 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // for its type arguments.
   auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
+  // Check that we are allowed to substitute the underlying type into the
+  // context.
+  auto inContext = this->inContext;
+  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
+        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
+          return true;
+        return false;
+      }))
+    return maybeOpaqueType;
+
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy, contextModule,
+    return substOpaqueTypesWithUnderlyingTypes(substTy, inContext,
                                                contextExpansion);
   }
+
   return substTy;
 }
 
 static ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    ModuleDecl *contextModule,
+                                    DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
-                                                 contextExpansion);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
@@ -2709,7 +2751,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
 
-  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
+  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return abstractRef;
   }
 
@@ -2729,12 +2772,23 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // Then apply the substitutions from the root opaque archetype, to specialize
   // for its type arguments.
   auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+
+  // Check that we are allowed to substitute the underlying type into the
+  // context.
+  auto inContext = this->inContext;
+  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
+        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
+          return true;
+        return false;
+      }))
+    return abstractRef;
+
   auto substRef =
       partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, contextModule,
+    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, inContext,
                                                contextExpansion);
   }
   return substRef;
