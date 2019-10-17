@@ -1930,7 +1930,9 @@ class PatternBindingEntry {
   CaptureInfo Captures;
 
   friend class PatternBindingInitializer;
+  friend class PatternBindingDecl;
 
+private:
   // FIXME: This API is transitional. Once the callers of
   // typeCheckPatternBinding are requestified, merge this bit with
   // Flags::Checked.
@@ -1952,6 +1954,7 @@ public:
       : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
         InitContextAndFlags({InitContext, None}) {}
 
+private:
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
 
@@ -2210,7 +2213,12 @@ public:
 
   /// Can the pattern at index i be default initialized?
   bool isDefaultInitializable(unsigned i) const;
-  
+
+  /// Does this pattern have a user-provided initializer expression?
+  bool isExplicitlyInitialized(unsigned i) const;
+
+  SourceLoc getEqualLoc(unsigned i) const;
+
   /// When the pattern binding contains only a single variable with no
   /// destructuring, retrieve that variable.
   VarDecl *getSingleVar() const;
@@ -4981,15 +4989,19 @@ public:
   /// binding has no initial value, this returns null.
   ///
   Expr *getParentInitializer() const {
-    if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).getInit();
+    if (auto *PBD = getParentPatternBinding()) {
+      const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+      return PBD->getInit(i);
+    }
     return nullptr;
   }
 
   /// Whether there exists an initializer for this \c VarDecl.
   bool isParentInitialized() const {
-    if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    if (auto *PBD = getParentPatternBinding()) {
+      const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+      return PBD->isInitialized(i);
+    }
     return false;
   }
 

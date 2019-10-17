@@ -1735,11 +1735,22 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   return false;
 }
 
+
 bool PatternBindingDecl::isComputingPatternBindingEntry(
     const VarDecl *vd) const {
   unsigned i = getPatternEntryIndexForVarDecl(vd);
   return getASTContext().evaluator.hasActiveRequest(
       PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
+}
+
+bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
+  const auto entry = getPatternList()[i];
+  return entry.isInitialized() && entry.getEqualLoc().isValid();
+}
+
+SourceLoc getEqualLoc(unsigned i) const {
+  const auto entry = getPatternList()[i];
+  return entry.getEqualLoc(i);
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -5282,9 +5293,11 @@ Stmt *VarDecl::getRecursiveParentPatternStmt() const {
 ///
 Pattern *VarDecl::getParentPattern() const {
   // If this has a PatternBindingDecl parent, use its pattern.
-  if (auto *PBD = getParentPatternBinding())
-    return PBD->getPatternEntryForVarDecl(this).getPattern();
-  
+  if (auto *PBD = getParentPatternBinding()) {
+    const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+    return PBD->getPattern(i);
+  }
+
   // If this is a statement parent, dig the pattern out of it.
   if (auto *stmt = getParentPatternStmt()) {
     if (auto *FES = dyn_cast<ForEachStmt>(stmt))
@@ -5925,8 +5938,7 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
     return nullptr;
 
   // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isInvalid()
-      && !PBD->isDefaultInitializable())
+  if (PBD->getEqualLoc(0).isInvalid() && !PBD->isDefaultInitializable())
     return nullptr;
 
   ASTContext &ctx = var->getASTContext();
