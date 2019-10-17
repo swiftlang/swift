@@ -1979,7 +1979,6 @@ void IRGenerator::ensureRelativeSymbolCollocation(
   if (isAvailableExternally(dw.getLinkage()))
     return;
 
-  forceLocalEmitOfLazyFunction(dw.getOriginalFunction());
   if (auto *jvp = dw.getJVP())
     forceLocalEmitOfLazyFunction(jvp);
   if (auto *vjp = dw.getJVP())
@@ -2208,20 +2207,17 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   // Build the witness table.
   ConstantInitBuilder builder(*this);
   auto diffWitnessContents = builder.beginStruct();
-  llvm::dbgs() << "get addr of orig " << dw->getOriginalFunction() << "\n";
-  dw->getOriginalFunction()->dump();
-  auto *origFnAddr = getAddrOfSILFunction(dw->getOriginalFunction(), NotForDefinition);
   llvm::dbgs() << "get addr of jvp " << dw->getJVP() << "\n";
   //dw->getJVP()->dump();
   auto *jvpFnAddr = getAddrOfSILFunction(dw->getJVP(), NotForDefinition);
   llvm::dbgs() << "get addr of vjp " << dw->getVJP() << "\n";
   //dw->getVJP()->dump();
   auto *vjpFnAddr = getAddrOfSILFunction(dw->getVJP(), NotForDefinition);
-  diffWitnessContents.addBitCast(origFnAddr, Int8PtrTy);
   diffWitnessContents.addBitCast(jvpFnAddr, Int8PtrTy);
   diffWitnessContents.addBitCast(vjpFnAddr, Int8PtrTy);
   auto diffWitnessFuture = diffWitnessContents.finishAndCreateFuture();
-  getAddrOfDifferentiabilityWitness(dw->getOriginalFunction(), dw->getAutoDiffConfig(), diffWitnessFuture);
+  getAddrOfDifferentiabilityWitness(
+      dw->getOriginalFunction(), dw->getAutoDiffConfig(), diffWitnessFuture);
 #if 0
   WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
   wtableBuilder.build();

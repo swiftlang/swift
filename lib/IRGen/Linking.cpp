@@ -632,10 +632,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::SILFunction:
+    return getSILFunction()->getEffectiveSymbolLinkage();
+
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     // TODO: Should use the JVP/VJP linkage. But that isn't available now. Need
     // to switch this to reference the SILDifferentiabilityWitness probably.
+    // FIXME: This is causing final TBDGen errors: need to use linkage of
+    // SILDifferentiabilityWitness instead of original function.
     return getSILFunction()->getEffectiveSymbolLinkage();
 
   case Kind::DynamicallyReplaceableFunctionImpl:

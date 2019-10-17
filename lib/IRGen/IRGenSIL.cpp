@@ -5553,10 +5553,10 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   case DifferentiabilityKind::Normal:
     switch (i->getDerivativeKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
-      offset = 1;
+      offset = 0;
       break;
     case AutoDiffDerivativeFunctionKind::VJP:
-      offset = 2;
+      offset = 1;
       break;
     }
     break;
