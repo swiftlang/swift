@@ -244,7 +244,17 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
         AFD->getASTContext());
     addSymbol(SILDeclRef(AFD).asAutoDiffDerivativeFunction(vjpId));
+    // Add symbol for SIL differentiability witness.
+    Mangle::ASTMangler mangler;
+    auto *resultIndices = IndexSubset::get(AFD->getASTContext(), 1, {0});
+    AutoDiffConfig config{DA->getParameterIndices(), resultIndices,
+                          DA->getDerivativeGenericSignature()};
+    SILDifferentiabilityWitnessKey key(SILDeclRef(AFD).mangle(), config);
+    addSymbol(mangler.mangleSILDifferentiabilityWitnessKey(key));
   }
+  // NOTE: This logic is not relevant until `@differentiating` no longer
+  // generates implicit `@differentiable` attributes.
+#if 0
   // Handle `@differentiating` attributes.
   for (auto *DA : AFD->getAttrs().getAttributes<DifferentiatingAttr>()) {
     auto *originalFD = DA->getOriginalFunction();
@@ -265,6 +275,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(
         SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
   }
+#endif
 
   visitDefaultArguments(AFD, AFD->getParameters());
 }
@@ -318,17 +329,26 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Handle `@differentiable` attributes. SILGen creates a JVP and a VJP for
   // every function with a `@differentiable` attribute.
   for (auto *DA : ASD->getAttrs().getAttributes<DifferentiableAttr>()) {
+    auto *getterDecl = ASD->getAccessor(AccessorKind::Get);
     auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
         AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
         ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
-                  .asAutoDiffDerivativeFunction(jvpId));
+    addSymbol(SILDeclRef(getterDecl).asAutoDiffDerivativeFunction(jvpId));
     auto *vjpId = AutoDiffDerivativeFunctionIdentifier::get(
         AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
         ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
-                  .asAutoDiffDerivativeFunction(vjpId));
+    addSymbol(SILDeclRef(getterDecl).asAutoDiffDerivativeFunction(vjpId));
+    // Add symbol for SIL differentiability witness.
+    Mangle::ASTMangler mangler;
+    auto *resultIndices = IndexSubset::get(ASD->getASTContext(), 1, {0});
+    AutoDiffConfig config{DA->getParameterIndices(), resultIndices,
+                          DA->getDerivativeGenericSignature()};
+    SILDifferentiabilityWitnessKey key(SILDeclRef(getterDecl).mangle(), config);
+    addSymbol(mangler.mangleSILDifferentiabilityWitnessKey(key));
   }
+  // NOTE: This logic is not relevant until `@differentiating` no longer
+  // generates implicit `@differentiable` attributes.
+#if 0
   // Handle `@differentiating` attributes.
   for (auto *DA : ASD->getAttrs().getAttributes<DifferentiatingAttr>()) {
     auto *originalFD = DA->getOriginalFunction();
@@ -349,6 +369,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     addSymbol(
         SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
   }
+#endif
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
   ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {

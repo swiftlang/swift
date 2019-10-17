@@ -268,6 +268,8 @@ struct AutoDiffConfig {
 
   void print(llvm::raw_ostream &s = llvm::errs()) const;
 
+  // TODO: This is a hack to match SILAutoDiffIndices mangling.
+  // Remove/change this before merging.
   std::string mangle() const {
     std::string result = "src_";
     interleave(resultIndices->getIndices(),
