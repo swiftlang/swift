@@ -65,7 +65,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 
   // Identify gerunds, which always end in "ing".
   if (word.endswith("ing") && word.size() > 4) {
-    StringRef possibleVerb = word.substr(0, word.size()-3);
+    StringRef possibleVerb = word.drop_back(3);
 
     // If what remains is a verb, we have a gerund.
     if (getPartOfSpeech(possibleVerb) == PartOfSpeech::Verb)
@@ -84,7 +84,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
     // instance of that letter and try again.
     unsigned count = possibleVerb.size();
     if (possibleVerb[count-1] == possibleVerb[count-2] &&
-        getPartOfSpeech(possibleVerb.substr(0, count-1)) == PartOfSpeech::Verb)
+        getPartOfSpeech(possibleVerb.drop_back()) == PartOfSpeech::Verb)
       return PartOfSpeech::Gerund;
   }
 
@@ -1191,7 +1191,7 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
   // Try splitting a Boolean "Animated".
   if (paramType.isBoolean() &&
       camel_case::getLastWord(baseName) == "Animated") {
-    baseName = baseName.substr(0, baseName.size() - strlen("Animated"));
+    baseName = baseName.drop_back(strlen("Animated"));
     argName = "animated";
     return true;
   }
