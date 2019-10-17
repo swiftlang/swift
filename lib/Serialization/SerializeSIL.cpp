@@ -1058,6 +1058,26 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         rawExtractee);
     break;
   }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
+    auto originalFnName = addSILFunctionRef(dwfi->getOriginalFunction());
+    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
+    SmallVector<unsigned, 8> parameterAndResultIndices(
+        dwfi->getParameterIndices()->begin(),
+        dwfi->getParameterIndices()->end());
+    parameterAndResultIndices.append(dwfi->getResultIndices()->begin(),
+                                     dwfi->getResultIndices()->end());
+    SILInstDifferentiabilityWitnessFunctionLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiabilityWitnessFunctionLayout::Code],
+        originalFnName, rawWitnessKind,
+        S.addGenericSignatureRef(dwfi->getWitnessGenericSignature()),
+        dwfi->getParameterIndices()->getNumIndices(),
+        dwfi->getResultIndices()->getNumIndices(),
+        parameterAndResultIndices);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for
@@ -2648,6 +2668,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
+  registerSILAbbr<SILInstDifferentiabilityWitnessFunctionLayout>();
   // SWIFT_ENABLE_TENSORFLOW END
 
   // Register the abbreviation codes so these layouts can exist in both

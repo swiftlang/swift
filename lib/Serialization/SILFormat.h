@@ -182,6 +182,7 @@ namespace sil_block {
     SIL_INST_LINEAR_FUNCTION,
     SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
     SIL_INST_LINEAR_FUNCTION_EXTRACT,
+    SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION,
     SIL_DIFFERENTIABILITY_WITNESS,
     // SWIFT_ENABLE_TENSORFLOW END
 
@@ -463,6 +464,16 @@ namespace sil_block {
     SILTypeCategoryField,
     ValueIDField,
     BCFixed<1> // extractee
+  >;
+
+  using SILInstDifferentiabilityWitnessFunctionLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION,
+    DeclIDField,             // Original function name
+    BCFixed<2>,              // Witness kind (JVP or VJP or transpose)
+    GenericSignatureIDField, // Witness generic signature
+    BCVBR<8>,                // Number of parameter indices
+    BCVBR<8>,                // Number of result indices
+    BCArray<ValueIDField>    // Parameter and result indices
   >;
   // SWIFT_ENABLE_TENSORFLOW END
 

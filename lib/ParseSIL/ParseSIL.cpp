@@ -3091,6 +3091,110 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         InstLoc, extractee, functionOperand);
     break;
   }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    // e.g. differentiability_witness_function
+    //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
+    //      @foo : $(T) -> T
+    DifferentiabilityWitnessFunctionKind witnessKind;
+    StringRef witnessKindNames[3] = {"jvp", "vjp", "transpose"};
+    SourceLoc lastLoc;
+    if (P.parseToken(tok::l_square,
+            diag::sil_inst_autodiff_expected_differentiability_witness_kind) ||
+        parseSILIdentifierSwitch(witnessKind, witnessKindNames,
+            diag::sil_inst_autodiff_expected_differentiability_witness_kind) ||
+        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                     "differentiability witness function kind"))
+      return true;
+    // Parse an index set, prefaced with the given label.
+    auto parseIndexSet = [&](StringRef label, SmallVectorImpl<unsigned> &indices,
+                             const Diagnostic &parseIndexDiag) -> bool {
+      // Parse `[<label> <integer_literal>...]`.
+      if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
+                       "index list") ||
+          P.parseSpecificIdentifier(
+              label, diag::sil_autodiff_expected_index_list_label, label))
+        return true;
+      while (P.Tok.is(tok::integer_literal)) {
+        unsigned index;
+        if (P.parseUnsignedInteger(index, lastLoc, parseIndexDiag))
+          return true;
+        indices.push_back(index);
+      }
+      if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "index list"))
+        return true;
+      return false;
+    };
+    // Parse parameter and result indices.
+    SmallVector<unsigned, 8> parameterIndices;
+    SmallVector<unsigned, 8> resultIndices;
+    if (parseIndexSet("parameters", parameterIndices,
+                      diag::sil_autodiff_expected_parameter_index))
+      return true;
+    if (parseIndexSet("results", resultIndices,
+                      diag::sil_autodiff_expected_result_index))
+      return true;
+    // Parse witness generic parameter clause.
+    GenericSignature *witnessGenSig = nullptr;
+    SourceLoc witnessGenSigStartLoc = P.getEndOfPreviousLoc();
+    {
+      // Create a new scope to avoid type redefinition errors.
+      Scope genericsScope(&P, ScopeKind::Generics);
+      auto *genericParams = P.parseSILGenericParams().getPtrOrNull();
+      if (genericParams) {
+        auto *witnessGenEnv =
+            handleSILGenericParams(P.Context, genericParams, &P.SF);
+        witnessGenSig = witnessGenEnv->getGenericSignature();
+      }
+    }
+    // Parse original function name and type.
+    SILFunction *originalFunction;
+    if (parseSILFunctionRef(InstLoc, originalFunction))
+      return true;
+    // Resolve parsed witness generic signature.
+    if (witnessGenSig) {
+      auto origGenSig = originalFunction
+          ->getLoweredFunctionType()->getGenericSignature();
+      // Check whether original function generic signature and parsed witness
+      // generic have the same generic parameters.
+      auto areGenericParametersConsistent = [&]() {
+        llvm::DenseSet<GenericParamKey> genericParamKeys;
+        for (auto *origGP : origGenSig->getGenericParams())
+          genericParamKeys.insert(GenericParamKey(origGP));
+        for (auto *witnessGP : witnessGenSig->getGenericParams())
+          if (!genericParamKeys.erase(GenericParamKey(witnessGP)))
+            return false;
+        return genericParamKeys.empty();
+      };
+      if (!areGenericParametersConsistent()) {
+        P.diagnose(witnessGenSigStartLoc,
+                   diag::sil_inst_autodiff_invalid_witness_generic_signature,
+                   witnessGenSig->getAsString(), origGenSig->getAsString());
+        return true;
+      }
+      // Combine parsed witness requirements with original function generic
+      // signature requirements to form full witness generic signature.
+      SmallVector<Requirement, 4> witnessRequirements(
+          witnessGenSig->getRequirements().begin(),
+          witnessGenSig->getRequirements().end());
+      witnessGenSig = evaluateOrDefault(
+          P.Context.evaluator,
+          AbstractGenericSignatureRequest{
+              origGenSig,
+              /*addedGenericParams=*/{},
+              std::move(witnessRequirements)},
+              nullptr);
+    }
+    auto origFnType = originalFunction->getLoweredFunctionType();
+    auto *parameterIndexSet = IndexSubset::get(
+        P.Context, origFnType->getNumParameters(), parameterIndices);
+    auto *resultIndexSet = IndexSubset::get(
+        P.Context, origFnType->getNumResults(), resultIndices);
+    ResultVal = B.createDifferentiabilityWitnessFunction(
+        InstLoc, originalFunction, witnessKind, parameterIndexSet,
+        resultIndexSet, witnessGenSig);
+    break;
+  }
   // SWIFT_ENABLE_TENSORFLOW END
 
   case SILInstructionKind::DynamicFunctionRefInst: {

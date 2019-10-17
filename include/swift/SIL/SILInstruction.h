@@ -8031,6 +8031,54 @@ public:
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
+
+class DifferentiabilityWitnessFunctionInst
+    : public InstructionBase<
+          SILInstructionKind::DifferentiabilityWitnessFunctionInst,
+          SingleValueInstruction> {
+private:
+  friend SILBuilder;
+  /// The original function.
+  SILFunction *originalFunction;
+  /// The differentiability witness function kind.
+  DifferentiabilityWitnessFunctionKind witnessKind;
+  /// The autodiff config: parameter indices, result indices, and witness
+  /// derivative signature.
+  AutoDiffConfig config;
+
+  static SILType getDifferentiabilityWitnessType(
+      SILModule &module, SILFunction *originalFunction,
+      DifferentiabilityWitnessFunctionKind witnessKind,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature *witnessGenericSignature);
+
+public:
+  DifferentiabilityWitnessFunctionInst(
+      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      DifferentiabilityWitnessFunctionKind witnessKind,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature *witnessGenericSignature);
+
+  static DifferentiabilityWitnessFunctionInst *create(
+      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      DifferentiabilityWitnessFunctionKind witnessKind,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature *witnessGenericSignature);
+
+  DifferentiabilityWitnessFunctionKind getWitnessKind() const {
+    return witnessKind;
+  }
+  SILFunction *getOriginalFunction() const { return originalFunction; }
+  AutoDiffConfig const &getConfig() const { return config; }
+  IndexSubset *getParameterIndices() const { return config.parameterIndices; }
+  IndexSubset *getResultIndices() const { return config.resultIndices; }
+  GenericSignature *getWitnessGenericSignature() const {
+    return config.derivativeGenericSignature;
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
 // SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on
