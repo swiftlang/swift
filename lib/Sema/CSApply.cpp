@@ -58,14 +58,13 @@ static bool isOpenedAnyObject(Type type) {
   return archetype->getOpenedExistentialType()->isAnyObject();
 }
 
-SubstitutionMap Solution::computeSubstitutions(
-                               GenericSignature sig,
-                               ConstraintLocatorBuilder locatorBuilder) const {
+SubstitutionMap
+Solution::computeSubstitutions(GenericSignature sig,
+                               ConstraintLocator *locator) const {
   if (sig.isNull())
     return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.
-  auto locator = getConstraintSystem().getConstraintLocator(locatorBuilder);
   auto openedTypes = OpenedTypes.find(locator);
 
   // If we have a member reference on an existential, there are no
@@ -98,7 +97,7 @@ SubstitutionMap Solution::computeSubstitutions(
 
 ConcreteDeclRef
 Solution::resolveConcreteDeclRef(ValueDecl *decl,
-                                 ConstraintLocatorBuilder locator) const {
+                                 ConstraintLocator *locator) const {
   if (!decl)
     return ConcreteDeclRef();
 
@@ -501,7 +500,7 @@ namespace {
         return typeExpr;
       }
 
-      auto ref = solution.resolveConcreteDeclRef(decl, locator);
+      auto ref = resolveConcreteDeclRef(decl, locator);
       auto declRefExpr =
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
@@ -538,6 +537,24 @@ namespace {
     /// because after rewriting an apply's function expr, its callee locator
     /// will no longer be equivalent to the one stored in the solution.
     llvm::DenseMap<ApplyExpr *, ConstraintLocator *> CalleeLocators;
+
+    /// A cache of decl references with their contextual substitutions for a
+    /// given callee locator.
+    llvm::DenseMap<ConstraintLocator *, ConcreteDeclRef> CachedConcreteRefs;
+
+    ConcreteDeclRef
+    resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocatorBuilder locator) {
+      if (!decl)
+        return ConcreteDeclRef();
+
+      auto *loc = getConstraintSystem().getConstraintLocator(locator);
+      auto &ref = CachedConcreteRefs[loc];
+      if (!ref)
+        ref = solution.resolveConcreteDeclRef(decl, loc);
+
+      assert(ref.getDecl() == decl);
+      return ref;
+    }
 
     /// Members which are AbstractFunctionDecls but not FuncDecls cannot
     /// mutate self.
@@ -763,7 +780,7 @@ namespace {
       }
 
       // Build a member reference.
-      auto memberRef = solution.resolveConcreteDeclRef(member, memberLocator);
+      auto memberRef = resolveConcreteDeclRef(member, memberLocator);
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
@@ -1381,7 +1398,7 @@ namespace {
       }
 
       // Compute the concrete reference to the subscript.
-      auto subscriptRef = solution.resolveConcreteDeclRef(subscript, memberLoc);
+      auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
 
       // Figure out the index and result types.
       Type resultTy;
@@ -2412,8 +2429,8 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        auto callee = solution.resolveConcreteDeclRef(selected.choice.getDecl(),
-                                                      memberLocator);
+        auto callee = resolveConcreteDeclRef(selected.choice.getDecl(),
+                                             memberLocator);
         ApplyExpr *apply = CallExpr::create(
             tc.Context, result, arg, expr->getArgumentLabels(),
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
@@ -2593,7 +2610,7 @@ namespace {
       }
 
       // Build a partial application of the delegated initializer.
-      auto callee = solution.resolveConcreteDeclRef(ctor, ctorLocator);
+      auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
       Expr *ctorRef = buildOtherConstructorRef(openedType, callee, base,
                                                nameLoc, ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
@@ -3028,7 +3045,11 @@ namespace {
       assert(calleeLoc);
 
       // Resolve the callee for the application if we have one.
-      auto callee = solution.resolveLocatorToDecl(calleeLoc);
+      ConcreteDeclRef callee;
+      if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc)) {
+        auto *decl = overload->choice.getDeclOrNull();
+        callee = resolveConcreteDeclRef(decl, calleeLoc);
+      }
       return finishApply(expr, callee, cs.getType(expr),
                          cs.getConstraintLocator(expr));
     }
@@ -4535,7 +4556,7 @@ namespace {
         resolvedTy = simplifyType(resolvedTy);
 
         // Compute the concrete reference to the member.
-        auto ref = solution.resolveConcreteDeclRef(property, locator);
+        auto ref = resolveConcreteDeclRef(property, locator);
         return KeyPathExpr::Component::forProperty(ref, resolvedTy,
                                                    componentLoc);
       }
@@ -4562,7 +4583,7 @@ namespace {
           /*canonicalVararg=*/false);
 
       // Compute substitutions to refer to the member.
-      auto ref = solution.resolveConcreteDeclRef(subscript, locator);
+      auto ref = resolveConcreteDeclRef(subscript, locator);
       indexType = indexType.subst(ref.getSubstitutions());
 
       // If this is a @dynamicMemberLookup reference to resolve a property
@@ -6686,8 +6707,8 @@ static Expr *finishApplyCallAsFunctionMethod(
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
   // Coerce argument to input type of the `callAsFunction` method.
-  auto callee = rewriter.solution.resolveConcreteDeclRef(choice.getDecl(),
-                                                         applyFunctionLoc);
+  auto callee = rewriter.resolveConcreteDeclRef(choice.getDecl(),
+                                                applyFunctionLoc);
   SmallVector<Identifier, 2> argLabelsScratch;
   auto *arg = rewriter.coerceCallArguments(
       apply->getArg(), openedMethodType, callee, apply,
@@ -7081,7 +7102,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-  auto ctorRef = solution.resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
+  auto ctorRef = resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
   Expr *declRef = buildMemberRef(fn, selected->openedFullType,
                                  /*dotLoc=*/SourceLoc(), choice,
                                  DeclNameLoc(fn->getEndLoc()),
