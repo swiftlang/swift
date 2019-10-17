@@ -271,6 +271,13 @@ public func gradient(
   return pullback(at: x, y, in: f)(1)
 }
 
+public func valueWithGradient<T, U: FloatingPoint>(
+  at x: T, in f: @differentiable (T) -> Tracked<U>
+) -> (value: Tracked<U>, gradient: T.TangentVector) {
+  let (y, pullback) = valueWithPullback(at: x, in: f)
+  return (y, pullback(Tracked<U>(1)))
+}
+
 public extension Differentiable {
   @inlinable
   func gradient(
