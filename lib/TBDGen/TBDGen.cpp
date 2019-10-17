@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -32,7 +33,9 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/IR/Mangler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -53,10 +56,15 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 }
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
-  Symbols.addSymbol(kind, name, Archs);
+  // The linker expects to see mangled symbol names in TBD files, so make sure
+  // to mangle before inserting the symbol.
+  SmallString<32> mangled;
+  llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+
+  Symbols.addSymbol(kind, mangled, Archs);
 
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
-    auto isNewValue = StringSymbols->insert(name).second;
+    auto isNewValue = StringSymbols->insert(mangled).second;
     (void)isNewValue;
     assert(isNewValue && "symbol appears twice");
   }
@@ -648,7 +656,10 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.addArch(arch);
   file.setPlatform(getPlatformKind(target));
 
-  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
+  auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  TBDGenVisitor visitor(file, arch, symbols,
+                        clang->getTargetInfo().getDataLayout(),
+                        linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {
