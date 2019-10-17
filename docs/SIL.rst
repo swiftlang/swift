@@ -5709,27 +5709,18 @@ Extracts the original function or a transpose function from the given
 
 differentiability_witness_function
 ``````````````````````````````````
-
 ::
 
   sil-instruction ::= 'differentiability_witness_function'
-                      sil-differentiability-witness-function-kind
+                      '[' sil-differentiability-witness-function-kind ']'
                       '[' 'parameters' sil-differentiability-witness-indices ']'
                       '[' 'results' sil-differentiability-witness-indices ']'
                       generic-parameter-clause?
                       sil-function-name ':' sil-type
 
   sil-differentiability-witness-function-kind ::=
-      '[' sil-differentiability-witness-function-kind-name ']'
-  sil-differentiability-witness-function-kind-name ::=
       'jvp' | 'vjp' | 'transpose'
-  sil-differentiability-witness-indices ::= [0-9]+ (' ' [0-9]+)*
-  generic-parameter-clause ::=
-      '<' generic-parameter-list generic-where-clause '>'
-  generic-where-clause ::=
-      'where' generic-requirement (',' generic-requirement)*
-  generic-requirement ::=
-      type '==' type | type ':' type | type ':' layout-constraint
+  sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
 
   differentiability_witness_function [jvp] [parameters 0] [results 0] \
     <T where T: Differentiable> @foo : $(T) -> T
