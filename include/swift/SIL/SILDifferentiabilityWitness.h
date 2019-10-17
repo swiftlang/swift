@@ -75,7 +75,14 @@ private:
       autoDiffConfig({parameterIndices, resultIndices, derivativeGenSig}),
       jvp(jvp), vjp(vjp), serialized(isSerialized), attribute(attribute) {}
 
+  SILDifferentiabilityWitness(const SILDifferentiabilityWitness&) = delete;
+  SILDifferentiabilityWitness& operator=(const SILDifferentiabilityWitness&)
+      = delete;
+
 public:
+
+  ~SILDifferentiabilityWitness();
+
   static SILDifferentiabilityWitness *create(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,

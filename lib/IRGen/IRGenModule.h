@@ -426,6 +426,10 @@ public:
 
   unsigned getFunctionOrder(SILFunction *F) {
     auto it = FunctionOrder.find(F);
+    if (it == FunctionOrder.end()) {
+      llvm::dbgs() << "no order for\n";
+      F->dump();
+    }
     assert(it != FunctionOrder.end() &&
            "no order number for SIL function definition?");
     return it->second;

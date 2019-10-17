@@ -2834,15 +2834,13 @@ emitDerivativeFunctionReference(
       return None;
 
     // NOTE: Test `differentiability_witness_function generation.
-#if 0
     auto *derivativeFnRef2 = builder.createDifferentiabilityWitnessFunction(
         loc, originalFn, DifferentiabilityKind::Normal, kind,
         minimalWitness->getParameterIndices(),
         minimalWitness->getResultIndices(),
         minimalWitness->getDerivativeGenericSignature());
-#endif
     auto *derivativeFn = minimalWitness->getDerivative(kind);
-    auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
+    //auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
     // Tentative solution: clone a new reabstraction thunk where function
     // argument has a `@differentiable` function type.
@@ -2850,7 +2848,7 @@ emitDerivativeFunctionReference(
       // Handle here.
     }
     auto convertedRef = reapplyFunctionConversion(
-        derivativeFnRef, originalFRI, original, builder, loc,
+        derivativeFnRef2, originalFRI, original, builder, loc,
         newBuffersToDealloc,
         derivativeFn->getLoweredFunctionType()->getGenericSignature());
     return std::make_pair(convertedRef, minimalWitness->getAutoDiffConfig());
@@ -8649,6 +8647,12 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
           peerThroughFunctionConversions<FunctionRefInst>(derivativeFn)) {
     auto *assoc = derivativeFnRef->getReferencedFunctionOrNull();
     assocRef = builder.createFunctionRef(loc, assoc);
+  } else if (auto *foo = peerThroughFunctionConversions<DifferentiabilityWitnessFunctionInst>(derivativeFn)) {
+    assocRef = builder.createDifferentiabilityWitnessFunction(
+        loc, foo->getOriginalFunction(), foo->getDifferentiabilityKind(), foo->getDerivativeKind(),
+        foo->getParameterIndices(),
+        foo->getResultIndices(),
+        foo->getWitnessGenericSignature());
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<WitnessMethodInst>(derivativeFn)) {
     assocRef = builder.createWitnessMethod(

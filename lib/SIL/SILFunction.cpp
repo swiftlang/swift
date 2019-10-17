@@ -206,6 +206,9 @@ SILFunction::~SILFunction() {
     BB.InstList.clearAndLeakNodesUnsafely();
   }
 
+  if (RefCount > 0)
+    llvm::dbgs() << getName() << "\n";
+
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
 }

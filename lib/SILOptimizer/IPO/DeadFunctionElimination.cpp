@@ -606,6 +606,14 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       }
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // Check differentiable function witness entries.
+    for (auto &dw : Module->getDifferentiabilityWitnessList()) {
+      llvm::dbgs() << "ensure alive for dw of " << dw.getOriginalFunction()->getName() << "\n";
+      ensureAlive(dw.getOriginalFunction());
+      ensureAlive(dw.getJVP());
+      ensureAlive(dw.getVJP());
+    }
   }
 
   /// Removes all dead methods from vtables and witness tables.

@@ -1067,12 +1067,9 @@ void IRGenerator::emitGlobalTopLevel() {
   // SWIFT_ENABLE_TENSORFLOW
   // Emit differentiability witnesses.
   for (auto &dw : PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
-    // NOTE: Uncommenting this will cause test failures
-#if 0
     // TODO: Which IRGenModule to use? The one containing JVP or VJP
     CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction()->getDeclContext());
     IGM->emitSILDifferentiabilityWitness(&dw);
-#endif
   }
   // SWIFT_ENABLE_TENSORFLOW
   
@@ -2717,12 +2714,15 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   // Clang may have defined the variable already.
-  if (auto existing = Module.getNamedGlobal(link.getName()))
+  if (auto existing = Module.getNamedGlobal(link.getName())) {
     return getElementBitCast(existing, defaultType);
+  }
 
   // If we're not defining the object now, forward declare it with the default
   // type.
-  if (!definitionType) definitionType = defaultType;
+  if (!definitionType) {
+    definitionType = defaultType;
+  }
 
   // Create the variable.
   auto var = createVariable(*this, link, definitionType,

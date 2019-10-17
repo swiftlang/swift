@@ -25,6 +25,13 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized, attribute);
+  //llvm::dbgs() << "construct dw for " << originalFunction->getName() << "\n";
+  //if (originalFunction)
+  //  originalFunction->incrementRefCount();
+  //if (jvp)
+  //  jvp->incrementRefCount();
+  //if (vjp)
+  //  vjp->incrementRefCount();
   // Register the differentiability witness in the module.
   auto config = diffWitness->getAutoDiffConfig();
 #if 0
@@ -41,6 +48,17 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   diffWitness->dump();
 #endif
   return diffWitness;
+}
+
+SILDifferentiabilityWitness::~SILDifferentiabilityWitness() {
+  //llvm::dbgs() << "destruct dw for " << originalFunction->getName() << "\n";
+  //if (originalFunction)
+  //  originalFunction->decrementRefCount();
+  //if (jvp)
+  //  jvp->decrementRefCount();
+  //if (vjp)
+  //  vjp->decrementRefCount();
+  //llvm::dbgs() << "finished destruct dw for " << originalFunction->getName() << "\n";
 }
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {

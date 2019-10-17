@@ -5519,7 +5519,6 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {
 #if 0
-#if 0
   CanType baseTy = i->getLookupType();
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
@@ -5548,16 +5547,16 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   SILDifferentiabilityWitnessKey key{i->getOriginalFunction()->getName(),
                                      config};
 
-  auto *diffWitness = IGM.getAddrOfDifferentiabilityWitness(original, config);
+  llvm::Value *diffWitness = IGM.getAddrOfDifferentiabilityWitness(original, config);
   unsigned offset = 0;
   switch (i->getDifferentiabilityKind()) {
   case DifferentiabilityKind::Normal:
     switch (i->getDerivativeKind()) {
     case AutoDiffDerivativeFunctionKind::JVP:
-      offset = 0;
+      offset = 1;
       break;
     case AutoDiffDerivativeFunctionKind::VJP:
-      offset = 1;
+      offset = 2;
       break;
     }
     break;
@@ -5567,11 +5566,15 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     llvm_unreachable("Differentiability kind must not be non-differentiable");
     break;
   }
-#if 0
-  auto fn = emitDifferentiabilityWitnessMethodValue(*this, diffWitness, i);
-  setLoweredFunctionPointer(i, fn);
-#endif
-#endif
+
+  diffWitness = Builder.CreateStructGEP(diffWitness, offset);
+  diffWitness = Builder.CreateLoad(diffWitness, IGM.getPointerAlignment());
+
+  auto fnType = cast<SILFunctionType>(i->getType().getASTType());
+  Signature signature = IGM.getSignature(fnType);
+  diffWitness = Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
+
+  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
 
 void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
