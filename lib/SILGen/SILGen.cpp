@@ -930,8 +930,8 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
-    for (auto entry : pbd->getPatternList())
-      if (entry.getExecutableInit())
+    for (auto i : indices(pbd->getPatternList()))
+      if (pbd->getExecutableInit(i))
         return true;
   }
 
@@ -1096,12 +1096,11 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
 
 void SILGenModule::
 emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
-  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
-  auto *var = pbdEntry.getAnchoringVarDecl();
-  auto *init = pbdEntry.getInit();
-  auto *initDC = pbdEntry.getInitContext();
-  auto captureInfo = pbdEntry.getCaptureInfo();
-  assert(!pbdEntry.isInitializerSubsumed());
+  auto *var = pbd->getAnchoringVarDecl(i);
+  auto *init = pbd->getInit(i);
+  auto *initDC = pbd->getInitContext(i);
+  auto captureInfo = pbd->getCaptureInfo(i);
+  assert(!pbd->isInitializerSubsumed(i));
 
   // If this is the backing storage for a property with an attached wrapper
   // that was initialized with `=`, use that expression as the initializer.

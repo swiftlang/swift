@@ -1166,14 +1166,13 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 }
 
 void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
-                                        unsigned pbdEntry) {
-  auto &entry = PBD->getPatternList()[pbdEntry];
-  auto initialization = emitPatternBindingInitialization(entry.getPattern(),
+                                        unsigned idx) {
+  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getExecutableInit()) {
+  if (auto *Init = PBD->getExecutableInit(idx)) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {

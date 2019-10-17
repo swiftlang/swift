@@ -5101,12 +5101,12 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // Now that we've parsed all of our patterns, initializers and accessors, we
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
-    auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                          VarLoc, PBDEntries, BaseContext);
+    auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
+                                           VarLoc, PBDEntries, BaseContext);
 
     // Wire up any initializer contexts we needed.
     for (unsigned i : indices(PBDEntries)) {
-      if (auto initContext = PBDEntries[i].getInitContext())
+      if (auto initContext = PBD->getInitContext(i))
         cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
     }
 

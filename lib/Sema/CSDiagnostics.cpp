@@ -2635,15 +2635,15 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
 
   if (PBD) {
     if (auto VD = PBD->getSingleVar()) {
-      auto entry = PBD->getPatternEntryForVarDecl(VD);
-
+      const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
+      auto *initExpr = PBD->getInit(i);
       if (!VD->isStatic() &&
           !VD->getAttrs().getAttribute<DynamicReplacementAttr>() &&
-          entry.getInit() && isa<ClosureExpr>(entry.getInit())) {
+          initExpr && isa<ClosureExpr>(initExpr)) {
         auto diag = emitDiagnostic(expr->getLoc(),
                                    diag::extension_stored_property_fixit,
                                    VD->getName());
-        diag.fixItRemove(entry.getEqualLoc());
+        diag.fixItRemove(PBD->getEqualLoc(i));
 
         if (VD->isLet()) {
           diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));

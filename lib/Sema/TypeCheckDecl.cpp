@@ -2401,16 +2401,16 @@ public:
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
     bool isTypeContext = DC->isTypeContext();
 
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+    for (auto i : indices(PBD->getPatternList())) {
       const auto *entry = evaluateOrDefault(TC.Context.evaluator,
                                             PatternBindingEntryRequest{PBD, i},
                                             nullptr);
       assert(entry && "No pattern binding entry?");
 
-      entry->getPattern()->forEachVariable([&](VarDecl *var) {
+      PBD->getPattern(i)->forEachVariable([&](VarDecl *var) {
         this->visitBoundVariable(var);
 
-        if (entry->isInitialized()) {
+        if (PBD->isInitialized(i)) {
           // Add the attribute that preserves the "has an initializer" value
           // across module generation, as required for TBDGen.
           if (var->hasStorage() &&
@@ -2497,7 +2497,7 @@ public:
     checkAccessControl(TC, PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+    for (auto i : indices(PBD->getPatternList())) {
       if (!PBD->isInitialized(i))
         continue;
 
@@ -2506,14 +2506,13 @@ public:
       }
 
       if (!PBD->isInvalid()) {
-        auto &entry = PBD->getPatternList()[i];
         auto *init = PBD->getInit(i);
 
         // If we're performing an binding to a weak or unowned variable from a
         // constructor call, emit a warning that the instance will be immediately
         // deallocated.
         diagnoseUnownedImmediateDeallocation(TC, PBD->getPattern(i),
-                                              entry.getEqualLoc(),
+                                              PBD->getEqualLoc(i),
                                               init);
 
         // If we entered an initializer context, contextualize any
@@ -2525,7 +2524,7 @@ public:
             !(PBD->getSingleVar() &&
               PBD->getSingleVar()->hasAttachedPropertyWrapper())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
-              entry.getInitContext());
+              PBD->getInitContext(i));
           if (initContext) {
             // Check safety of error-handling in the declaration, too.
             TC.checkInitializerErrorHandling(initContext, init);
@@ -2800,8 +2799,8 @@ public:
       // initialized. Diagnose the lack of initial value.
       pbd->setInvalid();
       SmallVector<VarDecl *, 4> vars;
-      for (auto entry : pbd->getPatternList())
-        entry.getPattern()->collectVariables(vars);
+      for (auto idx : indices(pbd->getPatternList()))
+        pbd->getPattern(idx)->collectVariables(vars);
       bool suggestNSManaged = propertiesCanBeNSManaged(cd, vars);
       switch (vars.size()) {
       case 0:
@@ -4699,11 +4698,12 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
         pbd->isDefaultInitializable() || pbd->isInvalid())
       continue;
    
-    for (auto entry : pbd->getPatternList()) {
-      if (entry.isInitialized()) continue;
-      
+    for (auto idx : indices(pbd->getPatternList())) {
+      if (pbd->isInitialized(idx)) continue;
+
+      auto *pattern = pbd->getPattern(idx);
       SmallVector<VarDecl *, 4> vars;
-      entry.getPattern()->collectVariables(vars);
+      pattern->collectVariables(vars);
       if (vars.empty()) continue;
 
       // Replace the variables we found with the originals for diagnostic
@@ -4738,8 +4738,8 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       }
 
       if (auto defaultValueSuggestion
-             = buildDefaultInitializerString(tc, classDecl, entry.getPattern()))
-        diag->fixItInsertAfter(entry.getPattern()->getEndLoc(),
+             = buildDefaultInitializerString(tc, classDecl, pattern))
+        diag->fixItInsertAfter(pattern->getEndLoc(),
                                " = " + *defaultValueSuggestion);
     }
   }

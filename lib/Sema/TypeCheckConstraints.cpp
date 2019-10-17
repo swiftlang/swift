@@ -2834,7 +2834,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber) {
-  const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2842,7 +2841,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
   if (!DC->isLocalContext()) {
-    initContext = cast_or_null<PatternBindingInitializer>(pbe.getInitContext());
+    initContext = cast_or_null<PatternBindingInitializer>(
+        PBD->getInitContext(patternNumber));
     if (initContext)
       DC = initContext;
   }

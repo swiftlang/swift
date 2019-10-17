@@ -183,7 +183,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   }
 
   binding->setPattern(entryNumber, pattern,
-                      binding->getPatternList()[entryNumber].getInitContext());
+                      binding->getInitContext(entryNumber));
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -1211,13 +1211,13 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
 
   Expr *InitValue;
-  if (PBD->getPatternList()[entryIndex].getInit()) {
+  if (PBD->getInit(entryIndex)) {
     PBD->setInitializerSubsumed(entryIndex);
 
     if (!PBD->isInitializerChecked(entryIndex))
       TC.typeCheckPatternBinding(PBD, entryIndex);
 
-    InitValue = PBD->getPatternList()[entryIndex].getInit();
+    InitValue = PBD->getInit(entryIndex);
   } else {
     InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getType());
   }
@@ -1647,8 +1647,9 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
+      const auto i = bindingDecl->getPatternEntryIndexForVarDecl(varDecl);
       auto *bindingInit = cast<PatternBindingInitializer>(
-        bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
+        bindingDecl->getInitContext(i));
 
       selfDecl = bindingInit->getImplicitSelfDecl();
     }
@@ -2195,9 +2196,9 @@ static void typeCheckSynthesizedWrapperInitializer(
   ASTContext &ctx = pbd->getASTContext();
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   tc.typeCheckExpression(initializer, originalDC);
+  const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
-          dyn_cast_or_null<Initializer>(
-            pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
+          dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
     tc.contextualizeInitializer(initializerContext, initializer);
   }
   tc.checkPropertyWrapperErrorHandling(pbd, initializer);

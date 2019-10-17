@@ -957,15 +957,8 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // all parsed attribute that appear in the concrete syntax upon on the
     // PatternBindingDecl are added to all of the VarDecls for the pattern
     // binding.
-    ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
-    if (!Entries.empty()) {
-      const VarDecl *AnyVD = nullptr;
-      // FIXME: This is wasteful; we only need the first variable.
-      Entries.front().getPattern()->forEachVariable([&](const VarDecl *VD) {
-        AnyVD = VD;
-      });
-      if (AnyVD)
-        return AnyVD;
+    if (PBD->getNumPatternEntries() != 0) {
+      return PBD->getAnchoringVarDecl(0);
     }
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
     // Similar to the PatternBindingDecl case above, we return the

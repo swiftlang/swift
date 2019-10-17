@@ -459,8 +459,8 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
   // Attributes on PatternBindingDecls are attached to VarDecls in AST.
   if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
-    for (auto Entry : PBD->getPatternList())
-      Entry.getPattern()->forEachVariable([&](VarDecl *VD) {
+    for (auto i : indices(PBD->getPatternList()))
+      PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
         for (auto Attr : VD->getAttrs())
           if (Attr->getRange().isValid())
             Range.widen(Attr->getRangeWithAt());
@@ -1495,6 +1495,12 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
+unsigned PatternBindingEntry::getNumBoundVariables() const {
+  unsigned varCount = 0;
+  getPattern()->forEachVariable([&](VarDecl *) { ++varCount; });
+  return varCount;
+}
+
 SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
   SourceLoc lastAccessorEnd;
   getPattern()->forEachVariable([&](VarDecl *var) {
@@ -1605,6 +1611,10 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)
     return getPatternList()[0].getPattern()->getSingleVar();
   return nullptr;
+}
+
+VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
+  return getPatternList()[i].getAnchoringVarDecl();
 }
 
 bool VarDecl::isInitExposedToClients() const {
@@ -1744,13 +1754,13 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
 }
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
-  const auto entry = getPatternList()[i];
+  const auto &entry = getPatternList()[i];
   return entry.isInitialized() && entry.getEqualLoc().isValid();
 }
 
-SourceLoc getEqualLoc(unsigned i) const {
-  const auto entry = getPatternList()[i];
-  return entry.getEqualLoc(i);
+SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
+  const auto &entry = getPatternList()[i];
+  return entry.getEqualLoc();
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -5639,7 +5649,7 @@ static bool propertyWrapperInitializedViaInitialValue(
 
   // If there was an initializer on the original property, initialize
   // via the initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isValid())
+  if (PBD->getEqualLoc(0).isValid())
     return true;
 
   // If there was an initializer on the outermost wrapper, initialize

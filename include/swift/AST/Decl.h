@@ -93,6 +93,12 @@ namespace swift {
   class VarDecl;
   class OpaqueReturnTypeRepr;
 
+  namespace ast_scope {
+  class AbstractPatternEntryScope;
+  class PatternEntryDeclScope;
+  class PatternEntryInitializerScope;
+  } // namespace ast_scope
+
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
 #define LAST_DECL(Id) Last_Decl = Id,
@@ -1929,8 +1935,12 @@ class PatternBindingEntry {
   /// Values captured by this initializer.
   CaptureInfo Captures;
 
+  friend class Parser;
   friend class PatternBindingInitializer;
   friend class PatternBindingDecl;
+  friend class ast_scope::AbstractPatternEntryScope;
+  friend class ast_scope::PatternEntryDeclScope;
+  friend class ast_scope::PatternEntryInitializerScope;
 
 private:
   // FIXME: This API is transitional. Once the callers of
@@ -2054,6 +2064,8 @@ private:
   CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
+  unsigned getNumBoundVariables() const;
+
 private:
   SourceLoc getLastAccessorEndLoc() const;
 };
@@ -2139,6 +2151,9 @@ public:
   Expr *getExecutableInit(unsigned i) const {
     return getPatternList()[i].getExecutableInit();
   }
+  Expr *getOriginalInit(unsigned i) const {
+    return getPatternList()[i].getOriginalInit();
+  }
 
   SourceRange getOriginalInitRange(unsigned i) const {
     return getPatternList()[i].getOriginalInitRange();
@@ -2175,13 +2190,6 @@ public:
   /// and "c" and "d" will have index 1 since they correspond to the second one.
   unsigned getPatternEntryIndexForVarDecl(const VarDecl *VD) const;
   
-  /// Return the PatternEntry (a pattern + initializer pair) for the specified
-  /// VarDecl.
-  const PatternBindingEntry &getPatternEntryForVarDecl(
-    const VarDecl *VD) const {
-    return getPatternList()[getPatternEntryIndexForVarDecl(VD)];
-  }
-  
   bool isInitializerChecked(unsigned i) const {
     return getPatternList()[i].isInitializerChecked();
   }
@@ -2217,11 +2225,20 @@ public:
   /// Does this pattern have a user-provided initializer expression?
   bool isExplicitlyInitialized(unsigned i) const;
 
+  /// Whether the pattern entry at the given index can generate a string
+  /// representation of its initializer expression.
+  bool hasInitStringRepresentation(unsigned i) const {
+    return getPatternList()[i].hasInitStringRepresentation();
+  }
+
   SourceLoc getEqualLoc(unsigned i) const;
 
   /// When the pattern binding contains only a single variable with no
   /// destructuring, retrieve that variable.
   VarDecl *getSingleVar() const;
+
+  /// Return the first variable initialized by the pattern at the given index.
+  VarDecl *getAnchoringVarDecl(unsigned i) const;
 
   bool isStatic() const { return Bits.PatternBindingDecl.IsStatic; }
   void setStatic(bool s) { Bits.PatternBindingDecl.IsStatic = s; }
@@ -2236,6 +2253,14 @@ public:
 
   /// Is the pattern binding entry for this variable  currently being computed?
   bool isComputingPatternBindingEntry(const VarDecl *vd) const;
+
+  /// Gets the text of the initializer expression for the pattern entry at the
+  /// given index, stripping out inactive branches of any #ifs inside the
+  /// expression.
+  StringRef getInitStringRepresentation(unsigned i,
+                                        SmallVectorImpl<char> &scratch) const {
+    return getPatternList()[i].getInitStringRepresentation(scratch);
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
