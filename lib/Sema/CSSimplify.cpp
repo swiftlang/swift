@@ -1937,6 +1937,12 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               if (req &&
                   req->getRequirementKind() == RequirementKind::Superclass)
                 return getTypeMatchSuccess();
+
+              auto *fix = fixRequirementFailure(*this, type1, type2, locator);
+              if (fix && !recordFix(fix)) {
+                recordFixedRequirement(type1, RequirementKind::Layout, type2);
+                return getTypeMatchSuccess();
+              }
             }
           }
 
@@ -2237,7 +2243,8 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
-  switch (req.getRequirementKind()) {
+  auto kind = req.getRequirementKind();
+  switch (kind) {
   case RequirementKind::SameType: {
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
   }
@@ -2248,7 +2255,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
-    return MissingConformance::forRequirement(cs, type1, type2, reqLoc);
+    return MissingConformance::forRequirement(cs, type1, type2, kind, reqLoc);
   }
   llvm_unreachable("covered switch");
 }

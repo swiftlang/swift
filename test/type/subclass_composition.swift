@@ -299,6 +299,7 @@ func dependentMemberTypes<T : BaseIntAndP2>(
   _: BaseIntAndP2.FullyConcrete) {}
 
 func conformsToAnyObject<T : AnyObject>(_: T) {}
+// expected-note@-1 {{required by global function 'conformsToAnyObject' where 'T' = 'P1'}}
 func conformsToP1<T : P1>(_: T) {}
 // expected-note@-1 {{required by global function 'conformsToP1' where 'T' = 'P1'}}
 func conformsToP2<T : P2>(_: T) {}
@@ -410,8 +411,7 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
 
   // Errors
   conformsToAnyObject(p1)
-  // expected-error@-1 {{cannot invoke 'conformsToAnyObject' with an argument list of type '(P1)'}}
-  // expected-note@-2 {{expected an argument list of type '(T)'}}
+  // expected-error@-1 {{value of protocol type 'P1' cannot conform to 'AnyObject'; only struct/enum/class types can conform to protocols}}
 
   conformsToP1(p1)
   // expected-error@-1 {{value of protocol type 'P1' cannot conform to 'P1'; only struct/enum/class types can conform to protocols}}

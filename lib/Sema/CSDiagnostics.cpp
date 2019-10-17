@@ -524,7 +524,8 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
     return;
   }
 
-  if (rhs->isEqual(req.getSecondType())) {
+  if (req.getKind() == RequirementKind::Layout ||
+      rhs->isEqual(req.getSecondType())) {
     emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
                    req.getFirstType(), lhs);
     return;

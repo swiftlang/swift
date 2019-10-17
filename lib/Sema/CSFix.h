@@ -396,11 +396,14 @@ class MissingConformance final : public ConstraintFix {
   // This could either be a protocol or protocol composition.
   Type ProtocolType;
 
+  RequirementKind Kind;
+
   MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
-                     Type protocolType, ConstraintLocator *locator)
+                     Type protocolType, RequirementKind kind,
+                     ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddConformance, locator),
         IsContextual(isContextual), NonConformingType(type),
-        ProtocolType(protocolType) {}
+        ProtocolType(protocolType), Kind(kind) {}
 
 public:
   std::string getName() const override {
@@ -411,6 +414,7 @@ public:
 
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,
+                                            RequirementKind kind,
                                             ConstraintLocator *locator);
 
   static MissingConformance *forContextual(ConstraintSystem &cs, Type type,

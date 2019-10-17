@@ -175,7 +175,7 @@ bool MissingConformance::diagnose(Expr *root, bool asNote) const {
   }
 
   MissingConformanceFailure failure(
-      root, cs, locator, std::make_pair(NonConformingType, ProtocolType));
+      root, cs, locator, std::make_pair(NonConformingType, ProtocolType), Kind);
   return failure.diagnose(asNote);
 }
 
@@ -183,16 +183,18 @@ MissingConformance *
 MissingConformance::forContextual(ConstraintSystem &cs, Type type,
                                   Type protocolType,
                                   ConstraintLocator *locator) {
+  auto kind = RequirementKind::Conformance;
   return new (cs.getAllocator()) MissingConformance(
-      cs, /*isContextual=*/true, type, protocolType, locator);
+      cs, /*isContextual=*/true, type, protocolType, kind, locator);
 }
 
 MissingConformance *
 MissingConformance::forRequirement(ConstraintSystem &cs, Type type,
                                    Type protocolType,
+                                   RequirementKind kind,
                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) MissingConformance(
-      cs, /*isContextual=*/false, type, protocolType, locator);
+      cs, /*isContextual=*/false, type, protocolType, kind, locator);
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {

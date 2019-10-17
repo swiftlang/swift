@@ -417,9 +417,10 @@ class MissingConformanceFailure final : public RequirementFailure {
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
-                            std::pair<Type, Type> conformance)
-      : RequirementFailure(cs, expr, RequirementKind::Conformance,
-                           conformance.first, conformance.second, locator) {}
+                            std::pair<Type, Type> conformance,
+                            RequirementKind kind)
+      : RequirementFailure(cs, expr, kind, conformance.first,
+                           conformance.second, locator) {}
 
   bool diagnoseAsError() override;
 

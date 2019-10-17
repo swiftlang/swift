@@ -16,12 +16,15 @@ func fOP<T : OP>(_ t: T) { }
 func fOPE(_ t: OP) { }
 func fSP<T : SP>(_ t: T) { }
 func fAO<T : AnyObject>(_ t: T) { }
+// expected-note@-1 {{required by global function 'fAO' where 'T' = 'P'}}
+// expected-note@-2 {{required by global function 'fAO' where 'T' = 'CP'}}
+// expected-note@-3 {{required by global function 'fAO' where 'T' = 'OP & P'}}
 func fAOE(_ t: AnyObject) { }
 func fT<T>(_ t: T) { }
 
 func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
   fP(p) // expected-error{{value of protocol type 'P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
-  fAO(p) // expected-error{{cannot invoke 'fAO' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fAO(p) // expected-error{{value of protocol type 'P' cannot conform to 'AnyObject'; only struct/enum/class types can conform to protocols}}
   fAOE(p) // expected-error{{argument type 'P' does not conform to expected type 'AnyObject'}}
   fT(p)
 
@@ -30,13 +33,13 @@ func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, 
   fAOE(op)
   fT(op)
 
-  fAO(cp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(CP)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fAO(cp) // expected-error{{value of protocol type 'CP' cannot conform to 'AnyObject'; only struct/enum/class types can conform to protocols}}
   fAOE(cp)
   fT(cp)
 
   fP(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
   fOP(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'OP'; only struct/enum/class types can conform to protocols}}
-  fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fAO(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'AnyObject'; only struct/enum/class types can conform to protocols}}
   fAOE(opp)
   fT(opp)
 
