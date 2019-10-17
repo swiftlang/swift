@@ -406,6 +406,21 @@ def skip_list_for_platform(config):
 
     return skip_list
 
+def symlink_llvm_monorepo(args):
+    print("Create symlink for LLVM Project")
+    llvm_projects = ['clang',
+                     'llvm',
+                     'lldb',
+                     'compiler-rt',
+                     'libcxx',
+                     'clang-tools-extra']
+    for project in llvm_projects:
+        src_path = os.path.join(args.source_root,
+                                'llvm-project',
+                                project)
+        dst_path = os.path.join(args.source_root, project)
+        if not os.path.islink(dst_path):
+            os.symlink(src_path, dst_path)
 
 def main():
     freeze_support()
@@ -554,5 +569,6 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:
+        symlink_llvm_monorepo(args)
         print("update-checkout succeeded")
     sys.exit(fail_count)
