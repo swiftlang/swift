@@ -699,6 +699,12 @@ public:
   SubstitutionMap computeSubstitutions(GenericSignature sig,
                                        ConstraintLocatorBuilder locator) const;
 
+  /// Resolves the contextual substitutions for a reference to a declaration
+  /// at a given locator.
+  ConcreteDeclRef
+  resolveConcreteDeclRef(ValueDecl *decl,
+                         ConstraintLocatorBuilder locator) const;
+
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
     assert(DisjunctionChoices.count(locator));

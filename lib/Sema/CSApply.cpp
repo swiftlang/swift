@@ -96,6 +96,17 @@ SubstitutionMap Solution::computeSubstitutions(
                               lookupConformanceFn);
 }
 
+ConcreteDeclRef
+Solution::resolveConcreteDeclRef(ValueDecl *decl,
+                                 ConstraintLocatorBuilder locator) const {
+  if (!decl)
+    return ConcreteDeclRef();
+
+  // Get the generic signatue of the decl and compute the substitutions.
+  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+  return ConcreteDeclRef(decl, computeSubstitutions(sig, locator));
+}
+
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
                                         DeclContext *DC) {
   // This only matters for stored properties.
@@ -490,13 +501,9 @@ namespace {
         return typeExpr;
       }
 
-      auto substitutions =
-          solution.computeSubstitutions(
-            decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            locator);
+      auto ref = solution.resolveConcreteDeclRef(decl, locator);
       auto declRefExpr =
-        new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
-                              loc, implicit, semantics, type);
+          new (ctx) DeclRefExpr(ref, loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       return forceUnwrapIfExpected(declRefExpr, choice, locator);
@@ -751,12 +758,7 @@ namespace {
       }
 
       // Build a member reference.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(
-            member->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            memberLocator);
-      auto memberRef = ConcreteDeclRef(member, substitutions);
-
+      auto memberRef = solution.resolveConcreteDeclRef(member, memberLocator);
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
@@ -1400,12 +1402,9 @@ namespace {
 
       // Form the subscript expression.
 
-      // Compute the substitutions used to reference the subscript.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(
-          subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
-          locator.withPathElement(locatorKind));
-      ConcreteDeclRef subscriptRef(subscript, substitutions);
+      // Compute the concrete reference to the subscript.
+      auto subscriptRef = solution.resolveConcreteDeclRef(
+          subscript, locator.withPathElement(locatorKind));
 
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
@@ -1480,10 +1479,7 @@ namespace {
       auto &ctx = tc.Context;
 
       // Compute the concrete reference.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(ctor->getGenericSignature(), locator);
-
-      auto ref = ConcreteDeclRef(ctor, substitutions);
+      auto ref = solution.resolveConcreteDeclRef(ctor, locator);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -4525,17 +4521,11 @@ namespace {
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
 
-        auto dc = property->getInnermostDeclContext();
-
-        // Compute substitutions to refer to the member.
-        SubstitutionMap subs = solution.computeSubstitutions(
-            dc->getGenericSignatureOfContext(), locator);
-
         auto resolvedTy = overload.openedType;
         resolvedTy = simplifyType(resolvedTy);
 
-        auto ref = ConcreteDeclRef(property, subs);
-
+        // Compute the concrete reference to the member.
+        auto ref = solution.resolveConcreteDeclRef(property, locator);
         return KeyPathExpr::Component::forProperty(ref, resolvedTy,
                                                    componentLoc);
       }
@@ -4561,12 +4551,9 @@ namespace {
           subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
           /*canonicalVararg=*/false);
 
-      SubstitutionMap subs;
-      if (auto sig = dc->getGenericSignatureOfContext()) {
-        // Compute substitutions to refer to the member.
-        subs = solution.computeSubstitutions(sig, locator);
-        indexType = indexType.subst(subs);
-      }
+      // Compute substitutions to refer to the member.
+      auto ref = solution.resolveConcreteDeclRef(subscript, locator);
+      indexType = indexType.subst(ref.getSubstitutions());
 
       // If this is a @dynamicMemberLookup reference to resolve a property
       // through the subscript(dynamicMember:) member, restore the
@@ -4599,7 +4586,6 @@ namespace {
       auto subscriptType =
           simplifyType(overload.openedType)->castTo<AnyFunctionType>();
       auto resolvedTy = subscriptType->getResult();
-      auto ref = ConcreteDeclRef(subscript, subs);
 
       // Coerce the indices to the type the subscript expects.
       auto *newIndexExpr =
