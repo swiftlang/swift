@@ -1789,3 +1789,20 @@ protocol ProtocolWithWrapper {
 struct UsesProtocolWithWrapper: ProtocolWithWrapper {
   @Wrapper var foo: Int // expected-warning{{ignoring associated type 'Wrapper' in favor of module-scoped property wrapper 'Wrapper'; please qualify the reference with 'property_wrappers'}}{{4-4=property_wrappers.}}
 }
+
+// rdar://problem/56350060 - [Dynamic key path member lookup] Assertion when subscripting with a key path
+func test_rdar56350060() {
+  @propertyWrapper
+  @dynamicMemberLookup
+  struct DynamicWrapper<Value> {
+    var wrappedValue: Value { fatalError() }
+
+    subscript<T>(keyPath keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      fatalError()
+    }
+
+    subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      return self[keyPath: keyPath] // Ok
+    }
+  }
+}
