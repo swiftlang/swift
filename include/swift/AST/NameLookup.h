@@ -77,6 +77,7 @@ private:
   /// method has its own implicit self decl.) There's one other kind of
   /// non-method, non-closure context that has a 'self.' -- a lazy property
   /// initializer, which unlike a non-lazy property can reference \c self.
+  /// \code
   ///  class Outer {
   ///    static func s()
   ///    func i()

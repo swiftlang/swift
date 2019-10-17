@@ -195,13 +195,27 @@ class ExplicitSelfRequiredTest {
     doStuff { [  ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{23-23=self.}}
     doStuff { [ /* This space intentionally left blank. */ ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{65-65=self.}}
     // An inserted capture list should be on the same line as the opening brace, immediately following it.
-    doStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    doStuff {
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
-    // expected-note @+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    // expected-note@+2 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    // Note: Trailing whitespace on the following line is intentional and should not be removed!
+    doStuff {             
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
+    }
+    // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     doStuff {   // We have stuff to do.
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
+    // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    doStuff {// We have stuff to do.
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
+    }
+
+    // String interpolation should offer the diagnosis and fix-its at the expected locations
+    doVoidStuff { _ = "\(method())" } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
+    doVoidStuff { _ = "\(x+1)" } // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
     
     // If we already have a capture list, self should be added to the list
     let y = 1
