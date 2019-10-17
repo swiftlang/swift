@@ -415,7 +415,8 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 ConstraintLocator *
-ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
+ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
+                                   bool lookThroughApply) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -456,26 +457,28 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
   if (isa<SubscriptExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
-  if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-    auto *fnExpr = applyExpr->getFn();
-    // For an apply of a metatype, we have a short-form constructor. Unlike
-    // other locators to callees, these are anchored on the apply expression
-    // rather than the function expr.
-    auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
-    if (fnTy->is<AnyMetatypeType>()) {
-      auto *fnLocator =
-          getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
-      return getConstraintLocator(fnLocator,
-                                  ConstraintLocator::ConstructorMember);
-    }
+  if (lookThroughApply) {
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+      auto *fnExpr = applyExpr->getFn();
+      // For an apply of a metatype, we have a short-form constructor. Unlike
+      // other locators to callees, these are anchored on the apply expression
+      // rather than the function expr.
+      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
+      if (fnTy->is<AnyMetatypeType>()) {
+        auto *fnLocator =
+            getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
+        return getConstraintLocator(fnLocator,
+                                    ConstraintLocator::ConstructorMember);
+      }
 
-    // Otherwise fall through and look for locators anchored on the function
-    // expr. For CallExprs, this can look through things like parens and
-    // optional chaining.
-    if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
-      anchor = callExpr->getDirectCallee();
-    } else {
-      anchor = fnExpr;
+      // Otherwise fall through and look for locators anchored on the function
+      // expr. For CallExprs, this can look through things like parens and
+      // optional chaining.
+      if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
+        anchor = callExpr->getDirectCallee();
+      } else {
+        anchor = fnExpr;
+      }
     }
   }
 

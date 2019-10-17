@@ -2050,7 +2050,13 @@ public:
   /// anchored on \c functionA(functionB()) with path elements pointing to the
   /// argument \c functionB(), the returned callee locator will describe
   /// \c functionA rather than \c functionB.
-  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator);
+  ///
+  /// \param locator The input locator.
+  /// \param lookThroughApply Whether to look through applies. If false, a
+  /// callee locator will only be returned for a direct reference such as
+  /// \c x.foo rather than \c x.foo().
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
+                                      bool lookThroughApply = true);
 
 public:
 
