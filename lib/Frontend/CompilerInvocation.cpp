@@ -1198,11 +1198,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
     }
   }
-                             
-  // Autolink runtime compatibility libraries, if asked to.
-  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+
+  auto getRuntimeCompatVersion = [&] () -> Optional<llvm::VersionTuple> {
     Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
-    
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
@@ -1218,15 +1216,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       runtimeCompatibilityVersion =
                            getSwiftRuntimeCompatibilityVersionForTarget(Triple);
     }
-      
-    Opts.AutolinkRuntimeCompatibilityLibraryVersion =
-                                                    runtimeCompatibilityVersion;
+    return runtimeCompatibilityVersion;
+  };
+
+  // Autolink runtime compatibility libraries, if asked to.
+  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+    Opts.AutolinkRuntimeCompatibilityLibraryVersion = getRuntimeCompatVersion();
   }
 
   if (!Args.hasArg(options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
-        getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+        getRuntimeCompatVersion();
   }
   return false;
 }
