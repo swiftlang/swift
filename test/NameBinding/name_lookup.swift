@@ -614,7 +614,6 @@ _ = ShadowingGenericParameter<String>().foo(t: "hi")
 // rdar://problem/51266778
 struct PatternBindingWithTwoVars1 { var x = 3, y = x }
 // expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
-// expected-error@-2 {{property 'x' references itself}}
 
 struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{property 'y' references itself}}
@@ -629,6 +628,6 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {
-  let closure1 = { closure2() } // expected-error {{let 'closure1' references itself}}
-  let closure2 = { closure1() }
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-error{{variable 'closure1' is not bound by any pattern}} expected-note {{through reference here}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}}
 }

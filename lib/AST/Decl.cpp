@@ -1444,7 +1444,9 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
 }
 
 Expr *PatternBindingEntry::getOriginalInit() const {
-  return InitContextAndIsText.getInt() ? nullptr : InitExpr.originalInit;
+  return InitContextAndFlags.getInt().contains(PatternFlags::IsText)
+             ? nullptr
+             : InitExpr.originalInit;
 }
 
 SourceRange PatternBindingEntry::getOriginalInitRange() const {
@@ -1455,7 +1457,8 @@ SourceRange PatternBindingEntry::getOriginalInitRange() const {
 
 void PatternBindingEntry::setOriginalInit(Expr *E) {
   InitExpr.originalInit = E;
-  InitContextAndIsText.setInt(false);
+  InitContextAndFlags.setInt(InitContextAndFlags.getInt() -
+                             PatternFlags::IsText);
 }
 
 bool PatternBindingEntry::isInitialized() const {
@@ -1481,7 +1484,8 @@ void PatternBindingEntry::setInit(Expr *E) {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
   InitExpr.initAfterSynthesis = E;
-  InitContextAndIsText.setInt(false);
+  InitContextAndFlags.setInt(InitContextAndFlags.getInt() -
+                             PatternFlags::IsText);
 }
 
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
@@ -1530,7 +1534,7 @@ SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
 }
 
 bool PatternBindingEntry::hasInitStringRepresentation() const {
-  if (InitContextAndIsText.getInt())
+  if (InitContextAndFlags.getInt().contains(PatternFlags::IsText))
     return !InitStringRepresentation.empty();
   return getInit() && getInit()->getSourceRange().isValid();
 }
@@ -1541,7 +1545,8 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   assert(hasInitStringRepresentation() &&
          "must check if pattern has string representation");
 
-  if (InitContextAndIsText.getInt() && !InitStringRepresentation.empty())
+  if (InitContextAndFlags.getInt().contains(PatternFlags::IsText) &&
+      !InitStringRepresentation.empty())
     return InitStringRepresentation;
   auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
   auto init = getOriginalInit();
@@ -1728,6 +1733,13 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
 
   // Otherwise, we can't default initialize this binding.
   return false;
+}
+
+bool PatternBindingDecl::isComputingPatternBindingEntry(
+    const VarDecl *vd) const {
+  unsigned i = getPatternEntryIndexForVarDecl(vd);
+  return getASTContext().evaluator.hasActiveRequest(
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -2756,7 +2768,7 @@ bool ValueDecl::isRecursiveValidation() const {
 
   if (auto *vd = dyn_cast<VarDecl>(this))
     if (auto *pbd = vd->getParentPatternBinding())
-      if (pbd->isBeingValidated())
+      if (pbd->isComputingPatternBindingEntry(vd))
         return true;
 
   auto *dc = getDeclContext();
@@ -5307,6 +5319,17 @@ Pattern *VarDecl::getParentPattern() const {
   // Otherwise, this is a case we do not know or understand. Return nullptr to
   // signal we do not have any information.
   return nullptr;
+}
+
+NamedPattern *VarDecl::getNamingPattern() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           NamingPatternRequest{const_cast<VarDecl *>(this)},
+                           nullptr);
+}
+
+void VarDecl::setNamingPattern(NamedPattern *Pat) {
+  getASTContext().evaluator.cacheOutput(NamingPatternRequest{this},
+                                        std::move(Pat));
 }
 
 TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {

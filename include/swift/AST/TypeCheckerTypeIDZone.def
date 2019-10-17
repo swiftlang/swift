@@ -85,6 +85,8 @@ SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest, VarDecl *(VarDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, NamingPatternRequest,
+              NamedPattern *(VarDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
               OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
@@ -97,6 +99,9 @@ SWIFT_REQUEST(TypeChecker, OperatorPrecedenceGroupRequest,
 SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
               llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
+              const PatternBindingEntry *(PatternBindingDecl *, unsigned),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
               PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
               NoLocationInfo)
