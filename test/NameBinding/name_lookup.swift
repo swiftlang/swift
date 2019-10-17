@@ -628,6 +628,6 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {
-  let closure1 = { closure2() } // expected-error {{circular reference}} expected-error{{variable 'closure1' is not bound by any pattern}} expected-note {{through reference here}}
-  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-error{{variable 'closure1' is not bound by any pattern}} expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
 }
