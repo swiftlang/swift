@@ -609,7 +609,7 @@ omitTrailingTypeNameWithSpecialCases(StringRef name,
 /// If there is no match, returns the end WordIterator for \p name.
 static Words::iterator matchTypeNameFromBackWithSpecialCases(
     StringRef name, OmissionTypeName typeName,
-    const InheritedNameSet *allPropertyNames, bool canSkipTypeSuffix = true) {
+    const InheritedNameSet *allPropertyNames) {
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);
   auto typeWords = camel_case::getWords(typeName.Name);
@@ -697,7 +697,7 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
     }
 
     // If this is a skippable suffix, skip it and keep looking.
-    if (canSkipTypeSuffix && nameWordRevIter == nameWordRevIterBegin) {
+    if (nameWordRevIter == nameWordRevIterBegin) {
       if (auto withoutSuffix = skipTypeSuffix(typeName.Name)) {
         typeName.Name = *withoutSuffix;
         typeWords = camel_case::getWords(typeName.Name);
@@ -724,8 +724,6 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
   typeName.CollectionElement = StringRef();
 
   auto nameWords = camel_case::getWords(name);
-
-  bool canSkipTypeSuffix = true;
   Optional<llvm::iterator_range<WordIterator>> matchingRange;
 
   // Search backwards for the type name, whether anchored at the end or not.
@@ -734,8 +732,7 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
        ++nameReverseIter) {
     StringRef matchName = nameReverseIter.base().getPriorStr();
     auto matchIter = matchTypeNameFromBackWithSpecialCases(matchName, typeName,
-                                                           allPropertyNames,
-                                                           canSkipTypeSuffix);
+                                                           allPropertyNames);
     auto matchIterInFullName = WordIterator(name, matchIter.getPosition());
     if (matchIterInFullName != nameReverseIter.base()) {
       matchingRange = llvm::make_range(matchIterInFullName,
@@ -746,7 +743,8 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
     // Note: This behavior fell out of a previous implementation of
     // omit-needless-words, even though it probably wasn't intentional. At this
     // point, though, it could be source-breaking to change it.
-    canSkipTypeSuffix = false;
+    while (auto withoutSuffix = skipTypeSuffix(typeName.Name))
+      typeName.Name = *withoutSuffix;
   }
 
   // If we matched nothing, or if the type name was all the way at the start
