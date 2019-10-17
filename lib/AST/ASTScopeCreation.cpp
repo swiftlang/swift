@@ -920,7 +920,7 @@ public:
         isInTypeDecl ? DeclVisibilityKind::MemberOfCurrentNominal
                      : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
-    for (auto i : indices(patternBinding->getPatternList())) {
+    for (auto i : range(patternBinding->getNumPatternEntries())) {
       // TODO: Won't need to do so much work to avoid creating one without
       // a SourceRange once parser is fixed to not create two
       // PatternBindingDecls with same locaiton and getSourceRangeOfThisASTNode
@@ -2054,7 +2054,7 @@ private:
   }
 
   void recordInitializers(PatternBindingDecl *pbd) {
-    for (auto idx : indices(pbd->getPatternList()))
+    for (auto idx : range(pbd->getNumPatternEntries()))
       record(pbd->getInitContext(idx));
   }
 

@@ -914,7 +914,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
-      for (auto i : indices(pbd->getPatternList())) {
+      for (auto i : range(pbd->getNumPatternEntries())) {
         auto init = pbd->getExecutableInit(i);
         if (!init) continue;
 

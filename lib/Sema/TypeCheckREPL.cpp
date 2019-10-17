@@ -346,7 +346,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   // This would just cause a confusing definite initialization error.  Some
   // day we will do some high level analysis of uninitialized variables
   // (rdar://15157729) but until then, output a specialized error.
-  for (auto entryIdx : indices(PBD->getPatternList())) {
+  for (auto entryIdx : range(PBD->getNumPatternEntries())) {
     auto *entryInit = PBD->getInit(entryIdx);
     if (!entryInit) {
       TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);

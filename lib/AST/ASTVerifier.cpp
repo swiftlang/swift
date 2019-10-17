@@ -2357,7 +2357,7 @@ public:
 
     void verifyChecked(PatternBindingDecl *binding) {
       // Look at all of the VarDecls being bound.
-      for (auto idx : indices(binding->getPatternList()))
+      for (auto idx : range(binding->getNumPatternEntries()))
         if (auto *P = binding->getPattern(idx))
           P->forEachVariable([&](VarDecl *VD) {
             // ParamDecls never get PBD's.

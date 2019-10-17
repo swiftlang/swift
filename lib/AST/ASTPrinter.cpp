@@ -1665,7 +1665,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
   // attributes can only be retrieved from the inside VarDecls.
   if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
     auto ShouldPrint = false;
-    for (auto idx : indices(PD->getPatternList())) {
+    for (auto idx : range(PD->getNumPatternEntries())) {
       ShouldPrint |= shouldPrint(PD->getPattern(idx), Options);
       if (ShouldPrint)
         return true;
@@ -2162,7 +2162,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // variables are immutable, and if so, we print as 'let'.  This allows us to
   // handle the 'let x = 4' case properly at least.
   const VarDecl *anyVar = nullptr;
-  for (auto idx : indices(decl->getPatternList())) {
+  for (auto idx : range(decl->getNumPatternEntries())) {
     decl->getPattern(idx)->forEachVariable([&](VarDecl *V) {
       anyVar = V;
     });
@@ -2190,7 +2190,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   }
 
   bool isFirst = true;
-  for (auto idx : indices(decl->getPatternList())) {
+  for (auto idx : range(decl->getNumPatternEntries())) {
     auto *pattern = decl->getPattern(idx);
     if (!shouldPrintPattern(pattern))
       continue;

@@ -1184,7 +1184,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  for (unsigned i : indices(PBD->getPatternList())) {
+  for (unsigned i : range(PBD->getNumPatternEntries())) {
     emitPatternBinding(PBD, i);
   }
 }

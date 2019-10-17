@@ -2079,7 +2079,7 @@ public:
     if (!PBD) return false;
 
     bool sawMutation = false;
-    for (auto idx : indices(PBD->getPatternList())) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
         auto it = VarDecls.find(VD);
         sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
@@ -2199,7 +2199,7 @@ public:
           Decl *D = node.get<Decl *>();
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
-          for (auto idx : indices(PBD->getPatternList())) {
+          for (auto idx : range(PBD->getNumPatternEntries())) {
             PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
               VarDecls[VD] = RK_Read|RK_Written;
             });

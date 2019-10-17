@@ -895,7 +895,7 @@ namespace {
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
 
-      for (auto idx : indices(PBD->getPatternList())) {
+      for (auto idx : range(PBD->getNumPatternEntries())) {
         OS << '\n';
         printRec(PBD->getPattern(idx));
         if (PBD->getOriginalInit(idx)) {

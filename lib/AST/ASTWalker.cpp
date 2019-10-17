@@ -171,7 +171,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         singleVar->getOriginalWrappedProperty() != nullptr;
     }
 
-    for (auto idx : indices(PBD->getPatternList())) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
       if (Pattern *Pat = doIt(PBD->getPattern(idx)))
         PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
       else

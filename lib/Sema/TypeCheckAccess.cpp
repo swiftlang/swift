@@ -551,7 +551,7 @@ public:
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto idx : indices(PBD->getPatternList())) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
           // Only check individual variables if we didn't check an enclosing
@@ -1174,7 +1174,7 @@ public:
         getFixedLayoutStructContext(PBD);
 
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto idx : indices(PBD->getPatternList())) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
           checkNamedPattern(NP, fixedLayoutStructContext, isTypeContext,
@@ -1816,7 +1816,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto idx : indices(PBD->getPatternList())) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
           checkNamedPattern(NP, seenVars);

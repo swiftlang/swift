@@ -2401,7 +2401,7 @@ public:
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
     bool isTypeContext = DC->isTypeContext();
 
-    for (auto i : indices(PBD->getPatternList())) {
+    for (auto i : range(PBD->getNumPatternEntries())) {
       const auto *entry = evaluateOrDefault(TC.Context.evaluator,
                                             PatternBindingEntryRequest{PBD, i},
                                             nullptr);
@@ -2497,7 +2497,7 @@ public:
     checkAccessControl(TC, PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
-    for (auto i : indices(PBD->getPatternList())) {
+    for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
         continue;
 
@@ -2799,7 +2799,7 @@ public:
       // initialized. Diagnose the lack of initial value.
       pbd->setInvalid();
       SmallVector<VarDecl *, 4> vars;
-      for (auto idx : indices(pbd->getPatternList()))
+      for (auto idx : range(pbd->getNumPatternEntries()))
         pbd->getPattern(idx)->collectVariables(vars);
       bool suggestNSManaged = propertiesCanBeNSManaged(cd, vars);
       switch (vars.size()) {
@@ -4698,7 +4698,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
         pbd->isDefaultInitializable() || pbd->isInvalid())
       continue;
    
-    for (auto idx : indices(pbd->getPatternList())) {
+    for (auto idx : range(pbd->getNumPatternEntries())) {
       if (pbd->isInitialized(idx)) continue;
 
       auto *pattern = pbd->getPattern(idx);

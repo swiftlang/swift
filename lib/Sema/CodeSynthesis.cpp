@@ -810,7 +810,7 @@ static bool areAllStoredPropertiesDefaultInitializable(NominalTypeDecl *decl) {
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->hasStorage() && !pbd->isStatic()) {
-        for (auto idx : indices(pbd->getPatternList())) {
+        for (auto idx : range(pbd->getNumPatternEntries())) {
           if (pbd->isInitialized(idx)) continue;
 
           // If one of the bound variables is @NSManaged, go ahead no matter

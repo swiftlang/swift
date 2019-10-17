@@ -2212,7 +2212,7 @@ public:
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
   bool isDefaultInitializable() const {
-    for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
+    for (unsigned i : range(getNumPatternEntries()))
       if (!isDefaultInitializable(i))
         return false;
 

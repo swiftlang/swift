@@ -2718,7 +2718,7 @@ public:
     if (binding->getDeclContext()->isTypeContext())
       owningDC = binding->getDeclContext();
 
-    for (auto entryIdx : indices(binding->getPatternList())) {
+    for (auto entryIdx : range(binding->getNumPatternEntries())) {
       writePattern(binding->getPattern(entryIdx));
       // Ignore initializer; external clients don't need to know about it.
     }
