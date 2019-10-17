@@ -410,6 +410,10 @@ template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
+template<typename Class>
+inline char checkSourceLocType(SourceLoc (Class::*)(bool) const);
+inline TwoChars checkSourceLocType(SourceLoc (Decl::*)(bool) const);
+
 template<typename Class> 
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
@@ -482,12 +486,52 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-SourceLoc Decl::getLoc() const {
+const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
+  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  auto Locs = File->getBasicLocsForDecl(this);
+  if (!Locs.hasValue()) {
+    static const Decl::CachedExternalSourceLocs NullLocs{};
+    return &NullLocs;
+  }
+  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
+  auto &SM = getASTContext().SourceMgr;
+#define CASE(X)                                                               \
+Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
+                                       Locs->X.Column);
+  CASE(Loc)
+  CASE(StartLoc)
+  CASE(EndLoc)
+#undef CASE
+  return Result;
+}
+
+SourceLoc Decl::getLoc(bool SerializedOK) const {
 #define DECL(ID, X) \
 static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
               #ID "Decl is re-defining getLoc()");
 #include "swift/AST/DeclNodes.def"
-  return getLocFromSource();
+  if (isa<ModuleDecl>(this))
+    return SourceLoc();
+  // When the decl is context-free, we should get loc from source buffer.
+  if (!getDeclContext())
+    return getLocFromSource();
+  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  switch(File->getKind()) {
+  case FileUnitKind::Source:
+    return getLocFromSource();
+  case FileUnitKind::SerializedAST: {
+    if (!SerializedOK)
+      return SourceLoc();
+    if (!CachedLocs) {
+      CachedLocs = calculateSerializedLocs();
+    }
+    return CachedLocs->Loc;
+  }
+  case FileUnitKind::Builtin:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
+    return SourceLoc();
+  }
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {

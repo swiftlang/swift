@@ -357,3 +357,30 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   return None;
 }
 
+unsigned SourceManager::getExternalSourceBufferId(StringRef Path) {
+  auto It = BufIdentIDMap.find(Path);
+  if (It != BufIdentIDMap.end()) {
+    return It->getSecond();
+  }
+  unsigned Id = 0u;
+  auto InputFileOrErr = swift::vfs::getFileOrSTDIN(*getFileSystem(), Path);
+  if (InputFileOrErr) {
+    // This assertion ensures we can look up from the map in the future when
+    // using the same Path.
+    assert(InputFileOrErr.get()->getBufferIdentifier() == Path);
+    Id = addNewSourceBuffer(std::move(InputFileOrErr.get()));
+  }
+  return Id;
+}
+
+SourceLoc
+SourceManager::getLocFromExternalSource(StringRef Path, unsigned Line,
+                                        unsigned Col) {
+  auto BufferId = getExternalSourceBufferId(Path);
+  if (BufferId == 0u)
+    return SourceLoc();
+  auto Offset = resolveFromLineCol(BufferId, Line, Col);
+  if (!Offset.hasValue())
+    return SourceLoc();
+  return getLocForOffset(BufferId, *Offset);
+}

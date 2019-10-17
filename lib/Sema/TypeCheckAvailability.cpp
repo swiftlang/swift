@@ -644,8 +644,10 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // We can assume we are running on at least the minimum deployment target.
   auto OverApproximateContext =
     AvailabilityContext::forDeploymentTarget(Context);
-
-  while (DC && loc.isInvalid()) {
+  auto isInvalidLoc = [SF](SourceLoc loc) {
+    return SF ? loc.isInvalid() : true;
+  };
+  while (DC && isInvalidLoc(loc)) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
     if (!D)
       break;

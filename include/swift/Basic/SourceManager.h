@@ -47,7 +47,6 @@ class SourceManager {
   };
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
-
 public:
   SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
                     llvm::vfs::getRealFileSystem())
@@ -245,9 +244,10 @@ public:
                                SourceLoc();
   }
 
+  SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;
-
+  unsigned getExternalSourceBufferId(StringRef Path);
   int getLineOffset(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
       return VFile->LineOffset;

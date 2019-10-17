@@ -667,6 +667,13 @@ private:
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
 
+  struct CachedExternalSourceLocs {
+    SourceLoc Loc;
+    SourceLoc StartLoc;
+    SourceLoc EndLoc;
+  };
+  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
+  const CachedExternalSourceLocs *calculateSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -764,7 +771,7 @@ public:
 
   /// Returns the preferred location when referring to declarations
   /// in diagnostics.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc(bool SerializedOK = true) const;
 
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
