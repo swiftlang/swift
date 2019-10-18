@@ -209,7 +209,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (auto *stdlib = Context.getStdlibModule()) {
+  if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
     return stdlib;
   }
 

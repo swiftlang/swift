@@ -1702,7 +1702,7 @@ public:
   ///
   /// This is "Swift", if that module is imported, or the current module if
   /// we're parsing the standard library.
-  ModuleDecl *getStdlibModule(const DeclContext *dc);
+  static ModuleDecl *getStdlibModule(const DeclContext *dc);
 
   /// \name Lazy resolution.
   ///
