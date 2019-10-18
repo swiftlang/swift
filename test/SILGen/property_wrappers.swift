@@ -535,7 +535,6 @@ class ClassWrapper<T> {
 
 
 struct SR_11603 {
-  // CHECK: @StructWrapper @ClassWrapper var prop: Int { get nonmutating set }
   @StructWrapper @ClassWrapper var prop: Int
 
   func foo() {
