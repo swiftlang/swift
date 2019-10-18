@@ -2930,11 +2930,11 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     auto clause = row.getClientData<CaseStmt>();
     emitProfilerIncrement(clause->getBody());
 
-    // Certain case statements can be entered along multiple paths, either
-    // because they have multiple labels or because of fallthrough. When we need
-    // multiple entrance path, we factor the paths with a shared block.
+    // Certain catch clauses can be entered along multiple paths because they
+    // have multiple labels. When we need multiple entrance path, we factor the
+    // paths with a shared block.
     //
-    // If we don't have a fallthrough or a multi-pattern 'case', we can emit the
+    // If we don't have a multi-pattern 'catch', we can emit the
     // body inline. Emit the statement here and bail early.
     if (clause->getCaseLabelItems().size() == 1) {
       // If we have case body vars, set them up to point at the matching var
@@ -3035,19 +3035,14 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   LLVM_DEBUG(llvm::dbgs() << "emitting catch dispatch\n"; S->dump(llvm::dbgs());
              llvm::dbgs() << '\n');
 
-  /*auto completionHandler = [this](PatternMatchEmission &emission,
-                                  ArgArray argArray, ClauseRow &row) {
-    return switchCaseStmtSuccessCallback(*this, emission, argArray, row);
-  };*/
   PatternMatchEmission emission(*this, S, completionHandler);
 
   // Add a row for each label of each case.
   SmallVector<ClauseRow, 8> clauseRows;
   clauseRows.reserve(S->getCatches().size());
   for (auto caseBlock : S->getCatches()) {
-    // If the previous block falls through into this block or we have multiple
-    // case label itmes, create a shared case block to generate the shared
-    // block.
+    // If we have multiple case label itmes, create a shared case block to
+    // generate the shared block.
     if (caseBlock->getCaseLabelItems().size() > 1) {
       emission.initSharedCaseBlockDest(caseBlock, /*hasFallthrough*/ false);
     }
@@ -3064,7 +3059,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   // multiple-entry case blocks.
   emission.emitAddressOnlyAllocations();
 
-  Scope switchScope(Cleanups, CleanupLocation(S));
+  Scope stmtScope(Cleanups, CleanupLocation(S));
 
   assert(exn.getType().isObject() &&
          "Error is special and should always be an object");
@@ -3103,7 +3098,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   emission.emitDispatch(clauseMatrix, subject, failure);
   assert(!B.hasValidInsertionPoint());
 
-  switchScope.pop();
+  stmtScope.pop();
 
   // Then emit the case blocks shared by multiple pattern cases.
   emission.emitSharedCaseBlocks([&](CaseStmt *caseStmt) {
