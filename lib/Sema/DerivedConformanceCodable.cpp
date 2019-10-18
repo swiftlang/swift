@@ -117,12 +117,6 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   //   var x: Int // <- we get to valuate x's var decl here, but its type
   //              //    hasn't yet been evaluated
   // }
-  //
-  // If the var decl didn't validate, it may still not have a type; confirm it
-  // has a type before ensuring the type conforms to Codable.
-  if (!varDecl->getInterfaceType())
-    return TypeNotValidated;
-
   bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
   return typeConformsToCodable(context, varDecl->getValueInterfaceType(),
                                isIUO, proto);
@@ -757,7 +751,6 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   encodeDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
 
-  encodeDecl->setValidationToChecked();
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -1038,7 +1031,6 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   initDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
 
-  initDecl->setValidationToChecked();
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
 

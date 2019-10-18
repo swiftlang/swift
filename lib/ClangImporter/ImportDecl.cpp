@@ -137,7 +137,6 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
   if (isImplicit)
     var->setImplicit();
   var->setInterfaceType(ty);
-  var->setValidationToChecked();
   var->setAccess(access);
   var->setSetterAccess(setterAccess);
 
@@ -528,7 +527,6 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                                  SourceLoc(), C.Id_rawValue,
                                  enumDecl);
   param->setInterfaceType(rawTy);
-  param->setValidationToChecked();
 
   auto paramPL = ParameterList::createWithoutLoc(param);
 
@@ -543,7 +541,6 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ctorDecl->setAccess(AccessLevel::Public);
 
   ctorDecl->computeType();
-  ctorDecl->setValidationToChecked();
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
 }
@@ -620,7 +617,6 @@ static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setIsTransparent(false);
 
   getterDecl->computeType();
-  getterDecl->setValidationToChecked();
 
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
@@ -702,7 +698,6 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setIsTransparent(false);
 
   getterDecl->computeType();
-  getterDecl->setValidationToChecked();
 
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
@@ -734,7 +729,6 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
-  getterDecl->setValidationToChecked();
 
   return getterDecl;
 }
@@ -771,7 +765,6 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setAccess(AccessLevel::Public);
 
   setterDecl->computeType();
-  setterDecl->setValidationToChecked();
 
   return setterDecl;
 }
@@ -1106,8 +1099,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   auto recordType = Ctx.getRecordType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
-  auto fieldNameInfo = clang::DeclarationNameInfo(fieldDecl->getDeclName(),
-                                                  clang::SourceLocation());
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
@@ -1179,14 +1170,14 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                         recordType,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
-    auto cGetterExpr = new (Ctx) clang::MemberExpr(cGetterSelfExpr,
-                                                   /*isarrow=*/ false,
-                                                   clang::SourceLocation(),
-                                                   fieldDecl,
-                                                   fieldNameInfo,
-                                                   fieldType,
-                                                   clang::VK_RValue,
-                                                   clang::OK_BitField);
+    auto cGetterExpr = clang::MemberExpr::CreateImplicit(Ctx,
+                                                         cGetterSelfExpr,
+                                                         /*isarrow=*/ false,
+                                                         fieldDecl,
+                                                         fieldType,
+                                                         clang::VK_RValue,
+                                                         clang::OK_BitField);
+
     
     auto cGetterBody = clang::ReturnStmt::Create(Ctx, clang::SourceLocation(),
                                                    cGetterExpr,
@@ -1224,14 +1215,13 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
     
-    auto cSetterMemberExpr = new (Ctx) clang::MemberExpr(cSetterSelfExpr,
-                                                         /*isarrow=*/ true,
-                                                         clang::SourceLocation(),
-                                                         fieldDecl,
-                                                         fieldNameInfo,
-                                                         fieldType,
-                                                         clang::VK_LValue,
-                                                         clang::OK_BitField);
+    auto cSetterMemberExpr = clang::MemberExpr::CreateImplicit(Ctx,
+                                                               cSetterSelfExpr,
+                                                               /*isarrow=*/true,
+                                                               fieldDecl,
+                                                               fieldType,
+                                                               clang::VK_LValue,
+                                                               clang::OK_BitField);
     
     auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterValue, false,
                                                          fieldType,
@@ -1319,7 +1309,6 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
 
   // Set the constructor's type.
   constructor->computeType();
-  constructor->setValidationToChecked();
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1432,7 +1421,6 @@ createValueConstructor(ClangImporter::Implementation &Impl,
         ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
-    param->setValidationToChecked();
     Impl.recordImplicitUnwrapForDecl(param, var->isImplicitlyUnwrappedOptional());
     valueParameters.push_back(param);
   }
@@ -1449,7 +1437,6 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
   // Set the constructor's type.
   constructor->computeType();
-  constructor->setValidationToChecked();
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1491,7 +1478,6 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
                                            nullptr, nominal);
   typealias->setUnderlyingType(underlyingType);
   typealias->setAccess(AccessLevel::Public);
-  typealias->setValidationToChecked();
   typealias->setImplicit();
   typealias->computeType();
 
@@ -1667,7 +1653,6 @@ static void makeStructRawValuedWithBridge(
   computedVar->setImplicit();
   computedVar->setAccess(AccessLevel::Public);
   computedVar->setSetterAccess(AccessLevel::Private);
-  computedVar->setValidationToChecked();
 
   // Create the getter for the computed value variable.
   auto computedVarGetter = makeStructRawValueGetter(
@@ -1730,7 +1715,6 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
 
   thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
-  thunk->setValidationToChecked();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
 
@@ -1765,7 +1749,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
       new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(), dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
-  paramVarDecl->setValidationToChecked();
 
   auto valueIndicesPL = ParameterList::create(C, {paramVarDecl, index});
 
@@ -1785,7 +1768,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      setter->getClangNode());
   thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
-  thunk->setValidationToChecked();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
 
@@ -1954,7 +1936,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
       /*IsStatic*/isStatic, VarDecl::Introducer::Var, /*IsCaptureList*/false,
       SourceLoc(), C.Id_errorDomain, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
-  errorDomainPropertyDecl->setValidationToChecked();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
 
   auto *params = ParameterList::createEmpty(C);
@@ -1973,7 +1954,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
   getterDecl->setStatic(isStatic);
   getterDecl->computeType();
-  getterDecl->setValidationToChecked();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
@@ -2564,7 +2544,6 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                   underlying->getDeclaredInterfaceType());
-              typealias->setValidationToChecked();
               typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -2585,7 +2564,6 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                 Impl.SwiftContext.getAnyObjectType());
-              typealias->setValidationToChecked();
               typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -2654,7 +2632,6 @@ namespace {
                                       Loc,
                                       /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftType);
-      Result->setValidationToChecked();
       Result->computeType();
       
       // Make Objective-C's 'id' unavailable.
@@ -2808,7 +2785,6 @@ namespace {
           // Create the wrapper struct.
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
           errorWrapper->computeType();
-          errorWrapper->setValidationToChecked();
           errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
@@ -2843,7 +2819,6 @@ namespace {
           nsErrorProp->setImplicit();
           nsErrorProp->setAccess(AccessLevel::Public);
           nsErrorProp->setInterfaceType(nsErrorType);
-          nsErrorProp->setValidationToChecked();
 
           // Create a pattern binding to describe the variable.
           Pattern *nsErrorPattern = createTypedNamedPattern(nsErrorProp);
@@ -2921,7 +2896,6 @@ namespace {
         rawValue->setAccess(AccessLevel::Public);
         rawValue->setSetterAccess(AccessLevel::Private);
         rawValue->setInterfaceType(underlyingType);
-        rawValue->setValidationToChecked();
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
@@ -2950,7 +2924,6 @@ namespace {
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
           alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
-          alias->setValidationToChecked();
           alias->computeType();
           enumDecl->addMember(alias);
 
@@ -3784,7 +3757,6 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->computeType();
-      result->setValidationToChecked();
 
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -4042,7 +4014,6 @@ namespace {
           Loc,
           /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
-      Result->setValidationToChecked();
       Result->computeType();
 
       return Result;
@@ -4373,7 +4344,6 @@ namespace {
 
       // Compute the interface type.
       result->computeType();
-      result->setValidationToChecked();
 
       Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
@@ -4581,7 +4551,6 @@ namespace {
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
-      result->setValidationToChecked();
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setMemberLoader(&Impl, 0);
 
@@ -4844,7 +4813,7 @@ namespace {
           result->getASTContext().evaluator.cacheOutput(
                 GenericParamListRequest{result}, std::move(genericParams));
 
-          auto *sig = Impl.buildGenericSignature(genericParams, dc);
+          auto sig = Impl.buildGenericSignature(genericParams, dc);
           result->setGenericSignature(sig);
         }
       } else {
@@ -5178,7 +5147,6 @@ namespace {
       }
 
       typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-      typealias->setValidationToChecked();
       typealias->computeType();
       return typealias;
     }
@@ -5415,7 +5383,6 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   }
 
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-  alias->setValidationToChecked();
   alias->computeType();
   
   // Record that this is the official version of this declaration.
@@ -5825,7 +5792,6 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
             ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
-    paramDecl->setValidationToChecked();
 
     parameterList = ParameterList::createWithoutLoc(paramDecl);
   } else {
@@ -8026,7 +7992,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-GenericSignature *ClangImporter::Implementation::buildGenericSignature(
+GenericSignature ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
   SmallVector<GenericTypeParamType *, 2> genericParamTypes;
   for (auto param : *genericParams) {
@@ -8061,7 +8027,7 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
       SwiftContext.evaluator,
       AbstractGenericSignatureRequest{
         nullptr, std::move(genericParamTypes), std::move(requirements)},
-      nullptr);
+      GenericSignature());
 }
 
 DeclContext *
@@ -8147,7 +8113,6 @@ ClangImporter::Implementation::importDeclContextOf(
                                      nominal->getDeclaredType());
   SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{ext},
                                      std::move(nominal));
-  ext->setValidationToChecked();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
@@ -8193,10 +8158,12 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   case clang::APValue::Array:
   case clang::APValue::ComplexFloat:
   case clang::APValue::ComplexInt:
+  case clang::APValue::FixedPoint:
+  case clang::APValue::Indeterminate:
   case clang::APValue::LValue:
   case clang::APValue::MemberPointer:
+  case clang::APValue::None:
   case clang::APValue::Struct:
-  case clang::APValue::Uninitialized:
   case clang::APValue::Union:
   case clang::APValue::Vector:
     llvm_unreachable("Unhandled APValue kind");
@@ -8391,7 +8358,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     var = new (SwiftContext)
         VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
                 /*IsCaptureList*/false, SourceLoc(), name, dc);
-    var->setValidationToChecked();
   }
 
   var->setInterfaceType(type);
@@ -8416,7 +8382,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setStatic(isStatic);
   func->computeType();
   func->setAccess(getOverridableAccessLevel(dc));
-  func->setValidationToChecked();
   func->setIsObjC(false);
   func->setIsDynamic(false);
 

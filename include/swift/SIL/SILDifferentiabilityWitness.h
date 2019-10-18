@@ -68,7 +68,7 @@ private:
                               SILFunction *originalFunction,
                               IndexSubset *parameterIndices,
                               IndexSubset *resultIndices,
-                              GenericSignature *derivativeGenSig,
+                              GenericSignature derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized, DeclAttribute *attribute)
     : module(module), linkage(linkage), originalFunction(originalFunction),
@@ -86,7 +86,7 @@ public:
   static SILDifferentiabilityWitness *create(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+      GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized, DeclAttribute *attribute = nullptr);
 
   SILDifferentiabilityWitnessKey getKey() const;
@@ -100,7 +100,7 @@ public:
   IndexSubset *getResultIndices() const {
     return autoDiffConfig.resultIndices;
   }
-  GenericSignature *getDerivativeGenericSignature() const {
+  GenericSignature getDerivativeGenericSignature() const {
     return autoDiffConfig.derivativeGenericSignature;
   }
   SILFunction *getJVP() const { return jvp; }

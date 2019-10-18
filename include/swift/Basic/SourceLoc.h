@@ -265,10 +265,8 @@ template <> struct DenseMapInfo<swift::SourceRange> {
   }
 
   static unsigned getHashValue(const swift::SourceRange &Val) {
-    return hash_combine(DenseMapInfo<const void *>::getHashValue(
-                            Val.Start.getOpaquePointerValue()),
-                        DenseMapInfo<const void *>::getHashValue(
-                            Val.End.getOpaquePointerValue()));
+    return hash_combine(Val.Start.getOpaquePointerValue(),
+                        Val.End.getOpaquePointerValue());
   }
 
   static bool isEqual(const swift::SourceRange &LHS,

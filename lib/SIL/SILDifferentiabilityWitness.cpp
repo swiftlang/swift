@@ -20,7 +20,7 @@ using namespace swift;
 SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+    GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
     bool isSerialized, DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,

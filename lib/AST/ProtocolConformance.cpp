@@ -333,7 +333,7 @@ GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
   llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
-GenericSignature *ProtocolConformance::getGenericSignature() const {
+GenericSignature ProtocolConformance::getGenericSignature() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
   case ProtocolConformanceKind::Normal:

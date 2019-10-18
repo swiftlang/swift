@@ -659,7 +659,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Otherwise do a self-reference, which is dynamically bogus but
     // should be statically valid.  This should only happen in invalid cases.    
     } else {
-      assert(storage->isInvalid());
       semantics = AccessSemantics::Ordinary;
       selfAccessKind = SelfAccessorKind::Peer;
     }
@@ -667,7 +666,17 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   case TargetImpl::Wrapper: {
     auto var = cast<VarDecl>(accessor->getStorage());
-    storage = var->getPropertyWrapperBackingProperty();
+    auto *backing = var->getPropertyWrapperBackingProperty();
+
+    // Error recovery.
+    if (!backing) {
+      auto type = storage->getValueInterfaceType();
+      if (isLValue)
+        type = LValueType::get(type);
+      return new (ctx) ErrorExpr(SourceRange(), type);
+    }
+
+    storage = backing;
 
     // If the outermost property wrapper uses the enclosing self pattern,
     // record that.
@@ -691,7 +700,18 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   case TargetImpl::WrapperStorage: {
     auto var =
         cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
-    storage = var->getPropertyWrapperBackingProperty();
+    auto *backing = var->getPropertyWrapperBackingProperty();
+
+    // Error recovery.
+    if (!backing) {
+      auto type = storage->getValueInterfaceType();
+      if (isLValue)
+        type = LValueType::get(type);
+      return new (ctx) ErrorExpr(SourceRange(), type);
+    }
+
+    storage = backing;
+
     enclosingSelfAccess =
         getEnclosingSelfPropertyWrapperAccess(var, /*forProjected=*/true);
     if (!enclosingSelfAccess) {
@@ -976,12 +996,21 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
       value = synthesizeCopyWithZoneCall(value, property, ctx);
   }
 
+  // Error recovery.
+  if (value->getType()->hasError())
+    return;
+
   Expr *dest = buildStorageReference(accessor, storage, target,
                                      /*isLValue=*/true, ctx);
 
   // A lazy property setter will store a value of type T into underlying storage
   // of type T?.
   auto destType = dest->getType()->getWithoutSpecifierType();
+
+  // Error recovery.
+  if (destType->hasError())
+    return;
+
   if (!destType->isEqual(value->getType())) {
     assert(destType->getOptionalObjectType()->isEqual(value->getType()));
     value = new (ctx) InjectIntoOptionalExpr(value, destType);
@@ -1172,17 +1201,25 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   // Take the initializer from the PatternBindingDecl for VD.
   // TODO: This doesn't work with complicated patterns like:
   //   lazy var (a,b) = foo()
-  auto *InitValue = VD->getParentInitializer();
   auto PBD = VD->getParentPatternBinding();
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
-  PBD->setInitializerSubsumed(entryIndex);
 
-  if (!PBD->isInitializerChecked(entryIndex))
-    TC.typeCheckPatternBinding(PBD, entryIndex);
+  Expr *InitValue;
+  if (PBD->getPatternList()[entryIndex].getInit()) {
+    PBD->setInitializerSubsumed(entryIndex);
+
+    if (!PBD->isInitializerChecked(entryIndex))
+      TC.typeCheckPatternBinding(PBD, entryIndex);
+
+    InitValue = PBD->getPatternList()[entryIndex].getInit();
+  } else {
+    InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getType());
+  }
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
   Get->getImplicitSelfDecl()->setDeclContext(Get);
+
   InitValue->walk(RecontextualizeClosures(Get));
 
   // Wrap the initializer in a LazyInitializerExpr to avoid walking it twice.
@@ -1227,6 +1264,12 @@ synthesizePropertyWrapperGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 }
 
 static std::pair<BraceStmt *, bool>
+synthesizeInvalidAccessor(AccessorDecl *accessor, ASTContext &ctx) {
+  auto loc = accessor->getLoc();
+  return { BraceStmt::create(ctx, loc, ArrayRef<ASTNode>(), loc, true), true };
+}
+
+static std::pair<BraceStmt *, bool>
 synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   auto storage = getter->getStorage();
 
@@ -1257,7 +1300,7 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
     return synthesizeTrivialGetterBody(getter, ctx);
 
   case ReadImplKind::Get:
-    llvm_unreachable("synthesizing getter that already exists?");
+    return synthesizeInvalidAccessor(getter, ctx);
 
   case ReadImplKind::Inherited:
     return synthesizeInheritedGetterBody(getter, ctx);
@@ -1490,7 +1533,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     return synthesizeInheritedWithObserversSetterBody(setter, ctx);
 
   case WriteImplKind::Set:
-    llvm_unreachable("synthesizing setter for unknown reason?");  
+    return synthesizeInvalidAccessor(setter, ctx);
 
   case WriteImplKind::MutableAddress:
     return synthesizeMutableAddressSetterBody(setter, ctx);
@@ -1547,16 +1590,13 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
   return synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
-std::pair<BraceStmt *, bool>
+static std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
   auto &ctx = accessor->getASTContext();
 
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized++;
-
-  if (accessor->isInvalid() || ctx.hadError())
-    return { nullptr, true };
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:

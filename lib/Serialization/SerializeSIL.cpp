@@ -1063,10 +1063,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
     auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
     addReferencedSILFunction(dwfi->getOriginalFunction(), /*DeclOnly*/ true);
-    auto originalFnName =
-        S.addUniquedStringRef(dwfi->getOriginalFunction()->getName());
-    auto rawDiffKind = (unsigned)dwfi->getDifferentiabilityKind();
-    auto rawDerivKind = (unsigned)dwfi->getDerivativeKind();
+    auto originalFnName = addSILFunctionRef(dwfi->getOriginalFunction());
+    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
     SmallVector<unsigned, 8> parameterAndResultIndices(
         dwfi->getParameterIndices()->begin(),
         dwfi->getParameterIndices()->end());
@@ -1075,7 +1073,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstDifferentiabilityWitnessFunctionLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiabilityWitnessFunctionLayout::Code],
-        originalFnName, rawDiffKind, rawDerivKind,
+        originalFnName, rawWitnessKind,
         S.addGenericSignatureRef(dwfi->getWitnessGenericSignature()),
         dwfi->getParameterIndices()->getNumIndices(),
         dwfi->getResultIndices()->getNumIndices(),
@@ -2347,7 +2345,7 @@ void SILSerializer::writeIndexTables() {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (!DifferentiabilityWitnessOffset.empty()) {
+  if (!DifferentiabilityWitnessList.empty()) {
     writeIndexTable(S, List,
                     sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
                     DifferentiabilityWitnessList);
@@ -2567,17 +2565,12 @@ writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
   DifferentiabilityWitnessOffset.push_back(Out.GetCurrentBitNo());
 
   auto *original = dw.getOriginalFunction();
-  addReferencedSILFunction(original, /*DeclOnly*/ true);
   IdentifierID jvpID = 0;
   IdentifierID vjpID = 0;
-  if (auto *jvp = dw.getJVP()) {
-    addReferencedSILFunction(jvp, /*DeclOnly*/ true);
-    jvpID = S.addUniquedStringRef(jvp->getName());
-  }
-  if (auto *vjp = dw.getVJP()) {
-    addReferencedSILFunction(vjp, /*DeclOnly*/ true);
-    vjpID = S.addUniquedStringRef(vjp->getName());
-  }
+  if (auto *jvp = dw.getJVP())
+    jvpID = addSILFunctionRef(jvp);
+  if (auto *vjp = dw.getVJP())
+    vjpID = addSILFunctionRef(vjp);
   SmallVector<unsigned, 8> parameterAndResultIndices(
       dw.getParameterIndices()->begin(), dw.getParameterIndices()->end());
   parameterAndResultIndices.append(dw.getResultIndices()->begin(),
@@ -2594,7 +2587,7 @@ writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
 
   DifferentiabilityWitnessLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
-      S.addUniquedStringRef(original->getName()),
+      addSILFunctionRef(original),
       toStableSILLinkage(dw.getLinkage()),
       dw.isSerialized(),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()),

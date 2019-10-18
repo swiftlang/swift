@@ -469,8 +469,7 @@ namespace sil_block {
   using SILInstDifferentiabilityWitnessFunctionLayout = BCRecordLayout<
     SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION,
     DeclIDField,             // Original function name
-    BCFixed<2>,              // Differentiability kind (normal or linear)
-    BCFixed<2>,              // Derivative kind (JVP or VJP)
+    BCFixed<2>,              // Witness kind (JVP or VJP or transpose)
     GenericSignatureIDField, // Witness generic signature
     BCVBR<8>,                // Number of parameter indices
     BCVBR<8>,                // Number of result indices

@@ -157,7 +157,7 @@ namespace irgen {
   GenericRequirementsMetadata addGenericRequirements(
                                           IRGenModule &IGM,
                                           ConstantStructBuilder &B,
-                                          GenericSignature *sig,
+                                          GenericSignature sig,
                                           ArrayRef<Requirement> requirements);
 
 } // end namespace irgen

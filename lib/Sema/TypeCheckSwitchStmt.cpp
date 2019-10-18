@@ -23,8 +23,10 @@
 #include "swift/Basic/APIntMap.h"
 #include <llvm/ADT/APFloat.h>
 
-#include <numeric>
 #include <forward_list>
+#include <iterator>
+#include <numeric>
+#include <utility>
 
 using namespace swift;
 
@@ -115,7 +117,7 @@ namespace {
 
       // In type space, we reuse HEAD to help us print meaningful name, e.g.,
       // tuple element name in fixits.
-      Identifier Head;
+      DeclName Head;
       std::forward_list<Space> Spaces;
 
       size_t computeSize(TypeChecker &TC, const DeclContext *DC,
@@ -170,19 +172,18 @@ namespace {
         llvm_unreachable("unhandled kind");
       }
 
-      explicit Space(Type T, Identifier NameForPrinting)
-        : Kind(SpaceKind::Type), TypeAndVal(T),
-          Head(NameForPrinting), Spaces({}){}
+      explicit Space(Type T, DeclName NameForPrinting)
+          : Kind(SpaceKind::Type), TypeAndVal(T), Head(NameForPrinting),
+            Spaces({}) {}
       explicit Space(UnknownCase_t, bool allowedButNotRequired)
         : Kind(SpaceKind::UnknownCase),
           TypeAndVal(Type(), allowedButNotRequired), Head(Identifier()),
           Spaces({}) {}
-      explicit Space(Type T, Identifier H, ArrayRef<Space> SP)
-        : Kind(SpaceKind::Constructor), TypeAndVal(T), Head(H),
-          Spaces(SP.begin(), SP.end()) {}
-      explicit Space(Type T, Identifier H, std::forward_list<Space> SP)
-        : Kind(SpaceKind::Constructor), TypeAndVal(T), Head(H),
-          Spaces(SP) {}
+      explicit Space(Type T, DeclName H, ArrayRef<Space> SP)
+          : Kind(SpaceKind::Constructor), TypeAndVal(T), Head(H),
+            Spaces(SP.begin(), SP.end()) {}
+      explicit Space(Type T, DeclName H, std::forward_list<Space> SP)
+          : Kind(SpaceKind::Constructor), TypeAndVal(T), Head(H), Spaces(SP) {}
       explicit Space(ArrayRef<Space> SP)
         : Kind(SpaceKind::Disjunct), TypeAndVal(Type()),
           Head(Identifier()), Spaces(SP.begin(), SP.end()) {}
@@ -194,7 +195,7 @@ namespace {
         : Kind(SpaceKind::Empty), TypeAndVal(Type()), Head(Identifier()),
           Spaces({}) {}
 
-      static Space forType(Type T, Identifier NameForPrinting) {
+      static Space forType(Type T, DeclName NameForPrinting) {
         if (T->isStructurallyUninhabited())
           return Space();
         return Space(T, NameForPrinting);
@@ -202,7 +203,7 @@ namespace {
       static Space forUnknown(bool allowedButNotRequired) {
         return Space(UnknownCase, allowedButNotRequired);
       }
-      static Space forConstructor(Type T, Identifier H, ArrayRef<Space> SP) {
+      static Space forConstructor(Type T, DeclName H, ArrayRef<Space> SP) {
         if (llvm::any_of(SP, std::mem_fn(&Space::isEmpty))) {
           // A constructor with an unconstructible parameter can never actually
           // be used.
@@ -210,7 +211,7 @@ namespace {
         }
         return Space(T, H, SP);
       }
-      static Space forConstructor(Type T, Identifier H,
+      static Space forConstructor(Type T, DeclName H,
                                   std::forward_list<Space> SP) {
         // No need to filter SP here; this is only used to copy other
         // Constructor spaces.
@@ -263,7 +264,7 @@ namespace {
         return TypeAndVal.getPointer();
       }
 
-      Identifier getHead() const {
+      DeclName getHead() const {
         assert(getKind() == SpaceKind::Constructor
                && "Wrong kind of space tried to access head");
         return Head;
@@ -272,7 +273,7 @@ namespace {
       Identifier getPrintingName() const {
         assert(getKind() == SpaceKind::Type
                && "Wrong kind of space tried to access printing name");
-        return Head;
+        return Head.getBaseIdentifier();
       }
 
       const std::forward_list<Space> &getSpaces() const {
@@ -333,7 +334,7 @@ namespace {
             return this->isSubspace(or2Space, TC, DC);
           }
 
-          return true;
+          return false;
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct): {
           // (_ : Ty1) <= (S1 | ... | Sn) iff (S1 <= S) || ... || (Sn <= S)
@@ -372,10 +373,11 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the constructor heads don't match, subspace is
           // impossible.
+
           if (this->Head != other.Head) {
             return false;
           }
-          
+
           // Special Case: Short-circuit comparisons with payload-less
           // constructors.
           if (other.getSpaces().empty()) {
@@ -557,7 +559,8 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads of the constructors don't match then
           // the two are disjoint and their difference is the first space.
-          if (this->Head != other.Head) {
+          if (this->Head.getBaseIdentifier() !=
+              other.Head.getBaseIdentifier()) {
             return *this;
           }
 
@@ -696,19 +699,40 @@ namespace {
           buffer << (getBoolValue() ? "true" : "false");
           break;
         case SpaceKind::Constructor: {
-          if (!Head.empty()) {
+          if (!Head.getBaseIdentifier().empty()) {
             buffer << ".";
-            buffer << Head.str();
+            buffer << Head.getBaseIdentifier().str();
           }
 
           if (Spaces.empty()) {
             return;
           }
 
+          auto args = Head.getArgumentNames().begin();
+          auto argEnd = Head.getArgumentNames().end();
+
+          // FIXME: Clean up code for performance
           buffer << "(";
-          interleave(Spaces, [&](const Space &param) {
-            param.show(buffer, forDisplay);
-          }, [&buffer]() { buffer << ", "; });
+          llvm::SmallVector<std::pair<Identifier, Space>, 4> labelSpaces;
+          for (auto param : Spaces) {
+            if (args != argEnd) {
+              labelSpaces.push_back(
+                  std::pair<Identifier, Space>(*args, param));
+              args++;
+            } else
+              labelSpaces.push_back(
+                  std::pair<Identifier, Space>(Identifier(), param));
+          }
+          interleave(
+              labelSpaces,
+              [&](const std::pair<Identifier, Space> &param) {
+                if (!param.first.empty()) {
+                  buffer << param.first;
+                  buffer << ": ";
+                }
+                param.second.show(buffer, forDisplay);
+              },
+              [&buffer]() { buffer << ", "; });
           buffer << ")";
         }
           break;
@@ -774,12 +798,6 @@ namespace {
           auto children = E->getAllElements();
           std::transform(children.begin(), children.end(),
                          std::back_inserter(arr), [&](EnumElementDecl *eed) {
-            // If there's still no interface type then there's
-            // not much else we can do here.
-            if (!eed->getInterfaceType()) {
-              return Space();
-            }
-
             // Don't force people to match unavailable cases; they can't even
             // write them.
             if (AvailableAttr::isUnavailable(eed)) {
@@ -800,7 +818,7 @@ namespace {
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
               }
             }
-            return Space::forConstructor(tp, eed->getName(),
+            return Space::forConstructor(tp, eed->getFullName(),
                                          constElemSpaces);
           });
 
@@ -961,7 +979,6 @@ namespace {
             return;
 
           Space projection = projectPattern(TC, caseItem.getPattern());
-
           bool isRedundant = !projection.isEmpty() &&
                              llvm::any_of(spaces, [&](const Space &handled) {
             return projection.isSubspace(handled, TC, DC);
@@ -1414,8 +1431,8 @@ namespace {
         auto subSpace = projectPattern(TC, OSP->getSubPattern());
         // To match patterns like (_, _, ...)?, we must rewrite the underlying
         // tuple pattern to .some(_, _, ...) first.
-        if (subSpace.getKind() == SpaceKind::Constructor
-            && subSpace.getHead().empty()) {
+        if (subSpace.getKind() == SpaceKind::Constructor &&
+            subSpace.getHead().getBaseIdentifier().empty()) {
           return Space::forConstructor(item->getType(), name,
                                        std::move(subSpace.getSpaces()));
         }

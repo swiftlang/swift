@@ -19,6 +19,7 @@
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
@@ -39,7 +40,7 @@ class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
-enum class DifferentiabilityKind: uint8_t {
+enum class DifferentiabilityKind : uint8_t {
   NonDifferentiable = 0,
   Normal = 1,
   Linear = 2
@@ -60,11 +61,79 @@ struct DifferentiabilityKind {
 };
 #endif
 
-// TODO(TF-904): Replace `DifferentiableFunctionExtractInst::Extractee`.
-enum class NormalDifferentiableFunctionTypeComponent : uint8_t {
-  Original = 0,
-  JVP = 1,
-  VJP = 2
+/// The kind of an linear map.
+struct AutoDiffLinearMapKind {
+  enum innerty : uint8_t {
+    // The differential function.
+    Differential = 0,
+    // The pullback function.
+    Pullback = 1
+  } rawValue;
+
+  AutoDiffLinearMapKind() = default;
+  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
+/// The kind of a derivative function.
+struct AutoDiffDerivativeFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1
+  } rawValue;
+
+  AutoDiffDerivativeFunctionKind() = default;
+  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
+      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
+  explicit AutoDiffDerivativeFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
+  AutoDiffLinearMapKind getLinearMapKind() {
+    return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
+};
+
+/// The kind of a differentiability witness function.
+struct DifferentiabilityWitnessFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1,
+    // The transpose function.
+    Transpose = 2
+  } rawValue;
+
+  DifferentiabilityWitnessFunctionKind() = default;
+  DifferentiabilityWitnessFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit DifferentiabilityWitnessFunctionKind(unsigned rawValue)
+      : rawValue(static_cast<innerty>(rawValue)) {}
+  explicit DifferentiabilityWitnessFunctionKind(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
+};
+
+struct NormalDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    JVP = 1,
+    VJP = 2
+  } rawValue;
+
+  NormalDifferentiableFunctionTypeComponent() = default;
+  NormalDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  NormalDifferentiableFunctionTypeComponent(
+      AutoDiffDerivativeFunctionKind kind);
+  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit NormalDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
 struct LinearDifferentiableFunctionTypeComponent {
@@ -76,8 +145,8 @@ struct LinearDifferentiableFunctionTypeComponent {
   LinearDifferentiableFunctionTypeComponent() = default;
   LinearDifferentiableFunctionTypeComponent(innerty rawValue)
       : rawValue(rawValue) {}
-  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue) :
-      LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
   explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
   operator innerty() const { return rawValue; }
 };
@@ -100,10 +169,10 @@ private:
 
 public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
-    : Loc(loc), Kind(kind), V(value) {}
+      : Loc(loc), Kind(kind), V(value) {}
   
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
-  : Loc(loc), Kind(kind), V(index) {}
+      : Loc(loc), Kind(kind), V(index) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
                                                    Identifier name) {
@@ -211,42 +280,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   return s;
 }
 
-/// The kind of an linear map.
-struct AutoDiffLinearMapKind {
-  enum innerty : uint8_t {
-    // The differential function.
-    Differential = 0,
-    // The pullback function.
-    Pullback = 1
-  } rawValue;
-
-  AutoDiffLinearMapKind() = default;
-  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
-  operator innerty() const { return rawValue; }
-};
-
-/// The kind of a derivative function.
-struct AutoDiffDerivativeFunctionKind {
-  enum innerty : uint8_t {
-   // The Jacobian-vector products function.
-   JVP = 0,
-   // The vector-Jacobian products function.
-   VJP = 1
-  } rawValue;
-
-  AutoDiffDerivativeFunctionKind() = default;
-  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
-      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
-  explicit AutoDiffDerivativeFunctionKind(unsigned rawValue) :
-      AutoDiffDerivativeFunctionKind((innerty)rawValue) {}
-  explicit AutoDiffDerivativeFunctionKind(StringRef string);
-  operator innerty() const { return rawValue; }
-  AutoDiffLinearMapKind getLinearMapKind() {
-    return (AutoDiffLinearMapKind::innerty)rawValue;
-  }
-};
-
 /// Identifies an autodiff derivative function configuration:
 /// - Parameter indices.
 /// - Result indices.
@@ -264,7 +297,13 @@ struct ASTAutoDiffConfig {
 struct AutoDiffConfig {
   IndexSubset *parameterIndices;
   IndexSubset *resultIndices;
-  GenericSignature *derivativeGenericSignature;
+  GenericSignature derivativeGenericSignature;
+
+  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
+                              IndexSubset *resultIndices,
+                              GenericSignature derivativeGenericSignature)
+      : parameterIndices(parameterIndices), resultIndices(resultIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
 
   void print(llvm::raw_ostream &s = llvm::errs()) const;
 
@@ -461,27 +500,28 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            static_cast<GenericSignature *>(ptr)};
+            llvm::DenseMapInfo<GenericSignature>::getEmptyKey()};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            static_cast<GenericSignature *>(ptr)};
+            llvm::DenseMapInfo<GenericSignature>::getTombstoneKey()};
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {
     unsigned combinedHash = hash_combine(
         ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
         DenseMapInfo<void *>::getHashValue(Val.resultIndices),
-        DenseMapInfo<void *>::getHashValue(Val.derivativeGenericSignature));
+        DenseMapInfo<GenericSignature>::getHashValue(Val.derivativeGenericSignature));
     return combinedHash;
   }
 
   static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
     return LHS.parameterIndices == RHS.parameterIndices &&
         LHS.resultIndices == RHS.resultIndices &&
-        LHS.derivativeGenericSignature == RHS.derivativeGenericSignature;
+        DenseMapInfo<GenericSignature>::isEqual(LHS.derivativeGenericSignature,
+                                                RHS.derivativeGenericSignature);
   }
 };
 

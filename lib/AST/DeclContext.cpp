@@ -154,7 +154,7 @@ unsigned DeclContext::getGenericContextDepth() const {
   return depth;
 }
 
-GenericSignature *DeclContext::getGenericSignatureOfContext() const {
+GenericSignature DeclContext::getGenericSignatureOfContext() const {
   auto dc = this;
   do {
     if (auto decl = dc->getAsDecl())

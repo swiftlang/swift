@@ -24,12 +24,13 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -200,125 +201,6 @@ namespace {
   };
 
 } // end anonymous namespace
-
-/// Return true if there are any users of V outside the specified block.
-static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
-  for (auto UI : V->getUses())
-    if (UI->getUser()->getParent() != BB)
-      return true;
-  return false;
-}
-
-// Populate 'projections' with the chain of address projections leading
-// to and including 'inst'.
-//
-// Populate 'inBlockDefs' with all the non-address value definitions in
-// the block that will be used outside this block after projection sinking.
-//
-// Return true on success, even if projections is empty.
-bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
-  projections.clear();
-  inBlockDefs.clear();
-
-  SILBasicBlock *bb = inst->getParent();
-  auto pushOperandVal = [&](SILValue def) {
-    if (def->getParentBlock() != bb)
-      return true;
-
-    if (!def->getType().isAddress()) {
-      inBlockDefs.insert(def);
-      return true;
-    }
-    if (auto *addressProj = dyn_cast<SingleValueInstruction>(def)) {
-      if (addressProj->isTriviallyDuplicatable()) {
-        projections.push_back(addressProj);
-        return true;
-      }
-    }
-    // Can't handle a multi-value or unclonable address producer.
-    return false;
-  };
-  // Check the given instruction for any address-type results.
-  for (auto result : inst->getResults()) {
-    if (!isUsedOutsideOfBlock(result, bb))
-      continue;
-    if (!pushOperandVal(result))
-      return false;
-  }
-  // Recurse upward through address projections.
-  for (unsigned idx = 0; idx < projections.size(); ++idx) {
-    // Only one address result/operand can be handled per instruction.
-    if (projections.size() != idx + 1)
-      return false;
-
-    for (SILValue operandVal : projections[idx]->getOperandValues())
-      pushOperandVal(operandVal);
-  }
-  return true;
-}
-
-// Clone the projections gathered by 'analyzeAddressProjections' at
-// their use site outside this block.
-bool SinkAddressProjections::cloneProjections() {
-  if (projections.empty())
-    return false;
-
-  SILBasicBlock *bb = projections.front()->getParent();
-  SmallVector<Operand *, 4> usesToReplace;
-  // Clone projections in last-to-first order.
-  for (unsigned idx = 0; idx < projections.size(); ++idx) {
-    auto *oldProj = projections[idx];
-    assert(oldProj->getParent() == bb);
-    usesToReplace.clear();
-    for (Operand *use : oldProj->getUses()) {
-      if (use->getUser()->getParent() != bb)
-        usesToReplace.push_back(use);
-    }
-    for (Operand *use : usesToReplace) {
-      auto *newProj = oldProj->clone(use->getUser());
-      use->set(cast<SingleValueInstruction>(newProj));
-    }
-  }
-  return true;
-}
-
-/// Helper function to perform SSA updates in case of jump threading.
-void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
-                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp;
-  for (auto AvailValPair : Cloner.AvailVals) {
-    ValueBase *Inst = AvailValPair.first;
-    if (Inst->use_empty())
-      continue;
-
-    SILValue NewRes(AvailValPair.second);
-
-    SmallVector<UseWrapper, 16> UseList;
-    // Collect the uses of the value.
-    for (auto Use : Inst->getUses())
-      UseList.push_back(UseWrapper(Use));
-
-    SSAUp.Initialize(Inst->getType());
-    SSAUp.AddAvailableValue(DestBB, Inst);
-    SSAUp.AddAvailableValue(SrcBB, NewRes);
-
-    if (UseList.empty())
-      continue;
-
-    // Update all the uses.
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SILInstruction *User = Use->getUser();
-      assert(User && "Missing user");
-
-      // Ignore uses in the same basic block.
-      if (User->getParent() == DestBB)
-        continue;
-
-      SSAUp.RewriteUse(*Use);
-    }
-  }
-}
 
 static SILValue getTerminatorCondition(TermInst *Term) {
   if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
@@ -1044,7 +926,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   // Are the arguments to this block used outside of the block.
   for (auto Arg : DestBB->getArguments())
-    if ((NeedToUpdateSSA |= isUsedOutsideOfBlock(Arg, DestBB))) {
+    if ((NeedToUpdateSSA |= isUsedOutsideOfBlock(Arg))) {
       break;
     }
 
@@ -1293,9 +1175,17 @@ static bool isReachable(SILBasicBlock *Block) {
 }
 #endif
 
+static llvm::cl::opt<bool> SimplifyUnconditionalBranches(
+    "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
+  // If we are asked to not simplify unconditional branches (for testing
+  // purposes), exit early.
+  if (!SimplifyUnconditionalBranches)
+    return false;
+
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
   bool Simplified = simplifyBranchOperands(BI->getArgs());
@@ -1956,43 +1846,88 @@ static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
   return true;
 }
 
-/// Check whether \p noneBB has the same ultimate successor as the successor to someBB.
-///  someBB       noneBB
-///   \             |
-///    \            ... (more bbs?)
+/// Check whether the \p someBB has only one single successor and that successor
+/// post-dominates \p noneBB.
+///
+///                          (maybe otherNoneBB)
+///  someBB       noneBB     /
+///   \             |       v
+///    \            ... more bbs? (A)
 ///     \           /
 ///       ulimateBB
+///
+/// This routine does not support diverging control flow in (A). This means that
+/// there must not be any loops or diamonds beginning in that region. We do
+/// support side-entrances from blocks not reachable from noneBB in order to
+/// ensure that we properly handle other failure cases where the failure case
+/// merges into .noneBB before ultimate BB.
+///
+/// DISCUSSION: We allow this side-entrance pattern to handle iterative
+/// conditional checks which all feed the failing case through the .none
+/// path. This is a common pattern in swift code. As an example consider a
+/// switch statement with multiple pattern binding matching that use the same
+/// cleanup code upon failure.
 static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someBB) {
   // Make sure that both our some, none blocks both have single successors that
   // are not themselves (which can happen due to single block loops).
   auto *someSuccessorBB = someBB->getSingleSuccessorBlock();
   if (!someSuccessorBB || someSuccessorBB == someBB)
     return false;
+
   auto *noneSuccessorBB = noneBB->getSingleSuccessorBlock();
   if (!noneSuccessorBB || noneSuccessorBB == noneBB)
     return false;
 
-  // If we immediately find a diamond, return true. We are done.
+  // If we immediately find a simple diamond, return true. We are done.
   if (noneSuccessorBB == someSuccessorBB)
     return true;
 
-  // Otherwise, lets keep looking down the none case.
-  auto *next = noneSuccessorBB;
-  while (next != someSuccessorBB) {
-    noneSuccessorBB = next;
-    next = noneSuccessorBB->getSingleSuccessorBlock();
+  // Otherwise, lets begin a traversal along the successors of noneSuccessorBB,
+  // searching for someSuccessorBB, being careful to only allow for blocks to be
+  // visited once. This enables us to guarantee that there are not any loops or
+  // any sub-diamonds in the part of the CFG we are traversing. This /does/
+  // allow for side-entrances to the region from blocks not reachable from
+  // noneSuccessorBB. See function level comment above.
+  SILBasicBlock *iter = noneSuccessorBB;
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  visitedBlocks.insert(iter);
 
-    // If we find another single successor and it is not our own block (due to a
-    // self-loop), continue.
-    if (next && next != noneSuccessorBB)
-      continue;
+  do {
+    // First try to grab our single successor if we have only one. If we have no
+    // successor or more than one successor, bail and do not optimize.
+    //
+    // DISCUSSION: Trivially, if we do not have a successor, then we have
+    // reached either a return/unreachable and this path will never merge with
+    // the ultimate block. If we have more than one successor, then for our
+    // condition to pass, we must have that both successors eventually join into
+    // someSuccessorBB. But this would imply that either someSuccessorBB has
+    // more than two predecessors and or that we merge the two paths before we
+    // visit someSuccessorBB.
+    auto *succBlock = iter->getSingleSuccessorBlock();
+    if (!succBlock)
+      return false;
 
-    // Otherwise, we either have multiple successors or a self-loop. We do not
-    // support this, return false.
-    return false;
-  }
+    // Then check if our single successor block has been visited already. If so,
+    // we have some sort of loop or have some sort of merge point that is not
+    // the final merge point.
+    //
+    // NOTE: We do not need to worry about someSuccessorBB being in
+    // visitedBlocks since before we begin the loop, we check that
+    // someSuccessorBB != iter and also check that in the do-while condition. So
+    // we can never have visited someSuccessorBB on any previous iteration
+    // meaning that the only time we can have succBlock equal to someSuccessorBB
+    // is on the last iteration before we exit the loop.
+    if (!visitedBlocks.insert(succBlock).second)
+      return false;
 
-  // At this point, we know that next must be someSuccessorBB.
+    // Otherwise, set iter to succBlock.
+    iter = succBlock;
+
+    // And then check if this new successor block is someSuccessorBB. If so, we
+    // break and then return true since we have found our target. Otherwise, we
+    // need to visit further successors, so go back around the loop.
+  } while (iter != someSuccessorBB);
+
   return true;
 }
 

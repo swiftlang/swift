@@ -38,10 +38,17 @@ enum class DiagnosticKind : uint8_t {
   Note
 };
 
-/// Extra information carried along with a diagnostic, which may or
-/// may not be of interest to a given diagnostic consumer.
+/// Information about a diagnostic passed to DiagnosticConsumers.
 struct DiagnosticInfo {
   DiagID ID = DiagID(0);
+  SourceLoc Loc;
+  DiagnosticKind Kind;
+  StringRef FormatString;
+  ArrayRef<DiagnosticArgument> FormatArgs;
+  SourceLoc BufferIndirectlyCausingDiagnostic;
+
+  /// DiagnosticInfo of notes which are children of this diagnostic, if any
+  ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
@@ -60,6 +67,24 @@ struct DiagnosticInfo {
 
   /// Extra source ranges that are attached to the diagnostic.
   ArrayRef<FixIt> FixIts;
+
+  /// This is a note which has a parent error or warning
+  bool IsChildNote = false;
+
+  DiagnosticInfo() {}
+
+  DiagnosticInfo(DiagID ID, SourceLoc Loc, DiagnosticKind Kind,
+                 StringRef FormatString,
+                 ArrayRef<DiagnosticArgument> FormatArgs,
+                 SourceLoc BufferIndirectlyCausingDiagnostic,
+                 ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo,
+                 ArrayRef<CharSourceRange> Ranges, ArrayRef<FixIt> FixIts,
+                 bool IsChildNote)
+      : ID(ID), Loc(Loc), Kind(Kind), FormatString(FormatString),
+        FormatArgs(FormatArgs),
+        BufferIndirectlyCausingDiagnostic(BufferIndirectlyCausingDiagnostic),
+        ChildDiagnosticInfo(ChildDiagnosticInfo), Ranges(Ranges),
+        FixIts(FixIts), IsChildNote(IsChildNote) {}
 };
   
 /// Abstract interface for classes that present diagnostics to the user.

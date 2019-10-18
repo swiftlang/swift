@@ -107,8 +107,6 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    assert(fd->hasInterfaceType() && "bridging functions must be type-checked");
-
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
@@ -752,11 +750,14 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              F->print(llvm::dbgs()));
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Visit `@differentiable` and `@differentiating` attributes and generate SIL
-  // differentiability witnesses.
-  // Skip:
-  // - Default argument generator functions.
-  // - Thunks.
+  // Visit `@differentiable` attributes and generate SIL differentiability
+  // witnesses.
+  // TODO(TF-835): Visit `@differentiating` attributes when type-checking no
+  // longer generates implicit `@differentiable` attributes. See TF-835 for
+  // replacement code.
+  // Skip if the SILDeclRef is a:
+  // - Default argument generator function.
+  // - Thunk.
   if (constant.hasDecl() && constant.getAbstractFunctionDecl() &&
       constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
       !constant.isThunk()) {
@@ -769,43 +770,22 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         jvp = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
       if (auto *vjpDecl = diffAttr->getVJPFunction())
         vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
-      emitDifferentiabilityWitness(AFD, F, diffAttr->getParameterIndices(), jvp,
-                                   vjp,
-                                   diffAttr->getDerivativeGenericSignature());
+      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+      AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
+                            diffAttr->getDerivativeGenericSignature().getPointer());
+      emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
     }
-#if 0
-    // Visit all `@differentiating` attributes.
-    for (auto *diffAttr :
-             AFD->getAttrs().getAttributes<DifferentiatingAttr>()) {
-      auto *origAFD = diffAttr->getOriginalFunction();
-      auto *origFn = getFunction(SILDeclRef(origAFD), NotForDefinition);
-      SILFunction *jvp = nullptr;
-      SILFunction *vjp = nullptr;
-      switch (diffAttr->getDerivativeKind()) {
-      case AutoDiffDerivativeFunctionKind::JVP:
-        jvp = F;
-        break;
-      case AutoDiffDerivativeFunctionKind::VJP:
-        vjp = F;
-        break;
-      }
-      emitDifferentiabilityWitness(origAFD, origFn,
-                                   diffAttr->getParameterIndices(), jvp, vjp,
-                                   AFD->getGenericSignature());
-    }
-#endif
   }
   F->verify();
 }
 
 void SILGenModule::emitDifferentiabilityWitness(
     AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
-    IndexSubset *parameterIndices, SILFunction *jvp, SILFunction *vjp,
-    GenericSignature *derivativeGenSig) {
+    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp) {
   auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto origSilFnType = originalFunction->getLoweredFunctionType();
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-      parameterIndices, origFnType);
+      config.parameterIndices, origFnType);
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
   // parameters corresponding to captured variables. These parameters do not
   // appear in the type of `origFnType`.
@@ -814,6 +794,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   if (origSilFnType->getNumParameters() > loweredParamIndices->getCapacity())
     loweredParamIndices = loweredParamIndices->extendingCapacity(
         getASTContext(), origSilFnType->getNumParameters());
+  // TODO(TF-913): Replace usages of `SILAutoDiffIndices` with `AutoDiffConfig`.
   SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
 
   // Self reordering thunk is necessary if wrt at least two parameters,
@@ -828,10 +809,13 @@ void SILGenModule::emitDifferentiabilityWitness(
   };
   bool reorderSelf = shouldReorderSelf();
 
-  // Get or create differentiability witness.
   CanGenericSignature derivativeCanGenSig;
-  if (derivativeGenSig)
+  if (auto derivativeGenSig = config.derivativeGenericSignature) {
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  }
+  // TODO(TF-835): Use simpler derivative generic signature logic below when
+  // type-checking no longer generates implicit `@differentiable` attributes.
+  // See TF-835 for replacement code.
   if (jvp) {
     auto jvpCanGenSig = jvp->getLoweredFunctionType()->getGenericSignature();
     if (!derivativeCanGenSig && jvpCanGenSig)
@@ -844,22 +828,16 @@ void SILGenModule::emitDifferentiabilityWitness(
       derivativeCanGenSig = vjpCanGenSig;
     assert(derivativeCanGenSig == vjpCanGenSig);
   }
-  auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
-  AutoDiffConfig config{loweredParamIndices, resultIndices,
-                        derivativeCanGenSig};
-  auto key = std::make_pair(originalFunction->getName(), config);
-  SILDifferentiabilityWitness *diffWitness = nullptr;
-  if (auto *foundWitness = M.lookUpDifferentiabilityWitness(
-          key, /*deserializeLazily*/ false)) {
-    diffWitness = foundWitness;
-  } else {
-    // Create new SIL differentiability witness.
-    // JVP and VJP function are populated below.
-    diffWitness = SILDifferentiabilityWitness::create(
-        M, originalFunction->getLinkage(), originalFunction,
-        loweredParamIndices, resultIndices, derivativeGenSig, /*jvp*/ nullptr,
-        /*vjp*/ nullptr, /*isSerialized*/ true);
-  }
+  assert(originalFunction);
+  // Create new SIL differentiability witness.
+  // Witness JVP and VJP are set below.
+  // TODO(TF-919): Explore creating serialized differentiability witnesses.
+  // Currently, differentiability witnesses are never serialized to avoid
+  // deserialization issues where JVP/VJP functions cannot be found.
+  auto *diffWitness = SILDifferentiabilityWitness::create(
+      M, originalFunction->getLinkage(), originalFunction,
+      loweredParamIndices, config.resultIndices, derivativeCanGenSig,
+      /*jvp*/ nullptr, /*vjp*/ nullptr, /*isSerialized*/ false);
 
   // Set derivative function in differentiability witness.
   auto setDerivativeInDifferentiabilityWitness =
@@ -872,17 +850,19 @@ void SILGenModule::emitDifferentiabilityWitness(
     SILFunction *derivativeThunk;
     if (reorderSelf ||
         derivative->getLoweredFunctionType() != expectedDerivativeType) {
-      derivativeThunk = getOrCreateAutoDiffDerivativeFunctionThunk(
+      derivativeThunk = getOrCreateAutoDiffDerivativeReabstractionThunk(
           originalFunction, indices, derivative, kind, reorderSelf);
     } else {
+      // Note: `AutoDiffDerivativeFunctionIdentifier` must be constructed with
+      // the AST-level parameter indices, not the SIL-level ones.
       auto *id = AutoDiffDerivativeFunctionIdentifier::get(
-          kind, parameterIndices, getASTContext());
-      derivativeThunk = getOrCreateAutoDiffThunk(
+          kind, config.parameterIndices, getASTContext());
+      derivativeThunk = getOrCreateAutoDiffDerivativeForwardingThunk(
           SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
           expectedDerivativeType);
     }
     // Check for existing same derivative.
-    // TODO(TF-898): Remove condition below and simplify assertion to
+    // TODO(TF-835): Remove condition below and simplify assertion to
     // `!diffWitness->getDerivative(kind)` after `@differentiating` attribute
     // type-checking no longer generates implicit `@differentiable` attributes.
     auto *existingDerivative = diffWitness->getDerivative(kind);

@@ -309,8 +309,8 @@ public:
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion3<clang::NamedDecl *, clang::MacroInfo *, 
-                              clang::ModuleMacro *>
+  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                             clang::ModuleMacro *>
     SingleEntry;
 
   /// A stored version of the context of an entity, which is Clang

@@ -249,7 +249,7 @@ public:
 
   /// Get the generic signature containing the parameters open on the conforming
   /// interface type.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature getGenericSignature() const;
 
   /// Get the substitutions associated with this conformance.
   SubstitutionMap getSubstitutions(ModuleDecl *M) const;

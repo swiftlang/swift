@@ -141,17 +141,17 @@ static ConstructorDecl *findInitialValueInit(
       continue;
     }
 
-    Type paramType;
-    if (!wrappedValueParam->isInOut() && !wrappedValueParam->isVariadic()) {
-      paramType = wrappedValueParam->getInterfaceType();
-      if (wrappedValueParam->isAutoClosure()) {
-        if (auto *fnType = paramType->getAs<FunctionType>())
-          paramType = fnType->getResult();
-      }
-    }
-    
-    if (!paramType)
+    if (!wrappedValueParam->hasInterfaceType())
       continue;
+
+    if (wrappedValueParam->isInOut() || wrappedValueParam->isVariadic())
+      continue;
+
+    auto paramType = wrappedValueParam->getInterfaceType();
+    if (wrappedValueParam->isAutoClosure()) {
+      if (auto *fnType = paramType->getAs<FunctionType>())
+        paramType = fnType->getResult();
+    }
 
     // The parameter type must be the same as the type of `valueVar` or an
     // autoclosure thereof.
