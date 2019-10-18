@@ -603,7 +603,8 @@ bool MissingConformanceFailure::diagnoseAsError() {
 
 bool MissingConformanceFailure::diagnoseTypeCannotConform(Expr *anchor,
     Type nonConformingType, Type protocolType) const {
-  if (!(nonConformingType->is<AnyFunctionType>() ||
+  if (getRequirement().getKind() == RequirementKind::Layout ||
+      !(nonConformingType->is<AnyFunctionType>() ||
       nonConformingType->is<TupleType>() ||
       nonConformingType->isExistentialType() ||
       nonConformingType->is<AnyMetatypeType>())) {
