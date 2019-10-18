@@ -2243,8 +2243,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
-  auto kind = req.getRequirementKind();
-  switch (kind) {
+  switch (req.getRequirementKind()) {
   case RequirementKind::SameType: {
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
   }
@@ -2255,7 +2254,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
-    return MissingConformance::forRequirement(cs, type1, type2, kind, reqLoc);
+    return MissingConformance::forRequirement(cs, type1, type2, reqLoc);
   }
   llvm_unreachable("covered switch");
 }

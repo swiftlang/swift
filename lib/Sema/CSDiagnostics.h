@@ -320,8 +320,8 @@ protected:
   Type LHS, RHS;
 
 public:
-  RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
-                     Type lhs, Type rhs, ConstraintLocator *locator)
+  RequirementFailure(ConstraintSystem &cs, Expr *expr, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator),
         Conformance(getConformanceForConditionalReq(locator)),
         Signature(getSignature(locator)), AffectedDecl(getDeclRef()),
@@ -333,9 +333,6 @@ public:
            "Couldn't find where the requirement came from?");
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
-
-    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
-    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -417,10 +414,13 @@ class MissingConformanceFailure final : public RequirementFailure {
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
-                            std::pair<Type, Type> conformance,
-                            RequirementKind kind)
-      : RequirementFailure(cs, expr, kind, conformance.first,
-                           conformance.second, locator) {}
+                            std::pair<Type, Type> conformance)
+      : RequirementFailure(cs, expr, conformance.first, conformance.second,
+                           locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::Conformance ||
+           reqElt.getRequirementKind() == RequirementKind::Layout);
+  }
 
   bool diagnoseAsError() override;
 
@@ -469,8 +469,10 @@ class SameTypeRequirementFailure final : public RequirementFailure {
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::SameType, lhs, rhs,
-                           locator) {}
+      : RequirementFailure(cs, expr, lhs, rhs, locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::SameType);
+  }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -503,8 +505,10 @@ class SuperclassRequirementFailure final : public RequirementFailure {
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::Superclass, lhs, rhs,
-                           locator) {}
+      : RequirementFailure(cs, expr, lhs, rhs, locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::Superclass);
+  }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {

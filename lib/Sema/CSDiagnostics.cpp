@@ -519,11 +519,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
   if (req.getKind() != RequirementKind::SameType) {
     if (auto wrappedType = lhs->getOptionalObjectType()) {
-      auto &tc = getConstraintSystem().TC;
+      auto &tc = getTypeChecker();
       auto kind = (req.getKind() == RequirementKind::Superclass ?
                    ConstraintKind::Subtype : ConstraintKind::ConformsTo);
       if (tc.typesSatisfyConstraint(wrappedType, rhs, /*openArchetypes=*/false,
-                                    kind, anchor->getDeclContext()))
+                                    kind, getDC()))
         emitDiagnostic(getAnchor()->getLoc(),
                        diag::wrapped_type_satisfies_requirement, wrappedType);
     }
