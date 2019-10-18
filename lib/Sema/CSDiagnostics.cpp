@@ -478,7 +478,8 @@ bool RequirementFailure::diagnoseAsError() {
     auto *namingDecl = OTD->getNamingDecl();
     emitDiagnostic(
         anchor->getLoc(), diag::type_does_not_conform_in_opaque_return,
-        namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs);
+        namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs,
+        rhs->isAnyObject());
 
     if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
       emitDiagnostic(repr->getLoc(), diag::opaque_return_type_declared_here)

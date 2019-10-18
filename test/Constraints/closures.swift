@@ -281,7 +281,7 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' conform to 'AnyObject'}}
+    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' be a class type}}
     // expected-note @+1 {{wrapped type 'Object' satisfies this requirement}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
@@ -295,7 +295,7 @@ func simplified1069() {
     // expected-note@-1 {{where 'T' = 'Optional<C>'}}
 
     func f(_ a: C?, _ b: C?, _ c: C) {
-      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' conform to 'AnyObject'}}
+      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' be a class type}}
       // expected-note @-1 {{wrapped type 'C' satisfies this requirement}}
     }
   }
