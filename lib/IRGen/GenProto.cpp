@@ -2199,11 +2199,7 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   // Build the witness table.
   ConstantInitBuilder builder(*this);
   auto diffWitnessContents = builder.beginStruct();
-  llvm::dbgs() << "get addr of jvp " << dw->getJVP() << "\n";
-  //dw->getJVP()->dump();
   auto *jvpFnAddr = getAddrOfSILFunction(dw->getJVP(), NotForDefinition);
-  llvm::dbgs() << "get addr of vjp " << dw->getVJP() << "\n";
-  //dw->getVJP()->dump();
   auto *vjpFnAddr = getAddrOfSILFunction(dw->getVJP(), NotForDefinition);
   diffWitnessContents.addBitCast(jvpFnAddr, Int8PtrTy);
   diffWitnessContents.addBitCast(vjpFnAddr, Int8PtrTy);
