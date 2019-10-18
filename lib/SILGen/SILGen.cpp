@@ -834,14 +834,11 @@ void SILGenModule::emitDifferentiabilityWitness(
   //   - Hidden if no JVP/VJP functions are registered. The differentiation
   //     transform will generate hidden JVP/VJP functions.
   //   - Otherwise, equal to the JVP/VJP function linkage.
-  // TODO(TF-919): Explore creating serialized differentiability witnesses.
-  // Currently, differentiability witnesses are never serialized to avoid
-  // deserialization issues where JVP/VJP functions cannot be found.
   Optional<SILLinkage> diffWitnessLinkage = None;
   auto *diffWitness = SILDifferentiabilityWitness::create(
       M, SILLinkage::Hidden, originalFunction, loweredParamIndices,
       config.resultIndices, derivativeCanGenSig, /*jvp*/ nullptr,
-      /*vjp*/ nullptr, /*isSerialized*/ false);
+      /*vjp*/ nullptr, /*isSerialized*/ true);
 
   // Set derivative function in differentiability witness.
   auto setDerivativeInDifferentiabilityWitness =
