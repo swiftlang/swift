@@ -35,6 +35,8 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
+#include <iostream>
+
 using namespace swift;
 
 STATISTIC(NumCombined, "Number of instructions combined");
@@ -170,6 +172,102 @@ public:
   }
 };
 
+bool SILCombiner::tryOptimizePopcount(SILFunction &F) {
+  if (!F.getName().contains("test")) return false;
+  
+  for (auto &block : F) {
+    BuiltinInst *incFn = nullptr;
+    
+    for (auto &inst : block) {
+      if (auto *addFn = dyn_cast<BuiltinInst>(&inst)) {
+        if (auto kind = addFn->getBuiltinKind(); kind && (kind.getValue() == BuiltinValueKind::Add ||
+                                                          kind.getValue() == BuiltinValueKind::SAddOver ||
+                                                          kind.getValue() == BuiltinValueKind::UAddOver)) {
+          // TODO: check other is none
+          // TODO: check its not modiefed elsewhere
+          incFn = addFn;
+        }
+        
+        if (auto kind = addFn->getBuiltinKind(); kind && kind.getValue() == BuiltinValueKind::And) {}
+        else { continue; }
+        
+        std::cout << 1 << std::endl;
+        
+        auto subject = addFn->getArguments()[0];
+        subject->dump();
+        auto first = subject->getUses().begin();
+        for (auto last = subject->getUses().end(); first != last; (void)++first) {
+          first->get()->dump();
+          std::cout << 2 << std::endl;
+          
+          auto *subFn = dyn_cast<BuiltinInst>(first->get());
+          if (subFn == nullptr) continue;
+          if (auto kind = addFn->getBuiltinKind(); !kind) continue;
+          
+          std::cout << 3 << std::endl;
+          
+          auto subKind = subFn->getBuiltinKind().getValue();
+          if (subKind != BuiltinValueKind::Sub && subKind != BuiltinValueKind::USubOver &&
+              subKind != BuiltinValueKind::SSubOver) continue;
+          
+          // TODO: check other arg is 1
+          
+          if (++first == last) continue;
+          
+          std::cout << 4 << std::endl;
+          
+          auto *andFn = dyn_cast<BuiltinInst>(first->get());
+          if (andFn == nullptr) continue;
+          if (auto kind = andFn->getBuiltinKind(); !kind) continue;
+          
+          std::cout << 5 << std::endl;
+          
+          auto andKind = andFn->getBuiltinKind().getValue();
+          if (andKind != BuiltinValueKind::And) continue;
+          
+          // TODO: check other is sub
+          
+          if (andFn->use_begin() == andFn->use_end()) continue;
+          auto *cmpFn = dyn_cast<BuiltinInst>(andFn->use_begin()->get());
+          if (cmpFn == nullptr) continue;
+          if (auto kind = cmpFn->getBuiltinKind(); !kind) continue;
+        
+          auto cmpKind = cmpFn->getBuiltinKind().getValue();
+          if (cmpKind != BuiltinValueKind::ICMP_EQ) continue;
+          
+          // TODO: check other is zero
+          
+          if (++first == last) continue;
+          
+          std::cout << 6 << std::endl;
+          
+          auto *condBr = dyn_cast<CondBranchInst>((SILInstruction*)first->get().getOpaqueValue());
+          if (condBr == nullptr) continue;
+          
+          auto *falseBlock = condBr->getFalseBB();
+          auto *brToThis = dyn_cast<BranchInst>(falseBlock->begin());
+          if (brToThis == nullptr) continue;
+          if (brToThis->getDestBB()->getDebugID() != block.getDebugID()) continue;
+          
+          std::cout << 7 << std::endl;
+          
+          if (incFn == nullptr) continue;
+          SILValue count = incFn->getArguments()[0];
+          char* popcntName = "popcnt";
+          auto *popcntFn = Builder.createBuiltin(count.getLoc(), Identifier::getFromOpaquePointer(popcntName), count->getType(), SubstitutionMap{}, {subject});
+          count->replaceAllUsesWith(popcntFn);
+          
+          std::cout << 8 << std::endl;
+          
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
 
@@ -180,6 +278,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   addReachableCodeToWorklist(&*F.begin());
 
   SILCombineCanonicalize scCanonicalize(Worklist);
+  
+  MadeChange |= tryOptimizePopcount(F);
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {

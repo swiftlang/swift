@@ -303,6 +303,8 @@ public:
 
   bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
+      
+  bool tryOptimizePopcount(SILFunction &F);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
