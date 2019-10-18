@@ -1557,7 +1557,7 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
     return getPatternList()[0].getPattern()->getSingleVar();
   return nullptr;
 }
-    
+
 bool VarDecl::isInitExposedToClients() const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;

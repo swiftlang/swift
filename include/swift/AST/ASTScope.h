@@ -672,6 +672,14 @@ public:
     /// to compute the selfDC from the history.
     static NullablePtr<DeclContext>
     computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
+    
+    /// If we find a lookup result that requires the dynamic implict self value,
+    /// we need to check the nested scopes to see if any closures explicitly
+    /// captured \c self. The appropriate selfDC is that of the innermost
+    /// closure which captures a \c self value from one of this type's methods.
+    static NullablePtr<DeclContext>
+    checkNestedScopesForSelfCapture(ArrayRef<const ASTScopeImpl *> history,
+                                    size_t start);
 };
 
 /// Behavior specific to representing the trailing where clause of a
@@ -1432,6 +1440,12 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  
+  /// Since explicit captures of \c self by closures enable the use of implicit
+  /// \c self, we need to make sure that the appropriate \c self is used as the
+  /// base decl for these uses (otherwise, the capture would be marked as
+  /// unused. \c ClosureParametersScope::computeSelfDCForParent() checks if we
+  /// have such a capture of self.
   Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
 
 protected:

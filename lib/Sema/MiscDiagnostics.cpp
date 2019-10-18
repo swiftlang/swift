@@ -1414,74 +1414,15 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       // explicit closure), or referencing self explicitly.
       if (memberLoc.isValid()) {
         if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-          // If we've already captured something with the name "self" other than
-          // the actual self param, offer special diagnostics.
-          if (auto *VD = CE->getCapturedSelfDecl()) {
-            // Either this is a weak capture of self...
-            if (VD->getType()->is<WeakStorageType>()) {
-              TC.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
-            // ...or something completely different.
-            } else {
-              TC.diagnose(VD->getLoc(), diag::note_other_self_capture);
-            }
+          if (diagnoseAlmostMatchingCaptures(memberLoc, CE)) {
             // Bail on the rest of the diagnostics. Offering the option to
             // capture 'self' explicitly will result in an error, and using
             // 'self.' explicitly will be accessing something other than the
             // self param.
             // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
-            return { false, E };
+            return { false, E};
           }
-          
-          TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
-            .fixItInsert(memberLoc, "self.");
-
-          auto diag = TC.diagnose(CE->getLoc(),
-                                  diag::note_capture_self_explicitly);
-
-          // There are four different potential fix-its to offer based on the
-          // closure signature:
-          //   1. The signature empty so far. We must insert the full capture
-          //      list as well as 'in'.
-          //   2. Arguments or types are already specified in the signature,
-          //      but there is no existing capture list. We will need to insert
-          //      the capture list, but 'in' will already be present.
-          //   3. There is an existing capture list which already has some
-          //      entries. We need to insert 'self' into the capture list along
-          //      with a separating comma.
-          //   4. There is an existing capture list, but it is empty. We can
-          //      just insert 'self'.
-          auto brackets = CE->getBracketRange();
-          if (brackets.isInvalid()) {
-            if (CE->getInLoc().isInvalid()) {
-              // If there's a (non-comment) token immediately following the
-              // opening brace of the closure, we may need to pad the fix-it
-              // with a space.
-              auto nextLoc = CE->getLoc().getAdvancedLoc(1);
-              auto next =
-                  Lexer::getTokenAtLocation(TC.Context.SourceMgr, nextLoc,
-                                            CommentRetentionMode::None);
-              std::string trailing = next.getLoc() == nextLoc ? " " : "";
-
-              diag.fixItInsertAfter(CE->getLoc(), " [self] in" + trailing);
-            }
-            else
-              diag.fixItInsertAfter(CE->getLoc(), " [self]");
-          }
-          else {
-            // Similar to above, we look for any non-comment token. If there's
-            // anything before the closing bracket, we assume that it is a valid
-            // capture list entry and insert 'self,'. If it wasn't a valid
-            // entry, then we will at least not be introducing any new
-            // errors/warnings...
-            auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-            auto nextAfterBracket =
-                Lexer::getTokenAtLocation(TC.Context.SourceMgr, locAfterBracket,
-                                          CommentRetentionMode::None);
-            if (nextAfterBracket.getLoc() != brackets.End)
-              diag.fixItInsertAfter(brackets.Start, "self, ");
-            else
-              diag.fixItInsertAfter(brackets.Start, "self");
-          }
+          emitFixItsForExplicitClosure(memberLoc, CE);
         } else {
           // If this wasn't an explicit closure, just offer the fix-it to
           // reference self explicitly.
@@ -1507,6 +1448,82 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       }
       
       return E;
+    }
+    
+    /// Diagnose any captures which might have been an attempt to capture
+    /// \c self strongly, but do not actually enable implicit \c self. Returns
+    /// whether there were any such captures to diagnose.
+    bool diagnoseAlmostMatchingCaptures(SourceLoc memberLoc,
+                                        ClosureExpr *closureExpr) {
+      // If we've already captured something with the name "self" other than
+      // the actual self param, offer special diagnostics.
+      if (auto *VD = closureExpr->getCapturedSelfDecl()) {
+        // Either this is a weak capture of self...
+        if (VD->getType()->is<WeakStorageType>()) {
+          TC.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
+        // ...or something completely different.
+        } else {
+          TC.diagnose(VD->getLoc(), diag::note_other_self_capture);
+        }
+        
+        return true;
+      }
+      return false;
+    }
+    
+    /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
+    /// The error can be solved by capturing self explicitly,
+    /// or by using \c self. explicitly.
+    void emitFixItsForExplicitClosure(SourceLoc memberLoc,
+                                      ClosureExpr *closureExpr) {
+      TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
+        .fixItInsert(memberLoc, "self.");
+      auto diag = TC.diagnose(closureExpr->getLoc(),
+                              diag::note_capture_self_explicitly);
+      // There are four different potential fix-its to offer based on the
+      // closure signature:
+      //   1. The signature empty so far. We must insert the full capture
+      //      list as well as 'in'.
+      //   2. Arguments or types are already specified in the signature,
+      //      but there is no existing capture list. We will need to insert
+      //      the capture list, but 'in' will already be present.
+      //   3. There is an existing capture list which already has some
+      //      entries. We need to insert 'self' into the capture list along
+      //      with a separating comma.
+      //   4. There is an existing capture list, but it is empty. We can
+      //      just insert 'self'.
+      auto brackets = closureExpr->getBracketRange();
+      if (brackets.isInvalid()) {
+        if (closureExpr->getInLoc().isInvalid()) {
+          // If there's a (non-comment) token immediately following the
+          // opening brace of the closure, we may need to pad the fix-it
+          // with a space.
+          const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
+          const auto next =
+              Lexer::getTokenAtLocation(TC.Context.SourceMgr, nextLoc,
+                                        CommentRetentionMode::None);
+          std::string trailing = next.getLoc() == nextLoc ? " " : "";
+
+          diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+        }
+        else
+          diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+      }
+      else {
+        // Similar to above, we look for any non-comment token. If there's
+        // anything before the closing bracket, we assume that it is a valid
+        // capture list entry and insert 'self,'. If it wasn't a valid
+        // entry, then we will at least not be introducing any new
+        // errors/warnings...
+        const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+        const auto nextAfterBracket =
+            Lexer::getTokenAtLocation(TC.Context.SourceMgr, locAfterBracket,
+                                      CommentRetentionMode::None);
+        if (nextAfterBracket.getLoc() != brackets.End)
+          diag.fixItInsertAfter(brackets.Start, "self, ");
+        else
+          diag.fixItInsertAfter(brackets.Start, "self");
+      }
     }
   };
 

@@ -3702,6 +3702,11 @@ public:
 
   /// VarDecl captured by this closure under the literal name \c self , if any.
   VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
+  
+  /// Whether this closure captures the \c self param in its body in such a
+  /// way that implicit \c self is enabled within its body (i.e. \c self is
+  /// captured non-weakly).
+  bool capturesSelfEnablingImplictSelf() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;

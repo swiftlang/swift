@@ -294,7 +294,7 @@ public:
   ///
   /// \param Loc The source location of the beginning of a token.
   ///
-  /// \param CRM The how comments should be treated by the lexer. Default is to
+  /// \param CRM How comments should be treated by the lexer. Default is to
   /// return the comments as tokens.
   static Token getTokenAtLocation(
       const SourceManager &SM, SourceLoc Loc,

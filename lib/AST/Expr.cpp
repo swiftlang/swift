@@ -1885,6 +1885,12 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->getNumElements() == 0;
 }
 
+bool ClosureExpr::capturesSelfEnablingImplictSelf() const {
+  if (auto *VD = getCapturedSelfDecl())
+    return VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>();
+  return false;
+}
+
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {

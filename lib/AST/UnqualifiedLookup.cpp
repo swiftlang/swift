@@ -199,13 +199,6 @@ namespace {
     SourceFile const *recordedSF = nullptr;
     bool recordedIsCascadingUse = false;
     unsigned resultsSizeBeforeLocalsPass = ~0;
-    
-  private:
-    // When performing a lookup, we may come across a capture of 'self'. We will
-    // need to remember the DeclContext of the innermost captured self so that
-    // it can be used as the base DeclContext if we find a lookup result in the
-    // enclosing type.
-    DeclContext *capturedSelfContext;
 
   public:
     // clang-format off
@@ -268,52 +261,72 @@ namespace {
     
     void lookupOperatorInDeclContexts(ContextAndUnresolvedIsCascadingUse);
     
-    void lookupNamesIntroducedBy(const ContextAndUnresolvedIsCascadingUse);
+    /// When performing a lookup, we may come across a capture of 'self'. We
+    /// will need to remember the DeclContext of the innermost captured self so
+    /// that it can be used as the base DeclContext if we find a lookup result
+    /// in the enclosing type. \c capturedSelfContext tracks this.
+    void lookupNamesIntroducedBy(const ContextAndUnresolvedIsCascadingUse,
+                                 DeclContext *capturedSelfContext);
     
     void finishLookingInContext(
                                 AddGenericParameters addGenericParameters,
                                 DeclContext *lookupContextForThisContext,
                                 Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
-                                Optional<bool> isCascadingUse);
+                                Optional<bool> isCascadingUse,
+                                DeclContext *capturedSelfContext);
     
     void lookupInModuleScopeContext(DeclContext *, Optional<bool> isCascadingUse);
     
     void lookupNamesIntroducedByPatternBindingInitializer(
-                                                          PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
+                                                          PatternBindingInitializer *PBI,
+                                                          Optional<bool> isCascadingUse,
+                                                          DeclContext *capturedSelfContext);
     
     void
     lookupNamesIntroducedByLazyVariableInitializer(PatternBindingInitializer *PBI,
                                                    ParamDecl *selfParam,
-                                                   Optional<bool> isCascadingUse);
+                                                   Optional<bool> isCascadingUse,
+                                                   DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
-                                                                   PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
+                                                                   PatternBindingInitializer *PBI,
+                                                                   Optional<bool> isCascadingUse,
+                                                                   DeclContext *capturedSelfContext);
     
     /// An initializer of a global name, or a function-likelocal name.
     void lookupNamesIntroducedByInitializerOfGlobalOrLocal(
-                                                           PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
+                                                           PatternBindingInitializer *PBI,
+                                                           Optional<bool> isCascadingUse,
+                                                           DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByFunctionDecl(AbstractFunctionDecl *AFD,
-                                             Optional<bool> isCascadingUse);
+                                             Optional<bool> isCascadingUse,
+                                             DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByMemberFunction(AbstractFunctionDecl *AFD,
-                                               bool isCascadingUse);
+                                               bool isCascadingUse,
+                                               DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByPureFunction(AbstractFunctionDecl *AFD,
-                                             bool isCascadingUse);
+                                             bool isCascadingUse,
+                                             DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByClosure(AbstractClosureExpr *ACE,
-                                        Optional<bool> isCascadingUse);
+                                        Optional<bool> isCascadingUse,
+                                        DeclContext *capturedSelfContext);
     
     template <typename NominalTypeDeclOrExtensionDecl>
     void lookupNamesIntroducedByNominalTypeOrExtension(
                                                        NominalTypeDeclOrExtensionDecl *D, Optional<bool> isCascadingUse);
     
     void lookupNamesIntroducedByDefaultArgumentInitializer(
-                                                           DefaultArgumentInitializer *I, Optional<bool> isCascadingUse);
+                                                           DefaultArgumentInitializer *I,
+                                                           Optional<bool> isCascadingUse,
+                                                           DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByMiscContext(DeclContext *dc,
-                                            Optional<bool> isCascadingUse);
+                                            Optional<bool> isCascadingUse,
+                                            DeclContext *capturedSelfContext);
     
     void lookForLocalVariablesIn(AbstractFunctionDecl *AFD,
                                  Optional<bool> isCascadingUse);
@@ -473,8 +486,7 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   Consumer(this, Name, Results, isOriginallyTypeLookup),
   #endif
   Results(Results),
-  IndexOfFirstOuterResult(IndexOfFirstOuterResult),
-  capturedSelfContext(nullptr)
+  IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
 // clang-format on
 
@@ -508,7 +520,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     if (Name.isOperator())
       lookupOperatorInDeclContexts(contextAndIsCascadingUse);
     else
-      lookupNamesIntroducedBy(contextAndIsCascadingUse);
+      lookupNamesIntroducedBy(contextAndIsCascadingUse, NULL);
   }
 
   if (crosscheckUnqualifiedLookup && useASTScopesForLookupIfEnabled()) {
@@ -521,7 +533,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     else if (Name.isOperator())
       altLookup.lookupOperatorInDeclContexts(contextAndIsCascadingUse);
     else
-      altLookup.lookupNamesIntroducedBy(contextAndIsCascadingUse);
+      altLookup.lookupNamesIntroducedBy(contextAndIsCascadingUse, NULL);
 
     assert(
         verifyEqualTo(std::move(altLookup), "main lookup", "alternate lookup"));
@@ -550,7 +562,8 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForLookup() const {
-  return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
+  return false;
+  //return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForLookupIfEnabled() const {
@@ -575,28 +588,40 @@ void UnqualifiedLookupFactory::lookupOperatorInDeclContexts(
 
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
 void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
-    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
+    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg,
+    DeclContext *capturedSelfContext) {
 #ifndef NDEBUG
   stopForDebuggingIfDuringTargetLookup(false);
 #endif
   DeclContext *const dc = contextAndIsCascadingUseArg.whereToLook;
   const auto isCascadingUseSoFar = contextAndIsCascadingUseArg.isCascadingUse;
-  if (dc->isModuleScopeContext())
+  if (dc->isModuleScopeContext()) {
+    assert(capturedSelfContext == NULL);
     lookupInModuleScopeContext(dc, isCascadingUseSoFar);
+  }
   else if (auto *PBI = dyn_cast<PatternBindingInitializer>(dc))
-    lookupNamesIntroducedByPatternBindingInitializer(PBI, isCascadingUseSoFar);
+    lookupNamesIntroducedByPatternBindingInitializer(PBI, isCascadingUseSoFar,
+                                                     capturedSelfContext);
   else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
-    lookupNamesIntroducedByFunctionDecl(AFD, isCascadingUseSoFar);
+    lookupNamesIntroducedByFunctionDecl(AFD, isCascadingUseSoFar,
+                                        capturedSelfContext);
   else if (auto *ACE = dyn_cast<AbstractClosureExpr>(dc))
-    lookupNamesIntroducedByClosure(ACE, isCascadingUseSoFar);
-  else if (auto *ED = dyn_cast<ExtensionDecl>(dc))
+    lookupNamesIntroducedByClosure(ACE, isCascadingUseSoFar,
+                                   capturedSelfContext);
+  else if (auto *ED = dyn_cast<ExtensionDecl>(dc)) {
+    assert(capturedSelfContext == NULL);
     lookupNamesIntroducedByNominalTypeOrExtension(ED, isCascadingUseSoFar);
-  else if (auto *ND = dyn_cast<NominalTypeDecl>(dc))
+  }
+  else if (auto *ND = dyn_cast<NominalTypeDecl>(dc)) {
+    assert(capturedSelfContext == NULL);
     lookupNamesIntroducedByNominalTypeOrExtension(ND, isCascadingUseSoFar);
+  }
   else if (auto I = dyn_cast<DefaultArgumentInitializer>(dc))
-    lookupNamesIntroducedByDefaultArgumentInitializer(I, isCascadingUseSoFar);
+    lookupNamesIntroducedByDefaultArgumentInitializer(I, isCascadingUseSoFar,
+                                                      capturedSelfContext);
   else
-    lookupNamesIntroducedByMiscContext(dc, isCascadingUseSoFar);
+    lookupNamesIntroducedByMiscContext(dc, isCascadingUseSoFar,
+                                       capturedSelfContext);
 }
 
 void UnqualifiedLookupFactory::lookupInModuleScopeContext(
@@ -614,22 +639,28 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
-    PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
+    PatternBindingInitializer *PBI, Optional<bool> isCascadingUse,
+    DeclContext *capturedSelfContext) {
   // Lazy variable initializer contexts have a 'self' parameter for
   // instance member lookup.
   if (auto *selfParam = PBI->getImplicitSelfDecl())
     lookupNamesIntroducedByLazyVariableInitializer(PBI, selfParam,
-                                                   isCascadingUse);
+                                                   isCascadingUse,
+                                                   capturedSelfContext);
   else if (PBI->getParent()->isTypeContext())
-    lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(PBI,
-                                                              isCascadingUse);
+    lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
+      PBI,
+      isCascadingUse,
+      capturedSelfContext
+    );
   else
-    lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse);
+    lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse,
+                                                      capturedSelfContext);
 }
 
   void UnqualifiedLookupFactory::lookupNamesIntroducedByLazyVariableInitializer(
       PatternBindingInitializer *PBI, ParamDecl *selfParam,
-      Optional<bool> isCascadingUse) {
+      Optional<bool> isCascadingUse, DeclContext *capturedSelfContext) {
     Consumer.foundDecl(selfParam, DeclVisibilityKind::FunctionParameter);
     ifNotDoneYet([&] {
       DeclContext *const patternContainer = PBI->getParent();
@@ -639,14 +670,16 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
       patternContainer,
       ResultFinderForTypeContext(this, PBI, patternContainer),
       resolveIsCascadingUse(PBI, isCascadingUse,
-                           /*onlyCareAboutFunctionBody=*/false));
+                           /*onlyCareAboutFunctionBody=*/false),
+      capturedSelfContext);
       // clang-format on
     });
 }
 
 void UnqualifiedLookupFactory::
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
-        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
+        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse,
+        DeclContext *capturedSelfContext) {
   // Initializers for stored properties of types perform static
   // lookup into the surrounding context.
   DeclContext *const storedPropertyContainer = PBI->getParent();
@@ -657,13 +690,15 @@ void UnqualifiedLookupFactory::
     ResultFinderForTypeContext(
       this, storedPropertyContainer, storedPropertyContainer),
     resolveIsCascadingUse(storedPropertyContainer, None,
-                          /*onlyCareAboutFunctionBody=*/false));
+                          /*onlyCareAboutFunctionBody=*/false),
+    capturedSelfContext);
   // clang-format on
 }
 
 void UnqualifiedLookupFactory::
     lookupNamesIntroducedByInitializerOfGlobalOrLocal(
-        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
+        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse,
+        DeclContext *capturedSelfContext) {
   // There's not much to find here, we'll keep going up to a parent
   // context.
   // clang-format off
@@ -672,12 +707,14 @@ void UnqualifiedLookupFactory::
                          PBI,
                          None, // not looking in the partic type
                          resolveIsCascadingUse(PBI, isCascadingUse,
-                                               /*onlyCareAboutFunctionBody=*/false));
+                                               /*onlyCareAboutFunctionBody=*/false),
+                         capturedSelfContext);
   // clang-format on
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
-    AbstractFunctionDecl *AFD, Optional<bool> isCascadingUseArg) {
+    AbstractFunctionDecl *AFD, Optional<bool> isCascadingUseArg,
+    DeclContext *capturedSelfContext) {
 
   // DOUG: how does this differ from isOutsideBodyOfFunction below?
   const bool isCascadingUse =
@@ -687,13 +724,16 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
           !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)));
 
   if (AFD->getDeclContext()->isTypeContext())
-    lookupNamesIntroducedByMemberFunction(AFD, isCascadingUse);
+    lookupNamesIntroducedByMemberFunction(AFD, isCascadingUse,
+                                          capturedSelfContext);
   else
-    lookupNamesIntroducedByPureFunction(AFD, isCascadingUse);
+    lookupNamesIntroducedByPureFunction(AFD, isCascadingUse,
+                                        capturedSelfContext);
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
-    AbstractFunctionDecl *AFD, bool isCascadingUse) {
+    AbstractFunctionDecl *AFD, bool isCascadingUse,
+    DeclContext *capturedSelfContext) {
   lookForLocalVariablesIn(AFD, isCascadingUse);
   ifNotDoneYet(
       [&] {
@@ -723,13 +763,15 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
         AddGenericParameters::Yes,
         AFD->getParent(),
         ResultFinderForTypeContext(this, BaseDC, fnDeclContext),
-        isCascadingUse);
+        isCascadingUse,
+        NULL);
         // clang-format on
       });
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
-    AbstractFunctionDecl *AFD, bool isCascadingUse) {
+    AbstractFunctionDecl *AFD, bool isCascadingUse,
+    DeclContext *capturedSelfContext) {
   lookForLocalVariablesIn(AFD, isCascadingUse);
   ifNotDoneYet([&] {
     // clang-format off
@@ -737,22 +779,23 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPureFunction(
                            AddGenericParameters::Yes,
                            AFD,
                            None,
-                           isCascadingUse);
+                           isCascadingUse,
+                           capturedSelfContext);
   });
 }
 
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
-    AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
+    AbstractClosureExpr *ACE, Optional<bool> isCascadingUse,
+    DeclContext *capturedSelfContext) {
   if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
     lookForLocalVariablesIn(CE);
     // If we don't already have a captured self context, and this closure
     // captures the self param (not weakly, so that implicit self is available),
     // remember that.
     if (capturedSelfContext == nullptr)
-      if (auto *VD = CE->getCapturedSelfDecl())
-        if (VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>())
-          capturedSelfContext = CE;
+      if (CE->capturesSelfEnablingImplictSelf())
+        capturedSelfContext = CE;
   }
   ifNotDoneYet([&] {
     // clang-format off
@@ -761,7 +804,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
       ACE,
       None,
       resolveIsCascadingUse(ACE, isCascadingUse,
-                           /*onlyCareAboutFunctionBody=*/false));
+                           /*onlyCareAboutFunctionBody=*/false),
+      capturedSelfContext);
     // clang-format on
   });
 }
@@ -778,21 +822,25 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByNominalTypeOrExtension(
                 ResultFinderForTypeContext(this, D, D))
     : None,
     resolveIsCascadingUse(D, isCascadingUse,
-                          /*onlyCareAboutFunctionBody=*/false));
+                          /*onlyCareAboutFunctionBody=*/false),
+    /*capturedSelfContext=*/NULL);
 
   // clang-format on
 }
 
 void UnqualifiedLookupFactory::
     lookupNamesIntroducedByDefaultArgumentInitializer(
-        DefaultArgumentInitializer *I, Optional<bool> isCascadingUse) {
+        DefaultArgumentInitializer *I, Optional<bool> isCascadingUse,
+        DeclContext *capturedSelfContext) {
   // In a default argument, skip immediately out of both the
   // initializer and the function.
-  finishLookingInContext(AddGenericParameters::No, I->getParent(), None, false);
+  finishLookingInContext(AddGenericParameters::No, I->getParent(), None, false,
+                         capturedSelfContext);
 }
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
-    DeclContext *dc, Optional<bool> isCascadingUse) {
+    DeclContext *dc, Optional<bool> isCascadingUse,
+    DeclContext *capturedSelfContext) {
   // clang-format off
   assert(isa<TopLevelCodeDecl>(dc) ||
          isa<Initializer>(dc) ||
@@ -803,7 +851,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
     dc,
     None,
     resolveIsCascadingUse(DC, isCascadingUse,
-                          /*onlyCareAboutFunctionBody=*/false));
+                          /*onlyCareAboutFunctionBody=*/false),
+    capturedSelfContext);
   // clang-format on
 }
 
@@ -812,7 +861,8 @@ void UnqualifiedLookupFactory::finishLookingInContext(
        const AddGenericParameters addGenericParameters,
        DeclContext *const lookupContextForThisContext,
        Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
-       const Optional<bool> isCascadingUse) {
+       const Optional<bool> isCascadingUse,
+       DeclContext *capturedSelfContext) {
 #ifndef NDEBUG
   stopForDebuggingIfDuringTargetLookup(false);
 #endif
@@ -833,7 +883,8 @@ void UnqualifiedLookupFactory::finishLookingInContext(
     // Recurse into the next context.
     [&] {
       lookupNamesIntroducedBy(ContextAndUnresolvedIsCascadingUse{
-        lookupContextForThisContext->getParentForLookup(), isCascadingUse});
+        lookupContextForThisContext->getParentForLookup(), isCascadingUse},
+        capturedSelfContext);
     });
 }
 

@@ -507,38 +507,38 @@ GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
       // If we've found a selfDC, we'll definitely be returning something.
       // However, we may have captured 'self' somewhere down the tree, so we
       // can't return outright without checking the nested scopes.
-      Optional<NullablePtr<DeclContext>> innerCapturedSelfDC = None;
-      // Start with the innermost scope.
-      size_t j = 0;
-      while (j != i) {
-        // Check if there's a DeclContext for self in this scope. If we're
-        // inside a scope for a completely different type, then we will
-        // encounter a GenericTypeOrExtensionScope somewhere up the tree that
-        // will cause us to forget any DeclContexts we find within.
-        Optional<NullablePtr<DeclContext>> maybeCapturedSelfDC =
-            history[j]->computeSelfDCForParent();
-
-        if (maybeCapturedSelfDC) {
-          // If we haven't already found a captured self context, remember the
-          // first one we see.
-          if (!innerCapturedSelfDC) {
-            innerCapturedSelfDC = maybeCapturedSelfDC;
-          }
-
-          // If there's an intervening scope that causes us to forget the self
-          // context, we should obey that.
-          if ((*maybeCapturedSelfDC).isNull()) {
-            innerCapturedSelfDC = None;
-          }
-        }
-        // Move up to the next scope.
-        j++;
-      }
-
-      return innerCapturedSelfDC ? *innerCapturedSelfDC : *maybeSelfDC;
+      NullablePtr<DeclContext> nestedCapturedSelfDC =
+          checkNestedScopesForSelfCapture(history, i);
+      return nestedCapturedSelfDC ?: *maybeSelfDC;
     }
   }
   return nullptr;
+}
+
+NullablePtr<DeclContext>
+GenericTypeOrExtensionWhereOrBodyPortion::checkNestedScopesForSelfCapture(
+    ArrayRef<const ASTScopeImpl *> history, size_t start) {
+  NullablePtr<DeclContext> innerCapturedSelfDC;
+  // Start with the next scope down the tree.
+  size_t j = start;
+  while (j != 0) {
+    Optional<NullablePtr<DeclContext>> maybeCapturedSelfDC =
+        history[--j]->computeSelfDCForParent();
+
+    if (maybeCapturedSelfDC) {
+      // If we encounter a scope that should cause us to forget the self
+      // context (such as a nested type), bail out and use whatever the
+      // the last inner context was.
+      if ((*maybeCapturedSelfDC).isNull()) {
+        break;
+      }
+      
+      // Otherwise, remember this self context.
+      innerCapturedSelfDC = *maybeCapturedSelfDC;
+    }
+    // Continue searching in the next scope down.
+  }
+  return innerCapturedSelfDC;
 }
 
 #pragma mark compute isCascadingUse
@@ -651,9 +651,8 @@ MethodBodyScope::computeSelfDCForParent() const {
 
 Optional<NullablePtr<DeclContext>>
 ClosureParametersScope::computeSelfDCForParent() const {
-  if (auto *VD = closureExpr->getCapturedSelfDecl())
-    if (VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>())
-      return NullablePtr<DeclContext>(closureExpr);
+  if (closureExpr->capturesSelfEnablingImplictSelf())
+    return NullablePtr<DeclContext>(closureExpr);
   return None;
 }
 
