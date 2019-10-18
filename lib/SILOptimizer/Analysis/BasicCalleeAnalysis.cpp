@@ -25,7 +25,24 @@
 
 using namespace swift;
 
-bool CalleeList::allCalleesVisible() {
+void CalleeList::dump() const {
+  print(llvm::errs());
+}
+
+void CalleeList::print(llvm::raw_ostream &os) const {
+  os << "Incomplete callee list? : "
+               << (isIncomplete() ? "Yes" : "No");
+  if (!allCalleesVisible())
+    os <<", not all callees visible";
+  os << '\n';
+  os << "Known callees:\n";
+  for (auto *CalleeFn : *this) {
+    os << "  " << CalleeFn->getName() << "\n";
+  }
+  os << "\n";
+}
+
+bool CalleeList::allCalleesVisible() const {
   if (isIncomplete())
     return false;
 
@@ -283,4 +300,23 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
     return CalleeList();
   SILDeclRef Destructor = SILDeclRef(Class->getDestructor());
   return getCalleeList(Destructor);
+}
+
+void BasicCalleeAnalysis::dump() const {
+  print(llvm::errs());
+}
+
+void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
+  if (!Cache) {
+    os << "<no cache>\n";
+  }
+  llvm::DenseSet<SILDeclRef> printed;
+  for (auto &VTable : M.getVTableList()) {
+    for (const SILVTable::Entry &entry : VTable.getEntries()) {
+      if (printed.insert(entry.Method).second) {
+        os << "callees for " << entry.Method << ":\n";
+        Cache->getCalleeList(entry.Method).print(os);
+      }
+    }
+  }
 }
