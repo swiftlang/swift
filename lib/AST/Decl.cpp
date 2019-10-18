@@ -2812,11 +2812,12 @@ Type ValueDecl::getInterfaceType() const {
     return TypeAndAccess.getPointer();
   }
 
-  auto ty =
-      evaluateOrDefault(getASTContext().evaluator,
-                        InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
-                        ErrorType::get(getASTContext()));
-  return ty ?: ErrorType::get(getASTContext());
+  if (auto Ty =
+          evaluateOrDefault(getASTContext().evaluator,
+                            InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
+                            ErrorType::get(getASTContext())))
+    return Ty;
+  return ErrorType::get(getASTContext());
 }
 
 void ValueDecl::setInterfaceType(Type type) {
