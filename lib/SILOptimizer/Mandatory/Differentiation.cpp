@@ -2856,11 +2856,15 @@ emitDerivativeFunctionReference(
       break;
     }
 
+#if 0
     auto *derivativeFnRef2 = builder.createDifferentiabilityWitnessFunction(
         loc, originalFn, witnessKind,
         minimalWitness->getParameterIndices(),
         minimalWitness->getResultIndices(),
         minimalWitness->getDerivativeGenericSignature());
+#endif
+    auto *derivativeFnRef2 = builder.createDifferentiabilityWitnessFunction(
+        loc, witnessKind, minimalWitness);
     auto *derivativeFn = minimalWitness->getDerivative(kind);
     //auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
@@ -8672,11 +8676,15 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
     auto *assoc = derivativeFnRef->getReferencedFunctionOrNull();
     assocRef = builder.createFunctionRef(loc, assoc);
   } else if (auto *foo = peerThroughFunctionConversions<DifferentiabilityWitnessFunctionInst>(derivativeFn)) {
+#if 0
     assocRef = builder.createDifferentiabilityWitnessFunction(
         loc, foo->getOriginalFunction(), foo->getWitnessKind(),
         foo->getParameterIndices(),
         foo->getResultIndices(),
         foo->getWitnessGenericSignature());
+#endif
+    assocRef = builder.createDifferentiabilityWitnessFunction(
+        loc, foo->getWitnessKind(), foo->getWitness());
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<WitnessMethodInst>(derivativeFn)) {
     assocRef = builder.createWitnessMethod(

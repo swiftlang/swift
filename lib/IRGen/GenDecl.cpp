@@ -4409,11 +4409,8 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
-    SILFunction *original, const AutoDiffConfig config, ConstantInit definition) {
-#if 0
-  IRGen.addLazyWitnessTable(conf);
-#endif
-  auto entity = LinkEntity::forDifferentiabilityWitness(original, config);
+    const SILDifferentiabilityWitness *witness, ConstantInit definition) {
+  auto entity = LinkEntity::forDifferentiabilityWitness(witness);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 // SWIFT_ENABLE_TENSORFLOW

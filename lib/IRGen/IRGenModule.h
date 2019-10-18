@@ -1424,7 +1424,7 @@ public:
                                       const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfDifferentiabilityWitness(
-      SILFunction *original, const AutoDiffConfig config,
+      const SILDifferentiabilityWitness *witness,
       ConstantInit definition = ConstantInit());
 
   llvm::Function *

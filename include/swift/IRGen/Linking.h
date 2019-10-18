@@ -474,11 +474,8 @@ class LinkEntity {
   }
 
   void setForDifferentiabilityWitness(
-      Kind kind, SILFunction *f, const AutoDiffConfig config) {
-    // assert(isProtocolConformanceKind(kind) && !isTypeKind(kind));
-    Pointer = f;
-    // TODO(!!!): Store this somewhere where it doesn't leak.
-    SecondaryPointer = (void*)new AutoDiffConfig(config);
+      Kind kind, const SILDifferentiabilityWitness *witness) {
+    Pointer = const_cast<void*>(static_cast<const void*>(witness));;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
@@ -864,9 +861,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   static LinkEntity forDifferentiabilityWitness(
-      SILFunction *f, const AutoDiffConfig config) {
+      const SILDifferentiabilityWitness *witness) {
     LinkEntity entity;
-    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness, f, config);
+    entity.setForDifferentiabilityWitness(
+        Kind::DifferentiabilityWitness, witness);
     return entity;
   }
   // SWIFT_ENABLE_TENSORFLOW END
@@ -1067,9 +1065,9 @@ public:
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
 
-  AutoDiffConfig *getAutoDiffConfig() const {
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
     assert(getKind() == Kind::DifferentiabilityWitness);
-    return reinterpret_cast<AutoDiffConfig *>(SecondaryPointer);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {
@@ -1260,24 +1258,28 @@ template <> struct DenseMapInfo<swift::irgen::LinkEntity> {
     return entity;
   }
   static unsigned getHashValue(const LinkEntity &entity) {
+#if 0
     // TODO: Remove hack when AutoDiffConfig has been uniquely allocated in ASTContext.
     if (entity.getKind() == LinkEntity::Kind::DifferentiabilityWitness) {
       return DenseMapInfo<void *>::getHashValue(entity.Pointer) ^
              DenseMapInfo<AutoDiffConfig>::getHashValue(*(AutoDiffConfig*)entity.SecondaryPointer) ^
              entity.Data;
     }
+#endif
 
     return DenseMapInfo<void *>::getHashValue(entity.Pointer) ^
            DenseMapInfo<void *>::getHashValue(entity.SecondaryPointer) ^
            entity.Data;
   }
   static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
+#if 0
     // TODO: Remove hack when AutoDiffConfig has been uniquely allocated in ASTContext.
     if (LHS.getKind() == LinkEntity::Kind::DifferentiabilityWitness) {
       return LHS.Pointer == RHS.Pointer &&
              DenseMapInfo<AutoDiffConfig>::isEqual(*(AutoDiffConfig*)LHS.SecondaryPointer, *(AutoDiffConfig*)RHS.SecondaryPointer) &&
              LHS.Data == RHS.Data;
     }
+#endif
 
     return LHS.Pointer == RHS.Pointer &&
            LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;

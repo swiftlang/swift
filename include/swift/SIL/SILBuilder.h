@@ -551,13 +551,10 @@ public:
 
   DifferentiabilityWitnessFunctionInst *
   createDifferentiabilityWitnessFunction(
-      SILLocation Loc, SILFunction *OriginalFunction,
-      DifferentiabilityWitnessFunctionKind WitnessKind,
-      IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
-      GenericSignature WitnessGenericSignature) {
+      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
+      SILDifferentiabilityWitness *Witness) {
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
-        getModule(), getSILDebugLocation(Loc), OriginalFunction, WitnessKind,
-        ParameterIndices, ResultIndices, WitnessGenericSignature.getPointer()));
+        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness));
   }
   // SWIFT_ENABLE_TENSORFLOW END
 

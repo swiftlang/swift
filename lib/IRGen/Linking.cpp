@@ -418,7 +418,8 @@ std::string LinkEntity::mangleAsString() const {
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
     return mangler.mangleSILDifferentiabilityWitnessKey(
-        {getSILFunction()->getName(), *getAutoDiffConfig()});
+        {getSILDifferentiabilityWitness()->getOriginalFunction()->getName(),
+         getSILDifferentiabilityWitness()->getConfig()});
   // SWIFT_ENABLE_TENSORFLOW END
   }
   llvm_unreachable("bad entity kind!");
@@ -636,11 +637,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
-    // TODO: Should use the JVP/VJP linkage. But that isn't available now. Need
-    // to switch this to reference the SILDifferentiabilityWitness probably.
-    // FIXME: This is causing final TBDGen errors: need to use linkage of
-    // SILDifferentiabilityWitness instead of original function.
-    return getSILFunction()->getEffectiveSymbolLinkage();
+    return getSILDifferentiabilityWitness()->getLinkage();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::DynamicallyReplaceableFunctionKeyAST:
@@ -789,8 +787,13 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return true;
 
   case Kind::SILFunction:
-  case Kind::DifferentiabilityWitness:
     return ::isAvailableExternally(IGM, getSILFunction());
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return ::isAvailableExternally(IGM,
+                                   getSILDifferentiabilityWitness()->getVJP());
+  // SWIFT_ENABLE_TENSORFLOW END
 
   case Kind::FieldOffset: {
     return ::isAvailableExternally(IGM,
@@ -1058,7 +1061,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
   // SWIFT_ENABLE_TENSORFLOW
   case Kind::DifferentiabilityWitness:
-    return getSILFunction()->isWeakImported();
+    return getSILDifferentiabilityWitness()->getVJP()->isWeakImported();
   // SWIFT_ENABLE_TENSORFLOW END
 
   // TODO: Revisit some of the below, for weak conformances.
@@ -1149,11 +1152,20 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::SILFunction:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::DynamicallyReplaceableFunctionKey:
-  case Kind::DifferentiabilityWitness:
     sf = getSourceFileForDeclContext(getSILFunction()->getDeclContext());
     if (!sf)
       return nullptr;
     break;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness: {
+    auto *vjp = getSILDifferentiabilityWitness()->getVJP();
+    sf = getSourceFileForDeclContext(vjp->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   
   case Kind::SILGlobalVariable:
     if (auto decl = getSILGlobalVariable()->getDecl()) {

@@ -1642,9 +1642,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ArrayRef<unsigned>(parameterAndResultIndices)
             .take_back(numResultIndices));
     auto witnessGenSig = MF->getGenericSignature(ValID2);
+    // TODO: Fix. Need to look up SIL differentiability witness.
+    ResultVal = Builder.createDifferentiabilityWitnessFunction(
+        Loc, witnessKind, /*witness*/ nullptr);
+#if 0
     ResultVal = Builder.createDifferentiabilityWitnessFunction(
         Loc, original, witnessKind, parameterIndices, resultIndices,
         witnessGenSig);
+#endif
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

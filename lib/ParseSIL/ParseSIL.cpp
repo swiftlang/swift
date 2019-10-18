@@ -3189,9 +3189,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         P.Context, origFnType->getNumParameters(), parameterIndices);
     auto *resultIndexSet = IndexSubset::get(
         P.Context, origFnType->getNumResults(), resultIndices);
+    // TODO: Fix parsing. Need to parse SIL differentiability witness forward
+    // declaration.
+    ResultVal = B.createDifferentiabilityWitnessFunction(
+        InstLoc, witnessKind, /*witness*/ nullptr);
+#if 0
     ResultVal = B.createDifferentiabilityWitnessFunction(
         InstLoc, originalFunction, witnessKind, parameterIndexSet,
         resultIndexSet, witnessGenSig);
+#endif
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

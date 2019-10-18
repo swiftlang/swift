@@ -716,21 +716,22 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
       extractee(extractee), operands(this, theFunction) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
-    SILModule &module, SILFunction *originalFunction,
-    DifferentiabilityWitnessFunctionKind witnessKind,
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature witnessGenSig) {
-  auto fnTy = originalFunction->getLoweredFunctionType();
+    SILModule &module, DifferentiabilityWitnessFunctionKind witnessFunctionKind,
+    SILDifferentiabilityWitness *witness) {
+  auto fnTy = witness->getOriginalFunction()->getLoweredFunctionType();
   CanGenericSignature witnessCanGenSig;
-  if (witnessGenSig)
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     witnessCanGenSig = witnessGenSig->getCanonicalSignature();
-  if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
+  auto *parameterIndices = witness->getParameterIndices();
+  auto *resultIndices = witness->getResultIndices();
+  if (auto derivativeKind = witnessFunctionKind.getAsDerivativeFunctionKind()) {
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
        parameterIndices, *resultIndices->begin(), *derivativeKind, module.Types,
        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
-  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
+  assert(witnessFunctionKind ==
+             DifferentiabilityWitnessFunctionKind::Transpose);
   auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
       parameterIndices, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
@@ -738,15 +739,29 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
 }
 
 DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
-    SILModule &module, SILDebugLocation debugLoc, SILFunction *originalFunction,
-    DifferentiabilityWitnessFunctionKind witnessKind,
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature witnessGenSig)
+    SILModule &module, SILDebugLocation debugLoc,
+    DifferentiabilityWitnessFunctionKind witnessFunctionKind,
+    SILDifferentiabilityWitness *witness)
     : InstructionBase(debugLoc, getDifferentiabilityWitnessType(
-          module, originalFunction, witnessKind, parameterIndices,
-          resultIndices, witnessGenSig)),
-      originalFunction(originalFunction), witnessKind(witnessKind),
-      config({parameterIndices, resultIndices, witnessGenSig.getPointer()}) {}
+          module, witnessFunctionKind, witness)),
+      witnessFunctionKind(witnessFunctionKind), witness(witness) {}
+
+SILFunction *DifferentiabilityWitnessFunctionInst::getOriginalFunction() const {
+  return witness->getOriginalFunction();
+}
+AutoDiffConfig const &DifferentiabilityWitnessFunctionInst::getConfig() const {
+  return witness->getConfig();
+}
+IndexSubset *DifferentiabilityWitnessFunctionInst::getParameterIndices() const {
+  return witness->getResultIndices();
+}
+IndexSubset *DifferentiabilityWitnessFunctionInst::getResultIndices() const {
+  return witness->getResultIndices();
+}
+GenericSignature
+DifferentiabilityWitnessFunctionInst::getWitnessGenericSignature() const {
+  return witness->getDerivativeGenericSignature();
+}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

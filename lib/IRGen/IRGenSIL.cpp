@@ -5509,36 +5509,10 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {
-#if 0
-  CanType baseTy = i->getLookupType();
-  ProtocolConformanceRef conformance = i->getConformance();
-  SILDeclRef member = i->getMember();
-
-  assert(member.requiresNewWitnessTableEntry());
-
-  if (IGM.isResilient(conformance.getRequirement(),
-                      ResilienceExpansion::Maximal)) {
-    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
-    auto fnType = IGM.getSILTypes().getConstantFunctionType(member);
-    auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnPtr, sig);
-
-    setLoweredFunctionPointer(i, fn);
-    return;
-  }
-
-  auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache,
-                                   member, conformance);
-  setLoweredFunctionPointer(i, fn);
-#endif
-
-  auto *original = i->getOriginalFunction();
-  AutoDiffConfig config{i->getParameterIndices(), i->getResultIndices(),
-                        i->getWitnessGenericSignature()};
-  SILDifferentiabilityWitnessKey key{i->getOriginalFunction()->getName(),
-                                     config};
-
-  llvm::Value *diffWitness = IGM.getAddrOfDifferentiabilityWitness(original, config);
+  llvm::errs() << "IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst\n";
+  i->dump();
+  i->getWitness()->dump();
+  llvm::Value *diffWitness = IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
   unsigned offset = 0;
   switch (i->getWitnessKind()) {
   case DifferentiabilityWitnessFunctionKind::JVP:
