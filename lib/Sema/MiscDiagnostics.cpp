@@ -1409,26 +1409,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
                       diag::method_call_in_closure_without_explicit_self,
                       MethodExpr->getDecl()->getBaseName().getIdentifier());
         }
-      
-      // This error can be fixed by either capturing self explicitly (if in an
-      // explicit closure), or referencing self explicitly.
+
       if (memberLoc.isValid()) {
-        if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-          if (diagnoseAlmostMatchingCaptures(memberLoc, CE)) {
-            // Bail on the rest of the diagnostics. Offering the option to
-            // capture 'self' explicitly will result in an error, and using
-            // 'self.' explicitly will be accessing something other than the
-            // self param.
-            // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
-            return { false, E};
-          }
-          emitFixItsForExplicitClosure(memberLoc, CE);
-        } else {
-          // If this wasn't an explicit closure, just offer the fix-it to
-          // reference self explicitly.
-          TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
-            .fixItInsert(memberLoc, "self.");
-        }
+        emitFixIts(memberLoc, ACE);
         return { false, E };
       }
       
@@ -1448,6 +1431,28 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       }
       
       return E;
+    }
+
+    /// Emit any fix-its for this error.
+    void emitFixIts(SourceLoc memberLoc, AbstractClosureExpr *ACE) {
+      // This error can be fixed by either capturing self explicitly (if in an
+      // explicit closure), or referencing self explicitly.
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (diagnoseAlmostMatchingCaptures(memberLoc, CE)) {
+          // Bail on the rest of the diagnostics. Offering the option to
+          // capture 'self' explicitly will result in an error, and using
+          // 'self.' explicitly will be accessing something other than the
+          // self param.
+          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
+          return;
+        }
+        emitFixItsForExplicitClosure(memberLoc, CE);
+      } else {
+        // If this wasn't an explicit closure, just offer the fix-it to
+        // reference self explicitly.
+        TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+      }
     }
     
     /// Diagnose any captures which might have been an attempt to capture
