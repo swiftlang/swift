@@ -46,7 +46,7 @@ f1(
    ) 
 
 // Tuple element unused.
-f0(i, i,
+f0(i, i, // expected-error@:7 {{cannot convert value of type 'Int' to expected argument type 'Float'}}
    i) // expected-error{{extra argument in call}}
 
 
@@ -431,11 +431,13 @@ CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
 CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
+// expected-error@-1:27 {{argument passed to call that takes no arguments}}
 
 CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
+// expected-error@-1 {{instance member 'method2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // expected-error@-1 {{extraneous argument label 'b:' in call}}
 CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -450,7 +452,8 @@ _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'me
 // expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}} expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
 extension CurriedClass {
@@ -907,7 +910,7 @@ struct rdar27891805 {
 }
 
 try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
-// expected-error@-1 {{incorrect argument labels in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:encoding:')}}
+// expected-error@-1 {{incorrect argument label in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:usedEncoding:')}}
 // expected-error@-2 {{'nil' is not compatible with expected argument type 'String'}}
 // expected-error@-3 {{'nil' is not compatible with expected argument type 'String'}}
 
@@ -929,10 +932,12 @@ func valueForKey<K>(_ key: K) -> CacheValue? {
 // SR-2242: poor diagnostic when argument label is omitted
 
 func r27212391(x: Int, _ y: Int) {
+  // expected-note@-1 {{candidate '(Int, Int) -> ()' requires 2 arguments, but 3 were provided}}
   let _: Int = x + y
 }
 
 func r27212391(a: Int, x: Int, _ y: Int) {
+  // expected-note@-1 {{incorrect labels for candidate (have: '(a:y:x:)', expected: '(a:x:_:)')}}
   let _: Int = a + x + y
 }
 
@@ -944,7 +949,7 @@ r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call
 r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
 r27212391(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
 r27212391(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{incorrect argument labels in call (have 'a:y:x:', expected 'a:x:_:')}} {{17-18=x}} {{23-26=}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{no exact matches in call to global function 'r27212391'}}
 r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
 
 // SR-1255

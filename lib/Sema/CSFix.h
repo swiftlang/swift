@@ -150,6 +150,10 @@ enum class FixKind : uint8_t {
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
 
+  /// If there are more arguments than parameters, let's fix that up
+  /// by removing extraneous arguments.
+  RemoveExtraneousArguments,
+
   /// Allow single tuple closure parameter destructuring into N arguments.
   AllowClosureParameterDestructuring,
 
@@ -1016,6 +1020,55 @@ public:
 private:
   MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
     return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+};
+
+class RemoveExtraneousArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<
+          RemoveExtraneousArguments,
+          std::pair<unsigned, AnyFunctionType::Param>> {
+  friend TrailingObjects;
+
+  using IndexedParam = std::pair<unsigned, AnyFunctionType::Param>;
+
+  FunctionType *ContextualType;
+  unsigned NumExtraneous;
+
+  RemoveExtraneousArguments(ConstraintSystem &cs, FunctionType *contextualType,
+                            llvm::ArrayRef<IndexedParam> extraArgs,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
+        ContextualType(contextualType), NumExtraneous(extraArgs.size()) {
+    std::uninitialized_copy(extraArgs.begin(), extraArgs.end(),
+                            getExtraArgumentsBuf().begin());
+  }
+
+public:
+  std::string getName() const override { return "remove extraneous argument(s)"; }
+
+  ArrayRef<IndexedParam> getExtraArguments() const {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
+  /// logic would be obsolete.
+  ///
+  /// Determine whether presence of extraneous arguments indicates
+  /// potential name shadowing problem with local `min`/`max` shadowing
+  /// global definitions with different number of arguments.
+  static bool isMinMaxNameShadowing(ConstraintSystem &cs,
+                                    ConstraintLocatorBuilder locator);
+
+  static RemoveExtraneousArguments *
+  create(ConstraintSystem &cs, FunctionType *contextualType,
+         llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<IndexedParam> getExtraArgumentsBuf() {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
   }
 };
 

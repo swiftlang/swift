@@ -3879,7 +3879,10 @@ public:
   /// parameter.
   ///
   /// \param argIdx The index of the extra argument.
-  virtual void extraArgument(unsigned argIdx);
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool extraArgument(unsigned argIdx);
 
   /// Indicates that no argument was provided for the parameter at the given
   /// indices.
@@ -3950,7 +3953,7 @@ public:
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+bool matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const ParameterListInfo &paramInfo,
                         bool hasTrailingClosure,
@@ -3960,6 +3963,7 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
+                   FunctionType *contextualType,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintKind subKind,

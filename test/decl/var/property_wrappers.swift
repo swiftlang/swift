@@ -235,9 +235,8 @@ struct Initialization {
   @Wrapper(stored: 17)
   var x2: Double
 
-  @Wrapper(stored: 17) // expected-error {{initializer expects a single parameter of type 'T' [with T = (wrappedValue: Int, stored: Int)]}}
-  // expected-note@-1 {{did you mean to pass a tuple?}}
-  var x3 = 42
+  @Wrapper(stored: 17)
+  var x3 = 42 // expected-error {{extra argument 'wrappedValue' in call}}
 
   @Wrapper(stored: 17)
   var x4
@@ -720,8 +719,7 @@ struct DefaultedPrivateMemberwiseLets {
 func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
-  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
-  // expected-error@-1 {{cannot convert value of type 'Wrapper<Bool>' to expected argument type 'Int'}}
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{argument passed to call that takes no arguments}}
 }
 
 
@@ -1117,8 +1115,8 @@ struct MissingPropertyWrapperUnwrap {
 }
 
 struct InvalidPropertyDelegateUse {
-  @Foo var x: Int = 42 // expected-error {{cannot invoke initializer for ty}}
-  // expected-note@-1{{overloads for 'Foo<_>' exist with these partially matching paramet}}
+  // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
+  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}

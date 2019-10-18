@@ -35,7 +35,7 @@ using namespace constraints;
 
 MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
-void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
+bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
 Optional<unsigned>
 MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
@@ -123,10 +123,9 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
   return true;
 }
 
-static bool
-areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                          ArrayRef<FunctionType::Param> args,
-                                          bool hasTrailingClosure) {
+static bool areConservativelyCompatibleArgumentLabels(
+    OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
+    bool hasTrailingClosure) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -217,7 +216,7 @@ static bool acceptsTrailingClosure(const AnyFunctionType::Param &param) {
 // FIXME: This should return ConstraintSystem::TypeMatchResult instead
 //        to give more information to the solver about the failure.
 bool constraints::
-matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const ParameterListInfo &paramInfo,
                    bool hasTrailingClosure,
@@ -561,12 +560,16 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       }
     }
 
-    // If we still haven't claimed all of the arguments, fail.
+    // If we still haven't claimed all of the arguments,
+    // fail if there is no recovery.
     if (numClaimedArgs != numArgs) {
-      nextArgIdx = 0;
-      skipClaimedArgs();
-      listener.extraArgument(nextArgIdx);
-      return true;
+      for (auto index : indices(claimedArgs)) {
+        if (claimedArgs[index])
+          continue;
+
+        if (listener.extraArgument(index))
+          return true;
+      }
     }
 
     // FIXME: If we had the actual parameters and knew the body names, those
@@ -576,7 +579,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
   // If we have any unfulfilled parameters, check them now.
   if (haveUnfulfilledParams) {
-    bool hasSynthesizedArgs = false;
     for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
       // If we have a binding for this parameter, we're done.
       if (!parameterBindings[paramIdx].empty())
@@ -594,17 +596,11 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
       if (auto newArgIdx = listener.missingArgument(paramIdx)) {
         parameterBindings[paramIdx].push_back(*newArgIdx);
-        hasSynthesizedArgs = true;
         continue;
       }
 
       return true;
     }
-
-    // If all of the missing arguments have been synthesized,
-    // let's stop since we have found the problem.
-    if (hasSynthesizedArgs)
-      return false;
   }
 
   // If any arguments were provided out-of-order, check whether we have
@@ -793,6 +789,7 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintLocatorBuilder Locator;
 
   unsigned NumSynthesizedArgs = 0;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
 
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
@@ -844,6 +841,14 @@ public:
     return newArgIdx;
   }
 
+  bool extraArgument(unsigned argIdx) override {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    ExtraArguments.push_back(std::make_pair(argIdx, Arguments[argIdx]));
+    return false;
+  }
+
   bool missingLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
   }
@@ -858,6 +863,15 @@ public:
 
   bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
     if (CS.shouldAttemptFixes()) {
+      // If some of the arguments are missing/extraneous, no reason to
+      // record a fix for this, increase the score so there is a way
+      // to identify that there is something going on besides just missing
+      // arguments.
+      if (NumSynthesizedArgs || !ExtraArguments.empty()) {
+        CS.increaseScore(SK_Fix);
+        return false;
+      }
+
       auto *fix = MoveOutOfOrderArgument::create(
           CS, argIdx, prevArgIdx, Bindings, CS.getConstraintLocator(Locator));
       return CS.recordFix(fix);
@@ -870,38 +884,55 @@ public:
     if (!CS.shouldAttemptFixes())
       return true;
 
+    // TODO(diagnostics): If re-labeling is mixed with extra arguments,
+    // let's produce a fix only for extraneous arguments for now,
+    // because they'd share a locator path which (currently) means
+    // one fix would overwrite another.
+    if (!ExtraArguments.empty()) {
+      CS.increaseScore(SK_Fix);
+      return false;
+    }
+
     auto *anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor)
+    if (!anchor || Arguments.size() != newLabels.size())
       return true;
 
     unsigned numExtraneous = 0;
-    for (unsigned paramIdx = 0, n = Bindings.size(); paramIdx != n;
-         ++paramIdx) {
-      if (Bindings[paramIdx].empty())
+    unsigned numRenames = 0;
+    for (unsigned i : indices(newLabels)) {
+      auto argLabel = Arguments[i].getLabel();
+      auto paramLabel = newLabels[i];
+
+      if (argLabel == paramLabel)
         continue;
 
-      const auto paramLabel = Parameters[paramIdx].getLabel();
-      for (auto argIdx : Bindings[paramIdx]) {
-        auto argLabel = Arguments[argIdx].getLabel();
-        if (paramLabel.empty() && !argLabel.empty())
+      if (!argLabel.empty()) {
+        if (paramLabel.empty())
           ++numExtraneous;
+        else
+          ++numRenames;
       }
     }
 
     auto *locator = CS.getConstraintLocator(Locator);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
-    CS.recordFix(fix);
-    // Re-labeling fixes with extraneous labels should take
-    // lower priority vs. other fixes on same/different
-    // overload(s) where labels did line up correctly.
-    CS.increaseScore(ScoreKind::SK_Fix, numExtraneous);
+    // Re-labeling fixes with extraneous/incorrect labels should be
+    // lower priority vs. other fixes on same/different overload(s)
+    // where labels did line up correctly.
+    CS.recordFix(fix, /*impact=*/1 + numExtraneous * 2 + numRenames * 3);
     return false;
+  }
+
+  ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
+  getExtraneousArguments() const {
+    return ExtraArguments;
   }
 };
 
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
-    ConstraintSystem &cs, ArrayRef<AnyFunctionType::Param> args,
+    ConstraintSystem &cs, FunctionType *contextualType,
+    ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator) {
   // Extract the parameters.
@@ -962,13 +993,27 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
             argsWithLabels, params, paramInfo, hasTrailingClosure,
-            cs.shouldAttemptFixes(), listener, parameterBindings)) {
-      if (!cs.shouldAttemptFixes())
+            cs.shouldAttemptFixes(), listener, parameterBindings))
+      return cs.getTypeMatchFailure(locator);
+
+    auto extraArguments = listener.getExtraneousArguments();
+    if (!extraArguments.empty()) {
+      if (RemoveExtraneousArguments::isMinMaxNameShadowing(cs, locator))
         return cs.getTypeMatchFailure(locator);
 
+      // First let's see whether this is a situation where a single
+      // parameter is a tuple, but N distinct arguments were passed in.
       if (AllowTupleSplatForSingleParameter::attempt(
-              cs, argsWithLabels, params, parameterBindings, locator))
-        return cs.getTypeMatchFailure(locator);
+              cs, argsWithLabels, params, parameterBindings, locator)) {
+        // Let's produce a generic "extraneous arguments"
+        // diagnostic otherwise.
+        auto *fix = RemoveExtraneousArguments::create(
+            cs, contextualType, extraArguments,
+            cs.getConstraintLocator(locator));
+
+        if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 5))
+          return cs.getTypeMatchFailure(locator);
+      }
     }
   }
 
@@ -1387,6 +1432,33 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   return false;
 }
 
+static bool fixExtraneousArguments(ConstraintSystem &cs,
+                                   FunctionType *contextualType,
+                                   ArrayRef<AnyFunctionType::Param> args,
+                                   int numExtraneous,
+                                   ConstraintLocatorBuilder locator) {
+  auto AnyType = cs.getASTContext().TheAnyType;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> extraneous;
+
+  auto argumentLocator =
+      locator.withPathElement(ConstraintLocator::FunctionArgument);
+
+  for (unsigned i = args.size() - numExtraneous, n = args.size(); i != n; ++i) {
+    extraneous.push_back({i, args[i]});
+    if (auto *typeVar = args[i].getPlainType()->getAs<TypeVariableType>()) {
+      cs.recordHole(typeVar);
+      cs.addConstraint(
+          ConstraintKind::Defaultable, typeVar, AnyType,
+          argumentLocator.withPathElement(LocatorPathElt::TupleElement(i)));
+    }
+  }
+
+  return cs.recordFix(
+      RemoveExtraneousArguments::create(cs, contextualType, extraneous,
+                                        cs.getConstraintLocator(locator)),
+      /*impact=*/numExtraneous * 2);
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
@@ -1612,8 +1684,14 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                               abs(diff), locator))
         return getTypeMatchFailure(argumentLocator);
     } else {
-      // TODO(diagnostics): Add handling of extraneous arguments.
-      return getTypeMatchFailure(argumentLocator);
+      // If there are extraneous arguments, let's remove
+      // them from the list.
+      if (fixExtraneousArguments(*this, func2, func1Params, diff, locator))
+        return getTypeMatchFailure(argumentLocator);
+
+      // Drop all of the extraneous arguments.
+      auto numParams = func2Params.size();
+      func1Params.erase(func1Params.begin() + numParams, func1Params.end());
     }
   }
 
@@ -4045,6 +4123,22 @@ ConstraintSystem::simplifyConstructionConstraint(
     return SolutionKind::Unsolved;
 
   case TypeKind::Tuple: {
+    // If this is an attempt to construct `Void` with arguments,
+    // let's diagnose it.
+    if (shouldAttemptFixes()) {
+      if (valueType->isVoid() && fnType->getNumParams() > 0) {
+        auto contextualType = FunctionType::get({}, fnType->getResult());
+        if (fixExtraneousArguments(
+                *this, contextualType, fnType->getParams(),
+                fnType->getNumParams(),
+                getConstraintLocator(locator,
+                                     ConstraintLocator::FunctionArgument)))
+          return SolutionKind::Error;
+
+        fnType = contextualType;
+      }
+    }
+
     // Tuple construction is simply tuple conversion.
     Type argType = AnyFunctionType::composeInput(getASTContext(),
                                                  fnType->getParams(),
@@ -6924,7 +7018,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // The argument type must be convertible to the input type.
     if (::matchCallArguments(
-            *this, func1->getParams(), func2->getParams(), subKind,
+            *this, func2, func1->getParams(), func2->getParams(), subKind,
             outerLocator.withPathElement(ConstraintLocator::ApplyArgument))
             .isFailure())
       return SolutionKind::Error;
@@ -7904,6 +7998,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
+  case FixKind::RemoveExtraneousArguments:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
   case FixKind::AllowInaccessibleMember:

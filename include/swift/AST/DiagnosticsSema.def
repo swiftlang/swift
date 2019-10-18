@@ -1122,6 +1122,8 @@ ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,none,
       "extra argument in call", ())
+ERROR(extra_arguments_in_call,none,
+      "extra arguments at positions %0 in call", (StringRef))
 ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,
@@ -1129,6 +1131,11 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
+NOTE(candidate_with_extraneous_args,none,
+      "candidate %0 requires %1 argument%s1, "
+      "but %2 %select{were|was}3 %select{provided|used in closure body}4",
+      (Type, unsigned, unsigned, bool, bool))
+
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))

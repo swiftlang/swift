@@ -1329,6 +1329,36 @@ public:
                                          ConstraintLocator *locator);
 };
 
+class ExtraneousArgumentsFailure final : public FailureDiagnostic {
+  FunctionType *ContextualType;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArgs;
+
+public:
+  ExtraneousArgumentsFailure(
+      Expr *root, ConstraintSystem &cs, FunctionType *contextualType,
+      ArrayRef<std::pair<unsigned, AnyFunctionType::Param>> extraArgs,
+      ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        ContextualType(resolveType(contextualType)->castTo<FunctionType>()),
+        ExtraArgs(extraArgs.begin(), extraArgs.end()) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  bool diagnoseSingleExtraArgument() const;
+
+  unsigned getTotalNumArguments() const {
+    return ContextualType->getNumParams() + ExtraArgs.size();
+  }
+
+  bool isContextualMismatch() const {
+    auto *locator = getLocator();
+    return locator->isLastElement<LocatorPathElt::ContextualType>() ||
+           locator->isLastElement<LocatorPathElt::ApplyArgToParam>();
+  }
+};
+
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
   using ParamBinding = SmallVector<unsigned, 1>;
 
