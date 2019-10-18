@@ -2805,30 +2805,23 @@ bool ValueDecl::isRecursiveValidation() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  if (!hasInterfaceType()) {
-    // Our clients that don't register the lazy resolver are relying on the
-    // fact that they can't pull an interface type out to avoid doing work.
-    // This is a necessary evil until we can wean them off.
-    if (auto resolver = getASTContext().getLazyResolver()) {
-      resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
-      if (!hasInterfaceType())
-        return ErrorType::get(getASTContext());
-    }
+  // Our clients that don't register the lazy resolver are relying on the
+  // fact that they can't pull an interface type out to avoid doing work.
+  // This is a necessary evil until we can wean them off.
+  if (!getASTContext().getLazyResolver()) {
+    return TypeAndAccess.getPointer();
   }
-  return TypeAndAccess.getPointer();
+
+  auto ty =
+      evaluateOrDefault(getASTContext().evaluator,
+                        InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
+                        ErrorType::get(getASTContext()));
+  return ty ?: ErrorType::get(getASTContext());
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (type) {
-    assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasArchetype() && "Archetype in interface type");
-
-    if (type->hasError())
-      setInvalid();
-  }
-
-  TypeAndAccess.setPointer(type);
+  getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{this},
+                                        std::move(type));
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
@@ -4001,7 +3994,7 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) cons
   do {
     // If we hit circularity, we will diagnose at some point in typeCheckDecl().
     // However we have to explicitly guard against that here because we get
-    // called as part of validateDecl().
+    // called as part of the interface type request.
     if (!visited.insert(CD).second)
       break;
 

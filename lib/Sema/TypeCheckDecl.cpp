@@ -2287,9 +2287,9 @@ public:
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
     // when the VarDecl is merely used from another file.
-    TC.validateDecl(VD);
 
     // Compute these requests in case they emit diagnostics.
+    (void) VD->getInterfaceType();
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
     (void) VD->getPropertyWrapperBackingProperty();
@@ -4091,15 +4091,9 @@ static Type validateParameterType(ParamDecl *decl) {
   return TL.getType();
 }
 
-void TypeChecker::validateDecl(ValueDecl *D) {
-  // Handling validation failure due to re-entrancy is left
-  // up to the caller, who must call hasInterfaceType() to
-  // check that validateDecl() returned a fully-formed decl.
-  if (D->isBeingValidated() || D->hasInterfaceType())
-    return;
-
-  PrettyStackTraceDecl StackTrace("validating", D);
-  FrontendStatsTracer StatsTracer(Context.Stats, "validate-decl", D);
+llvm::Expected<Type>
+InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
+  auto &Context = D->getASTContext();
 
   TypeChecker::checkForForbiddenPrefix(Context, D->getBaseName());
 
@@ -4123,13 +4117,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
     llvm_unreachable("should not get here");
-    return;
+    return Type();
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
     auto interfaceTy = assocType->getDeclaredInterfaceType();
-    assocType->setInterfaceType(MetatypeType::get(interfaceTy, Context));
-    break;
+    return MetatypeType::get(interfaceTy, Context);
   }
 
   case DeclKind::TypeAlias: {
@@ -4146,8 +4139,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       parent = parentDC->getSelfInterfaceType();
     auto sugaredType = TypeAliasType::get(typeAlias, parent, subs,
                                           typeAlias->getUnderlyingType());
-    typeAlias->setInterfaceType(MetatypeType::get(sugaredType, Context));
-    break;
+    return MetatypeType::get(sugaredType, Context);
   }
 
   case DeclKind::Enum:
@@ -4156,8 +4148,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Protocol: {
     auto nominal = cast<NominalTypeDecl>(D);
     Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
-    nominal->setInterfaceType(MetatypeType::get(declaredInterfaceTy, Context));
-    break;
+    return MetatypeType::get(declaredInterfaceTy, Context);
   }
 
   case DeclKind::Param: {
@@ -4167,8 +4158,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto selfParam = computeSelfParam(AFD,
                                         /*isInitializingCtor*/true,
                                         /*wantDynamicSelf*/true);
-      PD->setInterfaceType(selfParam.getPlainType());
-      break;
+      return selfParam.getPlainType();
     }
 
     if (auto *accessor = dyn_cast<AccessorDecl>(PD->getDeclContext())) {
@@ -4176,31 +4166,25 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto *originalParam = getOriginalParamFromAccessor(
         storage, accessor, PD);
       if (originalParam == nullptr) {
-        auto type = storage->getValueInterfaceType();
-        PD->setInterfaceType(type);
-        break;
+        return storage->getValueInterfaceType();
       }
 
       if (originalParam != PD) {
-        PD->setInterfaceType(originalParam->getInterfaceType());
-        break;
+        return originalParam->getInterfaceType();
       }
     }
 
     if (!PD->getTypeRepr())
-      return;
+      return Type();
 
-    auto ty = validateParameterType(PD);
-    PD->setInterfaceType(ty);
-    break;
+    return validateParameterType(PD);
   }
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
-      VD->setInterfaceType(ErrorType::get(Context));
-      break;
+      return ErrorType::get(Context);
     }
 
     Type interfaceType = namingPattern->getType();
@@ -4213,9 +4197,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         interfaceType =
             TypeChecker::checkReferenceOwnershipAttr(VD, interfaceType, attr);
     }
-    VD->setInterfaceType(interfaceType);
 
-    break;
+    return interfaceType;
   }
 
   case DeclKind::Func:
@@ -4224,8 +4207,54 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Destructor: {
     auto *AFD = cast<AbstractFunctionDecl>(D);
     DeclValidationRAII IBV(AFD);
-    AFD->computeType();
-    break;
+
+    auto sig = AFD->getGenericSignature();
+    bool hasSelf = AFD->hasImplicitSelfDecl();
+
+    AnyFunctionType::ExtInfo info;
+
+    // Result
+    Type resultTy;
+    if (auto fn = dyn_cast<FuncDecl>(D)) {
+      resultTy = fn->getResultInterfaceType();
+    } else if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
+      resultTy = ctor->getResultInterfaceType();
+    } else {
+      assert(isa<DestructorDecl>(D));
+      resultTy = TupleType::getEmpty(AFD->getASTContext());
+    }
+
+    // (Args...) -> Result
+    Type funcTy;
+
+    {
+      SmallVector<AnyFunctionType::Param, 4> argTy;
+      AFD->getParameters()->getParams(argTy);
+
+      // 'throws' only applies to the innermost function.
+      info = info.withThrows(AFD->hasThrows());
+      // Defer bodies must not escape.
+      if (auto fd = dyn_cast<FuncDecl>(D))
+        info = info.withNoEscape(fd->isDeferBody());
+
+      if (sig && !hasSelf) {
+        funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
+      } else {
+        funcTy = FunctionType::get(argTy, resultTy, info);
+      }
+    }
+
+    // (Self) -> (Args...) -> Result
+    if (hasSelf) {
+      // Substitute in our own 'self' parameter.
+      auto selfParam = computeSelfParam(AFD);
+      if (sig)
+        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy);
+      else
+        funcTy = FunctionType::get({selfParam}, funcTy);
+    }
+
+    return funcTy;
   }
 
   case DeclKind::Subscript: {
@@ -4243,9 +4272,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     else
       funcTy = FunctionType::get(argTy, elementTy);
 
-    // Record the interface type.
-    SD->setInterfaceType(funcTy);
-    break;
+    return funcTy;
   }
 
   case DeclKind::EnumElement: {
@@ -4272,13 +4299,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     else
       resultTy = FunctionType::get({selfTy}, resultTy);
 
-    // Record the interface type.
-    EED->setInterfaceType(resultTy);
-    break;
+    return resultTy;
   }
   }
-
-  assert(D->hasInterfaceType());
 }
 
 llvm::Expected<NamedPattern *>

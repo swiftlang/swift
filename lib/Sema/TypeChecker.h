@@ -798,8 +798,6 @@ public:
   GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
 
-  void validateDecl(ValueDecl *D);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///
@@ -1018,10 +1016,6 @@ public:
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
-
-  virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD);
-  }
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
