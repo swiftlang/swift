@@ -243,12 +243,9 @@ struct SILAutoDiffIndices {
            parameters->contains(parameterIndex);
   }
 
-  void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << "(source=" << source << " parameters=(";
-    interleave(parameters->getIndices(),
-               [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
-    s << "))";
-  }
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
 
   std::string mangle() const {
     std::string result = "src_" + llvm::utostr(source) + "_wrt_";
@@ -279,6 +276,10 @@ struct AutoDiffConfig {
                               GenericSignatureImpl *derivativeGenericSignature)
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
 };
 
 /// In conjunction with the original function declaration, identifies an
