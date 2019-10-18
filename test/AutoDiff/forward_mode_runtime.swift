@@ -205,7 +205,7 @@ ForwardModeTests.test("complexBinaryMethod") {
 // Tracked struct
 //===----------------------------------------------------------------------===//
 
-ForwardModeTests.test("TrackedIdentity") {
+ForwardModeTests.testWithLeakChecking("TrackedIdentity") {
   func identity(x: Tracked<Float>) -> Tracked<Float> {
     return x
   }
@@ -214,7 +214,7 @@ ForwardModeTests.test("TrackedIdentity") {
   expectEqual(1, differential(1))
 }
 
-ForwardModeTests.test("TrackedAddition") {
+ForwardModeTests.testWithLeakChecking("TrackedAddition") {
   func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x + y
   }
@@ -223,7 +223,7 @@ ForwardModeTests.test("TrackedAddition") {
   expectEqual(2, differential(1, 1))
 }
 
-ForwardModeTests.test("TrackedDivision") {
+ForwardModeTests.testWithLeakChecking("TrackedDivision") {
   func divide(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x / y
   }
@@ -232,7 +232,7 @@ ForwardModeTests.test("TrackedDivision") {
   expectEqual(-0.2, differential(1, 1))
 }
 
-ForwardModeTests.test("TrackedMultipleMultiplication") {
+ForwardModeTests.testWithLeakChecking("TrackedMultipleMultiplication") {
   func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x * y * x
   }
@@ -242,7 +242,7 @@ ForwardModeTests.test("TrackedMultipleMultiplication") {
   expectEqual(56, differential(1, 1))
 }
 
-ForwardModeTests.test("TrackedWithLets") {
+ForwardModeTests.testWithLeakChecking("TrackedWithLets") {
   func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     let a = x + y
     let b = a * a // (x+y)^2
@@ -627,7 +627,7 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
   expectEqual(36, differential(1, 1))
 }
 
-ForwardModeTests.test("TrackedDifferentiableFuncType") {
+ForwardModeTests.testWithLeakChecking("TrackedDifferentiableFuncType") {
   func valAndDeriv(
     f: @escaping @differentiable (Tracked<Float>) -> Tracked<Float>
   ) -> (Tracked<Float>, Tracked<Float>) {

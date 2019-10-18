@@ -51,7 +51,7 @@ SupersetVJPTests.test("ApplySubset") {
   func foo<T: Differentiable>(_ x: T, _ y: T, apply: @differentiable (T, T) -> T) -> T {
     return apply(x, y)
   }
-  expectEqual(1, gradient(at: Float(0)) { x in foo(x, 0) { $0 + $1 } })
+  expectEqual(1, gradient(at: Tracked<Float>(0)) { x in foo(x, 0) { $0 + $1 } })
 }
 
 // FIXME: The expression `(+) as @differentiable (Float, @nondiff Float) -> Float)`
@@ -63,16 +63,18 @@ SupersetVJPTests.test("ApplySubset") {
 //   expectEqual(Float(1), grad)
 // }
 
-SupersetVJPTests.test("IndirectResults") {
+SupersetVJPTests.testWithLeakChecking("IndirectResults") {
   @differentiable(wrt: (x, y), vjp: dx_T)
-  func x_T<T : Differentiable>(_ x: Float, _ y: T) -> Float {
+  func x_T<T : Differentiable>(_ x: Tracked<Float>, _ y: T) -> Tracked<Float> {
     if x > 1000 { return x }
     return x
   }
-  func dx_T<T : Differentiable>(_ x: Float, _ y: T) -> (Float, (Float) -> (Float, T.TangentVector)) {
+  func dx_T<T : Differentiable>(
+    _ x: Tracked<Float>, _ y: T
+  ) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, T.TangentVector)) {
     return (x_T(x, y), { v in (x * v, .zero) })
   }
-  expectEqual(2, gradient(at: 2) { x in x_T(x, Float(3)) })
+  expectEqual(2, gradient(at: 2) { x in x_T(x, Tracked<Float>(3)) })
 }
 
 runAllTests()
