@@ -1026,3 +1026,37 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   }
   decl->TypeAndAccess.setPointer(type);
 }
+
+//----------------------------------------------------------------------------//
+// LookupPrecedenceGroupRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc.getLoc();
+}
+
+void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto &desc = std::get<0>(getStorage());
+  if (auto pathDir = desc.pathDirection) {
+    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
+  } else {
+    diags.diagnose(desc.nameLoc, diag::circular_reference);
+  }
+}
+
+void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+  auto &desc = std::get<0>(getStorage());
+  diag.diagnose(desc.nameLoc,
+                 diag::circular_reference_through_precedence_group, desc.ident);
+}
+
+SourceLoc PrecedenceGroupDescriptor::getLoc() const {
+  return nameLoc;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const PrecedenceGroupDescriptor &desc) {
+  out << "precedence group " << desc.ident << " at ";
+  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+}

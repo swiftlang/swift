@@ -2783,8 +2783,13 @@ bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
 
+static bool isComputingInterfaceType(const ValueDecl *VD) {
+  return VD->getASTContext().evaluator.hasActiveRequest(
+            InterfaceTypeRequest{const_cast<ValueDecl *>(VD)});
+}
+
 bool ValueDecl::isRecursiveValidation() const {
-  if (hasValidationStarted() && !hasInterfaceType())
+  if (isComputingInterfaceType(this) && !hasInterfaceType())
     return true;
 
   if (auto *vd = dyn_cast<VarDecl>(this))
@@ -7402,21 +7407,6 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),
          lowerThan.size() * sizeof(Relation));
-}
-
-llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
-    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
-  auto *dc = descriptor.dc;
-  PrecedenceGroupDecl *group = nullptr;
-  if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    group = sf->lookupPrecedenceGroup(descriptor.ident, cascading,
-                                      descriptor.nameLoc);
-  } else {
-    group = dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
-                                                         descriptor.nameLoc);
-  }
-  return group;
 }
 
 PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {

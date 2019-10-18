@@ -1448,6 +1448,66 @@ public:
   void cacheResult(Type value) const;
 };
 
+struct PrecedenceGroupDescriptor {
+  enum PathDirection : bool {
+    LowerThan = false,
+    HigherThan = true,
+  };
+  DeclContext *dc;
+  Identifier ident;
+  SourceLoc nameLoc;
+  // Exists for diagnostics. Does not contribute to the descriptor otherwise.
+  Optional<PathDirection> pathDirection;
+
+  SourceLoc getLoc() const;
+
+  friend llvm::hash_code hash_value(const PrecedenceGroupDescriptor &owner) {
+    return llvm::hash_combine(owner.dc,
+                              owner.ident.getAsOpaquePointer(),
+                              owner.nameLoc.getOpaquePointerValue());
+  }
+
+  friend bool operator==(const PrecedenceGroupDescriptor &lhs,
+                         const PrecedenceGroupDescriptor &rhs) {
+    return lhs.dc == rhs.dc &&
+           lhs.ident == rhs.ident &&
+           lhs.nameLoc == rhs.nameLoc;
+  }
+
+  friend bool operator!=(const PrecedenceGroupDescriptor &lhs,
+                         const PrecedenceGroupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
+
+class LookupPrecedenceGroupRequest
+    : public SimpleRequest<LookupPrecedenceGroupRequest,
+                           PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Source location
+  SourceLoc getNearestLoc() const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

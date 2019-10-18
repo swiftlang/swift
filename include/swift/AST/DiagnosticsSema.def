@@ -883,6 +883,8 @@ NOTE(found_this_precedence_group,none,
 ERROR(unknown_precedence_group,none,
       "unknown precedence group %0", (Identifier))
 ERROR(precedence_group_cycle,none,
+      "cycle in '%select{lowerThan|higherThan}0' relation", (bool))
+ERROR(higher_than_precedence_group_cycle,none,
       "cycle in higherThan relation: %0", (StringRef))
 ERROR(precedence_group_lower_within_module,none,
       "precedence group cannot be given lower precedence than group in same"
@@ -892,6 +894,8 @@ ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
 NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
+NOTE(circular_reference_through_precedence_group, none,
+     "through reference to precedence group %0 here", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
