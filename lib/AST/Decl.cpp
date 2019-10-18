@@ -2783,8 +2783,13 @@ bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
 
+static bool isComputingInterfaceType(const ValueDecl *VD) {
+  return VD->getASTContext().evaluator.hasActiveRequest(
+            InterfaceTypeRequest{const_cast<ValueDecl *>(VD)});
+}
+
 bool ValueDecl::isRecursiveValidation() const {
-  if (hasValidationStarted() && !hasInterfaceType())
+  if (isComputingInterfaceType(this) && !hasInterfaceType())
     return true;
 
   if (auto *vd = dyn_cast<VarDecl>(this))

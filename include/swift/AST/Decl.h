@@ -285,7 +285,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+2+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.

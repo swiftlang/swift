@@ -4242,7 +4242,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Constructor:
   case DeclKind::Destructor: {
     auto *AFD = cast<AbstractFunctionDecl>(D);
-    DeclValidationRAII IBV(AFD);
 
     auto sig = AFD->getGenericSignature();
     bool hasSelf = AFD->hasImplicitSelfDecl();
@@ -4295,7 +4294,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Subscript: {
     auto *SD = cast<SubscriptDecl>(D);
-    DeclValidationRAII IBV(SD);
 
     auto elementTy = SD->getElementInterfaceType();
 
@@ -4313,7 +4311,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
-    DeclValidationRAII IBV(EED);
 
     auto *ED = EED->getParentEnum();
 
