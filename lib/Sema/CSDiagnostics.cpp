@@ -1868,7 +1868,16 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseConversionToNil())
     return true;
 
-  assert(!path.empty());
+  if (path.empty()) {
+    if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+      emitDiagnostic(KPE->getLoc(),
+                     diag::expr_smart_keypath_value_covert_to_contextual_type,
+                     getFromType(), getToType());
+      return true;
+    }
+
+    return false;
+  }
 
   if (diagnoseMissingFunctionCall())
     return true;
