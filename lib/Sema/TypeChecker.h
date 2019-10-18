@@ -1976,13 +1976,12 @@ public:
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
-                                  TypeChecker &TC, bool hasKeywordArguments);
+                                  bool hasKeywordArguments);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
-                                         TypeChecker &TC,
                                          bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1991,7 +1990,6 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
-                                      TypeChecker &TC,
                                       bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1999,7 +1997,7 @@ bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
 /// @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC,
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
                                        bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
