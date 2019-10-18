@@ -3438,6 +3438,18 @@ public:
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
 
+  /// Return the range of semantics attributes attached to this NominalTypeDecl.
+  auto getSemanticsAttrs() const
+      -> decltype(getAttrs().getAttributes<SemanticsAttr>()) {
+    return getAttrs().getAttributes<SemanticsAttr>();
+  }
+
+  bool hasSemanticsAttr(StringRef attrValue) const {
+    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
+      return attrValue.equals(attr->Value);
+    });
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
