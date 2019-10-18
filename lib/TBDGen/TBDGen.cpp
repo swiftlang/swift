@@ -254,30 +254,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
     addSymbol(mangledName);
   }
-  // NOTE: This logic is not relevant until `@differentiating` no longer
-  // generates implicit `@differentiable` attributes.
-#if 0
-  // Handle `@differentiating` attributes.
-  for (auto *DA : AFD->getAttrs().getAttributes<DifferentiatingAttr>()) {
-    auto *originalFD = DA->getOriginalFunction();
-    auto differentiableAttrs =
-        originalFD->getAttrs().getAttributes<DifferentiableAttr>();
-    // If there is a `@differentiable` attribute with the same parameter
-    // indices, then symbol has already been emitted. Continue.
-    auto differentiableAttrIt =
-        llvm::find_if(differentiableAttrs, [&](const DifferentiableAttr *attr) {
-          return DA->getParameterIndices() == attr->getParameterIndices();
-        });
-    if (differentiableAttrIt != differentiableAttrs.end())
-      continue;
-    // Otherwise, emit symbol.
-    auto *derivativeId = AutoDiffDerivativeFunctionIdentifier::get(
-        DA->getDerivativeKind(), DA->getParameterIndices(),
-        AFD->getASTContext());
-    addSymbol(
-        SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
-  }
-#endif
 
   visitDefaultArguments(AFD, AFD->getParameters());
 }
@@ -352,30 +328,6 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
     addSymbol(mangledName);
   }
-  // NOTE: This logic is not relevant until `@differentiating` no longer
-  // generates implicit `@differentiable` attributes.
-#if 0
-  // Handle `@differentiating` attributes.
-  for (auto *DA : ASD->getAttrs().getAttributes<DifferentiatingAttr>()) {
-    auto *originalFD = DA->getOriginalFunction();
-    auto differentiableAttrs =
-        originalFD->getAttrs().getAttributes<DifferentiableAttr>();
-    // If there is a `@differentiable` attribute with the same parameter
-    // indices, then symbol has already been emitted. Continue.
-    auto differentiableAttrIt =
-        llvm::find_if(differentiableAttrs, [&](const DifferentiableAttr *attr) {
-          return DA->getParameterIndices() == attr->getParameterIndices();
-        });
-    if (differentiableAttrIt != differentiableAttrs.end())
-      continue;
-    // Otherwise, emit symbol.
-    auto *derivativeId = AutoDiffDerivativeFunctionIdentifier::get(
-        DA->getDerivativeKind(), DA->getParameterIndices(),
-        ASD->getASTContext());
-    addSymbol(
-        SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
-  }
-#endif
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
   ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {

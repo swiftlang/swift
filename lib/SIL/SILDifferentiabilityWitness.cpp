@@ -33,7 +33,7 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   //if (vjp)
   //  vjp->incrementRefCount();
   // Register the differentiability witness in the module.
-  auto config = diffWitness->getAutoDiffConfig();
+  auto config = diffWitness->getConfig();
 #if 0
   llvm::errs() << "SILDifferentiabilityWitness::create\n";
   config.print(llvm::errs()); llvm::errs() << "\n";
@@ -41,7 +41,7 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   assert(!module.DifferentiabilityWitnessMap[originalFunction->getName()].count(config) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[originalFunction->getName()]
-                                    [diffWitness->getAutoDiffConfig()] =
+                                    [diffWitness->getConfig()] =
       diffWitness;
   module.getDifferentiabilityWitnessList().push_back(diffWitness);
 #if 0
@@ -62,5 +62,5 @@ SILDifferentiabilityWitness::~SILDifferentiabilityWitness() {
 }
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
-  return std::make_pair(originalFunction->getName(), autoDiffConfig);
+  return std::make_pair(originalFunction->getName(), config);
 }

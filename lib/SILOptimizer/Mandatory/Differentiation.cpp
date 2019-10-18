@@ -1122,16 +1122,8 @@ public:
       SILFunction *original, const AutoDiffConfig &config) const {
     if (!getModule().hasDifferentiabilityWitnesses(original->getName()))
       return nullptr;
-#if 0
-    llvm::errs() << "FOUND DIFF WITNESSES FOR ORIGINAL " << original->getName() << ": " << getModule().lookUpDifferentiabilityWitnesses(original->getName()).size() << "\n";
-    config.print(llvm::errs());  llvm::errs() << "\n";
-#endif
     for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName())) {
       auto *diffWitness = pair.second;
-#if 0
-      diffWitness->dump();
-      diffWitness->getAutoDiffConfig().print(llvm::errs());  llvm::errs() << "\n";
-#endif
       if (diffWitness->getResultIndices() == config.resultIndices &&
           diffWitness->getParameterIndices() == config.parameterIndices)
         return diffWitness;
@@ -2812,19 +2804,16 @@ emitDerivativeFunctionReference(
       }
       // Check and diagnose external declarations.
       if (originalFn->isExternalDeclaration()) {
-        bool found = false;
+        const DifferentiableAttr *minimalAttr = nullptr;
+        IndexSubset *minimalParamIndexSet = nullptr;
         if (auto *DC = originalFn->getDeclContext()) {
-          auto *origAFD = DC->getAsDecl();
-          for (auto pair : context.getASTContext().DifferentiableAttrs) {
-            auto origPair = pair.first;
-            auto origDecl = origPair.first;
-            if (origDecl != origAFD)
-              continue;
-            found = true;
-          }
+          if (auto *origAFD =
+                  cast_or_null<AbstractFunctionDecl>(DC->getAsDecl()))
+            std::tie(minimalAttr, minimalParamIndexSet) =
+                context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
+                    SILDeclRef(origAFD), originalFnTy, desiredConfig);
         }
-        if (!found) {
-          llvm::dbgs() << "not found here\n";
+        if (!minimalAttr) {
           context.emitNondifferentiabilityError(
               original, invoker,
               diag::autodiff_external_nondifferentiable_function);
@@ -2884,7 +2873,7 @@ emitDerivativeFunctionReference(
         derivativeFnRef2, originalFRI, original, builder, loc,
         newBuffersToDealloc,
         derivativeFn->getLoweredFunctionType()->getGenericSignature());
-    return std::make_pair(convertedRef, minimalWitness->getAutoDiffConfig());
+    return std::make_pair(convertedRef, minimalWitness->getConfig());
   }
 
   // Find witness method retrieval.
@@ -3517,7 +3506,7 @@ private:
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
 #endif
   const AutoDiffConfig &getConfig() const {
-    return witness->getAutoDiffConfig();
+    return witness->getConfig();
   }
 
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
@@ -3555,9 +3544,9 @@ public:
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), witness(witness), vjp(vjp),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, witness->getAutoDiffConfig(), vjp)),
+                              context, original, witness->getConfig(), vjp)),
         pullbackInfo(context, AutoDiffLinearMapKind::Pullback, original, vjp,
-                     witness->getAutoDiffConfig(), activityInfo) {
+                     witness->getConfig(), activityInfo) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
     context.getGeneratedFunctions().push_back(pullback);
@@ -4428,7 +4417,7 @@ private:
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
 #endif
   const AutoDiffConfig &getConfig() const {
-    return witness->getAutoDiffConfig();
+    return witness->getConfig();
   }
   SILBuilder &getDifferentialBuilder() { return differentialBuilder; }
   SILFunction &getDifferential() {
@@ -5451,9 +5440,9 @@ public:
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
         context(context), original(original), witness(witness), jvp(jvp),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, witness->getAutoDiffConfig(), jvp)),
+                              context, original, witness->getConfig(), jvp)),
         differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
-                         jvp, witness->getAutoDiffConfig(), activityInfo),
+                         jvp, witness->getConfig(), activityInfo),
         differentialBuilder(SILBuilder(*createEmptyDifferential(
             context, original, witness, &differentialInfo))),
         diffLocalAllocBuilder(getDifferential()) {
@@ -5996,19 +5985,11 @@ private:
   ASTContext &getASTContext() const { return getPullback().getASTContext(); }
   SILFunction &getOriginal() const { return *vjpEmitter.original; }
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
-#if 0
-  SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
-#endif
   SILDifferentiabilityWitness *getWitness() const { return vjpEmitter.witness; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
   LinearMapInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
-#if 0
-  const SILAutoDiffIndices &getIndices() const {
-    return vjpEmitter.getIndices();
-  }
-#endif
   const AutoDiffConfig &getConfig() const {
-    return getWitness()->getAutoDiffConfig();
+    return getWitness()->getConfig();
   }
   const DifferentiableActivityInfo &getActivityInfo() const {
     return vjpEmitter.activityInfo;
@@ -8078,7 +8059,7 @@ ADContext::declareExternalDerivativeFunction(
     SILFunction *original, SILDifferentiabilityWitness *witness,
     StringRef name, AutoDiffDerivativeFunctionKind kind) {
   auto &module = getModule();
-  auto &config = witness->getAutoDiffConfig();
+  auto &config = witness->getConfig();
   SILAutoDiffIndices indices(*config.resultIndices->begin(),
                              config.parameterIndices);
   auto originalTy = original->getLoweredFunctionType();
@@ -8109,7 +8090,7 @@ static SILFunction *createEmptyVJP(
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
-  auto &config = witness->getAutoDiffConfig();
+  auto &config = witness->getConfig();
   SILAutoDiffIndices indices(*config.resultIndices->begin(),
                              config.parameterIndices);
 
@@ -8161,7 +8142,7 @@ static SILFunction *createEmptyJVP(
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
-  auto &config = witness->getAutoDiffConfig();
+  auto &config = witness->getConfig();
   SILAutoDiffIndices indices(*config.resultIndices->begin(),
                              config.parameterIndices);
 
@@ -9060,15 +9041,6 @@ void Differentiation::run() {
     continue;
   }
   for (SILFunction &f : module) {
-#if 0
-    for (auto *diffAttr : f.getDifferentiableAttrs()) {
-      DifferentiationInvoker invoker(diffAttr);
-      assert(!context.getInvokers().count(diffAttr) &&
-             "[differentiable] attribute already has an invoker");
-      context.getInvokers().insert({diffAttr, invoker});
-      continue;
-    }
-#endif
     for (SILBasicBlock &bb : f) {
       for (SILInstruction &i : bb) {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))

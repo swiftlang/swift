@@ -810,9 +810,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   bool reorderSelf = shouldReorderSelf();
 
   CanGenericSignature derivativeCanGenSig;
-  if (auto derivativeGenSig = config.derivativeGenericSignature) {
+  if (auto derivativeGenSig = config.derivativeGenericSignature)
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
-  }
   // TODO(TF-835): Use simpler derivative generic signature logic below when
   // type-checking no longer generates implicit `@differentiable` attributes.
   // See TF-835 for replacement code.
@@ -830,14 +829,19 @@ void SILGenModule::emitDifferentiabilityWitness(
   }
   assert(originalFunction);
   // Create new SIL differentiability witness.
-  // Witness JVP and VJP are set below.
+  // - Witness JVP and VJP are set below.
+  // - Witness linkage is:
+  //   - Hidden if no JVP/VJP functions are registered. The differentiation
+  //     transform will generate hidden JVP/VJP functions.
+  //   - Otherwise, equal to the JVP/VJP function linkage.
   // TODO(TF-919): Explore creating serialized differentiability witnesses.
   // Currently, differentiability witnesses are never serialized to avoid
   // deserialization issues where JVP/VJP functions cannot be found.
+  Optional<SILLinkage> diffWitnessLinkage = None;
   auto *diffWitness = SILDifferentiabilityWitness::create(
-      M, originalFunction->getLinkage(), originalFunction,
-      loweredParamIndices, config.resultIndices, derivativeCanGenSig,
-      /*jvp*/ nullptr, /*vjp*/ nullptr, /*isSerialized*/ false);
+      M, SILLinkage::Hidden, originalFunction, loweredParamIndices,
+      config.resultIndices, derivativeCanGenSig, /*jvp*/ nullptr,
+      /*vjp*/ nullptr, /*isSerialized*/ false);
 
   // Set derivative function in differentiability witness.
   auto setDerivativeInDifferentiabilityWitness =
@@ -872,6 +876,14 @@ void SILGenModule::emitDifferentiabilityWitness(
            "SIL differentiability witness already has a different existing "
            "derivative");
     diffWitness->setDerivative(kind, derivativeThunk);
+    // Set witness linkage.
+    if (!diffWitnessLinkage) {
+      diffWitnessLinkage = derivativeThunk->getLinkage();
+    } else {
+      assert(diffWitnessLinkage == derivativeThunk->getLinkage() &&
+             "JVP/VJP linkages must match; this should be checked during "
+             "attribute type-checking");
+    }
   };
   if (jvp)
     setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::JVP,
@@ -879,6 +891,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   if (vjp)
     setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::VJP,
                                             vjp);
+  if (diffWitnessLinkage)
+    diffWitness->setLinkage(*diffWitnessLinkage);
 }
 
 void SILGenModule::

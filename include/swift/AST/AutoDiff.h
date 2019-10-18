@@ -45,21 +45,6 @@ enum class DifferentiabilityKind : uint8_t {
   Normal = 1,
   Linear = 2
 };
-#if 0
-struct DifferentiabilityKind {
-  enum innerty : unsigned {
-    NonDifferentiable = 0,
-    Normal = 1,
-    Linear = 2
-  } rawValue;
-
-  DifferentiabilityKind() = default;
-  DifferentiabilityKind(innerty rawValue) : rawValue(rawValue) {}
-  explicit DifferentiabilityKind(unsigned rawValue) :
-      DifferentiabilityKind((innerty)rawValue) {}
-  operator innerty() const { return rawValue; }
-};
-#endif
 
 /// The kind of an linear map.
 struct AutoDiffLinearMapKind {
@@ -284,16 +269,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
 /// - Parameter indices.
 /// - Result indices.
 /// - Derivative generic signature (optional).
-struct ASTAutoDiffConfig {
-  // Parameter indices for an AST function.
-  IndexSubset *parameterIndices;
-  GenericSignature *derivativeGenericSignature;
-};
-
-/// Identifies an autodiff derivative function configuration:
-/// - Parameter indices.
-/// - Result indices.
-/// - Derivative generic signature (optional).
 struct AutoDiffConfig {
   IndexSubset *parameterIndices;
   IndexSubset *resultIndices;
@@ -500,13 +475,13 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            llvm::DenseMapInfo<GenericSignature>::getEmptyKey()};
+            DenseMapInfo<GenericSignature>::getEmptyKey()};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            llvm::DenseMapInfo<GenericSignature>::getTombstoneKey()};
+            DenseMapInfo<GenericSignature>::getTombstoneKey()};
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {
