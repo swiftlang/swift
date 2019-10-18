@@ -315,6 +315,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }
+  if (Invocation.getDiagnosticOptions().EnableDescriptiveDiagnostics) {
+    Diagnostics.setUseDescriptiveDiagnostics(true);
+  }
 }
 
 bool CompilerInstance::setUpModuleLoaders() {
