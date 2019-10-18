@@ -20,6 +20,7 @@
 #include "CSDiagnostics.h"
 #include "CSFix.h"
 #include "TypeCheckType.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Statistic.h"
@@ -823,7 +824,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
           if (!var->isInvalid()) {
             TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
                         var->getDescriptiveKind(), var->getName());
-            var->markInvalid();
+            var->setInterfaceType(ErrorType::get(getASTContext()));
           }
           return ErrorType::get(TC.Context);
         }
@@ -1460,13 +1461,20 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   if (decl->isImplicitlyUnwrappedOptional())
     return Type();
 
+  // In a pattern binding initializer, all of its bound variables have no
+  // effective overload type.
+  if (auto *PBI = dyn_cast<PatternBindingInitializer>(useDC)) {
+    if (auto *VD = dyn_cast<VarDecl>(decl)) {
+      if (PBI->getBinding() == VD->getParentPatternBinding()) {
+        return Type();
+      }
+    }
+  }
+
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
-  if (!type) {
-    type = decl->getInterfaceType();
-    if (!type) {
-      return Type();
-    }
+  if (!type || type->hasError()) {
+    return Type();
   }
 
   // If we have a generic function type, drop the generic signature; we don't
@@ -3043,6 +3051,22 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
   return false;
 }
 
+bool constraints::hasAppliedSelf(ConstraintSystem &cs,
+                                 const OverloadChoice &choice) {
+  auto *decl = choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto baseType = choice.getBaseType();
+  if (baseType)
+    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
+
+  // In most cases where we reference a declaration with a curried self
+  // parameter, it gets dropped from the type of the reference.
+  return decl->hasCurriedSelf() &&
+         doesMemberRefApplyCurriedSelf(baseType, decl);
+}
+
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
@@ -3187,6 +3211,21 @@ bool constraints::isPatternMatchingOperator(Expr *expr) {
   return isOperator(expr, "~=");
 }
 
+bool constraints::isOperatorArgument(ConstraintLocator *locator,
+                                     StringRef expectedOperator) {
+  if (!locator->findLast<LocatorPathElt::ApplyArgToParam>())
+    return false;
+
+  if (auto *AE = dyn_cast_or_null<ApplyExpr>(locator->getAnchor())) {
+    if (isa<PrefixUnaryExpr>(AE) || isa<BinaryExpr>(AE) ||
+        isa<PostfixUnaryExpr>(AE))
+      return expectedOperator.empty() ||
+             isOperator(AE->getFn(), expectedOperator);
+  }
+
+  return false;
+}
+
 bool constraints::isArgumentOfPatternMatchingOperator(
     ConstraintLocator *locator) {
   auto *binaryOp = dyn_cast_or_null<BinaryExpr>(locator->getAnchor());
@@ -3197,13 +3236,6 @@ bool constraints::isArgumentOfPatternMatchingOperator(
 
 bool constraints::isArgumentOfReferenceEqualityOperator(
     ConstraintLocator *locator) {
-  if (!locator->findLast<LocatorPathElt::ApplyArgToParam>())
-    return false;
-
-  if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(locator->getAnchor())) {
-    auto *fnExpr = binaryOp->getFn();
-    return isOperator(fnExpr, "===") || isOperator(fnExpr, "!==");
-  }
-
-  return false;
+  return isOperatorArgument(locator, "===") ||
+         isOperatorArgument(locator, "!==");
 }

@@ -1645,7 +1645,8 @@ bool TempRValueOptPass::collectLoads(
                             << *user);
     return false;
 
-  case SILInstructionKind::ApplyInst: {
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::TryApplyInst: {
     ApplySite apply(user);
 
     // Check if the function can just read from userOp.
@@ -1694,7 +1695,7 @@ bool TempRValueOptPass::collectLoads(
                  "its source" << *user);
       return false;
     }
-    return true;
+    LLVM_FALLTHROUGH;
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
@@ -1713,12 +1714,11 @@ bool TempRValueOptPass::collectLoads(
   }
 
   case SILInstructionKind::LoadInst:
-  case SILInstructionKind::LoadBorrowInst: {
+  case SILInstructionKind::LoadBorrowInst:
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
     loadInsts.insert(user);
     return true;
-  }
 
   case SILInstructionKind::CopyAddrInst: {
     // copy_addr which read from the temporary are like loads.
@@ -1833,17 +1833,9 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       use->set(copyInst->getSrc());
       break;
     }
-    case SILInstructionKind::StructElementAddrInst:
-    case SILInstructionKind::TupleElementAddrInst:
-    case SILInstructionKind::LoadInst:
-    case SILInstructionKind::LoadBorrowInst:
-    case SILInstructionKind::ApplyInst:
-    case SILInstructionKind::OpenExistentialAddrInst:
+    default:
       use->set(copyInst->getSrc());
       break;
-
-    default:
-      llvm_unreachable("unhandled instruction");
     }
   }
   tempObj->eraseFromParent();

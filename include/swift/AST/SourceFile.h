@@ -117,6 +117,13 @@ private:
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
+  /// The set of validated opaque return type decls in the source file.
+  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
+  llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
+  /// The set of parsed decls with opaque return types that have not yet
+  /// been validated.
+  llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+
   friend ASTContext;
   friend Impl;
 public:
@@ -129,13 +136,6 @@ public:
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
-
-  /// The set of validated opaque return type decls in the source file.
-  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
-  llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of parsed decls with opaque return types that have not yet
-  /// been validated.
-  llvm::DenseSet<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation
@@ -276,6 +276,7 @@ public:
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
+  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -430,14 +431,16 @@ public:
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
 
-  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
-                                         LazyResolver *resolver) override;
+  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
+  /// Do not call when inside an inactive clause (\c
+  /// InInactiveClauseEnvironment)) because it will later on result in a lookup
+  /// to something that won't be in the ASTScope tree.
   void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
     UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
   }
 
-  void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
+  ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
 
 private:
 

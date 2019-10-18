@@ -25,6 +25,7 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
+#include "llvm/Object/RelocationResolver.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 
@@ -36,7 +37,6 @@
 
 #include <algorithm>
 #include <csignal>
-#include <iostream>
 
 using llvm::ArrayRef;
 using llvm::dyn_cast;
@@ -96,7 +96,11 @@ private:
   const ObjectFile *O;
   uint64_t HeaderAddress;
   std::vector<Segment> Segments;
-  llvm::DenseMap<uint64_t, StringRef> DynamicRelocations;
+  struct DynamicRelocation {
+    StringRef Symbol;
+    uint64_t Offset;
+  };
+  llvm::DenseMap<uint64_t, DynamicRelocation> DynamicRelocations;
   
   void scanMachO(const MachOObjectFile *O) {
     using namespace llvm::MachO;
@@ -144,7 +148,25 @@ private:
         llvm::consumeError(std::move(error));
         break;
       }
-      DynamicRelocations.insert({bind.address(), bind.symbolName()});
+      
+      // The offset from the symbol is stored at the target address.
+      uint64_t Offset;
+      auto OffsetContent = getContentsAtAddress(bind.address(),
+                                                O->getBytesInAddress());
+      if (OffsetContent.empty())
+        continue;
+      
+      if (O->getBytesInAddress() == 8) {
+        memcpy(&Offset, OffsetContent.data(), sizeof(Offset));
+      } else if (O->getBytesInAddress() == 4) {
+        uint32_t OffsetValue;
+        memcpy(&OffsetValue, OffsetContent.data(), sizeof(OffsetValue));
+        Offset = OffsetValue;
+      } else {
+        assert(false && "unexpected word size?!");
+      }
+      
+      DynamicRelocations.insert({bind.address(), {bind.symbolName(), Offset}});
     }
     if (error) {
       llvm::consumeError(std::move(error));
@@ -160,7 +182,6 @@ private:
     auto phdrs = O->getELFFile()->program_headers();
     if (!phdrs) {
       llvm::consumeError(phdrs.takeError());
-      return;
     }
 
     for (auto &ph : *phdrs) {
@@ -175,6 +196,45 @@ private:
       Segments.push_back({ph.p_vaddr, contents});
       HeaderAddress = std::min(HeaderAddress, (uint64_t)ph.p_vaddr);
     }
+        
+    // Collect the dynamic relocations.
+    auto resolver = getRelocationResolver(*O);
+    auto resolverSupports = resolver.first;
+    auto resolve = resolver.second;
+    
+    if (!resolverSupports || !resolve)
+      return;
+    
+    auto machine = O->getELFFile()->getHeader()->e_machine;
+    auto relativeRelocType = getELFRelativeRelocationType(machine);
+    
+    for (auto &S : static_cast<const ELFObjectFileBase*>(O)
+                                             ->dynamic_relocation_sections()) {
+      bool isRela = O->getSection(S.getRawDataRefImpl())->sh_type
+        == llvm::ELF::SHT_RELA;
+
+      for (const RelocationRef &R : S.relocations()) {
+        // `getRelocationResolver` doesn't handle RELATIVE relocations, so we
+        // have to do that ourselves.
+        if (isRela && R.getType() == relativeRelocType) {
+          auto rela = O->getRela(R.getRawDataRefImpl());
+          DynamicRelocations.insert({R.getOffset(),
+            {{}, HeaderAddress + rela->r_addend}});
+          continue;
+        }
+        
+        if (!resolverSupports(R.getType()))
+          continue;
+        auto symbol = R.getSymbol();
+        auto name = symbol->getName();
+        if (!name) {
+          llvm::consumeError(name.takeError());
+          continue;
+        }
+        uint64_t offset = resolve(R, 0, 0);
+        DynamicRelocations.insert({R.getOffset(), {*name, offset}});
+      }
+    }
   }
   
   void scanELF(const ELFObjectFileBase *O) {
@@ -186,6 +246,8 @@ private:
       scanELFType(le64);
     } else if (auto be64 = dyn_cast<ELFObjectFile<ELF64BE>>(O)) {
       scanELFType(be64);
+    } else {
+      return;
     }
     
     // FIXME: ReflectionContext tries to read bits of the ELF structure that
@@ -215,6 +277,8 @@ private:
       Segments.push_back({SectionBase, SectionContent});
     }
     
+    // FIXME: We need to map the header at least, but how much of it does
+    // Windows typically map?
     Segments.push_back({HeaderAddress, O->getData()});
   }
 
@@ -272,7 +336,8 @@ public:
     if (found == DynamicRelocations.end())
       result = RemoteAbsolutePointer("", pointerValue);
     else
-      result = RemoteAbsolutePointer(found->second, pointerValue);
+      result = RemoteAbsolutePointer(found->second.Symbol,
+                                     found->second.Offset);
     return result;
   }
 };
@@ -483,7 +548,7 @@ makeReflectionContextForObjectFiles(
 
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
                                     StringRef Arch, ActionType Action,
-                                    std::ostream &OS) {
+                                    FILE *file) {
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   std::vector<OwningBinary<Binary>> BinaryOwners;
@@ -516,7 +581,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    builder.dumpAllSections(OS);
+    builder.dumpAllSections(file);
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {
@@ -531,17 +596,17 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       auto *TypeRef =
           swift::Demangle::decodeMangledType(builder, Demangled);
       if (TypeRef == nullptr) {
-        OS << "Invalid typeref: " << Line << "\n";
+        fprintf(file, "Invalid typeref:%s\n", Line.c_str());
         continue;
       }
 
-      TypeRef->dump(OS);
+      TypeRef->dump(file);
       auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef);
       if (TypeInfo == nullptr) {
-        OS << "Invalid lowering\n";
+        fprintf(file, "Invalid lowering\n");
         continue;
       }
-      TypeInfo->dump(OS);
+      TypeInfo->dump(file);
     }
     break;
   }
@@ -555,5 +620,5 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
                                   options::Architecture, options::Action,
-                                  std::cout);
+                                  stdout);
 }

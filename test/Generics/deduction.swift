@@ -194,7 +194,7 @@ protocol IsBefore {
   func isBefore(_ other: Self) -> Bool
 }
 
-func min2<T : IsBefore>(_ x: T, _ y: T) -> T {
+func min2<T : IsBefore>(_ x: T, _ y: T) -> T { // expected-note {{where 'T' = 'Float'}}
   if y.isBefore(x) { return y }
   return x
 }
@@ -205,7 +205,7 @@ extension Int : IsBefore {
 
 func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   _ = min2(x, y)
-  min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
+  min2(a, b) // expected-error{{global function 'min2' requires that 'Float' conform to 'IsBefore'}}
 }
 
 func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{where 'R.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
@@ -241,11 +241,11 @@ genericInheritsA(C_GI())
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
-protocol Addable {
+protocol Addable { // expected-note {{where 'Self' = 'U'}}
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{argument type 'U' does not conform to expected type 'Addable'}}
+  u + u // expected-error{{protocol 'Addable' requires that 'U' conform to 'Addable'}}
   return x+y
 }
 
@@ -311,10 +311,10 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}}
+    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}} expected-error {{variable 'i' is not bound by any pattern}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
-    let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
+    let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
     let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped}}
   // expected-note@-1{{coalesce}}

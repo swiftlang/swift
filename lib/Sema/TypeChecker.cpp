@@ -330,7 +330,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
-  for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
+  for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
     TypeChecker::computeCaptures(FD);
   }
 
@@ -618,22 +618,6 @@ swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
   return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
-void swift::typeCheckCompletionDecl(Decl *D) {
-  auto &Ctx = D->getASTContext();
-
-  DiagnosticSuppression suppression(Ctx.Diags);
-  (void)createTypeChecker(Ctx);
-  if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-    if (auto *nominal = ext->computeExtendedNominal()) {
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)nominal->getInterfaceType();
-    }
-  } else {
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)cast<ValueDecl>(D)->getInterfaceType();
-  }
-}
-
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                     unsigned bindingIndex) {
   assert(!PBD->isInitializerChecked(bindingIndex) &&
@@ -745,38 +729,18 @@ TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
   return TypeChecker::createForContext(Ctx);
 }
 
-// checkForForbiddenPrefix is for testing purposes.
+void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
+  if (C.LangOpts.DebugForbidTypecheckPrefix.empty())
+    return;
 
-void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
+  // Don't touch special names or empty names.
+  if (Name.isSpecial() || Name.empty())
     return;
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (!VD->getBaseName().isSpecial())
-      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
-  }
-}
 
-void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (!E->getName().isSpecial())
-    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
-}
-
-void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  checkForForbiddenPrefix(Ident.empty() ? StringRef() : Ident.str());
-}
-
-void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (Name.empty())
-    return;
-  if (Name.startswith(Context.LangOpts.DebugForbidTypecheckPrefix)) {
+  StringRef Str = Name.getIdentifier().str();
+  if (Str.startswith(C.LangOpts.DebugForbidTypecheckPrefix)) {
     std::string Msg = "forbidden typecheck occurred: ";
-    Msg += Name;
+    Msg += Str;
     llvm::report_fatal_error(Msg);
   }
 }

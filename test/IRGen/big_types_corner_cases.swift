@@ -346,3 +346,11 @@ public extension sr8076_QueryHandler {
         return try body(query)
     }
 }
+
+public func foo() -> Optional<(a: Int?, b: Bool, c: (Int?)->BigStruct?)> {
+  return nil
+}
+
+public func dontAssert() {
+  let _ = foo()
+}

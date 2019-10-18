@@ -60,8 +60,7 @@ public:
 
   /// Look up an opaque return type by the mangled name of the declaration
   /// that defines it.
-  virtual OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
-                                                 LazyResolver *resolver) {
+  virtual OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) {
     return nullptr;
   }
 
@@ -129,6 +128,10 @@ public:
 
   virtual Optional<StringRef>
   getGroupNameByUSR(StringRef USR) const {
+    return None;
+  }
+
+  virtual Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const {
     return None;
   }
 

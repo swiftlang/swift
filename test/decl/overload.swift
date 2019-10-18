@@ -571,23 +571,23 @@ enum SR_10084_E_8 {
 }
 
 enum SR_10084_E_9 {
-  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static let A: SR_10084_E_9 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{'A' previously declared here}}
+  static let A: SR_10084_E_9 = .A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_10 {
-  static let A: SR_10084_E_10 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
-  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+  static let A: SR_10084_E_10 = .A // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_11 {
-  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static var A: SR_10084_E_11 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{'A' previously declared here}}
+  static var A: SR_10084_E_11 = .A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_12 {
-  static var A: SR_10084_E_12 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
-  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+  static var A: SR_10084_E_12 = .A // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_13 {
@@ -608,4 +608,29 @@ enum SR_10084_E_15 {
 enum SR_10084_E_16 {
   typealias Z = Int // expected-note {{'Z' previously declared here}}
   case Z // expected-error {{invalid redeclaration of 'Z'}}
+}
+
+// N.B. Validating the pattern binding initializer for `pickMe` used to cause
+// recursive validation of the VarDecl. Check that we don't regress now that
+// this isn't the case.
+public struct Cyclic {
+  static func pickMe(please: Bool) -> Int { return 42 }
+  public static let pickMe = Cyclic.pickMe(please: true)
+}
+
+struct Node {}
+struct Parameterized<Value, Format> {
+  func please<NewValue>(_ transform: @escaping (_ otherValue: NewValue) -> Value) -> Parameterized<NewValue, Format> {
+    fatalError()
+  }
+}
+
+extension Parameterized where Value == [Node], Format == String {
+  static var pickMe: Parameterized {
+    fatalError()
+  }
+}
+
+extension Parameterized where Value == Node, Format == String {
+  static let pickMe = Parameterized<[Node], String>.pickMe.please { [$0] }
 }

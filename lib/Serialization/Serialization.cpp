@@ -439,7 +439,7 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
-        !isa<SubscriptDecl>(DC);
+        !isa<SubscriptDecl>(DC) && !isa<EnumElementDecl>(DC);
 }
 
 namespace {
@@ -1851,11 +1851,10 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
 
   StringRef initStr;
   SmallString<128> scratch;
-  auto &entry = binding->getPatternList()[bindingIndex];
-  auto varDecl = entry.getAnchoringVarDecl();
-  if (entry.hasInitStringRepresentation() &&
+  auto varDecl = binding->getAnchoringVarDecl(bindingIndex);
+  if (binding->hasInitStringRepresentation(bindingIndex) &&
       varDecl->isInitExposedToClients()) {
-    initStr = entry.getInitStringRepresentation(scratch);
+    initStr = binding->getInitStringRepresentation(bindingIndex, scratch);
   }
 
   PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
@@ -2683,7 +2682,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    for (auto *genericParams : swift::reversed(allGenericParams))
+    for (auto *genericParams : llvm::reverse(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);
@@ -2698,7 +2697,7 @@ public:
     SmallVector<uint64_t, 2> initContextIDs;
     for (unsigned i : range(binding->getNumPatternEntries())) {
       auto initContextID =
-          S.addDeclContextRef(binding->getPatternList()[i].getInitContext());
+          S.addDeclContextRef(binding->getInitContext(i));
       if (!initContextIDs.empty()) {
         initContextIDs.push_back(initContextID.getOpaqueValue());
       } else if (initContextID) {
@@ -2719,8 +2718,8 @@ public:
     if (binding->getDeclContext()->isTypeContext())
       owningDC = binding->getDeclContext();
 
-    for (auto entry : binding->getPatternList()) {
-      writePattern(entry.getPattern());
+    for (auto entryIdx : range(binding->getNumPatternEntries())) {
+      writePattern(binding->getPattern(entryIdx));
       // Ignore initializer; external clients don't need to know about it.
     }
   }
@@ -3257,17 +3256,6 @@ public:
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
-    // Accessor synthesis and type checking is now sufficiently lazy that
-    // we might have unvalidated accessors in a primary file.
-    //
-    // FIXME: Once accessor synthesis and getInterfaceType() itself are
-    // request-ified this goes away.
-    if (!fn->hasInterfaceType()) {
-      assert(fn->isImplicit());
-      // FIXME: Remove this one
-      (void)fn->getInterfaceType();
-    }
-
     using namespace decls_block;
     verifyAttrSerializable(fn);
 

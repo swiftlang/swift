@@ -181,7 +181,7 @@ variadicWithTrailingClosure(fn: +)
 func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
-  (a, b) = (b, a % b)  // expected-error {{argument type 'T' does not conform to expected type 'BinaryInteger'}}
+  (a, b) = (b, a % b)  // expected-error {{protocol 'BinaryInteger' requires that 'T' conform to 'BinaryInteger'}}
 }
 
 // <rdar://problem/24210190>

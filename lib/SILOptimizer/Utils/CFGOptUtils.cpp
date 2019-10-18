@@ -27,7 +27,7 @@ using namespace swift;
 ///
 /// \param branch The terminator to add the argument to.
 /// \param dest The destination block of the edge.
-/// \param Val The value to the arguments of the branch.
+/// \param val The value to the arguments of the branch.
 /// \return The created branch. The old branch is deleted.
 /// The argument is appended at the end of the argument tuple.
 TermInst *swift::addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
@@ -268,7 +268,7 @@ replaceSwitchDest(SwitchEnumTy *sTy, SmallVectorImpl<SwitchEnumCaseTy> &cases,
 
 /// Replace a branch target.
 ///
-/// \param T The terminating instruction to modify.
+/// \param t The terminating instruction to modify.
 /// \param oldDest The successor block that will be replaced.
 /// \param newDest The new target block.
 /// \param preserveArgs If set, preserve arguments on the replaced edge.

@@ -2684,6 +2684,7 @@ void TypeChecker::checkParameterAttributes(ParameterList *params) {
 
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
                                               ReferenceOwnershipAttr *attr) {
+  auto &Diags = var->getASTContext().Diags;
   auto *dc = var->getDeclContext();
 
   // Don't check ownership attribute if the type is invalid.
@@ -2699,9 +2700,8 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   switch (optionalityOf(ownershipKind)) {
   case ReferenceOwnershipOptionality::Disallowed:
     if (isOptional) {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
-               ownershipKind)
-        .fixItReplace(attr->getRange(), "weak");
+      var->diagnose(diag::invalid_ownership_with_optional, ownershipKind)
+          .fixItReplace(attr->getRange(), "weak");
       attr->setInvalid();
     }
     break;
@@ -2709,8 +2709,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     break;
   case ReferenceOwnershipOptionality::Required:
     if (var->isLet()) {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_is_let,
-               ownershipKind);
+      var->diagnose(diag::invalid_ownership_is_let, ownershipKind);
       attr->setInvalid();
     }
 
@@ -2722,10 +2721,8 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
       if (var->getAttrs().hasAttribute<IBOutletAttr>())
         break;
 
-      auto diag = diagnose(var->getStartLoc(),
-                           diag::invalid_ownership_not_optional,
-                           ownershipKind,
-                           OptionalType::get(type));
+      auto diag = var->diagnose(diag::invalid_ownership_not_optional,
+                                ownershipKind, OptionalType::get(type));
       auto typeRange = var->getTypeSourceRangeForDiagnostics();
       if (type->hasSimpleTypeRepr()) {
         diag.fixItInsertAfter(typeRange.End, "?");
@@ -2750,16 +2747,17 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
       D = diag::invalid_ownership_protocol_type;
     }
 
-    diagnose(var->getStartLoc(), D, ownershipKind, underlyingType);
+    var->diagnose(D, ownershipKind, underlyingType);
     attr->setInvalid();
   }
 
   ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
   if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
-    diagnose(attr->getLocation(),
-             diag::invalid_ownership_incompatible_class,
-             underlyingType, ownershipKind)
-      .fixItRemove(attr->getRange());
+    Diags
+        .diagnose(attr->getLocation(),
+                  diag::invalid_ownership_incompatible_class, underlyingType,
+                  ownershipKind)
+        .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 
@@ -2767,11 +2765,11 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
     // properties of Objective-C protocols.
-    auto D = Context.isSwiftVersionAtLeast(5)
-           ? diag::ownership_invalid_in_protocols
-           : diag::ownership_invalid_in_protocols_compat_warning;
-    diagnose(attr->getLocation(), D, ownershipKind)
-      .fixItRemove(attr->getRange());
+    auto D = var->getASTContext().isSwiftVersionAtLeast(5)
+                 ? diag::ownership_invalid_in_protocols
+                 : diag::ownership_invalid_in_protocols_compat_warning;
+    Diags.diagnose(attr->getLocation(), D, ownershipKind)
+        .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 
@@ -2779,7 +2777,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     return type;
 
   // Change the type to the appropriate reference storage type.
-  return ReferenceStorageType::get(type, ownershipKind, Context);
+  return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
 Optional<Diag<>>

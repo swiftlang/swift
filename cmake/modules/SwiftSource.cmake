@@ -310,12 +310,12 @@ function(_compile_swift_files
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
-      set(specific_module_private_dir "${specific_module_dir}/Private")
-      set(source_info_file "${specific_module_private_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
+      set(specific_module_project_dir "${specific_module_dir}/Project")
+      set(source_info_file "${specific_module_project_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
     else()
       set(specific_module_dir)
-      set(specific_module_private_dir)
+      set(specific_module_project_dir)
       set(source_info_file "${module_base}.swiftsourceinfo")
     endif()
     set(module_file "${module_base}.swiftmodule")
@@ -331,6 +331,11 @@ function(_compile_swift_files
       set(interface_file "${module_base}.swiftinterface")
       list(APPEND swift_module_flags
            "-emit-module-interface-path" "${interface_file}")
+    endif()
+
+    if (NOT SWIFTFILE_IS_STDLIB_CORE)
+      list(APPEND swift_module_flags
+           "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
@@ -354,7 +359,7 @@ function(_compile_swift_files
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
                                OPTIONAL
-                               PATTERN "Private" EXCLUDE)
+                               PATTERN "Project" EXCLUDE)
   else()
     swift_install_in_component(FILES ${module_outputs}
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
@@ -495,7 +500,7 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
-          ${specific_module_private_dir}
+          ${specific_module_project_dir}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"

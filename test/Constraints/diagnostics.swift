@@ -31,6 +31,7 @@ func f5<T : P2>(_ : T) { }
 // expected-note@-1 {{required by global function 'f5' where 'T' = '(Int) -> Int'}}
 // expected-note@-2 {{required by global function 'f5' where 'T' = '(Int, String)'}}
 // expected-note@-3 {{required by global function 'f5' where 'T' = 'Int.Type'}}
+// expected-note@-4 {{where 'T' = 'Int'}}
 
 func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
@@ -75,17 +76,17 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 
 // Generic member does not conform.
 extension Int {
-  func wibble<T: P2>(_ x: T, _ y: T) -> T { return x }
+  func wibble<T: P2>(_ x: T, _ y: T) -> T { return x } // expected-note {{where 'T' = 'Int'}}
   func wubble<T>(_ x: (Int) -> T) -> T { return x(self) }
 }
-i.wibble(3, 4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+i.wibble(3, 4) // expected-error {{instance method 'wibble' requires that 'Int' conform to 'P2'}}
 
 // Generic member args correct, but return type doesn't match.
 struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}
+for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}  expected-error{{variable 'j' is not bound by any pattern}}
 }
 
 // Generic as part of function/tuple types
@@ -98,9 +99,9 @@ func f7() -> (c: Int, v: A) {
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
-func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
+func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 // expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
-f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
 f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
@@ -111,7 +112,7 @@ f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conf
 "awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.
-f5(i)  // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+f5(i)  // expected-error {{global function 'f5' requires that 'Int' conform to 'P2'}}
 
 // Make sure we don't leave open existentials when diagnosing.
 // <rdar://problem/20598568>
@@ -522,6 +523,7 @@ let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in c
 // expected-error@-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
 let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{28-28=&}}
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
@@ -1069,7 +1071,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' at position #1}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note 2 {{candidate expects value of type 'Int' for parameter #2}}
 }
 
 func SR_6272_d() {

@@ -545,7 +545,7 @@ public:
   RenameRangeCollector(const ValueDecl *D, StringRef newName)
       : newName(newName.str()) {
     llvm::raw_string_ostream OS(USR);
-    printDeclUSR(D, OS);
+    printValueDeclUSR(D, OS);
   }
 
   ArrayRef<RenameLoc> results() const { return locations; }
@@ -2841,11 +2841,10 @@ collectMembersForInit(ResolvedCursorInfo CursorInfo,
       continue;
     }
 
-    auto &entry = patternBinding->getPatternEntryForVarDecl(varDecl);
-    bool isExplicitlyInitialized =
-      entry.isInitialized() && entry.getEqualLoc().isValid();
+    const auto i = patternBinding->getPatternEntryIndexForVarDecl(varDecl);
     Expr *defaultInit = nullptr;
-    if (isExplicitlyInitialized || patternBinding->isDefaultInitializable()) {
+    if (patternBinding->isExplicitlyInitialized(i) ||
+        patternBinding->isDefaultInitializable()) {
       defaultInit = varDecl->getParentInitializer();
     }
 

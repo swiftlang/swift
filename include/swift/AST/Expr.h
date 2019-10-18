@@ -3450,7 +3450,7 @@ public:
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the parameters of this closure.

@@ -16,9 +16,9 @@ enum Z {
 
   init() { self = .none }
   init(_ c: UnicodeScalar) { self = .char(c) }
-  // expected-note@-1 2 {{candidate expects value of type 'UnicodeScalar' (aka 'Unicode.Scalar') at position #0}}
+  // expected-note@-1 2 {{candidate expects value of type 'UnicodeScalar' (aka 'Unicode.Scalar') for parameter #1}}
   init(_ s: String) { self = .string(s) }
-  // expected-note@-1 2 {{candidate expects value of type 'String' at position #0}}
+  // expected-note@-1 2 {{candidate expects value of type 'String' for parameter #1}}
   init(_ x: Int, _ y: Int) { self = .point(x, y) }
 }
 

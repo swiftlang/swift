@@ -87,7 +87,7 @@ private:
                                     /*trailing closure*/ nullptr,
                                     /*implicit*/true);
 
-    if (ctx.LangOpts.FunctionBuilderOneWayConstraints && allowOneWay) {
+    if (allowOneWay) {
       // Form a one-way constraint to prevent backward propagation.
       result = new (ctx) OneWayExpr(result);
     }
@@ -169,8 +169,15 @@ public:
       }
 
       auto expr = node.get<Expr *>();
-      if (wantExpr && ctx.LangOpts.FunctionBuilderOneWayConstraints)
-        expr = new (ctx) OneWayExpr(expr);
+      if (wantExpr) {
+        if (builderSupports(ctx.Id_buildExpression)) {
+          expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
+                                   { expr }, { Identifier() },
+                                   /*allowOneWay=*/true);
+        } else {
+          expr = new (ctx) OneWayExpr(expr);
+        }
+      }
 
       expressions.push_back(expr);
     }
@@ -293,7 +300,7 @@ public:
                                     ctx.Id_buildIf, chainExpr,
                                     /*argLabels=*/{ },
                                     /*allowOneWay=*/true);
-    } else if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+    } else {
       // Form a one-way constraint to prevent backward propagation.
       chainExpr = new (ctx) OneWayExpr(chainExpr);
     }
@@ -586,14 +593,16 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   assert(transformedType && "Missing type");
 
   // Record the transformation.
-  assert(std::find_if(builderTransformedClosures.begin(),
-                      builderTransformedClosures.end(),
-                      [&](const std::tuple<ClosureExpr *, Type, Expr *> &elt) {
-                        return std::get<0>(elt) == closure;
-                      }) == builderTransformedClosures.end() &&
+  assert(std::find_if(
+      builderTransformedClosures.begin(),
+      builderTransformedClosures.end(),
+      [&](const std::pair<ClosureExpr *, AppliedBuilderTransform> &elt) {
+        return elt.first == closure;
+      }) == builderTransformedClosures.end() &&
          "already transformed this closure along this path!?!");
   builderTransformedClosures.push_back(
-    std::make_tuple(closure, builderType, singleExpr));
+      std::make_pair(closure,
+                     AppliedBuilderTransform{builderType, singleExpr}));
 
   // Bind the result type of the closure to the type of the transformed
   // expression.

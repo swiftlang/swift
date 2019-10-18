@@ -638,8 +638,12 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool checkSuperclassConstraint = false;
   if (hasSuperclassConstraint) {
     Type srcSuperclassType = srcInstanceType;
-    if (srcSuperclassType->isExistentialType())
+    if (srcSuperclassType->isExistentialType()) {
       srcSuperclassType = srcSuperclassType->getSuperclass();
+      // Look for an AnyObject superclass (getSuperclass() returns nil).
+      if (!srcSuperclassType && srcInstanceType->isClassExistentialType())
+        checkSuperclassConstraint = true;
+    }
     if (srcSuperclassType) {
       checkSuperclassConstraint =
         !destInstanceType->getSuperclass()->isExactSuperclassOf(

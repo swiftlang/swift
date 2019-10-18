@@ -424,6 +424,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+// Experimental feature options
+def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental differentiable programming features">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

@@ -126,13 +126,39 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
   MissingForcedDowncastFailure failure(root, getConstraintSystem(),
+                                       getFromType(), getToType(),
                                        getLocator());
   return failure.diagnose(asNote);
 }
 
-CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
-                                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) CoerceToCheckedCast(cs, locator);
+CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
+                                                  Type fromType, Type toType,
+                                                  ConstraintLocator *locator) {
+  // If any of the types has a type variable, don't add the fix. 
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return nullptr;
+
+  auto &TC = cs.getTypeChecker();
+
+  auto *expr = locator->getAnchor();
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    expr = assignExpr->getSrc();
+  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
+  if (!coerceExpr)
+    return nullptr;
+
+  auto subExpr = coerceExpr->getSubExpr();
+  auto castKind =
+      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                              cs.DC, coerceExpr->getLoc(), subExpr,
+                              coerceExpr->getCastTypeLoc().getSourceRange());
+
+  // Invalid cast.
+  if (castKind == CheckedCastKind::Unresolved)
+    return nullptr;
+
+  return new (cs.getAllocator())
+      CoerceToCheckedCast(cs, fromType, toType, locator);
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {
@@ -707,14 +733,42 @@ bool AllowTupleSplatForSingleParameter::attempt(
 
   const auto &param = params.front();
 
-  auto *paramTy = param.getOldType()->getAs<TupleType>();
-  if (!paramTy || paramTy->getNumElements() != args.size())
+  if (param.isInOut() || param.isVariadic() || param.isAutoClosure())
+    return true;
+
+  auto paramTy = param.getOldType();
+
+  // Parameter type has to be either a tuple (with the same arity as
+  // argument list), or a type variable.
+  if (!(paramTy->is<TupleType>() &&
+        paramTy->castTo<TupleType>()->getNumElements() == args.size()) &&
+      !paramTy->is<TypeVariableType>())
     return true;
 
   SmallVector<TupleTypeElt, 4> argElts;
-  for (const auto &arg : args) {
-    argElts.push_back(
-        {arg.getPlainType(), arg.getLabel(), arg.getParameterFlags()});
+
+  for (unsigned index : indices(args)) {
+    const auto &arg = args[index];
+
+    auto label = arg.getLabel();
+    auto flags = arg.getParameterFlags();
+
+    // In situations where there is a single labeled parameter
+    // we need to form a tuple with omits first label e.g.
+    //
+    // func foo<T>(x: T) {}
+    // foo(x: 0, 1)
+    //
+    // We'd want to suggest argument list to be `x: (0, 1)` instead
+    // of `(x: 0, 1)` which would be incorrect.
+    if (index == 0 && param.getLabel() == label)
+      label = Identifier();
+
+    // Tuple can't have `inout` elements.
+    if (flags.isInOut())
+      return true;
+
+    argElts.push_back({arg.getPlainType(), label});
   }
 
   bindings[0].clear();

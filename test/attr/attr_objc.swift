@@ -123,7 +123,7 @@ func subject_genericFunc<T>(t: T) {
   func subject_instanceFunc() {}
 }
 
-func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}}
+func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
 }
 
 @objc // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
@@ -849,17 +849,21 @@ class infer_instanceVar1 {
   var observingAccessorsVar1: Int {
   // CHECK: @_hasStorage @objc var observingAccessorsVar1: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} @objc get
+    // CHECK-NEXT: {{^}} @objc get {
+    // CHECK-NEXT:    return
+    // CHECK-NEXT: }
     didSet {}
-    // CHECK-NEXT: {{^}} @objc set
+    // CHECK-NEXT: {{^}} @objc set {
   }
 
   @objc var observingAccessorsVar1_: Int {
   // CHECK: {{^}} @objc @_hasStorage var observingAccessorsVar1_: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} @objc get
+    // CHECK-NEXT: {{^}} @objc get {
+    // CHECK-NEXT:   return
+    // CHECK-NEXT: }
     didSet {}
-    // CHECK-NEXT: {{^}} @objc set
+    // CHECK-NEXT: {{^}} @objc set {
   }
 
 

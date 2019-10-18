@@ -300,6 +300,25 @@
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jumpSuper()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
 
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: class OMWObjectType
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func _enumerateTypes(handler: @escaping () -> Void)
+
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: class OMWTerrifyingGarbage4DTypeRefMask_t
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func throwAway()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "throwAway()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func throwGarbageAway()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func throwGarbage4DAwayHarder()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func throwGarbage4DTypeRefMask_tAwayHardest()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func burn()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "burn()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func burnGarbage()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func carefullyBurn()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "carefullyBurn()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func carefullyBurnGarbage4D()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func veryCarefullyBurn()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "veryCarefullyBurn()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func veryCarefullyBurnGarbage4DTypeRefMask_t()
+
 // CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C method 'conflicting1' in 'OMWSub' ('waggle1()' in 'OMWWaggle' vs. 'wiggle1()' in 'OMWWiggle')
 // CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper')
 

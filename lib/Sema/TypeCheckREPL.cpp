@@ -231,10 +231,10 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   // Build function of type T->() which prints the operand.
   auto *Arg = new (Context) ParamDecl(
-      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(), Loc,
+      SourceLoc(), SourceLoc(), Identifier(), Loc,
       Context.getIdentifier("arg"), /*DC*/ newTopLevel);
-  Arg->setType(E->getType());
   Arg->setInterfaceType(E->getType());
+  Arg->setSpecifier(ParamSpecifier::Default);
   auto params = ParameterList::createWithoutLoc(Arg);
 
   unsigned discriminator = TLC.claimNextClosureDiscriminator();
@@ -271,6 +271,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   BraceStmt *Body = builder.createBodyStmt(Loc, EndLoc);
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
+  TC.ClosuresWithUncomputedCaptures.push_back(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
   TheCall->getArg()->setType(AnyFunctionType::composeInput(Context, args, false));
@@ -314,7 +315,6 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, &SF);
-  vd->setType(E->getType());
   vd->setInterfaceType(E->getType());
   SF.Decls.push_back(vd);
 
@@ -347,15 +347,14 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   // This would just cause a confusing definite initialization error.  Some
   // day we will do some high level analysis of uninitialized variables
   // (rdar://15157729) but until then, output a specialized error.
-  unsigned entryIdx = 0U-1;
-  for (auto patternEntry : PBD->getPatternList()) {
-    ++entryIdx;
-    if (!patternEntry.getInit()) {
+  for (auto entryIdx : range(PBD->getNumPatternEntries())) {
+    auto *entryInit = PBD->getInit(entryIdx);
+    if (!entryInit) {
       TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
       continue;
     }
 
-    auto pattern = patternEntry.getPattern();
+    auto *pattern = PBD->getPattern(entryIdx);
     
     llvm::SmallString<16> PatternString;
     PatternBindingPrintLHS(PatternString).visit(pattern);
@@ -390,17 +389,16 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                         VarDecl::Introducer::Let,
                                         /*IsCaptureList*/false,
                                         PBD->getStartLoc(), name, &SF);
-    vd->setType(pattern->getType());
     vd->setInterfaceType(pattern->getType());
     SF.Decls.push_back(vd);
 
     // Create a PatternBindingDecl to bind the expression into the decl.
     Pattern *metavarPat = new (Context) NamedPattern(vd);
     metavarPat->setType(vd->getType());
-    PatternBindingDecl *metavarBinding = PatternBindingDecl::create(
+    auto *metavarBinding = PatternBindingDecl::create(
         Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
         /*VarLoc*/ PBD->getStartLoc(), metavarPat, /*EqualLoc*/ SourceLoc(),
-        patternEntry.getInit(), &SF);
+        entryInit, &SF);
 
     auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                      ASTNode(metavarBinding),

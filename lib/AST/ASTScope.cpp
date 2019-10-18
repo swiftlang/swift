@@ -190,10 +190,7 @@ NullablePtr<DeclContext> CaptureListScope::getDeclContext() const {
 }
 
 NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
-  return decl->getParentPatternBinding()
-      ->getPatternList()
-      .front()
-      .getInitContext();
+  return decl->getParentPatternBinding()->getInitContext(0);
 }
 
 NullablePtr<DeclContext> AbstractFunctionDeclScope::getDeclContext() const {

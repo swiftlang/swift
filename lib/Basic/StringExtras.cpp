@@ -44,16 +44,13 @@ bool swift::canBeMemberName(StringRef identifier) {
     .Default(true);
 }
 
-PrepositionKind swift::getPrepositionKind(StringRef word) {
-#define DIRECTIONAL_PREPOSITION(Word)           \
-  if (word.equals_lower(#Word))                 \
-    return PK_Directional;
+bool swift::isPreposition(StringRef word) {
 #define PREPOSITION(Word)                       \
   if (word.equals_lower(#Word))                 \
-    return PK_Nondirectional;
+    return true;
 #include "PartsOfSpeech.def"
 
-  return PK_None;
+  return false;
 }
 
 PartOfSpeech swift::getPartOfSpeech(StringRef word) {
@@ -68,7 +65,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 
   // Identify gerunds, which always end in "ing".
   if (word.endswith("ing") && word.size() > 4) {
-    StringRef possibleVerb = word.substr(0, word.size()-3);
+    StringRef possibleVerb = word.drop_back(3);
 
     // If what remains is a verb, we have a gerund.
     if (getPartOfSpeech(possibleVerb) == PartOfSpeech::Verb)
@@ -87,7 +84,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
     // instance of that letter and try again.
     unsigned count = possibleVerb.size();
     if (possibleVerb[count-1] == possibleVerb[count-2] &&
-        getPartOfSpeech(possibleVerb.substr(0, count-1)) == PartOfSpeech::Verb)
+        getPartOfSpeech(possibleVerb.drop_back()) == PartOfSpeech::Verb)
       return PartOfSpeech::Gerund;
   }
 
@@ -437,10 +434,10 @@ StringRef swift::matchLeadingTypeName(StringRef name,
 
   // Find the last instance of the first word in the name within
   // the words in the type name.
-  while (typeWordRevIter != typeWordRevIterEnd &&
-         !matchNameWordToTypeWord(*nameWordIter, *typeWordRevIter)) {
-    ++typeWordRevIter;
-  }
+  typeWordRevIter = std::find_if(typeWordRevIter, typeWordRevIterEnd,
+                                 [nameWordIter](StringRef word) {
+    return matchNameWordToTypeWord(*nameWordIter, word);
+  });
 
   // If we didn't find the first word in the name at all, we're
   // done.
@@ -451,6 +448,8 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   auto typeWordIter = typeWordRevIter.base(),
     typeWordIterEnd = typeWords.end();
   ++nameWordIter;
+
+  // FIXME: Use std::mismatch once we update to C++14.
   while (typeWordIter != typeWordIterEnd &&
          nameWordIter != nameWordIterEnd &&
          matchNameWordToTypeWord(*nameWordIter, *typeWordIter)) {
@@ -463,7 +462,7 @@ StringRef swift::matchLeadingTypeName(StringRef name,
     return name;
 
   // Chop of the beginning of the name.
-  return name.substr(nameWordIter.getPosition());
+  return nameWordIter.getRestOfStr();
 }
 
 StringRef StringScratchSpace::copyString(StringRef string) {
@@ -499,8 +498,7 @@ StringRef camel_case::toLowercaseWord(StringRef string,
 
 /// Omit needless words from the beginning of a name.
 static StringRef omitNeedlessWordsFromPrefix(StringRef name,
-                                             OmissionTypeName type,
-                                             StringScratchSpace &scratch){
+                                             OmissionTypeName type) {
   if (type.empty())
     return name;
 
@@ -521,11 +519,11 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
       if (nextWord.endswith("ing")) {
-        return toLowercaseWord(newName.substr(firstWord.size()), scratch);
+        return newName.substr(firstWord.size());
       }
     }
 
-    return toLowercaseWord(newName, scratch);
+    return newName;
   }
 
   return name;
@@ -574,14 +572,40 @@ static bool textMatchesPropertyName(StringRef text,
   return false;
 }
 
-static StringRef omitNeedlessWords(StringRef name,
-                                   OmissionTypeName typeName,
-                                   NameRole role,
-                                   const InheritedNameSet *allPropertyNames,
-                                   StringScratchSpace &scratch) {
-  // If we have no name or no type name, there is nothing to do.
-  if (name.empty() || typeName.empty()) return name;
+namespace {
+/// Describes the role that a particular name has within a
+/// signature, which can affect how we omit needless words.
+enum class NameRole {
+  /// The base name of a function or method.
+  BaseName,
 
+  /// The first parameter of a function or method.
+  FirstParameter,
+
+  // Subsequent parameters in a function or method.
+  SubsequentParameter,
+
+  // The name of a property.
+  Property,
+
+  // A partial name; used internally.
+  Partial,
+};
+} // end anonymous namespace
+
+static StringRef
+omitTrailingTypeNameWithSpecialCases(StringRef name,
+                                     OmissionTypeName typeName,
+                                     NameRole role,
+                                     const InheritedNameSet *allPropertyNames);
+
+/// Returns the iterator pointing to the first word in \p name that starts the
+/// match for \p typeName (anchored at the end of \p name).
+///
+/// If there is no match, returns the end WordIterator for \p name.
+static Words::iterator matchTypeNameFromBackWithSpecialCases(
+    StringRef name, OmissionTypeName typeName,
+    const InheritedNameSet *allPropertyNames) {
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);
   auto typeWords = camel_case::getWords(typeName.Name);
@@ -590,25 +614,15 @@ static StringRef omitNeedlessWords(StringRef name,
   // name.
   auto nameWordRevIter = nameWords.rbegin(),
     nameWordRevIterBegin = nameWordRevIter,
-    firstMatchingNameWordRevIter = nameWordRevIter,
     nameWordRevIterEnd = nameWords.rend();
   auto typeWordRevIter = typeWords.rbegin(),
     typeWordRevIterEnd = typeWords.rend();
-
-  bool anyMatches = false;
-  auto matched = [&] {
-    if (anyMatches) return;
-
-    anyMatches = true;
-    firstMatchingNameWordRevIter = nameWordRevIter;
-  };
 
   while (nameWordRevIter != nameWordRevIterEnd &&
          typeWordRevIter != typeWordRevIterEnd) {
     // If the names match, continue.
     auto nameWord = *nameWordRevIter;
     if (matchNameWordToTypeWord(nameWord, *typeWordRevIter)) {
-      matched();
       ++nameWordRevIter;
       ++typeWordRevIter;
       continue;
@@ -623,7 +637,6 @@ static StringRef omitNeedlessWords(StringRef name,
       ++nextTypeWordRevIter;
       if (nextTypeWordRevIter != typeWordRevIterEnd &&
           matchNameWordToTypeWord("Index", *nextTypeWordRevIter)) {
-        matched();
         ++nameWordRevIter;
         typeWordRevIter = nextTypeWordRevIter;
         ++typeWordRevIter;
@@ -635,7 +648,6 @@ static StringRef omitNeedlessWords(StringRef name,
     if (matchNameWordToTypeWord(nameWord, "Index") &&
         (matchNameWordToTypeWord("Int", *typeWordRevIter) ||
          matchNameWordToTypeWord("Integer", *typeWordRevIter))) {
-      matched();
       ++nameWordRevIter;
       ++typeWordRevIter;
       continue;
@@ -648,7 +660,6 @@ static StringRef omitNeedlessWords(StringRef name,
       auto nextNameWordRevIter = std::next(nameWordRevIter);
       if (nextNameWordRevIter != nameWordRevIterEnd &&
           matchNameWordToTypeWord(*nextNameWordRevIter, "Object")) {
-        matched();
         nameWordRevIter = nextNameWordRevIter;
         ++nameWordRevIter;
         ++typeWordRevIter;
@@ -659,26 +670,24 @@ static StringRef omitNeedlessWords(StringRef name,
     // Special case: if the word in the name ends in 's', and we have
     // a collection element type, see if this is a plural.
     if (!typeName.CollectionElement.empty() && nameWord.size() > 2 &&
-        nameWord.back() == 's' && role != NameRole::BaseNameSelf) {
+        nameWord.back() == 's') {
       // Check <element name>s.
-      auto shortenedNameWord
-        = name.substr(0, nameWordRevIter.base().getPosition()-1);
-      auto newShortenedNameWord
-        = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
-                            NameRole::Partial, allPropertyNames, scratch);
-      if (shortenedNameWord == newShortenedNameWord &&
-          shortenedNameWord.back() == 'e') {
-        (void)shortenedNameWord.drop_back();
-        newShortenedNameWord =
-          omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
-                            NameRole::Partial, allPropertyNames, scratch);
-      }
+      auto shortenedNameWord = nameWordRevIter.base().getPriorStr().drop_back();
+      auto newShortenedNameWord = omitTrailingTypeNameWithSpecialCases(
+          shortenedNameWord, typeName.CollectionElement, NameRole::Partial,
+          allPropertyNames);
 
       if (shortenedNameWord != newShortenedNameWord) {
-        matched();
         unsigned targetSize = newShortenedNameWord.size();
+        auto newIter = llvm::make_reverse_iterator(WordIterator(name,
+                                                                targetSize));
+#ifndef NDEBUG
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
+        assert(nameWordRevIter == newIter);
+#else
+        nameWordRevIter = newIter;
+#endif
         continue;
       }
     }
@@ -694,131 +703,186 @@ static StringRef omitNeedlessWords(StringRef name,
       }
     }
 
-    // If we're matching the base name of a method against the type of
-    // 'Self', and we haven't matched anything yet, skip over words in
-    // the name.
-    if (role == NameRole::BaseNameSelf && !anyMatches) {
-      ++nameWordRevIter;
-      continue;
+    break;
+  }
+
+  return nameWordRevIter.base();
+}
+
+static StringRef
+omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
+                         const InheritedNameSet *allPropertyNames,
+                         StringScratchSpace &scratch) {
+  // If we have no name or no type name, there is nothing to do.
+  if (name.empty() || typeName.empty()) return name;
+
+  // Deliberately drop the collection element from typeName.
+  typeName.CollectionElement = StringRef();
+
+  auto nameWords = camel_case::getWords(name);
+  Optional<llvm::iterator_range<WordIterator>> matchingRange;
+
+  // Search backwards for the type name, whether anchored at the end or not.
+  for (auto nameReverseIter = nameWords.rbegin();
+       nameReverseIter != nameWords.rend();
+       ++nameReverseIter) {
+    StringRef matchName = nameReverseIter.base().getPriorStr();
+    auto matchIter = matchTypeNameFromBackWithSpecialCases(matchName, typeName,
+                                                           allPropertyNames);
+    auto matchIterInFullName = WordIterator(name, matchIter.getPosition());
+    if (matchIterInFullName != nameReverseIter.base()) {
+      matchingRange = llvm::make_range(matchIterInFullName,
+                                       nameReverseIter.base());
+      break;
+    }
+
+    // Note: This behavior fell out of a previous implementation of
+    // omit-needless-words, even though it probably wasn't intentional. At this
+    // point, though, it could be source-breaking to change it.
+    while (auto withoutSuffix = skipTypeSuffix(typeName.Name))
+      typeName.Name = *withoutSuffix;
+  }
+
+  // If we matched nothing, or if the type name was all the way at the start
+  // of the base name, don't strip anything.
+  if (!matchingRange || matchingRange->begin() == nameWords.begin())
+    return name;
+  assert(matchingRange->begin() != matchingRange->end() &&
+         "should not have been considered a match");
+
+  // Don't strip just "Error" at the end of a base name.
+  // FIXME: Is this still relevant?
+  if (matchingRange->end() == nameWords.end() &&
+      std::next(matchingRange->begin()) == nameWords.end() &&
+      *matchingRange->begin() == "Error") {
+    return name;
+  }
+
+  // Only strip a type name that follows a verb.
+  switch (getPartOfSpeech(*std::prev(matchingRange->begin()))) {
+  case PartOfSpeech::Verb:
+    break;
+  case PartOfSpeech::Preposition:
+  case PartOfSpeech::Gerund:
+  case PartOfSpeech::Unknown:
+    return name;
+  }
+
+  // Splice together the parts before and after the matched
+  // type. For example, if we matched "ViewController" in
+  // "dismissViewControllerAnimated", stitch together
+  // "dismissAnimated".
+
+  // Don't prune redundant type information from the base name if
+  // there is a corresponding property (either singular or plural).
+  StringRef removedText = name.substr(matchingRange->begin().getPosition(),
+                                      matchingRange->end().getPosition());
+  if (textMatchesPropertyName(removedText, allPropertyNames))
+    return name;
+
+  SmallString<16> newName = matchingRange->begin().getPriorStr();
+  newName += matchingRange->end().getRestOfStr();
+
+  // If we ended up with something that can't be a member name, do nothing.
+  if (!canBeMemberName(newName))
+    return name;
+
+  // If we ended up with a vacuous name like "get" or "set", do nothing.
+  if (isVacuousName(newName))
+    return name;
+
+  // We're done.
+  return scratch.copyString(newName);
+}
+
+static StringRef
+omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
+                                     NameRole role,
+                                     const InheritedNameSet *allPropertyNames) {
+  // If we have no name or no type name, there is nothing to do.
+  if (name.empty() || typeName.empty()) return name;
+
+  auto nameWords = camel_case::getWords(name);
+  Words::iterator matchIter =
+      matchTypeNameFromBackWithSpecialCases(name, typeName, allPropertyNames);
+
+  if (matchIter == nameWords.end())
+    return name;
+
+  // Handle complete name matches.
+  if (matchIter == nameWords.begin()) {
+    // If we're doing a partial match or we have an initial
+    // parameter, return the empty string.
+    if (role == NameRole::Partial || role == NameRole::FirstParameter)
+      return "";
+
+    // Leave the name alone.
+    return name;
+  }
+
+  // Don't strip just "Error".
+  if (std::next(matchIter) == nameWords.end() && *matchIter == "Error")
+    return name;
+
+  switch (role) {
+  case NameRole::Property:
+    // Always strip off type information.
+    break;
+
+  case NameRole::FirstParameter:
+  case NameRole::Partial:
+  case NameRole::SubsequentParameter: {
+    // Classify the part of speech of the word before the type information we
+    // would strip off. We only want to strip it if the previous word is a
+    // preposition, verb, or gerund.
+    auto previousWordIter = std::prev(matchIter);
+    if (getPartOfSpeech(*previousWordIter) == PartOfSpeech::Unknown)
+      return name;
+    break;
+  }
+
+  case NameRole::BaseName: {
+    // Classify the part of speech of the word before the type
+    // information we would strip off.
+    auto previousWordIter = std::prev(matchIter);
+    switch (getPartOfSpeech(*previousWordIter)) {
+    case PartOfSpeech::Preposition:
+      // If there's nothing preceding the preposition, don't strip anything.
+      if (previousWordIter == nameWords.begin())
+        return name;
+      break;
+
+    case PartOfSpeech::Verb:
+    case PartOfSpeech::Gerund:
+      // Don't prune redundant type information from the base name if
+      // there is a corresponding property (either singular or plural).
+      if (textMatchesPropertyName(matchIter.getRestOfStr(), allPropertyNames))
+        return name;
+      break;
+
+    case PartOfSpeech::Unknown:
+      // Assume it's a noun or adjective; don't strip anything.
+      return name;
     }
 
     break;
   }
-
-  StringRef origName = name;
-
-  // If we matched anything above, update the name appropriately.
-  if (anyMatches) {
-    // Handle complete name matches.
-    if (nameWordRevIter == nameWordRevIterEnd) {
-      // If we're doing a partial match or we have an initial
-      // parameter, return the empty string.
-      if (role == NameRole::Partial || role == NameRole::FirstParameter)
-        return "";
-
-      // Leave the name alone.
-      return name;
-    }
-
-    // Don't strip just "Error".
-    if (nameWordRevIter != nameWordRevIterBegin) {
-      auto nameWordPrev = std::prev(nameWordRevIter);
-      if (nameWordPrev == nameWordRevIterBegin && *nameWordPrev == "Error")
-        return name;
-    }
-
-    switch (role) {
-    case NameRole::Property:
-      // Always strip off type information.
-      name = name.substr(0, nameWordRevIter.base().getPosition());
-      break;
-
-    case NameRole::BaseNameSelf:
-      switch (getPartOfSpeech(*nameWordRevIter)) {
-      case PartOfSpeech::Verb: {
-        // Splice together the parts before and after the matched
-        // type. For example, if we matched "ViewController" in
-        // "dismissViewControllerAnimated", stitch together
-        // "dismissAnimated".
-
-        // Don't prune redundant type information from the base name if
-        // there is a corresponding property (either singular or plural).
-        StringRef removedText =
-          name.substr(nameWordRevIter.base().getPosition(),
-                      firstMatchingNameWordRevIter.base().getPosition());
-        if (textMatchesPropertyName(removedText, allPropertyNames))
-          return name;
-
-        SmallString<16> newName =
-          name.substr(0, nameWordRevIter.base().getPosition());
-        newName
-          += name.substr(firstMatchingNameWordRevIter.base().getPosition());
-        name = scratch.copyString(newName);
-        break;
-      }
-
-      case PartOfSpeech::Preposition:
-      case PartOfSpeech::Gerund:
-      case PartOfSpeech::Unknown:
-        return name;
-      }
-      break;
-
-    case NameRole::BaseName:
-    case NameRole::FirstParameter:
-    case NameRole::Partial:
-    case NameRole::SubsequentParameter:
-      // Classify the part of speech of the word before the type
-      // information we would strip off.
-      switch (getPartOfSpeech(*nameWordRevIter)) {
-      case PartOfSpeech::Preposition:
-        if (role == NameRole::BaseName) {
-          // Strip off the part of the name that is redundant with
-          // type information, so long as there's something preceding the
-          // preposition.
-          if (std::next(nameWordRevIter) != nameWordRevIterEnd)
-            name = name.substr(0, nameWordRevIter.base().getPosition());
-          break;
-        }
-
-        LLVM_FALLTHROUGH;
-
-      case PartOfSpeech::Verb:
-      case PartOfSpeech::Gerund:
-        // Don't prune redundant type information from the base name if
-        // there is a corresponding property (either singular or plural).
-        if (role == NameRole::BaseName &&
-            textMatchesPropertyName(
-              name.substr(nameWordRevIter.base().getPosition()),
-              allPropertyNames))
-          return name;
-
-        // Strip off the part of the name that is redundant with
-        // type information.
-        name = name.substr(0, nameWordRevIter.base().getPosition());
-        break;
-
-      case PartOfSpeech::Unknown:
-        // Assume it's a noun or adjective; don't strip anything.
-        break;
-      }
-      break;
-    }
-
   }
+
+  // Strip off the part of the name that is redundant with
+  // type information.
+  StringRef newName = matchIter.getPriorStr();
 
   switch (role) {
   case NameRole::BaseName:
-  case NameRole::BaseNameSelf:
   case NameRole::Property:
     // If we ended up with something that can't be a member name, do nothing.
-    // do nothing.
-    if (!canBeMemberName(name))
-      return origName;
+    if (!canBeMemberName(newName))
+      return name;
 
     // If we ended up with a vacuous name like "get" or "set", do nothing.
-    if (isVacuousName(name))
-      return origName;
+    if (isVacuousName(newName))
+      return name;
 
     break;
 
@@ -829,7 +893,7 @@ static StringRef omitNeedlessWords(StringRef name,
   }
 
   // We're done.
-  return name;
+  return newName;
 }
 
 StringRef camel_case::toLowercaseInitialisms(StringRef string,
@@ -854,7 +918,8 @@ camel_case::toLowercaseInitialisms(StringRef string,
 
   // Lowercase until we hit the an uppercase letter followed by a
   // non-uppercase letter.
-  llvm::SmallString<32> scratchStr;
+  scratch.clear();
+  scratch.reserve(string.size());
   for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
@@ -863,19 +928,18 @@ camel_case::toLowercaseInitialisms(StringRef string,
       // lowercase the character we're on.
       if (i == 0 || !clang::isLetter(string[i+1]) ||
           isPluralSuffix(camel_case::getFirstWord(string.substr(i+1)))) {
-        scratchStr.push_back(clang::toLowercase(string[i]));
+        scratch.push_back(clang::toLowercase(string[i]));
         ++i;
       }
 
-      scratchStr.append(string.substr(i));
+      scratch.append(string.substr(i).begin(), string.substr(i).end());
       break;
     }
 
-    scratchStr.push_back(clang::toLowercase(string[i]));
+    scratch.push_back(clang::toLowercase(string[i]));
   }
 
-  scratch = scratchStr;
-  return {scratch.begin(), scratch.size()};
+  return {scratch.data(), scratch.size()};
 }
 
 /// Determine whether the given word occurring before the given
@@ -911,10 +975,6 @@ static bool wordConflictsAfterPreposition(StringRef word,
     if (camel_case::sameWordIgnoreFirstCase(word, "backing"))
       return true;
   }
-
-  if (camel_case::sameWordIgnoreFirstCase(preposition, "and") &&
-      camel_case::sameWordIgnoreFirstCase(word, "return"))
-    return true;
 
   return false;
 }
@@ -1129,7 +1189,7 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
   // Try splitting a Boolean "Animated".
   if (paramType.isBoolean() &&
       camel_case::getLastWord(baseName) == "Animated") {
-    baseName = baseName.substr(0, baseName.size() - strlen("Animated"));
+    baseName = baseName.drop_back(strlen("Animated"));
     argName = "animated";
     return true;
   }
@@ -1154,7 +1214,7 @@ static bool splitBaseName(StringRef &baseName, StringRef &argName,
 bool swift::omitNeedlessWords(StringRef &baseName,
                               MutableArrayRef<StringRef> argNames,
                               StringRef firstParamName,
-                              OmissionTypeName resultType,
+                              OmissionTypeName givenResultType,
                               OmissionTypeName contextType,
                               ArrayRef<OmissionTypeName> paramTypes,
                               bool returnsSelf,
@@ -1162,6 +1222,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               const InheritedNameSet *allPropertyNames,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
+  OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
 
   /// Local function that lowercases all of the base names and
   /// argument names before returning.
@@ -1185,10 +1246,9 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // If the result type matches the context, remove the context type from the
   // prefix of the name.
-  bool resultTypeMatchesContext = returnsSelf || (resultType == contextType);
+  bool resultTypeMatchesContext = (resultType == contextType);
   if (resultTypeMatchesContext) {
-    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType,
-                                                        scratch);
+    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;
@@ -1197,9 +1257,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // Strip the context type from the base name of a method.
   if (!isProperty) {
-    StringRef newBaseName = ::omitNeedlessWords(baseName, contextType,
-                                                NameRole::BaseNameSelf,
-                                                allPropertyNames, scratch);
+    StringRef newBaseName = omitSelfTypeFromBaseName(baseName, contextType,
+                                                     allPropertyNames, scratch);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;
@@ -1208,12 +1267,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   if (paramTypes.empty()) {
     if (resultTypeMatchesContext) {
-      StringRef newBaseName = ::omitNeedlessWords(
-                                baseName,
-                                returnsSelf ? contextType : resultType,
-                                NameRole::Property,
-                                allPropertyNames,
-                                scratch);
+      StringRef newBaseName = omitTrailingTypeNameWithSpecialCases(
+          baseName, resultType, NameRole::Property, allPropertyNames);
       if (newBaseName != baseName) {
         baseName = newBaseName;
         anyChanges = true;
@@ -1224,12 +1279,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   }
 
   if (camel_case::getFirstWord(baseName) == "set") {
-    StringRef newBaseName = ::omitNeedlessWords(
-                              baseName,
-                              contextType,
-                              NameRole::Property,
-                              allPropertyNames,
-                              scratch);
+    StringRef newBaseName = omitTrailingTypeNameWithSpecialCases(
+        baseName, contextType, NameRole::Property, allPropertyNames);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;
@@ -1256,11 +1307,9 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
     // Omit needless words from the name.
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
-    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role,
-                                            role == NameRole::BaseName 
-                                              ? allPropertyNames
-                                              : nullptr,
-                                            scratch);
+    StringRef newName = omitTrailingTypeNameWithSpecialCases(
+        name, paramTypes[i], role,
+        role == NameRole::BaseName ? allPropertyNames : nullptr);
 
     if (name == newName) continue;
 

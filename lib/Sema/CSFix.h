@@ -313,21 +313,6 @@ public:
                                      ConstraintLocator *locator);
 };
 
-
-/// Replace a coercion ('as') with a forced checked cast ('as!').
-class CoerceToCheckedCast final : public ConstraintFix {
-  CoerceToCheckedCast(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::CoerceToCheckedCast, locator) {}
-
-public:
-  std::string getName() const override { return "as to as!"; }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static CoerceToCheckedCast *create(ConstraintSystem &cs,
-                                     ConstraintLocator *locator);
-};
-
 /// Mark function type as explicitly '@escaping'.
 class MarkExplicitlyEscaping final : public ConstraintFix {
   /// Sometimes function type has to be marked as '@escaping'
@@ -487,8 +472,8 @@ protected:
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+                     ConstraintLocator *locator, bool warning = false)
+      : ConstraintFix(cs, kind, locator, warning), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -1347,8 +1332,9 @@ protected:
                               paramType, locator) {}
 
   AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
-                        Type paramType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, kind, argType, paramType, locator) {}
+                        Type paramType, ConstraintLocator *locator,
+                        bool warning = false)
+      : ContextualMismatch(cs, kind, argType, paramType, locator, warning) {}
 
 public:
   std::string getName() const override {
@@ -1412,6 +1398,22 @@ public:
   static UseValueTypeOfRawRepresentative *
   attempt(ConstraintSystem &cs, Type argType, Type paramType,
           ConstraintLocatorBuilder locator);
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class CoerceToCheckedCast final : public ContextualMismatch {
+  CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
+                      ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
+                           locator) {}
+
+public:
+  std::string getName() const { return "as to as!"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const;
+
+  static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

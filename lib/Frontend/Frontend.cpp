@@ -46,17 +46,15 @@ CompilerInstance::CompilerInstance() = default;
 CompilerInstance::~CompilerInstance() = default;
 
 std::string CompilerInvocation::getPCHHash() const {
-  using llvm::hash_code;
-  using llvm::hash_value;
   using llvm::hash_combine;
 
-  auto Code = hash_value(LangOpts.getPCHHashComponents());
-  Code = hash_combine(Code, FrontendOpts.getPCHHashComponents());
-  Code = hash_combine(Code, ClangImporterOpts.getPCHHashComponents());
-  Code = hash_combine(Code, SearchPathOpts.getPCHHashComponents());
-  Code = hash_combine(Code, DiagnosticOpts.getPCHHashComponents());
-  Code = hash_combine(Code, SILOpts.getPCHHashComponents());
-  Code = hash_combine(Code, IRGenOpts.getPCHHashComponents());
+  auto Code = hash_combine(LangOpts.getPCHHashComponents(),
+                           FrontendOpts.getPCHHashComponents(),
+                           ClangImporterOpts.getPCHHashComponents(),
+                           SearchPathOpts.getPCHHashComponents(),
+                           DiagnosticOpts.getPCHHashComponents(),
+                           SILOpts.getPCHHashComponents(),
+                           IRGenOpts.getPCHHashComponents());
 
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
@@ -210,6 +208,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   if (setUpModuleLoaders())
     return true;
 
+  createTypeChecker(*Context);
   return false;
 }
 
@@ -319,6 +318,23 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
 }
 
+// The ordering of ModuleLoaders is important!
+//
+// 1. SourceLoader: This is a hack and only the compiler's tests are using it,
+//    to avoid writing repetitive code involving generating modules/interfaces.
+//    Ideally, we'd get rid of it.
+// 2. MemoryBufferSerializedModuleLoader: This is used by LLDB, because it might
+//    already have the module available in memory.
+// 3. ModuleInterfaceLoader: Tries to find an up-to-date swiftmodule. If it
+//    succeeds, it issues a particular "error" (see
+//    [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]), which
+//    is interpreted by the overarching loader as a command to use the
+//    SerializedModuleLoader. If we failed to find a .swiftmodule, this falls
+//    back to using an interface. Actual errors lead to diagnostics.
+// 4. SerializedModuleLoader: Loads a serialized module if it can.
+// 5. ClangImporter: This must come after all the Swift module loaders because
+//    in the presence of overlays and mixed-source frameworks, we want to prefer
+//    the overlay or framework module over the underlying Clang module.
 bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool enableLibraryEvolution =
@@ -347,17 +363,14 @@ bool CompilerInstance::setUpModuleLoaders() {
       return true;
     }
   }
-
+  auto IgnoreSourceInfoFile =
+    Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
   if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
     auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
-        *Context, getDependencyTracker());
+        *Context, getDependencyTracker(), MLM, IgnoreSourceInfoFile);
     this->MemoryBufferLoader = MemoryBufferLoader.get();
     Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
-
-  std::unique_ptr<SerializedModuleLoader> SML =
-    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
-  this->SML = SML.get();
 
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
@@ -378,10 +391,16 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface);
+        FEOpts.RemarkOnRebuildFromModuleInterface, IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(PIML));
   }
+
+  std::unique_ptr<SerializedModuleLoader> SML =
+    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
+                                   IgnoreSourceInfoFile);
+  this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
+
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
 
   return false;
@@ -470,38 +489,35 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
       return existingBufferID;
     }
   }
-  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
-            std::unique_ptr<llvm::MemoryBuffer>>
-      buffers = getInputBufferAndModuleDocBufferIfPresent(input);
+  auto buffers = getInputBuffersIfPresent(input);
 
-  if (!buffers.first) {
+  if (!buffers.hasValue()) {
     failed = true;
     return None;
   }
 
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
-  if (serialization::isSerializedAST(buffers.first->getBuffer())) {
+  if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
     PartialModules.push_back(
-        {std::move(buffers.first), std::move(buffers.second)});
+        {std::move(buffers->ModuleBuffer), std::move(buffers->ModuleDocBuffer),
+         std::move(buffers->ModuleSourceInfoBuffer)});
     return None;
   }
-  assert(buffers.second.get() == nullptr);
+  assert(buffers->ModuleDocBuffer.get() == nullptr);
+  assert(buffers->ModuleSourceInfoBuffer.get() == nullptr);
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
-  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers.first));
+  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers->ModuleBuffer));
 
   InputSourceCodeBufferIDs.push_back(bufferID);
   return bufferID;
 }
 
-std::pair<std::unique_ptr<llvm::MemoryBuffer>,
-          std::unique_ptr<llvm::MemoryBuffer>>
-CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
+Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
   if (auto b = input.buffer()) {
-    return std::make_pair(llvm::MemoryBuffer::getMemBufferCopy(
-                              b->getBuffer(), b->getBufferIdentifier()),
-                          nullptr);
+    return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
+                                                              b->getBufferIdentifier()));
   }
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
@@ -511,17 +527,35 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
-    return std::make_pair(nullptr, nullptr);
+    return None;
   }
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
-    return std::make_pair(std::move(*inputFileOrErr), nullptr);
+    return ModuleBuffers(std::move(*inputFileOrErr));
 
-  if (Optional<std::unique_ptr<llvm::MemoryBuffer>> moduleDocBuffer =
-          openModuleDoc(input)) {
-    return std::make_pair(std::move(*inputFileOrErr),
-                          std::move(*moduleDocBuffer));
-  }
-  return std::make_pair(nullptr, nullptr);
+  auto swiftdoc = openModuleDoc(input);
+  auto sourceinfo = openModuleSourceInfo(input);
+  return ModuleBuffers(std::move(*inputFileOrErr),
+                       swiftdoc.hasValue() ? std::move(swiftdoc.getValue()) : nullptr,
+                       sourceinfo.hasValue() ? std::move(sourceinfo.getValue()) : nullptr);
+}
+
+Optional<std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInstance::openModuleSourceInfo(const InputFile &input) {
+  llvm::SmallString<128> pathWithoutProjectDir(input.file());
+  llvm::sys::path::replace_extension(pathWithoutProjectDir,
+                  file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
+  llvm::SmallString<128> pathWithProjectDir = pathWithoutProjectDir.str();
+  StringRef fileName = llvm::sys::path::filename(pathWithoutProjectDir);
+  llvm::sys::path::remove_filename(pathWithProjectDir);
+  llvm::sys::path::append(pathWithProjectDir, "Project");
+  llvm::sys::path::append(pathWithProjectDir, fileName);
+  if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                            pathWithProjectDir))
+    return std::move(*sourceInfoFileOrErr);
+  if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                            pathWithoutProjectDir))
+    return std::move(*sourceInfoFileOrErr);
+  return None;
 }
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
@@ -897,8 +931,9 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer), /*isFramework*/false,
+    if (!SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/"",
+                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
+                      std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
                       /*treatAsPartialModule*/true))
       hadLoadError = true;
   }

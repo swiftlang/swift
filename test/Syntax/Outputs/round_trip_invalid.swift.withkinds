@@ -9,7 +9,7 @@
 // RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
-let <PatternBinding><IdentifierPattern>strings</IdentifierPattern><TypeAnnotation>: <ArrayType>[<ArrayType><SimpleTypeIdentifier>Strin</SimpleTypeIdentifier></ArrayType></ArrayType></TypeAnnotation></PatternBinding></VariableDecl><IdentifierExpr>[g</IdentifierExpr>]?<FunctionDecl>
+let <PatternBinding><IdentifierPattern>strings</IdentifierPattern><TypeAnnotation>: [<SimpleTypeIdentifier>Strin</SimpleTypeIdentifier>[<UnresolvedPatternExpr><IdentifierPattern>g</IdentifierPattern></UnresolvedPatternExpr>]?</TypeAnnotation></PatternBinding></VariableDecl><FunctionDecl>
 
 // Function body without closing brace token.
 func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<VariableDecl>
@@ -19,5 +19,4 @@ class C <MemberDeclBlock>{<MemberDeclListItem><StructDecl>
 struct S <MemberDeclBlock>{<MemberDeclListItem><EnumDecl>
 enum E <MemberDeclBlock>{<MemberDeclListItem><ProtocolDecl>
 protocol P <MemberDeclBlock>{<MemberDeclListItem><ExtensionDecl>
-extension <SimpleTypeIdentifier>P </SimpleTypeIdentifier><MemberDeclBlock>{<MemberDeclListItem><InitializerDecl><DeclModifier>
-public </DeclModifier>init<ParameterClause>(<FunctionParameter>a: (<TupleTypeElement><SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TupleTypeElement>|| String)</FunctionParameter>)</ParameterClause></InitializerDecl></MemberDeclListItem></MemberDeclBlock></ExtensionDecl></MemberDeclListItem></MemberDeclBlock></ProtocolDecl></MemberDeclListItem></MemberDeclBlock></EnumDecl></MemberDeclListItem></MemberDeclBlock></StructDecl></MemberDeclListItem></MemberDeclBlock></ClassDecl></CodeBlock></FunctionDecl>
+extension <SimpleTypeIdentifier>P </SimpleTypeIdentifier><MemberDeclBlock>{</MemberDeclBlock></ExtensionDecl></MemberDeclListItem></MemberDeclBlock></ProtocolDecl></MemberDeclListItem></MemberDeclBlock></EnumDecl></MemberDeclListItem></MemberDeclBlock></StructDecl></MemberDeclListItem></MemberDeclBlock></ClassDecl></CodeBlock></FunctionDecl>

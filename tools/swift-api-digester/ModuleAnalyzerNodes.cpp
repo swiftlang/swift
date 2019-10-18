@@ -27,7 +27,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKContext &Ctx;
   DeclKind DKind;
   AccessorKind AccKind;
-
+  SourceLoc Loc;
 #define KEY_STRING(X, Y) StringRef X;
 #include "swift/IDE/DigesterEnums.def"
 #define KEY_BOOL(X, Y) bool X = false;
@@ -52,6 +52,29 @@ struct swift::ide::api::SDKNodeInitInfo {
 
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
 
+DiagnosticEngine &SDKContext::getDiags(SourceLoc Loc) {
+  // If the location is invalid, we just use the locally created DiagEngine.
+  if (Loc.isInvalid())
+    return Diags;
+  // If the Loc is valid, it may belong to any of the SourceManagers owned by
+  // the ASTContexts we created, thus we should go through the ASTContxts to find
+  // the right DiagnosticEngine to use.
+  for (auto &CI: CIs) {
+    if (CI->getSourceMgr().isOwning(Loc))
+      return CI->getDiags();
+  }
+  llvm_unreachable("cannot find diagnostic engine to use");
+}
+
+void SDKContext::addDiagConsumer(DiagnosticConsumer &Consumer) {
+  // we may emit diagnostics via any of the diagnostic engine, so add the consumer
+  // to all of them.
+  Diags.addConsumer(Consumer);
+  for (auto &CI: CIs) {
+    CI->getDiags().addConsumer(Consumer);
+  }
+}
+
 void SDKNodeRoot::registerDescendant(SDKNode *D) {
   // Operator doesn't have usr
   if (isa<SDKNodeDeclOperator>(D))
@@ -70,7 +93,7 @@ SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root)
   JsonFormatVer(Info.JsonFormatVer.hasValue() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
-      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
+      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr), Loc(Info.Loc),
         Location(Info.Location), ModuleName(Info.ModuleName),
         DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
@@ -983,7 +1006,7 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
 static StringRef calculateUsr(SDKContext &Ctx, ValueDecl *VD) {
   llvm::SmallString<64> SS;
   llvm::raw_svector_ostream OS(SS);
-  if (!ide::printDeclUSR(VD, OS)) {
+  if (!ide::printValueDeclUSR(VD, OS)) {
     return Ctx.buffer(SS.str());
   }
   return StringRef();
@@ -1297,7 +1320,7 @@ StringRef SDKContext::getInitKind(Decl *D) {
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
-      Ctx(Ctx), DKind(D->getKind()),
+      Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
       GenericSig(printGenericSignature(Ctx, D, /*Canonical*/Ctx.checkingABI())),
@@ -2143,6 +2166,9 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   if (llvm::errs().has_colors())
     PrintDiags.forceColors();
   CI.addDiagnosticConsumer(&PrintDiags);
+  // The PrintDiags is only responsible compiler errors, we should remove the
+  // consumer immediately after importing is done.
+  SWIFT_DEFER { CI.getDiags().removeConsumer(PrintDiags); };
   if (CI.setup(Invocation)) {
     llvm::errs() << "Failed to setup the compiler instance\n";
     return nullptr;
@@ -2211,7 +2237,7 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
   }
   PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.addDiagConsumer(PDC);
 
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
@@ -2227,7 +2253,7 @@ int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts) {
   }
   PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.addDiagConsumer(PDC);
 
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);

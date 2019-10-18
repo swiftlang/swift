@@ -249,6 +249,11 @@ struct SILDeclRef {
   bool isStoredPropertyInitializer() const {
     return kind == Kind::StoredPropertyInitializer;
   }
+  /// True if the SILDeclRef references the initializer for the backing storage
+  /// of a property wrapper.
+  bool isPropertyWrapperBackingInitializer() const {
+    return kind == Kind::PropertyWrapperBackingInitializer;
+  }
 
   /// True if the SILDeclRef references the ivar initializer or deinitializer of
   /// a class.

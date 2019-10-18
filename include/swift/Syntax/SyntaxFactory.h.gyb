@@ -71,7 +71,7 @@ struct SyntaxFactory {
   static Syntax
   makeBlankCollectionSyntax(SyntaxKind Kind);
 
-% for node in SYNTAX_NODES + PARSEONLY_NODES:
+% for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
 %     for child in node.children:

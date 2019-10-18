@@ -29,7 +29,7 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
         MutableArrayRef<ParsedRawSyntaxNode> Elements,
         function_ref<void(syntax::SyntaxKind, MutableArrayRef<ParsedRawSyntaxNode>)> receiver) {
   switch (Kind) {
-% for node in SYNTAX_NODES + PARSEONLY_NODES:
+% for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
 %   child_count = len(node.children)
@@ -77,7 +77,7 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
   }
 }
 
-% for node in SYNTAX_NODES + PARSEONLY_NODES:
+% for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
 %     child_move_args = []
@@ -90,21 +90,8 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
 %     child_params = ', '.join(child_params)
 %     child_move_args = ', '.join(child_move_args)
 Parsed${node.name}
-ParsedSyntaxRecorder::record${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
+ParsedSyntaxRecorder::record${node.syntax_kind}(${child_params},
                                        ParsedRawSyntaxRecorder &rec) {
-  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
-  return Parsed${node.name}(std::move(raw));
-}
-
-Parsed${node.name}
-ParsedSyntaxRecorder::defer${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout, SyntaxParsingContext &SPCtx) {
-  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, layout, SPCtx);
-  return Parsed${node.name}(std::move(raw));
-}
-
-Parsed${node.name}
-ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
-    SyntaxParsingContext &SPCtx) {
   ParsedRawSyntaxNode layout[] = {
 %     for child in node.children:
 %       if child.is_optional:
@@ -114,27 +101,56 @@ ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
 %       end
 %     end
   };
-  #ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(layout);
-  #endif
-  if (SPCtx.shouldDefer())
-    return defer${node.syntax_kind}(layout, SPCtx);
-  return record${node.syntax_kind}(layout, SPCtx.getRecorder());
+  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::defer${node.syntax_kind}(${child_params}, SyntaxParsingContext &SPCtx) {
+  ParsedRawSyntaxNode layout[] = {
+%     for child in node.children:
+%       if child.is_optional:
+    ${child.name}.hasValue() ? ${child.name}->takeRaw() : ParsedRawSyntaxNode::null(),
+%       else:
+    ${child.name}.takeRaw(),
+%       end
+%     end
+  };
+  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, llvm::makeMutableArrayRef(layout, ${len(node.children)}), SPCtx);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
+    SyntaxParsingContext &SPCtx) {
+  if (SPCtx.isBacktracking())
+    return defer${node.syntax_kind}(${child_move_args}, SPCtx);
+  return record${node.syntax_kind}(${child_move_args}, SPCtx.getRecorder());
 }
 
 %   elif node.is_syntax_collection():
 Parsed${node.name}
 ParsedSyntaxRecorder::record${node.syntax_kind}(
-    MutableArrayRef<ParsedRawSyntaxNode> layout,
+    MutableArrayRef<Parsed${node.collection_element_type}> elements,
     ParsedRawSyntaxRecorder &rec) {
+  SmallVector<ParsedRawSyntaxNode, 16> layout;
+  layout.reserve(elements.size());
+  for (auto &element : elements) {
+    layout.push_back(element.takeRaw());
+  }
   auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
   return Parsed${node.name}(std::move(raw));
 }
 
 Parsed${node.name}
 ParsedSyntaxRecorder::defer${node.syntax_kind}(
-    MutableArrayRef<ParsedRawSyntaxNode> layout,
+    MutableArrayRef<Parsed${node.collection_element_type}> elements,
     SyntaxParsingContext &SPCtx) {
+  SmallVector<ParsedRawSyntaxNode, 16> layout;
+  layout.reserve(elements.size());
+  for (auto &element : elements) {
+    layout.push_back(element.takeRaw());
+  }
   auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
                              layout, SPCtx);
   return Parsed${node.name}(std::move(raw));
@@ -144,24 +160,16 @@ Parsed${node.name}
 ParsedSyntaxRecorder::make${node.syntax_kind}(
     MutableArrayRef<Parsed${node.collection_element_type}> elements,
     SyntaxParsingContext &SPCtx) {
-  SmallVector<ParsedRawSyntaxNode, 16> layout;
-  layout.reserve(elements.size());
-  for (auto &element : elements) {
-    layout.push_back(element.takeRaw());
-  }
-  #ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(layout);
-  #endif
-  if (SPCtx.shouldDefer())
-    return defer${node.syntax_kind}(layout, SPCtx);
-  return record${node.syntax_kind}(layout, SPCtx.getRecorder());
+  if (SPCtx.isBacktracking())
+    return defer${node.syntax_kind}(elements, SPCtx);
+  return record${node.syntax_kind}(elements, SPCtx.getRecorder());
 }
 
 Parsed${node.name}
 ParsedSyntaxRecorder::makeBlank${node.syntax_kind}(SourceLoc loc,
         SyntaxParsingContext &SPCtx) {
   ParsedRawSyntaxNode raw;
-  if (SPCtx.shouldDefer()) {
+  if (SPCtx.isBacktracking()) {
     // FIXME: 'loc' is not preserved when capturing a deferred layout.
     raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {}, SPCtx);
   } else {
@@ -169,55 +177,8 @@ ParsedSyntaxRecorder::makeBlank${node.syntax_kind}(SourceLoc loc,
   }
   return Parsed${node.name}(std::move(raw));
 }
-%   elif node.is_unknown():
-Parsed${node.name}
-ParsedSyntaxRecorder::record${node.syntax_kind}(
-    MutableArrayRef<ParsedRawSyntaxNode> layout,
-    ParsedRawSyntaxRecorder &rec) {
-  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
-  return Parsed${node.name}(std::move(raw));
-}
-
-Parsed${node.name}
-ParsedSyntaxRecorder::defer${node.syntax_kind}(
-    MutableArrayRef<ParsedRawSyntaxNode> layout,
-    SyntaxParsingContext &SPCtx) {
-  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, layout, SPCtx);
-  return Parsed${node.name}(std::move(raw));
-}
-
-Parsed${node.name}
-ParsedSyntaxRecorder::make${node.syntax_kind}(
-    MutableArrayRef<ParsedSyntax> elements,
-    SyntaxParsingContext &SPCtx) {
-  SmallVector<ParsedRawSyntaxNode, 16> layout;
-  layout.reserve(elements.size());
-  for (auto &element : elements) {
-    layout.push_back(element.takeRaw());
-  }
-  #ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(layout);
-  #endif
-  if (SPCtx.shouldDefer())
-    return defer${node.syntax_kind}(layout, SPCtx);
-  return record${node.syntax_kind}(layout, SPCtx.getRecorder());
-}
 %   end
 % end
-
-ParsedTokenSyntax
-ParsedSyntaxRecorder::makeToken(const Token &Tok,
-                                const ParsedTrivia &LeadingTrivia,
-                                const ParsedTrivia &TrailingTrivia,
-                                SyntaxParsingContext &SPCtx) {
-  ParsedRawSyntaxNode raw;
-  if (SPCtx.shouldDefer()) {
-    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia, SPCtx);
-  } else {
-    raw = SPCtx.getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
-  }
-  return ParsedTokenSyntax(std::move(raw));
-}
 
 ParsedTupleTypeElementSyntax
 ParsedSyntaxRecorder::makeTupleTypeElement(ParsedTypeSyntax Type,

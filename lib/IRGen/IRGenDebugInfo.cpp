@@ -444,7 +444,7 @@ private:
         Dir = CurDir;
     }
     llvm::DIFile *F = DBuilder.createFile(File, Dir, CSInfo, Source);
-    DIFileCache[FileName.data()].reset(F);
+    DIFileCache[FileName].reset(F);
     return F;
   }
 
@@ -733,8 +733,6 @@ private:
         NoLoc, NoLoc, IGM.Context.getIdentifier(ArchetypeName), NoLoc,
         /*genericparams*/ nullptr, IGM.Context.TheBuiltinModule);
     Entry->setUnderlyingType(IGM.Context.TheRawPointerType);
-    Entry->setValidationToChecked();
-    Entry->computeType();
     return Entry;
   }
 

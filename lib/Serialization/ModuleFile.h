@@ -64,6 +64,7 @@ class ModuleFile
   /// The module file data.
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> ModuleDocInputBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoInputBuffer;
 
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
@@ -405,6 +406,18 @@ private:
   std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
+  class DeclUSRTableInfo;
+  using SerializedDeclUSRTable =
+      llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
+  std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
+
+  /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
+  StringRef SourceLocsTextData;
+
+  /// An array of fixed size source location data for each USR appearing in
+  /// \c DeclUSRsTable.
+  StringRef BasicDeclLocsData;
+
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
     unsigned EntryPointDeclID : 31;
@@ -444,6 +457,7 @@ private:
   /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+             std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
              bool isFramework, serialization::ValidationInfo &info,
              serialization::ExtendedValidationInfo *extInfo);
 
@@ -540,6 +554,21 @@ private:
   /// Returns false if there was an error.
   bool readModuleDocIfPresent();
 
+  /// Reads the source loc block, which contains USR to decl location mapping.
+  ///
+  /// Returns false if there was an error.
+  bool readDeclLocsBlock(llvm::BitstreamCursor &cursor);
+
+  /// Loads data from #ModuleSourceInfoInputBuffer.
+  ///
+  /// Returns false if there was an error.
+  bool readModuleSourceInfoIfPresent();
+
+  /// Read an on-disk decl hash table stored in
+  /// \c sourceinfo_block::DeclUSRSLayout format.
+  std::unique_ptr<SerializedDeclUSRTable>
+  readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
@@ -610,14 +639,19 @@ public:
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static serialization::ValidationInfo
-  load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+  load(StringRef moduleInterfacePath,
+       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, std::unique_ptr<ModuleFile> &theModule,
        serialization::ExtendedValidationInfo *extInfo = nullptr) {
     serialization::ValidationInfo info;
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
+                                   std::move(moduleSourceInfoInputBuffer),
                                    isFramework, info, extInfo));
+    if (!moduleInterfacePath.empty())
+      theModule->ModuleInterfacePath = moduleInterfacePath;
     return info;
   }
 
@@ -804,7 +838,7 @@ public:
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
-
+  Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
 
   // MARK: Deserialization interface

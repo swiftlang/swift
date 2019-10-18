@@ -386,8 +386,7 @@ class Factory : FactoryPattern {
 
   convenience init(string: String) {
     self.init(factory: Factory(_string: string))
-    // expected-error@-1 {{incorrect argument label in call (have 'factory:', expected '_string:')}}
-    // FIXME: Bogus diagnostic
+    // expected-error@-1 {{cannot convert value of type 'Factory' to expected argument type 'Self'}}
   }
 }
 

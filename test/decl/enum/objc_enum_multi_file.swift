@@ -1,8 +1,9 @@
-// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -typecheck -D NO_RAW_TYPE 2>&1 | %FileCheck -check-prefix=NO_RAW_TYPE %s
-// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -typecheck -D BAD_RAW_TYPE 2>&1 | %FileCheck -check-prefix=BAD_RAW_TYPE %s
-// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -typecheck -D NON_INT_RAW_TYPE 2>&1 | %FileCheck -check-prefix=NON_INT_RAW_TYPE %s
-// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -typecheck -D NO_CASES 2>&1 | %FileCheck -check-prefix=NO_CASES %s
-// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -typecheck -D DUPLICATE_CASES 2>&1 | %FileCheck -check-prefix=DUPLICATE_CASES %s
+// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir -D NO_RAW_TYPE 2>&1 | %FileCheck -check-prefix=NO_RAW_TYPE %s
+// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir -D BAD_RAW_TYPE 2>&1 | %FileCheck -check-prefix=BAD_RAW_TYPE %s
+// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir -D NON_INT_RAW_TYPE 2>&1 | %FileCheck -check-prefix=NON_INT_RAW_TYPE %s
+// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir -D NON_INT_RAW_VALUE 2>&1 | %FileCheck -check-prefix=NON_INT_RAW_VALUE %s
+// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir -D NO_CASES 2>&1 | %FileCheck -check-prefix=NO_CASES %s
+// RUN: not %target-swift-frontend -module-name main %s -primary-file %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir -D DUPLICATE_CASES 2>&1 | %FileCheck -check-prefix=DUPLICATE_CASES %s
 // Note that the *other* file is the primary file in this test!
 
 #if NO_RAW_TYPE
@@ -36,6 +37,13 @@
   // DUPLICATE_CASES: :[[@LINE-1]]:12: error: raw value for enum case is not unique
   // DUPLICATE_CASES: :[[@LINE-3]]:8: note: raw value previously used here
   // DUPLICATE_CASES: :[[@LINE-4]]:8: note: raw value implicitly auto-incremented from zero
+}
+
+#elseif NON_INT_RAW_VALUE
+@objc enum TheEnum : Int32 {
+  case A = 0
+  case B = "B"
+  // NON_INT_RAW_VALUE: :[[@LINE-1]]:12: error: cannot convert value of type 'String' to raw type 'Int32'
 }
 
 #else

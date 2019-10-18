@@ -472,8 +472,7 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                     paramInfo.SpecifierLoc,
+    auto param = new (ctx) ParamDecl(paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName,
                                      parser.CurDeclContext);
@@ -482,7 +481,6 @@ mapParsedParameters(Parser &parser,
     auto setInvalid = [&]{
       if (param->isInvalid())
         return;
-      param->getTypeLoc().setInvalidType(ctx);
       param->setInvalid();
     };
 
@@ -513,7 +511,7 @@ mapParsedParameters(Parser &parser,
                                                              "__owned",
                                                              parsingEnumElt);
       }
-      param->getTypeLoc() = TypeLoc(type);
+      param->setTypeRepr(type);
 
       // If there is `@autoclosure` attribute associated with the type
       // let's mark that in the declaration as well, because it
@@ -530,7 +528,8 @@ mapParsedParameters(Parser &parser,
       // Non-closure parameters require a type.
       if (!param->isInvalid())
         parser.diagnose(param->getLoc(), diag::missing_parameter_type);
-      
+
+      param->setSpecifier(ParamSpecifier::Default);
       setInvalid();
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
@@ -552,7 +551,12 @@ mapParsedParameters(Parser &parser,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
+
+      param->setSpecifier(ParamSpecifier::Default);
+    } else {
+      param->setSpecifier(ParamSpecifier::Default);
     }
+
     return param;
   };
 
@@ -624,7 +628,7 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(param.EllipsisLoc);
 
         param.EllipsisLoc = SourceLoc();
-      } else if (!result->getTypeLoc().getTypeRepr()) {
+      } else if (!result->getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(result->getSourceRange());
 
@@ -778,7 +782,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   } else if (Tok.is(tok::kw_rethrows)) {
     throwsLoc = consumeToken();
     rethrows = true;
-  } else if (Tok.is(tok::kw_throw)) {
+  } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
     throwsLoc = consumeToken();
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
@@ -1171,17 +1175,18 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
-  DeferringContextRAII Deferring(*SyntaxContext);
   ParserResult<Expr> subExpr =
     parseExprImpl(diag::expected_pattern, isExprBasic);
   ParserStatus status = subExpr;
   if (subExpr.isNull())
     return status;
 
-  if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
-    PatternCtx.addSyntax(UPES->getDeferredPattern());
-  } else {
-    PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+  if (SyntaxContext->isEnabled()) {
+    if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getDeferredPattern());
+    } else {
+      PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+    }
   }
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate

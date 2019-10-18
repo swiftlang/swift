@@ -36,8 +36,7 @@ bool checkOverrides(ValueDecl *decl);
 
 // Implemented in TypeCheckStorage.cpp
 void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx);
-void validatePatternBindingEntries(TypeChecker &tc,
-                                   PatternBindingDecl *binding);
+
 }
 
 #endif

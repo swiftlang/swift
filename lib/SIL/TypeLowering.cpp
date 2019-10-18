@@ -24,9 +24,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -1775,7 +1777,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(vd)) {
     auto *param = getParameterAt(afd, c.defaultArgIndex);
     if (param->getDefaultValue()) {
-      auto &captureInfo = param->getDefaultArgumentCaptureInfo();
+      auto captureInfo = param->getDefaultArgumentCaptureInfo();
       sig = getEffectiveGenericSignature(afd, captureInfo);
     }
   }
@@ -2111,6 +2113,9 @@ TypeConverter::hasLoweredLocalCaptures(SILDeclRef fn) {
 
 CaptureInfo
 TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
+  PrettyStackTraceSILLocation stack("getting lowered local captures",
+                                    fn.getAsRegularLocation(), Context);
+
   fn.isForeign = 0;
   fn.isCurried = 0;
   fn.isDirectReference = 0;
@@ -2132,11 +2137,14 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
 
-  std::function<void (const CaptureInfo &captureInfo)> collectCaptures;
+  std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
-  collectCaptures = [&](const CaptureInfo &captureInfo) {
+  collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
+    assert(captureInfo.hasBeenComputed() ||
+           !TypeConverter::canCaptureFromParent(dc));
+
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
@@ -2263,7 +2271,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (!visitedFunctions.insert(curFn).second)
       return;
 
-    collectCaptures(curFn.getCaptureInfo());
+    PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
+    auto dc = curFn.getAsDeclContext();
+    collectCaptures(curFn.getCaptureInfo(), dc);
 
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
@@ -2274,17 +2284,22 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (auto *AFD = curFn.getAbstractFunctionDecl()) {
       for (auto *P : *AFD->getParameters()) {
         if (P->getDefaultValue())
-          collectCaptures(P->getDefaultArgumentCaptureInfo());
+          collectCaptures(P->getDefaultArgumentCaptureInfo(), dc);
       }
     }
   };
 
   collectConstantCaptures = [&](SILDeclRef curFn) {
     if (curFn.isDefaultArgGenerator()) {
+      PrettyStackTraceSILLocation stack("lowering local captures",
+                                        fn.getAsRegularLocation(), Context);
+      
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(afd, curFn.defaultArgIndex);
-        if (param->getDefaultValue())
-          collectCaptures(param->getDefaultArgumentCaptureInfo());
+        if (param->getDefaultValue()) {
+          auto dc = afd->getInnermostDeclContext();
+          collectCaptures(param->getDefaultArgumentCaptureInfo(), dc);
+        }
         return;
       }
 

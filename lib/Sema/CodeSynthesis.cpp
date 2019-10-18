@@ -121,9 +121,8 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // Whether we have explicit initialization.
   bool isExplicitlyInitialized = false;
   if (auto pbd = var->getParentPatternBinding()) {
-    auto &entry = pbd->getPatternEntryForVarDecl(var);
-    isExplicitlyInitialized =
-      entry.isInitialized() && entry.getEqualLoc().isValid();
+    const auto i = pbd->getPatternEntryIndexForVarDecl(var);
+    isExplicitlyInitialized = pbd->isExplicitlyInitialized(i);
   }
 
   // Whether we can default-initialize this property.
@@ -236,8 +235,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       // Create the parameter.
       auto *arg = new (ctx)
-          ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), Loc,
+          ParamDecl(SourceLoc(), Loc,
                     var->getName(), Loc, var->getName(), decl);
+      arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
@@ -651,8 +651,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited |
-       ParameterList::WithoutTypes);
+       ParameterList::Inherited);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -669,7 +668,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
-    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,
@@ -692,8 +690,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
 
-  ctor->setValidationToChecked();
-
   configureInheritedDesignatedInitAttributes(classDecl, ctor,
                                              superclassCtor, ctx);
 
@@ -704,8 +700,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // Note that this is a stub implementation.
     ctor->setStubImplementation(true);
 
-    // Stub constructors don't appear in the vtable.
-    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 
@@ -816,13 +810,13 @@ static bool areAllStoredPropertiesDefaultInitializable(NominalTypeDecl *decl) {
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->hasStorage() && !pbd->isStatic()) {
-        for (auto entry : pbd->getPatternList()) {
-          if (entry.isInitialized()) continue;
+        for (auto idx : range(pbd->getNumPatternEntries())) {
+          if (pbd->isInitialized(idx)) continue;
 
           // If one of the bound variables is @NSManaged, go ahead no matter
           // what.
           bool CheckDefaultInitializer = true;
-          entry.getPattern()->forEachVariable([&](VarDecl *vd) {
+          pbd->getPattern(idx)->forEachVariable([&](VarDecl *vd) {
             if (vd->getAttrs().hasAttribute<NSManagedAttr>())
               CheckDefaultInitializer = false;
           });
@@ -844,18 +838,6 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
          "ClangImporter is responsible for adding implicit constructors");
   assert(!decl->hasUnreferenceableStorage() &&
          "User-defined structs cannot have unreferenceable storage");
-
-  // Bail out if we're validating one of our stored properties already;
-  // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
-
-      if (!var->getInterfaceType())
-        return;
-    }
-  }
 
   decl->setAddedImplicitInitializers();
 
@@ -917,7 +899,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->getInterfaceType())
+        if (ctor->isRecursiveValidation())
           return;
       }
     }

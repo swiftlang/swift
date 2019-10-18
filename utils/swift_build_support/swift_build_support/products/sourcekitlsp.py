@@ -28,7 +28,7 @@ class SourceKitLSP(product.Product):
             'build', host_target, self, self.args)
 
     def test(self, host_target):
-        if self.args.test and self.args.test_sourcekitlsp:
+        if self.args.test_sourcekitlsp:
             indexstoredb.run_build_script_helper(
                 'test', host_target, self, self.args)
 

@@ -319,8 +319,7 @@ public:
     return { false, DRE };
   }
 
-  void propagateCaptures(const CaptureInfo &captureInfo,
-                         SourceLoc loc) {
+  void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl()->getDeclContext() == CurDC)
@@ -673,7 +672,7 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
     if (!PBD) continue;
     // Walk the initializers for all properties declared in the type with
     // an initializer.
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+    for (unsigned i : range(PBD->getNumPatternEntries())) {
       if (PBD->isInitializerSubsumed(i))
         continue;
 

@@ -2357,8 +2357,8 @@ public:
 
     void verifyChecked(PatternBindingDecl *binding) {
       // Look at all of the VarDecls being bound.
-      for (auto entry : binding->getPatternList())
-        if (auto *P = entry.getPattern())
+      for (auto idx : range(binding->getNumPatternEntries()))
+        if (auto *P = binding->getPattern(idx))
           P->forEachVariable([&](VarDecl *VD) {
             // ParamDecls never get PBD's.
             assert(!isa<ParamDecl>(VD) && "ParamDecl has a PatternBindingDecl?");
@@ -3189,12 +3189,6 @@ public:
 
     void verifyParsed(AccessorDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying AccessorDecl", FD);
-
-      auto storage = FD->getStorage();
-      if (storage->isStatic() != FD->isStatic()) {
-        Out << "accessor static-ness must match static-ness of storage\n";
-        abort();
-      }
 
       verifyParsedBase(FD);
     }
