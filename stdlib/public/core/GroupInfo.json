@@ -197,15 +197,16 @@
     "Bitset.swift"
   ],
   "Atomics": [
+    "AtomicMemoryOrderings.swift",
     "RawAtomics.swift",
-    "UnsafeAtomicInt.swift",
-    "UnsafeAtomicUInt.swift",
-    "UnsafeAtomicUnmanaged.swift",
-    "UnsafeAtomicMutablePointer.swift",
-    "UnsafeAtomicInitializableReference.swift",
+    "AtomicInt.swift",
+    "AtomicUInt.swift",
+    "AtomicUnmanaged.swift",
+    "AtomicUnsafeMutablePointer.swift",
     "LegacyAtomicInt.swift"
   ],
   "Misc": [
+    "Anchored.swift",
     "ErrorType.swift",
     "Identifiable.swift",
     "InputStream.swift",

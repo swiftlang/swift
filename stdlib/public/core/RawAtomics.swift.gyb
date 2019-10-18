@@ -35,12 +35,12 @@
     ]
 
   integerOperations = [
-    # Swift name,        llvm name,  operator
-    ('WrappingAdd',      'add',      '&+'),
-    ('WrappingSubtract', 'sub',      '&-'),
-    ('BitwiseAnd',       'and',      '&'),
-    ('BitwiseOr',        'or',       '|'),
-    ('BitwiseXor',       'xor',      '^')
+    # Swift name,        llvm name,  operator, doc
+    ('WrappingAdd',      'add',      '&+',     "wrapping add"),
+    ('WrappingSubtract', 'sub',      '&-',     "wrapping subtract"),
+    ('BitwiseAnd',       'and',      '&',      "bitwise and"),
+    ('BitwiseOr',        'or',       '|',      "bitwise or"),
+    ('BitwiseXor',       'xor',      '^',      "bitwise xor")
   ]
 }%
 
@@ -48,10 +48,14 @@
 
 extension UnsafeMutableRawPointer {
 % for (enumOrder, apiOrder, docOrder, llvmOrder) in loadOrderings():
-  /// Atomically load the pointee with ${docOrder} ordering.
+  /// Atomically loads a word starting at this address with ${docOrder}
+  /// memory ordering.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
-  public // backdeployment
+  public // backdeployment hook
   func _atomic${apiOrder}LoadWord() -> UInt {
     return UInt(Builtin.atomicload_${llvmOrder}_Word(_rawValue))
   }
@@ -59,12 +63,36 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
+  /// Atomically loads a word starting at this address with the specified
+  /// memory ordering.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_alwaysEmitIntoClient
+  @_transparent // Debug performance
+  public
+  func _atomicLoadWord(ordering: AtomicLoadOrdering) -> UInt {
+    switch ordering {
+    case .relaxed:
+      return _atomicRelaxedLoadWord()
+    default:
+      return _atomicLoadWord()
+    }
+  }
+}
+
+
+extension UnsafeMutableRawPointer {
 % for enumOrder, apiOrder, docOrder, llvmOrder in storeOrderings():
-  /// Atomically store the specified value in the memory referenced by this
-  /// pointer, with ${docOrder} ordering.
+  /// Atomically stores the specified value starting at the memory referenced by
+  /// this pointer, with ${docOrder} memory ordering.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
-  public // backdeployment
+  public // backdeployment hook
   func _atomic${apiOrder}StoreWord(_ desired: UInt) {
     Builtin.atomicstore_${llvmOrder}_Word(_rawValue, desired._builtinWordValue)
   }
@@ -72,10 +100,40 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
+  /// Atomically stores the specified value starting at the memory referenced by
+  /// this pointer, with the specified memory ordering.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_alwaysEmitIntoClient
+  @_transparent // Debug performance
+  public
+  func _atomicStoreWord(
+    _ desired: UInt,
+    ordering: AtomicStoreOrdering
+  ) {
+    switch ordering {
+    case .relaxed:
+      _atomicRelaxedStoreWord(desired)
+    default:
+      _atomicStoreWord(desired)
+    }
+  }
+}
+
+extension UnsafeMutableRawPointer {
 % for _, apiOrder, docOrder, llvmOrder, _ in rmwOrderings():
+  /// Atomically stores the specified value at the memory referenced by this
+  /// pointer, returning the previous value, with ${docOrder} memory ordering.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
+  ///
+  /// - Returns: The original value.
   @_alwaysEmitIntoClient
   @_transparent
-  public // backdeployment
+  public // backdeployment hook
   func _atomic${apiOrder}ExchangeWord(
     _ desired: UInt
   ) -> UInt {
@@ -87,10 +145,56 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
-% for _, apiOrder, docOrder, llvmOrder, failureOrder in rmwOrderings():
+  /// Atomically stores the specified value starting at the memory referenced by
+  /// this pointer, with the specified memory ordering.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_alwaysEmitIntoClient
+  @_transparent // Debug performance
+  public
+  func _atomicExchangeWord(
+    _ desired: UInt,
+    ordering: AtomicUpdateOrdering
+  ) -> UInt {
+    switch ordering {
+    case .relaxed:
+      return _atomicRelaxedExchangeWord(desired)
+    case .acquiring:
+      return _atomicAcquiringExchangeWord(desired)
+    case .releasing:
+      return _atomicReleasingExchangeWord(desired)
+    default:
+      return _atomicExchangeWord(desired)
+    }
+  }
+}
+
+extension UnsafeMutableRawPointer {
+% for swiftOrder, apiOrder, docOrder, llvmOrder, failureOrder in rmwOrderings():
+  /// Perform an atomic compare and exchange operation with
+  /// ${docOrder} memory ordering.
+  ///
+  /// This operation is equivalent to the following pseudo code:
+  ///
+  /// ```
+  /// atomic(self, ordering: .${swiftOrder}) { value in
+  ///   if value == expected {
+  ///      value = desired
+  ///      return true
+  ///   } else {
+  ///      expected = value
+  ///      return false
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
-  public // backdeployment
+  public // backdeployment hook
   func _atomic${apiOrder}CompareExchangeWord(
     expected: inout UInt,
     desired: UInt
@@ -104,16 +208,108 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
-% for (swiftName, builtinName, operator) in integerOperations:
+  /// Perform an atomic compare and exchange operation with the specified memory
+  /// ordering.
+  ///
+  /// This operation is equivalent to the following pseudo code:
+  ///
+  /// ```
+  /// atomic(self, ordering: ordering) { value in
+  ///   if value == expected {
+  ///      value = desired
+  ///      return true
+  ///   } else {
+  ///      expected = value
+  ///      return false
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for accessing an UInt value.
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_alwaysEmitIntoClient
+  @_transparent // Debug performance
+  public
+  func _atomicCompareExchangeWord(
+    expected: inout UInt,
+    desired: UInt,
+    ordering: AtomicUpdateOrdering
+  ) -> Bool {
+    switch ordering {
+    case .relaxed:
+      return _atomicRelaxedCompareExchangeWord(
+        expected: &expected,
+        desired: desired)
+    case .acquiring:
+      return _atomicAcquiringCompareExchangeWord(
+        expected: &expected,
+        desired: desired)
+    case .releasing:
+      return _atomicReleasingCompareExchangeWord(
+        expected: &expected,
+        desired: desired)
+    default:
+      return _atomicCompareExchangeWord(
+        expected: &expected,
+        desired: desired)
+    }
+  }
+}
+
+extension UnsafeMutableRawPointer {
+% for (swiftName, builtinName, operator, doc) in integerOperations:
 %   for _, apiOrder, docOrder, llvmOrder, _ in rmwOrderings():
+  /// Perform an atomic ${doc} operation and return the new value,
+  /// with ${docOrder} memory ordering.
+  ///
+  % if "Wrapping" in swiftName:
+  /// - Note: This operation silently wraps around on overflow, like the
+  /// `${operator}` operator does on `UInt` values.
+  ///
+  % end
+  /// - Returns: The original value before the operation.
   @_alwaysEmitIntoClient
   @_transparent
-  public // backdeployment
+  public // backdeployment hook
   func _atomic${apiOrder}FetchThen${swiftName}Word(_ operand: UInt) -> UInt {
     let value = Builtin.atomicrmw_${builtinName}_${llvmOrder}_Word(
       _rawValue, operand._builtinWordValue)
     return UInt(value)
   }
 %   end
+% end
+}
+
+extension UnsafeMutableRawPointer {
+% for (swiftName, builtinName, operator, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the new value,
+  /// with the specified memory ordering.
+  ///
+  % if "Wrapping" in swiftName:
+  /// - Note: This operation silently wraps around on overflow, like the
+  /// `${operator}` operator does on `UInt` values.
+  ///
+  % end
+  /// - Returns: The original value before the operation.
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @_alwaysEmitIntoClient
+  @_transparent // Debug performance
+  public
+  func _atomicFetchThen${swiftName}Word(
+    _ operand: UInt,
+    ordering: AtomicUpdateOrdering
+  ) -> UInt {
+    switch ordering {
+    case .relaxed:
+      return _atomicRelaxedFetchThen${swiftName}Word(operand)
+    case .acquiring:
+      return _atomicAcquiringFetchThen${swiftName}Word(operand)
+    case .releasing:
+      return _atomicReleasingFetchThen${swiftName}Word(operand)
+    default:
+      return _atomicFetchThen${swiftName}Word(operand)
+    }
+  }
 % end
 }

@@ -1,0 +1,186 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  def lowerFirst(str):
+    return str[:1].lower() + str[1:] if str else ""
+
+  integerOperations = [
+    # Swift name,        operator, doc
+    ('WrappingAdd',      '&+',     "wrapping add"),
+    ('WrappingSubtract', '&-',     "wrapping subtract"),
+    ('BitwiseAnd',       '&',      "bitwise and"),
+    ('BitwiseOr',        '|',      "bitwise or"),
+    ('BitwiseXor',       '^',      "bitwise xor")
+  ]
+}%
+
+
+/// Provides atomic operations on a signed integer value that is stored at a
+/// stable memory location.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct AtomicInt: Anchored {
+  @usableFromInline
+  internal let _anchor: AnyObject
+
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @_transparent // Debug performance
+  public init(at address: UnsafeMutablePointer<Int>, in anchor: AnyObject) {
+    self._anchor = anchor
+    self._ptr = UnsafeMutableRawPointer(address)
+  }
+
+  public static var defaultInitialValue: Int { 0 }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInt {
+  /// Atomically loads and returns the current value,
+  /// with the specified memory ordering.
+  @_transparent @_alwaysEmitIntoClient
+  public func load(ordering: AtomicLoadOrdering = .acquiring) -> Int {
+    Int(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
+  }
+}
+
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInt {
+  /// Atomically sets the current value to `desired`,
+  /// with the specified memory ordering.
+  @_transparent @_alwaysEmitIntoClient
+  public func store(
+    _ desired: Int,
+    ordering: AtomicStoreOrdering = .releasing
+  ) {
+    _ptr._atomicStoreWord(UInt(bitPattern: desired), ordering: ordering)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInt {
+  /// Atomically sets the current value to `desired` and returns the previous
+  /// value, with the specified memory ordering.
+  ///
+  /// - Returns: The original value.
+  @_transparent @_alwaysEmitIntoClient
+  public func exchange(
+    _ desired: Int,
+      ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+  ) -> Int {
+    let r = _ptr._atomicExchangeWord(
+      UInt(bitPattern: desired),
+      ordering: ordering)
+    return Int(bitPattern: r)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInt {
+  /// Perform an atomic compare and exchange operation with
+  /// the specified memory ordering.
+  ///
+  /// This operation is equivalent to the following pseudo code:
+  ///
+  /// ```
+  /// atomic(self, ordering: ordering) { value in
+  ///   if value == expected {
+  ///      value = desired
+  ///      return true
+  ///   } else {
+  ///      expected = value
+  ///      return false
+  ///   }
+  /// }
+  /// ```
+  @_transparent @_alwaysEmitIntoClient
+  public func compareExchange(
+    expected: inout Int,
+    desired: Int,
+    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+  ) -> Bool {
+    var expectedWord = UInt(bitPattern: expected)
+    let r = _ptr._atomicCompareExchangeWord(
+      expected: &expectedWord,
+      desired: UInt(bitPattern: desired),
+      ordering: ordering)
+    expected = Int(bitPattern: expectedWord)
+    return r
+  }
+}
+
+
+% for (name, op, doc) in integerOperations:
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInt {
+  /// Perform an atomic ${doc} operation and return the original value, with
+  /// the specified memory ordering.
+  ///
+  % if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `Int` values.
+  ///
+  % end
+  /// - Returns: The original value before the operation.
+  @_transparent @_alwaysEmitIntoClient
+  @discardableResult
+  public func fetchThen${name}(
+    _ operand: Int,
+    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+  ) -> Int {
+    Int(bitPattern:
+      _ptr._atomicFetchThen${name}Word(
+        UInt(bitPattern: operand),
+        ordering: ordering))
+  }
+
+  /// Perform an atomic ${doc} operation and return the new value, with
+  /// the specified memory ordering.
+  ///
+  % if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `Int` values.
+  ///
+  % end
+  /// - Returns: The new value after the operation.
+  @_transparent @_alwaysEmitIntoClient
+  @discardableResult
+  public func ${lowerFirst(name)}ThenFetch(
+    _ operand: Int,
+    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+  ) -> Int {
+    fetchThen${name}(operand, ordering: ordering) ${op} operand
+  }
+}
+% end
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicInt {
+  @_transparent @_alwaysEmitIntoClient
+  public func wrappingIncrement(
+    by delta: Int = 1,
+    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+  ) {
+    fetchThenWrappingAdd(delta, ordering: ordering)
+  }
+
+  @_transparent @_alwaysEmitIntoClient
+  public func wrappingDecrement(
+    by delta: Int = 1,
+    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+  ) {
+    fetchThenWrappingSubtract(delta, ordering: ordering)
+  }
+}

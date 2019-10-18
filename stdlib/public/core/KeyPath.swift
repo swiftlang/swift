@@ -445,6 +445,17 @@ public class ReferenceWritableKeyPath<
   }
 }
 
+extension ReferenceWritableKeyPath where Root: AnyObject {
+  // FIXME: Should we replace the constraint with returning an anchor object?
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @usableFromInline
+  internal func _directAddress(in root: Root) -> UnsafeMutablePointer<Value>? {
+    guard let offset = _storedInstanceOffset else { return nil }
+    let p = _getUnsafePointerToStoredProperty(atOffset: offset, in: root)
+    return p.assumingMemoryBound(to: Value.self)
+  }
+}
+
 // MARK: Implementation details
 
 internal enum KeyPathComponentKind {

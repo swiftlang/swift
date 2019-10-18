@@ -191,14 +191,8 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
   Mirrors.swift.gyb
-  RawAtomics.swift.gyb
   Runtime.swift.gyb
   UnavailableStringAPIs.swift.gyb
-  UnsafeAtomicInitializableReference.swift.gyb
-  UnsafeAtomicInt.swift.gyb
-  UnsafeAtomicMutablePointer.swift.gyb
-  UnsafeAtomicUInt.swift.gyb
-  UnsafeAtomicUnmanaged.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )
@@ -215,6 +209,10 @@ endif()
 set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+  Anchored.swift
+  AtomicMemoryOrderings.swift
+  AtomicUnmanaged.swift
+  AtomicUnsafeMutablePointer.swift
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
@@ -233,7 +231,10 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  AtomicInt.swift.gyb
+  AtomicUInt.swift.gyb
   ExistentialCollection.swift.gyb
+  RawAtomics.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )

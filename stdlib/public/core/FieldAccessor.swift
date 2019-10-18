@@ -14,7 +14,7 @@
 /// class type.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct FieldAccessor<Root: AnyObject, Value> {
+public struct FieldAccessor<Anchor: AnyObject, Value> {
   @usableFromInline
   internal let _offset: Int
 
@@ -25,7 +25,7 @@ public struct FieldAccessor<Root: AnyObject, Value> {
 
   /// Initialize a new field accessor providing access to the stored property
   /// identified by the specified key path.
-  public init(for key: ReferenceWritableKeyPath<Root, Value>) {
+  public init(for key: ReferenceWritableKeyPath<Anchor, Value>) {
     guard let offset = key._storedInstanceOffset else {
       _preconditionFailure("FieldAccessor's key path isn't a stored property")
     }
@@ -36,7 +36,7 @@ public struct FieldAccessor<Root: AnyObject, Value> {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension FieldAccessor {
   @inlinable
-  internal func _pointer(in object: Root) -> UnsafeMutablePointer<Value> {
+  internal func _pointer(in object: Anchor) -> UnsafeMutablePointer<Value> {
     let rawPtr = _getUnsafePointerToStoredProperty(
       atOffset: _offset,
       in: object)
@@ -59,7 +59,7 @@ extension FieldAccessor {
   /// - Returns: The return value, if any, of the `body` closure.
   @inlinable
   public func withUnsafeMutablePointer<R>(
-    in object: Root,
+    in object: Anchor,
     _ body: (UnsafeMutablePointer<Value>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
