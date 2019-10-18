@@ -289,9 +289,7 @@ namespace {
                                                    DeclContext *capturedSelfContext);
     
     void lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
-                                                                   PatternBindingInitializer *PBI,
-                                                                   Optional<bool> isCascadingUse,
-                                                                   DeclContext *capturedSelfContext);
+                                                                   PatternBindingInitializer *PBI, Optional<bool> isCascadingUse);
     
     /// An initializer of a global name, or a function-likelocal name.
     void lookupNamesIntroducedByInitializerOfGlobalOrLocal(
@@ -646,12 +644,12 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     lookupNamesIntroducedByLazyVariableInitializer(PBI, selfParam,
                                                    isCascadingUse,
                                                    capturedSelfContext);
-  else if (PBI->getParent()->isTypeContext())
+  else if (PBI->getParent()->isTypeContext()) {
+    assert(capturedSelfContext == NULL);
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
-      PBI,
-      isCascadingUse,
-      capturedSelfContext
-    );
+                                                              PBI,
+                                                              isCascadingUse);
+  }
   else
     lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse,
                                                       capturedSelfContext);
@@ -677,8 +675,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
 
 void UnqualifiedLookupFactory::
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
-        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse,
-        DeclContext *capturedSelfContext) {
+        PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
   // Initializers for stored properties of types perform static
   // lookup into the surrounding context.
   DeclContext *const storedPropertyContainer = PBI->getParent();
@@ -690,7 +687,7 @@ void UnqualifiedLookupFactory::
       this, storedPropertyContainer, storedPropertyContainer),
     resolveIsCascadingUse(storedPropertyContainer, None,
                           /*onlyCareAboutFunctionBody=*/false),
-    capturedSelfContext);
+    /*capturedSelfContext=*/NULL);
   // clang-format on
 }
 
