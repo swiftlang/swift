@@ -213,7 +213,8 @@ StringRef SourceManager::extractText(CharSourceRange Range,
                        Range.getByteLength());
 }
 
-unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
+Optional<unsigned>
+SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());
   // Search the buffers back-to front, so later alias buffers are
   // visited first.
@@ -226,7 +227,18 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
         less_equal(Loc.Value.getPointer(), Buf->getBufferEnd()))
       return i;
   }
+  return None;
+}
+
+unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
+  auto Id = findBufferContainingLocInternal(Loc);
+  if (Id.hasValue())
+    return *Id;
   llvm_unreachable("no buffer containing location found");
+}
+
+bool SourceManager::isOwning(SourceLoc Loc) const {
+  return findBufferContainingLocInternal(Loc).hasValue();
 }
 
 void SourceRange::widen(SourceRange Other) {
