@@ -85,6 +85,9 @@ SWIFT_REQUEST(TypeChecker, IsSetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest, VarDecl *(VarDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LookupPrecedenceGroupRequest,
+              PrecedenceGroupDecl *(DeclContext *, Identifier, SourceLoc),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, NamingPatternRequest,

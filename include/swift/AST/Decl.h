@@ -282,13 +282,6 @@ bool conflicting(ASTContext &ctx,
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
-public:
-  enum class ValidationState {
-    Unchecked,
-    Checking,
-    Checked,
-  };
-
 protected:
   union { uint64_t OpaqueBits;
 
@@ -306,9 +299,6 @@ protected:
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
     FromClang : 1,
-
-    /// The validation state of this declaration.
-    ValidationState : 2,
 
     /// Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -689,7 +679,6 @@ protected:
     Bits.Decl.Invalid = false;
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
-    Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
@@ -830,37 +819,7 @@ public:
   /// Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { Bits.Decl.Implicit = implicit; }
 
-  /// Get the validation state.
-  ValidationState getValidationState() const {
-    return ValidationState(Bits.Decl.ValidationState);
-  }
-
-private:
-  friend class DeclValidationRAII;
-
-  /// Set the validation state.
-  void setValidationState(ValidationState VS) {
-    assert(VS > getValidationState() && "Validation is unidirectional");
-    Bits.Decl.ValidationState = unsigned(VS);
-  }
-
 public:
-  /// Whether the declaration is in the middle of validation or not.
-  bool isBeingValidated() const {
-    switch (getValidationState()) {
-    case ValidationState::Unchecked:
-    case ValidationState::Checked:
-      return false;
-    case ValidationState::Checking:
-      return true;
-    }
-    llvm_unreachable("Unknown ValidationState");
-  }
-
-  bool hasValidationStarted() const {
-    return getValidationState() > ValidationState::Unchecked;
-  }
-
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
   }
@@ -979,25 +938,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
-  }
-};
-
-/// Use RAII to track Decl validation progress and non-reentrancy.
-class DeclValidationRAII {
-  Decl *D;
-
-public:
-  DeclValidationRAII(const DeclValidationRAII &) = delete;
-  DeclValidationRAII(DeclValidationRAII &&) = delete;
-  void operator =(const DeclValidationRAII &) = delete;
-  void operator =(DeclValidationRAII &&) = delete;
-
-  DeclValidationRAII(Decl *decl) : D(decl) {
-    D->setValidationState(Decl::ValidationState::Checking);
-  }
-
-  ~DeclValidationRAII() {
-    D->setValidationState(Decl::ValidationState::Checked);
   }
 };
 

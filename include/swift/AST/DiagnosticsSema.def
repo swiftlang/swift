@@ -883,6 +883,8 @@ NOTE(found_this_precedence_group,none,
 ERROR(unknown_precedence_group,none,
       "unknown precedence group %0", (Identifier))
 ERROR(precedence_group_cycle,none,
+      "cycle in '%select{lowerThan|higherThan}0' relation", (bool))
+ERROR(higher_than_precedence_group_cycle,none,
       "cycle in higherThan relation: %0", (StringRef))
 ERROR(precedence_group_lower_within_module,none,
       "precedence group cannot be given lower precedence than group in same"

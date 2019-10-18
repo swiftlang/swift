@@ -1833,18 +1833,31 @@ static void checkPrecedenceCircularity(DiagnosticEngine &D,
         buildLowerThanPath(PGD, rel.Group, str);
       }
 
-      D.diagnose(PGD->getHigherThanLoc(), diag::precedence_group_cycle, path);
+      D.diagnose(PGD->getHigherThanLoc(),
+                 diag::higher_than_precedence_group_cycle, path);
       PGD->setInvalid();
       return;
     }
   } while (!stack.empty());
 }
 
+static PrecedenceGroupDecl *
+lookupPrecedenceGroup(const PrecedenceGroupDescriptor &descriptor) {
+  auto *dc = descriptor.dc;
+  if (auto sf = dc->getParentSourceFile()) {
+    bool cascading = dc->isCascadingContextForLookup(false);
+    return sf->lookupPrecedenceGroup(descriptor.ident, cascading,
+                                     descriptor.nameLoc);
+  } else {
+    return dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
+                                                        descriptor.nameLoc);
+  }
+}
+
 static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
   assert(PGD && "Cannot validate a null precedence group!");
-  if (PGD->isInvalid() || PGD->hasValidationStarted())
+  if (PGD->isInvalid())
     return;
-  DeclValidationRAII IBV(PGD);
 
   auto &Diags = PGD->getASTContext().Diags;
   
@@ -1853,13 +1866,16 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
   for (auto &rel : PGD->getMutableHigherThan()) {
     if (rel.Group) continue;
 
-    auto group = TypeChecker::lookupPrecedenceGroup(PGD->getDeclContext(),
-                                                    rel.Name, rel.NameLoc);
+    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name,
+                                   rel.NameLoc, true};
+    auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
+                                   LookupPrecedenceGroupRequest{desc}, nullptr);
     if (group) {
       rel.Group = group;
       addedHigherThan = true;
-    } else if (!PGD->isInvalid()) {
-      Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+    } else {
+      if (!lookupPrecedenceGroup(desc))
+        Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
       PGD->setInvalid();
     }
   }
@@ -1869,29 +1885,52 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     if (rel.Group) continue;
 
     auto dc = PGD->getDeclContext();
-    auto group = TypeChecker::lookupPrecedenceGroup(dc, rel.Name, rel.NameLoc);
+    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name,
+                                   rel.NameLoc, false};
+    auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
+                                   LookupPrecedenceGroupRequest{desc}, nullptr);
+    bool hadError = false;
     if (group) {
-      if (group->getDeclContext()->getParentModule() == dc->getParentModule()) {
-        if (!PGD->isInvalid()) {
-          Diags.diagnose(rel.NameLoc,
-                         diag::precedence_group_lower_within_module);
-          Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
-                         DescriptiveDeclKind::PrecedenceGroup);
-          PGD->setInvalid();
-        }
+      rel.Group = group;
+    } else {
+      hadError = true;
+      if (auto *rawGroup = lookupPrecedenceGroup(desc)) {
+        // We already know the lowerThan path is errant, try to use the results
+        // of a raw lookup to enforce the same-module restriction.
+        group = rawGroup;
       } else {
-        rel.Group = group;
+        Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
       }
-    } else if (!PGD->isInvalid()) {
-      Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      PGD->setInvalid();
     }
+
+    if (group &&
+        group->getDeclContext()->getParentModule() == dc->getParentModule()) {
+      if (!PGD->isInvalid()) {
+        Diags.diagnose(rel.NameLoc,
+                       diag::precedence_group_lower_within_module);
+        Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
+                       DescriptiveDeclKind::PrecedenceGroup);
+      }
+      hadError = true;
+    }
+
+    if (hadError)
+      PGD->setInvalid();
   }
-  
-  // Check for circularity.
-  if (addedHigherThan) {
+
+  // Try to catch trickier cycles that request evaluation alone can't.
+  if (addedHigherThan)
     checkPrecedenceCircularity(Diags, PGD);
+}
+
+llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
+  if (auto *group = lookupPrecedenceGroup(descriptor)) {
+    validatePrecedenceGroup(group);
+    return group;
   }
+
+  return nullptr;
 }
 
 static Optional<unsigned>
@@ -1970,12 +2009,9 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params) {
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         Identifier name,
                                                         SourceLoc nameLoc) {
-  auto *group = evaluateOrDefault(
+  return evaluateOrDefault(
       dc->getASTContext().evaluator,
-      LookupPrecedenceGroupRequest({dc, name, nameLoc}), nullptr);
-  if (group)
-    validatePrecedenceGroup(group);
-  return group;
+      LookupPrecedenceGroupRequest({dc, name, nameLoc, None}), nullptr);
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
