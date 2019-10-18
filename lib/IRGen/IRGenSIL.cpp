@@ -5509,9 +5509,9 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {
-  llvm::errs() << "IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst\n";
-  i->dump();
-  i->getWitness()->dump();
+  //llvm::errs() << "IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst\n";
+  //i->dump();
+  //i->getWitness()->dump();
   llvm::Value *diffWitness = IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
   unsigned offset = 0;
   switch (i->getWitnessKind()) {

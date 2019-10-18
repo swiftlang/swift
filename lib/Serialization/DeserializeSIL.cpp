@@ -3422,6 +3422,13 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       rawParameterAndResultIndices);
 
   auto linkage = fromStableSILLinkage(rawLinkage);
+
+  // TODO: This is a hack. The proper thing to do is to not serialize as many
+  // witnesses.
+  if (linkage == SILLinkage::Public) {
+    linkage = SILLinkage::PublicExternal;
+  }
+
   assert(linkage && "Expected value linkage for sil_differentiability_witness");
   auto originalName = MF->getIdentifierText(originalNameId);
   auto jvpName = MF->getIdentifierText(jvpNameId);

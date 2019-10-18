@@ -122,6 +122,7 @@ public:
     }
   }
   bool isSerialized() const { return serialized; }
+  void setIsSerialized(bool isSerialized) { this->serialized = isSerialized; }
   DeclAttribute *getAttribute() const { return attribute; }
 
   /// Verify that the differentiability witness is well-formed.

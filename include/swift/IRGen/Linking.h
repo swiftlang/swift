@@ -1258,28 +1258,36 @@ template <> struct DenseMapInfo<swift::irgen::LinkEntity> {
     return entity;
   }
   static unsigned getHashValue(const LinkEntity &entity) {
-#if 0
-    // TODO: Remove hack when AutoDiffConfig has been uniquely allocated in ASTContext.
+    // TODO: Uniquely allocate SILDifferentiabilityWitness so that we can remove
+    // this custom comparison.
     if (entity.getKind() == LinkEntity::Kind::DifferentiabilityWitness) {
-      return DenseMapInfo<void *>::getHashValue(entity.Pointer) ^
-             DenseMapInfo<AutoDiffConfig>::getHashValue(*(AutoDiffConfig*)entity.SecondaryPointer) ^
+      auto *witness = static_cast<swift::SILDifferentiabilityWitness *>(entity.Pointer);
+      return DenseMapInfo<void *>::getHashValue(witness->getOriginalFunction()) ^
+             DenseMapInfo<void *>::getHashValue(witness->getJVP()) ^
+             DenseMapInfo<void *>::getHashValue(witness->getVJP()) ^
+             DenseMapInfo<AutoDiffConfig>::getHashValue(witness->getConfig()) ^
              entity.Data;
     }
-#endif
 
     return DenseMapInfo<void *>::getHashValue(entity.Pointer) ^
            DenseMapInfo<void *>::getHashValue(entity.SecondaryPointer) ^
            entity.Data;
   }
   static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
-#if 0
-    // TODO: Remove hack when AutoDiffConfig has been uniquely allocated in ASTContext.
+    // TODO: Uniquely allocate SILDifferentiabilityWitness so that we can remove
+    // this custom comparison.
     if (LHS.getKind() == LinkEntity::Kind::DifferentiabilityWitness) {
-      return LHS.Pointer == RHS.Pointer &&
-             DenseMapInfo<AutoDiffConfig>::isEqual(*(AutoDiffConfig*)LHS.SecondaryPointer, *(AutoDiffConfig*)RHS.SecondaryPointer) &&
-             LHS.Data == RHS.Data;
+      if (RHS.getKind() != LinkEntity::Kind::DifferentiabilityWitness)
+        return false;
+
+      auto *lhsWit = static_cast<swift::SILDifferentiabilityWitness *>(LHS.Pointer);
+      auto *rhsWit = static_cast<swift::SILDifferentiabilityWitness *>(RHS.Pointer);
+
+      return DenseMapInfo<void *>::isEqual(lhsWit->getOriginalFunction(), rhsWit->getOriginalFunction()) &&
+             DenseMapInfo<void *>::isEqual(lhsWit->getJVP(), rhsWit->getJVP()) &&
+             DenseMapInfo<void *>::isEqual(lhsWit->getVJP(), rhsWit->getVJP()) &&
+             DenseMapInfo<AutoDiffConfig>::isEqual(lhsWit->getConfig(), rhsWit->getConfig());
     }
-#endif
 
     return LHS.Pointer == RHS.Pointer &&
            LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
