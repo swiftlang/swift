@@ -415,10 +415,10 @@ def symlink_llvm_monorepo(args):
                      'libcxx',
                      'clang-tools-extra']
     for project in llvm_projects:
-        src_path = os.path.join(args.source_root,
+        src_path = os.path.join(SWIFT_SOURCE_ROOT,
                                 'llvm-project',
                                 project)
-        dst_path = os.path.join(args.source_root, project)
+        dst_path = os.path.join(SWIFT_SOURCE_ROOT, project)
         if not os.path.islink(dst_path):
             os.symlink(src_path, dst_path)
 
