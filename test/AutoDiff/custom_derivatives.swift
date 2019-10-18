@@ -91,7 +91,7 @@ CustomDerivativesTests.testWithLeakChecking("ModifyGradientOfSum") {
 CustomDerivativesTests.testWithLeakChecking("WithoutDerivative") {
   expectEqual(0, gradient(at: Tracked<Float>(4)) { x in
     withoutDerivative(at: x) { x in
-        Tracked<Float>(sinf(x.value) + cosf(x.value))
+      Tracked<Float>(sinf(x.value) + cosf(x.value))
     }
   })
 }
