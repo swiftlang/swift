@@ -117,8 +117,7 @@ private:
   void enumerateFunctionsInModule();
   void sortAndUniqueCallees();
   CalleesAndCanCallUnknown &getOrCreateCalleesForMethod(SILDeclRef Decl);
-  void computeClassMethodCalleesForClass(ClassDecl *CD);
-  void computeClassMethodCallees(ClassDecl *CD, SILDeclRef Method);
+  void computeClassMethodCallees();
   void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WT);
   void computeMethodCallees();
   SILFunction *getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const;
