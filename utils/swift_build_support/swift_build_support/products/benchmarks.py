@@ -28,13 +28,13 @@ class Benchmarks(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def shall_build(self, host_target):
+    def should_build(self, host_target):
         return True
 
     def build(self, host_target):
         run_build_script_helper(host_target, self, self.args)
 
-    def shall_test(self, host_target):
+    def should_test(self, host_target):
         return True
 
     def test(self, host_target):
@@ -51,7 +51,7 @@ class Benchmarks(product.Product):
         bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
         shell.call([bench_Osize] + cmdline)
 
-    def shall_install(self, host_target):
+    def should_install(self, host_target):
         return False
 
     def install(self, host_target):

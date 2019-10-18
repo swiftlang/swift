@@ -283,3 +283,19 @@ def darwin_toolchain_prefix(darwin_install_prefix):
     directory.
     """
     return os.path.split(darwin_install_prefix)[0]
+
+
+def toolchain_path(install_destdir, install_prefix):
+    """
+    Given the install prefix for a Darwin system, and assuming that that path
+    is to a .xctoolchain directory, return the path to the .xctoolchain
+    directory in the given install directory.
+    This toolchain is being populated during the build-script invocation.
+    Downstream products can use products that were previously installed into
+    this toolchain.
+    """
+    built_toolchain_path = install_destdir
+    if platform.system() == 'Darwin':
+        # The prefix is an absolute path, so concatenate without os.path.
+        built_toolchain_path += darwin_toolchain_prefix(install_prefix)
+    return built_toolchain_path

@@ -23,21 +23,21 @@ class SourceKitLSP(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def shall_build(self, host_target):
+    def should_build(self, host_target):
         return True
 
     def build(self, host_target):
         indexstoredb.run_build_script_helper(
             'build', host_target, self, self.args)
 
-    def shall_test(self, host_target):
+    def should_test(self, host_target):
         return self.args.test_sourcekitlsp
 
     def test(self, host_target):
         indexstoredb.run_build_script_helper(
             'test', host_target, self, self.args)
 
-    def shall_install(self, host_target):
+    def should_install(self, host_target):
         return self.args.install_sourcekitlsp
 
     def install(self, host_target):

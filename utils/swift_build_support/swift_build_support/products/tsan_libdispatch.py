@@ -29,7 +29,7 @@ class TSanLibDispatch(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def shall_build(self, host_target):
+    def should_build(self, host_target):
         return True
 
     def build(self, host_target):
@@ -62,7 +62,7 @@ class TSanLibDispatch(product.Product):
             shell.call(config_cmd)
             shell.call(build_cmd)
 
-    def shall_test(self, host_target):
+    def should_test(self, host_target):
         return True
 
     def test(self, host_target):
@@ -73,7 +73,7 @@ class TSanLibDispatch(product.Product):
         with shell.pushd(self.build_dir):
             shell.call(cmd, env=env)
 
-    def shall_install(self, host_target):
+    def should_install(self, host_target):
         return False
 
     def install(self, host_target):
