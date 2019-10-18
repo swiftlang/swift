@@ -17,7 +17,6 @@ from . import product
 from .. import shell
 from .. import targets
 
-
 class SKStressTester(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -26,6 +25,9 @@ class SKStressTester(product.Product):
         The name of the source code directory of this product.
         """
         return "swift-stress-tester"
+
+    def package_name(self):
+        return 'SourceKitStressTester'
 
     def run_build_script_helper(self, action, additional_params=[]):
         script_path = os.path.join(
@@ -40,7 +42,7 @@ class SKStressTester(product.Product):
         helper_cmd = [
             script_path,
             action,
-            '--package-dir', 'SourceKitStressTester',
+            '--package-dir', self.package_name(),
             '--toolchain', toolchain_path,
             '--config', configuration,
             '--build-dir', self.build_dir,
@@ -60,8 +62,9 @@ class SKStressTester(product.Product):
 
     def build(self, host_target):
         if platform.system() != 'Darwin':
-            raise RuntimeError("Unable to build swift-stress-tester on a "
-                               "platform other than Darwin")
+            raise RuntimeError("Unable to build {product} on a platform other "
+                               "than Darwin".format(product=self.package_name())
+                               )
 
         self.run_build_script_helper('build')
 
@@ -79,3 +82,4 @@ class SKStressTester(product.Product):
         self.run_build_script_helper('install', [
             '--prefix', install_prefix
         ])
+

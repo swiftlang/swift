@@ -206,6 +206,7 @@ def _apply_default_arguments(args):
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
+        args.test_swiftevolve = False
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
@@ -571,6 +572,8 @@ def create_argument_parser():
            help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
            help='install the SourceKit stress tester')
+    option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
+           help='install SwiftEvolve')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -960,6 +963,8 @@ def create_argument_parser():
            help='skip testing sourcekit-lsp')
     option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
            help='skip testing the SourceKit Stress tester')
+    option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
+           help='skip testing SwiftEvolve')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1032,6 +1037,17 @@ def create_argument_parser():
     option('--skip-test-optimized', unsupported)
 
     # -------------------------------------------------------------------------
+    in_group('Build-script-impl arguments (for disambiguation)')
+    # We need to list --skip-build-swift explicitly because otherwise argparse
+    # will auto-expand arguments like --skip-build-swift to the only known
+    # argument --skip-build-swiftevolve.
+    # These arguments are forwarded to impl_args in migration.py
+
+    option('--install-swift', toggle_true('impl_install_swift'))
+    option('--skip-test-swift', toggle_true('impl_skip_test_swift'))
+
+
+    # -------------------------------------------------------------------------
     return builder.build()
 
 
@@ -1073,7 +1089,8 @@ Using option presets:
 
 
 Any arguments not listed are forwarded directly to Swift's
-'build-script-impl'.  See that script's help for details.
+'build-script-impl'. See that script's help for details. The listed
+build-script-impl arguments are only for disambiguation in the argument parser.
 
 Environment variables
 ---------------------
