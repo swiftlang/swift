@@ -1039,15 +1039,16 @@ SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
 void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto &desc = std::get<0>(getStorage());
   if (auto pathDir = desc.pathDirection) {
-    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, *pathDir);
+    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
   } else {
     diags.diagnose(desc.nameLoc, diag::circular_reference);
   }
 }
 
-void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diags) const {
+void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
   auto &desc = std::get<0>(getStorage());
-  diags.diagnose(desc.nameLoc, diag::circular_reference_through);
+  diag.diagnose(desc.nameLoc,
+                 diag::circular_reference_through_precedence_group, desc.ident);
 }
 
 SourceLoc PrecedenceGroupDescriptor::getLoc() const {

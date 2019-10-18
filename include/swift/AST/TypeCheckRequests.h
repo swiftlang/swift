@@ -1449,11 +1449,15 @@ public:
 };
 
 struct PrecedenceGroupDescriptor {
+  enum PathDirection : bool {
+    LowerThan = false,
+    HigherThan = true,
+  };
   DeclContext *dc;
   Identifier ident;
   SourceLoc nameLoc;
   // Exists for diagnostics. Does not contribute to the descriptor otherwise.
-  Optional<bool> pathDirection;
+  Optional<PathDirection> pathDirection;
 
   SourceLoc getLoc() const;
 

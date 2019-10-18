@@ -1860,14 +1860,15 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     return;
 
   auto &Diags = PGD->getASTContext().Diags;
-  
+
   // Validate the higherThan relationships.
   bool addedHigherThan = false;
   for (auto &rel : PGD->getMutableHigherThan()) {
-    if (rel.Group) continue;
+    if (rel.Group)
+      continue;
 
-    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name,
-                                   rel.NameLoc, true};
+    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
+                                   PrecedenceGroupDescriptor::HigherThan};
     auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
                                    LookupPrecedenceGroupRequest{desc}, nullptr);
     if (group) {
@@ -1882,11 +1883,12 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
 
   // Validate the lowerThan relationships.
   for (auto &rel : PGD->getMutableLowerThan()) {
-    if (rel.Group) continue;
+    if (rel.Group)
+      continue;
 
     auto dc = PGD->getDeclContext();
-    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name,
-                                   rel.NameLoc, false};
+    PrecedenceGroupDescriptor desc{PGD->getDeclContext(), rel.Name, rel.NameLoc,
+                                   PrecedenceGroupDescriptor::LowerThan};
     auto group = evaluateOrDefault(PGD->getASTContext().evaluator,
                                    LookupPrecedenceGroupRequest{desc}, nullptr);
     bool hadError = false;
@@ -1906,8 +1908,7 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     if (group &&
         group->getDeclContext()->getParentModule() == dc->getParentModule()) {
       if (!PGD->isInvalid()) {
-        Diags.diagnose(rel.NameLoc,
-                       diag::precedence_group_lower_within_module);
+        Diags.diagnose(rel.NameLoc, diag::precedence_group_lower_within_module);
         Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
                        DescriptiveDeclKind::PrecedenceGroup);
       }
@@ -1918,7 +1919,7 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
       PGD->setInvalid();
   }
 
-  // Try to catch trickier cycles that request evaluation alone can't.
+  // Try to diagnose trickier cycles that request evaluation alone can't catch.
   if (addedHigherThan)
     checkPrecedenceCircularity(Diags, PGD);
 }

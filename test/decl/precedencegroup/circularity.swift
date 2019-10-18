@@ -18,17 +18,17 @@ precedencegroup C0 {
   higherThan: C1 // expected-error {{cycle in 'higherThan' relation}}
 }
 precedencegroup C1 {
-  higherThan: C0 // expected-note{{through reference here}}
+  higherThan: C0 // expected-note{{through reference to precedence group 'C0' here}}
 }
 
 precedencegroup D0 {
   higherThan: D1 // expected-error {{cycle in 'higherThan' relation}}
 }
 precedencegroup D1 {
-  higherThan: D2 // expected-note{{through reference here}}
+  higherThan: D2 // expected-note{{through reference to precedence group 'D2' here}}
 }
 precedencegroup D2 {
-  higherThan: D0 // expected-note{{through reference here}}
+  higherThan: D0 // expected-note{{through reference to precedence group 'D0' here}}
 }
 
 precedencegroup E0 {
