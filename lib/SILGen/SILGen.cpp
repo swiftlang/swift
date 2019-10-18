@@ -848,6 +848,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   AutoDiffConfig config{loweredParamIndices, resultIndices,
                         derivativeCanGenSig};
   auto key = std::make_pair(originalFunction->getName(), config);
+  Optional<SILLinkage> diffWitnessLinkage = None;
   SILDifferentiabilityWitness *diffWitness = nullptr;
   if (auto *foundWitness = M.lookUpDifferentiabilityWitness(
           key, /*deserializeLazily*/ false)) {
@@ -855,8 +856,11 @@ void SILGenModule::emitDifferentiabilityWitness(
   } else {
     // Create new SIL differentiability witness.
     // JVP and VJP function are populated below.
+    // - Hidden if no JVP/VJP functions are registered. The differentiation
+    //   transform will generate hidden JVP/VJP functions.
+    // - Otherwise, equal to the JVP/VJP function linkage.
     diffWitness = SILDifferentiabilityWitness::create(
-        M, originalFunction->getLinkage(), originalFunction,
+        M, SILLinkage::Hidden, originalFunction,
         loweredParamIndices, resultIndices, derivativeGenSig, /*jvp*/ nullptr,
         /*vjp*/ nullptr, /*isSerialized*/ true);
   }
@@ -881,6 +885,13 @@ void SILGenModule::emitDifferentiabilityWitness(
           SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
           expectedDerivativeType);
     }
+    if (!diffWitnessLinkage) {
+      diffWitnessLinkage = derivativeThunk->getLinkage();
+    } else {
+      assert(diffWitnessLinkage == derivativeThunk->getLinkage() &&
+             "JVP/VJP linkages must match; this should be checked during "
+             "attribute type-checking");
+    }
     // Check for existing same derivative.
     // TODO(TF-898): Remove condition below and simplify assertion to
     // `!diffWitness->getDerivative(kind)` after `@differentiating` attribute
@@ -899,6 +910,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   if (vjp)
     setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::VJP,
                                             vjp);
+  if (diffWitnessLinkage)
+    diffWitness->setLinkage(*diffWitnessLinkage);
 }
 
 void SILGenModule::
