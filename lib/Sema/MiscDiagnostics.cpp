@@ -1434,10 +1434,10 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     }
 
     /// Emit any fix-its for this error.
-    void emitFixIts(SourceLoc memberLoc, AbstractClosureExpr *ACE) {
+    void emitFixIts(SourceLoc memberLoc, const AbstractClosureExpr *ACE) {
       // This error can be fixed by either capturing self explicitly (if in an
       // explicit closure), or referencing self explicitly.
-      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+      if (auto *CE = dyn_cast<const ClosureExpr>(ACE)) {
         if (diagnoseAlmostMatchingCaptures(memberLoc, CE)) {
           // Bail on the rest of the diagnostics. Offering the option to
           // capture 'self' explicitly will result in an error, and using
@@ -1459,7 +1459,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     /// \c self strongly, but do not actually enable implicit \c self. Returns
     /// whether there were any such captures to diagnose.
     bool diagnoseAlmostMatchingCaptures(SourceLoc memberLoc,
-                                        ClosureExpr *closureExpr) {
+                                        const ClosureExpr *closureExpr) {
       // If we've already captured something with the name "self" other than
       // the actual self param, offer special diagnostics.
       if (auto *VD = closureExpr->getCapturedSelfDecl()) {
@@ -1480,7 +1480,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     /// The error can be solved by capturing self explicitly,
     /// or by using \c self. explicitly.
     void emitFixItsForExplicitClosure(SourceLoc memberLoc,
-                                      ClosureExpr *closureExpr) {
+                                      const ClosureExpr *closureExpr) {
       TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
         .fixItInsert(memberLoc, "self.");
       auto diag = TC.diagnose(closureExpr->getLoc(),
