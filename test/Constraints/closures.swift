@@ -273,6 +273,7 @@ func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
   func append<Key: AnyObject>(value: T, forKey key: Key) where Key: Hashable {}
+  // expected-note@-1 {{where 'Key' = 'Object?'}}
 }
 class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
 struct S<T> {
@@ -280,9 +281,8 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+3 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
-    // expected-note @+2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note @+1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' conform to 'AnyObject'}}
+    // expected-note @+1 {{wrapped type 'Object' satisfies this requirement}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }
@@ -292,11 +292,11 @@ func simplified1069() {
   class C {}
   struct S {
     func genericallyNonOptional<T: AnyObject>(_ a: T, _ b: T, _ c: T) { }
+    // expected-note@-1 {{where 'T' = 'Optional<C>'}}
 
     func f(_ a: C?, _ b: C?, _ c: C) {
-      genericallyNonOptional(a, b, c) // expected-error 2{{value of optional type 'C?' must be unwrapped to a value of type 'C'}}
-      // expected-note @-1 2{{coalesce}}
-      // expected-note @-2 2{{force-unwrap}}
+      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' conform to 'AnyObject'}}
+      // expected-note @-1 {{wrapped type 'C' satisfies this requirement}}
     }
   }
 }

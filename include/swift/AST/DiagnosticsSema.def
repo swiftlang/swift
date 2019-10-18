@@ -1740,6 +1740,8 @@ NOTE(where_requirement_failure_both_subst,none,
      "where %0 = %1, %2 = %3", (Type, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
+NOTE(wrapped_type_satisfies_requirement,none,
+     "wrapped type %0 satisfies this requirement", (Type))
 NOTE(candidate_types_conformance_requirement,none,
      "candidate requires that %0 conform to %1 "
      "(requirement specified as %2 == %3%4)",

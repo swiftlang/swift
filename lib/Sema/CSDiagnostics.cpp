@@ -517,6 +517,18 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
                                              Type rhs) const {
   auto &req = getRequirement();
 
+  if (req.getKind() != RequirementKind::SameType) {
+    if (auto wrappedType = lhs->getOptionalObjectType()) {
+      auto &tc = getConstraintSystem().TC;
+      auto kind = (req.getKind() == RequirementKind::Superclass ?
+                   ConstraintKind::Subtype : ConstraintKind::ConformsTo);
+      if (tc.typesSatisfyConstraint(wrappedType, rhs, /*openArchetypes=*/false,
+                                    kind, anchor->getDeclContext()))
+        emitDiagnostic(getAnchor()->getLoc(),
+                       diag::wrapped_type_satisfies_requirement, wrappedType);
+    }
+  }
+
   if (isConditional()) {
     emitDiagnostic(anchor, diag::requirement_implied_by_conditional_conformance,
                    resolveType(Conformance->getType()),

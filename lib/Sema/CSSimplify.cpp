@@ -4237,24 +4237,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (!shouldAttemptFixes())
     return SolutionKind::Error;
 
-  // See if there's anything we can do to fix the conformance:
-  if (auto optionalObjectType = type->getOptionalObjectType()) {
-    TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-    // The underlying type of an optional may conform to the protocol if the
-    // optional doesn't; suggest forcing if that's the case.
-    auto result = simplifyConformsToConstraint(
-        optionalObjectType, protocol, kind,
-        locator.withPathElement(LocatorPathElt::GenericArgument(0)), subflags);
-    if (result == SolutionKind::Solved) {
-      auto *fix = ForceOptional::create(*this, type, optionalObjectType,
-                                        getConstraintLocator(locator));
-      if (recordFix(fix)) {
-        return SolutionKind::Error;
-      }
-    }
-    return result;
-  }
-
   auto protocolTy = protocol->getDeclaredType();
   // If this conformance has been fixed already, let's just consider this done.
   if (hasFixedRequirement(type, RequirementKind::Conformance, protocolTy))
