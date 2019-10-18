@@ -455,6 +455,10 @@ if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
   include(ClangClCompileRules)
 endif()
 
+if(CMAKE_C_COMPILER_ID STREQUAL Clang)
+  add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin OR
     EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
   set(SWIFT_BUILD_SYNTAXPARSERLIB_default TRUE)
