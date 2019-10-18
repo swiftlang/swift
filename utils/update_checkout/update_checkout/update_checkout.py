@@ -406,6 +406,7 @@ def skip_list_for_platform(config):
 
     return skip_list
 
+
 def symlink_llvm_monorepo(args):
     print("Create symlink for LLVM Project")
     llvm_projects = ['clang',
@@ -421,6 +422,7 @@ def symlink_llvm_monorepo(args):
         dst_path = os.path.join(SWIFT_SOURCE_ROOT, project)
         if not os.path.islink(dst_path):
             os.symlink(src_path, dst_path)
+
 
 def main():
     freeze_support()
