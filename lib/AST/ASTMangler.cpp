@@ -434,13 +434,26 @@ std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
   auto originalName = key.first;
   auto *parameterIndices = key.second.parameterIndices;
   auto *resultIndices = key.second.resultIndices;
-  auto derivativeGenericSignature = key.second.derivativeGenericSignature;
 
   Buffer << "AD__" << originalName << '_';
   Buffer << "P" << parameterIndices->getString();
   Buffer << "R" << resultIndices->getString();
+  // TODO(TF-930): Support mangling derivative generic signatures. This requires
+  // SILGen and TBDGen to use the same derivative generic signature to avoid
+  // "symbol is in generated IR file, but not in TBD file" errors.
+  //
+  // Currently, SILGen uses JVP/VJP generic signatures to construct SIL
+  // differentiability witnesses: see `derivativeCanGenSig` in
+  // `SILGenModule::emitDifferentiabilityWitness`.
+  //
+  // However, TBDGen emits differentiability witness symbols using
+  // `@differentiable` attribute derivative generic signatures, which may be
+  // less constrained than JVP/VJP generic signatures.
+#if 0
+  auto derivativeGenericSignature = key.second.derivativeGenericSignature;
   if (derivativeGenericSignature)
     appendGenericSignature(derivativeGenericSignature);
+#endif
 
   auto result = Storage.str().str();
   Storage.clear();
