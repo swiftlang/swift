@@ -37,7 +37,7 @@ extension AtomicUnmanaged {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
-  public func load(ordering: AtomicLoadOrdering = .acquiring) -> Value {
+  public func load(ordering: AtomicLoadOrdering) -> Value {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     guard let p = UnsafeRawPointer(bitPattern: value) else { return nil }
     return Unmanaged.fromOpaque(p)
@@ -52,7 +52,7 @@ extension AtomicUnmanaged {
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Value,
-    ordering: AtomicStoreOrdering = .releasing
+    ordering: AtomicStoreOrdering
   ) {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
@@ -68,7 +68,7 @@ extension AtomicUnmanaged {
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Value,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Value {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
     let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
@@ -99,7 +99,7 @@ extension AtomicUnmanaged {
   public func compareExchange(
     expected: inout Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Bool {
     var expectedWord = UInt(bitPattern: expected?.toOpaque())
     let desiredWord = UInt(bitPattern: desired?.toOpaque())

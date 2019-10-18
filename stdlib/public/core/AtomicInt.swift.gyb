@@ -50,7 +50,7 @@ extension AtomicInt {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
-  public func load(ordering: AtomicLoadOrdering = .acquiring) -> Int {
+  public func load(ordering: AtomicLoadOrdering) -> Int {
     Int(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
   }
 }
@@ -63,7 +63,7 @@ extension AtomicInt {
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Int,
-    ordering: AtomicStoreOrdering = .releasing
+    ordering: AtomicStoreOrdering
   ) {
     _ptr._atomicStoreWord(UInt(bitPattern: desired), ordering: ordering)
   }
@@ -78,7 +78,7 @@ extension AtomicInt {
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Int,
-      ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Int {
     let r = _ptr._atomicExchangeWord(
       UInt(bitPattern: desired),
@@ -109,7 +109,7 @@ extension AtomicInt {
   public func compareExchange(
     expected: inout Int,
     desired: Int,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Bool {
     var expectedWord = UInt(bitPattern: expected)
     let r = _ptr._atomicCompareExchangeWord(
@@ -138,7 +138,7 @@ extension AtomicInt {
   @discardableResult
   public func fetchThen${name}(
     _ operand: Int,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Int {
     Int(bitPattern:
       _ptr._atomicFetchThen${name}Word(
@@ -159,7 +159,7 @@ extension AtomicInt {
   @discardableResult
   public func ${lowerFirst(name)}ThenFetch(
     _ operand: Int,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Int {
     fetchThen${name}(operand, ordering: ordering) ${op} operand
   }
@@ -171,7 +171,7 @@ extension AtomicInt {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by delta: Int = 1,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) {
     fetchThenWrappingAdd(delta, ordering: ordering)
   }
@@ -179,7 +179,7 @@ extension AtomicInt {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by delta: Int = 1,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) {
     fetchThenWrappingSubtract(delta, ordering: ordering)
   }

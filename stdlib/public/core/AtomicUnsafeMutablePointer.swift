@@ -37,7 +37,7 @@ extension AtomicUnsafeMutablePointer {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
-  public func load(ordering: AtomicLoadOrdering = .acquiring) -> Value {
+  public func load(ordering: AtomicLoadOrdering) -> Value {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     return UnsafeMutablePointer(bitPattern: value)
   }
@@ -51,7 +51,7 @@ extension AtomicUnsafeMutablePointer {
   @_transparent @_alwaysEmitIntoClient
   public func store(
     _ desired: Value,
-    ordering: AtomicStoreOrdering = .releasing
+    ordering: AtomicStoreOrdering
   ) {
     let desiredWord = UInt(bitPattern: desired)
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
@@ -67,7 +67,7 @@ extension AtomicUnsafeMutablePointer {
   @_transparent @_alwaysEmitIntoClient
   public func exchange(
     _ desired: Value,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Value {
     let desiredWord = UInt(bitPattern: desired)
     let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
@@ -97,7 +97,7 @@ extension AtomicUnsafeMutablePointer {
   public func compareExchange(
     expected: inout Value,
     desired: Value,
-    ordering: AtomicUpdateOrdering = .acquiringAndReleasing
+    ordering: AtomicUpdateOrdering
   ) -> Bool {
     var expectedWord = UInt(bitPattern: expected)
     let desiredWord = UInt(bitPattern: desired)
