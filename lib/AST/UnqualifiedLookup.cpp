@@ -562,8 +562,7 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForLookup() const {
-  return false;
-  //return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
+  return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForLookupIfEnabled() const {
