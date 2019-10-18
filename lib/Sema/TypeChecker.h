@@ -1878,12 +1878,12 @@ public:
   static void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
   /// Check error handling in the given type-checked top-level code.
-  void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
-  void checkFunctionErrorHandling(AbstractFunctionDecl *D);
-  void checkInitializerErrorHandling(Initializer *I, Expr *E);
-  void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
-  void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
-                                          Expr *expr);
+  static void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
+  static void checkFunctionErrorHandling(AbstractFunctionDecl *D);
+  static void checkInitializerErrorHandling(Initializer *I, Expr *E);
+  static void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
+  static void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
+                                                Expr *expr);
 
   void addExprForDiagnosis(Expr *E1, Expr *Result) {
     DiagnosedExprs[E1] = Result;
