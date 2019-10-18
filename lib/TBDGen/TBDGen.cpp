@@ -35,19 +35,17 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/TextAPIReader.h"
+#include "llvm/TextAPI/MachO/TextAPIWriter.h"
 
 #include "TBDGenVisitor.h"
-#include "tapi/Architecture.h"
-#include "tapi/InterfaceFile.h"
-#include "tapi/Platform.h"
-#include "tapi/TextStub_v3.h"
-#include "tapi/YAMLReaderWriter.h"
 
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
 using StringSet = llvm::StringSet<>;
-using SymbolKind = tapi::internal::SymbolKind;
+using SymbolKind = llvm::MachO::SymbolKind;
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
@@ -256,30 +254,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
     addSymbol(mangledName);
   }
-  // NOTE: This logic is not relevant until `@differentiating` no longer
-  // generates implicit `@differentiable` attributes.
-#if 0
-  // Handle `@differentiating` attributes.
-  for (auto *DA : AFD->getAttrs().getAttributes<DifferentiatingAttr>()) {
-    auto *originalFD = DA->getOriginalFunction();
-    auto differentiableAttrs =
-        originalFD->getAttrs().getAttributes<DifferentiableAttr>();
-    // If there is a `@differentiable` attribute with the same parameter
-    // indices, then symbol has already been emitted. Continue.
-    auto differentiableAttrIt =
-        llvm::find_if(differentiableAttrs, [&](const DifferentiableAttr *attr) {
-          return DA->getParameterIndices() == attr->getParameterIndices();
-        });
-    if (differentiableAttrIt != differentiableAttrs.end())
-      continue;
-    // Otherwise, emit symbol.
-    auto *derivativeId = AutoDiffDerivativeFunctionIdentifier::get(
-        DA->getDerivativeKind(), DA->getParameterIndices(),
-        AFD->getASTContext());
-    addSymbol(
-        SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
-  }
-#endif
 
   visitDefaultArguments(AFD, AFD->getParameters());
 }
@@ -354,30 +328,6 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
     addSymbol(mangledName);
   }
-  // NOTE: This logic is not relevant until `@differentiating` no longer
-  // generates implicit `@differentiable` attributes.
-#if 0
-  // Handle `@differentiating` attributes.
-  for (auto *DA : ASD->getAttrs().getAttributes<DifferentiatingAttr>()) {
-    auto *originalFD = DA->getOriginalFunction();
-    auto differentiableAttrs =
-        originalFD->getAttrs().getAttributes<DifferentiableAttr>();
-    // If there is a `@differentiable` attribute with the same parameter
-    // indices, then symbol has already been emitted. Continue.
-    auto differentiableAttrIt =
-        llvm::find_if(differentiableAttrs, [&](const DifferentiableAttr *attr) {
-          return DA->getParameterIndices() == attr->getParameterIndices();
-        });
-    if (differentiableAttrIt != differentiableAttrs.end())
-      continue;
-    // Otherwise, emit symbol.
-    auto *derivativeId = AutoDiffDerivativeFunctionIdentifier::get(
-        DA->getDerivativeKind(), DA->getParameterIndices(),
-        ASD->getASTContext());
-    addSymbol(
-        SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
-  }
-#endif
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
   ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {
@@ -687,14 +637,14 @@ void TBDGenVisitor::addFirstFileSymbols() {
 
 /// Converts a version tuple into a packed version, ignoring components beyond
 /// major, minor, and subminor.
-static tapi::internal::PackedVersion
+static llvm::MachO::PackedVersion
 convertToPacked(const version::Version &version) {
   // FIXME: Warn if version is greater than 3 components?
   unsigned major = 0, minor = 0, subminor = 0;
   if (version.size() > 0) major = version[0];
   if (version.size() > 1) minor = version[1];
   if (version.size() > 2) subminor = version[2];
-  return tapi::internal::PackedVersion(major, minor, subminor);
+  return llvm::MachO::PackedVersion(major, minor, subminor);
 }
 
 static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
@@ -710,8 +660,9 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   const auto &target = ctx.LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
                                 isWholeModule);
-  tapi::internal::InterfaceFile file;
-  file.setFileType(tapi::internal::FileType::TBD_V3);
+
+  llvm::MachO::InterfaceFile file;
+  file.setFileType(llvm::MachO::FileType::TBD_V3);
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
@@ -719,10 +670,26 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
-  file.setPlatform(tapi::internal::mapToSinglePlatform(target));
-  auto arch = tapi::internal::getArchType(target.getArchName());
-  file.setArch(arch);
   file.setInstallAPI(opts.IsInstallAPI);
+
+  auto getPlatformKind =
+      [](const llvm::Triple &Target) -> llvm::MachO::PlatformKind {
+    switch (Target.getOS()) {
+    default:
+      return llvm::MachO::PlatformKind::unknown;
+    case llvm::Triple::MacOSX:
+      return llvm::MachO::PlatformKind::macOS;
+    case llvm::Triple::IOS:
+      return llvm::MachO::PlatformKind::iOS;
+    case llvm::Triple::TvOS:
+      return llvm::MachO::PlatformKind::tvOS;
+    case llvm::Triple::WatchOS:
+      return llvm::MachO::PlatformKind::watchOS;
+    }
+  };
+  auto arch = llvm::MachO::getArchitectureFromName(target.getArchName());
+  file.addArch(arch);
+  file.setPlatform(getPlatformKind(target));
 
   TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
 
@@ -750,13 +717,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   }
 
   if (os) {
-    tapi::internal::YAMLWriter writer;
-    writer.add(
-        llvm::make_unique<tapi::internal::stub::v3::YAMLDocumentHandler>());
-
-    assert(writer.canWrite(&file) &&
-           "YAML writer should be able to write TBD v3");
-    llvm::cantFail(writer.writeFile(*os, &file),
+    llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(*os, file),
                    "YAML writing should be error-free");
   }
 }

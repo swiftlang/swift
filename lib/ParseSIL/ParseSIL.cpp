@@ -253,7 +253,10 @@ namespace {
                                 DeclContext *DC = nullptr);
 
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
-                             SmallVectorImpl<Requirement> &To);
+                             SmallVectorImpl<Requirement> &To,
+                             // SWIFT_ENABLE_TENSORFLOW
+                             GenericEnvironment *GenericEnv = nullptr,
+                             DeclContext *DC = nullptr);
 
     Optional<ProtocolConformanceRef>
     parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -929,13 +932,19 @@ namespace {
 /// Remap RequirementReps to Requirements.
 void SILParser::convertRequirements(SILFunction *F,
                                     ArrayRef<RequirementRepr> From,
-                                    SmallVectorImpl<Requirement> &To) {
+                                    SmallVectorImpl<Requirement> &To,
+                                    // SWIFT_ENABLE_TENSORFLOW
+                                    GenericEnvironment *GenericEnv,
+                                    DeclContext *DC) {
   if (From.empty()) {
     To.clear();
     return;
   }
 
-  auto *GenericEnv = F->getGenericEnvironment();
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!GenericEnv)
+    GenericEnv = F->getGenericEnvironment();
+  // SWIFT_ENABLE_TENSORFLOW END
   assert(GenericEnv);
   (void)GenericEnv;
 
@@ -944,7 +953,9 @@ void SILParser::convertRequirements(SILFunction *F,
   // to the generic parameters.
   auto ResolveToInterfaceType = [&](TypeLoc Ty) -> Type {
     Ty.getTypeRepr()->walk(PerformLookup);
-    performTypeLocChecking(Ty, /* IsSIL */ false);
+    // SWIFT_ENABLE_TENSORFLOW
+    performTypeLocChecking(Ty, /* IsSIL */ false, GenericEnv, DC);
+    // SWIFT_ENABLE_TENSORFLOW END
     assert(Ty.getType());
     return Ty.getType()->mapTypeOutOfContext();
   };
@@ -992,7 +1003,7 @@ static bool parseDifferentiableAttr(
   if (P.parseSpecificIdentifier(
           "source", diag::sil_attr_differentiable_expected_keyword, "source") ||
       P.parseUnsignedInteger(SourceIndex, LastLoc,
-           diag::sil_attr_differentiable_expected_source_index))
+           diag::sil_autodiff_expected_result_index))
     return true;
   // Parse 'wrt'.
   if (P.parseSpecificIdentifier(
@@ -1005,7 +1016,7 @@ static bool parseDifferentiableAttr(
     unsigned Index;
     // TODO: Reject non-ascending parameter index lists.
     if (P.parseUnsignedInteger(Index, LastLoc,
-            diag::sil_attr_differentiable_expected_parameter_index))
+            diag::sil_autodiff_expected_parameter_index))
       return true;
     ParamIndices.push_back(Index);
     return false;
@@ -2922,29 +2933,28 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
-    // e.g. differentiable_function [wrt 0 1 2] %0 : $T
+    // e.g. differentiable_function [parameters 0 1 2] %0 : $T
     //
-    // e.g. differentiable_function [wrt 0 1 2] %0 : $T with
+    // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
     //      {%1 : $T, %2 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
     SmallVector<unsigned, 8> parameterIndices;
-    // Parse optional `[wrt <integer_literal>...]`
+    // Parse optional `[parameters <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
         P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "wrt") {
+        P.peekToken().getText() == "parameters") {
       P.consumeToken(tok::l_square);
       P.consumeToken(tok::identifier);
       // Parse indices.
       while (P.Tok.is(tok::integer_literal)) {
         unsigned index;
         if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_inst_autodiff_expected_parameter_index))
+              diag::sil_autodiff_expected_parameter_index))
           return true;
         parameterIndices.push_back(index);
       }
-      if (P.parseToken(tok::r_square,
-                       diag::sil_inst_autodiff_attr_expected_rsquare,
+      if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
                        "parameter index list"))
         return true;
     }
@@ -2960,8 +2970,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
-    // Parse an optional operand list `with { <operand> , <operand> }`.
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
+    // Parse an optional operand list
+    //   `with_derivative { <operand> , <operand> }`.
+    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
       P.consumeToken(tok::identifier);
       // Parse derivative function values as an operand list.
       // FIXME(rxwei): Change this to *not* require a type signature once
@@ -3001,12 +3012,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       while (P.Tok.is(tok::integer_literal)) {
         unsigned index;
         if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_inst_autodiff_expected_parameter_index))
+              diag::sil_autodiff_expected_parameter_index))
           return true;
         parameterIndices.push_back(index);
       }
-      if (P.parseToken(tok::r_square,
-                       diag::sil_inst_autodiff_attr_expected_rsquare,
+      if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
                        "parameter index list"))
         return true;
     }
@@ -3041,7 +3051,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     // Parse the rest of the instruction: an extractee, a differentiable
     // function operand, and a debug location.
-    DifferentiableFunctionExtractee extractee;
+    NormalDifferentiableFunctionTypeComponent extractee;
     StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
     SILValue functionOperand;
     SourceLoc lastLoc;
@@ -3049,8 +3059,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
             diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
         parseSILIdentifierSwitch(extractee, extracteeNames,
             diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
-        P.parseToken(tok::r_square,
-                     diag::sil_inst_autodiff_attr_expected_rsquare,
+        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
                      "extractee kind"))
       return true;
     if (parseTypedValueRef(functionOperand, B) ||
@@ -3071,8 +3080,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
             diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
         parseSILIdentifierSwitch(extractee, extracteeNames,
             diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
-        P.parseToken(tok::r_square,
-                     diag::sil_inst_autodiff_attr_expected_rsquare,
+        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
                      "extractee kind"))
       return true;
     if (parseTypedValueRef(functionOperand, B) ||
@@ -3083,118 +3091,107 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
-    // Parse the rest of the instruction: an extractee, a linear function
-    // operand, and a debug location.
-    DifferentiabilityKind differentiabilityKind;
-    AutoDiffDerivativeFunctionKind derivativeKind;
+    // e.g. differentiability_witness_function
+    //      [jvp] [parameters 0 1] [results 0] <T where T: Differentiable>
+    //      @foo : $(T) -> T
+    DifferentiabilityWitnessFunctionKind witnessKind;
+    StringRef witnessKindNames[3] = {"jvp", "vjp", "transpose"};
     SourceLoc lastLoc;
     if (P.parseToken(tok::l_square,
-            diag::sil_inst_autodiff_expected_linear_extractee_kind))
+            diag::sil_inst_autodiff_expected_differentiability_witness_kind) ||
+        parseSILIdentifierSwitch(witnessKind, witnessKindNames,
+            diag::sil_inst_autodiff_expected_differentiability_witness_kind) ||
+        P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                     "differentiability witness function kind"))
       return true;
-    Identifier kindId;
-    if (parseSILIdentifier(kindId, lastLoc,
-            diag::sil_inst_autodiff_expected_differentiability_witness_kind))
-      return true;
-    if (kindId.str() == "jvp") {
-      differentiabilityKind = DifferentiabilityKind::Normal;
-      derivativeKind = AutoDiffDerivativeFunctionKind::JVP;
-    } else if (kindId.str() == "vjp") {
-      differentiabilityKind = DifferentiabilityKind::Normal;
-      derivativeKind = AutoDiffDerivativeFunctionKind::VJP;
-    } else if (kindId.str() == "transpose") {
-      differentiabilityKind = DifferentiabilityKind::Linear;
-    } else {
-      P.diagnose(
-          P.Tok,
-          diag::sil_inst_autodiff_expected_differentiability_witness_kind);
-      return true;
-    }
-    if (P.parseToken(tok::r_square,
-                     diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "differentiability witness kind"))
-      return true;
-    // Parse an index subset, prefaced with the given label.
-    auto parseIndexSubset =
-        [&](StringRef label, IndexSubset *& indexSubset) -> bool {
-      if (P.parseToken(tok::l_square, diag::sil_diff_witness_expected_token,
-                       "["))
+    // Parse an index set, prefaced with the given label.
+    auto parseIndexSet = [&](StringRef label, SmallVectorImpl<unsigned> &indices,
+                             const Diagnostic &parseIndexDiag) -> bool {
+      // Parse `[<label> <integer_literal>...]`.
+      if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
+                       "index list") ||
+          P.parseSpecificIdentifier(
+              label, diag::sil_autodiff_expected_index_list_label, label))
         return true;
-      if (P.parseSpecificIdentifier(
-            label, diag::sil_diff_witness_expected_token, label))
-        return true;
-      // Parse parameter index list.
-      SmallVector<unsigned, 8> indices;
-      // Function that parses an index into `paramIndices`. Returns true on error.
-      auto parseParam = [&]() -> bool {
+      while (P.Tok.is(tok::integer_literal)) {
         unsigned index;
-        // TODO: Reject non-ascending index lists.
-        if (P.parseUnsignedInteger(index, lastLoc,
-                diag::sil_diff_witness_expected_index_list))
+        if (P.parseUnsignedInteger(index, lastLoc, parseIndexDiag))
           return true;
         indices.push_back(index);
-        return false;
-      };
-      // Parse first.
-      if (parseParam())
+      }
+      if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                       "index list"))
         return true;
-      // Parse rest.
-      while (P.Tok.isNot(tok::r_square))
-        if (parseParam())
-          return true;
-      if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token,
-                       "]"))
-        return true;
-      auto maxIndexRef = std::max_element(indices.begin(), indices.end());
-      indexSubset = IndexSubset::get(
-          P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, indices);
       return false;
     };
-    IndexSubset *parameterIndices;
-    IndexSubset *resultIndices;
     // Parse parameter and result indices.
-    if (parseIndexSubset("parameters", parameterIndices))
+    SmallVector<unsigned, 8> parameterIndices;
+    SmallVector<unsigned, 8> resultIndices;
+    if (parseIndexSet("parameters", parameterIndices,
+                      diag::sil_autodiff_expected_parameter_index))
       return true;
-    if (parseIndexSubset("results", resultIndices))
+    if (parseIndexSet("results", resultIndices,
+                      diag::sil_autodiff_expected_result_index))
       return true;
-    // Parse a trailing 'where' clause (optional).
-    // This represents witness generic signature requirements.
-    GenericSignature *witnessGenSig = nullptr;
-    SourceLoc whereLoc;
-    SmallVector<RequirementRepr, 4> witnessRequirementReprs;
-    if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::kw_where)) {
-      P.consumeToken(tok::l_square);
-      bool firstTypeInComplete;
-      P.parseGenericWhereClause(whereLoc, witnessRequirementReprs,
-                                firstTypeInComplete,
-                                /*AllowLayoutConstraints*/ false);
-      if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token,
-                       "]"))
-        return true;
+    // Parse witness generic parameter clause.
+    GenericSignature witnessGenSig = GenericSignature();
+    SourceLoc witnessGenSigStartLoc = P.getEndOfPreviousLoc();
+    {
+      // Create a new scope to avoid type redefinition errors.
+      Scope genericsScope(&P, ScopeKind::Generics);
+      auto *genericParams = P.parseSILGenericParams().getPtrOrNull();
+      if (genericParams) {
+        auto *witnessGenEnv =
+            handleSILGenericParams(P.Context, genericParams, &P.SF);
+        witnessGenSig = witnessGenEnv->getGenericSignature();
+      }
     }
-    // Parse original function name.
+    // Parse original function name and type.
     SILFunction *originalFunction;
     if (parseSILFunctionRef(InstLoc, originalFunction))
       return true;
-    // Resolve witness requirements.
-    if (!witnessRequirementReprs.empty()) {
-      SmallVector<Requirement, 4> requirements;
-      auto *whereClause = TrailingWhereClause::create(
-          originalFunction->getModule().getASTContext(), whereLoc,
-          witnessRequirementReprs);
-      convertRequirements(originalFunction, whereClause->getRequirements(),
-                          requirements);
-      assert(requirements.size() == witnessRequirementReprs.size());
+    // Resolve parsed witness generic signature.
+    if (witnessGenSig) {
+      auto origGenSig = originalFunction
+          ->getLoweredFunctionType()->getGenericSignature();
+      // Check whether original function generic signature and parsed witness
+      // generic have the same generic parameters.
+      auto areGenericParametersConsistent = [&]() {
+        llvm::DenseSet<GenericParamKey> genericParamKeys;
+        for (auto *origGP : origGenSig->getGenericParams())
+          genericParamKeys.insert(GenericParamKey(origGP));
+        for (auto *witnessGP : witnessGenSig->getGenericParams())
+          if (!genericParamKeys.erase(GenericParamKey(witnessGP)))
+            return false;
+        return genericParamKeys.empty();
+      };
+      if (!areGenericParametersConsistent()) {
+        P.diagnose(witnessGenSigStartLoc,
+                   diag::sil_inst_autodiff_invalid_witness_generic_signature,
+                   witnessGenSig->getAsString(), origGenSig->getAsString());
+        return true;
+      }
+      // Combine parsed witness requirements with original function generic
+      // signature requirements to form full witness generic signature.
+      SmallVector<Requirement, 4> witnessRequirements(
+          witnessGenSig->getRequirements().begin(),
+          witnessGenSig->getRequirements().end());
       witnessGenSig = evaluateOrDefault(
           P.Context.evaluator,
           AbstractGenericSignatureRequest{
-              originalFunction->getLoweredFunctionType()->getGenericSignature(),
+              origGenSig.getPointer(),
               /*addedGenericParams=*/{},
-              std::move(requirements)},
+              std::move(witnessRequirements)},
               nullptr);
     }
+    auto origFnType = originalFunction->getLoweredFunctionType();
+    auto *parameterIndexSet = IndexSubset::get(
+        P.Context, origFnType->getNumParameters(), parameterIndices);
+    auto *resultIndexSet = IndexSubset::get(
+        P.Context, origFnType->getNumResults(), resultIndices);
     ResultVal = B.createDifferentiabilityWitnessFunction(
-        InstLoc, originalFunction, differentiabilityKind, derivativeKind,
-        parameterIndices, resultIndices, witnessGenSig);
+        InstLoc, originalFunction, witnessKind, parameterIndexSet,
+        resultIndexSet, witnessGenSig);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END
@@ -3642,7 +3639,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    CanGenericSignature canSig = nullptr;
+    CanGenericSignature canSig = CanGenericSignature();
     if (patternEnv && patternEnv->getGenericSignature()) {
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
     }
@@ -5941,13 +5938,14 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
           // Resolve types and convert requirements.
           FunctionState.convertRequirements(FunctionState.F,
                                             Attr.requirements, requirements);
-          GenericSignature *genericSig = evaluateOrDefault(
+          auto *fenv = FunctionState.F->getGenericEnvironment();
+          auto genericSig = evaluateOrDefault(
               P.Context.evaluator,
               AbstractGenericSignatureRequest{
-                FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+                fenv->getGenericSignature().getPointer(),
                 /*addedGenericParams=*/{ },
                 std::move(requirements)},
-                nullptr);
+                GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
               Attr.kind));
@@ -5964,10 +5962,10 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         FunctionState.convertRequirements(
             FunctionState.F, attr->getWhereClause()->getRequirements(),
             requirements);
-        auto *derivativeGenSig = evaluateOrDefault(
+        auto derivativeGenSig = evaluateOrDefault(
             P.Context.evaluator,
             AbstractGenericSignatureRequest{
-              FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+              FunctionState.F->getGenericEnvironment()->getGenericSignature().getPointer(),
               /*addedGenericParams=*/{},
               std::move(requirements)},
               nullptr);
@@ -6927,67 +6925,6 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
   return false;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-893): Dedupe with `SILParser::convertRequirements` upstream.
-// Currently, this utility is defined on `SILParser`, but SIL differentiability
-// witness is defined on `SILParserTUState` and only has access to `Parser`.
-// Consider redefining `SILParser::convertRequirements`as
-// `Parser::convertRequirements`.
-static void convertRequirements(Parser &P, SILFunction *F,
-                                ArrayRef<RequirementRepr> From,
-                                SmallVectorImpl<Requirement> &To) {
-  if (From.empty()) {
-    To.clear();
-    return;
-  }
-
-  auto *GenericEnv = F->getLoweredFunctionType()
-                         ->getGenericSignature()
-                         ->getGenericEnvironment();
-  assert(GenericEnv);
-  (void)GenericEnv;
-
-  IdentTypeReprLookup PerformLookup(P);
-  // Use parser lexical scopes to resolve references
-  // to the generic parameters.
-  auto ResolveToInterfaceType = [&](TypeLoc Ty) -> Type {
-    Ty.getTypeRepr()->walk(PerformLookup);
-    swift::performTypeLocChecking(P.Context, Ty, /*isSILMode*/ true,
-                                  /*isSILType*/ true, GenericEnv, &P.SF);
-    assert(Ty.getType());
-    return Ty.getType()->mapTypeOutOfContext();
-  };
-
-  for (auto &Req : From) {
-    if (Req.getKind() == RequirementReprKind::SameType) {
-      auto FirstType = ResolveToInterfaceType(Req.getFirstTypeLoc());
-      auto SecondType = ResolveToInterfaceType(Req.getSecondTypeLoc());
-      Requirement ConvertedRequirement(RequirementKind::SameType, FirstType,
-                                       SecondType);
-      To.push_back(ConvertedRequirement);
-      continue;
-    }
-
-    if (Req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto Subject = ResolveToInterfaceType(Req.getSubjectLoc());
-      auto Constraint = ResolveToInterfaceType(Req.getConstraintLoc());
-      Requirement ConvertedRequirement(RequirementKind::Conformance, Subject,
-                                       Constraint);
-      To.push_back(ConvertedRequirement);
-      continue;
-    }
-
-    if (Req.getKind() == RequirementReprKind::LayoutConstraint) {
-      auto Subject = ResolveToInterfaceType(Req.getSubjectLoc());
-      Requirement ConvertedRequirement(RequirementKind::Layout, Subject,
-                                       Req.getLayoutConstraint());
-      To.push_back(ConvertedRequirement);
-      continue;
-    }
-    llvm_unreachable("Unsupported requirement kind");
-  }
-}
-
 /// decl-sil-differentiability-witness ::=
 ///   'sil_differentiability_witness'
 ///   ('[' 'serialized' ']')?
@@ -7054,52 +6991,40 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   };
 
   SourceLoc lastLoc = P.getEndOfPreviousLoc();
-  // Parse an index subset, prefaced with the given label.
-  auto parseIndexSubset =
-      [&](StringRef label, IndexSubset *& indexSubset) -> bool {
-    if (P.parseToken(tok::l_square, diag::sil_diff_witness_expected_token, "["))
+  // Parse an index set, prefaced with the given label.
+  auto parseIndexSet = [&](StringRef label, SmallVectorImpl<unsigned> &indices,
+                           const Diagnostic &parseIndexDiag) -> bool {
+    // Parse `[<label> <integer_literal>...]`.
+    if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
+                     "index list") ||
+        P.parseSpecificIdentifier(
+            label, diag::sil_autodiff_expected_index_list_label, label))
       return true;
-    if (P.parseSpecificIdentifier(
-          label, diag::sil_diff_witness_expected_token, label))
-      return true;
-    // Parse parameter index list.
-    SmallVector<unsigned, 8> paramIndices;
-    // Function that parses an index into `paramIndices`. Returns true on error.
-    auto parseParam = [&]() -> bool {
+    while (P.Tok.is(tok::integer_literal)) {
       unsigned index;
-      // TODO: Reject non-ascending index lists.
-      if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_diff_witness_expected_index_list))
+      if (P.parseUnsignedInteger(index, lastLoc, parseIndexDiag))
         return true;
-      paramIndices.push_back(index);
-      return false;
-    };
-    // Parse first.
-    if (parseParam())
+      indices.push_back(index);
+    }
+    if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                     "index list"))
       return true;
-    // Parse rest.
-    while (P.Tok.isNot(tok::r_square))
-      if (parseParam())
-        return true;
-    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
-      return true;
-    auto maxIndexRef =
-        std::max_element(paramIndices.begin(), paramIndices.end());
-    indexSubset = IndexSubset::get(
-        P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, paramIndices);
     return false;
   };
   // Parse parameter and result indices.
-  IndexSubset *parameterIndices = nullptr;
-  IndexSubset *resultIndices = nullptr;
-  if (parseIndexSubset("parameters", parameterIndices))
+  SmallVector<unsigned, 8> parameterIndices;
+  SmallVector<unsigned, 8> resultIndices;
+  // Parse parameter and result indices.
+  if (parseIndexSet("parameters", parameterIndices,
+                    diag::sil_autodiff_expected_parameter_index))
     return true;
-  if (parseIndexSubset("results", resultIndices))
+  if (parseIndexSet("results", resultIndices,
+                    diag::sil_autodiff_expected_result_index))
     return true;
 
   // Parse a trailing 'where' clause (optional).
   // This represents derivative generic signature requirements.
-  GenericSignature *derivativeGenSig = nullptr;
+  GenericSignature derivativeGenSig = GenericSignature();
   SourceLoc whereLoc;
   SmallVector<RequirementRepr, 4> derivativeRequirementReprs;
   if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::kw_where)) {
@@ -7108,7 +7033,8 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     P.parseGenericWhereClause(whereLoc, derivativeRequirementReprs,
                               firstTypeInComplete,
                               /*AllowLayoutConstraints*/ false);
-    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
+    if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                     "where clause"))
       return true;
   }
 
@@ -7123,13 +7049,14 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     auto *whereClause = TrailingWhereClause::create(
         originalFn->getModule().getASTContext(), whereLoc,
         derivativeRequirementReprs);
-    convertRequirements(P, originalFn, whereClause->getRequirements(),
-                        requirements);
+    SILParser SP(P);
+    SP.convertRequirements(originalFn, whereClause->getRequirements(),
+                           requirements);
     assert(requirements.size() == derivativeRequirementReprs.size());
     derivativeGenSig = evaluateOrDefault(
         P.Context.evaluator,
         AbstractGenericSignatureRequest{
-            originalFn->getLoweredFunctionType()->getGenericSignature(),
+            originalFn->getLoweredFunctionType()->getGenericSignature().getPointer(),
             /*addedGenericParams=*/{},
             std::move(requirements)},
             nullptr);
@@ -7166,8 +7093,13 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
+  auto origFnType = originalFn->getLoweredFunctionType();
+  auto *parameterIndexSet = IndexSubset::get(
+      P.Context, origFnType->getNumParameters(), parameterIndices);
+  auto *resultIndexSet = IndexSubset::get(
+      P.Context, origFnType->getNumResults(), resultIndices);
   SILDifferentiabilityWitness::create(
-      M, *linkage, originalFn, parameterIndices, resultIndices,
+      M, *linkage, originalFn, parameterIndexSet, resultIndexSet,
       derivativeGenSig, jvp, vjp, isSerialized);
   return false;
 }

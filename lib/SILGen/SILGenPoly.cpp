@@ -2914,7 +2914,7 @@ buildThunkSignature(SILGenFunction &SGF,
 
   // Add the existing generic signature.
   int depth = 0;
-  GenericSignature *baseGenericSig = nullptr;
+  GenericSignature baseGenericSig = GenericSignature();
   if (inheritGenericSig) {
     if (auto genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature()) {
       baseGenericSig = genericSig;
@@ -2927,11 +2927,11 @@ buildThunkSignature(SILGenFunction &SGF,
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
 
-  GenericSignature *genericSig = evaluateOrDefault(
+  auto genericSig = evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
-        baseGenericSig, { newGenericParam }, { newRequirement }},
-      nullptr);
+        baseGenericSig.getPointer(), { newGenericParam }, { newRequirement }},
+      GenericSignature());
   genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
@@ -3665,7 +3665,7 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *
-SILGenModule::getOrCreateAutoDiffDerivativeFunctionThunk(
+SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
     SILFunction *original, SILAutoDiffIndices &indices,
     SILFunction *derivativeFn, AutoDiffDerivativeFunctionKind derivativeFnKind,
     bool reorderSelf) {
@@ -3695,6 +3695,8 @@ SILGenModule::getOrCreateAutoDiffDerivativeFunctionThunk(
   SILGenFunctionBuilder fb(*this);
   auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
       original->getLinkage(), /*isDerivativeFnExported*/ true);
+  // This thunk is publicly exposed and cannot be transparent.
+  // TODO(TF-925): Mark the thunks as "always inline" for optimization.
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, origDerivativeFnType, IsBare, IsNotTransparent,
       derivativeFn->isSerialized(), derivativeFn->isDynamicallyReplaceable(),
@@ -4312,7 +4314,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
       auto autoDiffFn = SGF.B.createDifferentiableFunction(
           loc, loweredIndices, originalFn);
       return SGF.B.createDifferentiableFunctionExtract(
-          loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
+          loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
           autoDiffFn);
     }
 

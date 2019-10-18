@@ -21,14 +21,14 @@
 
 #define DEBUG_TYPE "sil-optimizer"
 
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"

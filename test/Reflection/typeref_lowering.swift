@@ -1,7 +1,11 @@
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
+
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypeLowering -o %t/TypesToReflect
+
 // RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-reflection-dump -binary-filename %t/TypesToReflect -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 12TypeLowering11BasicStructV
 // CHECK-64:      (struct TypeLowering.BasicStruct)

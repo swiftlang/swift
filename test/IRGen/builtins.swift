@@ -316,17 +316,17 @@ func testStaticReport(_ b: Bool, ptr: Builtin.RawPointer) -> () {
 func testCondFail(_ b: Bool, c: Bool) {
   // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
   Builtin.condfail_message(b, StaticString("message").unsafeRawPointer)
-  // CHECK: <label>:[[CONT]]
+  // CHECK: [[CONT]]
   // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
   Builtin.condfail_message(c, StaticString("message").unsafeRawPointer)
-  // CHECK: <label>:[[CONT]]
+  // CHECK: [[CONT]]
   // CHECK: ret void
 
-  // CHECK: <label>:[[FAIL]]
+  // CHECK: [[FAIL]]:
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 
-  // CHECK: <label>:[[FAIL2]]
+  // CHECK: [[FAIL2]]:
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 }

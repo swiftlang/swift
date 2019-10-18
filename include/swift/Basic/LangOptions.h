@@ -329,9 +329,7 @@ namespace swift {
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
-    // SWIFT_ENABLE_TENSORFLOW
-    // The default on tensorflow branch is true. On master, it is false.
-    bool EnableExperimentalDifferentiableProgramming = true;
+    bool EnableExperimentalDifferentiableProgramming = false;
 
     /// Whether to enable #quote, #unquote and @quoted.
     bool EnableExperimentalQuasiquotes = false;
@@ -452,12 +450,10 @@ namespace swift {
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {
-      auto code = llvm::hash_value(Target.str());
       SmallString<16> Scratch;
       llvm::raw_svector_ostream OS(Scratch);
       OS << EffectiveLanguageVersion;
-      code = llvm::hash_combine(code, OS.str());
-      return code;
+      return llvm::hash_combine(Target.str(), OS.str());
     }
 
   private:

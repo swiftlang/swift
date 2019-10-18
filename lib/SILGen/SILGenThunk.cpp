@@ -72,9 +72,9 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *
-SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef derivativeFnDeclRef,
-                                       SILFunction *derivativeFn,
-                                       CanSILFunctionType derivativeFnTy) {
+SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
+    SILDeclRef derivativeFnDeclRef, SILFunction *derivativeFn,
+    CanSILFunctionType derivativeFnTy) {
   auto *autoDiffFuncId =
       derivativeFnDeclRef.autoDiffDerivativeFunctionIdentifier;
   assert(autoDiffFuncId);
@@ -86,6 +86,8 @@ SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef derivativeFnDeclRef,
   auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
       originalLinkage, /*isDerivativeFnExported*/ true);
   auto name = derivativeFnDeclRef.mangle();
+  // This thunk is publicly exposed and cannot be transparent.
+  // TODO(TF-925): Mark the thunks as "always inline" for optimization.
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsNotTransparent,
       derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
@@ -146,7 +148,8 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto diffFn = SGF.B.createDifferentiableFunction(
       loc, loweredIndices, originalFnRef);
   auto diffDerivativeFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()), diffFn);
+      loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
+      diffFn);
   auto autoDiffDerivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());

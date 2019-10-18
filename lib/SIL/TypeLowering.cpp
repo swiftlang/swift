@@ -892,14 +892,14 @@ namespace {
   class NormalDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
                    NormalDifferentiableSILFunctionTypeLowering,
-                   DifferentiableFunctionExtractee> {
+                   NormalDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
 
-    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
-                               SILValue tupleValue,
-                               DifferentiableFunctionExtractee extractee,
-                               const TypeLowering &eltLowering) const {
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        NormalDifferentiableFunctionTypeComponent extractee,
+        const TypeLowering &eltLowering) const {
       return B.createDifferentiableFunctionExtract(
           loc, extractee, tupleValue);
     }
@@ -921,7 +921,7 @@ namespace {
       auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
-        DifferentiableFunctionExtractee::Original,
+        NormalDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
       for (AutoDiffDerivativeFunctionKind kind :
@@ -931,12 +931,12 @@ namespace {
             paramIndices, 0, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
-        DifferentiableFunctionExtractee extractee(kind);
+        NormalDifferentiableFunctionTypeComponent extractee(kind);
         // Assert that we have the right extractee. A terrible bug in the past
         // was caused by implicit conversions from `unsigned` to
-        // `DifferentiableFunctionExtractee` which resulted into a wrong
-        // extractee.
-        assert(extractee.getExtracteeAsDerivativeFunction() == kind);
+        // `NormalDifferentiableFunctionTypeComponent` which resulted into a
+        // wrong extractee.
+        assert(extractee.getAsDerivativeFunctionKind() == kind);
         children.push_back(Child{
             extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
       }
@@ -1895,7 +1895,7 @@ getTypeLoweringForExpansion(TypeKey key,
   return nullptr;
 }
 
-static GenericSignature *
+static GenericSignature 
 getEffectiveGenericSignature(DeclContext *dc,
                              CaptureInfo captureInfo) {
   if (dc->getParent()->isLocalContext() &&
@@ -1905,14 +1905,14 @@ getEffectiveGenericSignature(DeclContext *dc,
   return dc->getGenericSignatureOfContext();
 }
 
-static GenericSignature *
+static GenericSignature 
 getEffectiveGenericSignature(AnyFunctionRef fn,
                              CaptureInfo captureInfo) {
   return getEffectiveGenericSignature(fn.getAsDeclContext(), captureInfo);
 }
 
 static CanGenericSignature
-getCanonicalSignatureOrNull(GenericSignature *sig) {
+getCanonicalSignatureOrNull(GenericSignature sig) {
   if (!sig || sig->areAllParamsConcrete())
       return nullptr;
 
@@ -1948,7 +1948,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   // Get the generic signature from the surrounding context.
-  auto *sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
+  auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(vd)) {
     auto *param = getParameterAt(afd, c.defaultArgIndex);
     if (param->getDefaultValue()) {
@@ -2071,7 +2071,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
-  auto *genericSig = getEffectiveGenericSignature(closure, captureInfo);
+  auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
 
   auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                                funcType->throws());
@@ -2162,7 +2162,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-GenericSignature *
+GenericSignature 
 TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
   
@@ -2198,7 +2198,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
 
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  if (auto *sig = getConstantGenericSignature(c))
+  if (auto sig = getConstantGenericSignature(c))
     return sig->getGenericEnvironment();
   return nullptr;
 }

@@ -664,45 +664,16 @@ LinearFunctionInst *LinearFunctionInst::create(
       HasOwnership);
 }
 
-DifferentiableFunctionExtractInst::Extractee::Extractee(
-    AutoDiffDerivativeFunctionKind kind) {
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    rawValue = JVP;
-    return;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    rawValue = VJP;
-    return;
-  }
-}
-
-DifferentiableFunctionExtractInst::Extractee::Extractee(StringRef string) {
-  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
-      .Case("original", Original)
-      .Case("jvp", JVP)
-      .Case("vjp", VJP);
-  assert(result && "Invalid string");
-  rawValue = *result;
-}
-
-Optional<AutoDiffDerivativeFunctionKind>
-DifferentiableFunctionExtractInst::Extractee::
-getExtracteeAsDerivativeFunction() const {
-  switch (rawValue) {
-  case Original: return None;
-  case JVP: return {AutoDiffDerivativeFunctionKind::JVP};
-  case VJP: return {AutoDiffDerivativeFunctionKind::VJP};
-  }
-}
-
 SILType DifferentiableFunctionExtractInst::
-getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
+getExtracteeType(
+    SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
+    SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
   auto originalFnTy = fnTy->getWithoutDifferentiability();
-  auto kindOpt = extractee.getExtracteeAsDerivativeFunction();
+  auto kindOpt = extractee.getAsDerivativeFunctionKind();
   if (!kindOpt) {
-    assert(extractee == Extractee::Original);
+    assert(extractee == NormalDifferentiableFunctionTypeComponent::Original);
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
   auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
@@ -713,8 +684,8 @@ getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
 }
 
 DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
-    SILValue theFunction)
+    SILModule &module, SILDebugLocation debugLoc,
+    NormalDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
@@ -746,42 +717,36 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
     SILModule &module, SILFunction *originalFunction,
-    DifferentiabilityKind diffKind, AutoDiffDerivativeFunctionKind derivKind,
+    DifferentiabilityWitnessFunctionKind witnessKind,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature *witnessGenSig) {
+    GenericSignature witnessGenSig) {
   auto fnTy = originalFunction->getLoweredFunctionType();
   CanGenericSignature witnessCanGenSig;
   if (witnessGenSig)
     witnessCanGenSig = witnessGenSig->getCanonicalSignature();
-  switch (diffKind) {
-  case DifferentiabilityKind::Normal: {
+  if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
-       parameterIndices, *resultIndices->begin(), derivKind, module.Types,
+       parameterIndices, *resultIndices->begin(), *derivativeKind, module.Types,
        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
-  case DifferentiabilityKind::Linear: {
-    auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
-        parameterIndices, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
-    return SILType::getPrimitiveObjectType(transposeFnTy);
-  }
-  case DifferentiabilityKind::NonDifferentiable:
-    llvm_unreachable("Differentiability kind must be normal or linear");
-  }
+  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
+  auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
+      parameterIndices, module.Types,
+      LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+  return SILType::getPrimitiveObjectType(transposeFnTy);
 }
 
 DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
     SILModule &module, SILDebugLocation debugLoc, SILFunction *originalFunction,
-    DifferentiabilityKind diffKind, AutoDiffDerivativeFunctionKind derivKind,
+    DifferentiabilityWitnessFunctionKind witnessKind,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature *witnessGenSig)
+    GenericSignature witnessGenSig)
     : InstructionBase(debugLoc, getDifferentiabilityWitnessType(
-          module, originalFunction, diffKind, derivKind, parameterIndices,
+          module, originalFunction, witnessKind, parameterIndices,
           resultIndices, witnessGenSig)),
-      originalFunction(originalFunction), differentiabilityKind(diffKind),
-      derivativeKind(derivKind), parameterIndices(parameterIndices),
-      resultIndices(resultIndices), witnessGenericSignature(witnessGenSig) {}
+      originalFunction(originalFunction), witnessKind(witnessKind),
+      config({parameterIndices, resultIndices, witnessGenSig.getPointer()}) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

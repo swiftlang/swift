@@ -58,9 +58,9 @@ entry(%e : $Either<(), ()>):
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
 
   // CHECK-NEXT: br i1 {{%.*}}, label %7, label %6
-  // CHECK:      <label>:6
+  // CHECK:      6:
   // CHECK:        br label %8
-  // CHECK:      <label>:7
+  // CHECK:      7:
   // CHECK:        br label %9
   switch_enum %e : $Either<(), ()>,
     case #Either.Left!enumelt.1: left,
@@ -125,9 +125,9 @@ entry(%e : $EitherOr<(), ()>):
     case #EitherOr.Center!enumelt: center,
     case #EitherOr.Right!enumelt.1: right
 
-  // CHECK:      <label>:[[LEFT_PRE]]
+  // CHECK:      [[LEFT_PRE]]:
   // CHECK:        br label [[LEFT:%[0-9]+]]
-  // CHECK:      <label>:[[RIGHT_PRE]]
+  // CHECK:      [[RIGHT_PRE]]:
   // CHECK:        br label [[RIGHT:%[0-9]+]]
 
 left(%x : $()):
@@ -307,22 +307,22 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
     case #EitherOr.Center!enumelt: center,
     case #EitherOr.Right!enumelt.1: right
 
-  // CHECK: <label>:[[LEFT]]
+  // CHECK: [[LEFT]]:
 left:
   %0 = integer_literal $Builtin.Int8, 0
   br next(%0 : $Builtin.Int8)
 
-  // CHECK: <label>:[[MIDDLE]]
+  // CHECK: [[MIDDLE]]:
 middle:
   %1 = integer_literal $Builtin.Int8, 1
   br next(%1 : $Builtin.Int8)
 
-  // CHECK: <label>:[[CENTER]]
+  // CHECK: [[CENTER]]:
 center:
   %2 = integer_literal $Builtin.Int8, 2
   br next(%2 : $Builtin.Int8)
 
-  // CHECK: <label>:[[RIGHT]]
+  // CHECK: [[RIGHT]]:
 right:
   %3 = integer_literal $Builtin.Int8, 3
   br next(%3 : $Builtin.Int8)
@@ -340,23 +340,23 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // -- only the Left branch of this instance needs cleanup
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[NOOP:[0-9]+]], label %[[LEFT:[0-9]+]]
-  // CHECK:      <label>:[[LEFT]]
+  // CHECK:      [[LEFT]]:
   // CHECK:        call void %destroy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
-  // CHECK:      <label>:[[NOOP]]
+  // CHECK:      [[NOOP]]:
   destroy_addr %a : $*EitherOr<T, Builtin.Int64>
 
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
   // -- only the Left branch of this instance needs nontrivial take
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
-  // CHECK:      <label>:[[LEFT]]
+  // CHECK:      [[LEFT]]:
   // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
-  // CHECK:      <label>:[[TRIVIAL]]
+  // CHECK:      [[TRIVIAL]]:
   // CHECK:        call void @llvm.memcpy
   // CHECK:        br label %[[DONE]]
-  // CHECK:      <label>:[[DONE]]
+  // CHECK:      [[DONE]]:
   copy_addr [take] %a to [initialization] %b : $*EitherOr<T, Builtin.Int64>
 
   copy_addr [take] %a to                  %b : $*EitherOr<T, Builtin.Int64>
@@ -375,25 +375,25 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
-  // CHECK:      <label>:[[LEFT]]
+  // CHECK:      [[LEFT]]:
   // CHECK:        call void %destroy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[NOOP]]
-  // CHECK:      <label>:[[RIGHT]]
+  // CHECK:      [[RIGHT]]:
   // CHECK:        call void {{.*}} @swift_release
-  // CHECK:      <label>:[[NOOP]]
+  // CHECK:      [[NOOP]]:
   destroy_addr %a : $*EitherOr<T, C>
 
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
   // -- only the Left branch of this instance needs cleanup
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
-  // CHECK:      <label>:[[LEFT]]
+  // CHECK:      [[LEFT]]:
   // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
-  // CHECK:      <label>:[[TRIVIAL]]
+  // CHECK:      [[TRIVIAL]]:
   // CHECK:        call void @llvm.memcpy
   // CHECK:        br label %[[DONE]]
-  // CHECK:      <label>:[[DONE]]
+  // CHECK:      [[DONE]]:
   copy_addr [take] %a to [initialization] %b : $*EitherOr<T, C>
 
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
@@ -402,16 +402,16 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
-  // CHECK:      <label>:[[LEFT]]
+  // CHECK:      [[LEFT]]:
   // CHECK:        call %swift.opaque* %initializeWithCopy(%swift.opaque* noalias {{%.*}}, %swift.type* %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
-  // CHECK:      <label>:[[RIGHT]]
+  // CHECK:      [[RIGHT]]:
   // CHECK:        call %swift.refcounted* @swift_retain
   // CHECK:        br label %[[DONE:[0-9]+]]
-  // CHECK:      <label>:[[TRIVIAL]]
+  // CHECK:      [[TRIVIAL]]:
   // CHECK:        call void @llvm.memcpy
   // CHECK:        br label %[[DONE]]
-  // CHECK:      <label>:[[DONE]]
+  // CHECK:      [[DONE]]:
   copy_addr        %a to [initialization] %b : $*EitherOr<T, C>
 
   return undef : $()

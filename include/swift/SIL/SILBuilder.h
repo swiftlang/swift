@@ -521,14 +521,14 @@ public:
 
   LinearFunctionInst *createLinearFunction(
       SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
-      Optional<SILValue> TransposeFunction) {
+      Optional<SILValue> TransposeFunction = None) {
     return insert(LinearFunctionInst::create(
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, TransposeFunction, hasOwnership()));
   }
   
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
-      SILLocation Loc, DifferentiableFunctionExtractee Extractee,
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
       SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
@@ -546,21 +546,20 @@ public:
                                               SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc),
-        DifferentiableFunctionExtractee::Original, TheFunction));
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
   }
 
   DifferentiabilityWitnessFunctionInst *
   createDifferentiabilityWitnessFunction(
       SILLocation Loc, SILFunction *OriginalFunction,
-      DifferentiabilityKind DiffKind, AutoDiffDerivativeFunctionKind DerivKind,
+      DifferentiabilityWitnessFunctionKind WitnessKind,
       IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
-      GenericSignature *DerivativeGenericSignature) {
+      GenericSignature WitnessGenericSignature) {
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
-        getModule(), getSILDebugLocation(Loc),
-        OriginalFunction, DiffKind, DerivKind, ParameterIndices, ResultIndices,
-        DerivativeGenericSignature));
+        getModule(), getSILDebugLocation(Loc), OriginalFunction, WitnessKind,
+        ParameterIndices, ResultIndices, WitnessGenericSignature.getPointer()));
   }
-  // SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW END
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,

@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-ir -o /dev/null %s -tbd-current-version 2.0.3 -tbd-compatibility-version 1.7 -emit-tbd -emit-tbd-path %t/both_provided.tbd
 // RUN: %target-swift-frontend -emit-ir -o /dev/null %s -tbd-current-version 2.0 -emit-tbd -emit-tbd-path %t/only_current_provided.tbd

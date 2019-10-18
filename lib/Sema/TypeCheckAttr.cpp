@@ -1842,7 +1842,7 @@ static bool diagnoseIndirectGenericTypeParam(SourceLoc loc, Type type,
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
-  auto *genericSig = FD->getGenericSignature();
+  auto genericSig = FD->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
@@ -2824,7 +2824,7 @@ static FuncDecl *resolveAutoDiffDerivativeFunction(
 // Otherwise, generic signatures are checked for equality.
 static bool checkFunctionSignature(
     CanAnyFunctionType required, CanType candidate,
-    Optional<std::function<bool(GenericSignature *, GenericSignature *)>>
+    Optional<std::function<bool(GenericSignature, GenericSignature)>>
         checkGenericSignature = None) {
   // Check that candidate is actually a function.
   auto candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
@@ -3333,7 +3333,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // - Compute generic signature for autodiff derivative functions based on
   //   the original function's generate signature and the attribute's where
   //   clause requirements.
-  GenericSignature *whereClauseGenSig = nullptr;
+  GenericSignature whereClauseGenSig = GenericSignature();
   GenericEnvironment *whereClauseGenEnv = nullptr;
   if (auto *whereClause = attr->getWhereClause()) {
     // `@differentiable` attributes on protocol requirements do not support
@@ -3352,7 +3352,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return;
     }
 
-    auto *originalGenSig = original->getGenericSignature();
+    auto originalGenSig = original->getGenericSignature();
     if (!originalGenSig) {
       // Attributes with where clauses can only be declared on
       // generic functions.
@@ -3635,9 +3635,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto *originalFnType =
       derivativeInterfaceType->getAutoDiffOriginalFunctionType();
 
-  std::function<bool(GenericSignature *, GenericSignature *)>
+  std::function<bool(GenericSignature, GenericSignature)>
     checkGenericSignatureSatisfied =
-        [&](GenericSignature *source, GenericSignature *target) {
+        [&](GenericSignature source, GenericSignature target) {
           // If target is null, then its requirements are satisfied.
           if (!target)
             return true;
@@ -3988,9 +3988,9 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   }
 
   // Compute expected original function type.
-  std::function<bool(GenericSignature *, GenericSignature *)>
-    checkGenericSignatureSatisfied = [&](GenericSignature *source,
-                                         GenericSignature *target) {
+  std::function<bool(GenericSignature, GenericSignature)>
+    checkGenericSignatureSatisfied = [&](GenericSignature source,
+                                         GenericSignature target) {
           // If target is null, then its requirements are satisfied.
           if (!target)
             return true;
@@ -4094,9 +4094,9 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
 
   // Check if original function type matches expected original function type
   // we computed.
-  std::function<bool(GenericSignature *, GenericSignature *)>
+  std::function<bool(GenericSignature, GenericSignature)>
       genericComparison =
-          [&](GenericSignature *a, GenericSignature *b) { return a == b; };
+          [&](GenericSignature a, GenericSignature b) { return a.getPointer() == b.getPointer(); };
   if (!checkFunctionSignature(
            cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
            originalFn->getInterfaceType()->getCanonicalType(),
@@ -4343,8 +4343,8 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (!underlyingType)
     underlyingType = type;
 
-  auto *sig = var->getDeclContext()->getGenericSignatureOfContext();
-  if (!underlyingType->allowsOwnership(sig)) {
+  auto sig = var->getDeclContext()->getGenericSignatureOfContext();
+  if (!underlyingType->allowsOwnership(sig.getPointer())) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||

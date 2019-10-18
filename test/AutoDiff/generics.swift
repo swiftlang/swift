@@ -16,7 +16,7 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN]], [[ORIG_COTAN_METATYPE]])
 // CHECK-SIL: }
 
-struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorProtocol, Differentiable {
+struct Tensor<Scalar : FloatingPoint & Differentiable> : Differentiable {
   // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
   // until differentiation has indirect passing support.
   var value: Float

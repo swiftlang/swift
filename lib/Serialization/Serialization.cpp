@@ -529,7 +529,7 @@ LocalDeclContextID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
 }
 
 GenericSignatureID
-Serializer::addGenericSignatureRef(const GenericSignature *sig) {
+Serializer::addGenericSignatureRef(GenericSignature sig) {
   if (!sig)
     return 0;
   return GenericSignaturesToSerialize.addRef(sig);
@@ -789,6 +789,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_INST_LINEAR_FUNCTION);
   BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT);
   BLOCK_RECORD(sil_block, SIL_INST_LINEAR_FUNCTION_EXTRACT);
+  BLOCK_RECORD(sil_block, SIL_DIFFERENTIABILITY_WITNESS);
+  BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION);
   // SWIFT_ENABLE_TENSORFLOW END
 
   // These layouts can exist in both decl blocks and sil blocks.
@@ -829,6 +831,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
   // SWIFT_ENABLE_TENSORFLOW
+  BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
   // SWIFT_ENABLE_TENSORFLOW END
 
@@ -1180,7 +1183,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
-void Serializer::writeASTBlockEntity(const GenericSignature *sig) {
+void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
   assert(sig);
@@ -3416,7 +3419,7 @@ public:
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       rawValueKind = EnumElementRawValueKind::IntegerLiteral;
-      auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
+      auto ILE = cast<IntegerLiteralExpr>(elem->getStructuralRawValueExpr());
       RawValueText = ILE->getDigitsText();
       isNegative = ILE->isNegative();
       isRawValueImplicit = ILE->isImplicit();
@@ -3998,7 +4001,7 @@ public:
     using namespace decls_block;
     assert(!fnTy->isNoEscape());
 
-    auto *genericSig = fnTy->getGenericSignature();
+    auto genericSig = fnTy->getGenericSignature();
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),

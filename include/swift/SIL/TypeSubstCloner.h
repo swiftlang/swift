@@ -21,10 +21,10 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/Support/Debug.h"
 
@@ -297,7 +297,7 @@ protected:
   /// to clone a unique copy of the function declaration with the substitutions
   /// applied for the debug info.
   static bool substitutionsChangeGenericTypeParameters(SubstitutionMap SubsMap,
-                                                       GenericSignature *Sig) {
+                                                       GenericSignature Sig) {
 
     // If there are no substitutions, just reuse
     // the original decl.
@@ -324,7 +324,7 @@ protected:
                                           SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
-                                          GenericSignature *RemappedSig,
+                                          GenericSignature RemappedSig,
                                           bool ForInlining = false) {
     // If the original, non-inlined version of the function had no generic
     // environment, there is no need to remap it.

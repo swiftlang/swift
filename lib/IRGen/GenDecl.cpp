@@ -41,7 +41,6 @@
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -441,7 +440,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
-  for (auto *opaqueDecl : SF.OpaqueReturnTypes)
+  for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);
 
   SF.collectLinkLibraries([this](LinkLibrary linkLib) {
@@ -911,6 +910,7 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
                : ("__DATA," + Section + "," + MachOAttributes).str();
   case llvm::Triple::ELF:
     return Section.substr(2).str();
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     return ("." + Section.substr(2) + "$B").str();
   case llvm::Triple::Wasm:
@@ -942,6 +942,7 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
     }
   case llvm::Triple::ELF:
     return;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     return;
   case llvm::Triple::Wasm:
@@ -1360,6 +1361,7 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   case llvm::Triple::Wasm:
     sectionName = "swift5_replace";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5repl$B";
     break;
@@ -1380,6 +1382,7 @@ static std::string getDynamicReplacementSomeSection(IRGenModule &IGM) {
   case llvm::Triple::Wasm:
     sectionName = "swift5_replac2";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5reps$B";
     break;
@@ -3052,6 +3055,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_protocols";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
     break;
@@ -3112,6 +3116,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_protocol_conformances";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5prtc$B";
     break;
@@ -3137,6 +3142,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_type_metadata";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
     break;
@@ -3205,6 +3211,7 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   case llvm::Triple::Wasm:
     sectionName = "swift5_fieldmd";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5flmd$B";
     break;
@@ -4496,7 +4503,10 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
-  llvm::Constant *fn = Module.getOrInsertFunction(fnName, fnTy);
+  llvm::Constant *fn =
+      cast<llvm::Function>(Module.getOrInsertFunction(fnName, fnTy)
+                               .getCallee()
+                               ->stripPointerCasts());
 
   if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
     IRGenFunction IGF(*this, def);

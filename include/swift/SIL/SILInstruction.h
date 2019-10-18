@@ -7967,42 +7967,29 @@ class DifferentiableFunctionExtractInst
     : public InstructionBase<
           SILInstructionKind::DifferentiableFunctionExtractInst,
           SingleValueInstruction> {
-public:
-  struct Extractee {
-    enum innerty : unsigned {
-      Original = 0,
-      JVP = 1,
-      VJP = 2
-    } rawValue;
-    Extractee() = default;
-    Extractee(innerty rawValue) : rawValue(rawValue) {}
-    explicit Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
-    Extractee(AutoDiffDerivativeFunctionKind kind);
-    explicit Extractee(StringRef name);
-    operator innerty() const { return rawValue; }
-
-    Optional<AutoDiffDerivativeFunctionKind>
-    getExtracteeAsDerivativeFunction() const;
-  };
-
 private:
   /// The extractee.
-  Extractee extractee;
+  NormalDifferentiableFunctionTypeComponent extractee;
   /// The list containing the `@differentiable` function operand.
   FixedOperandList<1> operands;
 
   static SILType
-  getExtracteeType(SILValue function, Extractee extractee, SILModule &module);
+  getExtracteeType(
+      SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
+      SILModule &module);
 
 public:
   explicit DifferentiableFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+      SILModule &module, SILDebugLocation debugLoc,
+      NormalDifferentiableFunctionTypeComponent extractee,
       SILValue theFunction);
 
-  Extractee getExtractee() const { return extractee; }
+  NormalDifferentiableFunctionTypeComponent getExtractee() const {
+      return extractee;
+  }
 
   AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
-    auto kind = extractee.getExtracteeAsDerivativeFunction();
+    auto kind = extractee.getAsDerivativeFunctionKind();
     assert(kind);
     return *kind;
   }
@@ -8011,9 +7998,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
-
-typedef DifferentiableFunctionExtractInst::Extractee
-    DifferentiableFunctionExtractee;
 
 /// `linear_function_extract` - given an `@differentiable(linear)` function
 /// representing a bundle of the original function and the transpose function,
@@ -8058,55 +8042,40 @@ private:
   friend SILBuilder;
   /// The original function.
   SILFunction *originalFunction;
-  /// The differentiability kind.
-  DifferentiabilityKind differentiabilityKind;
-  /// The derivative kind.
-  // TODO(TF-???): When VJPs are removed and JVP is the only derivative kind,
-  // remove this field.
-  AutoDiffDerivativeFunctionKind derivativeKind;
-  /// The parameter indices to differentiate with respect to.
-  IndexSubset *parameterIndices;
-  /// The result indices to differentiate with respect to.
-  IndexSubset *resultIndices;
-  /// The witness generic signature.
-  GenericSignature *witnessGenericSignature;
+  /// The differentiability witness function kind.
+  DifferentiabilityWitnessFunctionKind witnessKind;
+  /// The autodiff config: parameter indices, result indices, and witness
+  /// derivative signature.
+  AutoDiffConfig config;
 
   static SILType getDifferentiabilityWitnessType(
       SILModule &module, SILFunction *originalFunction,
-      DifferentiabilityKind differentiabilityKind,
-      AutoDiffDerivativeFunctionKind derivativeKind,
+      DifferentiabilityWitnessFunctionKind witnessKind,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *witnessGenericSignature);
+      GenericSignature witnessGenericSignature);
 
 public:
   DifferentiabilityWitnessFunctionInst(
       SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
-      DifferentiabilityKind differentiabilityKind,
-      AutoDiffDerivativeFunctionKind derivativeKind,
+      DifferentiabilityWitnessFunctionKind witnessKind,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *witnessGenericSignature);
+      GenericSignature witnessGenericSignature);
 
   static DifferentiabilityWitnessFunctionInst *create(
       SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
-      DifferentiabilityKind differentiabilityKind,
-      AutoDiffDerivativeFunctionKind derivativeKind,
+      DifferentiabilityWitnessFunctionKind witnessKind,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *witnessGenericSignature);
+      GenericSignature witnessGenericSignature);
 
-  DifferentiabilityKind getDifferentiabilityKind() const {
-    return differentiabilityKind;
-  }
-  AutoDiffDerivativeFunctionKind getDerivativeKind() const {
-    assert(differentiabilityKind == DifferentiabilityKind::Normal &&
-           "Derivative kind is defined only when differentiability kind is "
-           "normal");
-    return derivativeKind;
+  DifferentiabilityWitnessFunctionKind getWitnessKind() const {
+    return witnessKind;
   }
   SILFunction *getOriginalFunction() const { return originalFunction; }
-  IndexSubset *getParameterIndices() const { return parameterIndices; }
-  IndexSubset *getResultIndices() const { return resultIndices; }
-  GenericSignature *getWitnessGenericSignature() const {
-    return witnessGenericSignature;
+  AutoDiffConfig const &getConfig() const { return config; }
+  IndexSubset *getParameterIndices() const { return config.parameterIndices; }
+  IndexSubset *getResultIndices() const { return config.resultIndices; }
+  GenericSignature getWitnessGenericSignature() const {
+    return config.derivativeGenericSignature;
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }

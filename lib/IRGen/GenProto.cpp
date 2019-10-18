@@ -2205,7 +2205,7 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   diffWitnessContents.addBitCast(vjpFnAddr, Int8PtrTy);
   auto diffWitnessFuture = diffWitnessContents.finishAndCreateFuture();
   getAddrOfDifferentiabilityWitness(
-      dw->getOriginalFunction(), dw->getAutoDiffConfig(), diffWitnessFuture);
+      dw->getOriginalFunction(), dw->getConfig(), diffWitnessFuture);
 }
 // SWIFT_ENABLE_TENSORFLOW END
 

@@ -447,6 +447,51 @@ void SILType::dump() const {
   llvm::errs() << '\n';
 }
 
+// TODO(TF-893): Use this helper to dedupe the same logic in
+// `SILFunction::print`.
+static void printSILFunctionNameAndType(
+    llvm::raw_ostream &OS, SILFunction *function) {
+  function->printName(OS);
+  OS << " : $";
+  llvm::DenseMap<CanType, Identifier> Aliases;
+  llvm::DenseSet<Identifier> UsedNames;
+  auto sig = function->getLoweredFunctionType()->getGenericSignature();
+  auto env = function->getGenericEnvironment();
+  if (sig && env) {
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : sig->getGenericParams()) {
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
+      while (!UsedNames.insert(name).second) {
+        disambiguatedNameBuf.clear();
+        {
+          llvm::raw_svector_ostream names(disambiguatedNameBuf);
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
+        }
+        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
+      }
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
+    }
+  }
+
+  {
+    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
+    withGenericEnvironment.GenericEnv = env;
+    withGenericEnvironment.AlternativeTypeNames =
+      Aliases.empty() ? nullptr : &Aliases;
+    function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
+  }
+}
+
 namespace {
   
 class SILPrinter;
@@ -1077,7 +1122,7 @@ public:
   }
 
   void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
+                          GenericSignature Sig = GenericSignature()) {
     if (!Subs.hasAnySubstitutableParams()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses
@@ -1163,14 +1208,14 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     if (!dfi->getParameterIndices()->isEmpty()) {
-      *this << "[wrt";
+      *this << "[parameters";
       for (auto i : dfi->getParameterIndices()->getIndices())
         *this << ' ' << i;
       *this << "] ";
     }
     *this << getIDAndType(dfi->getOriginalFunction());
     if (dfi->hasDerivativeFunctions()) {
-      *this << " with ";
+      *this << " with_derivative ";
       *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
             << getIDAndType(dfi->getVJPFunction()) << '}';
     }
@@ -1194,13 +1239,13 @@ public:
       DifferentiableFunctionExtractInst *dfei) {
     *this << '[';
     switch (dfei->getExtractee()) {
-    case DifferentiableFunctionExtractee::Original:
+    case NormalDifferentiableFunctionTypeComponent::Original:
       *this << "original";
       break;
-    case DifferentiableFunctionExtractee::JVP:
+    case NormalDifferentiableFunctionTypeComponent::JVP:
       *this << "jvp";
       break;
-    case DifferentiableFunctionExtractee::VJP:
+    case NormalDifferentiableFunctionTypeComponent::VJP:
       *this << "vjp";
       break;
     }
@@ -1211,10 +1256,10 @@ public:
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
     *this << '[';
     switch (lfei->getExtractee()) {
-    case LinearFunctionExtractee::Original:
+    case LinearDifferentiableFunctionTypeComponent::Original:
       *this << "original";
       break;
-    case LinearFunctionExtractee::Transpose:
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
       *this << "transpose";
       break;
     }
@@ -1223,24 +1268,18 @@ public:
   }
 
   void visitDifferentiabilityWitnessFunctionInst(
-       DifferentiabilityWitnessFunctionInst *dwfi) {
+      DifferentiabilityWitnessFunctionInst *dwfi) {
     *this << '[';
-    switch (dwfi->getDifferentiabilityKind()) {
-    case DifferentiabilityKind::Normal:
-      switch (dwfi->getDerivativeKind()) {
-      case AutoDiffDerivativeFunctionKind::JVP:
-        *this << "jvp";
-        break;
-      case AutoDiffDerivativeFunctionKind::VJP:
-        *this << "vjp";
-        break;
-      }
+    switch (dwfi->getWitnessKind()) {
+    case DifferentiabilityWitnessFunctionKind::JVP:
+      *this << "jvp";
       break;
-    case DifferentiabilityKind::Linear:
-        *this << "linear";
+    case DifferentiabilityWitnessFunctionKind::VJP:
+      *this << "vjp";
       break;
-    case DifferentiabilityKind::NonDifferentiable:
-      llvm_unreachable("Differentiability kind must be normal or linear");
+    case DifferentiabilityWitnessFunctionKind::Transpose:
+      *this << "transpose";
+      break;
     }
     *this << "] [parameters";
     for (auto i : dwfi->getParameterIndices()->getIndices())
@@ -1249,23 +1288,12 @@ public:
     for (auto i : dwfi->getResultIndices()->getIndices())
       *this << ' ' << i;
     *this << "] ";
-#if 0
-    *this << "] ";
-    if (dwfi->getParameterIndices()->isEmpty()) {
-      *this << "[parameters";
-      for (auto i : dwfi->getParameterIndices()->getIndices())
-        *this << ' ' << i;
-      *this << "] ";
+    if (auto witnessGenSig = dwfi->getWitnessGenericSignature()) {
+      auto subPrinter = PrintOptions::printSIL();
+      witnessGenSig->print(PrintState.OS, subPrinter);
+      *this << " ";
     }
-    if (dwfi->getResultIndices()->isEmpty()) {
-      *this << "[results";
-      for (auto i : dwfi->getResultIndices()->getIndices())
-        *this << ' ' << i;
-      *this << "] ";
-    }
-#endif
-    dwfi->getOriginalFunction()->printName(PrintState.OS);
-    *this << " : " << dwfi->getOriginalFunction()->getLoweredType();
+    printSILFunctionNameAndType(PrintState.OS, dwfi->getOriginalFunction());
   }
   // SWIFT_ENABLE_TENSORFLOW END
 
@@ -3132,46 +3160,6 @@ void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
 
-// TODO(TF-893): Use this helper to dedupe the same logic in
-// `SILFunction::print`.
-static void printSILFunctionType(llvm::raw_ostream &OS, SILFunction *function) {
-  llvm::DenseMap<CanType, Identifier> Aliases;
-  llvm::DenseSet<Identifier> UsedNames;
-  auto sig = function->getLoweredFunctionType()->getGenericSignature();
-  auto *env = function->getGenericEnvironment();
-  if (sig && env) {
-    llvm::SmallString<16> disambiguatedNameBuf;
-    unsigned disambiguatedNameCounter = 1;
-    for (auto *paramTy : sig->getGenericParams()) {
-      auto sugaredTy = env->getSugaredType(paramTy);
-      Identifier name = sugaredTy->getName();
-      while (!UsedNames.insert(name).second) {
-        disambiguatedNameBuf.clear();
-        {
-          llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << sugaredTy->getName() << disambiguatedNameCounter++;
-        }
-        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
-      }
-      if (name != sugaredTy->getName()) {
-        Aliases[paramTy->getCanonicalType()] = name;
-
-        // Also for the archetype
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)
-            ->getAs<ArchetypeType>();
-        if (archetypeTy)
-          Aliases[archetypeTy->getCanonicalType()] = name;
-      }
-    }
-  }
-
-  PrintOptions withGenericEnvironment = PrintOptions::printSIL();
-  withGenericEnvironment.GenericEnv = env;
-  withGenericEnvironment.AlternativeTypeNames =
-    Aliases.empty() ? nullptr : &Aliases;
-  function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
-}
-
 // SWIFT_ENABLE_TENSORFLOW
 void SILDifferentiabilityWitness::print(
     llvm::raw_ostream &OS, bool verbose) const {
@@ -3194,9 +3182,9 @@ void SILDifferentiabilityWitness::print(
   interleave(getResultIndices()->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ' '; });
-  OS << ']';
+  OS << "] ";
   // ([where ...])?
-  if (auto *derivativeGenSig = getDerivativeGenericSignature()) {
+  if (auto derivativeGenSig = getDerivativeGenericSignature()) {
     ArrayRef<Requirement> requirements;
     SmallVector<Requirement, 4> requirementsScratch;
     auto *origGenEnv = originalFunction->getGenericEnvironment();
@@ -3210,7 +3198,7 @@ void SILDifferentiabilityWitness::print(
       }
     }
     if (!requirements.empty()) {
-      OS << " [where ";
+      OS << "[where ";
       auto subPrinter = PrintOptions::printSIL();
       subPrinter.GenericEnv = origGenEnv;
       interleave(requirements,
@@ -3218,22 +3206,26 @@ void SILDifferentiabilityWitness::print(
                    req.print(OS, subPrinter);
                  },
                  [&] { OS << ", "; });
-      OS << ']';
+      OS << "] ";
     }
   }
   // @original-function-name : $original-sil-type
-  OS << " @" << originalFunction->getName() << " : $";
-  printSILFunctionType(OS, originalFunction);
-
+  printSILFunctionNameAndType(OS, originalFunction);
   // {
   //   jvp: @jvp-function-name : $jvp-sil-type
   //   vjp: @vjp-function-name : $vjp-sil-type
   // }
   OS << " {\n";
-  if (jvp)
-    OS << "  jvp: @" << jvp->getName() << " : " << jvp->getLoweredType() << '\n';
-  if (vjp)
-    OS << "  vjp: @" << vjp->getName() << " : " << vjp->getLoweredType() << '\n';
+  if (jvp) {
+    OS << "  jvp: ";
+    printSILFunctionNameAndType(OS, jvp);
+    OS << '\n';
+  }
+  if (vjp) {
+    OS << "  vjp: ";
+    printSILFunctionNameAndType(OS, vjp);
+    OS << '\n';
+  }
   OS << "}\n\n";
 }
 

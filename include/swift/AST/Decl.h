@@ -340,12 +340,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1,
-    /// Whether a keypath component can directly reference this storage,
-    /// or if it must use the overridden declaration instead.
-    HasComputedValidKeyPathComponent : 1,
-    ValidKeyPathComponent : 1,
-    
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1,
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1
@@ -393,7 +388,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -409,12 +404,6 @@ protected:
     /// Whether the function body throws.
     Throws : 1,
 
-    /// Whether this function requires a new vtable entry.
-    NeedsNewVTableEntry : 1,
-
-    /// Whether NeedsNewVTableEntry is valid.
-    HasComputedNeedsNewVTableEntry : 1,
-
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
     Synthesized : 1,
@@ -423,7 +412,10 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2,
+    /// Whether we've computed the 'static' flag yet.
+    IsStaticComputed : 1,
+
     /// Whether this function is a 'static' method.
     IsStatic : 1,
 
@@ -857,17 +849,6 @@ public:
 
   bool hasValidationStarted() const {
     return getValidationState() > ValidationState::Unchecked;
-  }
-
-  /// Manually indicate that validation is complete for the declaration. For
-  /// example: during importing, code synthesis, or derived conformances.
-  ///
-  /// For normal code validation, please use DeclValidationRAII instead.
-  ///
-  /// FIXME -- Everything should use DeclValidationRAII instead of this.
-  void setValidationToChecked() {
-    if (!isBeingValidated())
-      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
   }
 
   bool escapedFromIfConfig() const {
@@ -1497,7 +1478,7 @@ public:
   TrailingWhereClause *TrailingWhere = nullptr;
 
   /// The generic signature of this declaration.
-  llvm::PointerIntPair<GenericSignature *, 1, bool> GenericSigAndBit;
+  llvm::PointerIntPair<GenericSignature, 1, bool> GenericSigAndBit;
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
@@ -1541,7 +1522,7 @@ public:
   }
 
   /// Retrieve the generic signature for this context.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature getGenericSignature() const;
 
   /// Retrieve the generic context for this context.
   GenericEnvironment *getGenericEnvironment() const;
@@ -1553,7 +1534,7 @@ public:
   ArrayRef<Requirement> getGenericRequirements() const;
 
   /// Set the generic signature of this context.
-  void setGenericSignature(GenericSignature *genericSig);
+  void setGenericSignature(GenericSignature genericSig);
 
   /// Retrieve the position of any where clause for this context's
   /// generic parameters.
@@ -2610,6 +2591,9 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
+  /// FIXME: This is deprecated.
+  bool isRecursiveValidation() const;
+
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic
   /// function, this will have a GenericFunctionType with a
@@ -2769,12 +2753,6 @@ public:
   /// Get the representative for this value's opaque result type, if it has one.
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
-  /// Set the opaque return type decl for this decl.
-  ///
-  /// `this` must be of a decl type that supports opaque return types, and
-  /// must not have previously had an opaque result type set.
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
-
   /// Retrieve the attribute associating this declaration with a
   /// function builder, if there is one.
   CustomAttr *getAttachedFunctionBuilder() const;
@@ -2880,7 +2858,7 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   /// The generic signature of the opaque interface to the type. This is the
   /// outer generic signature with an added generic parameter representing the
   /// underlying type.
-  GenericSignature *OpaqueInterfaceGenericSignature;
+  GenericSignature OpaqueInterfaceGenericSignature;
   
   /// The generic parameter that represents the underlying type.
   GenericTypeParamType *UnderlyingInterfaceType;
@@ -2897,7 +2875,7 @@ public:
   OpaqueTypeDecl(ValueDecl *NamingDecl,
                  GenericParamList *GenericParams,
                  DeclContext *DC,
-                 GenericSignature *OpaqueInterfaceGenericSignature,
+                 GenericSignature OpaqueInterfaceGenericSignature,
                  GenericTypeParamType *UnderlyingInterfaceType);
   
   ValueDecl *getNamingDecl() const { return NamingDecl; }
@@ -2913,7 +2891,7 @@ public:
   /// function could also be the getter of a storage declaration.
   bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
 
-  GenericSignature *getOpaqueInterfaceGenericSignature() const {
+  GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
   
@@ -3543,12 +3521,37 @@ public:
 class EnumDecl final : public NominalTypeDecl {
   SourceLoc EnumLoc;
 
+  enum SemanticInfoFlags : uint8_t {
+    // Is the raw type valid?
+    HasComputedRawType         = 1 << 0,
+    // Is the complete set of (auto-incremented) raw values available?
+    HasFixedRawValues          = 1 << 1,
+    // Is the complete set of raw values type checked?
+    HasFixedRawValuesAndTypes  = 1 << 2,
+  };
+  
   struct {
     /// The raw type and a bit to indicate whether the
     /// raw was computed yet or not.
-    llvm::PointerIntPair<Type, 1, bool> RawType;
+    llvm::PointerIntPair<Type, 3, OptionSet<SemanticInfoFlags>> RawTypeAndFlags;
+    
+    bool hasRawType() const {
+      return RawTypeAndFlags.getInt().contains(HasComputedRawType);
+    }
+    void cacheRawType(Type ty) {
+      auto flags = RawTypeAndFlags.getInt() | HasComputedRawType;
+      RawTypeAndFlags.setPointerAndInt(ty, flags);
+    }
+    
+    bool hasFixedRawValues() const {
+      return RawTypeAndFlags.getInt().contains(HasFixedRawValues);
+    }
+    bool hasCheckedRawValues() const {
+      return RawTypeAndFlags.getInt().contains(HasFixedRawValuesAndTypes);
+    }
   } LazySemanticInfo;
 
+  friend class EnumRawValuesRequest;
   friend class EnumRawTypeRequest;
   friend class TypeChecker;
 
@@ -3607,6 +3610,9 @@ public:
     Bits.EnumDecl.Circularity = static_cast<unsigned>(circularity);
   }
   
+  /// Record that this enum has had all of its raw values computed.
+  void setHasFixedRawValues();
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Enum;
@@ -3636,9 +3642,11 @@ public:
 
   /// Set the raw type of the enum from its inheritance clause.
   void setRawType(Type rawType) {
-    LazySemanticInfo.RawType.setPointerAndInt(rawType, true);
+    auto flags = LazySemanticInfo.RawTypeAndFlags.getInt();
+    LazySemanticInfo.RawTypeAndFlags.setPointerAndInt(
+        rawType, flags | HasComputedRawType);
   }
-  
+
   /// True if none of the enum cases have associated values.
   ///
   /// Note that this is true for enums with absolutely no cases.
@@ -4529,10 +4537,6 @@ protected:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
-  void computeIsValidKeyPathComponent();
-  
-  OpaqueTypeDecl *OpaqueReturn = nullptr;
-
 public:
 
   /// Should this declaration be treated as if annotated with transparent
@@ -4773,18 +4777,9 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  void setIsValidKeyPathComponent(bool value) {
-    Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent = true;
-    Bits.AbstractStorageDecl.ValidKeyPathComponent = value;
-  }
-
   /// True if the storage can be referenced by a keypath directly.
   /// Otherwise, its override must be referenced.
-  bool isValidKeyPathComponent() const {
-    if (!Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent)
-      const_cast<AbstractStorageDecl *>(this)->computeIsValidKeyPathComponent();
-    return Bits.AbstractStorageDecl.ValidKeyPathComponent;
-  }
+  bool isValidKeyPathComponent() const;
 
   /// True if the storage exports a property descriptor for key paths in
   /// other modules.
@@ -4798,14 +4793,6 @@ public:
   bool hasAnyNativeDynamicAccessors() const;
 
   bool hasAnyDynamicReplacementAccessors() const;
-
-  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
-    return OpaqueReturn;
-  }
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    assert(!OpaqueReturn && "already has opaque type decl");
-    OpaqueReturn = decl;
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4834,7 +4821,7 @@ public:
   };
 
 protected:
-  PointerUnion3<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
+  PointerUnion<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
@@ -5584,6 +5571,8 @@ public:
 
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
+  friend class NeedsNewVTableEntryRequest;
+
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -5653,6 +5642,11 @@ protected:
   /// Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
+  struct {
+    unsigned NeedsNewVTableEntryComputed : 1;
+    unsigned NeedsNewVTableEntry : 1;
+  } LazySemanticInfo = { };
+
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
@@ -5664,8 +5658,6 @@ protected:
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
-    Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
-    Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.Synthesized = false;
     Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
   }
@@ -5835,16 +5827,9 @@ public:
     return getBodyKind() == BodyKind::MemberwiseInitializer;
   }
 
-  void setNeedsNewVTableEntry(bool value) {
-    Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = true;
-    Bits.AbstractFunctionDecl.NeedsNewVTableEntry = value;
-  }
-
-  bool needsNewVTableEntry() const {
-    if (!Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry)
-      const_cast<AbstractFunctionDecl *>(this)->computeNeedsNewVTableEntry();
-    return Bits.AbstractFunctionDecl.NeedsNewVTableEntry;
-  }
+  /// For a method of a class, checks whether it will require a new entry in the
+  /// vtable.
+  bool needsNewVTableEntry() const;
 
   bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
     return (std::min(getEffectiveAccess(), AccessLevel::Public) >
@@ -5986,13 +5971,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
   friend class SelfAccessKindRequest;
+  friend class IsStaticRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
-
-  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -6009,14 +5993,14 @@ protected:
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
-    Bits.FuncDecl.IsStatic =
-      StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
     Bits.FuncDecl.ForcedStaticDispatch = false;
     Bits.FuncDecl.SelfAccess =
       static_cast<unsigned>(SelfAccessKind::NonMutating);
     Bits.FuncDecl.SelfAccessComputed = false;
+    Bits.FuncDecl.IsStaticComputed = false;
+    Bits.FuncDecl.IsStatic = false;
   }
 
 private:
@@ -6032,6 +6016,13 @@ private:
   Optional<SelfAccessKind> getCachedSelfAccessKind() const {
     if (Bits.FuncDecl.SelfAccessComputed)
       return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
+
+    return None;
+  }
+
+  Optional<bool> getCachedIsStatic() const {
+    if (Bits.FuncDecl.IsStaticComputed)
+      return Bits.FuncDecl.IsStatic;
 
     return None;
   }
@@ -6058,12 +6049,11 @@ public:
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
-  bool isStatic() const {
-    return Bits.FuncDecl.IsStatic;
-  }
+  bool isStatic() const;
   bool isCallable() const {
     return getName().str() == "callAsFunction" && isInstanceMember();
   }
+
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
     return static_cast<StaticSpellingKind>(Bits.FuncDecl.StaticSpelling);
@@ -6071,6 +6061,7 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
   void setStatic(bool IsStatic = true) {
+    Bits.FuncDecl.IsStaticComputed = true;
     Bits.FuncDecl.IsStatic = IsStatic;
   }
 
@@ -6142,15 +6133,7 @@ public:
   }
 
   OperatorDecl *getOperatorDecl() const;
-  
-  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
-    return OpaqueReturn;
-  }
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    assert(!OpaqueReturn && "already has opaque type decl");
-    OpaqueReturn = decl;
-  }
-  
+
   /// Returns true if the function is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const {
     return Bits.FuncDecl.ForcedStaticDispatch;
@@ -6382,6 +6365,8 @@ public:
 /// parent EnumDecl, although syntactically they are subordinate to the
 /// EnumCaseDecl.
 class EnumElementDecl : public DeclContext, public ValueDecl {
+  friend class EnumRawValuesRequest;
+  
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -6422,9 +6407,20 @@ public:
 
   ParameterList *getParameterList() const { return Params; }
 
-  bool hasRawValueExpr() const { return RawValueExpr; }
-  LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
-  void setRawValueExpr(LiteralExpr *e) { RawValueExpr = e; }
+  /// Retrieves a fully typechecked raw value expression associated
+  /// with this enum element, if it exists.
+  LiteralExpr *getRawValueExpr() const;
+  
+  /// Retrieves a "structurally" checked raw value expression associated
+  /// with this enum element, if it exists.
+  ///
+  /// The structural raw value may or may not have a type set, but it is
+  /// guaranteed to be suitable for retrieving any non-semantic information
+  /// like digit text for an integral raw value or user text for a string raw value.
+  LiteralExpr *getStructuralRawValueExpr() const;
+  
+  /// Reset the raw value expression.
+  void setRawValueExpr(LiteralExpr *e);
 
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
@@ -6447,6 +6443,10 @@ public:
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
+  
+  /// Do not call this!
+  /// It exists to let the AST walkers get the raw value without forcing a request.
+  LiteralExpr *getRawValueUnchecked() const { return RawValueExpr; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::EnumElement;

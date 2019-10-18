@@ -17,6 +17,7 @@
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
@@ -366,9 +367,9 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion4<GenericParamList *, Decl *, SpecializeAttr *,
-                      // SWIFT_ENABLE_TENSORFLOW
-                      DifferentiableAttr *>
+  llvm::PointerUnion<GenericParamList *, Decl *, SpecializeAttr *,
+                     // SWIFT_ENABLE_TENSORFLOW
+                     DifferentiableAttr *>
       source;
 
   WhereClauseOwner(Decl *decl);
@@ -386,8 +387,7 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return hash_combine(hash_value(owner.dc),
-                        hash_value(owner.source.getOpaqueValue()));
+    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
@@ -1071,9 +1071,9 @@ void simple_display(llvm::raw_ostream &out, AncestryFlags value);
 
 class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
-                         GenericSignature *(GenericSignature *,
-                                            SmallVector<GenericTypeParamType *, 2>,
-                                            SmallVector<Requirement, 2>),
+                         GenericSignature (GenericSignatureImpl *,
+                                           SmallVector<GenericTypeParamType *, 2>,
+                                           SmallVector<Requirement, 2>),
                          CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1082,9 +1082,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   evaluate(Evaluator &evaluator,
-           GenericSignature *baseSignature,
+           GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
            SmallVector<Requirement, 2> addedRequirements) const;
 
@@ -1100,8 +1100,8 @@ public:
 
 class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
-                         GenericSignature *(ModuleDecl *,
-                                            GenericSignature *,
+                         GenericSignature (ModuleDecl *,
+                                            GenericSignatureImpl *,
                                             GenericParamList *,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
@@ -1114,10 +1114,10 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
-           GenericSignature *baseSignature,
+           GenericSignatureImpl *baseSignature,
            GenericParamList *gpl,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
@@ -1176,7 +1176,7 @@ public:
 
 class GenericSignatureRequest :
     public SimpleRequest<GenericSignatureRequest,
-                         GenericSignature *(GenericContext *),
+                         GenericSignature (GenericContext *),
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1185,17 +1185,17 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   evaluate(Evaluator &evaluator, GenericContext *value) const;
   
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<GenericSignature *> getCachedResult() const;
-  void cacheResult(GenericSignature *value) const;
+  Optional<GenericSignature> getCachedResult() const;
+  void cacheResult(GenericSignature value) const;
 };
 
-/// Compute the interface type of the underlying definition type of a typealias declaration.
+/// Compute the underlying interface type of a typealias.
 class UnderlyingTypeRequest :
     public SimpleRequest<UnderlyingTypeRequest,
                          Type(TypeAliasDecl *),
@@ -1215,8 +1215,10 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
+/// Looks up the precedence group of an operator declaration.
 class OperatorPrecedenceGroupRequest
     : public SimpleRequest<OperatorPrecedenceGroupRequest,
                            PrecedenceGroupDecl *(InfixOperatorDecl *),
@@ -1236,6 +1238,110 @@ public:
   bool isCached() const { return true; }
 };
 
+class EnumRawValuesRequest :
+    public SimpleRequest<EnumRawValuesRequest,
+                         bool (EnumDecl *, TypeResolutionStage),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
+  
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+                           
+  // Separate caching.
+  bool isCached() const;
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class IsABICompatibleOverrideRequest
+    : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Builds an opaque result type for a declaration.
+class OpaqueResultTypeRequest
+    : public SimpleRequest<OpaqueResultTypeRequest,
+                           OpaqueTypeDecl *(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<OpaqueTypeDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Determines if a function declaration is 'static'.
+class IsStaticRequest :
+    public SimpleRequest<IsStaticRequest,
+                         bool(FuncDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, FuncDecl *value) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class NeedsNewVTableEntryRequest
+    : public SimpleRequest<NeedsNewVTableEntryRequest,
+                           bool(AbstractFunctionDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                AbstractFunctionDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1243,6 +1349,16 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
   assert(typeID == other.typeID && "Caller should match type IDs");
   return value.getPointer() ==
       static_cast<const Holder<Type> &>(other).value.getPointer();
+}
+
+// Allow AnyValue to compare two GenericSignature values.
+template <>
+inline bool
+AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+         static_cast<const Holder<GenericSignature> &>(other)
+             .value.getPointer();
 }
 
 void simple_display(llvm::raw_ostream &out, Type value);

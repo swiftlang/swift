@@ -148,11 +148,13 @@ public:
                                CanSILFunctionType constantTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff derivative function thunk for the given
-  /// SILDeclRef, SILFunction, and derivative function type.
-  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef derivativeFnRef,
-                                        SILFunction *derivativeFn,
-                                        CanSILFunctionType derivativeFnTy);
+  /// Get or create an autodiff derivative function forwarding thunk for the
+  /// given derivative SILDeclRef, SILFunction, and function type.
+  /// The thunk simply forwards arguments and returns results: use this when no
+  /// reabstraction or self reordering is necessary.
+  SILFunction *getOrCreateAutoDiffDerivativeForwardingThunk(
+      SILDeclRef derivativeFnRef, SILFunction *derivativeFn,
+      CanSILFunctionType derivativeFnTy);
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Get or create an autodiff derivative function vtable entry thunk for the
@@ -180,12 +182,51 @@ public:
                                            CanType dynamicSelfType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create a thunk for reabstracting user-defined JVP/VJP functions.
+  /// Get or create an autodiff derivative function thunk performing
+  /// reabstraction and/or self-reordering.
+  ///
+  /// Self-reordering is done for canonicalizing the types of derivative
+  /// functions for instance methods wrt self. We want users to define
+  /// derivatives with the following AST function types:
+  ///
+  /// JVP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns differential taking `Self.Tan` as first parameter.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns pullback returning `Self.Tan` as first result.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// However, the curried `Self` parameter in the AST JVP/VJP function types
+  /// becomes the *last* parameter in the flattened parameter list of their
+  /// lowered SIL function types.
+  ///
+  /// JVP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns differential taking `Self.Tan` as *first* parameter.
+  ///
+  ///     $(T, ..., Self) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns pullback returning `Self.Tan` as *first* result.
+  ///
+  ///     $(T, ..., Self) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// This leads to a parameter ordering inconsistency, and would require the
+  /// Differentiation transform to handle "wrt self instance method derivatives"
+  /// specially. However, canonicalization during SILGen makes the parameter
+  /// ordering uniform for "wrt self instance method derivatives" and simplifies
+  /// the transform rules.
   ///
   /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffDerivativeFunctionThunk(
+  SILFunction *getOrCreateAutoDiffDerivativeReabstractionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
       SILFunction *derivativeFn,
       AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf);
@@ -320,13 +361,12 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Emit the differentiability witness for the given original function
-  /// declaration and SIL function, parameter indices, and JVP and VJP
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
   /// functions (null if undefined).
   void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
                                     SILFunction *originalFunction,
-                                    IndexSubset *parameterIndices,
-                                    SILFunction *jvp, SILFunction *vjp,
-                                    GenericSignature *derivativeGenSig);
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp);
   // SWIFT_ENABLE_TENSORFLOW END
 
   /// Emit the lazy initializer function for a global pattern binding

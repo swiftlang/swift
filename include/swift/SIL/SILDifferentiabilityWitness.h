@@ -50,7 +50,7 @@ private:
   SILFunction *originalFunction;
   /// The autodiff configuration: parameter indices, result indices, derivative
   /// generic signature (optional).
-  AutoDiffConfig autoDiffConfig;
+  AutoDiffConfig config;
   /// The JVP (Jacobian-vector products) derivative function.
   SILFunction *jvp;
   /// The VJP (vector-Jacobian products) derivative function.
@@ -68,11 +68,11 @@ private:
                               SILFunction *originalFunction,
                               IndexSubset *parameterIndices,
                               IndexSubset *resultIndices,
-                              GenericSignature *derivativeGenSig,
+                              GenericSignature derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized, DeclAttribute *attribute)
     : module(module), linkage(linkage), originalFunction(originalFunction),
-      autoDiffConfig({parameterIndices, resultIndices, derivativeGenSig}),
+      config(parameterIndices, resultIndices, derivativeGenSig),
       jvp(jvp), vjp(vjp), serialized(isSerialized), attribute(attribute) {}
 
   SILDifferentiabilityWitness(const SILDifferentiabilityWitness&) = delete;
@@ -86,7 +86,7 @@ public:
   static SILDifferentiabilityWitness *create(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+      GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized, DeclAttribute *attribute = nullptr);
 
   SILDifferentiabilityWitnessKey getKey() const;
@@ -94,15 +94,15 @@ public:
   SILLinkage getLinkage() const { return linkage; }
   void setLinkage(SILLinkage linkage) { this->linkage = linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }
-  const AutoDiffConfig &getAutoDiffConfig() const { return autoDiffConfig; }
+  const AutoDiffConfig &getConfig() const { return config; }
   IndexSubset *getParameterIndices() const {
-    return autoDiffConfig.parameterIndices;
+    return config.parameterIndices;
   }
   IndexSubset *getResultIndices() const {
-    return autoDiffConfig.resultIndices;
+    return config.resultIndices;
   }
-  GenericSignature *getDerivativeGenericSignature() const {
-    return autoDiffConfig.derivativeGenericSignature;
+  GenericSignature getDerivativeGenericSignature() const {
+    return config.derivativeGenericSignature;
   }
   SILFunction *getJVP() const { return jvp; }
   SILFunction *getVJP() const { return vjp; }

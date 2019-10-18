@@ -693,7 +693,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
 
-    auto *derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
+    auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
     SmallVector<unsigned, 8> parameterIndices(rawParameterIndices.begin(),
                                               rawParameterIndices.end());
@@ -709,7 +709,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    if (auto *genericSig = MF->getGenericSignature(genericSigID))
+    if (auto genericSig = MF->getGenericSignature(genericSigID))
       genericEnv = genericSig->getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
@@ -1029,9 +1029,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            // SWIFT_ENABLE_TENSORFLOW
-           Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, NumSubs = 0,
-           NumConformances = 0, IsNonThrowingApply = 0;
-           // SWIFT_ENABLE_TENSORFLOW END
+           Attr = 0, Attr2 = 0, Attr3 = 0, NumSubs = 0, NumConformances = 0,
+           IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1157,9 +1156,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION:
     SILInstDifferentiabilityWitnessFunctionLayout::readRecord(
-        scratch, /*originalFunctionName*/ ValID, /*diffKind*/ Attr,
-        /*derivKind*/ Attr2, /*witnessGenSig*/ ValID2, /*numParams*/ Attr3,
-        /*numResults*/ Attr4, ListOfValues);
+        scratch, /*originalFunctionName*/ ValID, /*witnessKind*/ Attr,
+        /*witnessGenSig*/ ValID2, /*numParams*/ Attr2, /*numResults*/ Attr3,
+        ListOfValues);
     RawOpCode =
         (unsigned)SILInstructionKind::DifferentiabilityWitnessFunctionInst;
     break;
@@ -1609,7 +1608,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto astTy = MF->getType(TyID);
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
-    DifferentiableFunctionExtractee extractee(Attr);
+    NormalDifferentiableFunctionTypeComponent extractee(Attr);
     ResultVal =
         Builder.createDifferentiableFunctionExtract(Loc, extractee, val);
     break;
@@ -1618,7 +1617,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto astTy = MF->getType(TyID);
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
-    LinearFunctionExtractee extractee(Attr);
+    LinearDifferentiableFunctionTypeComponent extractee(Attr);
     ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
     break;
   }
@@ -1626,10 +1625,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto originalName = MF->getIdentifierText(ValID);
     auto *original = getFuncForReference(originalName);
     assert(original && "Original function must be found");
-    DifferentiabilityKind diffKind(static_cast<DifferentiabilityKind>(Attr));
-    AutoDiffDerivativeFunctionKind derivKind(Attr2);
-    auto numParameterIndices = Attr3;
-    auto numResultIndices = Attr4;
+    DifferentiabilityWitnessFunctionKind witnessKind(Attr);
+    auto numParameterIndices = Attr2;
+    auto numResultIndices = Attr3;
     SmallVector<unsigned, 8> parameterAndResultIndices(ListOfValues.begin(),
                                                        ListOfValues.end());
     assert(parameterAndResultIndices.size() ==
@@ -1643,9 +1641,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
         ArrayRef<unsigned>(parameterAndResultIndices)
             .take_back(numResultIndices));
-    auto *witnessGenSig = MF->getGenericSignature(ValID2);
+    auto witnessGenSig = MF->getGenericSignature(ValID2);
     ResultVal = Builder.createDifferentiabilityWitnessFunction(
-        Loc, original, diffKind, derivKind, parameterIndices, resultIndices,
+        Loc, original, witnessKind, parameterIndices, resultIndices,
         witnessGenSig);
     break;
   }
@@ -2634,7 +2632,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SmallVector<Requirement, 4> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
     
-    CanGenericSignature sig = nullptr;
+    CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
       sig = GenericSignature::get(genericParams, requirements)
          ->getCanonicalSignature();
@@ -3431,7 +3429,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   auto *vjp = getFuncForReference(vjpName);
   if (!vjpName.empty())
     assert(vjp && "VJP function must be found if VJP name is not empty");
-  auto *derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
+  auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
   SmallVector<unsigned, 8> parameterAndResultIndices(
       rawParameterAndResultIndices.begin(),

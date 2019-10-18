@@ -11,8 +11,10 @@ public class Foo {
       // CHECK1: call void @llvm.dbg.value(metadata i{{.*}} 0,
       // CHECK1-SAME:                      metadata ![[TYPE:.*]], metadata
       // CHECK1: ![[TYPE]] = !DILocalVariable(name: "type",
-      // CHECK1-SAME:                         line: [[@LINE+4]],
-      // CHECK1-SAME:                         type: ![[METAFOO:[0-9]+]]
+      // CHECK1-SAME:                         line: [[@LINE+6]],
+      // CHECK1-SAME:                         type: ![[LET_METAFOO:[0-9]+]]
+      // CHECK1: ![[LET_METAFOO]] = !DIDerivedType(tag: DW_TAG_const_type,
+      // CHECK1-SAME:                             baseType: ![[METAFOO:[0-9]+]])
       // CHECK1: ![[METAFOO]] = !DICompositeType(tag: DW_TAG_structure_type,
       // CHECK1-SAME:                            flags:
             let type = Swift.type(of: self)

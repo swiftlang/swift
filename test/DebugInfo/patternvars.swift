@@ -36,22 +36,22 @@ public func mangle(s: [UnicodeScalar]) -> [UnicodeScalar] {
 // CHECK: define {{.*}}@"$s11patternvars6mangle1sSayAA13UnicodeScalarVGAF_tFA2EXEfU_"
 // CHECK: %[[VAL:[0-9]+]] = call swiftcc i32 @"$s11patternvars13UnicodeScalarV5values6UInt32Vvg"(i32 %0)
 // CHECK-NEXT:  call void @llvm.dbg.value(metadata i32 %[[VAL]]
-// CHECK:       ; <label>
+// CHECK:       {{[0-9]+}}:
 // CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
 // CHECK-NOT:   call void @llvm.dbg.value
 // CHECK-NOT:   call void asm sideeffect "", "r"
 
-// CHECK:       ; <label>
+// CHECK:       {{[0-9]+}}:
 // CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
 // CHECK-NOT:   call void @llvm.dbg.value
 // CHECK-NOT:   call void asm sideeffect "", "r"
 
-// CHECK:       ; <label>
+// CHECK:       {{[0-9]+}}:
 // CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
 // CHECK-NOT:   call void @llvm.dbg.value
 // CHECK-NOT:   call void asm sideeffect "", "r"
 
-// CHECK:       ; <label>
+// CHECK:       {{[0-9]+}}:
 // CHECK:       call void @llvm.dbg.value(metadata i32 %[[VAL]]
 // CHECK-NOT:   call void @llvm.dbg.value
 // CHECK-NOT:   call void asm sideeffect "", "r"

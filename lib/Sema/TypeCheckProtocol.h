@@ -495,7 +495,7 @@ struct RequirementCheck;
 class WitnessChecker {
 public:
   using RequirementEnvironmentCacheKey =
-      std::pair<const GenericSignature *, const ClassDecl *>;
+      std::pair<const GenericSignatureImpl *, const ClassDecl *>;
   using RequirementEnvironmentCache =
       llvm::DenseMap<RequirementEnvironmentCacheKey, RequirementEnvironment>;
 

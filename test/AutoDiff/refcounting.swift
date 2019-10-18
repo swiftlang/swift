@@ -7,7 +7,7 @@ public class NonTrivialStuff : Equatable {
 }
 
 @frozen
-public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equatable {
+public struct Vector : AdditiveArithmetic, Differentiable, Equatable {
   public var x: Float
   public var y: Float
   public var nonTrivialStuff = NonTrivialStuff()
@@ -86,7 +86,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
 // CHECK:   [[ADD_JVP:%.*]] = differentiability_witness_function [jvp] [parameters 0 1] [results 0] @{{.*}}Vector_plus{{.*}}
 // CHECK:   [[ADD_VJP:%.*]] = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @{{.*}}Vector_plus{{.*}}
-// CHECK:   [[ADD_AD_FUNC:%.*]] = differentiable_function [wrt 0 1] [[ADD]] {{.*}} with {[[ADD_JVP]] {{.*}}, [[ADD_VJP]] {{.*}}}
+// CHECK:   [[ADD_AD_FUNC:%.*]] = differentiable_function [parameters 0 1] [[ADD]] {{.*}} with_derivative {[[ADD_JVP]] {{.*}}, [[ADD_VJP]] {{.*}}}
 // CHECK:   [[ADD_AD_FUNC_EXTRACT:%.*]] = differentiable_function_extract [vjp] [[ADD_AD_FUNC]]
 // CHECK:   [[ADD_VJP_RESULT:%.*]] = apply [[ADD_AD_FUNC_EXTRACT]]({{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector))
 // CHECK:   [[ADD_PULLBACK:%.*]] = tuple_extract [[ADD_VJP_RESULT]] : $(Vector, @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector)), 1

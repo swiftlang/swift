@@ -1019,9 +1019,8 @@ void SILCloner<ImplClass>::visitDifferentiabilityWitnessFunctionInst(
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiabilityWitnessFunction(
                 getOpLocation(Inst->getLoc()), Inst->getOriginalFunction(),
-                Inst->getDifferentiabilityKind(), Inst->getDerivativeKind(),
-                Inst->getParameterIndices(), Inst->getResultIndices(),
-                Inst->getWitnessGenericSignature()));
+                Inst->getWitnessKind(), Inst->getParameterIndices(),
+                Inst->getResultIndices(), Inst->getWitnessGenericSignature()));
 }
 // SWIFT_ENABLE_TENSORFLOW END
 

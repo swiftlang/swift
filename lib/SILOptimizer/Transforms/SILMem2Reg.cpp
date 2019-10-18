@@ -20,23 +20,23 @@
 
 
 #define DEBUG_TYPE "sil-mem2reg"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "llvm/ADT/DenseSet.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
 #include <queue>
@@ -971,17 +971,6 @@ void MemoryToRegisters::promoteAllocs(ArrayRef<AllocStackInst*> allocs) {
     if (alloc->use_empty())
       alloc->eraseFromParent();
   }
-}
-
-/// Attempt to promote the specified array of stack allocations to SSA
-/// registers.  Promotion can fail if the allocation escapes.
-void swift::promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
-                               DominanceInfo *domInfo) {
-  if (allocs.empty()) return;
-
-  auto *fn = allocs.front()->getFunction();
-  assert(fn && "Shouldn't have alloc stacks in global var initializers");
-  MemoryToRegisters(*fn, domInfo).promoteAllocs(allocs);
 }
 
 

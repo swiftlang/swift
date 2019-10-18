@@ -430,12 +430,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
-    // FIXME: This should happen before we attempt shadowing checks.
-    if (!typeDecl->getInterfaceType()) {
-      // FIXME: recursion-breaking hack
-      continue;
-    }
-
     auto memberType = typeDecl->getDeclaredInterfaceType();
 
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
@@ -503,10 +497,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // If the type does not actually conform to the protocol, skip this
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
-
-      // If we're validating the protocol recursively, bail out.
-      if (!protocol->hasInterfaceType())
-        continue;
 
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);

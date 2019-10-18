@@ -66,7 +66,6 @@ class X {
 struct SomeStruct<A> {
   typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
   typealias B = B // expected-error {{type alias 'B' references itself}}
-  // expected-note@-1 {{type declared here}}
 }
 
 // <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias

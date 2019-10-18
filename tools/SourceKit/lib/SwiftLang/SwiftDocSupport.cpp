@@ -264,7 +264,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   if (DC == nullptr || !DC->isInnermostContextGeneric())
     return;
 
-  GenericSignature *GenericSig = DC->getGenericSignatureOfContext();
+  GenericSignature GenericSig = DC->getGenericSignatureOfContext();
 
   if (!GenericSig)
     return;
@@ -401,7 +401,7 @@ static bool initDocEntityInfo(const Decl *D,
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
-      if (auto *Sig = E->getGenericSignature()) {
+      if (auto Sig = E->getGenericSignature()) {
         // The extension under printing is potentially part of a synthesized
         // extension. Thus it's hard to print the fully annotated decl. We
         // need to at least print the generic signature here.
