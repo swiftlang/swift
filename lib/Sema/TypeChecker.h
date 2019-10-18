@@ -795,8 +795,8 @@ public:
   void checkUnsupportedProtocolType(GenericParamList *genericParams);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
-                                             DeclContext *DC);
+  static GenericEnvironment *
+  handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.

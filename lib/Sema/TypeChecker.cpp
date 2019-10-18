@@ -615,7 +615,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 GenericEnvironment *
 swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
-  return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
+  return TypeChecker::handleSILGenericParams(genericParams, DC);
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
