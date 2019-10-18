@@ -2183,16 +2183,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 // SWIFT_ENABLE_TENSORFLOW END
 void IRGenModule::emitSILDifferentiabilityWitness(
     SILDifferentiabilityWitness *dw) {
-#if 0
-  // Don't emit a witness table if it is a declaration.
-  if (wt->isDeclaration())
-    return;
-#endif
-
-  // Don't emit a witness table that is available externally.
-  // It can end up in having duplicate symbols for generated associated type
-  // metadata access functions.
-  // Also, it is not a big benefit for LLVM to emit such witness tables.
+  // Don't emit a differentiability witness that is available externally to
+  // avoid duplicate symbols.
   if (isAvailableExternally(dw->getLinkage()))
     return;
 
@@ -2218,53 +2210,6 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   auto diffWitnessFuture = diffWitnessContents.finishAndCreateFuture();
   getAddrOfDifferentiabilityWitness(
       dw->getOriginalFunction(), dw->getAutoDiffConfig(), diffWitnessFuture);
-#if 0
-  WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
-  wtableBuilder.build();
-#endif
-
-#if 0
-  SmallVector<llvm::Constant *, 4> resilientWitnesses;
-  // Collect the resilient witnesses to go into the conformance descriptor.
-  wtableBuilder.collectResilientWitnesses(resilientWitnesses);
-
-  // Produce the initializer value.
-  auto initializer = wtableContents.finishAndCreateFuture();
-
-  bool isDependent = isDependentConformance(conf);
-
-  llvm::GlobalVariable *global = nullptr;
-  unsigned tableSize;
-  if (!isResilientConformance(conf)) {
-    global = cast<llvm::GlobalVariable>(
-      (isDependent && conf->getDeclContext()->isGenericContext())
-        ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
-                                       initializer)
-        : getAddrOfWitnessTable(conf, initializer));
-    global->setConstant(isConstantWitnessTable(wt));
-    global->setAlignment(getWitnessTableAlignment().getValue());
-    tableSize = wtableBuilder.getTableSize();
-  } else {
-    initializer.abandon();
-    tableSize = 0;
-  }
-
-  // Collect the information that will go into the protocol conformance
-  // descriptor.
-  ConformanceDescription description(conf, wt, global, tableSize,
-                                     wtableBuilder.getTablePrivateSize(),
-                                     isDependent);
-
-  // Build the instantiation function, we if need one.
-  description.instantiationFn = wtableBuilder.buildInstantiationFunction();
-  description.resilientWitnesses = std::move(resilientWitnesses);
-
-  // Record this conformance descriptor.
-  addProtocolConformance(std::move(description));
-
-  IRGen.noteUseOfTypeContextDescriptor(conf->getType()->getAnyNominal(),
-                                       RequireMetadata);
-#endif
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
