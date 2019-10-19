@@ -413,7 +413,15 @@ def symlink_llvm_monorepo(args):
                                 project)
         dst_path = os.path.join(args.source_root, project)
         if not os.path.islink(dst_path):
-            os.symlink(src_path, dst_path)
+            try:
+                os.symlink(src_path, dst_path)
+            except OSError as e:
+                if e.errno == 17:
+                    print("File '%s' already exists. Remove it, so "
+                          "update-checkout can create the symlink to the "
+                          "llvm-monorepo." % dst_path)
+                else:
+                    raise e
 
 
 def main():
