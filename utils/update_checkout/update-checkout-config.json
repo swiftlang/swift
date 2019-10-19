@@ -64,7 +64,8 @@
                 "icu": "release-61-1",
                 "cmake": "v3.15.1",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "next" : {
@@ -88,7 +89,8 @@
                 "icu": "release-61-1",
                 "cmake": "v3.15.1",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
        "swift-3.0-branch" : {
@@ -107,7 +109,8 @@
                 "swift-xcode-playground-support": "swift-3.0-branch",
                 "ninja": "release",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "swift-3.1-branch" : {
@@ -127,7 +130,8 @@
                 "swift-xcode-playground-support": "swift-3.1-branch",
                 "ninja": "release",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "swift-4.0-branch" : {
@@ -147,7 +151,8 @@
                 "swift-xcode-playground-support": "swift-4.0-branch",
                 "ninja": "release",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "swift-4.1-branch" : {
@@ -167,7 +172,8 @@
                 "swift-xcode-playground-support": "swift-4.1-branch",
                 "ninja": "release",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "swift-4.2-branch" : {
@@ -187,7 +193,8 @@
                 "swift-xcode-playground-support": "swift-4.2-branch",
                 "ninja": "release",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "swift-5.0-branch" : {
@@ -208,7 +215,8 @@
                 "ninja": "release",
                 "icu": "release-61-1",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
        "swift-5.1-branch" : {
@@ -229,7 +237,8 @@
                 "ninja": "release",
                 "icu": "release-61-1",
                 "indexstore-db": "swift-5.1-branch",
-                "sourcekit-lsp": "swift-5.1-branch"
+                "sourcekit-lsp": "swift-5.1-branch",
+                "swift-format": "master"
             }
         }
     }
