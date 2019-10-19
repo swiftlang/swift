@@ -1575,3 +1575,143 @@ void swift::insertDestroyOfCapturedArguments(
     releasePartialApplyCapturedArg(builder, loc, arg.get(), paramInfo);
   }
 }
+
+/// Return true if the given operand is consumed by the given call.
+static bool isAppliedArgConsumed(ApplySite apply, Operand *oper) {
+  ParameterConvention paramConv;
+  if (oper->get() == apply.getCallee()) {
+    assert(oper->getOperandNumber() == 0 &&
+           "function can't be passed to itself");
+    paramConv = apply.getSubstCalleeType()->getCalleeConvention();
+  } else {
+    unsigned argIndex = apply.getCalleeArgIndex(*oper);
+    paramConv = apply.getSubstCalleeConv()
+                    .getParamInfoForSILArg(argIndex)
+                    .getConvention();
+  }
+  return isConsumedParameter(paramConv);
+}
+
+/// Return true if the given builtin consumes its operand.
+static bool isBuiltinArgConsumed(BuiltinInst *BI) {
+  const BuiltinInfo &Builtin = BI->getBuiltinInfo();
+  switch (Builtin.ID) {
+  default:
+    llvm_unreachable("Unexpected Builtin with non-trivial value operand.");
+  // Extend lifetime without consuming.
+  case BuiltinValueKind::ErrorInMain:
+  case BuiltinValueKind::UnexpectedError:
+  case BuiltinValueKind::WillThrow:
+  case BuiltinValueKind::GlobalStringTablePointer:
+    return false;
+  // UnsafeGuaranteed moves the value, which will later be destroyed.
+  case BuiltinValueKind::UnsafeGuaranteed:
+    return true;
+  }
+}
+
+bool swift::isConsumingUse(Operand *use) {
+  assert(!use->get()->getType().isAddress());
+
+  auto *user = use->getUser();
+  if (isa<ApplySite>(user))
+    return isAppliedArgConsumed(ApplySite(user), use);
+
+  if (auto *BI = dyn_cast<BuiltinInst>(user))
+    return isBuiltinArgConsumed(BI);
+
+  switch (user->getKind()) {
+  default:
+    llvm::dbgs() << *user;
+    llvm_unreachable("Unexpected use of a non-trivial, non-address value.");
+
+  // Consume the value.
+  case SILInstructionKind::AutoreleaseValueInst:
+  case SILInstructionKind::DeallocBoxInst:
+  case SILInstructionKind::DeallocExistentialBoxInst:
+  case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::DeinitExistentialValueInst:
+  case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::InitExistentialRefInst:
+  case SILInstructionKind::InitExistentialValueInst:
+  case SILInstructionKind::KeyPathInst:
+  case SILInstructionKind::ReleaseValueInst:
+  case SILInstructionKind::ReleaseValueAddrInst:
+  case SILInstructionKind::StoreInst:
+  case SILInstructionKind::StrongReleaseInst:
+  case SILInstructionKind::UnownedReleaseInst:
+  case SILInstructionKind::UnconditionalCheckedCastValueInst:
+    return true;
+
+  // Terminators must consume their owned values.
+  case SILInstructionKind::BranchInst:
+  case SILInstructionKind::CheckedCastBranchInst:
+  case SILInstructionKind::CheckedCastValueBranchInst:
+  case SILInstructionKind::CondBranchInst:
+  case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ThrowInst:
+    return true;
+
+  case SILInstructionKind::DeallocPartialRefInst:
+    return cast<DeallocPartialRefInst>(user)->getInstance() == use->get();
+
+  // Move the value.
+  case SILInstructionKind::TupleInst:
+  case SILInstructionKind::StructInst:
+  case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::EnumInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::BridgeObjectToRefInst:
+  case SILInstructionKind::UnconditionalCheckedCastInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
+    return true;
+
+  // BeginBorrow extends the lifetime like a normal use. Note that end_borrow
+  // is a consuming use of begin_borrow.
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::LoadBorrowInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::TupleExtractInst:
+    return false;
+  case SILInstructionKind::EndBorrowInst:
+    return true;
+
+  // Extend the lifetime without borrowing, propagating, or destroying it.
+  case SILInstructionKind::BridgeObjectToWordInst:
+  case SILInstructionKind::ClassMethodInst:
+  case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::ExistentialMetatypeInst:
+  case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::SelectEnumInst:
+  case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::StoreWeakInst:
+  case SILInstructionKind::ValueMetatypeInst:
+    return false;
+
+  // Escape the value. The lifetime must already be enforced via something like
+  // fix_lifetime.
+  case SILInstructionKind::RefToRawPointerInst:
+  case SILInstructionKind::RefToUnmanagedInst:
+  case SILInstructionKind::RefToUnownedInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+    return false;
+
+  // Dynamic dispatch without capturing self.
+  case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::ObjCSuperMethodInst:
+  case SILInstructionKind::SuperMethodInst:
+  case SILInstructionKind::WitnessMethodInst:
+    return false;
+  }
+}

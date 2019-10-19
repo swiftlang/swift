@@ -384,6 +384,16 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 Optional<FindLocalApplySitesResult>
 findLocalApplySites(FunctionRefBaseInst *fri);
 
+/// Return true iff the given operand, that is a non-trivial and non-address
+/// value, is consumed by its user. That means, in ownership SIL this use must
+/// consume the value, and in non-ownership SIL, this operand must be released
+/// by this use. The given operand is required to be non-trivial and
+/// non-address.
+///
+/// TODO: Review the semantics of operations that extend the lifetime *without*
+/// propagating the value. Ideally, that never happens without borrowing first.
+bool isConsumingUse(Operand *use);
+
 } // end namespace swift
 
 #endif
