@@ -305,6 +305,7 @@ public:
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
       
   bool tryOptimizePopcount(SILFunction &F);
+  void removeRecursively(SILInstruction *I);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.

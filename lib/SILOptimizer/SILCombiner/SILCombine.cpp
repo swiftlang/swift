@@ -172,96 +172,117 @@ public:
   }
 };
 
+void SILCombiner::removeRecursively(SILInstruction *inst) {
+  if (!inst->hasResults()) {
+    inst->dump();
+    eraseInstFromFunction(*inst);
+    return;
+  }
+  
+  for (auto useInst : inst->getResult(0)->getUses()) {
+    removeRecursively(useInst->getUser());
+  }
+  inst->dump();
+  eraseInstFromFunction(*inst);
+}
+
 bool SILCombiner::tryOptimizePopcount(SILFunction &F) {
   if (!F.getName().contains("test")) return false;
   
   for (auto &block : F) {
-    BuiltinInst *incFn = nullptr;
+    std::tuple<BuiltinInst*, TupleExtractInst*> incFnAndNext;
     
-    for (auto &inst : block) {
-      if (auto *addFn = dyn_cast<BuiltinInst>(&inst)) {
+    auto first = block.begin();
+    for (auto last = block.end(); first != last; (void)++first) {
+      if (auto *addFn = dyn_cast<BuiltinInst>(first)) {
         if (auto kind = addFn->getBuiltinKind(); kind && (kind.getValue() == BuiltinValueKind::Add ||
                                                           kind.getValue() == BuiltinValueKind::SAddOver ||
                                                           kind.getValue() == BuiltinValueKind::UAddOver)) {
           // TODO: check other is none
           // TODO: check its not modiefed elsewhere
-          incFn = addFn;
-        }
-        
-        if (auto kind = addFn->getBuiltinKind(); kind && kind.getValue() == BuiltinValueKind::And) {}
-        else { continue; }
-        
-        std::cout << 1 << std::endl;
-        
-        auto subject = addFn->getArguments()[0];
-        subject->dump();
-        auto first = subject->getUses().begin();
-        for (auto last = subject->getUses().end(); first != last; (void)++first) {
-          first->get()->dump();
-          std::cout << 2 << std::endl;
-          
-          auto *subFn = dyn_cast<BuiltinInst>(first->get());
-          if (subFn == nullptr) continue;
-          if (auto kind = addFn->getBuiltinKind(); !kind) continue;
-          
-          std::cout << 3 << std::endl;
-          
-          auto subKind = subFn->getBuiltinKind().getValue();
-          if (subKind != BuiltinValueKind::Sub && subKind != BuiltinValueKind::USubOver &&
-              subKind != BuiltinValueKind::SSubOver) continue;
-          
-          // TODO: check other arg is 1
-          
-          if (++first == last) continue;
-          
-          std::cout << 4 << std::endl;
-          
-          auto *andFn = dyn_cast<BuiltinInst>(first->get());
-          if (andFn == nullptr) continue;
-          if (auto kind = andFn->getBuiltinKind(); !kind) continue;
-          
-          std::cout << 5 << std::endl;
-          
-          auto andKind = andFn->getBuiltinKind().getValue();
-          if (andKind != BuiltinValueKind::And) continue;
-          
-          // TODO: check other is sub
-          
-          if (andFn->use_begin() == andFn->use_end()) continue;
-          auto *cmpFn = dyn_cast<BuiltinInst>(andFn->use_begin()->get());
-          if (cmpFn == nullptr) continue;
-          if (auto kind = cmpFn->getBuiltinKind(); !kind) continue;
-        
-          auto cmpKind = cmpFn->getBuiltinKind().getValue();
-          if (cmpKind != BuiltinValueKind::ICMP_EQ) continue;
-          
-          // TODO: check other is zero
-          
-          if (++first == last) continue;
-          
-          std::cout << 6 << std::endl;
-          
-          auto *condBr = dyn_cast<CondBranchInst>((SILInstruction*)first->get().getOpaqueValue());
-          if (condBr == nullptr) continue;
-          
-          auto *falseBlock = condBr->getFalseBB();
-          auto *brToThis = dyn_cast<BranchInst>(falseBlock->begin());
-          if (brToThis == nullptr) continue;
-          if (brToThis->getDestBB()->getDebugID() != block.getDebugID()) continue;
-          
-          std::cout << 7 << std::endl;
-          
-          if (incFn == nullptr) continue;
-          SILValue count = incFn->getArguments()[0];
-          char* popcntName = "popcnt";
-          auto *popcntFn = Builder.createBuiltin(count.getLoc(), Identifier::getFromOpaquePointer(popcntName), count->getType(), SubstitutionMap{}, {subject});
-          count->replaceAllUsesWith(popcntFn);
-          
-          std::cout << 8 << std::endl;
-          
-          return true;
+          // TODO: why doesn't uses work?
+          if (++first == last) break;
+          incFnAndNext = std::make_tuple(addFn, dyn_cast<TupleExtractInst>(first));
+          continue;
         }
       }
+      
+      auto *subFn = dyn_cast<BuiltinInst>(first);
+      if (subFn == nullptr) continue;
+      if (auto kind = subFn->getBuiltinKind(); !kind) continue;
+      auto subKind = subFn->getBuiltinKind().getValue();
+      if (subKind != BuiltinValueKind::Sub && subKind != BuiltinValueKind::USubOver &&
+          subKind != BuiltinValueKind::SSubOver) continue;
+      
+      // TODO: check other arg is 1
+      
+      while (++first != last && dyn_cast<BuiltinInst>(first) == nullptr) {}
+      if (first == last) break;
+      
+      // TODO: check that arg is same as subject [probably not]?
+      
+      auto *andFn = dyn_cast<BuiltinInst>(first);
+      if (andFn == nullptr) continue;
+      if (auto kind = andFn->getBuiltinKind(); kind && kind.getValue() == BuiltinValueKind::And) {}
+      else { continue; }
+      
+      // TODO: check args are the same as subfn
+      
+      while (++first != last && dyn_cast<BuiltinInst>(first) == nullptr) {}
+      if (first == last) break;
+      
+      std::cout << 1 << std::endl;
+      
+      // TODO: check other is sub
+      
+      auto *cmpFn = dyn_cast<BuiltinInst>(first);
+      if (cmpFn == nullptr) continue;
+      if (auto kind = cmpFn->getBuiltinKind(); !kind) continue;
+      auto cmpKind = cmpFn->getBuiltinKind().getValue();
+      if (cmpKind != BuiltinValueKind::ICMP_EQ) continue;
+      
+      // TODO: check that cmpFn is calling andFn
+      // TODO: use count not working
+      
+      // TODO: check other is zero
+      
+      if (++first == last) continue;
+      
+      std::cout << 2 << std::endl;
+      
+      auto *condBr = dyn_cast<CondBranchInst>(first);
+      if (condBr == nullptr) break; // otherwise we could loop forever
+      
+      auto *trueBlock = condBr->getTrueBB();
+      auto *falseBlock = condBr->getFalseBB();
+      auto *brToThis = dyn_cast<BranchInst>(falseBlock->begin());
+      if (brToThis == nullptr) continue;
+      if (brToThis->getDestBB()->getDebugID() != block.getDebugID()) continue;
+      
+      std::cout << 3 << std::endl;
+      
+      auto subject = andFn->getArguments()[0];
+      auto [incFn, incRes] = incFnAndNext;
+      if (incFn == nullptr || incRes == nullptr) continue;
+
+      char* popcntName = "popcnt";
+      Builder.setInsertionPoint(incFn);
+      auto *popcntFn = Builder.createBuiltin(incFn->getLoc(), Identifier::getFromOpaquePointer(popcntName), incRes->getType(), SubstitutionMap{}, {subject});
+      
+      incRes->replaceAllUsesWith(popcntFn);
+      removeRecursively(incFn);
+      
+      Builder.setInsertionPoint(condBr);
+      Builder.createBranch(condBr->getLoc(), trueBlock);
+      eraseInstFromFunction(*condBr);
+      
+      std::cout << 4 << std::endl;
+      
+      std::cout << std::endl;
+      for (auto &x : block) { x.dump(); }
+      std::cout << std::endl;
+      
+      return false; // true
     }
   }
   
