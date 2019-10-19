@@ -286,10 +286,11 @@ public:
   /// Call an intrinsic with no type arguments.
   llvm::CallInst *CreateIntrinsicCall(llvm::Intrinsic::ID intrinsicID,
                                       ArrayRef<llvm::Value *> args,
+                                      ArrayRef<llvm::Type *> types = None,
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, types);
     return CreateCall(intrinsicFn, args, name);
   }
 

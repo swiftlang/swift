@@ -492,17 +492,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
   
   if (Builtin.ID == BuiltinValueKind::PopCnt) {
-    if (IGF.IGM.TargetMachine->getTargetTriple().getArch() != llvm::Triple::ArchType::x86_64 &&
-        IGF.IGM.TargetMachine->getTargetTriple().getArch() != llvm::Triple::ArchType::x86)
-      assert(false && "Instruction only available on x86");
-    
     auto inputInt = args.claimNext();
     auto intTy = IGF.IGM.Int64Ty;
     
-    llvm::FunctionType *funcTy = llvm::FunctionType::get(intTy, {intTy}, false);
-    llvm::Function *fn = llvm::Function::Create(funcTy, llvm::Function::ExternalLinkage, "popcnt", IGF.IGM.Module);
-    
-    auto popcntRes = IGF.Builder.CreateCall(funcTy, fn, {inputInt});
+    auto popcntRes = IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::ctpop, { inputInt }, { intTy });
     out.add(popcntRes);
     
     return;
