@@ -790,10 +790,10 @@ static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getStrCmpOperation(ASTContext &Context, Identifier Id) {
-  Type ArgElts[] = { Context.TheRawPointerType, Context.TheRawPointerType };
-  Type BoolTy = BuiltinIntegerType::get(1, Context);
-  return getBuiltinFunction(Id, ArgElts, BoolTy);
+static ValueDecl *getPopCntOperation(ASTContext &Context, Identifier Id) {
+  Type IntlTy = BuiltinIntegerType::get(64, Context);
+  Type ArgElts[] = { IntlTy };
+  return getBuiltinFunction(Id, ArgElts, IntlTy);
 }
 
 static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
@@ -1587,8 +1587,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getFenceOperation(Context, Id);
   }
   
-  if (OperationName.startswith("strcmp")) {
-    return getStrCmpOperation(Context, Id);
+  if (OperationName.startswith("popcnt")) {
+    return getPopCntOperation(Context, Id);
   }
   
   // If this starts with cmpxchg, we have special suffixes to handle.
@@ -1739,7 +1739,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   switch (BV) {
   case BuiltinValueKind::Fence:
-  case BuiltinValueKind::StrCmp:
+  case BuiltinValueKind::PopCnt:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
   case BuiltinValueKind::AtomicLoad:

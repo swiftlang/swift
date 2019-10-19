@@ -462,8 +462,8 @@ BUILTIN_MISC_OPERATION(OnFastPath, "onFastPath", "n", None)
 /// CmpXChg has type (Builtin.RawPointer, T, T) -> (T, Bool).
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", "", Special)
 
-/// StrCmp has type (Builtin.RawPointer, Builtin.RawPointer) -> Bool.
-BUILTIN_MISC_OPERATION(StrCmp, "strcmp", "n", None)
+/// PopCnt has type Builtin.Int64 -> Builtin.Int64.
+BUILTIN_MISC_OPERATION(PopCnt, "popcnt", "n", None)
 
 /// AtomicLoad has type (Builtin.RawPointer) -> T.
 BUILTIN_MISC_OPERATION(AtomicLoad, "atomicload", "", Special)

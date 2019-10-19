@@ -491,21 +491,19 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
   
   
-  if (Builtin.ID == BuiltinValueKind::StrCmp) {
+  if (Builtin.ID == BuiltinValueKind::PopCnt) {
     if (IGF.IGM.TargetMachine->getTargetTriple().getArch() != llvm::Triple::ArchType::x86_64 &&
         IGF.IGM.TargetMachine->getTargetTriple().getArch() != llvm::Triple::ArchType::x86)
       assert(false && "Instruction only available on x86");
     
-    auto firstPointer = args.claimNext();
-    auto secondPointer = args.claimNext();
-    auto boolTy = IGF.IGM.Int1Ty;
-    auto ptrTy = IGF.IGM.Int8PtrTy;
+    auto inputInt = args.claimNext();
+    auto intTy = IGF.IGM.Int64Ty;
     
-    llvm::FunctionType *funcTy = llvm::FunctionType::get(boolTy, {ptrTy, ptrTy}, false);
-    llvm::Function *fn = llvm::Function::Create(funcTy, llvm::Function::ExternalLinkage, "strcmp", IGF.IGM.Module);
+    llvm::FunctionType *funcTy = llvm::FunctionType::get(intTy, {intTy}, false);
+    llvm::Function *fn = llvm::Function::Create(funcTy, llvm::Function::ExternalLinkage, "popcnt", IGF.IGM.Module);
     
-    auto strcmpRes = IGF.Builder.CreateCall(funcTy, fn, {firstPointer, secondPointer});
-    out.add(strcmpRes);
+    auto popcntRes = IGF.Builder.CreateCall(funcTy, fn, {inputInt});
+    out.add(popcntRes);
     
     return;
   }

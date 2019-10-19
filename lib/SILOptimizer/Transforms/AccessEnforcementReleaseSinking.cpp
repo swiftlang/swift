@@ -143,7 +143,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AtomicStore:
     case BuiltinValueKind::AtomicRMW:
     case BuiltinValueKind::Unreachable:
-    case BuiltinValueKind::StrCmp:
+    case BuiltinValueKind::PopCnt:
     case BuiltinValueKind::CmpXChg:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
