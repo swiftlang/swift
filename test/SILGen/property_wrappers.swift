@@ -533,31 +533,12 @@ class ClassWrapper<T> {
   }
 }
 
-
-struct SR_11603_1 {
+struct SR_11603 {
   @StructWrapper @ClassWrapper var prop: Int
 
   func foo() {
     prop = 1234
   }
-}
-
-@propertyWrapper
-struct MutatingGetNonMutatingSetWrapper<T> {
-  private var fixed: T
-  
-  var wrappedValue: T {
-    mutating get { fixed }
-    nonmutating set { }
-  }
-  
-  init(wrappedValue initialValue: T) {
-    fixed = initialValue
-  }
-}
-
-struct SR_11603_2 {
-  @MutatingGetNonMutatingSetWrapper var text: String = "" 
 }
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
