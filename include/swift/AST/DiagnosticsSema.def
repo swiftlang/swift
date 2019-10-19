@@ -18,28 +18,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef FIXIT
-#  define FIXIT(ID, Text, Signature)
-#endif
+#define DEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
 
 #ifndef REMARK
 #  define REMARK(ID,Options,Text,Signature)   \
@@ -5064,12 +5044,5 @@ ERROR(atomics_ordering_must_be_constant, none,
       "ordering argument must be a static method or property of %0",
       (Identifier))
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef NOTE
-# undef WARNING
-# undef ERROR
-# undef FIXIT
-#endif
+#define UNDEFINE_DIAGNOSTIC_MACROS
+#include "DefineDiagnosticMacros.h"
