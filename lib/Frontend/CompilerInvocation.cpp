@@ -671,6 +671,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
+  Opts.EnableDescriptiveDiagnostics |=
+      Args.hasArg(OPT_enable_descriptive_diagnostics);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");

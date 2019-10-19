@@ -112,6 +112,9 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
+  
+def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
+  HelpText<"Show descriptive diagnostic information, if available.">;
 
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
