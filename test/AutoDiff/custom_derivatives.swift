@@ -7,25 +7,26 @@ import Darwin.C
 #else
 import Glibc
 #endif
+import DifferentiationUnittest
 
 var CustomDerivativesTests = TestSuite("CustomDerivatives")
 
 // Specify non-differentiable functions.
 // These will be wrapped in `differentiableFunction` and tested.
 
-func unary(_ x: Float) -> Float {
+func unary(_ x: Tracked<Float>) -> Tracked<Float> {
   var x = x
   x *= 2
   return x
 }
 
-func binary(_ x: Float, _ y: Float) -> Float {
+func binary(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   var x = x
   x *= y
   return x
 }
 
-CustomDerivativesTests.test("differentiableFunction-unary") {
+CustomDerivativesTests.testWithLeakChecking("differentiableFunction-unary") {
   let diffableUnary = differentiableFunction { x in
     (value: unary(x), pullback: { v in v * x * 2 })
   }
@@ -35,7 +36,7 @@ CustomDerivativesTests.test("differentiableFunction-unary") {
   expectEqual(40, gradient(at: 10, in: { diffableUnary($0) * 2 }))
 }
 
-CustomDerivativesTests.test("differentiableFunction-binary") {
+CustomDerivativesTests.testWithLeakChecking("differentiableFunction-binary") {
   let diffableBinary = differentiableFunction { (x, y) in
     (value: binary(x, y), pullback: { v in (v * y, v * x) })
   }
@@ -45,14 +46,14 @@ CustomDerivativesTests.test("differentiableFunction-binary") {
   expectEqual((20, 10), gradient(at: 5, 10, in: { diffableBinary($0, $1) * 2 }))
 }
 
-CustomDerivativesTests.test("Checkpointing") {
+CustomDerivativesTests.testWithLeakChecking("Checkpointing") {
   var count = 0
-  func cube(_ x: Float) -> Float {
+  func cube(_ x: Tracked<Float>) -> Tracked<Float> {
     count += 1
     return x * x * x
   }
   // Test the top-level function variant of the checkpointing API.
-  expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+  expectEqual(324, gradient(at: 3) { (x: Tracked<Float>) -> Tracked<Float> in
     expectEqual(0, count)
     let y = withRecomputationInPullbacks(cube)(x)
     expectEqual(1, count)
@@ -61,7 +62,7 @@ CustomDerivativesTests.test("Checkpointing") {
   expectEqual(2, count)
   // Reset and test the method variant.
   count = 0
-  expectEqual(324, gradient(at: 3) { (x: Float) -> Float in
+  expectEqual(324, gradient(at: 3) { (x: Tracked<Float>) -> Tracked<Float> in
     expectEqual(0, count)
     let y = x.withRecomputationInPullbacks(cube)
     expectEqual(1, count)
@@ -70,10 +71,10 @@ CustomDerivativesTests.test("Checkpointing") {
   expectEqual(2, count)
 }
 
-CustomDerivativesTests.test("SumOfGradPieces") {
-  var grad: Float = 0
-  func addToGrad(_ x: inout Float) { grad += x }
-  _ = gradient(at: 4) { (x: Float) in
+CustomDerivativesTests.testWithLeakChecking("SumOfGradPieces") {
+  var grad: Tracked<Float> = 0
+  func addToGrad(_ x: inout Tracked<Float>) { grad += x }
+  _ = gradient(at: 4) { (x: Tracked<Float>) in
     x.withDerivative(addToGrad)
       * x.withDerivative(addToGrad)
         * x.withDerivative(addToGrad)
@@ -81,16 +82,16 @@ CustomDerivativesTests.test("SumOfGradPieces") {
   expectEqual(48, grad)
 }
 
-CustomDerivativesTests.test("ModifyGradientOfSum") {
-  expectEqual(30, gradient(at: 4) { (x: Float) in
+CustomDerivativesTests.testWithLeakChecking("ModifyGradientOfSum") {
+  expectEqual(30, gradient(at: 4) { (x: Tracked<Float>) in
     x.withDerivative { $0 *= 10 } + x.withDerivative { $0 *= 20 }
   })
 }
 
-CustomDerivativesTests.test("WithoutDerivative") {
-  expectEqual(0, gradient(at: Float(4)) { x in
+CustomDerivativesTests.testWithLeakChecking("WithoutDerivative") {
+  expectEqual(0, gradient(at: Tracked<Float>(4)) { x in
     withoutDerivative(at: x) { x in
-      sinf(x) + cosf(x)
+      Tracked<Float>(sinf(x.value) + cosf(x.value))
     }
   })
 }

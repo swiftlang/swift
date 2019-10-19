@@ -243,12 +243,9 @@ struct SILAutoDiffIndices {
            parameters->contains(parameterIndex);
   }
 
-  void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << "(source=" << source << " parameters=(";
-    interleave(parameters->getIndices(),
-               [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
-    s << "))";
-  }
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
 
   std::string mangle() const {
     std::string result = "src_" + llvm::utostr(source) + "_wrt_";
@@ -280,22 +277,24 @@ struct AutoDiffConfig {
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
 
-  void print(llvm::raw_ostream &s = llvm::errs()) const;
+   // TODO: This is a hack to match SILAutoDiffIndices mangling.
+   // Remove/change this before merging.
+   std::string mangle() const {
+     std::string result = "src_";
+     interleave(resultIndices->getIndices(),
+                [&](unsigned idx) { result += llvm::utostr(idx); },
+                [&] { result += '_'; });
+     result += "_wrt_";
+     interleave(parameterIndices->getIndices(),
+                [&](unsigned idx) { result += llvm::utostr(idx); },
+                [&] { result += '_'; });
+     // TODO: Derivative generic signature should also be mangled.
+     return result;
+   }
 
-  // TODO: This is a hack to match SILAutoDiffIndices mangling.
-  // Remove/change this before merging.
-  std::string mangle() const {
-    std::string result = "src_";
-    interleave(resultIndices->getIndices(),
-               [&](unsigned idx) { result += llvm::utostr(idx); },
-               [&] { result += '_'; });
-    result += "_wrt_";
-    interleave(parameterIndices->getIndices(),
-               [&](unsigned idx) { result += llvm::utostr(idx); },
-               [&] { result += '_'; });
-    // TODO: Derivative generic signature should also be mangled.
-    return result;
-  }
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
