@@ -2682,25 +2682,6 @@ reapplyFunctionConversion(
   llvm_unreachable("Unhandled function conversion instruction");
 }
 
-static SubstitutionMap getSubstitutionMap(
-    SILValue value, SubstitutionMap substMap = SubstitutionMap()) {
-  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
-    return getSubstitutionMap(thinToThick->getOperand(), substMap);
-  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
-    return getSubstitutionMap(convertFn->getOperand(), substMap);
-  if (auto *partialApply = dyn_cast<PartialApplyInst>(value)) {
-    auto appliedSubstMap = partialApply->getSubstitutionMap();
-    // TODO: Combine argument `substMap` with `appliedSubstMap`.
-    return getSubstitutionMap(partialApply->getCallee(), appliedSubstMap);
-  }
-  if (auto *apply = dyn_cast<ApplyInst>(value)) {
-    auto appliedSubstMap = apply->getSubstitutionMap();
-    // TODO: Combine argument `substMap` with `appliedSubstMap`.
-    return getSubstitutionMap(apply->getCallee(), appliedSubstMap);
-  }
-  return substMap;
-}
-
 /// Emits a reference to a derivative function of `original`, differentiated
 /// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
 /// the derivative function and the actual indices that the derivative function
@@ -2765,7 +2746,6 @@ emitDerivativeFunctionReference(
           peerThroughFunctionConversions<FunctionRefInst>(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunctionOrNull();
-    auto substMap = getSubstitutionMap(original);
     // Attempt to look up a `[differentiable]` attribute that minimally
     // satisfies the specified indices.
     // TODO(TF-482): Change `lookUpMinimalDifferentiabilityWitness` to
@@ -2834,8 +2814,18 @@ emitDerivativeFunctionReference(
       minimalWitness = newWitness;
     }
     assert(minimalWitness);
+    // Get the substitution map for checking unmet generic requirements.
+    // By default, use the forwarding substitution map of the original function.
+    // If the original callee is a `partial_apply` or `apply` instruction, use
+    // its substitution map instead.
     // TODO(TF-482): Move generic requirement checking logic to
     // `lookUpMinimalDifferentiabilityWitness`.
+    auto substMap = original->getFunction()->getForwardingSubstitutionMap();
+    if (auto *pai = dyn_cast<PartialApplyInst>(original)) {
+      substMap = pai->getSubstitutionMap();
+    } else if (auto *ai = dyn_cast<ApplyInst>(original)) {
+      substMap = ai->getSubstitutionMap();
+    }
     if (diagnoseUnsatisfiedRequirements(
             context, minimalWitness->getDerivativeGenericSignature(), originalFn,
             substMap, invoker, original.getLoc().getSourceLoc()))

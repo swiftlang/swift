@@ -864,6 +864,13 @@ void SILGenModule::emitDifferentiabilityWitness(
           SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
           expectedDerivativeType);
     }
+    if (!diffWitnessLinkage) {
+      diffWitnessLinkage = derivativeThunk->getLinkage();
+    } else {
+      assert(diffWitnessLinkage == derivativeThunk->getLinkage() &&
+             "JVP/VJP linkages must match; this should be checked during "
+             "attribute type-checking");
+    }
     // Check for existing same derivative.
     // TODO(TF-835): Remove condition below and simplify assertion to
     // `!diffWitness->getDerivative(kind)` after `@differentiating` attribute
