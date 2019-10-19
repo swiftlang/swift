@@ -530,6 +530,20 @@ ControlFlowTests.test("Loops") {
   expectEqual((8, 12), valueWithGradient(at: 2, in: for_loop))
   expectEqual((27, 27), valueWithGradient(at: 3, in: for_loop))
 
+  func for_loop_nonactive_initial_value(_ x: Float) -> Float {
+    var result: Float = 1
+    for _ in 0..<2 {
+      result = result * x
+    }
+    return result
+  }
+  // TODO(TF-933): Fix incorrect derivatives when `var result` is not initially
+  // assigned to `x`.
+  // expectEqual((4, 4), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
+  // expectEqual((9, 6), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
+  expectEqual((4, 2), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
+  expectEqual((9, 3), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
+
   func while_loop(_ x: Float) -> Float {
     var result = x
     var i = 0
