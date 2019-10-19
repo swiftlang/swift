@@ -3354,8 +3354,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (shouldAttemptFixes()) {
         auto last = locator.last();
         // If this happens as part of the argument-to-parameter
-        // conversion, there is a tailored fix/diagnostic.
-        if (last && last->is<LocatorPathElt::ApplyArgToParam>())
+        // conversion or type requirement, there is a tailored
+        // fix/diagnostic.
+        if (last && (last->is<LocatorPathElt::ApplyArgToParam>() ||
+                     last->is<LocatorPathElt::AnyRequirement>()))
           break;
       }
       // If two module types or archetypes were not already equal, there's
