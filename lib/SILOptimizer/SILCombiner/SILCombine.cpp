@@ -35,8 +35,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-#include <iostream>
-
 using namespace swift;
 
 STATISTIC(NumCombined, "Number of instructions combined");
@@ -174,7 +172,6 @@ public:
 
 void SILCombiner::removeRecursively(SILInstruction *inst) {
   if (!inst->hasResults()) {
-    inst->dump();
     eraseInstFromFunction(*inst);
     return;
   }
@@ -182,31 +179,69 @@ void SILCombiner::removeRecursively(SILInstruction *inst) {
   for (auto useInst : inst->getResult(0)->getUses()) {
     removeRecursively(useInst->getUser());
   }
-  inst->dump();
   eraseInstFromFunction(*inst);
 }
 
+/// We are trying to optimize a count-set-bits function into a call to popcnt.
+/// Here is an example input:
+/// func test(x: Int) -> Int {
+///    var c = Int()
+///    while x != 0 {
+///        c += 1;
+///        x &= (x - 1);
+///    }
+///    return c
+/// }
+///
+/// Here is the (unoptimized) silgen:
+/// %12 = builtin "sadd_with_overflow_Int64"(%11 : $Builtin.Int64, %7 : $Builtin.Int64, %8 : $Builtin.Int1)
+/// %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 0
+/// %14 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1
+/// cond_fail %14 : $Builtin.Int1
+/// %16 = builtin "ssub_with_overflow_Int64"(%10 : $Builtin.Int64, %7 : $Builtin.Int64, %8 : $Builtin.Int1)
+/// %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 0
+/// %18 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1
+/// cond_fail %18 : $Builtin.Int1
+/// %20 = builtin "and_Int64"(%10 : $Builtin.Int64, %17 : $Builtin.Int64)
+/// %21 = builtin "cmp_eq_Int64"(%20 : $Builtin.Int64, %3 : $Builtin.Int64)
+/// cond_br %21, bb5, bb4
+///
 bool SILCombiner::tryOptimizePopcount(SILFunction &F) {
   if (!F.getName().contains("test")) return false;
   
   for (auto &block : F) {
-    std::tuple<BuiltinInst*, TupleExtractInst*> incFnAndNext;
+    std::tuple<BuiltinInst*, TupleExtractInst*> incFnAndResult;
     
     auto first = block.begin();
     for (auto last = block.end(); first != last; (void)++first) {
+      // Grab the add function whenever we can
       if (auto *addFn = dyn_cast<BuiltinInst>(first)) {
         if (auto kind = addFn->getBuiltinKind(); kind && (kind.getValue() == BuiltinValueKind::Add ||
                                                           kind.getValue() == BuiltinValueKind::SAddOver ||
                                                           kind.getValue() == BuiltinValueKind::UAddOver)) {
-          // TODO: check other is none
-          // TODO: check its not modiefed elsewhere
-          // TODO: why doesn't uses work?
-          if (++first == last) break;
-          incFnAndNext = std::make_tuple(addFn, dyn_cast<TupleExtractInst>(first));
-          continue;
+          auto *oneLiteral = dyn_cast<IntegerLiteralInst>(addFn->getArguments()[1]);
+          // It's possible that someone wrote `x = 1 + x`
+          if (oneLiteral == nullptr) oneLiteral = dyn_cast<IntegerLiteralInst>(addFn->getArguments()[0]);
+          if (oneLiteral == nullptr) continue;
+          if (oneLiteral->getValue() != 1) continue;
+          
+          TupleExtractInst *incRes = nullptr;
+          for (auto *use : addFn->getUses()) {
+            auto *resValue = dyn_cast<TupleExtractInst>(use->getUser());
+            if (resValue == nullptr) goto done;
+            
+            if (resValue->getFieldNo() == 0) {
+              incRes = resValue;
+            }
+          }
+          
+          if (incRes == nullptr) continue;
+          incFnAndResult = std::make_tuple(addFn, incRes);
+          done: continue;
         }
       }
       
+      // Start trying to match the block once we find `x - 1`
       auto *subFn = dyn_cast<BuiltinInst>(first);
       if (subFn == nullptr) continue;
       if (auto kind = subFn->getBuiltinKind(); !kind) continue;
@@ -214,55 +249,66 @@ bool SILCombiner::tryOptimizePopcount(SILFunction &F) {
       if (subKind != BuiltinValueKind::Sub && subKind != BuiltinValueKind::USubOver &&
           subKind != BuiltinValueKind::SSubOver) continue;
       
-      // TODO: check other arg is 1
+      // Check that one is being subtracted from x
+      auto *oneLiteral = dyn_cast<IntegerLiteralInst>(subFn->getArguments()[1]);
+      if (oneLiteral == nullptr) continue;
+      if (oneLiteral->getValue() != 1) continue;
+      
+      // Get out subject (the input to popcnt)
+      auto subject = subFn->getArguments()[0];
       
       while (++first != last && dyn_cast<BuiltinInst>(first) == nullptr) {}
       if (first == last) break;
       
-      // TODO: check that arg is same as subject [probably not]?
-      
+      // Match the and function `x &= ...`
       auto *andFn = dyn_cast<BuiltinInst>(first);
       if (andFn == nullptr) continue;
       if (auto kind = andFn->getBuiltinKind(); kind && kind.getValue() == BuiltinValueKind::And) {}
       else { continue; }
       
-      // TODO: check args are the same as subfn
+      // Make sure that the subject is also the first argument to the and function.
+      if (subject.getOpaqueValue() != andFn->getArguments()[0].getOpaqueValue()) continue;
       
       while (++first != last && dyn_cast<BuiltinInst>(first) == nullptr) {}
       if (first == last) break;
       
-      std::cout << 1 << std::endl;
-      
-      // TODO: check other is sub
-      
+      // Match the while loop
       auto *cmpFn = dyn_cast<BuiltinInst>(first);
       if (cmpFn == nullptr) continue;
       if (auto kind = cmpFn->getBuiltinKind(); !kind) continue;
       auto cmpKind = cmpFn->getBuiltinKind().getValue();
       if (cmpKind != BuiltinValueKind::ICMP_EQ) continue;
       
-      // TODO: check that cmpFn is calling andFn
-      // TODO: use count not working
+      // Check that the compare builtin is comparing the result of the and function and zero
+      bool usedInCompare = false;
+      for (auto *use : andFn->getUses()) {
+        if (use->getUser() == cmpFn) {
+          usedInCompare = true;
+          break;
+        }
+      }
+      if (!usedInCompare) continue;
       
-      // TODO: check other is zero
+      // Check we are comparing to zero
+      auto *zeroLiteral = dyn_cast<IntegerLiteralInst>(cmpFn->getArguments()[1]);
+      if (zeroLiteral == nullptr) continue;
+      if (zeroLiteral->getValue() != 0) continue;
       
-      if (++first == last) continue;
-      
-      std::cout << 2 << std::endl;
+      while (++first != last && dyn_cast<CondBranchInst>(first) == nullptr) {}
+      if (first == last) break;
       
       auto *condBr = dyn_cast<CondBranchInst>(first);
-      if (condBr == nullptr) break; // otherwise we could loop forever
+      if (condBr == nullptr) break; // Otherwise we could loop forever
       
       auto *trueBlock = condBr->getTrueBB();
       auto *falseBlock = condBr->getFalseBB();
       auto *brToThis = dyn_cast<BranchInst>(falseBlock->begin());
       if (brToThis == nullptr) continue;
+      // Check that this is actually a loop
       if (brToThis->getDestBB()->getDebugID() != block.getDebugID()) continue;
       
-      std::cout << 3 << std::endl;
-      
-      auto subject = andFn->getArguments()[0];
-      auto [incFn, incRes] = incFnAndNext;
+      // Replace our loop and incrementing function with a call to popcnt
+      auto [incFn, incRes] = incFnAndResult;
       if (incFn == nullptr || incRes == nullptr) continue;
 
       char* popcntName = "popcnt";
@@ -274,15 +320,10 @@ bool SILCombiner::tryOptimizePopcount(SILFunction &F) {
       
       Builder.setInsertionPoint(condBr);
       Builder.createBranch(condBr->getLoc(), trueBlock);
+      // TODO: this removes the loop. That will break code. How would you recommend I structure this?
       eraseInstFromFunction(*condBr);
       
-      std::cout << 4 << std::endl;
-      
-      std::cout << std::endl;
-      for (auto &x : block) { x.dump(); }
-      std::cout << std::endl;
-      
-      return false; // true
+      return true;
     }
   }
   
