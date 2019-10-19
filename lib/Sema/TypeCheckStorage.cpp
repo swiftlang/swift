@@ -743,18 +743,39 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
 
   bool isMemberLValue = isLValue;
+  auto propertyWrapperMutability =
+      [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
+    if (accessor->isCoroutine())
+      return None;
+    auto var = dyn_cast<VarDecl>(decl);
+    if (!var)
+      return None;
+    auto mut = var->getPropertyWrapperMutability();
+    if (!mut)
+      return None;
+    return std::make_pair(mut->Getter == PropertyWrapperMutability::Mutating,
+                          mut->Setter == PropertyWrapperMutability::Mutating);
+  };
 
-  // If we're acessing a property wrapper, determine if the
+  // If we're accessing a property wrapper, determine if the
   // intermediate access requires an lvalue.
-  if (underlyingVars.size() > 0) {
-    isMemberLValue = underlyingVars[0]->isGetterMutating();
+  if (auto mut = propertyWrapperMutability(accessor->getStorage())) {
+    isMemberLValue = mut->first;
     if (isLValue)
-      isMemberLValue |= underlyingVars[0]->isSetterMutating();
+      isMemberLValue |= mut->second;
   }
 
   bool isSelfLValue = storage->isGetterMutating();
   if (isMemberLValue)
     isSelfLValue |= storage->isSetterMutating();
+
+  // If we're accessing a property wrapper, determine if
+  // the self requires an lvalue.
+  if (auto mut = propertyWrapperMutability(storage)) {
+    isSelfLValue = mut->first;
+    if (isMemberLValue)
+      isSelfLValue |= mut->second;
+  }
 
   Expr *selfDRE =
     buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
