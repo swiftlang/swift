@@ -489,6 +489,26 @@ if (Builtin.ID == BuiltinValueKind::id) { \
                                           : llvm::SyncScope::System);
     return;
   }
+  
+  
+  if (Builtin.ID == BuiltinValueKind::StrCmp) {
+    if (IGF.IGM.TargetMachine->getTargetTriple().getArch() != llvm::Triple::ArchType::x86_64 &&
+        IGF.IGM.TargetMachine->getTargetTriple().getArch() != llvm::Triple::ArchType::x86)
+      assert(false && "Instruction only available on x86");
+    
+    auto firstPointer = args.claimNext();
+    auto secondPointer = args.claimNext();
+    auto boolTy = IGF.IGM.Int1Ty;
+    auto ptrTy = IGF.IGM.Int8PtrTy;
+    
+    llvm::FunctionType *funcTy = llvm::FunctionType::get(boolTy, {ptrTy, ptrTy}, false);
+    llvm::Function *fn = llvm::Function::Create(funcTy, llvm::Function::ExternalLinkage, "strcmp", IGF.IGM.Module);
+    
+    auto strcmpRes = IGF.Builder.CreateCall(funcTy, fn, {firstPointer, secondPointer});
+    out.add(strcmpRes);
+    
+    return;
+  }
 
   
   if (Builtin.ID == BuiltinValueKind::CmpXChg) {

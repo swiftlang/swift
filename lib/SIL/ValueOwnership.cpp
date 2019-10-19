@@ -505,6 +505,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Any, GlobalStringTablePointer)
     }                                                                          \
     return ValueOwnershipKind::Unowned;                                        \
   }
+UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(StrCmp)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(CmpXChg)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ExtractElement)

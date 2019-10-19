@@ -790,6 +790,12 @@ static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getStrCmpOperation(ASTContext &Context, Identifier Id) {
+  Type ArgElts[] = { Context.TheRawPointerType, Context.TheRawPointerType };
+  Type BoolTy = BuiltinIntegerType::get(1, Context);
+  return getBuiltinFunction(Id, ArgElts, BoolTy);
+}
+
 static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
                                         Type T) {
   return getBuiltinFunction(Id, { Context.TheRawPointerType, T }, T);
@@ -1581,6 +1587,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getFenceOperation(Context, Id);
   }
   
+  if (OperationName.startswith("strcmp")) {
+    return getStrCmpOperation(Context, Id);
+  }
+  
   // If this starts with cmpxchg, we have special suffixes to handle.
   if (OperationName.startswith("cmpxchg_")) {
     OperationName = OperationName.drop_front(strlen("cmpxchg_"));
@@ -1729,6 +1739,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   switch (BV) {
   case BuiltinValueKind::Fence:
+  case BuiltinValueKind::StrCmp:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
   case BuiltinValueKind::AtomicLoad:
