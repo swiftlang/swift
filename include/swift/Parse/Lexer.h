@@ -295,7 +295,12 @@ public:
   /// \param Loc The source location of the beginning of a token.
   ///
   /// \param CRM How comments should be treated by the lexer. Default is to
-  /// return the comments as tokens.
+  /// return the comments as tokens. This is needed in situations where
+  /// detecting the next semantically meaningful token is required, such as
+  /// the 'implicit self' diagnostic determining whether a capture list is
+  /// empty (i.e., the opening bracket is immediately followed by a closing
+  /// bracket, possibly with comments in between) in order to insert the
+  /// appropriate fix-it.
   static Token getTokenAtLocation(
       const SourceManager &SM, SourceLoc Loc,
       CommentRetentionMode CRM = CommentRetentionMode::ReturnAsTokens);

@@ -689,8 +689,9 @@ public:
     
     /// If we find a lookup result that requires the dynamic implict self value,
     /// we need to check the nested scopes to see if any closures explicitly
-    /// captured \c self. The appropriate selfDC is that of the innermost
-    /// closure which captures a \c self value from one of this type's methods.
+    /// captured \c self. In that case, the appropriate selfDC is that of the
+    /// innermost closure which captures a \c self value from one of this type's
+    /// methods.
     static NullablePtr<DeclContext>
     checkNestedScopesForSelfCapture(ArrayRef<const ASTScopeImpl *> history,
                                     size_t start);
