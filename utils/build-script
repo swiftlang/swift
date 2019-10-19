@@ -790,9 +790,12 @@ class BuildScriptInvocation(object):
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=self.workspace.build_dir(
                         host_target, product_name))
-                product.build(host_target)
-                product.test(host_target)
-                product.install(host_target)
+                if product.should_build(host_target):
+                    product.build(host_target)
+                if product.should_test(host_target):
+                    product.test(host_target)
+                if product.should_install(host_target):
+                    product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
