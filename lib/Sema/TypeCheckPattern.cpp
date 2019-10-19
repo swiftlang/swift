@@ -978,12 +978,10 @@ recur:
     TypeChecker::checkForForbiddenPrefix(Context, var->getBaseName());
 
     // If we are inferring a variable to have type AnyObject.Type,
-    // "()", an uninhabited type, or optional thereof, emit a diagnostic.
-    // In the first 2 cases, the coder probably forgot a cast and expected a
-    // concrete type.  In the later case, they probably didn't mean to bind to
-    // a variable, or there is some other bug.  We always tell them that they
-    // can silence the warning with an explicit type annotation
-    // (and provide a fixit) as a note.
+    // "()", "[()]", an uninhabited type, or optional thereof, emit a diagnostic.
+    // They are probably missing a cast or didn't mean to bind to a variable.
+    // We always tell them that they can silence the warning with an
+    // explicit type annotation (and provide a fixit) as a note.
     Type diagTy = type->lookThroughAllOptionalTypes();
     bool isOptional = !type->getOptionalObjectType().isNull();
     if (!diagTy) diagTy = type;
@@ -1010,6 +1008,9 @@ recur:
         assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
           "unknown structurally uninhabited type");
       }
+    } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
+      if (BST->getDecl() == Context.getArrayDecl())
+          shouldRequireType = BST->getGenericArgs()[0]->isEqual(Context.TheEmptyTupleType);
     }
     
     if (shouldRequireType &&
@@ -1019,7 +1020,7 @@ recur:
       diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
                      NP->getDecl()->isLet());
       diags.diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-          .fixItInsertAfter(var->getNameLoc(), ": " + type->getString());
+          .fixItInsertAfter(var->getNameLoc(), ": " + type->getWithoutParens()->getString());
     }
 
     return false;

@@ -60,6 +60,16 @@ func testAnyObjectOptional() -> AnyObject? {
   return x
 }
 
+// SR-11511 Warning for inferring an array of empty tuples
+var arrayOfEmptyTuples = [""].map { print($0) } // expected-warning {{variable 'arrayOfEmptyTuples' inferred to have type '[()]'}} \
+                                                // expected-note {{add an explicit type annotation to silence this warning}} {{23-23=: [()]}}
+
+var maybeEmpty = Optional(arrayOfEmptyTuples) // expected-warning {{variable 'maybeEmpty' inferred to have type '[()]?'}} \
+                                              // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: [()]?}}
+
+var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warning {{variable 'shouldWarnWithoutSugar' inferred to have type 'Array<()>'}} \
+                                 // expected-note {{add an explicit type annotation to silence this warning}} {{27-27=: Array<()>}}
+
 class SomeClass {}
 
 // <rdar://problem/16877304> weak let's should be rejected
