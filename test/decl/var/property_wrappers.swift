@@ -1579,12 +1579,14 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject {
+extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{'SR_11288_S4.SR_11288_Wrapper4.Type' (aka 'SR_11288_S0.Type') requires that 'SR_11288_S4' conform to 'AnyObject'}}
+  // FIXME: We shouldn't diagnose the arg-to-param mismatch (rdar://problem/56345248)
+  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
+  // expected-error @-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 }
 
 class SR_11288_C0: SR_11288_P4 {

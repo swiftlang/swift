@@ -316,9 +316,8 @@ func foo() {
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+    let l = min(3, oi) // expected-error{{global function 'min' requires that 'Int?' conform to 'Comparable'}}
+  // expected-note@-1{{wrapped type 'Int' satisfies this requirement}}
 }
 
 infix operator +&

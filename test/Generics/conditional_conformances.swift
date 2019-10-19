@@ -11,7 +11,7 @@ protocol P6: P2 {}
 
 protocol Assoc { associatedtype AT }
 
-func takes_P2<X: P2>(_: X) {} // expected-note {{in call to function 'takes_P2'}}
+func takes_P2<X: P2>(_: X) {}
 func takes_P5<X: P5>(_: X) {}
 
 // Skip the first generic signature declcontext dump
@@ -89,6 +89,7 @@ struct SameTypeGeneric<T, U> {}
 extension SameTypeGeneric: P2 where T == U {}
 // expected-note@-1 {{requirement from conditional conformance of 'SameTypeGeneric<U, Int>' to 'P2'}}
 // expected-note@-2 {{requirement from conditional conformance of 'SameTypeGeneric<Int, Float>' to 'P2'}}
+// expected-note@-3 {{requirement from conditional conformance of 'SameTypeGeneric<U, V>' to 'P2'}}
 func same_type_generic_good<U, V>(_: U, _: V)
   where U: Assoc, V: Assoc, U.AT == V.AT
 {
@@ -98,7 +99,7 @@ func same_type_generic_good<U, V>(_: U, _: V)
 }
 func same_type_bad<U, V>(_: U, _: V) {
   takes_P2(SameTypeGeneric<U, V>())
-  // expected-error@-1{{generic parameter 'X' could not be inferred}}
+  // expected-error@-1{{global function 'takes_P2' requires the types 'U' and 'V' be equivalent}}
   takes_P2(SameTypeGeneric<U, Int>())
   // expected-error@-1{{global function 'takes_P2' requires the types 'U' and 'Int' be equivalent}}
   takes_P2(SameTypeGeneric<Int, Float>())
