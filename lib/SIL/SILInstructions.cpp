@@ -753,7 +753,7 @@ AutoDiffConfig const &DifferentiabilityWitnessFunctionInst::getConfig() const {
   return witness->getConfig();
 }
 IndexSubset *DifferentiabilityWitnessFunctionInst::getParameterIndices() const {
-  return witness->getResultIndices();
+  return witness->getParameterIndices();
 }
 IndexSubset *DifferentiabilityWitnessFunctionInst::getResultIndices() const {
   return witness->getResultIndices();
