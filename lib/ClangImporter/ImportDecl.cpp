@@ -4535,30 +4535,35 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclImpl(const U *decl, Identifier name, bool hasCustomName,
-                            ModuleDecl *overlay) {
+    T *resolveSwiftDeclImpl(const U *decl, Identifier name, 
+                            bool hasKnownSwiftName, ModuleDecl *overlay) {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
-      // None = not enough information
-      // true/false = definitive answer
-      auto isMatch = [&](const T *singleResult) -> Optional<bool> {
+      auto isMatch = [&](const T *singleResult, bool baseNameMatches) -> bool {
         const DeclAttributes &attrs = singleResult->getAttrs();
 
         // Skip versioned variants.
         if (attrs.isUnavailableInSwiftVersion(languageVersion))
           return false;
 
-        // If Clang decl has a custom Swift name, then `name` is that name.
-        if (hasCustomName)
-          return None;
+        // Skip if type not exposed to Objective-C.
+        // If the base name doesn't match, then a matching
+        // custom name in an @objc attribute is required.
+        if (baseNameMatches && !singleResult->isObjC())
+          return false;
+
+        // If Clang decl has a custom Swift name, then we know that
+        // `name` is the base name we're looking for.
+        if (hasKnownSwiftName)
+          return baseNameMatches;
 
         // Skip if a different name is used for Objective-C.
         if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
           if (auto objcName = objcAttr->getName())
             return objcName->getSimpleName() == name;
 
-        return None;
+        return baseNameMatches;
       };
 
       // First look at Swift types with the same name.
@@ -4567,38 +4572,26 @@ namespace {
       T *found = nullptr;
       for (auto result : results) {
         if (auto singleResult = dyn_cast<T>(result)) {
-          // Eliminate false positives (Swift name matches but Obj-C name doesn't).
-          Optional<bool> matched = isMatch(singleResult);
-          if (matched.hasValue() && !*matched)
-            continue;
-
-          // Skip if type not exposed to Objective-C.
-          if (!hasCustomName && !singleResult->isObjC())
-            continue;
-
-          if (found)
-            return nullptr;
-
-          found = singleResult;
+          if (isMatch(singleResult, /*baseNameMatches=*/true)) {
+            if (found)
+              return nullptr;
+            found = singleResult;
+          }
         }
       }
 
-      if (!found && !hasCustomName) {
-        // Try harder to find match with custom Objective-C name.
-        // Only positive matches can be used, since we've already eliminated
-        // all native Swift types with the same native name.
+      if (!found && !hasKnownSwiftName) {
+        // Try harder to find a match looking at just custom Objective-C names.
         SmallVector<Decl *, 64> results;
         overlay->getTopLevelDecls(results);
         for (auto result : results) {
           if (auto singleResult = dyn_cast<T>(result)) {
-            Optional<bool> matched = isMatch(singleResult);
-            if (!(matched.hasValue() && *matched))
-              continue;
-
-            if (found)
-              return nullptr;
-
-            found = singleResult;
+            // The base name _could_ match but it's irrelevant here.
+            if (isMatch(singleResult, /*baseNameMatches=*/false)) {
+              if (found)
+                return nullptr;
+              found = singleResult;
+            }
           }
         }
       }
@@ -4611,17 +4604,17 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDecl(const U *decl, Identifier name, bool hasCustomName,
-                        ClangModuleUnit *clangModule) {
+    T *resolveSwiftDecl(const U *decl, Identifier name,
+                        bool hasKnownSwiftName, ClangModuleUnit *clangModule) {
       if (auto overlay = clangModule->getOverlayModule())
-        return resolveSwiftDeclImpl<T>(decl, name, hasCustomName, overlay);
+        return resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, overlay);
       if (clangModule == Impl.ImportedHeaderUnit) {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
         for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
           ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
-          if (T *result = resolveSwiftDeclImpl<T>(decl, name, hasCustomName,
-                                                  owner))
+          if (T *result = resolveSwiftDeclImpl<T>(decl, name,
+                                                  hasKnownSwiftName, owner))
             return result;
         }
       }
@@ -4634,7 +4627,7 @@ namespace {
       if (!importer::hasNativeSwiftDecl(decl))
         return false;
       auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-      swiftDecl = resolveSwiftDecl<T>(decl, name, /*hasCustomName=*/true,
+      swiftDecl = resolveSwiftDecl<T>(decl, name, /*hasCustomSwiftName=*/true,
                                       wrapperUnit);
       return true;
     }
@@ -4664,14 +4657,15 @@ namespace {
                                             *correctSwiftName);
 
       Identifier name = importedName.getDeclName().getBaseIdentifier();
-      bool hasCustomName = importedName.hasCustomName();
+      bool hasKnownSwiftName = importedName.hasCustomName();
 
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
       if (!decl->hasDefinition()) {
         // Check if this protocol is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
-          if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name, hasCustomName,
+          if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
+                                                           hasKnownSwiftName,
                                                            clangModule))
             return native;
 
@@ -4783,13 +4777,13 @@ namespace {
                                             *correctSwiftName);
 
       auto name = importedName.getDeclName().getBaseIdentifier();
-      bool hasCustomName = importedName.hasCustomName();
+      bool hasKnownSwiftName = importedName.hasCustomName();
 
       if (!decl->hasDefinition()) {
         // Check if this class is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
           if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
-                                                        hasCustomName,
+                                                        hasKnownSwiftName,
                                                         clangModule)) {
             return native;
           }
