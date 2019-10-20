@@ -12,6 +12,12 @@ func thrower() throws -> Bool {
 /*=====================================*/
 
 lazy var topLevelLazy1 = compute()
+lazy var topLevelLazy2 = thrower()
+// expected-error@-1 {{call can throw, but errors cannot be thrown out of a lazy getter}}
+lazy var topLevelLazy3 = try thrower()
+// expected-error@-1 {{call can throw, but errors cannot be thrown out of a lazy getter}}
+lazy var topLevelLazy4 = try? thrower()
+lazy var topLevelLazy5 = try! thrower()
 
 /*=====================================*/
 /*                Local                */
@@ -44,7 +50,30 @@ func testLocalLazyUsage() -> Bool {
   #endif
 }
 
+func testLocalLazyErrorHandling() {
+  do {
+    lazy var lazy1 = try thrower()
+    // expected-error@-1 {{call can throw, but errors cannot be thrown out of a lazy getter}}
+    lazy var lazy2 = thrower()
+    // expected-error@-1 {{call can throw, but errors cannot be thrown out of a lazy getter}}
+  } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    return
+  }
+  lazy var lazy2 = { () -> Bool in
+    do {
+      return try thrower()
+    } catch {
+      return true
+    }
+  }()
+  lazy var lazy3 = try? thrower()
+  lazy var lazy4 = try! thrower()
+}
+
 class LocalLazyWrapperClass {
+  lazy var foo = try thrower()
+  // expected-error@-1 {{call can throw, but errors cannot be thrown out of a lazy getter}}
+
   func compute() -> Bool { return true }
 
   func testLocalLazyInitializers() {

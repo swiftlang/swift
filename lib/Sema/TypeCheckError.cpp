@@ -190,13 +190,15 @@ class ErrorHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
   bool walkToDeclPre(Decl *D) override {
-    ShouldRecurse_t recurse = ShouldRecurse;
+    ShouldRecurse_t recurse = ShouldNotRecurse;
     // Skip the implementations of all local declarations... except
-    // PBD.  We should really just have a PatternBindingStmt.
+    // maybe PBD.  We should really just have a PatternBindingStmt.
     if (auto ic = dyn_cast<IfConfigDecl>(D))
       recurse = asImpl().checkIfConfig(ic);
-    else if (!isa<PatternBindingDecl>(D))
-      recurse = ShouldNotRecurse;
+    else if (const auto PBD = dyn_cast<PatternBindingDecl>(D)) {
+      recurse = asImpl().checkPatternBinding(PBD);
+    }
+
     return bool(recurse);
   }
 
@@ -610,6 +612,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkPatternBinding(PatternBindingDecl *PBD) {
+      return ShouldRecurse;
+    }
+
     ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -830,7 +836,10 @@ public:
     CatchGuard,
 
     /// A defer body
-    DeferBody
+    DeferBody,
+
+    /// The getter for a local lazy var.
+    LazyGetter
   };
 
 private:
@@ -844,14 +853,6 @@ private:
       return Kind::Handled;
     }
     llvm_unreachable("invalid classify result");
-  }
-
-  static Context getContextForPatternBinding(PatternBindingDecl *pbd) {
-    if (!pbd->isStatic() && pbd->getDeclContext()->isTypeContext()) {
-      return Context(Kind::IVarInitializer);
-    } else {
-      return Context(Kind::GlobalVarInitializer);
-    }
   }
 
   Kind TheKind;
@@ -872,27 +873,15 @@ public:
     return Context(Kind::Handled);
   }
 
+  static Context forLazyGetter() {
+    return Context(Kind::LazyGetter);
+  }
+
   static Context forFunction(AbstractFunctionDecl *D) {
     if (D->getAttrs().hasAttribute<RethrowsAttr>()) {
       Context result(Kind::RethrowingFunction);
       result.RethrowsDC = D;
       return result;
-    }
-
-    // HACK: If the decl is the synthesized getter for a 'lazy' property, then
-    // treat the context as a property initializer in order to produce a better
-    // diagnostic; the only code we should be diagnosing on is within the
-    // initializer expression that has been transplanted from the var's pattern
-    // binding decl. We don't perform the analysis on the initializer while it's
-    // still a part of that PBD, as it doesn't get a solution applied there.
-    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
-      if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
-        if (accessor->isGetter() && var->getAttrs().hasAttribute<LazyAttr>()) {
-          auto *pbd = var->getParentPatternBinding();
-          assert(pbd && "lazy var didn't have a pattern binding decl");
-          return getContextForPatternBinding(pbd);
-        }
-      }
     }
 
     return Context(getKindForFunctionBody(
@@ -913,7 +902,7 @@ public:
     auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
     assert(!binding->getDeclContext()->isLocalContext() &&
            "setting up error context for local pattern binding?");
-    return getContextForPatternBinding(binding);
+    return forPatternBinding(binding);
   }
 
   static Context forEnumElementInitializer(EnumElementDecl *elt) {
@@ -939,8 +928,16 @@ public:
     return Context(Kind::CatchGuard);
   }
 
-  static Context forPatternBinding(PatternBindingDecl *binding) {
-    return getContextForPatternBinding(binding);
+  static Context forPatternBinding(PatternBindingDecl *PBD) {
+    if (!PBD->isStatic() && PBD->getDeclContext()->isTypeContext()) {
+      if (const auto VD = PBD->getSingleVar())
+        if (VD->getAttrs().hasAttribute<LazyAttr>())
+          return Context(Kind::LazyGetter);
+
+      return Context(Kind::IVarInitializer);
+    } else {
+      return Context(Kind::GlobalVarInitializer);
+    }
   }
 
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
@@ -1156,6 +1153,9 @@ public:
     case Kind::DeferBody:
       diagnoseThrowInIllegalContext(TC, E, "a defer body", isInDefer);
       return;
+    case Kind::LazyGetter:
+      diagnoseThrowInIllegalContext(TC, E, "a lazy getter");
+      return;
     }
     llvm_unreachable("bad context kind");
   }
@@ -1184,6 +1184,7 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
+    case Kind::LazyGetter:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -1607,6 +1608,26 @@ private:
       TC.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
     return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkPatternBinding(PatternBindingDecl *PBD) {
+    if (const auto VD = PBD->getSingleVar()) {
+      // A lazy var initializer expression is transplanted to its getter,
+      // so we walk it separately with a kind of error handling context
+      // that acts like a non-throwing function, but produces a dedicated
+      // diagnostic.
+      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
+        const auto Init = PBD->getInit(0);
+        if (!Init)
+          return ShouldRecurse;
+
+        CheckErrorCoverage Checker(TC, Context::forLazyGetter());
+        Init->walk(Checker);
+
+        return ShouldNotRecurse;
+      }
+    }
+    return ShouldRecurse;
   }
 };
 
