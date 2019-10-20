@@ -1487,48 +1487,64 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
                               diag::note_capture_self_explicitly);
       // There are four different potential fix-its to offer based on the
       // closure signature:
-      //   1. The signature empty so far. We must insert the full capture
-      //      list as well as 'in'.
-      //   2. Arguments or types are already specified in the signature,
-      //      but there is no existing capture list. We will need to insert
-      //      the capture list, but 'in' will already be present.
-      //   3. There is an existing capture list which already has some
+      //   1. There is an existing capture list which already has some
       //      entries. We need to insert 'self' into the capture list along
       //      with a separating comma.
-      //   4. There is an existing capture list, but it is empty. We can
-      //      just insert 'self'.
-      auto brackets = closureExpr->getBracketRange();
-      if (brackets.isInvalid()) {
-        if (closureExpr->getInLoc().isInvalid()) {
-          // If there's a (non-comment) token immediately following the
-          // opening brace of the closure, we may need to pad the fix-it
-          // with a space.
-          const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
-          const auto next =
-              Lexer::getTokenAtLocation(TC.Context.SourceMgr, nextLoc,
-                                        CommentRetentionMode::None);
-          std::string trailing = next.getLoc() == nextLoc ? " " : "";
-
-          diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
-        }
-        else
-          diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //      We can just insert 'self'.
+      //   3. Arguments or types are already specified in the signature,
+      //      but there is no existing capture list. We will need to insert
+      //      the capture list, but 'in' will already be present.
+      //   4. The signature empty so far. We must insert the full capture
+      //      list as well as 'in'.
+      const auto brackets = closureExpr->getBracketRange();
+      if (brackets.isValid()) {
+        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
       }
       else {
-        // Similar to above, we look for any non-comment token. If there's
-        // anything before the closing bracket, we assume that it is a valid
-        // capture list entry and insert 'self,'. If it wasn't a valid
-        // entry, then we will at least not be introducing any new
-        // errors/warnings...
-        const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-        const auto nextAfterBracket =
-            Lexer::getTokenAtLocation(TC.Context.SourceMgr, locAfterBracket,
-                                      CommentRetentionMode::None);
-        if (nextAfterBracket.getLoc() != brackets.End)
-          diag.fixItInsertAfter(brackets.Start, "self, ");
-        else
-          diag.fixItInsertAfter(brackets.Start, "self");
+        emitInsertNewCaptureListFixIt(closureExpr, diag);
       }
+    }
+    
+    /// Emit a fix-it for inserting \c self into in existing capture list, along
+    /// with a trailing comma if needed. The fix-it will be attached to the
+    /// provided diagnostic \c diag.
+    void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
+                                            InFlightDiagnostic &diag) {
+      // Look for any non-comment token. If there's anything before the
+      // closing bracket, we assume that it is a valid capture list entry and
+      // insert 'self,'. If it wasn't a valid entry, then we will at least not
+      // be introducing any new errors/warnings...
+      const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+      const auto nextAfterBracket =
+          Lexer::getTokenAtLocation(TC.Context.SourceMgr, locAfterBracket,
+                                    CommentRetentionMode::None);
+      if (nextAfterBracket.getLoc() != brackets.End)
+        diag.fixItInsertAfter(brackets.Start, "self, ");
+      else
+        diag.fixItInsertAfter(brackets.Start, "self");
+    }
+    
+    /// Emit a fix-it for inserting a capture list into a closure that does not
+    /// already have one, along with a trailing \c in if necessary. The fix-it
+    /// will be attached to the provided diagnostic \c diag.
+    void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
+                                       InFlightDiagnostic &diag) {
+      if (closureExpr->getInLoc().isValid()) {
+        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+        return;
+      }
+
+      // If there's a (non-comment) token immediately following the
+      // opening brace of the closure, we may need to pad the fix-it
+      // with a space.
+      const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
+      const auto next =
+      Lexer::getTokenAtLocation(TC.Context.SourceMgr, nextLoc,
+                                CommentRetentionMode::None);
+      std::string trailing = next.getLoc() == nextLoc ? " " : "";
+      
+      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
     }
   };
 
