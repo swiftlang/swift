@@ -1475,7 +1475,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       }
       return false;
     }
-    
+
     /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
     /// The error can be solved by capturing self explicitly,
     /// or by using \c self. explicitly.
@@ -1505,7 +1505,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         emitInsertNewCaptureListFixIt(closureExpr, diag);
       }
     }
-    
+
     /// Emit a fix-it for inserting \c self into in existing capture list, along
     /// with a trailing comma if needed. The fix-it will be attached to the
     /// provided diagnostic \c diag.
@@ -1524,7 +1524,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       else
         diag.fixItInsertAfter(brackets.Start, "self");
     }
-    
+
     /// Emit a fix-it for inserting a capture list into a closure that does not
     /// already have one, along with a trailing \c in if necessary. The fix-it
     /// will be attached to the provided diagnostic \c diag.
@@ -1543,7 +1543,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       Lexer::getTokenAtLocation(TC.Context.SourceMgr, nextLoc,
                                 CommentRetentionMode::None);
       std::string trailing = next.getLoc() == nextLoc ? " " : "";
-      
+
       diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
     }
   };
