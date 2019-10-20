@@ -526,12 +526,25 @@ GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
   return nullptr;
 }
 
+#pragma mark checkNestedScopesForSelfCapture
+
 NullablePtr<DeclContext>
 GenericTypeOrExtensionWhereOrBodyPortion::checkNestedScopesForSelfCapture(
     ArrayRef<const ASTScopeImpl *> history, size_t start) {
   NullablePtr<DeclContext> innerCapturedSelfDC;
   // Start with the next scope down the tree.
   size_t j = start;
+
+  // Note: even though having this loop is nested inside the while loop from
+  // GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC may appear to
+  // result in quadratic blowup, complexity actually remains linear with respect
+  // to the size of history. This relies on the fact that
+  // GenericTypeOrExtensionScope::computeSelfDCForParent returns a null pointer,
+  // which will cause this method to bail out of the search early. Thus, this
+  // method is called once per type body in the lookup history, and will not
+  // end up re-checking the bodies of nested types that have already been
+  // covered by earlier calls, so the total impact of this method across all
+  // calls in a single lookup is O(n).
   while (j != 0) {
     Optional<NullablePtr<DeclContext>> maybeCapturedSelfDC =
         history[--j]->computeSelfDCForParent();
