@@ -5535,6 +5535,16 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   }
 }
 
+bool NonEphemeralConversionFailure::diagnoseAsNote() {
+  // We can only emit a useful note if we have a callee.
+  if (auto *callee = getCallee()) {
+    emitDiagnostic(callee, diag::candidate_performs_illegal_ephemeral_conv,
+                   getParamPosition());
+    return true;
+  }
+  return false;
+}
+
 bool NonEphemeralConversionFailure::diagnoseAsError() {
   auto *argExpr = getArgExpr();
   if (isa<InOutExpr>(argExpr)) {

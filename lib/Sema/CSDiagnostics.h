@@ -1933,6 +1933,7 @@ public:
   }
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 private:
   /// Emits a note explaining to the user that an ephemeral conversion is only
