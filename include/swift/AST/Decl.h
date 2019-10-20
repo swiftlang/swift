@@ -5263,6 +5263,10 @@ public:
   /// have a textual representation of their default expression.
   bool hasDefaultExpr() const;
 
+  /// Whether this parameter has a caller-side default argument expression
+  /// such as the magic literal \c #function.
+  bool hasCallerSideDefaultExpr() const;
+
   /// Retrieve the fully type-checked default argument expression for this
   /// parameter, or \c nullptr if there is no default expression.
   ///

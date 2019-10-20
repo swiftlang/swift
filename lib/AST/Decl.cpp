@@ -6081,6 +6081,25 @@ bool ParamDecl::hasDefaultExpr() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
+bool ParamDecl::hasCallerSideDefaultExpr() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+  case DefaultArgumentKind::Normal:
+    return false;
+  case DefaultArgumentKind::File:
+  case DefaultArgumentKind::Line:
+  case DefaultArgumentKind::Column:
+  case DefaultArgumentKind::Function:
+  case DefaultArgumentKind::DSOHandle:
+  case DefaultArgumentKind::NilLiteral:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    return true;
+  }
+}
+
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
   // Don't kick off a request if we know there's no default expr. The only
   // exception is for inherited default args which we need to perform a couple
