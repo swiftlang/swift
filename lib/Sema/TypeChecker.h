@@ -712,9 +712,7 @@ public:
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
   static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                                        Type paramType,
-                                        bool isAutoClosure = false,
-                                        bool canFail = true);
+                                        Type paramType, bool isAutoClosure);
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 

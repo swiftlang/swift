@@ -2301,7 +2301,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
-                                            bool isAutoClosure, bool canFail) {
+                                            bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
 
   if (isAutoClosure) {
@@ -2323,12 +2323,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     AutoClosureListener listener(fnType);
     return typeCheckExpression(defaultValue, DC,
                                TypeLoc::withoutLoc(fnType->getResult()),
-                               canFail ? CTP_DefaultParameter : CTP_CannotFail,
-                               TypeCheckExprOptions(), &listener);
+                               CTP_DefaultParameter, TypeCheckExprOptions(),
+                               &listener);
   }
 
   return typeCheckExpression(defaultValue, DC, TypeLoc::withoutLoc(paramType),
-                             canFail ? CTP_DefaultParameter : CTP_CannotFail);
+                             CTP_DefaultParameter);
 }
 
 Type TypeChecker::
