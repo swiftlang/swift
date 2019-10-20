@@ -154,9 +154,16 @@ class ExplicitSelfRequiredTest {
     doVoidStuff({ self.x += 1 })
     doVoidStuff({ [self] in x += 1 })
     doVoidStuff({ [self = self] in x += 1 })
+    doVoidStuff({ [unowned self] in x += 1 })
+    doVoidStuff({ [unowned(unsafe) self] in x += 1 })
+    doVoidStuff({ [unowned self = self] in x += 1 })
+
     doStuff({ [self] in x+1 })
     doStuff({ [self = self] in x+1 })
     doStuff({ self.x+1 })
+    doStuff({ [unowned self] in x+1 })
+    doStuff({ [unowned(unsafe) self] in x+1 })
+    doStuff({ [unowned self = self] in x+1 })
     doStuff({ x+1 })    // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}} expected-note{{reference 'self.' explicitly}} {{15-15=self.}}
     doVoidStuff({ doStuff({ x+1 })}) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{28-28= [self] in}} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
     doVoidStuff({ x += 1 })    // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}} expected-note{{reference 'self.' explicitly}} {{19-19=self.}}
@@ -182,9 +189,16 @@ class ExplicitSelfRequiredTest {
     doVoidStuff { _ = self.method() }
     doVoidStuff { [self] in _ = method() }
     doVoidStuff { [self = self] in _ = method() }
+    doVoidStuff({ [unowned self] in _ = method() })
+    doVoidStuff({ [unowned(unsafe) self] in _ = method() })
+    doVoidStuff({ [unowned self = self] in _ = method() })
+
     doStuff { self.method() }
     doStuff { [self] in method() }
     doStuff({ [self = self] in method() })
+    doStuff({ [unowned self] in method() })
+    doStuff({ [unowned(unsafe) self] in method() })
+    doStuff({ [unowned self = self] in method() })
     
     // When there's no space between the opening brace and the first expression, insert it
     doStuff {method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in }} expected-note{{reference 'self.' explicitly}} {{14-14=self.}}
@@ -194,6 +208,12 @@ class ExplicitSelfRequiredTest {
     doStuff { [] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{21-21=self.}}
     doStuff { [  ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{23-23=self.}}
     doStuff { [ /* This space intentionally left blank. */ ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{65-65=self.}}
+    // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}}
+    doStuff { [ // Nothing in this capture list!
+        ]
+        in
+        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{9-9=self.}}
+    }
     // An inserted capture list should be on the same line as the opening brace, immediately following it.
     // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     doStuff {
