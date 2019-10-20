@@ -593,7 +593,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
   DeclContext *const dc = contextAndIsCascadingUseArg.whereToLook;
   const auto isCascadingUseSoFar = contextAndIsCascadingUseArg.isCascadingUse;
   if (dc->isModuleScopeContext()) {
-    assert(capturedSelfContext == NULL && "By the time we reach module scope,
+    assert(capturedSelfContext == NULL && "By the time we reach module scope,"
            " there should be no 'self'.");
     lookupInModuleScopeContext(dc, isCascadingUseSoFar);
   }
@@ -607,12 +607,12 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
     lookupNamesIntroducedByClosure(ACE, isCascadingUseSoFar,
                                    capturedSelfContext);
   else if (auto *ED = dyn_cast<ExtensionDecl>(dc)) {
-    assert(capturedSelfContext == NULL && "When we recurse into type context,
+    assert(capturedSelfContext == NULL && "When we recurse into type context,"
            " 'self' should be forgotten.");
     lookupNamesIntroducedByNominalTypeOrExtension(ED, isCascadingUseSoFar);
   }
   else if (auto *ND = dyn_cast<NominalTypeDecl>(dc)) {
-    assert(capturedSelfContext == NULL && "When we recurse into type context,
+    assert(capturedSelfContext == NULL && "When we recurse into type context,"
            " 'self' should be forgotten.");
     lookupNamesIntroducedByNominalTypeOrExtension(ND, isCascadingUseSoFar);
   }
@@ -648,7 +648,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
                                                    isCascadingUse,
                                                    capturedSelfContext);
   else if (PBI->getParent()->isTypeContext()) {
-    assert(capturedSelfContext == NULL && "If we were in a type's property
+    assert(capturedSelfContext == NULL && "If we were in a type's property"
            " initializer, there should be no 'self' to have been captured.");
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(
                                                               PBI,
