@@ -535,7 +535,7 @@ GenericTypeOrExtensionWhereOrBodyPortion::checkNestedScopesForSelfCapture(
   // Start with the next scope down the tree.
   size_t j = start;
 
-  // Note: even though having this loop is nested inside the while loop from
+  // Note: even though having this loop nested inside the while loop from
   // GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC may appear to
   // result in quadratic blowup, complexity actually remains linear with respect
   // to the size of history. This relies on the fact that
