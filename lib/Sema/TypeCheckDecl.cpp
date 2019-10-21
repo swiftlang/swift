@@ -4278,135 +4278,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Func:
-<<<<<<< HEAD
-  case DeclKind::Accessor: {
-    auto *FD = cast<FuncDecl>(D);
-
-    DeclValidationRAII IBV(FD);
-
-    // Accessors should pick up various parts of their type signatures
-    // directly from the storage declaration instead of re-deriving them.
-    // FIXME: should this include the generic signature?
-    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-      auto storage = accessor->getStorage();
-
-      // Note that it's important for correctness that we're filling in
-      // empty TypeLocs, because otherwise revertGenericFuncSignature might
-      // erase the types we set, causing them to be re-validated in a later
-      // pass.  That later validation might be incorrect even if the TypeLocs
-      // are a clone of the type locs from which we derived the value type,
-      // because the rules for interpreting types in parameter contexts
-      // are sometimes different from the rules elsewhere; for example,
-      // function types default to non-escaping.
-
-      auto valueParams = accessor->getParameters();
-
-      // Determine the value type.
-      Type valueIfaceTy = storage->getValueInterfaceType();
-      if (auto SD = dyn_cast<SubscriptDecl>(storage)) {
-        // Copy the index types instead of re-validating them.
-        auto indices = SD->getIndices();
-        for (size_t i = 0, e = indices->size(); i != e; ++i) {
-          auto subscriptParam = indices->get(i);
-          if (!subscriptParam->hasInterfaceType())
-            continue;
-
-          Type paramIfaceTy = subscriptParam->getInterfaceType();
-
-          auto accessorParam = valueParams->get(valueParams->size() - e + i);
-          accessorParam->setInterfaceType(paramIfaceTy);
-          accessorParam->getTypeLoc().setType(paramIfaceTy);
-        }
-      }
-
-      // Propagate the value type into the correct position.
-      switch (accessor->getAccessorKind()) {
-      // For getters, set the result type to the value type.
-      case AccessorKind::Get:
-        accessor->getBodyResultTypeLoc().setType(valueIfaceTy);
-        break;
-
-      // For setters and observers, set the old/new value parameter's type
-      // to the value type.
-      case AccessorKind::DidSet:
-      case AccessorKind::WillSet:
-      case AccessorKind::Set: {
-        auto newValueParam = valueParams->get(0);
-        newValueParam->setInterfaceType(valueIfaceTy);
-        newValueParam->getTypeLoc().setType(valueIfaceTy);
-        accessor->getBodyResultTypeLoc().setType(TupleType::getEmpty(Context));
-        break;
-      }
-
-      // Addressor result types can get complicated because of the owner.
-      case AccessorKind::Address:
-      case AccessorKind::MutableAddress:
-        if (Type resultType =
-              buildAddressorResultType(*this, accessor, valueIfaceTy)) {
-          accessor->getBodyResultTypeLoc().setType(resultType);
-        }
-        break;
-
-      // These don't mention the value type directly.
-      // If we add yield types to the function type, we'll need to update this.
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
-        accessor->getBodyResultTypeLoc().setType(TupleType::getEmpty(Context));
-        break;
-      }
-    }
-    
-    // We want the function to be available for name lookup as soon
-    // as it has a valid interface type.
-    typeCheckParameterList(FD->getParameters(), FD,
-                           TypeResolverContext::AbstractFunctionDecl);
-    validateResultType(FD, FD->getBodyResultTypeLoc());
-    // FIXME: Roll all of this interface type computation into a request.
-    FD->computeType();
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(FD);
-    // SWIFT_ENABLE_TENSORFLOW END
-
-    // If the function is exported to C, it must be representable in (Obj-)C.
-    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                errorConvention)) {
-        if (FD->hasThrows()) {
-          FD->setForeignErrorConvention(*errorConvention);
-          diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
-        }
-      }
-    }
-    
-    break;
-  }
-
-  case DeclKind::Constructor: {
-    auto *CD = cast<ConstructorDecl>(D);
-
-    DeclValidationRAII IBV(CD);
-
-    typeCheckParameterList(CD->getParameters(), CD,
-                           TypeResolverContext::AbstractFunctionDecl);
-    CD->computeType();
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(CD);
-    // SWIFT_ENABLE_TENSORFLOW END
-    break;
-  }
-
-=======
   case DeclKind::Accessor:
   case DeclKind::Constructor:
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   case DeclKind::Destructor: {
     auto *AFD = cast<AbstractFunctionDecl>(D);
     DeclValidationRAII IBV(AFD);
     AFD->computeType();
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(CD);
+    // SWIFT_ENABLE_TENSORFLOW END
     break;
   }
 
@@ -4416,13 +4297,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     auto elementTy = SD->getElementInterfaceType();
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(SD);
-    // SWIFT_ENABLE_TENSORFLOW END
-
-=======
     SmallVector<AnyFunctionType::Param, 2> argTy;
     SD->getIndices()->getParams(argTy);
 
@@ -4434,7 +4308,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Record the interface type.
     SD->setInterfaceType(funcTy);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(SD);
+    // SWIFT_ENABLE_TENSORFLOW END
+
     break;
   }
 

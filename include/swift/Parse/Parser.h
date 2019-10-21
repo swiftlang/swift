@@ -1642,28 +1642,14 @@ public:
   ParsedSyntaxResult<ParsedClosureExprSyntax>
   parseTrailingClosureSyntax(SourceRange calleeRange);
 
-<<<<<<< HEAD
-  /// Parse an object literal.
-  ///
-  /// \param LK The literal kind as determined by the first token.
-  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
-                                            bool isExprBasic);
+  ParserResult<Expr> parseExprObjectLiteral(bool isExprBasic);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprObjectLiteralSyntax(bool isExprBasic);
   ParserResult<Expr> parseExprQuoteLiteral();
   ParserResult<Expr> parseExprUnquote();
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
-  ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundAssert();
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
-=======
-  ParserResult<Expr> parseExprObjectLiteral(bool isExprBasic);
-  ParsedSyntaxResult<ParsedExprSyntax>
-  parseExprObjectLiteralSyntax(bool isExprBasic);
-  ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
-                                         bool isExprBasic);
-  ParserResult<Expr> parseExprCollection();
   ParsedSyntaxResult<ParsedExprSyntax> parseExprCollectionSyntax();
   ParsedSyntaxResult<ParsedExprSyntax>
   parseExprArraySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
@@ -1672,7 +1658,6 @@ public:
   parseExprDictionarySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
                             ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
 
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParsedSyntaxResult<ParsedExprSyntax>
   parseExprPoundUnknownSyntax(Optional<ParsedTokenSyntax> &&LSquare,

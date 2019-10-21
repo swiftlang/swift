@@ -443,7 +443,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
 
-<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   /// A cache of tangent spaces per type.
   llvm::DenseMap<CanType, Optional<VectorSpace>> VectorSpaces;
@@ -456,11 +455,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
       AutoDiffDerivativeFunctionIdentifiers;
   // SWIFT_ENABLE_TENSORFLOW END
 
-=======
-  /// For uniquifying `IndexSubset` allocations.
-  llvm::FoldingSet<IndexSubset> IndexSubsets;
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>

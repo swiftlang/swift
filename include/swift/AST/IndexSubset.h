@@ -201,26 +201,10 @@ public:
       id.AddInteger(index);
   }
 
-<<<<<<< HEAD
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   LLVM_ATTRIBUTE_DEPRECATED(void dump(llvm::raw_ostream &s = llvm::errs())
                                 const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
-=======
-  void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << '{';
-    interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
-               [&s] { s << ", "; });
-    s << '}';
-  }
-
-  void dump(llvm::raw_ostream &s = llvm::errs()) const {
-    s << "(index_subset capacity=" << capacity << " indices=(";
-    interleave(getIndices(), [&s](unsigned i) { s << i; },
-               [&s] { s << ", "; });
-    s << "))";
-  }
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 
   int findNext(int startIndex) const;
   int findFirst() const { return findNext(-1); }

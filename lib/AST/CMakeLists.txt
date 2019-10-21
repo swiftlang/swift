@@ -29,12 +29,9 @@ add_swift_host_library(swiftAST STATIC
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
-<<<<<<< HEAD
   # SWIFT_ENABLE_TENSORFLOW
   AutoDiff.cpp
-=======
   IndexSubset.cpp
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp

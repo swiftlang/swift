@@ -79,7 +79,6 @@ IndexSubset *IndexSubset::extendingCapacity(
   return IndexSubset::get(ctx, indices);
 }
 
-<<<<<<< HEAD
 void IndexSubset::print(llvm::raw_ostream &s) const {
   s << '{';
   interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
@@ -94,8 +93,6 @@ void IndexSubset::dump(llvm::raw_ostream &s) const {
   s << "))\n";
 }
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 int IndexSubset::findNext(int startIndex) const {
   assert(startIndex < (int)capacity && "Start index cannot be past the end");
   unsigned bitWordIndex = 0, offset = 0;
