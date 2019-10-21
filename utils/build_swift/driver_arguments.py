@@ -1046,7 +1046,6 @@ def create_argument_parser():
     option('--install-swift', toggle_true('impl_install_swift'))
     option('--skip-test-swift', toggle_true('impl_skip_test_swift'))
 
-
     # -------------------------------------------------------------------------
     return builder.build()
 
