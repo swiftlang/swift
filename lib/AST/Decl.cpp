@@ -3921,7 +3921,7 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
     CD->recordObjCMethod(DD, DD->getObjCSelector());
 
   // Assign DD the interface type (Self) -> () -> ()
-  DD->computeType();
+  (void)DD->getInterfaceType();
 
   return DD;
 }
@@ -6626,55 +6626,6 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
   OpaqueReturnTypeIdentifier = getASTContext().getIdentifier(mangleBuf);
   return OpaqueReturnTypeIdentifier;
-}
-
-void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
-  auto sig = getGenericSignature();
-  bool hasSelf = hasImplicitSelfDecl();
-
-  // Result
-  Type resultTy;
-  if (auto fn = dyn_cast<FuncDecl>(this)) {
-    resultTy = fn->getResultInterfaceType();
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    resultTy = ctor->getResultInterfaceType();
-  } else {
-    assert(isa<DestructorDecl>(this));
-    resultTy = TupleType::getEmpty(getASTContext());
-  }
-
-  // (Args...) -> Result
-  Type funcTy;
-
-  {
-    SmallVector<AnyFunctionType::Param, 4> argTy;
-    getParameters()->getParams(argTy);
-
-    // 'throws' only applies to the innermost function.
-    info = info.withThrows(hasThrows());
-    // Defer bodies must not escape.
-    if (auto fd = dyn_cast<FuncDecl>(this))
-      info = info.withNoEscape(fd->isDeferBody());
-
-    if (sig && !hasSelf) {
-      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
-    } else {
-      funcTy = FunctionType::get(argTy, resultTy, info);
-    }
-  }
-
-  // (Self) -> (Args...) -> Result
-  if (hasSelf) {
-    // Substitute in our own 'self' parameter.
-    auto selfParam = computeSelfParam(this);
-    if (sig)
-      funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy);
-    else
-      funcTy = FunctionType::get({selfParam}, funcTy);
-  }
-
-  // Record the interface type.
-  setInterfaceType(funcTy);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {

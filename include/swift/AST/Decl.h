@@ -5834,10 +5834,6 @@ public:
   }
 
 public:
-  /// Compute the interface type of this function declaration from the
-  /// parameter types.
-  void computeType(AnyFunctionType::ExtInfo Info = FunctionType::ExtInfo());
-
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 

@@ -750,7 +750,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
+  (void)encodeDecl->getInterfaceType();
 
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -1030,7 +1030,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
+  (void)initDecl->getInterfaceType();
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
