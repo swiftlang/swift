@@ -32,6 +32,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -580,7 +581,7 @@ private:
       branchingTraceDecl->setGenericSignature(genericSig);
     computeAccessLevel(branchingTraceDecl,
                        original->getEffectiveSymbolLinkage());
-    // branchingTraceDecl->computeType();  // TODO(saeta): FIX ME!
+    branchingTraceDecl->getInterfaceType();
     assert(branchingTraceDecl->hasInterfaceType());
     file.addVisibleDecl(branchingTraceDecl);
     // Add basic block enum cases.
@@ -604,7 +605,7 @@ private:
           /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)),
           paramList, loc, /*RawValueExpr*/ nullptr, branchingTraceDecl);
       enumEltDecl->setImplicit();
-      // enumEltDecl->computeType();  // TODO(saeta): FIX ME!
+      enumEltDecl->getInterfaceType();
       auto *enumCaseDecl = EnumCaseDecl::create(
           /*CaseLoc*/ loc, {enumEltDecl}, branchingTraceDecl);
       enumCaseDecl->setImplicit();
@@ -659,7 +660,7 @@ private:
       linearMapStruct->setGenericSignature(genericSig);
     computeAccessLevel(
         linearMapStruct, original->getEffectiveSymbolLinkage());
-    // linearMapStruct->computeType();  // TODO(saeta): FIX ME!
+    linearMapStruct->getInterfaceType();
     assert(linearMapStruct->hasInterfaceType());
     file.addVisibleDecl(linearMapStruct);
     return linearMapStruct;

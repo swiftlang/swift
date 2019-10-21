@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// #include "swift/AST/AutoDiff.h"  // TODO(saeta): CHECK ME!
 #include "swift/AST/IndexSubset.h"
 #include "TestContext.h"
 #include "gtest/gtest.h"
