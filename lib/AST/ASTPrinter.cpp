@@ -3513,9 +3513,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (Options.FullyQualifiedTypes)
       return true;
 
-    if (!Options.FullyQualifiedTypesIfAmbiguous)
-      return false;
-
     Decl *D;
     if (auto *TAT = dyn_cast<TypeAliasType>(T))
       D = TAT->getDecl();
@@ -3528,6 +3525,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return true;
 
     ModuleDecl *M = D->getDeclContext()->getParentModule();
+    if (M->isBuiltinModule())
+      return true;
+
+    if (!Options.FullyQualifiedTypesIfAmbiguous)
+      return false;
 
     if (Options.CurrentModule && M == Options.CurrentModule) {
       return false;
