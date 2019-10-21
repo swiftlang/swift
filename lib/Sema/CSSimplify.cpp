@@ -4970,8 +4970,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
       if (auto *VD = dyn_cast<VarDecl>(decl)) {
         if (PBI->getBinding() == VD->getParentPatternBinding()) {
-          result.addUnviable(candidate,
-                             MemberLookupResult::UR_InstanceMemberOnType);
+          // If this is a recursive reference to an instance variable,
+          // try to see if we can give a good diagnostic by adding it as
+          // an unviable candidate.
+          if (!VD->isStatic()) {
+            result.addUnviable(candidate,
+                               MemberLookupResult::UR_InstanceMemberOnType);
+          }
           return;
         }
       }
