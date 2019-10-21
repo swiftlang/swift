@@ -388,6 +388,20 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
   return %29 : $()
 }
 
+sil @actually_not_throwing: $@convention(thin) (Builtin.Int32) -> (@owned Builtin.Int32, @error Error)
+
+// CHECK-LABEL: sil @remove_throwing_thin_to_not_throwing_thick_conversion
+// CHECK: [[FN:%[0-9]+]] = function_ref
+// CHECK: apply [nothrow] [[FN]](%0)
+// CHECK: } // end sil function 'remove_throwing_thin_to_not_throwing_thick_conversion'
+sil @remove_throwing_thin_to_not_throwing_thick_conversion : $@convention(thin) (Builtin.Int32) -> @owned Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %2 = function_ref @actually_not_throwing : $@convention(thin) (Builtin.Int32) -> (@owned Builtin.Int32, @error Error)
+  %3 = thin_to_thick_function %2 : $@convention(thin) (Builtin.Int32) -> (@owned Builtin.Int32, @error Error) to $@callee_guaranteed (Builtin.Int32) -> @owned Builtin.Int32
+  %5 = apply %3(%0) : $@callee_guaranteed (Builtin.Int32) -> @owned Builtin.Int32
+  return %5 : $Builtin.Int32
+}
+
 sil @testCombineClosureHelper : $(Builtin.Int32) -> ()
 
 // Test function_ref -> partial_apply -> convert_function -> apply.
