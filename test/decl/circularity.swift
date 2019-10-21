@@ -43,3 +43,15 @@ class Sub: Base {
         return foo(1) // expected-error {{variable used within its own initial value}}
     }()
 }
+
+extension Float {
+    static let pickMe: Float = 1
+}
+
+extension SIMD3 {
+  init(_ scalar: Scalar) { self.init(repeating: scalar) }
+}
+
+extension SIMD3 where SIMD3.Scalar == Float {
+    static let pickMe = SIMD3(.pickMe)
+}
