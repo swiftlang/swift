@@ -2564,7 +2564,7 @@ public:
     }
 
     ctor->setImplicitlyUnwrappedOptional(isIUO);
-    ctor->computeType();
+    (void)ctor->getInterfaceType();
 
     return ctor;
   }
@@ -3036,8 +3036,8 @@ public:
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
-    // Set the interface type.
-    fn->computeType();
+    // Compute the interface type.
+    (void)fn->getInterfaceType();
 
     return fn;
   }
@@ -3820,7 +3820,7 @@ public:
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    dtor->computeType();
+    (void)dtor->getInterfaceType();
 
     if (isImplicit)
       dtor->setImplicit();
