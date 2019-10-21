@@ -326,9 +326,9 @@ static ValueDecl *deriveDifferentiable_method(
   auto &C = derived.TC.Context;
   auto *parentDC = derived.getConformanceContext();
 
-  auto *param =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argumentName, SourceLoc(), parameterName, parentDC);
+  auto *param = new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentName,
+                                  SourceLoc(), parameterName, parentDC);
+  param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 
@@ -699,7 +699,6 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  aliasDecl->computeType();
   TC.validateDecl(aliasDecl);
   C.addSynthesizedDecl(aliasDecl);
 };
@@ -845,7 +844,6 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
     aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-    aliasDecl->computeType();
     TC.validateDecl(aliasDecl);
     derived.addMembersToConformanceContext({aliasDecl});
     C.addSynthesizedDecl(aliasDecl);

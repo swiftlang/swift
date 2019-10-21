@@ -151,7 +151,7 @@ autodiff::getLoweredParameterIndices(IndexSubset *indices,
     paramLoweredSizes.push_back(paramLoweredSize);
     totalLoweredSize += paramLoweredSize;
   };
-  for (auto *curryLevel : reversed(curryLevels))
+  for (auto *curryLevel : llvm::reverse(curryLevels))
     for (auto &param : curryLevel->getParams())
       addLoweredParamInfo(param.getPlainType());
 
@@ -183,7 +183,7 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
 
   SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
   unsigned currentOffset = 0;
-  for (unsigned curryLevelIndex : reversed(indices(curryLevels))) {
+  for (unsigned curryLevelIndex : llvm::reverse(indices(curryLevels))) {
     curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
     currentOffset += curryLevels[curryLevelIndex]->getNumParams();
   }

@@ -544,10 +544,9 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
   auto parentDC = property->getDeclContext();
 
   auto propertyInterfaceType = property->getInterfaceType();
-  auto propertyParam = new (C)
-    ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-              Identifier(), property->getLoc(), C.getIdentifier("newValue"),
-              parentDC);
+  auto propertyParam = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
+              property->getLoc(), C.getIdentifier("newValue"), parentDC);
+  propertyParam->setSpecifier(ParamDecl::Specifier::Default);
   propertyParam->setInterfaceType(propertyInterfaceType);
 
   ParameterList *params = ParameterList::create(C, propertyParam);

@@ -4286,7 +4286,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     AFD->computeType();
     // SWIFT_ENABLE_TENSORFLOW
     // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(CD);
+    checkDeclDifferentiableAttributes(AFD);
     // SWIFT_ENABLE_TENSORFLOW END
     break;
   }

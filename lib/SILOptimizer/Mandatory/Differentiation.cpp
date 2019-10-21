@@ -580,7 +580,7 @@ private:
       branchingTraceDecl->setGenericSignature(genericSig);
     computeAccessLevel(branchingTraceDecl,
                        original->getEffectiveSymbolLinkage());
-    branchingTraceDecl->computeType();
+    // branchingTraceDecl->computeType();  // TODO(saeta): FIX ME!
     assert(branchingTraceDecl->hasInterfaceType());
     file.addVisibleDecl(branchingTraceDecl);
     // Add basic block enum cases.
@@ -591,9 +591,9 @@ private:
       auto linearMapStructTy =
           linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
       // Create dummy declaration representing enum case parameter.
-      auto *decl = new (astCtx)
-          ParamDecl(ParamDecl::Specifier::Default, loc, loc, Identifier(), loc,
-                    Identifier(), moduleDecl);
+      auto *decl = new (astCtx) ParamDecl(loc, loc, Identifier(), loc,
+                                          Identifier(), moduleDecl);
+      decl->setSpecifier(ParamDecl::Specifier::Default);
       if (linearMapStructTy->hasArchetype())
         decl->setInterfaceType(linearMapStructTy->mapTypeOutOfContext());
       else
@@ -604,7 +604,7 @@ private:
           /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)),
           paramList, loc, /*RawValueExpr*/ nullptr, branchingTraceDecl);
       enumEltDecl->setImplicit();
-      enumEltDecl->computeType();
+      // enumEltDecl->computeType();  // TODO(saeta): FIX ME!
       auto *enumCaseDecl = EnumCaseDecl::create(
           /*CaseLoc*/ loc, {enumEltDecl}, branchingTraceDecl);
       enumCaseDecl->setImplicit();
@@ -659,7 +659,7 @@ private:
       linearMapStruct->setGenericSignature(genericSig);
     computeAccessLevel(
         linearMapStruct, original->getEffectiveSymbolLinkage());
-    linearMapStruct->computeType();
+    // linearMapStruct->computeType();  // TODO(saeta): FIX ME!
     assert(linearMapStruct->hasInterfaceType());
     file.addVisibleDecl(linearMapStruct);
     return linearMapStruct;
@@ -2017,7 +2017,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   // Propagate usefulness through the function in post-dominance order.
   PostDominanceOrder postDomOrder(&*function.findReturnBB(), pdi);
   while (auto *bb = postDomOrder.getNext()) {
-    for (auto &inst : reversed(*bb)) {
+    for (auto &inst : llvm::reverse(*bb)) {
       for (auto i : indices(outputValues)) {
         // Handle indirect results in `apply`.
         if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
@@ -3239,7 +3239,7 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   auto retVal = joinElements(results, builder, loc);
 
   // Deallocate local allocations.
-  for (auto *alloc : reversed(localAllocations))
+  for (auto *alloc : llvm::reverse(localAllocations))
     builder.createDeallocStack(loc, alloc);
 
   // Create return.
@@ -6610,7 +6610,7 @@ public:
       auto &s = getADDebugStream()
           << "Original bb" + std::to_string(bb->getDebugID())
           << ": To differentiate or not to differentiate?\n";
-      for (auto &inst : reversed(*bb)) {
+      for (auto &inst : llvm::reverse(*bb)) {
         s << (getPullbackInfo().shouldDifferentiateInstruction(&inst)
                   ? "[∂] " : "[ ] ")
           << inst;
@@ -6618,7 +6618,7 @@ public:
     });
 
     // Visit each instruction in reverse order.
-    for (auto &inst : reversed(*bb)) {
+    for (auto &inst : llvm::reverse(*bb)) {
       if (!getPullbackInfo().shouldDifferentiateInstruction(&inst))
         continue;
       // Differentiate instruction.
@@ -6981,7 +6981,7 @@ public:
       }
     }
     // Destroy and deallocate pullback indirect results.
-    for (auto *alloc : reversed(pullbackIndirectResults)) {
+    for (auto *alloc : llvm::reverse(pullbackIndirectResults)) {
       builder.emitDestroyAddrAndFold(loc, alloc);
       builder.createDeallocStack(loc, alloc);
     }
@@ -8312,7 +8312,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
-    for (auto *alloc : reversed(localAllocations))
+    for (auto *alloc : llvm::reverse(localAllocations))
       builder.createDeallocStack(loc, alloc);
     builder.createReturn(loc, ai);
     return {thunk, interfaceSubs};
@@ -8345,7 +8345,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     }
   }
   // Deallocate local allocations and return final direct result.
-  for (auto *alloc : reversed(localAllocations))
+  for (auto *alloc : llvm::reverse(localAllocations))
     builder.createDeallocStack(loc, alloc);
   auto result = joinElements(results, builder, loc);
   builder.createReturn(loc, result);
@@ -8693,7 +8693,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     derivativeFns.push_back(derivativeFn);
   }
   // Deallocate temporary buffers used for creating derivative functions.
-  for (auto *buf : reversed(newBuffersToDealloc))
+  for (auto *buf : llvm::reverse(newBuffersToDealloc))
     builder.createDeallocStack(loc, buf);
 
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);

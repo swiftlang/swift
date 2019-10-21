@@ -323,8 +323,9 @@ static ValueDecl *deriveTensorGroup_constructor(
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argumentName, SourceLoc(), parameterName, parentDC);
+      new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentName, SourceLoc(),
+                        parameterName, parentDC);
+  param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 

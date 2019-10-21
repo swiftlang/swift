@@ -228,8 +228,9 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
     auto *param = new (C)
-        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), C.getIdentifier(name), parentDC);
+        ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                  C.getIdentifier(name), parentDC);
+    param->setSpecifier(ParamDecl::Specifier::Default);
     param->setInterfaceType(type);
     return param;
   };

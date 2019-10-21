@@ -5918,7 +5918,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
                       diag::invalid_differentiable_function_conversion_expr,
                       isToTypeLinear);
           if (paramDecl->getType()->is<AnyFunctionType>()) {
-            auto *typeRepr = paramDecl->getTypeLoc().getTypeRepr();
+            auto *typeRepr = paramDecl->getTypeRepr();
             while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
               typeRepr = attributed->getTypeRepr();
             std::string attributeString = "@differentiable";
@@ -5929,7 +5929,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
             tc.diagnose(paramDecl->getLoc(),
                 diag::invalid_differentiable_function_conversion_parameter,
                 attributeString)
-               .highlight(paramDecl->getTypeLoc().getSourceRange())
+               .highlight(paramDecl->getTypeRepr()->getSourceRange())
                .fixItInsert(paramListLoc, attributeString + " ");
           }
           return;

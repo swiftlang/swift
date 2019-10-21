@@ -1649,7 +1649,7 @@ public:
   ParserResult<Expr> parseExprUnquote();
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
-  ParserResult<Expr> parseExprPoundAssert();
+  ParserResult<Expr> parseExprCollection();
   ParsedSyntaxResult<ParsedExprSyntax> parseExprCollectionSyntax();
   ParsedSyntaxResult<ParsedExprSyntax>
   parseExprArraySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
@@ -1658,6 +1658,7 @@ public:
   parseExprDictionarySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
                             ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
 
+  ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParsedSyntaxResult<ParsedExprSyntax>
   parseExprPoundUnknownSyntax(Optional<ParsedTokenSyntax> &&LSquare,
