@@ -421,7 +421,7 @@ class TestDriverArgumentParser(unittest.TestCase):
 
     def parse_args(self, args, namespace=None):
         namespace, unknown_args = self.parse_args_and_unknown_args(args,
-            namespace)
+                                                                   namespace)
 
         if unknown_args:
             raise ParserError('unknown arguments: ' + str(unknown_args))

@@ -32,9 +32,9 @@ def parse_args(parser, argv):
     """
     args, unknown_args = parser.parse_known_args(
         list(arg for arg in argv if arg != '--'))
-    
+
     args, unknown_args = process_disambiguation_arguments(args, unknown_args)
-    
+
     args.build_script_impl_args = unknown_args
     return args
 
@@ -57,6 +57,7 @@ def process_disambiguation_arguments(args, unknown_args):
         del args.impl_install_swift
 
     return args, unknown_args
+
 
 def check_impl_args(build_script_impl, argv):
     """

@@ -17,6 +17,7 @@ from . import product
 from .. import shell
 from .. import targets
 
+
 class SKStressTester(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -63,8 +64,8 @@ class SKStressTester(product.Product):
     def build(self, host_target):
         if platform.system() != 'Darwin':
             raise RuntimeError("Unable to build {product} on a platform other "
-                               "than Darwin".format(product=self.package_name())
-                               )
+                               "than Darwin".format(
+                                   product=self.package_name()))
 
         self.run_build_script_helper('build')
 
@@ -82,4 +83,3 @@ class SKStressTester(product.Product):
         self.run_build_script_helper('install', [
             '--prefix', install_prefix
         ])
-
