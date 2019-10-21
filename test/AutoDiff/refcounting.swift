@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-skip-folding-differentiable-function-extraction %s | %FileCheck %s
+// REQUIRES: asserts
 
 public class NonTrivialStuff : Equatable {
   public init() {}
