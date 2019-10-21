@@ -2030,10 +2030,12 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
                                                          /*implicit=*/ true));
   }
 
-  return makeParserResult(CaseStmt::create(
-      Context, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
-      /*UnknownAttrLoc*/ SourceLoc(), bodyResult.get()->getStartLoc(),
-      bodyResult.get(), caseBodyDecls, None, nullptr));
+  return makeParserResult(
+      status, CaseStmt::create(Context, CaseParentKind::DoCatch, catchLoc,
+                               caseLabelItems,
+                               /*UnknownAttrLoc*/ SourceLoc(),
+                               bodyResult.get()->getStartLoc(),
+                               bodyResult.get(), caseBodyDecls, None, nullptr));
 }
 
 static bool isStmtForCStyle(Parser &P) {
