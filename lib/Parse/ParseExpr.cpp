@@ -2656,8 +2656,6 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   // to detect any tuple splat or destructuring as early as
   // possible and give a proper fix-it. See SE-0110 for more details.
   auto isTupleDestructuring = [](ParamDecl *param) -> bool {
-    if (!param->isInvalid())
-      return false;
     if (auto *typeRepr = param->getTypeRepr())
       return !param->hasName() && isa<TupleTypeRepr>(typeRepr);
     return false;

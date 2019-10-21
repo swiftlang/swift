@@ -327,6 +327,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // was invalid.  Remember that.
         if (type.isParseError() && !type.hasCodeCompletion())
           param.isInvalid = true;
+      } else if (paramContext != Parser::ParameterContextKind::Closure) {
+        diagnose(Tok, diag::expected_parameter_colon);
+        param.isInvalid = true;
       }
     } else {
       // Otherwise, we have invalid code.  Check to see if this looks like a
@@ -358,8 +361,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // on is most likely argument destructuring, we are going
         // to diagnose that after all of the parameters are parsed.
         if (param.Type) {
-          // Mark current parameter as invalid so it is possible
-          // to diagnose it as destructuring of the closure parameter list.
           param.isInvalid = true;
           if (!isClosure) {
             // Unnamed parameters must be written as "_: Type".
@@ -478,12 +479,6 @@ mapParsedParameters(Parser &parser,
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
 
-    auto setInvalid = [&]{
-      if (param->isInvalid())
-        return;
-      param->setInvalid();
-    };
-
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
     // If we're not parsing an enum case, lack of a SourceLoc for both
@@ -493,7 +488,7 @@ mapParsedParameters(Parser &parser,
     
     // If we diagnosed this parameter as a parse error, propagate to the decl.
     if (paramInfo.isInvalid)
-      setInvalid();
+      param->setInvalid();
     
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
@@ -524,13 +519,6 @@ mapParsedParameters(Parser &parser,
         // or typealias with underlying function type.
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
       }
-    } else if (paramContext != Parser::ParameterContextKind::Closure) {
-      // Non-closure parameters require a type.
-      if (!param->isInvalid())
-        parser.diagnose(param->getLoc(), diag::missing_parameter_type);
-
-      param->setSpecifier(ParamSpecifier::Default);
-      setInvalid();
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
       switch (paramInfo.SpecifierKind) {
