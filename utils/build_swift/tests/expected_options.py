@@ -89,6 +89,8 @@ EXPECTED_DEFAULTS = {
     'build_indexstoredb': False,
     'build_sourcekitlsp': False,
     'install_sourcekitlsp': False,
+    'install_skstresstester': False,
+    'install_swiftevolve': False,
     'build_toolchainbenchmarks': False,
     'build_tvos': True,
     'build_tvos_device': False,
@@ -205,6 +207,8 @@ EXPECTED_DEFAULTS = {
     'test_watchos_simulator': False,
     'test_indexstoredb': False,
     'test_sourcekitlsp': False,
+    'test_skstresstester': False,
+    'test_swiftevolve': False,
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -342,6 +346,14 @@ class IgnoreOption(_BaseOption):
     pass
 
 
+class BuildScriptImplOption(_BaseOption):
+    """Option that gets forwarded to build-script-impl by migration.py and is
+    only listed for disambiguation by argparse.
+    """
+
+    pass
+
+
 # -----------------------------------------------------------------------------
 
 EXPECTED_OPTIONS = [
@@ -464,6 +476,8 @@ EXPECTED_OPTIONS = [
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
     EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
+    EnableOption('--install-skstresstester', dest='install_skstresstester'),
+    EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
     EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
     EnableOption('--tsan-libdispatch-test'),
     EnableOption('--long-test'),
@@ -520,6 +534,8 @@ EXPECTED_OPTIONS = [
                   dest='test_watchos_simulator'),
     DisableOption('--skip-test-indexstore-db', dest='test_indexstoredb'),
     DisableOption('--skip-test-sourcekit-lsp', dest='test_sourcekitlsp'),
+    DisableOption('--skip-test-skstresstester', dest='test_skstresstester'),
+    DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),
@@ -585,6 +601,10 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-for-size'),
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
+
+    # Options forwared to build-script-impl
+    BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
+    BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 
     # NOTE: LTO flag is a special case that acts both as an option and has
     # valid choices
