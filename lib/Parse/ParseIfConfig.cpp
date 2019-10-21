@@ -662,6 +662,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
     // Parse elements
     SmallVector<ASTNode, 16> Elements;
+    llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
+                                 InInactiveClauseEnvironment || !isActive);
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
     } else {

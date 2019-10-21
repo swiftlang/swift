@@ -1105,8 +1105,9 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
-bool TypeConverter::readLegacyTypeInfo(StringRef path) {
-  auto fileOrErr = llvm::MemoryBuffer::getFile(path);
+bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
+                                       StringRef path) {
+  auto fileOrErr = fs.getBufferForFile(path);
   if (!fileOrErr)
     return true;
 
@@ -1209,6 +1210,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  auto fs =
+      IGM.getSwiftModule()->getASTContext().SourceMgr.getFileSystem();
   if (path.empty()) {
     const auto &Triple = IGM.Context.LangOpts.Target;
 
@@ -1225,7 +1228,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     bool found = false;
     for (auto &RuntimeLibraryPath
          : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
-      if (llvm::sys::fs::exists(RuntimeLibraryPath)) {
+      if (fs->exists(RuntimeLibraryPath)) {
         defaultPath.append(RuntimeLibraryPath);
         found = true;
         break;
@@ -1245,7 +1248,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     path = defaultPath;
   }
 
-  bool error = readLegacyTypeInfo(path);
+  bool error = readLegacyTypeInfo(*fs, path);
   if (error)
     llvm::report_fatal_error("Cannot read '" + path + "'");
 }

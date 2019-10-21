@@ -686,7 +686,7 @@ class ExprContextAnalyzer {
     switch (D->getKind()) {
     case DeclKind::PatternBinding: {
       auto PBD = cast<PatternBindingDecl>(D);
-      for (unsigned I = 0; I < PBD->getNumPatternEntries(); ++I) {
+      for (unsigned I : range(PBD->getNumPatternEntries())) {
         if (auto Init = PBD->getInit(I)) {
           if (containsTarget(Init)) {
             if (PBD->getPattern(I)->hasType()) {

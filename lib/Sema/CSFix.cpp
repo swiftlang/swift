@@ -126,13 +126,39 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
   MissingForcedDowncastFailure failure(root, getConstraintSystem(),
+                                       getFromType(), getToType(),
                                        getLocator());
   return failure.diagnose(asNote);
 }
 
-CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
-                                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) CoerceToCheckedCast(cs, locator);
+CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
+                                                  Type fromType, Type toType,
+                                                  ConstraintLocator *locator) {
+  // If any of the types has a type variable, don't add the fix. 
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return nullptr;
+
+  auto &TC = cs.getTypeChecker();
+
+  auto *expr = locator->getAnchor();
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    expr = assignExpr->getSrc();
+  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
+  if (!coerceExpr)
+    return nullptr;
+
+  auto subExpr = coerceExpr->getSubExpr();
+  auto castKind =
+      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                              cs.DC, coerceExpr->getLoc(), subExpr,
+                              coerceExpr->getCastTypeLoc().getSourceRange());
+
+  // Invalid cast.
+  if (castKind == CheckedCastKind::Unresolved)
+    return nullptr;
+
+  return new (cs.getAllocator())
+      CoerceToCheckedCast(cs, fromType, toType, locator);
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {
@@ -492,6 +518,42 @@ AddMissingArguments::create(ConstraintSystem &cs,
   return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
 }
 
+bool RemoveExtraneousArguments::diagnose(Expr *root, bool asNote) const {
+  ExtraneousArgumentsFailure failure(root, getConstraintSystem(),
+                                     ContextualType, getExtraArguments(),
+                                     getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool RemoveExtraneousArguments::isMinMaxNameShadowing(
+    ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+  auto *anchor = dyn_cast_or_null<CallExpr>(locator.getAnchor());
+  if (!anchor)
+    return false;
+
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor->getFn())) {
+    if (auto *baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+      auto *decl = baseExpr->getDecl();
+      if (baseExpr->isImplicit() && decl &&
+          decl->getFullName() == cs.getASTContext().Id_self) {
+        auto memberName = UDE->getName();
+        return memberName.isSimpleName("min") || memberName.isSimpleName("max");
+      }
+    }
+  }
+
+  return false;
+}
+
+RemoveExtraneousArguments *RemoveExtraneousArguments::create(
+    ConstraintSystem &cs, FunctionType *contextualType,
+    llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<IndexedParam>(extraArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(RemoveExtraneousArguments));
+  return new (mem)
+      RemoveExtraneousArguments(cs, contextualType, extraArgs, locator);
+}
+
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
   OutOfOrderArgumentFailure failure(root, getConstraintSystem(), ArgIdx,
                                     PrevArgIdx, Bindings, getLocator());
@@ -735,8 +797,15 @@ bool AllowTupleSplatForSingleParameter::attempt(
     //
     // We'd want to suggest argument list to be `x: (0, 1)` instead
     // of `(x: 0, 1)` which would be incorrect.
-    if (index == 0 && param.getLabel() == label)
-      label = Identifier();
+    if (param.hasLabel() && label == param.getLabel()) {
+      if (index == 0) {
+        label = Identifier();
+      } else {
+        // If label match anything other than first argument,
+        // this can't be a tuple splat.
+        return true;
+      }
+    }
 
     // Tuple can't have `inout` elements.
     if (flags.isInOut())

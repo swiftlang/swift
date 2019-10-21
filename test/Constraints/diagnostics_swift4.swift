@@ -24,7 +24,7 @@ extension C_2505 {
 class C2_2505: P_2505 {
 }
 
-let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{incorrect argument label in call (have 'arg:', expected 'from:')}}
+let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{extraneous argument label 'arg:' in call}}
 
 // rdar://problem/31898542 - Swift 4: 'type of expression is ambiguous without more context' errors, without a fixit
 

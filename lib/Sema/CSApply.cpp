@@ -4455,7 +4455,6 @@ namespace {
           SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
-      param->setType(baseTy);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
       param->setSpecifier(ParamSpecifier::Default);
 
@@ -4471,7 +4470,6 @@ namespace {
                               /*argument label*/ SourceLoc(), Identifier(),
                               /*parameter name*/ SourceLoc(),
                               ctx.getIdentifier("$kp$"), outerClosure);
-      outerParam->setType(keyPathTy);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
       outerParam->setSpecifier(ParamSpecifier::Default);
 
@@ -4505,6 +4503,10 @@ namespace {
       outerClosure->setBody(closure);
       outerClosure->setType(outerClosureTy);
       cs.cacheType(outerClosure);
+
+      // The inner closure at least will definitely have a capture.
+      cs.TC.ClosuresWithUncomputedCaptures.push_back(outerClosure);
+      cs.TC.ClosuresWithUncomputedCaptures.push_back(closure);
 
       // let outerApply = "\( outerClosure )( \(E) )"
       auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
@@ -4650,7 +4652,6 @@ namespace {
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 
-      E->getVar()->setType(type);
       E->getVar()->setInterfaceType(type->mapTypeOutOfContext());
 
       cs.setType(E, type);

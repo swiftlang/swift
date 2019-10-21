@@ -16,7 +16,7 @@ class ProtoWithVersionedUnavailableMemberImpl: ProtoWithVersionedUnavailableMemb
 func testNonGeneric() {
   // CHECK-DIAGS-4:[[@LINE+1]]:{{[0-9]+}}: error: cannot convert value of type 'Any' to specified type 'Int'
   let _: Int = NewlyGenericSub.defaultElement()
-  // CHECK-DIAGS-5:[[@LINE-1]]:{{[0-9]+}}: error: generic parameter 'Element' could not be inferred
+  // CHECK-DIAGS-5:[[@LINE-1]]:{{[0-9]+}}: error: generic class 'NewlyGenericSub' requires that 'Int' be a class type
 
   // CHECK-DIAGS-4:[[@LINE+1]]:{{[0-9]+}}: error: cannot specialize non-generic type 'NewlyGenericSub'
   let _: Int = NewlyGenericSub<Base>.defaultElement()

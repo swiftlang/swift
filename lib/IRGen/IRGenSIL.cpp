@@ -5466,11 +5466,19 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
 
+  // The condition should be false, or we die.
+  auto expectedCond = Builder.CreateExpect(cond,
+                                         llvm::ConstantInt::get(IGM.Int1Ty, 0));
+  
   // Emit individual fail blocks so that we can map the failure back to a source
   // line.
+  auto origInsertionPoint = Builder.GetInsertBlock();
+
   llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  Builder.CreateCondBr(cond, failBB, contBB);
+  Builder.CreateCondBr(expectedCond, failBB, contBB);
+    
+  Builder.SetInsertPoint(&CurFn->back());
   Builder.emitBlock(failBB);
   if (IGM.DebugInfo)
     // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
@@ -5479,6 +5487,8 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
     // in CodeView.
     IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
   emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
+  
+  Builder.SetInsertPoint(origInsertionPoint);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
 }

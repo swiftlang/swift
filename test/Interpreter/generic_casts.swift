@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -Onone %s -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-codesign %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | %FileCheck %s
@@ -130,6 +132,58 @@ allClassesToCOrE(X()).print() // CHECK: E!
 anyClassToCOrE(C()).print() // CHECK: C!
 anyClassToCOrE(D()).print() // CHECK: D!
 anyClassToCOrE(X()).print() // CHECK: E!
+
+protocol P {}
+struct PS: P {}
+enum PE: P {}
+class PC: P {}
+class PCSub: PC {}
+
+func nongenericAnyIsP(type: Any.Type) -> Bool {
+  return type is P.Type
+}
+func nongenericAnyIsPAndAnyObject(type: Any.Type) -> Bool {
+  return type is (P & AnyObject).Type
+}
+func nongenericAnyIsPAndPCSub(type: Any.Type) -> Bool {
+  return type is (P & PCSub).Type
+}
+func genericAnyIs<T>(type: Any.Type, to: T.Type) -> Bool {
+  return type is T.Type
+}
+// CHECK-LABEL: casting types to protocols with generics:
+print("casting types to protocols with generics:")
+print(nongenericAnyIsP(type: PS.self)) // CHECK: true
+print(genericAnyIs(type: PS.self, to: P.self)) // CHECK-ONONE: true
+print(nongenericAnyIsP(type: PE.self)) // CHECK: true
+print(genericAnyIs(type: PE.self, to: P.self)) // CHECK-ONONE: true
+print(nongenericAnyIsP(type: PC.self)) // CHECK: true
+print(genericAnyIs(type: PC.self, to: P.self)) // CHECK-ONONE: true
+print(nongenericAnyIsP(type: PCSub.self)) // CHECK: true
+print(genericAnyIs(type: PCSub.self, to: P.self)) // CHECK-ONONE: true
+
+// CHECK-LABEL: casting types to protocol & AnyObject existentials:
+print("casting types to protocol & AnyObject existentials:")
+print(nongenericAnyIsPAndAnyObject(type: PS.self)) // CHECK: false
+print(genericAnyIs(type: PS.self, to: (P & AnyObject).self)) // CHECK: false
+print(nongenericAnyIsPAndAnyObject(type: PE.self)) // CHECK: false
+print(genericAnyIs(type: PE.self, to: (P & AnyObject).self)) // CHECK: false
+print(nongenericAnyIsPAndAnyObject(type: PC.self)) // CHECK: true
+print(genericAnyIs(type: PC.self, to: (P & AnyObject).self)) // CHECK-ONONE: true
+print(nongenericAnyIsPAndAnyObject(type: PCSub.self)) // CHECK: true
+print(genericAnyIs(type: PCSub.self, to: (P & AnyObject).self)) // CHECK-ONONE: true
+
+// CHECK-LABEL: casting types to protocol & class existentials:
+print("casting types to protocol & class existentials:")
+print(nongenericAnyIsPAndPCSub(type: PS.self)) // CHECK: false
+print(genericAnyIs(type: PS.self, to: (P & PCSub).self)) // CHECK: false
+print(nongenericAnyIsPAndPCSub(type: PE.self)) // CHECK: false
+print(genericAnyIs(type: PE.self, to: (P & PCSub).self)) // CHECK: false
+//print(nongenericAnyIsPAndPCSub(type: PC.self)) // CHECK-SR-11565: false -- FIXME: reenable this when SR-11565 is fixed
+print(genericAnyIs(type: PC.self, to: (P & PCSub).self)) // CHECK: false
+print(nongenericAnyIsPAndPCSub(type: PCSub.self)) // CHECK: true
+print(genericAnyIs(type: PCSub.self, to: (P & PCSub).self)) // CHECK-ONONE: true
+
 
 // CHECK-LABEL: type comparisons:
 print("type comparisons:\n")

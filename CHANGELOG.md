@@ -58,6 +58,29 @@ Swift 5.2
   (foo as Magic)(5)
   ```
 
+* [SR-11298][]:
+
+  A class-constrained protocol extension, where the extended protocol does
+  not impose a class constraint, will now infer the constraint implicitly.
+
+  ```swift
+  protocol Foo {}
+  class Bar: Foo {
+    var someProperty: Int = 0
+  }
+
+  // Even though 'Foo' does not impose a class constraint, it is automatically
+  // inferred due to the Self: Bar constraint.
+  extension Foo where Self: Bar {
+    var anotherProperty: Int {
+      get { return someProperty }
+      // As a result, the setter is now implicitly nonmutating, just like it would
+      // be if 'Foo' had a class constraint.
+      set { someProperty = newValue }
+    }
+  }
+  ```
+
 * [SE-0253][]:
 
   Values of types that declare `func callAsFunction` methods can be called
@@ -83,7 +106,7 @@ Swift 5.2
 
 * [SR-4206][]:
 
-  A method override is no longer allowed to have a generic signature with 
+  A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
 
   ```
@@ -7799,4 +7822,5 @@ Swift 1.0
 [SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
+[SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>

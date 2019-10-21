@@ -261,7 +261,13 @@ public:
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
-  
+
+  /// Returns whether this context has value semantics.
+  bool hasValueSemantics() const;
+
+  /// Returns whether this context is an extension constrained to a class type.
+  bool isClassConstrainedProtocolExtension() const;
+
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.

@@ -311,13 +311,6 @@ EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-DisableFunctionBuilderOneWayConstraints(
-    "disable-function-builder-one-way-constraints",
-    llvm::cl::desc("Disable one-way constraints in function builders"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
            llvm::cl::desc("Whether to skip printing destructors"),
            llvm::cl::cat(Category),
@@ -1510,7 +1503,7 @@ private:
 
   void printLoc(SourceLoc Loc, raw_ostream &OS) {
     OS << '@';
-    if (Loc.isValid()) {
+    if (Loc.isValid() && SM.findBufferContainingLoc(Loc) == BufferID) {
       auto LineCol = SM.getLineAndColumn(Loc, BufferID);
       OS  << LineCol.first << ':' << LineCol.second;
     }
@@ -1527,16 +1520,16 @@ private:
         OS << 'i';
       if (isa<ConstructorDecl>(D) && Entity.IsRef) {
         OS << "Ctor";
-        printLoc(D->getLoc(), OS);
+        printLoc(D->getLoc(/*SerializedOK*/false), OS);
         if (Entity.CtorTyRef) {
           OS << '-';
           OS << Decl::getKindName(Entity.CtorTyRef->getKind());
-          printLoc(Entity.CtorTyRef->getLoc(), OS);
+          printLoc(Entity.CtorTyRef->getLoc(/*SerializedOK*/false), OS);
         }
       } else {
         OS << Decl::getKindName(D->getKind());
         if (Entity.IsRef)
-          printLoc(D->getLoc(), OS);
+          printLoc(D->getLoc(/*SerializedOK*/false), OS);
       }
 
     } else {
@@ -3345,8 +3338,6 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
-  InitInvok.getLangOptions().FunctionBuilderOneWayConstraints =
-    !options::DisableFunctionBuilderOneWayConstraints;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=

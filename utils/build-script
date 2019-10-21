@@ -305,8 +305,6 @@ class BuildScriptInvocation(object):
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
             "--swiftsyntax-build-type", args.build_variant,
-            "--skstresstester-build-type", args.build_variant,
-            "--swiftevolve-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -437,10 +435,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-swiftpm"]
         if not args.build_swiftsyntax:
             impl_args += ["--skip-build-swiftsyntax"]
-        if not args.build_skstresstester:
-            impl_args += ["--skip-build-skstresstester"]
-        if not args.build_swiftevolve:
-            impl_args += ["--skip-build-swiftevolve"]
         if not args.build_playgroundsupport:
             impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
@@ -485,8 +479,6 @@ class BuildScriptInvocation(object):
                           "--skip-test-llbuild",
                           "--skip-test-swiftpm",
                           "--skip-test-swiftsyntax",
-                          "--skip-test-skstresstester",
-                          "--skip-test-swiftevolve",
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
@@ -790,9 +782,12 @@ class BuildScriptInvocation(object):
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=self.workspace.build_dir(
                         host_target, product_name))
-                product.build(host_target)
-                product.test(host_target)
-                product.install(host_target)
+                if product.should_build(host_target):
+                    product.build(host_target)
+                if product.should_test(host_target):
+                    product.test(host_target)
+                if product.should_install(host_target):
+                    product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:

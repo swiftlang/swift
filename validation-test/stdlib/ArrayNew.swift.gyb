@@ -6,6 +6,9 @@
 // RUN: %target-codesign %t/Array && %line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
+// FIXME: rdar://problem/55944126
+// UNSUPPORTED: CPU=armv7s || CPU=armv7k
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 

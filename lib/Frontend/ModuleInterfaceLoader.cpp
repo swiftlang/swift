@@ -764,6 +764,7 @@ class ModuleInterfaceLoaderImpl {
       }
     }
 
+    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
     // Finally, if there's a module adjacent to the .swiftinterface that we can
     // _likely_ load (it validates OK and is up to date), bail early with
     // errc::not_supported, so the next (serialized) loader in the chain will
@@ -989,6 +990,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
   StringRef ModuleDocFilename,
   StringRef ModuleSourceInfoFilename,
+  SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
@@ -1035,6 +1037,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   if (ModuleBuffer) {
     *ModuleBuffer = std::move(*ModuleBufferOrErr);
+    if (ModuleInterfacePath)
+      *ModuleInterfacePath = InPath;
   }
   // Open .swiftsourceinfo file if it's present.
   SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,

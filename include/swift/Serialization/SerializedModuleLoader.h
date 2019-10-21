@@ -31,8 +31,8 @@ enum class ModuleLoadingMode {
   OnlySerialized
 };
 
-/// Common functionality shared between \c SerializedModuleLoader and
-/// \c ModuleInterfaceLoader.
+/// Common functionality shared between \c SerializedModuleLoader,
+/// \c ModuleInterfaceLoader and \c MemoryBufferSerializedModuleLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
@@ -43,14 +43,17 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
+  bool IgnoreSwiftSourceInfoFile;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
-                             ModuleLoadingMode LoadMode);
+                             ModuleLoadingMode LoadMode,
+                             bool IgnoreSwiftSourceInfoFile);
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
 
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   bool findModule(AccessPathElem moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
@@ -72,6 +75,7 @@ protected:
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
       StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
@@ -125,6 +129,7 @@ public:
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+                    StringRef moduleInterfacePath,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
@@ -168,14 +173,15 @@ public:
 class SerializedModuleLoader : public SerializedModuleLoaderBase {
 
   SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
-                         ModuleLoadingMode loadMode)
-    : SerializedModuleLoaderBase(ctx, tracker, loadMode)
+                         ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
   {}
 
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
       StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
@@ -197,9 +203,10 @@ public:
   /// into the given ASTContext.
   static std::unique_ptr<SerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
-         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
+         bool IgnoreSwiftSourceInfo = false) {
     return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker, loadMode)
+      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
     };
   }
 };
@@ -211,13 +218,16 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 
   MemoryBufferSerializedModuleLoader(ASTContext &ctx,
                                      DependencyTracker *tracker,
-                                     ModuleLoadingMode loadMode)
-      : SerializedModuleLoaderBase(ctx, tracker, loadMode) {}
+                                     ModuleLoadingMode loadMode,
+                                     bool IgnoreSwiftSourceInfo)
+      : SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                                   IgnoreSwiftSourceInfo) {}
 
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
       StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
@@ -253,9 +263,11 @@ public:
   /// into the given ASTContext.
   static std::unique_ptr<MemoryBufferSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
-         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
+         bool IgnoreSwiftSourceInfo = false) {
     return std::unique_ptr<MemoryBufferSerializedModuleLoader>{
-        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode)};
+        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode,
+                                               IgnoreSwiftSourceInfo)};
   }
 };
 

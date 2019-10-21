@@ -1606,8 +1606,8 @@ namespace {
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
 static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
-  for (auto entry : binding->getPatternList()) {
-    auto var = FindFirstVariable().visit(entry.getPattern());
+  for (auto idx : range(binding->getNumPatternEntries())) {
+    auto var = FindFirstVariable().visit(binding->getPattern(idx));
     if (var) return var;
   }
   // Pattern-binding bound without variables exists in erroneous code, e.g.

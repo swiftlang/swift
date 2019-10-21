@@ -1454,7 +1454,7 @@ public:
 
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
-      const PatternBindingEntry &entry,
+      VarDecl *anchoringVar,
       SubstitutionMap subs,
       CanType resultType,
       AbstractionPattern origResultType,

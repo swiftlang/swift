@@ -444,7 +444,7 @@ private:
         Dir = CurDir;
     }
     llvm::DIFile *F = DBuilder.createFile(File, Dir, CSInfo, Source);
-    DIFileCache[FileName.data()].reset(F);
+    DIFileCache[FileName].reset(F);
     return F;
   }
 

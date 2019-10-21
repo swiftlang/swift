@@ -53,13 +53,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the type and declaration attributes of a value.
-  ///
-  /// This can be called when the type or signature of a value is needed.
-  /// It does not perform full type-checking, only checks for basic
-  /// consistency and provides the value a type.
-  virtual void resolveDeclSignature(ValueDecl *VD) = 0;
-
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 

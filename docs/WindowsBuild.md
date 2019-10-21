@@ -9,7 +9,7 @@ Visual Studio 2017 or newer is needed to build swift on Windows.
   installation.
 
 ## 2. Clone the repositories
-1. Configure git to work with Unix file endings
+1. Configure git to work with Unix file endings (ie `git config --global core.autocrlf false`)
 1. Create a folder to contain all the Swift repositories
 1. Clone `apple/swift-cmark` into a folder named `cmark`
 1. Clone `apple/swift-clang` into a folder named `clang`
@@ -51,28 +51,22 @@ git clone https://github.com/curl/curl.git
 git clone https://gitlab.gnome.org/GNOME/libxml2.git
 ```
 
-## 3. Acquire ICU
-1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the folder to a new folder called `thirdparty`. In other words, there should be a folder `S:\thirdparty\icu4c-64_2-Win64-MSVC2017` with the ICU. 
-1. Add the `bin64` folder to your `Path` environment variable.
+## 3. Acquire ICU, SQLite3, curl, libxml2
+1. Go to https://dev.azure.com/compnerd/windows-swift and scroll down to "Dependencies" where you'll see bots (hopefully green) for icu, SQLite, curl, and libxml2. Download each of the zip files and copy their contents into S:/Library. The directory structure should resemble:
 
-```cmd
-PATH S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;%PATH%
+```
+S:/Library/
+          /icu-64/usr
+          /libcurl-development/usr
+          /libxml2-development/usr
+          /sqlite-3.28.0/usr
+          /zlib-1.2.11/usr
 ```
 
-## 4. Fetch SQLite3
+## 4. Get ready
+- From within a **NATIVE developer** command prompt (not PowerShell nor cmd, but the [Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC (The Native Developer command prompt is situated at "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Visual Studio 2019\Visual Studio Tools\VC\x64 Native Tools Command Prompt for VS 2019.lnk").
 
-```powershell
-(New-Object System.Net.WebClient).DownloadFile("https://www.sqlite.org/2019/sqlite-amalgamation-3270200.zip", "S:\sqlite-amalgamation-3270200.zip")
-Add-Type -A System.IO.Compression.FileSystem
-[IO.Compression.ZipFile]::ExtractToDirectory("S:\sqlite-amalgamation-3270200.zip", "S:\")
-```
-
-## 5. Get ready
-- From within a **developer** command prompt (not PowerShell nor cmd, but the [Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC.
-
-```cmd
-VsDevCmd -arch=amd64
-```
+Run this as administrator the first time, for setting up the symlinks below. 
 
 If instead you're compiling for a 32-bit Windows target, adapt the `arch` argument to `x86` and run
 
@@ -98,7 +92,7 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
-## 6. Build LLVM/Clang
+## 5. Build LLVM/Clang
 - This must be done from within a developer command prompt. Make sure that the build
   type for LLVM/Clang is compatible with the build type for Swift. That is,
   either build everything `Debug` or some variant of `Release` (e.g. `Release`,
@@ -124,7 +118,7 @@ ninja
 ```cmd
 path S:\b\llvm\bin;%PATH%
 ```
-## 7. Build CMark
+## 6. Build CMark
 - This must be done from within a developer command prompt.
 
 ```cmd
@@ -138,7 +132,7 @@ cmake -G Ninja^
 ninja
 ```
 
-## 8. Build Swift
+## 7. Build Swift
 - This must be done from within a developer command prompt
 - Note that Visual Studio vends a 32-bit python 2.7 installation in `C:\Python27` and a 64-bit python in `C:\Python27amd64`.  You may use either one based on your installation.
 
@@ -157,10 +151,10 @@ cmake -G Ninja^
  -DLLVM_DIR=S:\b\llvm\lib\cmake\llvm^
  -DClang_DIR=S:\b\llvm\lib\cmake\clang^
  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
- -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/include"^
- -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/lib64/icuuc.lib"^
- -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/include"^
- -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/lib64/icuin.lib"^
+ -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include"^
+ -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib"^
+ -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include"^
+ -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib"^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
  -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
  S:\swift
@@ -178,7 +172,7 @@ ninja
 cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 ```
 
-## 9. Build lldb
+## 8. Build lldb
 - This must be done from within a developer command prompt.
 
 ```cmd
@@ -196,16 +190,16 @@ cmake -G Ninja^
 ninja
 ```
 
-## 10. Running tests on Windows
+## 9. Running tests on Windows
 
 Running the testsuite on Windows has additional external dependencies.
 
 ```cmd
-path S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-64\usr\bin;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\swift check-swift
 ```
 
-## 11. Build swift-corelibs-libdispatch
+## 10. Build swift-corelibs-libdispatch
 
 ```cmd
 md "S:\b\libdispatch"
@@ -226,24 +220,7 @@ ninja
 path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
 ```
 
-## 12. Build curl
-
-```cmd
-cd "S:\curl"
-.\buildconf.bat
-cd winbuild
-nmake /f Makefile.vc mode=static VC=15 MACHINE=x64
-```
-
-## 13. Build libxml2
-
-```cmd
-cd "S:\libxml2\win32"
-cscript //E:jscript configure.js iconv=no
-nmake /f Makefile.msvc
-```
-
-## 14. Build swift-corelibs-foundation
+## 11. Build swift-corelibs-foundation
 
 ```cmd
 md "S:\b\foundation"
@@ -255,7 +232,7 @@ cmake -G Ninja^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DENABLE_TESTING=NO^
-  -DICU_ROOT="S:/thirdparty/icu4c-64_2-Win64-MSVC2017"^
+  -DICU_ROOT="S:/Library/icu-64"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
@@ -269,7 +246,7 @@ ninja
 path S:\b\foundation;%PATH%
 ```
 
-## 15. Build swift-corelibs-xctest
+## 12. Build swift-corelibs-xctest
 
 ```cmd
 md "S:\b\xctest"
@@ -292,13 +269,13 @@ ninja
 path S:\b\xctest;%PATH%
 ```
 
-## 16. Test XCTest
+## 13. Test XCTest
 
 ```cmd
 ninja -C S:\b\xctest check-xctest
 ```
 
-## 17. Rebuild Foundation
+## 14. Rebuild Foundation
 
 ```cmd
 cd "S:\b\foundation
@@ -309,7 +286,7 @@ cmake -G Ninja^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DENABLE_TESTING=YES^
-  -DICU_ROOT="S:/thirdparty/icu4c-64_2-Win64-MSVC2017"^
+  -DICU_ROOT="S:/Library/icu-64"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
@@ -319,27 +296,14 @@ cmake -G Ninja^
 ninja
 ```
 
-## 18. Test Foundation
+## 15. Test Foundation
 
 ```cmd
 cmake --build S:\b\foundation
 ninja -C S:\b\foundation test 
 ```
 
-## 19. Build SQLite3
-
-```cmd
-md S:\b\sqlite
-cd S:\b\sqlite
-cl /MD /Ox /Zi /LD /DSQLITE_API=__declspec(dllexport) S:\sqlite-amalgamation-3270200\sqlite3.c
-```
-
- - Add SQLite3 to your path:
-```cmd
-path S:\b\sqlite;%PATH%
-```
-
-## 20. Build llbuild
+## 16. Build llbuild
 
 ```cmd
 md S:\b\llbuild
@@ -364,7 +328,7 @@ ninja
 path S:\b\llbuild\bin;%PATH%
 ```
 
-## 21. Build swift-package-manager
+## 17. Build swift-package-manager
 
 ```cmd
 md S:\b\spm
@@ -372,7 +336,7 @@ cd S:\b\spm
 C:\Python27\python.exe S:\swift-package-manager\Utilities\bootstrap --foundation S:\b\foundation --libdispatch-build-dir S:\b\libdispatch --libdispatch-source-dir S:\swift-corelibs-libdispatch --llbuild-build-dir S:\b\llbuild --llbuild-source-dir S:\llbuild --sqlite-build-dir S:\b\sqlite --sqlite-source-dir S:\sqlite-amalgamation-3270200
 ```
 
-## 22. Install Swift on Windows
+## 18. Install Swift on Windows
 
 - Run ninja install:
 
@@ -387,5 +351,5 @@ ninja -C S:\b\swift install
 If you resume development from a new shell, the path will need to be readjusted.  The following will add the correct search order to the path:
 
 ```cmd
-path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\llvm\bin;S:\b\swift\bin;S:\b\libdispatch;S:\b\libdispatch\src;S:\b\foundation;S:\b\xctest;S:\b\llbuild\bin;S:\b\sqlite;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-64\bin;S:\b\llvm\bin;S:\b\swift\bin;S:\b\libdispatch;S:\b\libdispatch\src;S:\b\foundation;S:\b\xctest;S:\b\llbuild\bin;S:\b\sqlite;%PATH%;%ProgramFiles%\Git\usr\bin
 ```

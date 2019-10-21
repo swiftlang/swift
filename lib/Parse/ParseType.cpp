@@ -352,9 +352,9 @@ Parser::parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion,
   // Don't consume 'throws', if the next token is not '->', so we can emit a
   // more useful diagnostic when parsing a function decl.
   bool canBeFunctionTy =
-      Tok.is(tok::arrow) ||
-      (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
-       peekToken().is(tok::arrow));
+      Tok.is(tok::arrow) || (Tok.isAny(tok::kw_throws, tok::kw_rethrows,
+                                       tok::kw_throw, tok::kw_try) &&
+                             peekToken().is(tok::arrow));
 
   // If the first type has an error, or this is not a function type, return the
   // first result.
@@ -380,7 +380,7 @@ Parser::parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion,
 
   // Parse a throws specifier.
   Optional<ParsedTokenSyntax> throws;
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
+  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw, tok::kw_try) &&
       peekToken().is(tok::arrow)) {
     if (Tok.isNot(tok::kw_throws)) {
       // 'rethrows' is only allowed on function declarations for now.

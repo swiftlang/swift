@@ -798,12 +798,6 @@ public:
   GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
 
-  void validateDecl(ValueDecl *D);
-
-  /// Validate the given extension declaration, ensuring that it
-  /// properly extends the nominal type it names.
-  void validateExtension(ExtensionDecl *ext);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///
@@ -1020,12 +1014,8 @@ public:
   void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
-  Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
-                                   ReferenceOwnershipAttr *attr);
-
-  virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD);
-  }
+  static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
+                                          ReferenceOwnershipAttr *attr);
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
@@ -1883,16 +1873,9 @@ public:
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
-  /// has a name with that prefix, an llvm fatal_error is triggered.
+  /// name starts with that prefix, an llvm fatal_error is triggered.
   /// This is for testing purposes.
-  void checkForForbiddenPrefix(const Decl *D);
-  void checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E);
-  void checkForForbiddenPrefix(Identifier Ident);
-  void checkForForbiddenPrefix(StringRef Name);
-
-  bool hasEnabledForbiddenTypecheckPrefix() const {
-    return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
-  }
+  static void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
   /// Check error handling in the given type-checked top-level code.
   void checkTopLevelErrorHandling(TopLevelCodeDecl *D);

@@ -188,7 +188,7 @@ public:
     TokKind = uint16_t(tok::unknown);
     DK = DataKind::Null;
     IsMissing = false;
- }
+  }
 
   ParsedRawSyntaxNode unsafeCopy() const {
     ParsedRawSyntaxNode copy;

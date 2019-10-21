@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Module.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -83,7 +84,7 @@ class NonInlinableFunctionSkippingChecker : public SILModuleTransform {
       return;
 
     // Skip this verification for SwiftOnoneSupport
-    if (getModule()->isOptimizedOnoneSupportModule())
+    if (getModule()->getSwiftModule()->isOnoneSupportModule())
       return;
 
     for (auto &F : *getModule()) {

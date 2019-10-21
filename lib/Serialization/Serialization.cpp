@@ -1851,11 +1851,10 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
 
   StringRef initStr;
   SmallString<128> scratch;
-  auto &entry = binding->getPatternList()[bindingIndex];
-  auto varDecl = entry.getAnchoringVarDecl();
-  if (entry.hasInitStringRepresentation() &&
+  auto varDecl = binding->getAnchoringVarDecl(bindingIndex);
+  if (binding->hasInitStringRepresentation(bindingIndex) &&
       varDecl->isInitExposedToClients()) {
-    initStr = entry.getInitStringRepresentation(scratch);
+    initStr = binding->getInitStringRepresentation(bindingIndex, scratch);
   }
 
   PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
@@ -2698,7 +2697,7 @@ public:
     SmallVector<uint64_t, 2> initContextIDs;
     for (unsigned i : range(binding->getNumPatternEntries())) {
       auto initContextID =
-          S.addDeclContextRef(binding->getPatternList()[i].getInitContext());
+          S.addDeclContextRef(binding->getInitContext(i));
       if (!initContextIDs.empty()) {
         initContextIDs.push_back(initContextID.getOpaqueValue());
       } else if (initContextID) {
@@ -2719,8 +2718,8 @@ public:
     if (binding->getDeclContext()->isTypeContext())
       owningDC = binding->getDeclContext();
 
-    for (auto entry : binding->getPatternList()) {
-      writePattern(entry.getPattern());
+    for (auto entryIdx : range(binding->getNumPatternEntries())) {
+      writePattern(binding->getPattern(entryIdx));
       // Ignore initializer; external clients don't need to know about it.
     }
   }

@@ -17,7 +17,7 @@ do {
   typealias Alias2 = () -> (a b: [Generic<Int
 }
 do {
-  typealias Alias3 = (a b C, 
+  typealias Alias3 = (a b C,
 }
 do {
   typealias Alias3 = () -> @objc func

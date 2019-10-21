@@ -720,27 +720,6 @@ static bool validateTypedPattern(TypeChecker &TC,
 
   assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
 
-  // Track whether the decl in this typed pattern should be
-  // implicitly unwrapped as needed during expression type checking.
-  if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
-      TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto *subPattern = TP->getSubPattern();
-
-    while (auto *parenPattern = dyn_cast<ParenPattern>(subPattern))
-      subPattern = parenPattern->getSubPattern();
-
-    if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      // FIXME: This needs to be done as part of
-      // IsImplicitlyUnwrappedOptionalRequest::evaluate(); we just
-      // need to find the right TypedPattern there for the VarDecl
-      // in order to recover it's TypeRepr.
-      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
-    } else {
-      assert(isa<AnyPattern>(subPattern) &&
-             "Unexpected pattern nested in typed pattern!");
-    }
-  }
-
   return hadError;
 }
 
@@ -806,7 +785,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
       }
     }
     return true;
@@ -998,28 +978,16 @@ recur:
     if (var->isInvalid())
       type = ErrorType::get(Context);
 
-    Type interfaceType = type;
-    if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
-
     // In SIL mode, VarDecls are written as having reference storage types.
-    if (type->is<ReferenceStorageType>()) {
-      assert(interfaceType->is<ReferenceStorageType>());
-      type = type->getReferenceStorageReferent();
-    } else {
-      if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-        interfaceType = checkReferenceOwnershipAttr(var, interfaceType, attr);
-    }
+    type = type->getReferenceStorageReferent();
 
     // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
-    var->setInterfaceType(interfaceType);
-    var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
-    var->setTypeRepr(tyLoc.getTypeRepr());
+    var->setNamingPattern(NP);
 
-    // FIXME: Should probably just remove the forbidden prefix stuff, it no
-    // longer makes a lot of sense in a request-based world.
-    checkForForbiddenPrefix(var);
+    // FIXME: This call can be removed once pattern binding validation is
+    // sufficiently requestified.
+    TypeChecker::checkForForbiddenPrefix(Context, var->getBaseName());
 
     // If we are inferring a variable to have type AnyObject.Type,
     // "()", an uninhabited type, or optional thereof, emit a diagnostic.
@@ -1540,7 +1508,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      param->setType(ty);
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
   };

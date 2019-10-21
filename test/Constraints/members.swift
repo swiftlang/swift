@@ -316,7 +316,7 @@ struct S22490787 {
 func f22490787() {
   var path: S22490787 = S22490787()
 
-  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
+  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}} expected-error{{variable 'p' is not bound by any pattern}}
   }
 }
 

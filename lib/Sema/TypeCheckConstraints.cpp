@@ -1119,7 +1119,8 @@ namespace {
         return finish(walkToClosureExprPre(closure), expr);
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        TC.checkForForbiddenPrefix(unresolved);
+        TypeChecker::checkForForbiddenPrefix(
+            TC.Context, unresolved->getName().getBaseName());
         return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
       }
 
@@ -2819,12 +2820,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      if (var->hasType() &&
+      if (var->hasInterfaceType() &&
           !var->getType()->hasUnboundGenericType() &&
           !var->getType()->hasError())
         return;
 
-      var->markInvalid();
+      var->setInterfaceType(ErrorType::get(Context));
     });
   }
 
@@ -2833,7 +2834,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber) {
-  const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2841,7 +2841,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
   if (!DC->isLocalContext()) {
-    initContext = cast_or_null<PatternBindingInitializer>(pbe.getInitContext());
+    initContext = cast_or_null<PatternBindingInitializer>(
+        PBD->getInitContext(patternNumber));
     if (initContext)
       DC = initContext;
   }
@@ -3031,9 +3032,9 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasType() && !var->getType()->hasError())
+        if (var->hasInterfaceType() && !var->getType()->hasError())
           return;
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
       });
     };
 
@@ -3088,7 +3089,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          DC);
-  matchVar->setType(rhsType);
   matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();

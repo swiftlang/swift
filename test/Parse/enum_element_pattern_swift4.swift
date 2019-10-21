@@ -43,6 +43,7 @@ func testE(e: E) {
                    // expected-note@-1 {{remove associated values to make the pattern match}} {{12-14=}}
     case .D(let payload) = e // expected-error {{pattern with associated values does not match enum case 'D'}}
                              // expected-note@-1 {{remove associated values to make the pattern match}} {{12-25=}}
+                             // expected-error@-2 {{variable 'payload' is not bound by any pattern}}
   else { return }
 }
 
