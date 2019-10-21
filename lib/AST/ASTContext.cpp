@@ -4808,10 +4808,6 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 IndexSubset *
 IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto &foldingSet = ctx.getImpl().IndexSubsets;
@@ -4832,8 +4828,7 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }
-<<<<<<< HEAD
-
+// TODO(saeta): CHECK IF CAN BE REMOVED!
 AutoDiffDerivativeFunctionIdentifier *
 AutoDiffDerivativeFunctionIdentifier::get(
     AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
@@ -4857,5 +4852,3 @@ AutoDiffDerivativeFunctionIdentifier::get(
 
   return newNode;
 }
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
