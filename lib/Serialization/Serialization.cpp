@@ -2593,6 +2593,24 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     return count;
   }
 
+  /// Returns true if a client can still use decls that override \p overridden
+  /// even if \p overridden itself isn't available (isn't found, can't be
+  /// imported, can't be deserialized, whatever).
+  ///
+  /// This should be kept conservative. Compiler crashes are still better than
+  /// miscompiles.
+  static bool overriddenDeclAffectsABI(const ValueDecl *overridden) {
+    if (!overridden)
+      return false;
+    // There's one case where we know a declaration doesn't affect the ABI of
+    // its overrides after they've been compiled: if the declaration is '@objc'
+    // and 'dynamic'. In that case, all accesses to the method or property will
+    // go through the Objective-C method tables anyway.
+    if (overridden->hasClangNode() || overridden->isObjCDynamic())
+      return false;
+    return true;
+  }
+
 public:
   DeclSerializer(Serializer &S, DeclID id) : S(S), id(id) {}
   ~DeclSerializer() {
@@ -3212,6 +3230,7 @@ public:
                            fn->isImplicitlyUnwrappedOptional(),
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
+                           overriddenDeclAffectsABI(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
                              fn->getFullName().isCompoundName(),
                            rawAccessLevel,
@@ -3267,6 +3286,9 @@ public:
     uint8_t rawAccessorKind =
       uint8_t(getStableAccessorKind(fn->getAccessorKind()));
 
+    bool overriddenAffectsABI =
+        overriddenDeclAffectsABI(fn->getOverriddenDecl());
+
     Type ty = fn->getInterfaceType();
     SmallVector<IdentifierID, 4> dependencies;
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
@@ -3288,6 +3310,7 @@ public:
                                S.addTypeRef(fn->getResultInterfaceType()),
                                fn->isImplicitlyUnwrappedOptional(),
                                S.addDeclRef(fn->getOverriddenDecl()),
+                               overriddenAffectsABI,
                                S.addDeclRef(fn->getStorage()),
                                rawAccessorKind,
                                rawAccessLevel,
