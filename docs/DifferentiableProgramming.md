@@ -954,27 +954,59 @@ result of a differentiable function.
 The `Differentiable` protocol defines operations and structures required for a
 type to be differentiated.
 
+
 ```swift
 public protocol Differentiable {
-    /// A type representing a differentiable value's derivatives.
-    /// Mathematically, this is equivalent to the tangent bundle of the
-    /// differentiable manifold represented by the differentiable type.
+    /// A type that can be used to represent derivatives with respect to a
+    /// value whose type is `Self`. Mathematically, this is equivalent to the
+    /// tangent bundle of the differentiable manifold represented by the
+    /// differentiable type.
     associatedtype TangentVector: Differentiable & AdditiveArithmetic
         where TangentVector == TangentVector.TangentVector
 
-    /// Moves `self` along the given direction. In Riemannian geometry,
-    /// this is equivalent to exponential map, which moves `self` on the
-    /// geodesic surface along the given tangent vector.
+    /// Moves `self` along the given direction. In Riemannian geometry, this is
+    /// equivalent to exponential map, which moves `self` on the geodesic
+    /// surface along the given tangent vector.
     mutating func move(along direction: TangentVector)
-
-    /// A tangent vector such that `move(along: zeroTangentVector)`
-    /// will not modify `self`.
-    /// - Note: `zeroTangentVector` can be `TangentVector.zero` in most cases,
-    ///   but types whose tangent vectors depend on instance properties of
-    ///   `self` need to provide a different implementation. For example, an
-    ///   array's zero tangent vector depends on the array's `count`.
+    
+    /// A closure that produces a zero tangent vector and does not capture `self`.
+    ///
+    /// A zero tangent vector of `self` is equal to `TangentVector.zero`
+    /// sometimes. In some cases, the zero tangent vector dependes on
+    /// information on `self`, such as shape. For differentiable programming, it
+    /// is more memory-efficient to define a custom
+    /// `zeroTangentVectorInitializer` to return a closure that captures and
+    /// uses such information to create a zero tangent vector. For example:
+    ///
+    /// ```swift
+    /// struct Vector {
+    ///    var scalars: [Float]
+    ///    var count: Int { scalars.count }
+    ///    init(repeating repeatedElement: Float, count: Int) { ... }
+    /// }
+    ///
+    /// ...
+    /// 
+    /// extension Vector: Differentiable {
+    ///     typealias TangentVector = Vector
+    ///
+    ///     @noDerivative
+    ///     var zeroTangentVectorInitializer: () -> TangentVector {
+    ///         let count = self.count
+    ///         return { TangentVector(repeating: 0, count: count) }
+    ///     }
+    /// }
+    /// ```
+    ///
     @noDerivative
-    var zeroTangentVector: TangentVector { get }
+    var zeroTangentVectorInitializer: () -> TangentVector { get }
+}
+
+extension Differentiable {
+    /// A tangent vector such that `move(along: zeroTangentVector)` will not modify
+    /// `self`.
+    @noDerivative
+    var zeroTangentVector: TangentVector { zeroTangentVectorInitializer() }
 }
 ```
 
@@ -1041,8 +1073,9 @@ public extension Differentiable where Self == TangentVector {
         self += direction
     }
 
-    var zeroTangentVector: TangentVector {
-        .zero
+    @noDerivative
+    var zeroTangentVectorInitializer: () -> TangentVector {
+        { .zero }
     }
 }
 ```
@@ -1102,8 +1135,11 @@ extension Array: Differentiable where Element: Differentiable {
         }
     }
 
-    public var zeroTangentVector: TangentVector {
-        TangentVector(elements: Array(repeating: .zero, count: count))
+    @noDerivative
+    public var zeroTangentVectorInitializer: () -> TangentVector {
+        { [count = self.count] in
+            TangentVector(Array(repeating: .zero, count: count))
+        }
     }
 }
 
@@ -1126,8 +1162,12 @@ extension Dictionary: Differentiable where Value: Differentiable {
         }
     }
 
-    public var zeroTangentVector: TangentVector {
-        TangentVector(mapValues { _ in .zero })
+    @noDerivative
+    public var zeroTangentVectorInitializer: () -> TangentVector {
+        { [keys = self.keys] in
+            let pairs = zip(keys, sequence(first: .zero, next: {$0}))
+            return TangentVector(Dictionary(uniqueKeysWithValues: pairs))
+        }
     }
 }
 
@@ -1148,8 +1188,9 @@ extension Optional: Differentiable where Wrapped: Differentiable {
         }
     }
 
-    public var zeroTangentVector: TangentVector {
-        TangentVector(value: .zero)
+    @noDerivative
+    public var zeroTangentVectorInitializer: () -> TangentVector {
+        { TangentVector(.zero) }
     }
 }
 ```
@@ -1211,8 +1252,12 @@ struct Foo<T: Differentiable, U: Differentiable>: @memberwise Differentiable {
     //         x.move(along: direction.x)
     //         y.move(along: direction.y)
     //     }
-    //     var zeroTangentVector: TangentVector {
-    //         return TangentVector(x: x.zeroTangentVector, y: y.zeroTangentVector)
+    //     @noDerivative
+    //     var zeroTangentVectorInitializer: () -> TangentVector {
+    //         { [xTanInit = x.zeroTangentVectorInitializer,
+    //            yTanInit = y.zeroTangentVectorInitializer] in
+    //             TangentVector(x: xTanInit(), y: yTanInit())
+    //         }
     //     }
 }
 ```
@@ -2587,12 +2632,12 @@ library-based approaches.
 Many people have influenced the design and the implementation of the
 differentiable programming feature. The authors would like to thank these people
 (sorted alphabetically by last name) for their contributions in any form
-(inspirations, ideas, discussions, code, or bikeshedding): James Bradbury, Steve
-Canon, Casey Chu, Conal Elliott, Roy Frostig, Doug Gregor, Dominik Grewe, Dmitri
-Gribenko, Joe Groff, Tim Harley, Matthew Johnson, Chris Lattner, Dougal
-Maclaurin, John McCall, Bart van Merriënboer, Slava Pestov, Anthony Platanios,
-Gordon Plotkin, Alexey Radul, Brennan Saeta, Parker Schuh, and Dimitrios
-Vytiniotis.
+(inspirations, ideas, discussions, code, or bikeshedding): Gogul Balakrishnan,
+James Bradbury, Steve Canon, Casey Chu, Conal Elliott, Roy Frostig, Doug Gregor,
+Dominik Grewe, Dmitri Gribenko, Joe Groff, Sylvain Gugger, Tim Harley, Matthew
+Johnson, Chris Lattner, Dougal Maclaurin, John McCall, Bart van Merriënboer,
+Slava Pestov, Anthony Platanios, Gordon Plotkin, Alexey Radul, Brennan Saeta,
+Parker Schuh, and Dimitrios Vytiniotis.
 
 <!-- Links -->
 
