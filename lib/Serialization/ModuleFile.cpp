@@ -1411,14 +1411,21 @@ ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 }
 
 bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
-  cursor.EnterSubBlock(DECL_LOCS_BLOCK_ID);
+  if (llvm::Error Err = cursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+    consumeError(std::move(Err));
+    return false;
+  }
 
   SmallVector<uint64_t, 4> scratch;
   StringRef blobData;
 
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
-    switch (entry.Kind) {
+    Expected<llvm::BitstreamEntry> entry = cursor.advance();
+    if (!entry) {
+      consumeError(entry.takeError());
+      return false;
+    }
+    switch (entry->Kind) {
     case llvm::BitstreamEntry::EndBlock:
       return true;
 
@@ -1433,9 +1440,13 @@ bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
 
     case llvm::BitstreamEntry::Record:
       scratch.clear();
-      unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
-
-      switch (kind) {
+      Expected<unsigned> kind =
+          cursor.readRecord(entry->ID, scratch, &blobData);
+      if (!kind) {
+        consumeError(kind.takeError());
+        return false;
+      }
+      switch (*kind) {
       case decl_locs_block::BASIC_DECL_LOCS:
         BasicDeclLocsData = blobData;
         break;
@@ -1467,20 +1478,28 @@ bool ModuleFile::readModuleSourceInfoIfPresent() {
   }
 
   SmallVector<uint64_t, 64> scratch;
-  llvm::BitstreamEntry topLevelEntry;
 
   bool hasValidControlBlock = false;
   ValidationInfo info;
+  unsigned kind = llvm::BitstreamEntry::Error;
 
   while (!infoCursor.AtEndOfStream()) {
-    topLevelEntry = infoCursor.advance(AF_DontPopBlockAtEnd);
-    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+    Expected<llvm::BitstreamEntry> topLevelEntry =
+        infoCursor.advance(AF_DontPopBlockAtEnd);
+    if (!topLevelEntry) {
+      consumeError(topLevelEntry.takeError());
+      return false;
+    }
+    kind = topLevelEntry->Kind;
+    if (kind != llvm::BitstreamEntry::SubBlock)
       break;
 
-    switch (topLevelEntry.ID) {
+    switch (topLevelEntry->ID) {
     case CONTROL_BLOCK_ID: {
-      infoCursor.EnterSubBlock(CONTROL_BLOCK_ID);
-
+      if (llvm::Error Err = infoCursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+        consumeError(std::move(Err));
+        return false;
+      }
       info = validateControlBlock(infoCursor, scratch,
                                   {SWIFTSOURCEINFO_VERSION_MAJOR,
                                    SWIFTSOURCEINFO_VERSION_MINOR},
@@ -1509,7 +1528,7 @@ bool ModuleFile::readModuleSourceInfoIfPresent() {
     }
   }
 
-  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+  if (kind != llvm::BitstreamEntry::EndBlock)
     return false;
 
   return true;

@@ -205,8 +205,8 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        unsigned argIndex, Alignment align) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::ByVal);
-  b.addAttribute(llvm::Attribute::getWithAlignment(IGM.LLVMContext,
-                                                   align.getValue()));
+  b.addAttribute(llvm::Attribute::getWithAlignment(
+      IGM.LLVMContext, llvm::Align(align.getValue())));
   attrs = attrs.addAttributes(IGM.LLVMContext,
                               argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
