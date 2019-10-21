@@ -1162,7 +1162,7 @@ extension Array: RangeReplaceableCollection {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    // This check prevents a data race writting to _swiftEmptyArrayStorage
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
     if writtenCount > 0 {
       _buffer.count += writtenCount
     }
