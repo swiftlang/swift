@@ -24,31 +24,31 @@ class T: Thread {
   }
 }
 
-func runOnThread(closure: @escaping () -> Void) {
+func runOnThread(_ closure: @escaping () -> Void) {
   let t = T(closure: closure)
   t.start()
 }
 
-runOnThread(closure: {
+runOnThread {
   var oneEmptyArray: [[String:String]] = []
   oneEmptyArray.append(contentsOf: [])
-})
-runOnThread(closure: {
+}
+runOnThread {
   var aCompletelyUnrelatedOtherEmptyArray: [[Double:Double]] = []
   aCompletelyUnrelatedOtherEmptyArray.append(contentsOf: [])
-})
-runOnThread(closure: {
+}
+runOnThread {
   var array = Array<Int>()
   array.append(contentsOf: [])
-})
-runOnThread(closure: {
+}
+runOnThread {
   var arraySlice = ArraySlice<Int>()
   arraySlice.append(contentsOf: [])
-})
-runOnThread(closure: {
+}
+runOnThread {
   var contiguousArray = ContiguousArray<Int>()
   contiguousArray.append(contentsOf: [])
-})
+}
 
 for _ in 1...5 {
   sem.wait()
