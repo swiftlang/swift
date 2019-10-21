@@ -2672,8 +2672,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, initType, Locator,
-                                   false /* ignoreTopLevelInjection */);
+      expr = solution.coerceToType(expr, initType, Locator);
       if (!expr)
         return nullptr;
 
@@ -3451,7 +3450,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
-                                       /*ignoreTopLevelInjection*/false,
                                        typeFromPattern);
   if (!result) {
     return true;
