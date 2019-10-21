@@ -55,6 +55,7 @@
 #ifndef SWIFT_ABI_TRAILINGOBJECTS_H
 #define SWIFT_ABI_TRAILINGOBJECTS_H
 
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -175,7 +176,7 @@ protected:
 
     if (requiresRealignment())
       return reinterpret_cast<const NextTy *>(
-          llvm::alignAddr(Ptr, alignof(NextTy)));
+          llvm::alignAddr(Ptr, llvm::Align(alignof(NextTy))));
     else
       return reinterpret_cast<const NextTy *>(Ptr);
   }
@@ -189,7 +190,8 @@ protected:
                     Obj, TrailingObjectsBase::OverloadToken<PrevTy>());
 
     if (requiresRealignment())
-      return reinterpret_cast<NextTy *>(llvm::alignAddr(Ptr, alignof(NextTy)));
+      return reinterpret_cast<NextTy *>(
+          llvm::alignAddr(Ptr, llvm::Align(alignof(NextTy))));
     else
       return reinterpret_cast<NextTy *>(Ptr);
   }
