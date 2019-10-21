@@ -1038,9 +1038,9 @@ def create_argument_parser():
 
     # -------------------------------------------------------------------------
     in_group('Build-script-impl arguments (for disambiguation)')
-    # We need to list --skip-build-swift explicitly because otherwise argparse
-    # will auto-expand arguments like --skip-build-swift to the only known
-    # argument --skip-build-swiftevolve.
+    # We need to list --skip-test-swift explicitly because otherwise argparse
+    # will auto-expand arguments like --skip-test-swift to the only known
+    # argument --skip-test-swiftevolve.
     # These arguments are forwarded to impl_args in migration.py
 
     option('--install-swift', toggle_true('impl_install_swift'))
