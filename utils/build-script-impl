@@ -3074,7 +3074,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
-                         "${lldb_build_dir}/lit" \
+                         "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS}
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
@@ -3083,7 +3083,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
                        call "${llvm_build_dir}/bin/llvm-lit" \
-                            "${lldb_build_dir}/lit" \
+                            "${lldb_build_dir}/test" \
                             ${LLVM_LIT_ARGS} \
                             --param dotest-args="${DOTEST_ARGS}" \
                             --filter=compat
