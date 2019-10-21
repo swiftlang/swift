@@ -617,7 +617,7 @@ private:
 #endif
     ASTScopeAssert(startOrder * endOrder != -1,
                    "Start order contradicts end order");
-    return startOrder + endOrder < 1;
+    return startOrder <= 0 && endOrder <= 0;
   }
 
   static bool isVarDeclInPatternBindingDecl(ASTNode n1, ASTNode n2) {
