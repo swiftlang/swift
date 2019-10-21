@@ -910,9 +910,6 @@ namespace {
                 P->setInterfaceType(Type());
               }
               TS->PossiblyInvalidDecls.insert(P);
-              
-              if (P->isInvalid())
-                P->setInvalid(false);
             }
           
           expr->setType(nullptr);
