@@ -19,6 +19,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/ParsedSyntax.h"
+#include "swift/Parse/ParsedRawSyntaxRecorder.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingCache.h"
@@ -58,7 +59,7 @@ size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
     return 0;
   }
   Mode = AccumulationMode::SkippedForIncrementalUpdate;
-  auto length = foundNode.getRange().getByteLength();
+  auto length = foundNode.getRecordedRange().getByteLength();
   getStorage().push_back(std::move(foundNode));
   return length;
 }

@@ -4615,9 +4615,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     accessors.LBLoc = consumeToken(tok::l_brace);
     // Give syntax node an empty accessor list.
     if (SyntaxContext->isEnabled()) {
-      SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
+      SourceLoc listLoc = leadingTriviaLoc();
       SyntaxContext->addSyntax(
-        ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+          ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
     }
     accessors.RBLoc = consumeToken(tok::r_brace);
 

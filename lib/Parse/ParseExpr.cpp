@@ -1183,7 +1183,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                Tok.getLoc(), *SyntaxContext));
+                leadingTriviaLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -1466,6 +1466,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // name, not a binding, because it is the start of an enum pattern or
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
+      DeferringContextRAII Deferring(*SyntaxContext);
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
       auto introducer = (InVarOrLetPattern != IVOLP_InVar
@@ -1474,10 +1475,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       auto pattern = createBindingFromPattern(loc, name, introducer);
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
-            ParsedSyntaxRecorder::deferIdentifierPattern(
+            ParsedSyntaxRecorder::makeIdentifierPattern(
                                     SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
-            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(std::move(PatternNode),
+            ParsedSyntaxRecorder::makeUnresolvedPatternExpr(std::move(PatternNode),
                                                              *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
@@ -1587,7 +1588,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                Tok.getLoc(), *SyntaxContext));
+                leadingTriviaLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -2101,7 +2102,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
           ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
-            Tok.getLoc(), *SyntaxContext));
+              leadingTriviaLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -3303,9 +3304,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankArrayElementList(
-                                Tok.getLoc(), *SyntaxContext));
+      SyntaxContext->addSyntax(ParsedSyntaxRecorder::makeBlankArrayElementList(
+          leadingTriviaLoc(), *SyntaxContext));
     RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(
