@@ -151,3 +151,7 @@ SWIFT_REQUEST(TypeChecker, IsStaticRequest,
               bool(FuncDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, NeedsNewVTableEntryRequest,
               bool(AbstractFunctionDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ParamSpecifierRequest,
+              ParamDecl::Specifier(ParamDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
+              Type(ValueDecl *), SeparatelyCached, NoLocationInfo)

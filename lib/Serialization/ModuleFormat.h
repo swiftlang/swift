@@ -654,6 +654,28 @@ enum BlockID {
   ///
   /// \sa comment_block
   COMMENT_BLOCK_ID,
+
+  /// The module source location container block, which contains all other
+  /// source location blocks.
+  ///
+  /// This is part of a stable format and should not be renumbered.
+  ///
+  /// Though we strive to keep the format stable, breaking the format of
+  /// .swiftsourceinfo doesn't have consequences as serious as breaking the
+  /// format of .swiftdoc because .swiftsourceinfo file is for local development
+  /// use only.
+  MODULE_SOURCEINFO_BLOCK_ID = 192,
+
+  /// The source location block, which contains decl locations.
+  ///
+  /// This is part of a stable format and should not be renumbered.
+  ///
+  /// Though we strive to keep the format stable, breaking the format of
+  /// .swiftsourceinfo doesn't have consequences as serious as breaking the format
+  /// of .swiftdoc because .swiftsourceinfo file is for local development use only.
+  ///
+  /// \sa decl_locs_block
+  DECL_LOCS_BLOCK_ID,
 };
 
 /// The record types within the control block.

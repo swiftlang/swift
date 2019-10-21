@@ -239,8 +239,8 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  // TODO: Once rdar://53627317 is accomplished, the following may be able to be
-  // simplified.
+  // TODO: Once the creation of two PatternBindingDecls at same location is
+  // eliminated, the following may be able to be simplified.
   if (!getChildren().empty()) { // why needed???
     bool hasOne = false;
     getPattern()->forEachVariable([&](VarDecl *) { hasOne = true; });
@@ -254,8 +254,8 @@ SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
 
 SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  // See rdar://53921703
-  // Note: grep for "When the initializer is removed we don't actually clear the
+  // TODO: Don't remove the initializer in the rest of the compiler:
+  // Search for "When the initializer is removed we don't actually clear the
   // pointer" because we do!
   return initAsWrittenWhenCreated->getSourceRange();
 }
@@ -317,12 +317,14 @@ SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
 
 SourceRange
 ExtensionScope::moveStartPastExtendedNominal(const SourceRange sr) const {
-  const auto start = getLocAfterExtendedNominal(decl);
+  const auto afterExtendedNominal = getLocAfterExtendedNominal(decl);
   // Illegal code can have an endLoc that is before the end of the
-  // ExtendedNominal, so push the end back, too, in that case.
-  const auto end =
-      getSourceManager().isBeforeInBuffer(sr.End, start) ? start : sr.End;
-  return SourceRange(start, end);
+  // ExtendedNominal
+  if (getSourceManager().isBeforeInBuffer(sr.End, afterExtendedNominal)) {
+    // Must not have the source range returned include the extended nominal
+    return SourceRange(sr.Start, sr.Start);
+  }
+  return SourceRange(afterExtendedNominal, sr.End);
 }
 
 SourceRange
@@ -762,4 +764,10 @@ SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {
   const auto &SM = ext->getASTContext().SourceMgr;
   return Lexer::getCharSourceRangeFromSourceRange(SM, etr->getSourceRange())
       .getEnd();
+}
+
+SourceLoc ast_scope::extractNearestSourceLoc(
+    std::tuple<ASTScopeImpl *, ScopeCreator *> scopeAndCreator) {
+  const ASTScopeImpl *scope = std::get<0>(scopeAndCreator);
+  return scope->getSourceRangeOfThisASTNode().Start;
 }

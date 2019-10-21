@@ -251,36 +251,12 @@ inline Iterator prev_or_begin(Iterator it, Iterator begin) {
 
 /// @}
 
-/// A range of iterators.
-/// TODO: Add `llvm::iterator_range::empty()`, then remove this helper, along
-/// with the superfluous TransformIterator.
-template<typename Iterator>
-class IteratorRange {
-  Iterator First, Last;
-
-public:
-  using iterator = Iterator;
-
-  IteratorRange(Iterator first, Iterator last) : First(first), Last(last) { }
-  iterator begin() const { return First; }
-  iterator end() const { return Last; }
-  bool empty() const { return First == Last; }
-
-  typename std::iterator_traits<iterator>::value_type front() const { 
-    assert(!empty() && "Front of empty range");
-    return *begin(); 
-  }
-};
-
-/// Create a new iterator range.
-template<typename Iterator>
-inline IteratorRange<Iterator> 
-makeIteratorRange(Iterator first, Iterator last) {
-  return IteratorRange<Iterator>(first, last);
-}
 
 /// An iterator that transforms the result of an underlying bidirectional
 /// iterator with a given operation.
+///
+/// Slightly different semantics from llvm::map_iterator, but we should
+/// probably figure out how to merge them eventually.
 ///
 /// \tparam Iterator the underlying iterator.
 ///

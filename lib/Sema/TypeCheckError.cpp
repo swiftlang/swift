@@ -461,7 +461,7 @@ public:
 
       // Use the most significant result from the arguments.
       Classification result;
-      for (auto arg : reversed(args)) {
+      for (auto arg : llvm::reverse(args)) {
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
 

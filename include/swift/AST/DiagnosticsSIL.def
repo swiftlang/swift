@@ -434,7 +434,7 @@ NOTE(constexpr_witness_call_found_here, none,
 NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
      "non-constant value produced by an unevaluated instructions", ())
 NOTE(constexpr_returned_by_unevaluated_instruction,none,
-     "return value of an unevaluated instruction is not a constant", ())
+     "result of an unevaluated instruction is not a constant", ())
 NOTE(constexpr_mutated_by_unevaluated_instruction,none, "value mutable by an "
     "unevaluated instruction is not a constant", ())
 

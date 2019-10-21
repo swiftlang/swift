@@ -977,6 +977,8 @@ ERROR(expected_expr_throw,PointsToFirstBadToken,
 // Yield Statment
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
+ERROR(unexpected_arg_label_yield,none,
+      "unexpected argument label in 'yield' statement", ())
 
 // Defer Statement
 ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,

@@ -381,8 +381,8 @@ ERROR(cannot_convert_argument_value,none,
       (Type,Type))
 
 NOTE(candidate_has_invalid_argument_at_position,none,
-     "candidate expects value of type %0 for parameter #%1",
-     (Type, unsigned))
+     "candidate expects %select{|in-out }2value of type %0 for parameter #%1",
+     (Type, unsigned, bool))
 
 ERROR(cannot_convert_array_to_variadic,none,
       "cannot pass array of type %0 as variadic arguments of type %1",
@@ -3697,6 +3697,8 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
+NOTE(note_maybe_forgot_to_form_tuple,none,
+     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
@@ -4750,8 +4752,6 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_wrapper_ambiguous_default_value_init, none,
-  "property wrapper type %0 has multiple default-value initializers", (Type))
 ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing property wrapper type %3 "

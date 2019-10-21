@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 //===------------------ IndexSubsetTests.cpp -----------------------===//
+=======
+//===--------------------- IndexSubsetTests.cpp ---------------------------===//
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+<<<<<<< HEAD
 #include "swift/AST/AutoDiff.h"
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 #include "swift/AST/IndexSubset.h"
 #include "TestContext.h"
 #include "gtest/gtest.h"
@@ -49,6 +56,7 @@ TEST(IndexSubset, BitWordIndexAndOffset) {
 
 TEST(IndexSubset, Equality) {
   TestContext ctx;
+<<<<<<< HEAD
   EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0}),
             IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
@@ -69,12 +77,25 @@ TEST(IndexSubset, Equality) {
                                      /*indices*/ {0}),
             IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {}));
+=======
+  EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0}),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0}));
+  EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0, 2, 4}),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0, 2, 4}));
+  EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+  EXPECT_NE(IndexSubset::get(ctx.Ctx, /*capacity*/ 1, /*indices*/ {}),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+  EXPECT_NE(IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0}),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 }
 
 TEST(IndexSubset, Initializers) {
   TestContext ctx;
   // Default init.
   EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
+<<<<<<< HEAD
                                             /*includeAll*/ true),
             IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0, 1, 2, 3, 4}));
@@ -87,20 +108,41 @@ TEST(IndexSubset, Initializers) {
                                      /*indices*/ {}));
   EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
                                             /*includeAll*/ false),
+=======
+                                    /*includeAll*/ true),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                             /*indices*/ {0, 1, 2, 3, 4}));
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
+                                    /*includeAll*/ false),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
+                                    /*includeAll*/ true),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
+                                    /*includeAll*/ false),
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
             IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
   // Bit vector init.
   {
     llvm::SmallBitVector bitVec(6);
     bitVec.set(1, 4);
     EXPECT_EQ(IndexSubset::get(ctx.Ctx, bitVec),
+<<<<<<< HEAD
               IndexSubset::get(ctx.Ctx, /*capacity*/ 6,
                                        /*indices*/ {1, 2, 3}));
+=======
+              IndexSubset::get(ctx.Ctx, /*capacity*/ 6, /*indices*/ {1, 2, 3}));
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   }
   {
     llvm::SmallBitVector bitVec(0);
     EXPECT_EQ(IndexSubset::get(ctx.Ctx, bitVec),
+<<<<<<< HEAD
               IndexSubset::get(ctx.Ctx, /*capacity*/ 0,
                                        /*indices*/ {}));
+=======
+              IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   }
   // String init.
   EXPECT_EQ(IndexSubset::getFromString(ctx.Ctx, "SSSSS"),
@@ -118,7 +160,11 @@ TEST(IndexSubset, Initializers) {
 TEST(IndexSubset, Bits) {
   TestContext ctx;
   auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+<<<<<<< HEAD
                                             /*indices*/ {0, 2, 4});
+=======
+                                    /*indices*/ {0, 2, 4});
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   EXPECT_EQ(indices1->getNumBitWords(), 1u);
   EXPECT_EQ(indices1->getCapacity(), 5u);
   EXPECT_TRUE(indices1->contains(0));
@@ -128,7 +174,11 @@ TEST(IndexSubset, Bits) {
   EXPECT_TRUE(indices1->contains(4));
 
   auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+<<<<<<< HEAD
                                             /*indices*/ {1, 3});
+=======
+                                    /*indices*/ {1, 3});
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   EXPECT_EQ(indices2->getNumBitWords(), 1u);
   EXPECT_EQ(indices2->getCapacity(), 5u);
   EXPECT_FALSE(indices2->contains(0));
@@ -143,7 +193,11 @@ TEST(IndexSubset, Iteration) {
   // Test 1
   {
     auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+<<<<<<< HEAD
                                               /*indices*/ {0, 2, 4});
+=======
+                                      /*indices*/ {0, 2, 4});
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
     // Check forward iteration.
     EXPECT_EQ(indices1->findFirst(), 0);
     EXPECT_EQ(indices1->findNext(0), 2);
@@ -162,7 +216,11 @@ TEST(IndexSubset, Iteration) {
   // Test 2
   {
     auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+<<<<<<< HEAD
                                               /*indices*/ {1, 3});
+=======
+                                      /*indices*/ {1, 3});
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
     // Check forward iteration.
     EXPECT_EQ(indices2->findFirst(), 1);
     EXPECT_EQ(indices2->findNext(1), 3);
@@ -181,11 +239,18 @@ TEST(IndexSubset, Iteration) {
 TEST(IndexSubset, SupersetAndSubset) {
   TestContext ctx;
   auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+<<<<<<< HEAD
                                             /*indices*/ {0, 2, 4});
   EXPECT_TRUE(indices1->isSupersetOf(indices1));
   EXPECT_TRUE(indices1->isSubsetOf(indices1));
   auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                             /*indices*/ {2});
+=======
+                                    /*indices*/ {0, 2, 4});
+  EXPECT_TRUE(indices1->isSupersetOf(indices1));
+  EXPECT_TRUE(indices1->isSubsetOf(indices1));
+  auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {2});
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
   EXPECT_TRUE(indices2->isSupersetOf(indices2));
   EXPECT_TRUE(indices2->isSubsetOf(indices2));
 
@@ -202,6 +267,7 @@ TEST(IndexSubset, Insertion) {
   EXPECT_EQ(indices1->adding(3, ctx.Ctx),
             IndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
 }
+<<<<<<< HEAD
 
 TEST(IndexSubset, Lowering) {
   TestContext testCtx;
@@ -316,3 +382,5 @@ TEST(IndexSubset, GetSubsetParameterTypes) {
                     [](Type ty1, Type ty2) { return ty1->isEqual(ty2); }));
   }
 }
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a

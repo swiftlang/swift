@@ -218,8 +218,12 @@ EXPR_NODES = [
     Node('TupleExprElement', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
-             Child('Label', kind='IdentifierToken',
-                   is_optional=True),
+             Child('Label', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
              Child('Colon', kind='ColonToken',
                    is_optional=True),
              Child('Expression', kind='Expr'),
@@ -503,6 +507,8 @@ EXPR_NODES = [
     Node('ObjcNamePiece', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True),
              Child('Dot', kind='PeriodToken', is_optional=True),
          ]),
 
@@ -554,6 +560,8 @@ EXPR_NODES = [
              Child('Arguments', kind='TupleExprElementList',
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
          ]),
 
     # quote-expr -> '#quote' '(' expr ')'

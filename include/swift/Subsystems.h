@@ -65,6 +65,7 @@ namespace swift {
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
+  class TypeChecker;
   struct TypeLoc;
   class UnifiedStatsReporter;
   enum class SourceFileKind;
@@ -193,6 +194,12 @@ namespace swift {
     /// interface without a full compilation.
     SkipNonInlinableFunctionBodies = 1 << 4,
   };
+
+  /// Creates a type checker instance on the given AST context, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type checker instance.
+  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.

@@ -174,14 +174,11 @@ Solution ConstraintSystem::finalize() {
 
   for (const auto &transformed : builderTransformedClosures) {
     auto known =
-        solution.builderTransformedClosures.find(std::get<0>(transformed));
+        solution.builderTransformedClosures.find(transformed.first);
     if (known != solution.builderTransformedClosures.end()) {
-      assert(known->second.second == std::get<2>(transformed));
+      assert(known->second.singleExpr == transformed.second.singleExpr);
     }
-    solution.builderTransformedClosures.insert(
-      std::make_pair(std::get<0>(transformed),
-                     std::make_pair(std::get<1>(transformed),
-                                    std::get<2>(transformed))));
+    solution.builderTransformedClosures.insert(transformed);
   }
 
   return solution;
@@ -253,10 +250,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     CheckedConformances.push_back(conformance);
 
   for (const auto &transformed : solution.builderTransformedClosures) {
-    builderTransformedClosures.push_back(
-      std::make_tuple(transformed.first,
-                      transformed.second.first,
-                      transformed.second.second));
+    builderTransformedClosures.push_back(transformed);
   }
     
   // Register any fixes produced along this path.

@@ -174,7 +174,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
       cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
-      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
+      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);

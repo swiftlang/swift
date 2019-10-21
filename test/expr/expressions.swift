@@ -774,6 +774,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
+  // expected-error@-1:12 {{cannot convert value of type 'Bool' to expected argument type 'Int?'}}
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
@@ -781,7 +782,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
+  // expected-error@-1 {{argument type 'ClosedRange<Int>' does not conform to expected type 'Comparable'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   
@@ -851,6 +853,7 @@ func inoutTests(_ arr: inout Int) {
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
 func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide default value to inout parameter 'z'}}
+  // expected-error@-1 {{use of extraneous '&'}}
   print(z)
 }
 

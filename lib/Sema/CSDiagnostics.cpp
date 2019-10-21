@@ -987,7 +987,10 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
       emitDiagnostic(PD->getLoc(), diag::noescape_parameter, PD->getName());
 
   if (!PD->isAutoClosure()) {
-    note.fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@escaping ");
+    SourceLoc reprLoc;
+    if (auto *repr = PD->getTypeRepr())
+      reprLoc = repr->getStartLoc();
+    note.fixItInsert(reprLoc, "@escaping ");
   } // TODO: add in a fixit for autoclosure
 
   return true;
@@ -2144,6 +2147,12 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 }
 
 void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
+  auto *locator = getLocator();
+  // Can't apply any of the fix-its below if this failure
+  // is related to `inout` argument.
+  if (locator->isLastElement<LocatorPathElt::LValueConversion>())
+    return;
+
   if (trySequenceSubsequenceFixIts(diagnostic))
     return;
 
@@ -4127,9 +4136,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   // with parameters, if there are, we'll have to add
   // type information to the replacement argument.
   bool explicitTypes =
-      llvm::any_of(params->getArray(), [](const ParamDecl *param) {
-        return param->getTypeLoc().getTypeRepr();
-      });
+      llvm::any_of(params->getArray(),
+                   [](const ParamDecl *param) { return param->getTypeRepr(); });
 
   if (isMultiLineClosure)
     OS << '\n' << indent;
@@ -4882,13 +4890,49 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
           ? emitDiagnostic(argExpr->getLoc(),
                            diag::single_tuple_parameter_mismatch_special,
                            choice->getDescriptiveKind(), paramTy, subsStr)
-          : emitDiagnostic(
-                argExpr->getLoc(), diag::single_tuple_parameter_mismatch_normal,
-                choice->getDescriptiveKind(), name, paramTy, subsStr);
+          : emitDiagnostic(argExpr->getLoc(),
+                           diag::single_tuple_parameter_mismatch_normal,
+                           choice->getDescriptiveKind(), name, paramTy, subsStr);
 
-  diagnostic.highlight(argExpr->getSourceRange())
-      .fixItInsertAfter(argExpr->getStartLoc(), "(")
-      .fixItInsert(argExpr->getEndLoc(), ")");
+
+  auto newLeftParenLoc = argExpr->getStartLoc();
+  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    auto firstArgLabel = TE->getElementName(0);
+    // Cover situations like:
+    //
+    // func foo(x: (Int, Int)) {}
+    // foo(x: 0, 1)
+    //
+    // Where left paren should be suggested after the label,
+    // since the label belongs to the parameter itself.
+    if (!firstArgLabel.empty()) {
+      auto paramTuple = resolveType(ParamType)->castTo<TupleType>();
+      // If the label of the first argument matches the one required
+      // by the parameter it would be omitted from the fixed parameter type.
+      if (!paramTuple->getElement(0).hasName())
+        newLeftParenLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                                     TE->getElementNameLoc(0));
+    }
+  }
+
+  // If the parameter is a generic parameter, it's hard to say
+  // whether use of a tuple is really intended here, so let's
+  // attach a fix-it to a note instead of the diagnostic message
+  // to indicate that it's not the only right solution possible.
+  if (auto *typeVar = ParamType->getAs<TypeVariableType>()) {
+    if (typeVar->getImpl().getGenericParameter()) {
+      diagnostic.flush();
+
+      emitDiagnostic(argExpr->getLoc(), diag::note_maybe_forgot_to_form_tuple)
+          .fixItInsertAfter(newLeftParenLoc, "(")
+          .fixItInsert(argExpr->getEndLoc(), ")");
+    }
+  } else {
+    diagnostic.highlight(argExpr->getSourceRange())
+        .fixItInsertAfter(newLeftParenLoc, "(")
+        .fixItInsert(argExpr->getEndLoc(), ")");
+  }
+
   return true;
 }
 
@@ -5044,9 +5088,11 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
   if (auto *callee = getCallee()) {
     emitDiagnostic(callee, diag::candidate_has_invalid_argument_at_position,
-                   getToType(), getParamPosition());
+                   getToType(), getParamPosition(),
+                   locator->isLastElement<LocatorPathElt::LValueConversion>());
     return true;
   }
 

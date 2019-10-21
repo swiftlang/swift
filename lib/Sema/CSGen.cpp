@@ -24,6 +24,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -2044,8 +2045,8 @@ namespace {
         Type paramType, internalType;
 
         // If a type was explicitly specified, use its opened type.
-        if (auto type = param->getTypeLoc().getType()) {
-          paramType = closureExpr->mapTypeIntoContext(type);
+        if (param->getTypeRepr()) {
+          paramType = closureExpr->mapTypeIntoContext(param->getInterfaceType());
           // FIXME: Need a better locator for a pattern as a base.
           paramType = CS.openUnboundGenericType(paramType, locator);
           internalType = paramType;
@@ -2572,11 +2573,6 @@ namespace {
         return Type();
       }
 
-      // If the 'self' parameter is not configured, something went
-      // wrong elsewhere and should have been diagnosed already.
-      if (!selfDecl->hasInterfaceType())
-        return ErrorType::get(tc.Context);
-
       auto selfTy = CS.DC->mapTypeIntoContext(
         typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass();
@@ -2593,28 +2589,24 @@ namespace {
     }
     
     Type visitIfExpr(IfExpr *expr) {
-      // The conditional expression must conform to LogicValue.
+      // Condition must convert to Bool.
       auto boolDecl = CS.getASTContext().getBoolDecl();
       if (!boolDecl)
         return Type();
 
-      // Condition must convert to Bool.
       CS.addConstraint(ConstraintKind::Conversion,
                        CS.getType(expr->getCondExpr()),
                        boolDecl->getDeclaredType(),
                        CS.getConstraintLocator(expr->getCondExpr()));
 
       // The branches must be convertible to a common type.
-      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                            TVO_PrefersSubtypeBinding |
-                                            TVO_CanBindToNoEscape);
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getThenExpr()), resultTy,
-                       CS.getConstraintLocator(expr->getThenExpr()));
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getElseExpr()), resultTy,
-                       CS.getConstraintLocator(expr->getElseExpr()));
-      return resultTy;
+      return CS.addJoinConstraint(CS.getConstraintLocator(expr),
+          {
+            { CS.getType(expr->getThenExpr()),
+              CS.getConstraintLocator(expr->getThenExpr()) },
+            { CS.getType(expr->getElseExpr()),
+              CS.getConstraintLocator(expr->getElseExpr()) }
+          });
     }
     
     virtual Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {

@@ -284,8 +284,8 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
     if (!paramTy || !parentParamTy)
       return;
 
-    TypeLoc TL = decl->getTypeLoc();
-    if (!TL.getTypeRepr())
+    auto *repr = decl->getTypeRepr();
+    if (!repr)
       return;
 
     bool paramIsOptional =  (bool) paramTy->getOptionalObjectType();
@@ -305,11 +305,11 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
                                  member->getDescriptiveKind(),
                                  isa<SubscriptDecl>(member),
                                  parentParamTy, paramTy);
-      if (TL.getTypeRepr()->isSimple()) {
-        diag.fixItInsertAfter(TL.getSourceRange().End, "?");
+      if (repr->isSimple()) {
+        diag.fixItInsertAfter(repr->getEndLoc(), "?");
       } else {
-        diag.fixItInsert(TL.getSourceRange().Start, "(");
-        diag.fixItInsertAfter(TL.getSourceRange().End, ")?");
+        diag.fixItInsert(repr->getStartLoc(), "(");
+        diag.fixItInsertAfter(repr->getEndLoc(), ")?");
       }
       return;
     }
@@ -318,25 +318,24 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     // Allow silencing this warning using parens.
-    if (TL.getType()->hasParenSugar())
+    if (paramTy->hasParenSugar())
       return;
 
-    diags.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
-                   member->getDescriptiveKind(), parentParamTy, paramTy)
-      .highlight(TL.getSourceRange());
+    diags
+        .diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
+                  member->getDescriptiveKind(), parentParamTy, paramTy)
+        .highlight(repr->getSourceRange());
 
-    auto sugaredForm =
-      dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TL.getTypeRepr());
-    if (sugaredForm) {
-      diags.diagnose(sugaredForm->getExclamationLoc(),
-                     diag::override_unnecessary_IUO_remove)
-        .fixItRemove(sugaredForm->getExclamationLoc());
+    if (auto iuoRepr = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
+      diags
+          .diagnose(iuoRepr->getExclamationLoc(),
+                    diag::override_unnecessary_IUO_remove)
+          .fixItRemove(iuoRepr->getExclamationLoc());
     }
 
-    diags.diagnose(TL.getSourceRange().Start,
-                   diag::override_unnecessary_IUO_silence)
-      .fixItInsert(TL.getSourceRange().Start, "(")
-      .fixItInsertAfter(TL.getSourceRange().End, ")");
+    diags.diagnose(repr->getStartLoc(), diag::override_unnecessary_IUO_silence)
+        .fixItInsert(repr->getStartLoc(), "(")
+        .fixItInsertAfter(repr->getEndLoc(), ")");
   };
 
   // FIXME: If we ever allow argument reordering, this is incorrect.

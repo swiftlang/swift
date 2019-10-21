@@ -52,6 +52,7 @@ class ParsedRawSyntaxNode {
   };
   struct DeferredLayoutNode {
     MutableArrayRef<ParsedRawSyntaxNode> Children;
+    CharSourceRange Range;
   };
   struct DeferredTokenNode {
     const ParsedTriviaPiece *TriviaPieces;
@@ -72,9 +73,9 @@ class ParsedRawSyntaxNode {
   /// Primary used for capturing a deferred missing token.
   bool IsMissing = false;
 
-  ParsedRawSyntaxNode(syntax::SyntaxKind k,
+  ParsedRawSyntaxNode(syntax::SyntaxKind k, CharSourceRange r,
                       MutableArrayRef<ParsedRawSyntaxNode> deferredNodes)
-    : DeferredLayout({deferredNodes}),
+    : DeferredLayout({deferredNodes, r}),
       SynKind(uint16_t(k)), TokKind(uint16_t(tok::unknown)),
       DK(DataKind::DeferredLayout) {
     assert(getKind() == k && "Syntax kind with too large value!");
@@ -211,14 +212,12 @@ public:
     return copy;
   }
 
-  CharSourceRange getDeferredRange(bool includeTrivia) const {
+  CharSourceRange getDeferredRange() const {
     switch (DK) { 
     case DataKind::DeferredLayout:
-      return getDeferredLayoutRange(includeTrivia);
+      return getDeferredLayoutRange();
     case DataKind::DeferredToken:
-      return includeTrivia
-        ? getDeferredTokenRangeWithTrivia()
-        : getDeferredTokenRange();
+      return getDeferredTokenRangeWithTrivia();
     default:
       llvm_unreachable("node not deferred");
     }
@@ -243,20 +242,9 @@ public:
 
   // Deferred Layout Data ====================================================//
 
-  CharSourceRange getDeferredLayoutRange(bool includeTrivia) const {
+  CharSourceRange getDeferredLayoutRange() const {
     assert(DK == DataKind::DeferredLayout);
-    auto HasValidRange = [includeTrivia](const ParsedRawSyntaxNode &Child) {
-      return !Child.isNull() && !Child.isMissing() &&
-        Child.getDeferredRange(includeTrivia).isValid();
-    };
-    auto first = llvm::find_if(getDeferredChildren(), HasValidRange);
-    if (first == getDeferredChildren().end())
-      return CharSourceRange();
-    auto last = llvm::find_if(llvm::reverse(getDeferredChildren()),
-                              HasValidRange);
-    auto firstRange = first->getDeferredRange(includeTrivia);
-    firstRange.widen(last->getDeferredRange(includeTrivia));
-    return firstRange;
+    return DeferredLayout.Range;
   }
   ArrayRef<ParsedRawSyntaxNode> getDeferredChildren() const {
     assert(DK == DataKind::DeferredLayout);

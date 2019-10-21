@@ -110,8 +110,11 @@ namespace swift {
   class VarDecl;
   class UnifiedStatsReporter;
   class IndexSubset;
+<<<<<<< HEAD
   class VectorSpace;
   class DifferentiableAttr;
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-13-a
 
   enum class KnownProtocolKind : uint8_t;
 

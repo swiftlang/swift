@@ -123,12 +123,22 @@ class ConstExprFunctionState {
   /// addresses.
   llvm::DenseMap<SILValue, SymbolicValue> calculatedValues;
 
+  /// If a SILValue is not bound to a SymbolicValue in the calculatedValues,
+  /// try to compute it recursively by visiting its defining instruction.
+  bool recursivelyComputeValueIfNotInState = false;
+
 public:
   ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
                          SubstitutionMap substitutionMap,
-                         unsigned &numInstEvaluated)
+                         unsigned &numInstEvaluated,
+                         bool enableTopLevelEvaluation)
       : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
-        numInstEvaluated(numInstEvaluated) {}
+        numInstEvaluated(numInstEvaluated),
+        recursivelyComputeValueIfNotInState(enableTopLevelEvaluation) {
+    assert((!fn || !enableTopLevelEvaluation) &&
+           "top-level evaluation must be disabled when evaluating a function"
+           " body step by step");
+  }
 
   /// Pretty print the state to stderr.
   void dump() const {
@@ -168,8 +178,9 @@ public:
     return result;
   }
 
-  /// Return the SymbolicValue for the specified SIL value, lazily computing
-  /// it if needed.
+  /// Return the SymbolicValue for the specified SIL value. If the SIL value is
+  /// not in \c calculatedValues, try computing the SymbolicValue recursively
+  /// if \c recursivelyComputeValueIfNotInState flag is set.
   SymbolicValue getConstantValue(SILValue value);
 
   /// Evaluate the specified instruction in a flow sensitive way, for use by
@@ -231,14 +242,6 @@ Type ConstExprFunctionState::substituteGenericParamsAndSimpify(Type ty) {
 /// Const-evaluate `value`, which must not have been computed.
 SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   assert(!calculatedValues.count(value));
-
-  // If the client is asking for the value of a stack object that hasn't been
-  // computed, and if fn is null, then we are in top level code, and the
-  // stack object must be a single store value.  Since this is a very different
-  // computation, split it out to its own path.
-  if (!fn && value->getType().isAddress() && isa<AllocStackInst>(value)) {
-    return getSingleWriterAddressValue(value);
-  }
 
   // If this a trivial constant instruction that we can handle, then fold it
   // immediately.
@@ -381,17 +384,6 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   if (auto *builtin = dyn_cast<BuiltinInst>(value))
     return computeConstantValueBuiltin(builtin);
-
-  if (auto *apply = dyn_cast<ApplyInst>(value)) {
-    auto callResult = computeCallResult(apply);
-
-    // If this failed, return the error code.
-    if (callResult.hasValue())
-      return callResult.getValue();
-
-    assert(calculatedValues.count(apply));
-    return calculatedValues[apply];
-  }
 
   if (auto *enumVal = dyn_cast<EnumInst>(value)) {
     if (!enumVal->hasOperand())
@@ -1174,15 +1166,37 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   return None;
 }
 
-/// Return the SymbolicValue for the specified SIL value, lazily computing
-/// it if needed.
 SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   // Check to see if we already have an answer.
   auto it = calculatedValues.find(value);
   if (it != calculatedValues.end())
     return it->second;
 
-  // Compute the value of a normal instruction based on its operands.
+  if (!recursivelyComputeValueIfNotInState) {
+    return getUnknown(evaluator, value, UnknownReason::UntrackedSILValue);
+  }
+
+  // If the client is asking for the value of a stack object that hasn't been
+  // computed, and if we have to recursively compute it, the stack object must
+  // be a single store value. Since this is a very different computation,
+  // split it out to its own path.
+  if (value->getType().isAddress() && isa<AllocStackInst>(value)) {
+    return getSingleWriterAddressValue(value);
+  }
+
+  if (auto *apply = dyn_cast<ApplyInst>(value)) {
+    auto callResult = computeCallResult(apply);
+
+    // If this failed, return the error code.
+    if (callResult.hasValue())
+      return callResult.getValue();
+
+    assert(calculatedValues.count(apply));
+    return calculatedValues[apply];
+  }
+
+  // Compute the value of a normal single-value instructions based on its
+  // operands.
   auto result = computeConstantValue(value);
 
   // If this is the top-level lazy interpreter, output a debug trace.
@@ -1567,15 +1581,6 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     return None;
   }
 
-  // Make sure that our copy_value, begin_borrow form constants. Otherwise,
-  // return why.
-  if (isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst)) {
-    auto result = getConstantValue(inst->getOperand(0));
-    if (!result.isConstant())
-      return result;
-    return None;
-  }
-
   // If this is a deallocation of a memory object that we are tracking, then
   // don't do anything.  The memory is allocated in a BumpPtrAllocator so there
   // is no useful way to free it.
@@ -1596,7 +1601,10 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     }
   }
 
-  // If this is a call, evaluate it.
+  // If this is a call, evaluate it. Calls are handled separately from other
+  // single-valued instructions because calls which return void will not be
+  // mapped to a symbolic value. Every other single-valued instruction will be
+  // mapped to a symbolic value if its evaluation is successful.
   if (auto apply = dyn_cast<ApplyInst>(inst))
     return computeCallResult(apply);
 
@@ -1622,13 +1630,13 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                           injectEnumInst->getOperand());
   }
 
-  // If the instruction produces a result, try constant folding it.
-  // If this fails, then we fail.
-  if (isa<SingleValueInstruction>(inst)) {
-    auto oneResultVal = inst->getResults()[0];
-    auto result = getConstantValue(oneResultVal);
+  // If the instruction produces a result, try computing it, and fail if the
+  // computation fails.
+  if (auto *singleValueInst = dyn_cast<SingleValueInstruction>(inst)) {
+    auto result = computeConstantValue(singleValueInst);
     if (!result.isConstant())
       return result;
+    setValue(singleValueInst, result);
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
     return None;
   }
@@ -1767,7 +1775,8 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ConstExprEvaluator &evaluator) {
   assert(!fn.isExternalDeclaration() && "Can't analyze bodyless function");
   ConstExprFunctionState state(evaluator, &fn, substitutionMap,
-                               numInstEvaluated);
+                               numInstEvaluated,
+                               /*TopLevelEvaluation*/ false);
 
   // TODO: implement caching.
   // TODO: reject code that is too complex.
@@ -1860,7 +1869,9 @@ SymbolicValue ConstExprEvaluator::getUnknown(SILNode *node,
 void ConstExprEvaluator::computeConstantValues(
     ArrayRef<SILValue> values, SmallVectorImpl<SymbolicValue> &results) {
   unsigned numInstEvaluated = 0;
-  ConstExprFunctionState state(*this, nullptr, {}, numInstEvaluated);
+  ConstExprFunctionState state(*this, /*SILFunction*/ nullptr, {},
+                               numInstEvaluated,
+                               /*enableTopLevelEvaluation*/ true);
   for (auto v : values) {
     auto symVal = state.getConstantValue(v);
     results.push_back(symVal);
@@ -1881,7 +1892,8 @@ ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
                                                bool trackCallees)
     : evaluator(alloc, assertConf, trackCallees),
       internalState(
-          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
+          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated,
+                                     /*enableTopLevelEvaluation*/ false)) {
   assert(fun);
 }
 

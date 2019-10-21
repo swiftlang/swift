@@ -938,3 +938,40 @@ void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
   decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
   decl->LazySemanticInfo.NeedsNewVTableEntry = value;
 }
+
+//----------------------------------------------------------------------------//
+// ParamSpecifierRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ParamSpecifier> ParamSpecifierRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedSpecifier();
+}
+
+void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setSpecifier(specifier);
+}
+
+//----------------------------------------------------------------------------//
+// ResultTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
+    return funcDecl->getBodyResultTypeLoc();
+  auto *subscriptDecl = cast<SubscriptDecl>(decl);
+  return subscriptDecl->getElementTypeLoc();
+}
+
+Optional<Type> ResultTypeRequest::getCachedResult() const {
+  if (auto type = getResultTypeLoc().getType())
+    return type;
+
+  return None;
+}
+
+void ResultTypeRequest::cacheResult(Type type) const {
+  getResultTypeLoc().setType(type);
+}

@@ -1322,7 +1322,7 @@ SourceRange TupleExpr::getSourceRange() const {
       return { SourceLoc(), SourceLoc() };
     } else {
       // Scan backwards for a valid source loc.
-      for (Expr *expr : reversed(getElements())) {
+      for (Expr *expr : llvm::reverse(getElements())) {
         end = expr->getEndLoc();
         if (end.isValid()) {
           break;

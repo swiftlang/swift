@@ -2250,46 +2250,6 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
                    subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
-RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
-    SILLocation loc,
-    VarDecl *var,
-    RValue &&originalValue,
-    SGFContext C) {
-  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
-  auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc, constant));
-  auto fnType = fnRef.getType().castTo<SILFunctionType>();
-
-  SubstitutionMap subs;
-  auto varDC = var->getInnermostDeclContext();
-  if (auto genericSig = varDC->getGenericSignatureOfContext()) {
-    subs = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) {
-          if (auto gp = type->getAs<GenericTypeParamType>()) {
-            return F.mapTypeIntoContext(gp);
-          }
-
-          return Type(type);
-        },
-        LookUpConformanceInModule(varDC->getParentModule()));
-  }
-
-  auto substFnType = fnType->substGenericArgs(SGM.M, subs);
-
-  CanType resultType =
-      F.mapTypeIntoContext(var->getPropertyWrapperBackingPropertyType())
-        ->getCanonicalType();
-  AbstractionPattern origResultType(resultType);
-  CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
-  ResultPlanPtr resultPlan =
-      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
-  ArgumentScope argScope(*this, loc);
-  SmallVector<ManagedValue, 2> args;
-  std::move(originalValue).getAll(args);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   args, calleeTypeInfo, ApplyOptions::None, C);
-}
-
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
                                                 SGFContext C) {
   // Emit the sub-expression tuple and destructure it into elements.
@@ -5600,7 +5560,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
           SGFContext::AllowImmediatePlusZero).getAsSingleValue(*this, LE);
     }
 
-    for (auto &FVE : reversed(forceValueExprs)) {
+    for (auto &FVE : llvm::reverse(forceValueExprs)) {
       const TypeLowering &optTL = getTypeLowering(FVE->getSubExpr()->getType());
       bool isImplicitUnwrap = FVE->isImplicit() &&
           FVE->isForceOfImplicitlyUnwrappedOptional();

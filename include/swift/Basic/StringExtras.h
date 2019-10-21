@@ -315,29 +315,6 @@ namespace swift {
     size_t findWord(StringRef string, StringRef word);
   } // end namespace camel_case
 
-/// Describes the role that a particular name has within a
-/// signature, which can affect how we omit needless words.
-enum class NameRole {
-  /// The base name of a function or method.
-  BaseName,
-
-  /// The base name of a method where the omission type name is the
-  /// 'self' type.
-  BaseNameSelf,
-
-  /// The first parameter of a function or method.
-  FirstParameter,
-
-  // Subsequent parameters in a function or method.
-  SubsequentParameter,
-
-  // The name of a property.
-  Property,
-
-  // A partial name; used internally.
-  Partial,
-};
-
 /// Flags used by \c OmissionTypeName to describe the input type.
 enum class OmissionTypeFlags {
   /// Whether the parameter with this type has a default argument.

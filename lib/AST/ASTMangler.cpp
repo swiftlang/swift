@@ -657,6 +657,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
     ParamList = AFD->getParameters();
+  } else if (auto EED = dyn_cast<EnumElementDecl>(D->getDeclContext())) {
+    ParamList = EED->getParameterList();
   } else {
     auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
     ParamList = ACE->getParameters();
@@ -1226,7 +1228,7 @@ GenericTypeParamType *ASTMangler::appendAssocType(DependentMemberType *DepTy,
   }
   if (auto gpRoot = dyn_cast<GenericTypeParamType>(base)) {
     bool first = true;
-    for (auto *member : reversed(path)) {
+    for (auto *member : llvm::reverse(path)) {
       appendAssociatedTypeName(member);
       appendListSeparator(first);
     }
@@ -1458,7 +1460,7 @@ void ASTMangler::appendRetroactiveConformances(Type type) {
     module = Mod ? Mod : nominal->getModuleContext();
     subMap = type->getContextSubstitutionMap(module, nominal);
   }
-  
+
   appendRetroactiveConformances(subMap, module);
 }
 
@@ -2619,7 +2621,7 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
 
   auto conformingType = conformance->getType();
   appendType(conformingType->getCanonicalType());
-  
+
   appendProtocolName(conformance->getProtocol());
 
   bool needsModule = true;
@@ -2741,6 +2743,17 @@ void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance) {
   auto module = conformance->getDeclContext()->getParentModule();
 
+  // It's possible that we might not have a generic signature here to get
+  // the conformance access path (for example, when mangling types for
+  // debugger). In that case, we can use the generic signature of the
+  // conformance (if it's present).
+  auto conformanceSig = conformance->getGenericSignature();
+  auto shouldUseConformanceSig = !CurGenericSignature && conformanceSig;
+  llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+      CurGenericSignature, shouldUseConformanceSig
+                               ? conformanceSig->getCanonicalSignature()
+                               : CurGenericSignature);
+
   // Conforming type.
   Type conformingType = conformance->getType();
   if (conformingType->hasArchetype())
@@ -2770,7 +2783,7 @@ void ASTMangler::appendConcreteProtocolConformance(
         assert(CurGenericSignature &&
                "Need a generic signature to resolve conformance");
         auto conformanceAccessPath =
-          CurGenericSignature->getConformanceAccessPath(type, proto);
+            CurGenericSignature->getConformanceAccessPath(type, proto);
         appendDependentProtocolConformance(conformanceAccessPath);
       } else if (auto opaqueType = canType->getAs<OpaqueTypeArchetypeType>()) {
         GenericSignature opaqueSignature = opaqueType->getBoundSignature();

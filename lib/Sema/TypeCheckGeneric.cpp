@@ -642,7 +642,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
       auto params = func ? func->getParameters() : subscr->getIndices();
       for (auto param : *params) {
-        auto *typeRepr = param->getTypeLoc().getTypeRepr();
+        auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
           continue;
 
