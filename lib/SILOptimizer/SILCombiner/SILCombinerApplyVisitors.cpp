@@ -600,9 +600,23 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
     if (addr->getType().getStructOrBoundGenericStruct()) {
       addr = builder.createStructElementAddr(loc, addr, storedProperty);
     } else if (addr->getType().getClassOrBoundGenericClass()) {
-      LoadInst *Ref = builder.createLoad(loc, addr,
+      SingleValueInstruction *Ref = builder.createLoad(loc, addr,
                                          LoadOwnershipQualifier::Unqualified);
       insertEndAccess(beginAccess, /*isModify*/ false, builder);
+
+      // Handle the case where the storedProperty is in a super class.
+      while (Ref->getType().getClassOrBoundGenericClass() !=
+             storedProperty->getDeclContext()) {
+        SILType superCl = Ref->getType().getSuperclass();
+        if (!superCl) {
+          // This should never happen, because the property should be in the
+          // decl or in a superclass of it. Just handle this to be on the safe
+          // side.
+          return SILValue();
+        }
+        Ref = builder.createUpcast(loc, Ref, superCl);
+      }
+
       addr = builder.createRefElementAddr(loc, Ref, storedProperty);
 
       // Class members need access enforcement.
