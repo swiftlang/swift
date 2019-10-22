@@ -3186,6 +3186,12 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::Condition: {
+    conversionsOrFixes.push_back(IgnoreContextualType::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   default:
     break;
   }
