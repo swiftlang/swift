@@ -2533,10 +2533,6 @@ namespace {
     /// forced downcasts.
     SmallVector<InjectIntoOptionalExpr *, 4> SuspiciousOptionalInjections;
 
-  public:
-    /// A list of optional injections that have been diagnosed.
-    llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
-  private:
     /// Create a member reference to the given constructor.
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                            DeclNameLoc nameLoc, bool implicit,
@@ -4682,11 +4678,6 @@ namespace {
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
-        // If we already diagnosed this injection, we're done.
-        if (DiagnosedOptionalInjections.count(injection)) {
-          continue;
-        }
-
         auto *cast = findForcedDowncast(tc.Context, injection->getSubExpr());
         if (!cast)
           continue;
@@ -7728,22 +7719,12 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
-                             bool ignoreTopLevelInjection,
                              Optional<Pattern*> typeFromPattern) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;
-
-  // If we were asked to ignore top-level optional injections, mark
-  // the top-level injection (if any) as "diagnosed".
-  if (ignoreTopLevelInjection) {
-    if (auto injection = dyn_cast<InjectIntoOptionalExpr>(
-                           result->getSemanticsProvidingExpr())) {
-      rewriter.DiagnosedOptionalInjections.insert(injection);
-    }
-  }
 
   rewriter.finalize(result);
   return result;
