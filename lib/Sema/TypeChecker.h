@@ -1112,7 +1112,7 @@ public:
   ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
-  void addImplicitConstructors(NominalTypeDecl *typeDecl);
+  static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
   /// Synthesize the member with the given name on the target if applicable,
   /// i.e. if the member is synthesizable and has not yet been added to the
