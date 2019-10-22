@@ -241,7 +241,9 @@ extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   
   @objc(removeLastObject)
   dynamic internal func removeLastObject() {
-    contents.removeLast()
+    if !contents.isEmpty {
+      contents.removeLast()
+    }
   }
   
   @objc(replaceObjectAtIndex:withObject:)
