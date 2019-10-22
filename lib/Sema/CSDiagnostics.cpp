@@ -4400,9 +4400,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
     auto &cs = getConstraintSystem();
     auto *locator =
         cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (cs.hasFixFor(locator))
       return false;
   }
 
@@ -5028,6 +5026,36 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::throws_functiontype_mismatch,
                  getFromType(), getToType());
+  return true;
+}
+
+bool UnnecessaryCoercionFailure::diagnoseAsError() {
+  auto expr = cast<CoerceExpr>(getAnchor());
+  auto sourceRange =
+      SourceRange(expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End);
+
+  if (isa<TypeAliasType>(getFromType().getPointer()) &&
+      isa<TypeAliasType>(getToType().getPointer())) {
+    auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
+    auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
+    // If the typealias are different, we need a warning
+    // mentioning both types.
+    if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
+      emitDiagnostic(expr->getLoc(),
+                     diag::unnecessary_same_typealias_type_coercion,
+                     getFromType(), getToType())
+
+          .fixItRemove(sourceRange);
+    } else {
+      emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                     getToType())
+          .fixItRemove(sourceRange);
+    }
+  } else {
+    emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                   getToType())
+        .fixItRemove(sourceRange);
+  }
   return true;
 }
 

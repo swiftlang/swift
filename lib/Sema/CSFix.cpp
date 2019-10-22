@@ -857,6 +857,36 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
+bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnnecessaryCoercionFailure failure(root, cs, getFromType(), getToType(),
+                                     getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
+                                        Type toType,
+                                        ConstraintLocatorBuilder locator) {
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
+      auto expr = cast<CoerceExpr>(locator.getAnchor());
+      auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
+
+      // only diagnosing for coercion where the left-side is a DeclRefExpr
+      // or a explicit/implicit coercion e.g. Double(1) as Double
+      if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
+          (isa<DeclRefExpr>(expr->getSubExpr()) ||
+           isa<CoerceExpr>(expr->getSubExpr()))) {
+        auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
+            cs, fromType, toType, cs.getConstraintLocator(locator));
+
+        return cs.recordFix(fix);
+      }
+    }
+  }
+  return false;
+}
+
 bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   auto *AE = cast<AssignExpr>(getAnchor());

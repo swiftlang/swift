@@ -196,6 +196,9 @@ enum class FixKind : uint8_t {
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
+  
+  /// Remove an unnecessary coercion ('as') if the types are already equal. e.g. Double(1) as Double
+  RemoveUnnecessaryCoercion,
 
   /// Allow a single argument type mismatch. This is the most generic
   /// failure related to argument-to-parameter conversions.
@@ -1338,6 +1341,24 @@ public:
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
+};
+
+class RemoveUnnecessaryCoercion : public ContextualMismatch {
+protected:
+  RemoveUnnecessaryCoercion(ConstraintSystem &cs,
+                            Type fromType, Type toType,
+                            ConstraintLocator *locator)
+  : ContextualMismatch(cs, FixKind::RemoveUnnecessaryCoercion, fromType, toType,
+                       locator, /*isWarning*/ true) {}
+  
+public:
+  std::string getName() const override { return "remove unnecessary explicit type coercion"; }
+  
+  bool diagnose(Expr *root, bool asNote = false) const override;
+  
+  static bool attempt(ConstraintSystem &cs,
+                      Type fromType, Type toType,
+                      ConstraintLocatorBuilder locator);
 };
 
 class IgnoreAssignmentDestinationType final : public ContextualMismatch {

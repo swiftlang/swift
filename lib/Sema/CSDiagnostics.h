@@ -156,7 +156,13 @@ protected:
   }
 
   /// \returns true is locator hasn't been simplified down to expression.
-  bool hasComplexLocator() const { return HasComplexLocator; }
+  bool hasComplexLocator() const {
+    bool isExplicitCoercion =
+        getLocator()
+            ->isLastElement<
+                ConstraintLocator::PathElement::ExplicitTypeCoercion>();
+    return HasComplexLocator && !isExplicitCoercion;
+  }
 
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
@@ -707,8 +713,8 @@ public:
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
-  // If we're trying to convert something of type "() -> T" to T,
-  // then we probably meant to call the value.
+  /// If we're trying to convert something of type "() -> T" to T,
+  /// then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
@@ -1460,11 +1466,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-//
-// ```swift
-// let keyPath = \AnyObject.bar
-// ```
+/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+///
+/// ```swift
+/// let keyPath = \AnyObject.bar
+/// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1772,6 +1778,27 @@ public:
   bool diagnoseAsNote() override;
 
   void tryDropArrayBracketsFixIt(Expr *anchor) const;
+};
+
+/// Diagnose a situation where there is an explicit type coercion
+/// to the same type e.g.:
+///
+/// ```swift
+/// Double(1) as Double // redundant cast to 'Double' has no effect
+/// 1 as Double as Double // redundant cast to 'Double' has no effect
+/// let string = "String"
+/// let s = string as String // redundant cast to 'String' has no effect
+/// ```
+class UnnecessaryCoercionFailure final
+    : public ContextualFailure {
+      
+public:
+  UnnecessaryCoercionFailure(Expr *root, ConstraintSystem &cs,
+                             Type fromType, Type toType,
+                             ConstraintLocator *locator)
+      : ContextualFailure(root, cs, fromType, toType, locator) {}
+  
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose a situation there is a mismatch between argument and parameter
