@@ -2992,6 +2992,12 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
     }
 
+    case ConstraintLocator::Condition: {
+      anchor = cast<IfExpr>(anchor)->getCondExpr();
+      path = path.slice(1);
+      continue;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
