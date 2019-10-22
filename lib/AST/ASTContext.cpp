@@ -4637,7 +4637,7 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   if (existing)
     return existing;
   auto sizeToAlloc = sizeof(IndexSubset) +
-      getNumBitWordsNeededForCapacity(capacity);
+      getNumBytesNeededForCapacity(capacity);
   auto *buf = reinterpret_cast<IndexSubset *>(
       ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
   auto *newNode = new (buf) IndexSubset(indices);
