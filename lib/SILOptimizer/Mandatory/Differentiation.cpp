@@ -1823,18 +1823,18 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 
 class DifferentiableActivityCollection {
 public:
-  SmallDenseMap<GenericSignatureImpl *, DifferentiableActivityInfo> activityInfoMap;
+  SmallDenseMap<GenericSignature, DifferentiableActivityInfo> activityInfoMap;
   SILFunction &function;
   DominanceInfo *domInfo;
   PostDominanceInfo *postDomInfo;
 
   DifferentiableActivityInfo &getActivityInfo(
       GenericSignature assocGenSig, AutoDiffDerivativeFunctionKind kind) {
-    auto activityInfoLookup = activityInfoMap.find(assocGenSig.getPointer());
+    auto activityInfoLookup = activityInfoMap.find(assocGenSig);
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
     auto insertion = activityInfoMap.insert(
-        {assocGenSig.getPointer(), DifferentiableActivityInfo(*this, assocGenSig)});
+        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig)});
     return insertion.first->getSecond();
   }
 

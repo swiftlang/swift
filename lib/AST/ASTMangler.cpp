@@ -434,7 +434,7 @@ std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
   auto originalName = key.first;
   auto *parameterIndices = key.second.parameterIndices;
   auto *resultIndices = key.second.resultIndices;
-  auto *derivativeGenericSignature = key.second.derivativeGenericSignature;
+  auto derivativeGenericSignature = key.second.derivativeGenericSignature;
 
   Buffer << "AD__" << originalName << '_';
   Buffer << "P" << parameterIndices->getString();

@@ -810,7 +810,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   bool reorderSelf = shouldReorderSelf();
 
   CanGenericSignature derivativeCanGenSig;
-  if (auto *derivativeGenSig = config.derivativeGenericSignature)
+  if (auto derivativeGenSig = config.derivativeGenericSignature)
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
   // TODO(TF-835): Use simpler derivative generic signature logic below when
   // type-checking no longer generates implicit `@differentiable` attributes.
