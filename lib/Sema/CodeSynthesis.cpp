@@ -800,9 +800,9 @@ static void diagnoseMissingRequiredInitializer(
                      diag::required_initializer_here);
 }
 
-static bool areAllStoredPropertiesDefaultInitializable(NominalTypeDecl *decl) {
-  if (decl->hasClangNode())
-    return true;
+llvm::Expected<bool> AreAllStoredPropertiesDefaultInitableRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
+  assert(!decl->hasClangNode());
 
   for (auto member : decl->getMembers()) {
     // If a stored property lacks an initial value and if there is no way to
@@ -831,6 +831,15 @@ static bool areAllStoredPropertiesDefaultInitializable(NominalTypeDecl *decl) {
   }
 
   return true;
+}
+
+static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
+                                                       NominalTypeDecl *decl) {
+  if (decl->hasClangNode())
+    return true;
+
+  return evaluateOrDefault(
+      eval, AreAllStoredPropertiesDefaultInitableRequest{decl}, false);
 }
 
 static void addImplicitConstructorsToStruct(StructDecl *decl) {
@@ -864,15 +873,15 @@ static void addImplicitConstructorsToStruct(StructDecl *decl) {
     }
   }
 
+  auto &ctx = decl->getASTContext();
   if (FoundMemberwiseInitializedProperty) {
     // Create the implicit memberwise constructor.
-    auto &ctx = decl->getASTContext();
     auto ctor = createImplicitConstructor(
         decl, ImplicitConstructorKind::Memberwise, ctx);
     decl->addMember(ctor);
   }
 
-  if (areAllStoredPropertiesDefaultInitializable(decl))
+  if (areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl))
     TypeChecker::defineDefaultConstructor(decl);
 }
 
@@ -932,21 +941,18 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
     }
   }
 
-  bool SuppressDefaultInitializer =
-    !areAllStoredPropertiesDefaultInitializable(decl);
+  bool defaultInitable =
+      areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
 
   // For a class with a superclass, automatically define overrides
   // for all of the superclass's designated initializers.
   if (Type superclassTy = decl->getSuperclass()) {
-    bool canInheritInitializers = (!SuppressDefaultInitializer &&
-                                   !FoundDesignatedInit);
+    bool canInheritInitializers = defaultInitable && !FoundDesignatedInit;
 
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (SuppressDefaultInitializer && !FoundDesignatedInit &&
-        !decl->hasClangNode()) {
+    if (!defaultInitable && !FoundDesignatedInit && !decl->hasClangNode())
       return;
-    }
 
     auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
     assert(superclassDecl && "Superclass of class is not a class?");
@@ -1056,7 +1062,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
     // constructor.
 
     // ... unless there are uninitialized stored properties.
-    if (SuppressDefaultInitializer)
+    if (!defaultInitable)
       return;
 
     // Clang-imported types should never get a default constructor, just a

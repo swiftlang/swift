@@ -165,3 +165,5 @@ SWIFT_REQUEST(TypeChecker, ParamSpecifierRequest,
               ParamDecl::Specifier(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
