@@ -1354,9 +1354,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // afterwards.  This allows for better diagnostics, and keeps the
   // closure expression type well-formed.
   for (auto param : *PL) {
-    // FIXME: Forces computation of isInvalid().
-    (void) param->getInterfaceType();
-
     hadParameterError |= param->isInvalid();
   }
 

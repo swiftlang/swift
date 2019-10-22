@@ -1536,10 +1536,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   conformance->setState(ProtocolConformanceState::Checking);
   SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
-  // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface
-  // type.
-  (void)Proto->getInterfaceType();
-  
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
     conformance->setInvalid();
@@ -3868,7 +3864,7 @@ void ConformanceChecker::resolveValueWitnesses() {
     }
 
     // Make sure we've got an interface type.
-    if (!requirement->getInterfaceType() || requirement->isInvalid()) {
+    if (requirement->isInvalid()) {
       Conformance->setInvalid();
       continue;
     }

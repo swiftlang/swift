@@ -961,8 +961,6 @@ namespace {
       if (!decl)
         return nullptr;
       
-      // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-      (void)decl->getInterfaceType();
       if (decl->isInvalid())
         return nullptr;
 
@@ -1427,8 +1425,6 @@ namespace {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
-        // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-        (void)decls[i]->getInterfaceType();
         if (decls[i]->isInvalid())
           continue;
 

@@ -1940,7 +1940,6 @@ namespace {
       auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
 
       if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->getInterfaceType() ||
           !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;

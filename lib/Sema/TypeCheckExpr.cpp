@@ -652,9 +652,6 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   if (!TD)
     return Type();
   
-  // FIXME: Make isInvalid ask for the interface type.
-  (void)TD->getInterfaceType();
-  
   if (TD->isInvalid())
     return Type();
 

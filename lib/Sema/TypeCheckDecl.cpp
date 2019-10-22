@@ -634,13 +634,8 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
-  // FIXME: Computes isInvalid() below.
-  (void) current->getInterfaceType();
-
   // Ignore invalid and anonymous declarations.
-  if (current->isInvalid() ||
-      !current->hasInterfaceType() ||
-      !current->hasName())
+  if (current->isInvalid() || !current->hasName())
     return;
 
   // If this declaration isn't from a source file, don't check it.
@@ -703,9 +698,6 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     auto otherSig = other->getOverloadSignature();
     if (!conflicting(currentSig, otherSig))
       continue;
-
-    // FIXME: Computes isInvalid() below.
-    (void) other->getInterfaceType();
 
     // Skip invalid declarations.
     if (other->isInvalid())
@@ -1593,9 +1585,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   
   Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
-    // FIXME: Computes isInvalid() below.
-    (void) elt->getInterfaceType();
-
     // If the element has been diagnosed up to now, skip it.
     if (elt->isInvalid())
       continue;
@@ -4375,7 +4364,8 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     //
     // Once that's through, this will only fire during circular validation.
     if (!namingPattern) {
-      if (!VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+      if (VD->hasInterfaceType() &&
+          !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
         VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
       }
 

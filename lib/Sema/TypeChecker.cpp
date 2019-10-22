@@ -69,9 +69,8 @@ ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
                            Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->getInterfaceType()) {
-    if (protocol->isInvalid())
-      return nullptr;
+  if (protocol && protocol->isInvalid()) {
+    return nullptr;
   }
 
   return protocol;
