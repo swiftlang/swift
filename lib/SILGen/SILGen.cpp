@@ -832,7 +832,7 @@ void SILGenModule::emitDifferentiabilityWitness(
   // TODO(TF-919): Explore creating serialized differentiability witnesses.
   // Currently, differentiability witnesses are never serialized to avoid
   // deserialization issues where JVP/VJP functions cannot be found.
-  auto *diffWitness = SILDifferentiabilityWitness::create(
+  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
       M, originalFunction->getLinkage(), originalFunction,
       loweredParamIndices, config.resultIndices, derivativeCanGenSig,
       /*jvp*/ nullptr, /*vjp*/ nullptr, /*isSerialized*/ false);

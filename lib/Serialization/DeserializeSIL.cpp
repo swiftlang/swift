@@ -3446,7 +3446,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));
 
-  auto *diffWitness = SILDifferentiabilityWitness::create(
+  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
       SILMod, *linkage, original, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized);
   diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);

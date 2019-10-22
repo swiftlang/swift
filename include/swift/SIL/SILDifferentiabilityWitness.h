@@ -43,26 +43,28 @@ class SILDifferentiabilityWitness
 {
 private:
   /// The module which contains the differentiability witness.
-  SILModule &module;
+  SILModule &Module;
   /// The linkage of the differentiability witness.
-  SILLinkage linkage;
+  SILLinkage Linkage;
   /// The original function.
-  SILFunction *originalFunction;
+  SILFunction *OriginalFunction;
   /// The autodiff configuration: parameter indices, result indices, derivative
   /// generic signature (optional).
-  AutoDiffConfig config;
+  AutoDiffConfig Config;
   /// The JVP (Jacobian-vector products) derivative function.
-  SILFunction *jvp;
+  SILFunction *JVP;
   /// The VJP (vector-Jacobian products) derivative function.
-  SILFunction *vjp;
+  SILFunction *VJP;
+  /// Whether or not this differentiability witness is a declaration.
+  bool IsDeclaration;
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
-  bool serialized;
+  bool IsSerialized;
   /// The AST `@differentiable` or `@differentiating` attribute from which the
   /// differentiability witness is generated. Used for diagnostics.
   /// Null if the differentiability witness is parsed from SIL or if it is
   /// deserialized.
-  DeclAttribute *attribute = nullptr;
+  DeclAttribute *Attribute = nullptr;
 
   SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
                               SILFunction *originalFunction,
@@ -70,51 +72,59 @@ private:
                               IndexSubset *resultIndices,
                               GenericSignature derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
-                              bool isSerialized, DeclAttribute *attribute)
-    : module(module), linkage(linkage), originalFunction(originalFunction),
-      config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
-      jvp(jvp), vjp(vjp), serialized(isSerialized), attribute(attribute) {}
+                              bool isDeclaration, bool isSerialized,
+                              DeclAttribute *attribute)
+    : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
+      Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
+      JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
+      IsSerialized(isSerialized), Attribute(attribute) {}
 
 public:
-  static SILDifferentiabilityWitness *create(
+  static SILDifferentiabilityWitness *createDeclaration(
+      SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature derivativeGenSig, DeclAttribute *attribute = nullptr);
+
+  static SILDifferentiabilityWitness *createDefinition(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
       GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized, DeclAttribute *attribute = nullptr);
 
   SILDifferentiabilityWitnessKey getKey() const;
-  SILModule &getModule() const { return module; }
-  SILLinkage getLinkage() const { return linkage; }
-  SILFunction *getOriginalFunction() const { return originalFunction; }
-  const AutoDiffConfig &getConfig() const { return config; }
+  SILModule &getModule() const { return Module; }
+  SILLinkage getLinkage() const { return Linkage; }
+  SILFunction *getOriginalFunction() const { return OriginalFunction; }
+  const AutoDiffConfig &getConfig() const { return Config; }
   IndexSubset *getParameterIndices() const {
-    return config.parameterIndices;
+    return Config.parameterIndices;
   }
   IndexSubset *getResultIndices() const {
-    return config.resultIndices;
+    return Config.resultIndices;
   }
   GenericSignature getDerivativeGenericSignature() const {
-    return config.derivativeGenericSignature;
+    return Config.derivativeGenericSignature;
   }
-  SILFunction *getJVP() const { return jvp; }
-  SILFunction *getVJP() const { return vjp; }
+  SILFunction *getJVP() const { return JVP; }
+  SILFunction *getVJP() const { return VJP; }
   SILFunction *getDerivative(AutoDiffDerivativeFunctionKind kind) const {
     switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP: return jvp;
-    case AutoDiffDerivativeFunctionKind::VJP: return vjp;
+    case AutoDiffDerivativeFunctionKind::JVP: return JVP;
+    case AutoDiffDerivativeFunctionKind::VJP: return VJP;
     }
   }
-  void setJVP(SILFunction *jvp) { this->jvp = jvp; }
-  void setVJP(SILFunction *vjp) { this->vjp = vjp; }
+  void setJVP(SILFunction *jvp) { JVP = jvp; }
+  void setVJP(SILFunction *vjp) { VJP = vjp; }
   void setDerivative(AutoDiffDerivativeFunctionKind kind,
                      SILFunction *derivative) {
     switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP: jvp = derivative; break;
-    case AutoDiffDerivativeFunctionKind::VJP: vjp = derivative; break;
+    case AutoDiffDerivativeFunctionKind::JVP: JVP = derivative; break;
+    case AutoDiffDerivativeFunctionKind::VJP: VJP = derivative; break;
     }
   }
-  bool isSerialized() const { return serialized; }
-  DeclAttribute *getAttribute() const { return attribute; }
+  bool isDeclaration() const { return IsDeclaration; }
+  bool isSerialized() const { return IsSerialized; }
+  DeclAttribute *getAttribute() const { return Attribute; }
 
   /// Verify that the differentiability witness is well-formed.
   void verify(const SILModule &module) const;

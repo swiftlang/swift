@@ -2586,6 +2586,7 @@ writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
       addSILFunctionRef(original),
       toStableSILLinkage(dw.getLinkage()),
+      dw.isDeclaration(),
       dw.isSerialized(),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()),
       jvpID, vjpID,

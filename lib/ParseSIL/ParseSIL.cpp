@@ -6933,7 +6933,9 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
 ///   ('[' 'where' derivatve-generic-signature-requirements ']')?
-///   sil-function-name ':' sil-type
+///   decl-sil-differentiability-witness-body?
+///
+/// decl-sil-differentiability-witness-body ::=
 ///   '{'
 ///   ('jvp' sil-function-name ':' sil-type)?
 ///   ('vjp' sil-function-name ':' sil-type)?
@@ -7099,7 +7101,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       P.Context, origFnType->getNumParameters(), parameterIndices);
   auto *resultIndexSet = IndexSubset::get(
       P.Context, origFnType->getNumResults(), resultIndices);
-  SILDifferentiabilityWitness::create(
+  SILDifferentiabilityWitness::createDefinition(
       M, *linkage, originalFn, parameterIndexSet, resultIndexSet,
       derivativeGenSig, jvp, vjp, isSerialized);
   return false;
