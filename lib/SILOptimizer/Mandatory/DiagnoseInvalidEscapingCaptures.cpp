@@ -323,19 +323,33 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   // Otherwise, we have at least one escaping use of a partial_apply
   // capturing a non-escaping value. We need to emit diagnostics.
 
+  // Should match SELECT_ESCAPING_CLOSURE_KIND in DiagnosticsSIL.def.
+  enum {
+    EscapingLocalFunction,
+    EscapingClosure
+  } functionKind = EscapingClosure;
+
+  if (auto *F = PAI->getReferencedFunctionOrNull()) {
+    if (auto loc = F->getLocation()) {
+      if (loc.isASTNode<FuncDecl>())
+        functionKind = EscapingLocalFunction;
+    }
+  }
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
     if (isUseOfSelfInInitializer(inoutCapture)) {
-      diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture);
+      diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
+               functionKind);
     } else {
       auto *param = getParamDeclFromOperand(inoutCapture->get());
       if (param->isSelfParameter())
-        diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture);
+        diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
+                 functionKind);
       else {
         diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
-                  param->getName());
+                 functionKind, param->getName());
         diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
-                  param->getName());
+                 param->getName());
       }
     }
 
@@ -346,11 +360,12 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   for (auto noEscapeCapture : noEscapeCaptures) {
     if (auto *param = getParamDeclFromOperand(noEscapeCapture->get())) {
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_param_capture,
-               param->getName());
+               functionKind, param->getName());
       diagnose(Context, param->getLoc(), diag::noescape_param_defined_here,
                param->getName());
     } else {
-      diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture);
+      diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture,
+               functionKind);
     }
 
     diagnoseCaptureLoc(Context, DC, PAI, noEscapeCapture);
