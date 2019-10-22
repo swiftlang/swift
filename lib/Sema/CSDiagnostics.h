@@ -92,15 +92,18 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  Type getType(Expr *expr) const;
-  Type getType(const TypeLoc &loc) const;
+  Type getType(Expr *expr, bool wantRValue = true) const;
+  Type getType(const TypeLoc &loc, bool wantRValue = true) const;
 
   /// Resolve type variables present in the raw type, if any.
-  Type resolveType(Type rawType, bool reconstituteSugar = false) const {
+  Type resolveType(Type rawType, bool reconstituteSugar = false,
+                   bool wantRValue = true) const {
     auto resolvedType = CS.simplifyType(rawType);
-    return reconstituteSugar
-               ? resolvedType->reconstituteSugar(/*recursive*/ true)
-               : resolvedType;
+
+    if (reconstituteSugar)
+      resolvedType = resolvedType->reconstituteSugar(/*recursive*/ true);
+
+    return wantRValue ? resolvedType->getRValueType() : resolvedType;
   }
 
   /// Resolve type variables present in the raw type, using generic parameter
@@ -695,8 +698,7 @@ public:
                     ContextualTypePurpose purpose, Type lhs, Type rhs,
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), CTP(purpose),
-        FromType(resolve(lhs)->getRValueType()),
-        ToType(resolve(rhs)->getRValueType()) {}
+        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
 
   Type getFromType() const { return FromType; }
 

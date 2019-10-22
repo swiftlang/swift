@@ -1274,7 +1274,7 @@ func rdar17170728() {
     // expected-error@-1 {{missing argument label 'into:' in call}}
     // expected-error@-2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to operands of type '@lvalue Bool' and 'Bool'}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
     // expected-error@-2 {{'nil' cannot be used in context expecting type 'Bool'}}
   }
 }
