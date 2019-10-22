@@ -191,5 +191,23 @@ ErrorTests.test("test dealloc empty error box") {
   }
 }
 
+var errors: [Error] = []
+ErrorTests.test("willThrow") {
+  typealias WillThrow = @convention(c) (Error) -> Void
+  let willThrow = pointerToSwiftCoreSymbol(name: "_swift_willThrow")!
+  willThrow.storeBytes(of: { errors.append($0) }, as: WillThrow.self)
+  expectTrue(errors.isEmpty)
+  do {
+    throw UnsignedError.negativeOne
+  } catch {}
+  expectEqual(UnsignedError.self, type(of: errors.last!))
+
+  do {
+    throw SillyError.JazzHands
+  } catch {}
+  expectEqual(2, errors.count)
+  expectEqual(SillyError.self, type(of: errors.last!))
+}
+
 runAllTests()
 
