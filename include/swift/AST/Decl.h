@@ -3464,6 +3464,13 @@ public:
     });
   }
 
+  /// Whether this declaration has a synthesized memberwise initializer.
+  bool hasMemberwiseInitializer() const;
+
+  /// Retrieves the synthesized memberwise initializer for this declaration,
+  /// or \c nullptr if it does not have one.
+  ConstructorDecl *getMemberwiseInitializer() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&

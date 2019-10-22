@@ -169,3 +169,7 @@ SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
+              bool(StructDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)

@@ -871,35 +871,13 @@ static void addImplicitConstructorsToStruct(StructDecl *decl) {
          "User-defined structs cannot have unreferenceable storage");
 
   decl->setAddedImplicitInitializers();
-
-  // Check whether there is a user-declared constructor or an instance
-  // variable.
-  bool FoundMemberwiseInitializedProperty = false;
+  (void)decl->getMemberwiseInitializer();
 
   // If the user has already defined a designated initializer, then don't
-  // synthesize an initializer.
+  // synthesize a default initializer.
   auto &ctx = decl->getASTContext();
   if (hasUserDefinedDesignatedInit(ctx.evaluator, decl))
     return;
-
-  for (auto member : decl->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      // If this is a backing storage property for a property wrapper,
-      // skip it.
-      if (var->getOriginalWrappedProperty())
-        continue;
-
-      if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        FoundMemberwiseInitializedProperty = true;
-    }
-  }
-
-  if (FoundMemberwiseInitializedProperty) {
-    // Create the implicit memberwise constructor.
-    auto ctor = createImplicitConstructor(
-        decl, ImplicitConstructorKind::Memberwise, ctx);
-    decl->addMember(ctor);
-  }
 
   if (areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl))
     TypeChecker::defineDefaultConstructor(decl);
@@ -1201,6 +1179,43 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       (void)evaluateTargetConformanceTo(encodableProto);
     }
   }
+}
+
+llvm::Expected<bool>
+HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
+                                   StructDecl *decl) const {
+  // Don't synthesize a memberwise init for imported decls.
+  if (decl->hasClangNode())
+    return false;
+
+  // If the user has already defined a designated initializer, then don't
+  // synthesize a memberwise init.
+  if (hasUserDefinedDesignatedInit(evaluator, decl))
+    return false;
+
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      // If this is a backing storage property for a property wrapper,
+      // skip it.
+      if (var->getOriginalWrappedProperty())
+        continue;
+
+      if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+        return true;
+    }
+  }
+  return false;
+}
+
+llvm::Expected<ConstructorDecl *>
+SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *decl) const {
+  // Create the implicit memberwise constructor.
+  auto &ctx = decl->getASTContext();
+  auto ctor =
+      createImplicitConstructor(decl, ImplicitConstructorKind::Memberwise, ctx);
+  decl->addMember(ctor);
+  return ctor;
 }
 
 /// Synthesizer callback for a function body consisting of "return".

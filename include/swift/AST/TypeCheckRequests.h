@@ -1549,6 +1549,44 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether this type has a synthesized memberwise initializer.
+class HasMemberwiseInitRequest
+    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, StructDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a memberwise initializer for a given type.
+class SynthesizeMemberwiseInitRequest
+    : public SimpleRequest<SynthesizeMemberwiseInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
