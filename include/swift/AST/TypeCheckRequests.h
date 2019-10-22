@@ -1528,6 +1528,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Computes whether this type has a user-defined designated initializer. This
+/// does not include a synthesized designated initializer used to satisfy a
+/// conformance.
+class HasUserDefinedDesignatedInitRequest
+    : public SimpleRequest<HasUserDefinedDesignatedInitRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

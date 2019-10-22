@@ -842,6 +842,28 @@ static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
       eval, AreAllStoredPropertiesDefaultInitableRequest{decl}, false);
 }
 
+llvm::Expected<bool>
+HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
+                                              NominalTypeDecl *decl) const {
+  assert(!decl->hasClangNode());
+
+  for (auto *member : decl->getMembers())
+    if (auto *ctor = dyn_cast<ConstructorDecl>(member))
+      if (ctor->isDesignatedInit() && !ctor->isSynthesized())
+        return true;
+  return false;
+}
+
+static bool hasUserDefinedDesignatedInit(Evaluator &eval,
+                                         NominalTypeDecl *decl) {
+  // Imported decls don't have a designated initializer defined by the user.
+  if (decl->hasClangNode())
+    return false;
+
+  return evaluateOrDefault(eval, HasUserDefinedDesignatedInitRequest{decl},
+                           false);
+}
+
 static void addImplicitConstructorsToStruct(StructDecl *decl) {
   assert(!decl->hasClangNode() &&
          "ClangImporter is responsible for adding implicit constructors");
@@ -854,14 +876,13 @@ static void addImplicitConstructorsToStruct(StructDecl *decl) {
   // variable.
   bool FoundMemberwiseInitializedProperty = false;
 
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      // Initializers that were synthesized to fulfill derived conformances
-      // should not prevent default initializer synthesis.
-      if (ctor->isDesignatedInit() && !ctor->isSynthesized())
-        return;
-    }
+  // If the user has already defined a designated initializer, then don't
+  // synthesize an initializer.
+  auto &ctx = decl->getASTContext();
+  if (hasUserDefinedDesignatedInit(ctx.evaluator, decl))
+    return;
 
+  for (auto member : decl->getMembers()) {
     if (auto var = dyn_cast<VarDecl>(member)) {
       // If this is a backing storage property for a property wrapper,
       // skip it.
@@ -873,7 +894,6 @@ static void addImplicitConstructorsToStruct(StructDecl *decl) {
     }
   }
 
-  auto &ctx = decl->getASTContext();
   if (FoundMemberwiseInitializedProperty) {
     // Create the implicit memberwise constructor.
     auto ctor = createImplicitConstructor(
@@ -899,10 +919,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
 
   decl->setAddedImplicitInitializers();
 
-  // Check whether there is a user-declared constructor or an instance
-  // variable.
-  bool FoundDesignatedInit = false;
-
   auto &ctx = decl->getASTContext();
   SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
@@ -925,11 +941,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
   } else {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        // Initializers that were synthesized to fulfill derived conformances
-        // should not prevent default initializer synthesis.
-        if (ctor->isDesignatedInit() && !ctor->isSynthesized())
-          FoundDesignatedInit = true;
-
         if (!ctor->isInvalid()) {
           auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
           declaredInitializers.push_back({ctor, type});
@@ -941,17 +952,20 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
     }
   }
 
+  // Check whether the user has defined a designated initializer for this class,
+  // and whether all of its stored properties have initial values.
+  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
   bool defaultInitable =
       areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
 
   // For a class with a superclass, automatically define overrides
   // for all of the superclass's designated initializers.
   if (Type superclassTy = decl->getSuperclass()) {
-    bool canInheritInitializers = defaultInitable && !FoundDesignatedInit;
+    bool canInheritInitializers = defaultInitable && !foundDesignatedInit;
 
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (!defaultInitable && !FoundDesignatedInit && !decl->hasClangNode())
+    if (!defaultInitable && !foundDesignatedInit && !decl->hasClangNode())
       return;
 
     auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
@@ -1057,7 +1071,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
     return;
   }
 
-  if (!FoundDesignatedInit) {
+  if (!foundDesignatedInit) {
     // For a class with no superclass, automatically define a default
     // constructor.
 
