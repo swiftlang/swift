@@ -860,7 +860,6 @@ namespace {
     llvm::DenseMap<TypeLoc*, Type> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
-    llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
@@ -909,7 +908,6 @@ namespace {
                 TS->ParamDeclInterfaceTypes[P] = P->getInterfaceType();
                 P->setInterfaceType(Type());
               }
-              TS->PossiblyInvalidDecls.insert(P);
             }
           
           expr->setType(nullptr);
@@ -960,16 +958,10 @@ namespace {
         paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
       }
       
-      if (!PossiblyInvalidDecls.empty())
-        for (auto D : PossiblyInvalidDecls)
-          if (D->hasInterfaceType())
-            D->setInvalid(D->getInterfaceType()->hasError());
-      
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
       TypeLocTypes.clear();
       PatternTypes.clear();
-      PossiblyInvalidDecls.clear();
     }
     
     // On destruction, if a type got wiped out, reset it from null to its
@@ -997,11 +989,6 @@ namespace {
           paramDeclIfaceElt.first->setInterfaceType(
               getParamBaseType(paramDeclIfaceElt));
         }
-
-      if (!PossiblyInvalidDecls.empty())
-        for (auto D : PossiblyInvalidDecls)
-          if (D->hasInterfaceType())
-            D->setInvalid(D->getInterfaceType()->hasError());
     }
 
   private:
