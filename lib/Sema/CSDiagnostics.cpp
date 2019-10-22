@@ -1813,15 +1813,13 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
     return member->choice;
 
   auto *DC = getDC();
-  auto &TC = getTypeChecker();
-
   auto *decl = member->choice.getDecl();
   if (isa<SubscriptDecl>(decl) &&
-      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC, TC)) {
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC)) {
     auto *subscript = cast<SubscriptDecl>(decl);
     // If this is a keypath dynamic member lookup, we have to
     // adjust the locator to find member referred by it.
-    if (isValidKeyPathDynamicMemberLookup(subscript, TC)) {
+    if (isValidKeyPathDynamicMemberLookup(subscript)) {
       auto &cs = getConstraintSystem();
       // Type has a following format:
       // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`

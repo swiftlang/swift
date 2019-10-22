@@ -2222,7 +2222,7 @@ static void typeCheckSynthesizedWrapperInitializer(
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
     tc.contextualizeInitializer(initializerContext, initializer);
   }
-  tc.checkPropertyWrapperErrorHandling(pbd, initializer);
+  TypeChecker::checkPropertyWrapperErrorHandling(pbd, initializer);
 }
 
 static PropertyWrapperMutability::Value

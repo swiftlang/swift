@@ -1643,7 +1643,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       Expr *exprToCheck = prevValue;
       if (TC->typeCheckExpression(exprToCheck, ED, TypeLoc::withoutLoc(rawTy),
                                   CTP_EnumCaseRawValue)) {
-        TC->checkEnumElementErrorHandling(elt, exprToCheck);
+        TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
       }
     }
 
@@ -1999,7 +1999,7 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params) {
       param->setDefaultValue(e);
     }
 
-    tc.checkInitializerErrorHandling(initContext, e);
+    TypeChecker::checkInitializerErrorHandling(initContext, e);
 
     // Walk the checked initializer and contextualize any closures
     // we saw there.
@@ -2564,7 +2564,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             // Check safety of error-handling in the declaration, too.
-            TC.checkInitializerErrorHandling(initContext, init);
+            TypeChecker::checkInitializerErrorHandling(initContext, init);
             (void) TC.contextualizeInitializer(initContext, init);
           }
         }
@@ -2783,7 +2783,7 @@ public:
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
 
-    TC.addImplicitConstructors(SD);
+    TypeChecker::addImplicitConstructors(SD);
 
     for (Decl *Member : SD->getMembers())
       visit(Member);
@@ -4408,7 +4408,7 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
 
   // We need to add implicit initializers because they
   // affect vtable layout.
-  TC.addImplicitConstructors(CD);
+  TypeChecker::addImplicitConstructors(CD);
 
   auto forceConformance = [&](ProtocolDecl *protocol) {
     if (auto ref = TypeChecker::conformsToProtocol(

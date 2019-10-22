@@ -209,7 +209,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (auto *stdlib = Context.getStdlibModule()) {
+  if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
     return stdlib;
   }
 
@@ -615,7 +615,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 GenericEnvironment *
 swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
-  return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
+  return TypeChecker::handleSILGenericParams(genericParams, DC);
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
