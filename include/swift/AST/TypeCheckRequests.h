@@ -1587,6 +1587,46 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether this type has a synthesized zero parameter default
+/// initializer.
+class HasDefaultInitRequest
+    : public SimpleRequest<HasDefaultInitRequest, bool(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a default initializer for a given type.
+class SynthesizeDefaultInitRequest
+    : public SimpleRequest<SynthesizeDefaultInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

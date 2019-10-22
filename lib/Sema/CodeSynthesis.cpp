@@ -864,26 +864,7 @@ static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                            false);
 }
 
-static void addImplicitConstructorsToStruct(StructDecl *decl) {
-  assert(!decl->hasClangNode() &&
-         "ClangImporter is responsible for adding implicit constructors");
-  assert(!decl->hasUnreferenceableStorage() &&
-         "User-defined structs cannot have unreferenceable storage");
-
-  decl->setAddedImplicitInitializers();
-  (void)decl->getMemberwiseInitializer();
-
-  // If the user has already defined a designated initializer, then don't
-  // synthesize a default initializer.
-  auto &ctx = decl->getASTContext();
-  if (hasUserDefinedDesignatedInit(ctx.evaluator, decl))
-    return;
-
-  if (areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl))
-    TypeChecker::defineDefaultConstructor(decl);
-}
-
-static void addImplicitConstructorsToClass(ClassDecl *decl) {
+static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   // Bail out if we're validating one of our constructors already;
   // we'll revisit the issue later.
   if (!decl->hasClangNode()) {
@@ -1048,22 +1029,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
 
     return;
   }
-
-  if (!foundDesignatedInit) {
-    // For a class with no superclass, automatically define a default
-    // constructor.
-
-    // ... unless there are uninitialized stored properties.
-    if (!defaultInitable)
-      return;
-
-    // Clang-imported types should never get a default constructor, just a
-    // memberwise one.
-    if (decl->hasClangNode())
-      return;
-
-    TypeChecker::defineDefaultConstructor(decl);
-  }
 }
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
@@ -1083,10 +1048,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
   }
 
-  if (auto *structDecl = dyn_cast<StructDecl>(decl))
-    addImplicitConstructorsToStruct(structDecl);
   if (auto *classDecl = dyn_cast<ClassDecl>(decl))
-    addImplicitConstructorsToClass(classDecl);
+    addImplicitInheritedConstructorsToClass(classDecl);
+
+  // Force the memberwise and default initializers if the type has them.
+  // FIXME: We need to be more lazy about synthesizing constructors.
+  (void)decl->getMemberwiseInitializer();
+  (void)decl->getDefaultInitializer();
 }
 
 void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
@@ -1218,6 +1186,37 @@ SynthesizeMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   return ctor;
 }
 
+llvm::Expected<bool>
+HasDefaultInitRequest::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const {
+  assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
+
+  // Don't synthesize a default for imported decls.
+  if (decl->hasClangNode())
+    return false;
+
+  if (auto *sd = dyn_cast<StructDecl>(decl)) {
+    assert(!sd->hasUnreferenceableStorage() &&
+           "User-defined structs cannot have unreferenceable storage");
+    (void)sd;
+  }
+
+  // Don't synthesize a default for a subclass, it will attempt to inherit its
+  // initializers from its superclass.
+  if (auto *cd = dyn_cast<ClassDecl>(decl))
+    if (cd->getSuperclass())
+      return false;
+
+  // If the user has already defined a designated initializer, then don't
+  // synthesize a default init.
+  if (hasUserDefinedDesignatedInit(evaluator, decl))
+    return false;
+
+  // We can only synthesize a default init if all the stored properties have an
+  // initial value.
+  return areAllStoredPropertiesDefaultInitializable(evaluator, decl);
+}
+
 /// Synthesizer callback for a function body consisting of "return".
 static std::pair<BraceStmt *, bool>
 synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
@@ -1228,7 +1227,9 @@ synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
            /*isTypeChecked=*/true };
 }
 
-void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
+llvm::Expected<ConstructorDecl *>
+SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
+                                       NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
   FrontendStatsTracer StatsTracer(ctx.Stats, "define-default-ctor", decl);
@@ -1245,4 +1246,5 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 
   // Lazily synthesize an empty body for the default constructor.
   ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
+  return ctor;
 }

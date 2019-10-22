@@ -173,3 +173,7 @@ SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
