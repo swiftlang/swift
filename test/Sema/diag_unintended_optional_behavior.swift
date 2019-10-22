@@ -212,7 +212,7 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{67-67=)}} 
   // expected-note@-3 {{provide a default value to avoid this warning}} {{67-67= ?? <#default value#>}}
 
-  print("Always some, Always some, Always some: \(o as Int?)") // No warning
+  print("Always some, Always some, Always some: \(o as Int?)") // expected-warning {{redundant cast to 'Int?' has no effect}} {{53-60=}}
   print("Always some, Always some, Always some: \(o.debugDescription)") // No warning.
   
   let oST = Optional(SpecialType())

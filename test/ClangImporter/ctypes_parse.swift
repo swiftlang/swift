@@ -47,7 +47,7 @@ func testAnonEnum() {
 func testAnonEnumSmall() {
   var a = AnonConstSmall1
   a = AnonConstSmall2
-  _ = a as Int
+  _ = a as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{9-16=}}
 }
 
 func testPoint() -> Float {
@@ -141,14 +141,14 @@ func testImportStddefTypes() {
   let t2_unqual: Int = size_t_test
   let t3_unqual: Int = rsize_t_test
 
-  _ = t1_unqual as ctypes.ptrdiff_t
-  _ = t2_unqual as ctypes.size_t
-  _ = t3_unqual as ctypes.rsize_t
+  _ = t1_unqual as ctypes.ptrdiff_t // expected-warning {{redundant cast to 'ptrdiff_t' (aka 'Int') has no effect}} {{17-37=}}
+  _ = t2_unqual as ctypes.size_t // expected-warning {{redundant cast to 'size_t' (aka 'Int') has no effect}} {{17-34=}}
+  _ = t3_unqual as ctypes.rsize_t // expected-warning {{redundant cast to 'rsize_t' (aka 'Int') has no effect}} {{17-35=}}
 }
 
 func testImportSysTypesTypes() {
   let t1_unqual: Int = ssize_t_test
-  _ = t1_unqual as ctypes.ssize_t
+  _ = t1_unqual as ctypes.ssize_t // expected-warning {{redundant cast to 'ssize_t' (aka 'Int') has no effect}} {{17-35=}}
 }
 
 func testImportOSTypesTypes() {
@@ -198,7 +198,7 @@ func testFunctionPointers() {
   let fp = getFunctionPointer()
   useFunctionPointer(fp)
 
-  _ = fp as (@convention(c) (CInt) -> CInt)?
+  _ = fp as (@convention(c) (CInt) -> CInt)? // expected-warning {{redundant cast to '(@convention(c) (CInt) -> CInt)?' (aka 'Optional<@convention(c) (Int32) -> Int32>') has no effect}} {{10-46=}}
 
   let wrapper: FunctionPointerWrapper = FunctionPointerWrapper(a: nil, b: nil)
   _ = FunctionPointerWrapper(a: fp, b: fp)

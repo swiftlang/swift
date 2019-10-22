@@ -26,20 +26,20 @@ extension Set {
 }
 
 func foo() {
-  _  = NSStringToNSString as (String?) -> String?
+  _  = NSStringToNSString as (String?) -> String? // expected-warning {{redundant cast to '(String?) -> String?' has no effect}} {{27-51=}}
   _ = DummyClass().nsstringProperty.onlyOnString() as String
 
-  _  = BOOLtoBOOL as (Bool) -> Bool
+  _  = BOOLtoBOOL as (Bool) -> Bool // expected-warning {{redundant cast to '(Bool) -> Bool' has no effect}} {{19-37=}}
   _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
-  _  = arrayToArray as (Array<Any>?) -> (Array<Any>?)
+  _  = arrayToArray as (Array<Any>?) -> (Array<Any>?) // expected-warning {{redundant cast to '(Array<Any>?) -> (Array<Any>?)' has no effect}} {{21-55=}}
   DummyClass().arrayProperty.onlyOnArray()
 
-  _ = dictToDict as (Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>?
+  _ = dictToDict as (Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>? // expected-warning {{redundant cast to '(Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>?' has no effect}} {{18-86=}}
 
   DummyClass().dictProperty.onlyOnDictionary()
 
-  _ = setToSet as (Set<AnyHashable>?) -> Set<AnyHashable>?
+  _ = setToSet as (Set<AnyHashable>?) -> Set<AnyHashable>? // expected-warning {{redundant cast to '(Set<AnyHashable>?) -> Set<AnyHashable>?' has no effect}} {{16-60=}}
   DummyClass().setProperty.onlyOnSet()
 }
 
