@@ -598,11 +598,62 @@ swift::swift_errorRelease(SwiftError *error) {
   return objc_release((id)error);
 }
 
-/// Breakpoint hook for debuggers.
+// The implementation of the will throw callbacks management. This is designed
+// to be fast in the common case where no callbacks are ever registered. It is a
+// simple lock-free prepend-only linked list.
+namespace WillThrowCallbacks {
+  struct Node {
+    WillThrowCallback callback;
+    HeapObject *context;
+    std::atomic<Node *> next;
+  };
+  
+  static std::atomic<Node *> callbacks;
+  
+  static void add(WillThrowCallback callback, HeapObject *context) {
+    swift_retain(context);
+    auto *node = new Node;
+    node->callback = callback;
+    node->context = context;
+    
+    Node *current;
+    bool success = false;
+    while (!success) {
+      current = callbacks.load(std::memory_order_relaxed);
+      node->next.store(current, std::memory_order_relaxed);
+      success = callbacks.compare_exchange_weak(current, node,
+                                                std::memory_order_release);
+    }
+  }
+  
+  static void call(SwiftError *error) {
+    // Do a cheap load and bail out early if there are no callbacks, since
+    // that's expected to be the common case.
+    if (callbacks.load(std::memory_order_relaxed) == nullptr)
+      return;
+
+    std::atomic<Node *> *next = &callbacks;
+    while (auto node = next->load(std::memory_order_acquire)) {
+      node->callback(error, node->context);
+      next = &node->next;
+    }
+  }
+}
+
+/// Register a callback to be called whenever an error is thrown.
+/// Implementation of _addErrorWillThrowCallback Swift API.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+void _swift_addErrorWillThrowCallback(WillThrowCallback callback,
+                                      HeapObject *context) {
+  WillThrowCallbacks::add(callback, context);
+}
+
+/// Breakpoint hook for debuggers, and invokes any throw callbacks that have
+/// been added.
 SWIFT_CC(swift) void
 swift::swift_willThrow(SWIFT_CONTEXT void *unused,
                        SWIFT_ERROR_RESULT SwiftError **error) {
-  // empty
+  WillThrowCallbacks::call(*error);
 }
 
 #endif

@@ -175,6 +175,10 @@ internal func _getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?
 public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 #endif
 
+/// SPI for registering a callback to be called whenever an error is thrown.
+@_silgen_name("_swift_addErrorWillThrowCallback")
+public func _addErrorWillThrowCallback(_ callback: @escaping (Error) -> Void)
+
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedError")

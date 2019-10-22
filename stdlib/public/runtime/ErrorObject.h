@@ -205,6 +205,13 @@ SwiftError *swift_errorRetain(SwiftError *object);
 SWIFT_RUNTIME_STDLIB_API
 void swift_errorRelease(SwiftError *object);
 
+typedef SWIFT_CC(swift) void (*WillThrowCallback)(
+  SwiftError *error, SWIFT_CONTEXT HeapObject *context);
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+void _swift_addErrorWillThrowCallback(WillThrowCallback callback,
+                                      HeapObject *context);
+
 /// Breakpoint hook for debuggers.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void swift_willThrow(SWIFT_CONTEXT void *unused,

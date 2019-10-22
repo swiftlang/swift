@@ -191,5 +191,21 @@ ErrorTests.test("test dealloc empty error box") {
   }
 }
 
+ErrorTests.test("willThrow") {
+  var errors: [Error] = []
+  _addErrorWillThrowCallback({ errors.append($0) })
+  expectTrue(errors.isEmpty)
+  do {
+    throw UnsignedError.negativeOne
+  } catch {}
+  expectEqual(UnsignedError.self, type(of: errors.last!))
+
+  do {
+    throw SillyError.JazzHands
+  } catch {}
+  expectEqual(2, errors.count)
+  expectEqual(SillyError.self, type(of: errors.last!))
+}
+
 runAllTests()
 
