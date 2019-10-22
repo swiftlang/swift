@@ -475,6 +475,18 @@ public:
           isExplicit ? theVar->getFormalAccess()
                      : typeAccessScope.requiredAccessForDiagnostics();
       auto diagID = diag::pattern_type_access_inferred;
+
+      // FIXME: Make this conditional if we ever introduce a -swift-version 6
+      bool containsDependentAlias =
+        theVar->getInterfaceType().findIf([](Type t) -> bool {
+          if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer()))
+            if (typeAliasType->getDecl()->getUnderlyingType()->hasTypeParameter())
+              return true;
+          return false;
+        });
+      if (containsDependentAlias)
+        downgradeToWarning = DowngradeToWarning::Yes;
+
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::pattern_type_access_inferred_warn;
       auto diag = TC.diagnose(NP->getLoc(), diagID,

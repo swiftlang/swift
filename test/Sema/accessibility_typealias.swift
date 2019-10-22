@@ -40,7 +40,7 @@ private func privateFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
   return 3
 }
 
-var y = privateFuncWithFileprivateAlias() // expected-error{{variable must be declared private or fileprivate because its type 'Generic<Int>.Dependent' (aka 'Int') uses a fileprivate type}}
+var y = privateFuncWithFileprivateAlias() // expected-warning{{variable should be declared fileprivate because its type 'Generic<Int>.Dependent' (aka 'Int') uses a fileprivate type}}
 
 
 private typealias FnType = (_ x: Int) -> Void // expected-note * {{type declared here}}
@@ -99,4 +99,18 @@ public typealias GenericAlias<T> = PublicGeneric<T>
 fileprivate func makeAValue() -> GenericAlias<ActuallyPrivate> { }
 
 public var cannotBePublic = makeAValue()
-// expected-error@-1 {{variable cannot be declared public because its type 'GenericAlias<ActuallyPrivate>' (aka 'PublicGeneric<ActuallyPrivate>') uses a private type}}
+// expected-warning@-1 {{variable should not be declared public because its type 'GenericAlias<ActuallyPrivate>' (aka 'PublicGeneric<ActuallyPrivate>') uses a private type}}
+
+// rdar://problem/55996101
+class C<T : P> {
+  private typealias I = T.Element
+
+  var foo = Box(B<I>())
+  // expected-warning@-1 {{property should be declared private because its type 'Box<B<C<T>.I>>' uses a private type}}
+}
+
+struct Box<T> {
+  init(_: T) {}
+}
+
+struct B<I> {}
