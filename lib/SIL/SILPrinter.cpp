@@ -3164,11 +3164,11 @@ void SILDefaultWitnessTable::dump() const {
 void SILDifferentiabilityWitness::print(
     llvm::raw_ostream &OS, bool verbose) const {
   OS << "// differentiability witness for "
-     << demangleSymbol(originalFunction->getName()) << '\n';
+     << demangleSymbol(getOriginalFunction()->getName()) << '\n';
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   // sil_differentiability_witness (linkage)?
   OS << "sil_differentiability_witness ";
-  printLinkage(OS, linkage, ForDefinition);
+  printLinkage(OS, getLinkage(), ForDefinition);
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
@@ -3187,7 +3187,7 @@ void SILDifferentiabilityWitness::print(
   if (auto derivativeGenSig = getDerivativeGenericSignature()) {
     ArrayRef<Requirement> requirements;
     SmallVector<Requirement, 4> requirementsScratch;
-    auto *origGenEnv = originalFunction->getGenericEnvironment();
+    auto *origGenEnv = getOriginalFunction()->getGenericEnvironment();
     if (derivativeGenSig) {
       if (origGenEnv) {
         requirementsScratch = derivativeGenSig->requirementsNotSatisfiedBy(
@@ -3210,18 +3210,18 @@ void SILDifferentiabilityWitness::print(
     }
   }
   // @original-function-name : $original-sil-type
-  printSILFunctionNameAndType(OS, originalFunction);
+  printSILFunctionNameAndType(OS, getOriginalFunction());
   // {
   //   jvp: @jvp-function-name : $jvp-sil-type
   //   vjp: @vjp-function-name : $vjp-sil-type
   // }
   OS << " {\n";
-  if (jvp) {
+  if (auto *jvp = getJVP()) {
     OS << "  jvp: ";
     printSILFunctionNameAndType(OS, jvp);
     OS << '\n';
   }
-  if (vjp) {
+  if (auto *vjp = getVJP()) {
     OS << "  vjp: ";
     printSILFunctionNameAndType(OS, vjp);
     OS << '\n';

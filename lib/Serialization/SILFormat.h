@@ -294,6 +294,7 @@ namespace sil_block {
     SIL_DIFFERENTIABILITY_WITNESS,
     DeclIDField,             // Original function name
     SILLinkageField,         // Linkage
+    BCFixed<1>,              // Is declaration?
     BCFixed<1>,              // Is serialized?
     GenericSignatureIDField, // Derivative function generic signature
     DeclIDField,             // JVP function name

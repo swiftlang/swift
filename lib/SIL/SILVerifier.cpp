@@ -5387,7 +5387,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
   if (!M.getOptions().VerifyAll)
     return;
 #endif
-  auto origFnType = originalFunction->getLoweredFunctionType();
+  auto origFnType = getOriginalFunction()->getLoweredFunctionType();
   CanGenericSignature derivativeCanGenSig;
   if (auto derivativeGenSig = getDerivativeGenericSignature())
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
@@ -5407,7 +5407,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     else
       exit(1);
   };
-  if (jvp) {
+  if (auto *jvp = getJVP()) {
     // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
     // to accept result indices.
     auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
@@ -5417,7 +5417,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
                     "JVP type does not match expected JVP type");
   }
-  if (vjp) {
+  if (auto *vjp = getVJP()) {
     // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
     // to result indices.
     auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
