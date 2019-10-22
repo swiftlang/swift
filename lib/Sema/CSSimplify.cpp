@@ -2587,7 +2587,8 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
-  if (path.empty()) {
+  if (path.empty() ||
+      path.back().getKind() == ConstraintLocator::ExplicitTypeCoercion) {
     if (!anchor)
       return false;
 
@@ -3212,9 +3213,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // let's defer it until later proper check.
   if (!(desugar1->is<DependentMemberType>() &&
         desugar2->is<DependentMemberType>())) {
-    // If the types are obviously equivalent, we're done.
-    if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2)) {
-      return getTypeMatchSuccess();
+    if (desugar1->isEqual(desugar2)) {
+      if (kind >= ConstraintKind::Conversion &&
+          !flags.contains(TMF_ApplyingFix)) {
+        if (RemoveUnnecessaryCoercion::attempt(*this, type1, type2,
+                                               getConstraintLocator(locator))) {
+          return getTypeMatchFailure(locator);
+        }
+      }
+      if (!isa<InOutType>(desugar2))
+        return getTypeMatchSuccess();
     }
   }
 
@@ -7999,6 +8007,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
+  case FixKind::RemoveUnnecessaryCoercion:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -8305,11 +8314,20 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
+  ConstraintLocator *coerceLocator = locatorPtr;
+
+  if (allowFixes && shouldAttemptFixes()) {
+    auto *anchor = locator.getAnchor();
+    if (isa<CoerceExpr>(anchor) && !anchor->isImplicit()) {
+      coerceLocator =
+          getConstraintLocator(anchor, LocatorPathElt::ExplicitTypeCoercion());
+    }
+  }
 
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, locatorPtr);
+                       fromType, toType, coerceLocator);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 
