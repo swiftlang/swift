@@ -518,7 +518,10 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   auto ctor = dyn_cast<CallExpr>(entry.getInit());
   if (!ctor)
     return;
-  if (!isa<ConstructorDecl>(ctor->getCalledValue()))
+  auto ctorCalledVal = ctor->getCalledValue();
+  if (!ctorCalledVal)
+    return;
+  if (!isa<ConstructorDecl>(ctorCalledVal))
     return;
   
   // Make sure it is calling the rawValue constructor
