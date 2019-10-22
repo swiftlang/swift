@@ -7,4 +7,5 @@ utils/build-script --release-debuginfo --wasm \
 	--wasm-icu-i18n "todo" \
 	--wasm-icu-i18n-include "todo" \
 	--wasm-icu-data "todo" \
+	--build-swift-static-stdlib \
 	"$@"
