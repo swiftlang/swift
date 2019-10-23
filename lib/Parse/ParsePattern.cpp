@@ -361,8 +361,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // on is most likely argument destructuring, we are going
         // to diagnose that after all of the parameters are parsed.
         if (param.Type) {
-          // Mark current parameter as invalid so it is possible
+          // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
+          param.Type->setInvalid();
           param.isInvalid = true;
           if (!isClosure) {
             // Unnamed parameters must be written as "_: Type".
@@ -521,7 +522,7 @@ mapParsedParameters(Parser &parser,
         // or typealias with underlying function type.
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
       }
-    } if (paramInfo.SpecifierLoc.isValid()) {
+    } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
       switch (paramInfo.SpecifierKind) {
       case ParamDecl::Specifier::InOut:
@@ -698,7 +699,7 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
                                  defaultArgs, paramContext);
-  
+
   // Turn the parameter clause into argument and body patterns.
   auto paramList = mapParsedParameters(*this, leftParenLoc, params,
                                        rightParenLoc, namePieces, paramContext);
