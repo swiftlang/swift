@@ -313,7 +313,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   }
   newResults.push_back({closureType->getCanonicalType(derivativeFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(derivativeFnGenSig, getExtInfo(),
+  // If original function is `@convention(c)`, the derivative function should
+  // have `@convention(thin)`. IRGen does not support `@convention(c)` functions
+  // with multiple results.
+  auto extInfo = getExtInfo();
+  if (getLanguage() == SILFunctionLanguage::C)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  return SILFunctionType::get(derivativeFnGenSig, extInfo,
                               getCoroutineKind(), getCalleeConvention(),
                               getParameters(), getYields(), newResults,
                               getOptionalErrorResult(), ctx,
@@ -389,10 +395,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   }
   for (auto &res : getResults())
     newParameters.push_back(getParameterInfoForOriginalResult(res));
+  // If original function is `@convention(c)`, the derivative function should
+  // have `@convention(thin)`. IRGen does not support `@convention(c)` functions
+  // with multiple results.
+  auto extInfo = getExtInfo();
+  if (getLanguage() == SILFunctionLanguage::C)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
   return SILFunctionType::get(
-      genSig, getExtInfo(), getCoroutineKind(),
-      getCalleeConvention(), newParameters, getYields(), newResults,
-      getOptionalErrorResult(), getASTContext());
+      genSig, extInfo, getCoroutineKind(), getCalleeConvention(), newParameters,
+      getYields(), newResults, getOptionalErrorResult(), getASTContext());
 }
 
 ClassDecl *

@@ -17,22 +17,33 @@
 
 using namespace swift;
 
-SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
+SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
+    SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    GenericSignature derivativeGenSig, DeclAttribute *attribute) {
+  auto *diffWitness = new (module) SILDifferentiabilityWitness(
+      module, linkage, originalFunction, parameterIndices, resultIndices,
+      derivativeGenSig, /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isDeclaration*/ true, /*isSerialized*/ false, attribute);
+  auto config = diffWitness->getConfig();
+  assert(!module.DifferentiabilityWitnessMap[originalFunction->getName()].count(config) &&
+         "Cannot create duplicate differentiability witness in a module");
+  module.DifferentiabilityWitnessMap[originalFunction->getName()]
+                                    [diffWitness->getConfig()] =
+      diffWitness;
+  module.getDifferentiabilityWitnessList().push_back(diffWitness);
+  return diffWitness;
+}
+
+SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
     GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
     bool isSerialized, DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
-      derivativeGenSig, jvp, vjp, isSerialized, attribute);
-  //llvm::dbgs() << "construct dw for " << originalFunction->getName() << "\n";
-  //if (originalFunction)
-  //  originalFunction->incrementRefCount();
-  //if (jvp)
-  //  jvp->incrementRefCount();
-  //if (vjp)
-  //  vjp->incrementRefCount();
-  // Register the differentiability witness in the module.
+      derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
+      attribute);
   auto config = diffWitness->getConfig();
 #if 0
   llvm::errs() << "SILDifferentiabilityWitness::create\n";
@@ -48,17 +59,6 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   diffWitness->dump();
 #endif
   return diffWitness;
-}
-
-SILDifferentiabilityWitness::~SILDifferentiabilityWitness() {
-  //llvm::dbgs() << "destruct dw for " << originalFunction->getName() << "\n";
-  //if (originalFunction)
-  //  originalFunction->decrementRefCount();
-  //if (jvp)
-  //  jvp->decrementRefCount();
-  //if (vjp)
-  //  vjp->decrementRefCount();
-  //llvm::dbgs() << "finished destruct dw for " << originalFunction->getName() << "\n";
 }
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {

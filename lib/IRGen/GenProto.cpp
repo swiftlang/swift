@@ -2183,8 +2183,16 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 // SWIFT_ENABLE_TENSORFLOW END
 void IRGenModule::emitSILDifferentiabilityWitness(
     SILDifferentiabilityWitness *dw) {
-  // Don't emit a differentiability witness that is available externally to
-  // avoid duplicate symbols.
+#if 0
+  llvm::errs() << "IRGenModule::emitSILDifferentiabilityWitness\n";
+  dw->dump();
+#endif
+  // Don't emit differentiability witness if it is a declaration.
+  if (dw->isExternalDeclaration())
+    return;
+
+  // Don't emit differentiability witness that is available externally to avoid
+  // duplicate symbols.
   if (isAvailableExternally(dw->getLinkage()))
     return;
 
@@ -2205,8 +2213,10 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   diffWitnessContents.addBitCast(vjpFnAddr, Int8PtrTy);
   auto diffWitnessFuture = diffWitnessContents.finishAndCreateFuture();
 
+#if 0
   llvm::errs() << "IRGenModule::emitSILDifferentiabilityWitness\n";
   dw->dump();
+#endif
   getAddrOfDifferentiabilityWitness(dw, diffWitnessFuture);
 }
 // SWIFT_ENABLE_TENSORFLOW END

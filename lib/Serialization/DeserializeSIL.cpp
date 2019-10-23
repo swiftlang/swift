@@ -20,6 +20,9 @@
 
 #include "SILSerializationFunctionBuilder.h"
 #include "swift/AST/GenericSignature.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/ASTMangler.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
@@ -1643,8 +1646,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
             .take_back(numResultIndices));
     auto witnessGenSig = MF->getGenericSignature(ValID2);
     // TODO: Fix. Need to look up SIL differentiability witness.
+    llvm::errs() << "DESERIALIZING SILInstructionKind::DifferentiabilityWitnessFunctionInst\n";
+    Mangle::ASTMangler mangler;
+    AutoDiffConfig config(parameterIndices, resultIndices, witnessGenSig);
+    SILDifferentiabilityWitnessKey key(originalName, config);
+
+    auto *diffWitness = lookupDifferentiabilityWitness(mangler.mangleSILDifferentiabilityWitnessKey(key));
+    llvm::errs() << "DIFF WITNESS: " << diffWitness << "\n";
     ResultVal = Builder.createDifferentiabilityWitnessFunction(
-        Loc, witnessKind, /*witness*/ nullptr);
+        Loc, witnessKind, diffWitness);
 #if 0
     ResultVal = Builder.createDifferentiabilityWitnessFunction(
         Loc, original, witnessKind, parameterIndices, resultIndices,
@@ -3422,13 +3432,6 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       rawParameterAndResultIndices);
 
   auto linkage = fromStableSILLinkage(rawLinkage);
-
-  // TODO: This is a hack. The proper thing to do is to not serialize as many
-  // witnesses.
-  if (linkage == SILLinkage::Public) {
-    linkage = SILLinkage::PublicExternal;
-  }
-
   assert(linkage && "Expected value linkage for sil_differentiability_witness");
   auto originalName = MF->getIdentifierText(originalNameId);
   auto jvpName = MF->getIdentifierText(jvpNameId);
@@ -3463,7 +3466,10 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   AutoDiffConfig config{parameterIndices, resultIndices, derivativeGenSig};
   config.print(llvm::errs()); llvm::errs() << "\n";
 #endif
-  auto *diffWitness = SILDifferentiabilityWitness::create(
+  // NOTE: Added assertion below. Uncomment it when you want to verify that the
+  // differentiation transform is not performing deserialization.
+  // assert(false && "Let's not deserialize differentiability witnesses");
+  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
       SILMod, *linkage, original, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized);
   diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);

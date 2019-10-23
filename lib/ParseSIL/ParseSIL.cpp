@@ -7104,7 +7104,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       P.Context, origFnType->getNumParameters(), parameterIndices);
   auto *resultIndexSet = IndexSubset::get(
       P.Context, origFnType->getNumResults(), resultIndices);
-  SILDifferentiabilityWitness::create(
+  SILDifferentiabilityWitness::createDefinition(
       M, *linkage, originalFn, parameterIndexSet, resultIndexSet,
       derivativeGenSig, jvp, vjp, isSerialized);
   return false;

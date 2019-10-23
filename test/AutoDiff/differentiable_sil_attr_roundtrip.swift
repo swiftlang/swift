@@ -2,6 +2,11 @@
 // RUN: %target-swift-frontend -emit-silgen %s -o %t/roundtrip.sil
 // RUN: %target-swift-frontend -emit-sil %t/roundtrip.sil
 
+// NOTE: This test currently fails for SIL differentiability witnesses because
+// `SILFunction::getDeclContext` for parsed SIL functions returns nullptr. This
+// laeds to an error: "cannot differentiate functions that have not been marked
+// '@differentiable' and that are defined in other files".
+
 // TF-656: Verify that `AutoDiffIndexSubset` for SIL `[differentiable]`
 // attribute is set correctly.
 

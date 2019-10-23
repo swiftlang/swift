@@ -836,8 +836,11 @@ void SILGenModule::emitDifferentiabilityWitness(
   //   - Otherwise, equal to the JVP/VJP function linkage.
   // TODO: We shouldn't be serializing these.
   Optional<SILLinkage> diffWitnessLinkage = None;
-  auto *diffWitness = SILDifferentiabilityWitness::create(
-      M, originalFunction->getLinkage(), originalFunction, loweredParamIndices,
+  auto diffWitnessOriginalLinkage =
+      autodiff::getAutoDiffDerivativeFunctionLinkage(
+          originalFunction->getLinkage(), /*isDerivativeFnExported*/ true);
+  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
+      M, diffWitnessOriginalLinkage, originalFunction, loweredParamIndices,
       config.resultIndices, derivativeCanGenSig, /*jvp*/ nullptr,
       /*vjp*/ nullptr,
       /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()));

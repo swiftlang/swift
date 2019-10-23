@@ -263,7 +263,7 @@ static GenericSignature getConstrainedDerivativeGenericSignature(
           derivativeGenSig.getPointer(),
           /*addedGenericParams*/ {},
           std::move(requirements)},
-      nullptr);
+      nullptr)->getCanonicalSignature();
 }
 
 /// Returns the canonical derivative generic signature for the given
@@ -1120,9 +1120,9 @@ public:
   /// attribute exists.
   SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(
       SILFunction *original, const AutoDiffConfig &config) const {
-    if (!getModule().hasDifferentiabilityWitnesses(original->getName()))
+    if (!getModule().hasDifferentiabilityWitnesses(original->getName(), /*deserializeLazily*/ false))
       return nullptr;
-    for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName())) {
+    for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName(), /*deserializeLazily*/ false)) {
       auto *diffWitness = pair.second;
       if (diffWitness->getResultIndices() == config.resultIndices &&
           diffWitness->getParameterIndices() == config.parameterIndices)
@@ -1150,9 +1150,9 @@ public:
     if (auto *exactWitness = lookUpDifferentiabilityWitness(original, config))
       return exactWitness;
     SILDifferentiabilityWitness *minimalWitness = nullptr;
-    if (!getModule().hasDifferentiabilityWitnesses(original->getName()))
+    if (!getModule().hasDifferentiabilityWitnesses(original->getName(), /*deserializeLazily*/ false))
       return nullptr;
-    for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName())) {
+    for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName(), /*deserializeLazily*/ false)) {
       auto *diffWitness = pair.second;
       if (diffWitness->getResultIndices() != config.resultIndices)
         continue;
@@ -1220,10 +1220,31 @@ public:
     auto derivativeConstrainedGenSig = getConstrainedDerivativeGenericSignature(
         original->getLoweredFunctionType(), config.parameterIndices,
         config.derivativeGenericSignature);
-    auto *diffWitness = SILDifferentiabilityWitness::create(
+    // TODO: Try different linkage. Linker errors may be due to this.
+    // FIXME: SHOULD USE LINKAGE OF DERIVATIVE FUNCTIONS. EXPORTEDNESS DEPENDS ON DERIVATIVE FUNCTION LINKAGE
+    // TODO: Take optional linkage instead
+#if 0
+    auto diffWitnessLinkage = autodiff::getAutoDiffDerivativeFunctionLinkage(original->getLinkage(), /*isDerivativeFnExported*/ true);
+#endif
+    auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
         getModule(), original->getLinkage(), original, config.parameterIndices,
         config.resultIndices, derivativeConstrainedGenSig,
         /*jvp*/ nullptr, /*vjp*/ nullptr, /*isSerialized*/ true);
+    return diffWitness;
+  }
+
+  /// Creates a `[differentiable]` attribute on the specified original function
+  /// with the specified parameter indices.
+  SILDifferentiabilityWitness *createDifferentiabilityWitnessDeclaration(
+      SILFunction *original, const AutoDiffConfig &config) const {
+    assert(!lookUpDifferentiabilityWitness(original, config));
+    auto derivativeConstrainedGenSig = getConstrainedDerivativeGenericSignature(
+        original->getLoweredFunctionType(), config.parameterIndices,
+        config.derivativeGenericSignature);
+    auto *diffWitness = SILDifferentiabilityWitness::createDeclaration(
+        getModule(), SILLinkage::PublicExternal, original,
+        config.parameterIndices, config.resultIndices,
+        derivativeConstrainedGenSig);
     return diffWitness;
   }
 
@@ -1231,8 +1252,8 @@ public:
   /// original function corresponding to the specified parameter indices.
   SILDifferentiabilityWitness *getOrCreateDifferentiabilityWitness(
       SILFunction *original, const AutoDiffConfig &config) {
-    if (auto *attr = lookUpDifferentiabilityWitness(original, config))
-      return attr;
+    if (auto *diffWitness = lookUpDifferentiabilityWitness(original, config))
+      return diffWitness;
 #if 0
     // NOTE: This assertion should be removed.
     assert(original->isDefinition());
@@ -2753,6 +2774,7 @@ emitDerivativeFunctionReference(
     // requirements are satisfied.
     auto *minimalWitness = context.lookUpMinimalDifferentiabilityWitness(
         originalFn, desiredConfig);
+    bool foundExternalAttr = false;
     if (!minimalWitness) {
       // If the function is intentionally marked as being opaque to
       // differentiation, then we should not create a task for it.
@@ -2783,15 +2805,122 @@ emitDerivativeFunctionReference(
         return None;
       }
       // Check and diagnose external declarations.
+      const DifferentiableAttr *minimalAttr = nullptr;
+      IndexSubset *minimalParamIndexSet = nullptr;
+      if (auto *DC = originalFn->getDeclContext()) {
+        if (auto *origAFD =
+                cast_or_null<AbstractFunctionDecl>(DC->getAsDecl())) {
+          std::tie(minimalAttr, minimalParamIndexSet) =
+              context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
+                  SILDeclRef(origAFD), originalFnTy, desiredConfig);
+        }
+      }
+      if (!minimalAttr && originalFn->isExternalDeclaration()) {
+        llvm::errs() << "HI! " << originalFn->getDeclContext() << "\n";
+        context.emitNondifferentiabilityError(
+            original, invoker,
+            diag::autodiff_external_nondifferentiable_function);
+        return None;
+      }
+#if 0
+      llvm::errs() << "AHA, FOUND MINIMAL ATTR! " << originalFn->getName() << ", IS EXTERNAL? " << originalFn->isExternalDeclaration() << "\n";
+      minimalAttr->print(llvm::errs(), originalFn->getDeclContext()->getAsDecl()); llvm::errs() << "\n";
+#endif
+
+      if (!minimalAttr) {
+        // TODO: Change "get or create" to just "create" here? Minimal diff witness lookup already failed
+        auto *newWitness = context.getOrCreateDifferentiabilityWitness(
+            originalFn, desiredConfig);
+        if (context.processDifferentiableAttribute(originalFn, newWitness, invoker))
+          return None;
+        minimalWitness = newWitness;
+      } else {
+        // NOTE: This check happens to work now because `@differentiating` generates
+        // implicit `@differentiable` attributes that always have either JVP/VJP set.
+        // TODO: If retroactive registration, require both JVP/VJP to be defined?
+        // NOTE: Better name for boolean: "areDerivativeDefinitions"?
+        bool isRetroactiveDerivativeRegistration = false;
+        Optional<SILLinkage> derivativeLinkage = None;
+        SILFunction *retroactiveJVP = nullptr;
+        SILFunction *retroactiveVJP = nullptr;
+        if (auto *jvpDecl = minimalAttr->getJVPFunction()) {
+          // NOTE: This may not be correct for multiple Swift file case? Actually, I think it is correct
+          if (auto *jvp = context.getModule().lookUpFunction(SILDeclRef(jvpDecl))) {
+            // TODO: Check `jvp->isExternalDeclaration()`?
+            isRetroactiveDerivativeRegistration = true;
+            derivativeLinkage = jvp->getLinkage();
+            retroactiveJVP = jvp;
+          }
+        }
+        if (auto *vjpDecl = minimalAttr->getVJPFunction()) {
+          // NOTE: This may not be correct for multiple Swift file case? Actually, I think it is correct
+          if (auto *vjp = context.getModule().lookUpFunction(SILDeclRef(vjpDecl))) {
+            isRetroactiveDerivativeRegistration = true;
+  #ifdef NDEBUG
+            if (derivativeLinkage)
+              assert(derivativeLinkage == vjp->getLinkage());
+  #endif // NDEBUG
+            derivativeLinkage = vjp->getLinkage();
+            retroactiveVJP = vjp;
+          }
+        }
+        if (originalFn->isDefinition()) {
+          // TODO: Change "get or create" to just "create" here? Minimal diff witness lookup already failed
+          auto *newWitness = context.getOrCreateDifferentiabilityWitness(
+              originalFn, desiredConfig);
+          newWitness->setLinkage(*derivativeLinkage);
+          if (context.processDifferentiableAttribute(originalFn, newWitness, invoker))
+            return None;
+          minimalWitness = newWitness;
+        } else if (minimalAttr) {
+          if (isRetroactiveDerivativeRegistration) {
+            // TODO: Change "get or create" to just "create" here? Minimal diff witness lookup already failed
+            auto *newWitness = context.getOrCreateDifferentiabilityWitness(
+                originalFn, desiredConfig);
+            newWitness->setLinkage(*derivativeLinkage);
+            // Type-checking should have checked these
+            assert(retroactiveJVP);
+            assert(retroactiveVJP);
+            newWitness->setJVP(retroactiveJVP);
+            newWitness->setVJP(retroactiveVJP);
+            minimalWitness = newWitness;
+          } else {
+            AutoDiffConfig config(
+                minimalParamIndexSet, desiredConfig.resultIndices,
+                minimalAttr->getDerivativeGenericSignature());
+            minimalWitness = context.createDifferentiabilityWitnessDeclaration(originalFn, config);
+            // TODO: Make this robust. Need more checks? (original function must've been public?)
+            // minimalWitness->setLinkage(SILLinkage::Hidden);
+            foundExternalAttr = true;
+          }
+        }
+      }
+      // TODO: Check conditions for emitting external declaration. Depends on "which Swift module the AST attribute came from"
+#if 0
+      // Note: any derivative generic signature is fine, since derivative
+      // generic signatures are not yet mangled for SIL differentiability
+      // witnesses.
+      AutoDiffConfig config(
+          minimalParamIndexSet, desiredConfig.resultIndices,
+          desiredConfig.derivativeGenericSignature);
+      minimalWitness = context.createDifferentiabilityWitnessDeclaration(originalFn, config);
+      // TODO: Make this robust
+      minimalWitness->setLinkage(SILLinkage::Hidden);
+      foundExternalAttr = true;
+#endif
+
+#if 0
       if (originalFn->isExternalDeclaration()) {
         const DifferentiableAttr *minimalAttr = nullptr;
         IndexSubset *minimalParamIndexSet = nullptr;
         if (auto *DC = originalFn->getDeclContext()) {
           if (auto *origAFD =
-                  cast_or_null<AbstractFunctionDecl>(DC->getAsDecl()))
+                  cast_or_null<AbstractFunctionDecl>(DC->getAsDecl())) {
+            origAFD->dump();
             std::tie(minimalAttr, minimalParamIndexSet) =
                 context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
                     SILDeclRef(origAFD), originalFnTy, desiredConfig);
+          }
         }
         if (!minimalAttr) {
           context.emitNondifferentiabilityError(
@@ -2799,19 +2928,36 @@ emitDerivativeFunctionReference(
               diag::autodiff_external_nondifferentiable_function);
           return None;
         }
+        if (minimalAttr) {
+          llvm::errs() << "AHA, FOUND MINIMAL ATTR! " << originalFn->getName() << ", IS EXTERNAL? " << originalFn->isExternalDeclaration() << "\n";
+          minimalAttr->print(llvm::errs(), originalFn->getDeclContext()->getAsDecl()); llvm::errs() << "\n";
+          // Note: any derivative generic signature is fine, since derivative
+          // generic signatures are not yet mangled for SIL differentiability
+          // witnesses.
+          AutoDiffConfig config(
+              minimalParamIndexSet, desiredConfig.resultIndices,
+              desiredConfig.derivativeGenericSignature);
+          minimalWitness = context.createDifferentiabilityWitnessDeclaration(originalFn, config);
+          // TODO: Make this robust
+          minimalWitness->setLinkage(SILLinkage::Hidden);
+          foundExternalAttr = true;
+        }
       }
-      // Sanity check passed. Create a new SIL differentiability witness and
-      // process it.
-      GenericSignature contextualDerivativeGenSig = GenericSignature();
-      if (invoker.getKind() ==
-          DifferentiationInvoker::Kind::IndirectDifferentiation)
-        contextualDerivativeGenSig = invoker.getIndirectDifferentiation().second
-            ->getDerivativeGenericSignature();
-      auto *newWitness = context.getOrCreateDifferentiabilityWitness(
-          originalFn, desiredConfig);
-      if (context.processDifferentiableAttribute(originalFn, newWitness, invoker))
-        return None;
-      minimalWitness = newWitness;
+      if (!foundExternalAttr) {
+        // Sanity check passed. Create a new SIL differentiability witness and
+        // process it.
+        GenericSignature contextualDerivativeGenSig;;
+        if (invoker.getKind() ==
+            DifferentiationInvoker::Kind::IndirectDifferentiation)
+          contextualDerivativeGenSig = invoker.getIndirectDifferentiation().second
+              ->getDerivativeGenericSignature();
+        auto *newWitness = context.getOrCreateDifferentiabilityWitness(
+            originalFn, desiredConfig);
+        if (context.processDifferentiableAttribute(originalFn, newWitness, invoker))
+          return None;
+        minimalWitness = newWitness;
+      }
+#endif
     }
     assert(minimalWitness);
     // Get the substitution map for checking unmet generic requirements.
@@ -2846,14 +2992,7 @@ emitDerivativeFunctionReference(
       break;
     }
 
-#if 0
-    auto *derivativeFnRef2 = builder.createDifferentiabilityWitnessFunction(
-        loc, originalFn, witnessKind,
-        minimalWitness->getParameterIndices(),
-        minimalWitness->getResultIndices(),
-        minimalWitness->getDerivativeGenericSignature());
-#endif
-    auto *derivativeFnRef2 = builder.createDifferentiabilityWitnessFunction(
+    auto *derivativeFnRef = builder.createDifferentiabilityWitnessFunction(
         loc, witnessKind, minimalWitness);
     auto *derivativeFn = minimalWitness->getDerivative(kind);
     //auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
@@ -2864,9 +3003,10 @@ emitDerivativeFunctionReference(
       // Handle here.
     }
     auto convertedRef = reapplyFunctionConversion(
-        derivativeFnRef2, originalFRI, original, builder, loc,
+        derivativeFnRef, originalFRI, original, builder, loc,
         newBuffersToDealloc,
         derivativeFn->getLoweredFunctionType()->getGenericSignature());
+        // derivativeFnRef->getType().castTo<SILFunctionType>()->getGenericSignature());
     return std::make_pair(convertedRef, minimalWitness->getConfig());
   }
 
@@ -9020,9 +9160,11 @@ void Differentiation::run() {
   auto &module = *getModule();
   auto &astCtx = module.getASTContext();
   debugDump(module);
+#if 0
   // FIXME: Temporary hack; SerializedSILLoader must be created at start of
   // transform to avoid deserialization crash.
   module.getSILLoader();
+#endif
 
   // A global differentiation context.
   ADContext context(*this);

@@ -55,6 +55,8 @@ private:
   SILFunction *jvp;
   /// The VJP (vector-Jacobian products) derivative function.
   SILFunction *vjp;
+  /// Whether or not this differentiability witness is a declaration.
+  bool isDeclaration;
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
   bool serialized;
@@ -70,10 +72,12 @@ private:
                               IndexSubset *resultIndices,
                               GenericSignature derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
-                              bool isSerialized, DeclAttribute *attribute)
+                              bool isDeclaration, bool isSerialized,
+                              DeclAttribute *attribute)
     : module(module), linkage(linkage), originalFunction(originalFunction),
       config(parameterIndices, resultIndices, derivativeGenSig),
-      jvp(jvp), vjp(vjp), serialized(isSerialized), attribute(attribute) {}
+      jvp(jvp), vjp(vjp), isDeclaration(isDeclaration),
+      serialized(isSerialized), attribute(attribute) {}
 
   SILDifferentiabilityWitness(const SILDifferentiabilityWitness&) = delete;
   SILDifferentiabilityWitness& operator=(const SILDifferentiabilityWitness&)
@@ -81,9 +85,12 @@ private:
 
 public:
 
-  ~SILDifferentiabilityWitness();
+  static SILDifferentiabilityWitness *createDeclaration(
+      SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature derivativeGenSig, DeclAttribute *attribute = nullptr);
 
-  static SILDifferentiabilityWitness *create(
+  static SILDifferentiabilityWitness *createDefinition(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
       GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
@@ -121,6 +128,7 @@ public:
     case AutoDiffDerivativeFunctionKind::VJP: vjp = derivative; break;
     }
   }
+  bool isExternalDeclaration() const { return isDeclaration; }
   bool isSerialized() const { return serialized; }
   void setIsSerialized(bool isSerialized) { this->serialized = isSerialized; }
   DeclAttribute *getAttribute() const { return attribute; }
