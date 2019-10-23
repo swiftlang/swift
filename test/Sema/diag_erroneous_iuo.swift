@@ -219,6 +219,6 @@ struct T {
 }
 
 func select(i: Int!, m: Int, t: T) {
-  let _ = i ? i : m // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
-  let _ = t.i ? t.j : t.k // expected-error {{result values in '? :' expression have mismatching types 'Int?' and 'Int'}}
+  let _ = i ? i : m // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}} {{11-11=(}} {{12-12= != nil)}}
+  let _ = t.i ? t.j : t.k // expected-error {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}} {{11-11=(}} {{14-14= != nil)}}
 }

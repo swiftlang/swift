@@ -2578,10 +2578,10 @@ namespace {
       if (!boolDecl)
         return Type();
 
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getCondExpr()),
-                       boolDecl->getDeclaredType(),
-                       CS.getConstraintLocator(expr->getCondExpr()));
+      CS.addConstraint(
+          ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
+          boolDecl->getDeclaredType(),
+          CS.getConstraintLocator(expr, LocatorPathElt::Condition()));
 
       // The branches must be convertible to a common type.
       return CS.addJoinConstraint(CS.getConstraintLocator(expr),
