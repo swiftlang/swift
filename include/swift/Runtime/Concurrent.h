@@ -50,11 +50,13 @@ template <class ElemTy> struct ConcurrentListNode {
 /// link that already points to the old head value. Notice that the more
 /// difficult feature of removing links is not supported.
 /// See 'push_front' for more details.
+///
+/// This is currently only used for global lists and thus does not have a
+/// destructor to clean up the allocations. Transient uses must call clear()
+/// when done, or do some template magic to allow for a specialization with
+/// a destructor as was done for ConcurrentMap.
 template <class ElemTy> struct ConcurrentList {
-  ConcurrentList() : First(nullptr) {}
-  ~ConcurrentList() {
-    clear();
-  }
+  constexpr ConcurrentList() : First(nullptr) {}
 
   /// Remove all of the links in the chain. This method leaves
   /// the list at a usable state and new links can be added.
@@ -126,6 +128,13 @@ template <class ElemTy> struct ConcurrentList {
       // first element.
       N->Next = OldFirst;
     }
+  }
+
+  /// Check if the list is empty. This uses no barriers and is intended as
+  /// a cheap check in a case where the list is typically empty and maximum
+  /// performance is desired for that case.
+  bool isEmpty() const {
+    return First.load(std::memory_order_relaxed) == nullptr;
   }
 
   /// Points to the first link in the list.

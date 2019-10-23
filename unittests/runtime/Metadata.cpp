@@ -167,6 +167,8 @@ TEST(Concurrent, ConcurrentList) {
 
   // Check that the length of the list is correct.
   EXPECT_EQ(ListLen, results.size() * numElem);
+
+  List.clear();
 }
 
 
