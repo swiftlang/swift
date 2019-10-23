@@ -47,29 +47,25 @@ using InstSet = llvm::SmallPtrSet<SILInstruction *, 8>;
 
 using InstVector = llvm::SmallVector<SILInstruction *, 8>;
 
-/// A subset of instruction which may have side effects.
-/// Doesn't contain ones that have special handling (e.g. fix_lifetime)
-using WriteSet = SmallPtrSet<SILInstruction *, 8>;
-
-/// Returns true if the \p MayWrites set contains any memory writes which may
-/// alias with the memory addressed by \a LI.
+/// Returns true if the \p SideEffectInsts set contains any memory writes which
+/// may alias with the memory addressed by \a LI.
 template <SILInstructionKind K, typename T>
-static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites,
+static bool mayWriteTo(AliasAnalysis *AA, InstSet &SideEffectInsts,
                        UnaryInstructionBase<K, T> *Inst) {
-  for (auto *W : MayWrites)
-    if (AA->mayWriteToMemory(W, Inst->getOperand())) {
-      LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to "
+  for (auto *I : SideEffectInsts)
+    if (AA->mayWriteToMemory(I, Inst->getOperand())) {
+      LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *I << " to "
                               << *Inst << "\n");
       return true;
     }
   return false;
 }
 
-/// Returns true if the \p MayWrites set contains any memory writes which may
-/// alias with any memory which is read by \p AI.
+/// Returns true if the \p SideEffectInsts set contains any memory writes which
+/// may alias with any memory which is read by \p AI.
 /// Note: This function should only be called on a read-only apply!
 static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
-                       WriteSet &MayWrites, ApplyInst *AI) {
+                       InstSet &SideEffectInsts, ApplyInst *AI) {
   FunctionSideEffects E;
   SEA->getCalleeEffects(E, AI);
   assert(E.getMemBehavior(RetainObserveKind::IgnoreRetains) <=
@@ -87,9 +83,9 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
     SILValue Arg = AI->getArgument(Idx);
 
     // Check if the memory addressed by the argument may alias any writes.
-    for (auto *W : MayWrites) {
-      if (AA->mayWriteToMemory(W, Arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to "
+    for (auto *I : SideEffectInsts) {
+      if (AA->mayWriteToMemory(I, Arg)) {
+        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *I << " to "
                                 << *AI << "\n");
         return true;
       }
@@ -192,17 +188,17 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   return Changed;
 }
 
-/// Summary of may writes occurring in the loop tree rooted at \p
+/// Summary of side effect instructions occurring in the loop tree rooted at \p
 /// Loop. This includes all writes of the sub loops and the loop itself.
 struct LoopNestSummary {
   SILLoop *Loop;
-  WriteSet MayWrites;
+  InstSet SideEffectInsts;
 
   LoopNestSummary(SILLoop *Curr) : Loop(Curr) {}
 
 
   void copySummary(LoopNestSummary &Other) {
-    MayWrites.insert(Other.MayWrites.begin(), Other.MayWrites.end());
+    SideEffectInsts.insert(Other.SideEffectInsts.begin(), Other.SideEffectInsts.end());
   }
 
   LoopNestSummary(const LoopNestSummary &) = delete;
@@ -284,8 +280,8 @@ static bool sinkInstruction(DominanceInfo *DT,
   }
   if (Changed && !ExitBB) {
     // Created clones of instruction
-    // Remove it from the may write set - dangling pointer
-    LoopSummary->MayWrites.erase(Inst);
+    // Remove it from the side-effect set - dangling pointer
+    LoopSummary->SideEffectInsts.erase(Inst);
     Inst->getParent()->erase(Inst);
   }
   return Changed;
@@ -476,9 +472,10 @@ static bool isSafeReadOnlyApply(SideEffectAnalysis *SEA, ApplyInst *AI) {
   return (MB <= SILInstruction::MemoryBehavior::MayRead);
 }
 
-static void checkSideEffects(swift::SILInstruction &Inst, WriteSet &MayWrites) {
+static void checkSideEffects(swift::SILInstruction &Inst,
+                             InstSet &SideEffectInsts) {
   if (Inst.mayHaveSideEffects()) {
-    MayWrites.insert(&Inst);
+    SideEffectInsts.insert(&Inst);
   }
 }
 
@@ -551,7 +548,7 @@ static bool isCoveredByScope(BeginAccessInst *BI, DominanceInfo *DT,
 static bool analyzeBeginAccess(BeginAccessInst *BI,
                                SmallVector<BeginAccessInst *, 8> &BeginAccesses,
                                SmallVector<FullApplySite, 8> &fullApplies,
-                               WriteSet &MayWrites,
+                               InstSet &SideEffectInsts,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
   const AccessedStorage &storage =
@@ -595,12 +592,12 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
   // TODO Introduce "Pure Swift" deinitializers
   // We can then make use of alias information for instr's operands
   // If they don't alias - we might get away with not recording a conflict
-  for (auto mayWrite : MayWrites) {
-    // we actually compute all MayWrites in analyzeCurrentLoop
-    if (!mayWrite->mayRelease()) {
+  for (SILInstruction *I : SideEffectInsts) {
+    // we actually compute all SideEffectInsts in analyzeCurrentLoop
+    if (!I->mayRelease()) {
       continue;
     }
-    if (!isCoveredByScope(BI, DT, mayWrite))
+    if (!isCoveredByScope(BI, DT, I))
       return false;
   }
 
@@ -611,12 +608,12 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
 // Computes set of instructions we may be able to move out of the loop
 // Important Note:
 // We can't bail out of this method! we have to run it on all loops.
-// We *need* to discover all MayWrites -
+// We *need* to discover all SideEffectInsts -
 // even if the loop is otherwise skipped!
 // This is because outer loops will depend on the inner loop's writes.
 void LoopTreeOptimization::analyzeCurrentLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary) {
-  WriteSet &MayWrites = CurrSummary->MayWrites;
+  InstSet &sideEffects = CurrSummary->SideEffectInsts;
   SILLoop *Loop = CurrSummary->Loop;
   LLVM_DEBUG(llvm::dbgs() << " Analyzing accesses.\n");
 
@@ -651,7 +648,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         auto *BI = dyn_cast<BeginAccessInst>(&Inst);
         assert(BI && "Expected a Begin Access");
         BeginAccesses.push_back(BI);
-        checkSideEffects(Inst, MayWrites);
+        checkSideEffects(Inst, sideEffects);
         break;
       }
       case SILInstructionKind::RefElementAddrInst: {
@@ -665,7 +662,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         // cond_fail that would have protected (executed before) a memory access
         // must - after hoisting - also be executed before said access.
         HoistUp.insert(&Inst);
-        checkSideEffects(Inst, MayWrites);
+        checkSideEffects(Inst, sideEffects);
         break;
       }
       case SILInstructionKind::ApplyInst: {
@@ -681,7 +678,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         if (auto fullApply = FullApplySite::isa(&Inst)) {
           fullApplies.push_back(fullApply);
         }
-        checkSideEffects(Inst, MayWrites);
+        checkSideEffects(Inst, sideEffects);
         if (canHoistUpDefault(&Inst, Loop, DomTree, RunsOnHighLevelSIL)) {
           HoistUp.insert(&Inst);
         }
@@ -697,23 +694,23 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     return;
   }
   for (auto *AI : ReadOnlyApplies) {
-    if (!mayWriteTo(AA, SEA, MayWrites, AI)) {
+    if (!mayWriteTo(AA, SEA, sideEffects, AI)) {
       HoistUp.insert(AI);
     }
   }
   for (auto *LI : Loads) {
-    if (!mayWriteTo(AA, MayWrites, LI)) {
+    if (!mayWriteTo(AA, sideEffects, LI)) {
       HoistUp.insert(LI);
     }
   }
-  bool mayWritesMayRelease =
-      std::any_of(MayWrites.begin(), MayWrites.end(),
+  bool sideEffectsMayRelease =
+      std::any_of(sideEffects.begin(), sideEffects.end(),
                   [&](SILInstruction *W) { return W->mayRelease(); });
   for (auto *FL : FixLifetimes) {
     if (!DomTree->dominates(FL->getOperand()->getParentBlock(), Preheader)) {
       continue;
     }
-    if (!mayWriteTo(AA, MayWrites, FL) || !mayWritesMayRelease) {
+    if (!mayWriteTo(AA, sideEffects, FL) || !sideEffectsMayRelease) {
       SinkDown.push_back(FL);
     }
   }
@@ -723,7 +720,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
       continue;
     }
-    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, MayWrites, ASA,
+    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, sideEffects, ASA,
                            DomTree)) {
       SpecialHoist.push_back(BI);
     }
