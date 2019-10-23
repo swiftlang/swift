@@ -502,9 +502,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
   if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
-    PartialModules.push_back(
-        {std::move(buffers->ModuleBuffer), std::move(buffers->ModuleDocBuffer),
-         std::move(buffers->ModuleSourceInfoBuffer)});
+    PartialModules.push_back(std::move(*buffers));
     return None;
   }
   assert(buffers->ModuleDocBuffer.get() == nullptr);
@@ -516,7 +514,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   return bufferID;
 }
 
-Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
+Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
   if (auto b = input.buffer()) {
     return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
