@@ -596,7 +596,7 @@ public:
       Buffer.append(Text);
       Buffer.push_back('\0');
     }
-    return (*IterAndIsNew.first).getValue();
+    return IterAndIsNew.first->getValue();
   }
 
   void emitSourceFilesRecord(llvm::BitstreamWriter &Out) {
