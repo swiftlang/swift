@@ -5093,8 +5093,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = owner.getDecl()->getDeclContext()->mapTypeIntoContext(
-      param->getInterfaceType());
+  auto defArgType =
+      param->getInterfaceType().subst(owner.getSubstitutions());
   auto resultTy =
       tc.typeCheckParameterDefault(init, dc, defArgType,
                                    /*isAutoClosure=*/param->isAutoClosure(),
