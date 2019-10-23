@@ -6,8 +6,6 @@
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name main | %FileCheck %s
 
 // Round-trip parsing/printing and serialization/deserialization test.
-// NOTE: deserialization currently fails if public function bodies are removed
-// so that they are only declarations. This may require investigation.
 
 sil_stage raw
 
@@ -78,3 +76,38 @@ sil_differentiability_witness hidden [parameters 0 1] [results 0] [where T : _Di
 // CHECK:   jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
 // CHECK:   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
 // CHECK: }
+
+// Test SIL differentiability witness for external function.
+
+sil @externalFn1 : $@convention(thin) (Float) -> Float
+
+sil @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+  jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// CHECK-LABEL: // differentiability witness for externalFn1
+// CHECK: sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+// CHECK:   jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK: }
+
+// Test SIL differentiability witness declaration.
+
+sil @externalFn2 : $@convention(thin) (Float) -> Float
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float
+
+// CHECK-LABEL: // differentiability witness for externalFn2
+// CHECK: sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float
+// CHECK-NOT: {

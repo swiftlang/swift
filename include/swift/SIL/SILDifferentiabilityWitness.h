@@ -123,6 +123,7 @@ public:
     }
   }
   bool isDeclaration() const { return IsDeclaration; }
+  bool isDefinition() const { return !IsDeclaration; }
   bool isSerialized() const { return IsSerialized; }
   DeclAttribute *getAttribute() const { return Attribute; }
 

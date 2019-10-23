@@ -3168,7 +3168,7 @@ void SILDifferentiabilityWitness::print(
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   // sil_differentiability_witness (linkage)?
   OS << "sil_differentiability_witness ";
-  printLinkage(OS, getLinkage(), ForDefinition);
+  printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
@@ -3211,6 +3211,10 @@ void SILDifferentiabilityWitness::print(
   }
   // @original-function-name : $original-sil-type
   printSILFunctionNameAndType(OS, getOriginalFunction());
+
+  if (isDeclaration())
+    return;
+
   // {
   //   jvp: @jvp-function-name : $jvp-sil-type
   //   vjp: @vjp-function-name : $vjp-sil-type

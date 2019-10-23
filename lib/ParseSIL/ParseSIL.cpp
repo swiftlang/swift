@@ -6951,9 +6951,6 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   Optional<SILLinkage> linkage;
   if (parseSILLinkage(linkage, P))
     return true;
-  // Default to public linkage.
-  if (!linkage)
-    linkage = SILLinkage::Public;
 
   // Parse '[serialized]' flag (optional).
   bool isSerialized = false;
@@ -6988,8 +6985,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       P.diagnose(fnNameLoc, diag::expected_sil_function_type);
       return true;
     }
-    fn = State.getGlobalNameForReference(name, fnType, fnNameLoc, true);
-    State.TUState.PotentialZombieFns.insert(fn);
+    fn = State.getGlobalNameForReference(name, fnType, fnNameLoc);
     return false;
   };
 
@@ -7065,7 +7061,26 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
             nullptr);
   }
 
-  // Parse differentiability witness body.
+  auto origFnType = originalFn->getLoweredFunctionType();
+  auto *parameterIndexSet = IndexSubset::get(
+      P.Context, origFnType->getNumParameters(), parameterIndices);
+  auto *resultIndexSet = IndexSubset::get(
+      P.Context, origFnType->getNumResults(), resultIndices);
+
+  // If this is just a declaration, create the declaration now and return.
+  if (!P.Tok.is(tok::l_brace)) {
+    if (isSerialized) {
+      P.diagnose(lastLoc, diag::sil_diff_witness_serialized_declaration);
+      return true;
+    }
+
+    SILDifferentiabilityWitness::createDeclaration(
+        M, linkage ? *linkage : SILLinkage::DefaultForDeclaration, originalFn,
+        parameterIndexSet, resultIndexSet, derivativeGenSig);
+    return false;
+  }
+
+  // This is a definition, so parse differentiability witness body.
   SILFunction *jvp = nullptr;
   SILFunction *vjp = nullptr;
   if (P.Tok.is(tok::l_brace)) {
@@ -7096,14 +7111,10 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
-  auto origFnType = originalFn->getLoweredFunctionType();
-  auto *parameterIndexSet = IndexSubset::get(
-      P.Context, origFnType->getNumParameters(), parameterIndices);
-  auto *resultIndexSet = IndexSubset::get(
-      P.Context, origFnType->getNumResults(), resultIndices);
   SILDifferentiabilityWitness::createDefinition(
-      M, *linkage, originalFn, parameterIndexSet, resultIndexSet,
-      derivativeGenSig, jvp, vjp, isSerialized);
+      M, linkage ? *linkage : SILLinkage::DefaultForDefinition, originalFn,
+      parameterIndexSet, resultIndexSet, derivativeGenSig, jvp, vjp,
+      isSerialized);
   return false;
 }
 // SWIFT_ENABLE_TENSORFLOW END
