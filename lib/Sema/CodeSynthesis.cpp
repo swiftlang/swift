@@ -859,26 +859,8 @@ static void addImplicitConstructorsToStruct(StructDecl *decl) {
       if (var->getOriginalWrappedProperty())
         continue;
 
-      if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
-        // Initialized 'let' properties have storage, but don't get an argument
-        // to the memberwise initializer since they already have an initial
-        // value that cannot be overridden.
-        if (var->isLet() && var->isParentInitialized()) {
-          // We cannot handle properties like:
-          //   let (a,b) = (1,2)
-          // for now, just disable implicit init synthesization in structs in
-          // this case.
-          auto SP = var->getParentPattern();
-          if (auto *TP = dyn_cast<TypedPattern>(SP))
-            SP = TP->getSubPattern();
-          if (!isa<NamedPattern>(SP))
-            return;
-
-          continue;
-        }
-
+      if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         FoundMemberwiseInitializedProperty = true;
-      }
     }
   }
 
@@ -946,8 +928,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl) {
 
         if (auto overridden = ctor->getOverriddenDecl())
           overriddenInits.insert(overridden);
-
-        continue;
       }
     }
   }
