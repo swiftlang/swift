@@ -97,7 +97,7 @@ protected:
   openModuleSourceInfoFileIfPresent(AccessPathElem ModuleID,
                                     StringRef ModulePath,
                                     StringRef ModuleSourceInfoFileName,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try
