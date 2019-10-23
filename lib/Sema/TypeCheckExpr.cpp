@@ -638,15 +638,16 @@ Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
   return closure;
 }
 
-static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
+static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
+  auto &ctx = dc->getASTContext();
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(dc->getModuleScopeContext(),
-                                     TC.Context.getIdentifier(name),
-                                     SourceLoc(),
-                                     lookupOptions);
+  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
+                                               ctx.getIdentifier(name),
+                                               SourceLoc(),
+                                               lookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
@@ -709,15 +710,12 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
   if (!name)
     return nullptr;
 
-  // FIXME: Creating a whole type checker just to do lookup is unnecessary.
-  TypeChecker &tc = TypeChecker::createForContext(dc->getASTContext());
-
   Type type;
   if (performLocalLookup)
-    type = lookupDefaultLiteralType(tc, dc, name);
+    type = lookupDefaultLiteralType(dc, name);
 
   if (!type)
-    type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+    type = lookupDefaultLiteralType(TypeChecker::getStdlibModule(dc), name);
 
   // Strip off one level of sugar; we don't actually want to print
   // the name of the typealias itself anywhere.

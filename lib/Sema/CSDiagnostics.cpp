@@ -75,12 +75,14 @@ std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
   return {anchor, !resolved->getPath().empty()};
 }
 
-Type FailureDiagnostic::getType(Expr *expr) const {
-  return resolveType(CS.getType(expr));
+Type FailureDiagnostic::getType(Expr *expr, bool wantRValue) const {
+  return resolveType(CS.getType(expr), /*reconstituteSugar=*/false,
+                     wantRValue);
 }
 
-Type FailureDiagnostic::getType(const TypeLoc &loc) const {
-  return resolveType(CS.getType(loc));
+Type FailureDiagnostic::getType(const TypeLoc &loc, bool wantRValue) const {
+  return resolveType(CS.getType(loc), /*reconstituteSugar=*/false,
+                     wantRValue);
 }
 
 template <typename... ArgTypes>
@@ -248,7 +250,6 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // Try to resolve the function type by loading lvalues and looking through
   // optional types, which can occur for expressions like `fn?(5)`.
   auto *fnType = resolveType(rawFnType)
-                     ->getRValueType()
                      ->lookThroughAllOptionalTypes()
                      ->getAs<FunctionType>();
   if (!fnType)
@@ -733,6 +734,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
+  case CTP_ForEachStmt:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -1077,7 +1079,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
-  auto baseType = getType(anchor)->getRValueType();
+  auto baseType = getType(anchor);
   bool resultIsOptional = ResultTypeIsOptional;
 
   // If we've resolved the member overload to one that returns an optional
@@ -1229,7 +1231,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     }
 
     emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
-                   getType(anchor)->getRValueType())
+                   getType(anchor))
         .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
                       "try!");
     return true;
@@ -1399,7 +1401,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 
       if (resolvedOverload->Choice.getKind() ==
           OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        if (!getType(member->getBase())->hasLValueType())
+        if (!getType(member->getBase(), /*wantRValue=*/false)->hasLValueType())
           subElementDiagID =
               diag::assignment_dynamic_property_has_immutable_base;
       }
@@ -1812,15 +1814,13 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
     return member->choice;
 
   auto *DC = getDC();
-  auto &TC = getTypeChecker();
-
   auto *decl = member->choice.getDecl();
   if (isa<SubscriptDecl>(decl) &&
-      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC, TC)) {
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC)) {
     auto *subscript = cast<SubscriptDecl>(decl);
     // If this is a keypath dynamic member lookup, we have to
     // adjust the locator to find member referred by it.
-    if (isValidKeyPathDynamicMemberLookup(subscript, TC)) {
+    if (isValidKeyPathDynamicMemberLookup(subscript)) {
       auto &cs = getConstraintSystem();
       // Type has a following format:
       // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
@@ -1917,6 +1917,16 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
+  case ConstraintLocator::Condition: {
+    // Tailored diagnostics for optional or assignment use
+    // in condition expression.
+    if (diagnoseConversionToBool())
+      return true;
+
+    diagnostic = diag::cannot_convert_condition_value;
+    break;
+  }
+
   case ConstraintLocator::ContextualType: {
     if (diagnoseConversionToBool())
       return true;
@@ -1926,6 +1936,21 @@ bool ContextualFailure::diagnoseAsError() {
 
     if (diagnoseYieldByReferenceMismatch())
       return true;
+
+    if (CTP == CTP_ForEachStmt) {
+      if (FromType->isAnyExistentialType()) {
+        emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                       /*isExistentialType=*/true, FromType, ToType);
+        return true;
+      }
+
+      emitDiagnostic(
+          anchor->getLoc(),
+          diag::foreach_sequence_does_not_conform_to_expected_protocol,
+          FromType, ToType, bool(FromType->getOptionalObjectType()))
+          .highlight(anchor->getSourceRange());
+      return true;
+    }
 
     auto contextualType = getToType();
     if (auto msg = getDiagnosticFor(CTP, contextualType->isExistentialType())) {
@@ -1964,6 +1989,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return diag::cannot_convert_to_return_type_nil;
 
   case CTP_ThrowStmt:
+  case CTP_ForEachStmt:
   case CTP_YieldByReference:
     return None;
 
@@ -2299,7 +2325,7 @@ bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
     return false;
 
   auto *anchor = getAnchor();
-  auto exprType = getType(anchor);
+  auto exprType = getType(anchor, /*wantRValue=*/false);
   auto contextualType = getToType();
 
   if (auto exprLV = exprType->getAs<LValueType>()) {
@@ -2738,6 +2764,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
+  case CTP_ForEachStmt:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -5191,7 +5218,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   // let's match up its element type to the argument to see whether
   // it would be appropriate to suggest adding `&`.
   auto *argExpr = getAnchor();
-  if (getType(argExpr)->is<LValueType>()) {
+  if (getType(argExpr, /*wantRValue=*/false)->is<LValueType>()) {
     auto elementTy = paramType->getAnyPointerElementType();
     if (elementTy && argType->isEqual(elementTy)) {
       diag.fixItInsert(argExpr->getStartLoc(), "&");
@@ -5227,8 +5254,8 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
 
   auto name = *getOperatorName(binaryOp->getFn());
 
-  auto lhsType = getType(lhs)->getRValueType();
-  auto rhsType = getType(rhs)->getRValueType();
+  auto lhsType = getType(lhs);
+  auto rhsType = getType(rhs);
 
   // If both arguments where incorrect e.g. both are function types,
   // let's avoid producing a diagnostic second time, because first
@@ -5289,8 +5316,8 @@ bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
   auto *lhsExpr = op->getArg()->getElement(0);
   auto *rhsExpr = op->getArg()->getElement(1);
 
-  auto lhsType = getType(lhsExpr)->getRValueType();
-  auto rhsType = getType(rhsExpr)->getRValueType();
+  auto lhsType = getType(lhsExpr);
+  auto rhsType = getType(rhsExpr);
 
   auto diagnostic =
       lhsType->is<UnresolvedType>()

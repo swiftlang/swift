@@ -90,6 +90,7 @@ public:
     case KeyPathValue:
     case KeyPathComponentResult:
     case ExplicitTypeCoercion:
+    case Condition:
       return 0;
 
     case ContextualType:

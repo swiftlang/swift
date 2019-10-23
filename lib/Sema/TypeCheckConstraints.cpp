@@ -2672,8 +2672,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, initType, Locator,
-                                   false /* ignoreTopLevelInjection */);
+      expr = solution.coerceToType(expr, initType, Locator);
       if (!expr)
         return nullptr;
 
@@ -2909,6 +2908,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
+      auto *contextualLocator =
+          cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
@@ -2925,11 +2926,16 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       sequenceProto->getDeclaredType(), Locator);
+                       sequenceProto->getDeclaredType(), contextualLocator);
 
-      auto elementLocator =
-        cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceElementType);
+      // Since we are using "contextual type" here, it has to be recorded
+      // in the constraint system for diagnostics to have access to "purpose".
+      cs.setContextualType(
+          expr, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+          CTP_ForEachStmt);
+
+      auto elementLocator = cs.getConstraintLocator(
+          contextualLocator, ConstraintLocator::SequenceElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
@@ -3451,7 +3457,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
-                                       /*ignoreTopLevelInjection*/false,
                                        typeFromPattern);
   if (!result) {
     return true;

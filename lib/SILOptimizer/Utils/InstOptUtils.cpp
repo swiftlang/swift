@@ -1433,12 +1433,18 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
   if (decl.isForeign)
     return false;
 
+  auto *afd = decl.getAbstractFunctionDecl();
+  assert(afd && "Expected abstract function decl!");
+  return calleesAreStaticallyKnowable(module, afd);
+}
+
+/// Are the callees that could be called through Decl statically
+/// knowable based on the Decl and the compilation mode?
+bool swift::calleesAreStaticallyKnowable(SILModule &module,
+                                         AbstractFunctionDecl *afd) {
   const DeclContext *assocDC = module.getAssociatedContext();
   if (!assocDC)
     return false;
-
-  auto *afd = decl.getAbstractFunctionDecl();
-  assert(afd && "Expected abstract function decl!");
 
   // Only handle members defined within the SILModule's associated context.
   if (!afd->isChildContextOf(assocDC))

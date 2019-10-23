@@ -46,7 +46,7 @@ TEST(IndexSubset, BitWordIndexAndOffset) {
             std::make_pair(1u, 0u));
 }
 
-TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Equality) {
+TEST(IndexSubset, Equality) {
   TestContext ctx;
   EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0}),
             IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {0}));
@@ -60,7 +60,7 @@ TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Equality) {
             IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
 }
 
-TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Initializers) {
+TEST(IndexSubset, Initializers) {
   TestContext ctx;
   // Default init.
   EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
@@ -101,7 +101,7 @@ TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Initializers) {
             IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
 }
 
-TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Bits) {
+TEST(IndexSubset, Bits) {
   TestContext ctx;
   auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                     /*indices*/ {0, 2, 4});
@@ -124,7 +124,7 @@ TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Bits) {
   EXPECT_FALSE(indices2->contains(4));
 }
 
-TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Iteration) {
+TEST(IndexSubset, Iteration) {
   TestContext ctx;
   // Test 1
   {
@@ -164,7 +164,7 @@ TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Iteration) {
   }
 }
 
-TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_SupersetAndSubset) {
+TEST(IndexSubset, SupersetAndSubset) {
   TestContext ctx;
   auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                     /*indices*/ {0, 2, 4});
@@ -178,7 +178,7 @@ TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_SupersetAndSubset) {
   EXPECT_TRUE(indices2->isSubsetOf(indices1));
 }
 
-TEST(IndexSubset, /* rdar://problem/56338898 */DISABLED_Insertion) {
+TEST(IndexSubset, Insertion) {
   TestContext ctx;
   auto *indices1 = IndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
   EXPECT_EQ(indices1->adding(0, ctx.Ctx), indices1);
