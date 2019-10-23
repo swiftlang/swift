@@ -4969,8 +4969,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // was invalid.
   if (invalid) {
     for (auto accessor : Accessors) {
-      if (accessor)
-        accessor->setInvalid();
+      accessor->setInvalid();
     }
   }
 
