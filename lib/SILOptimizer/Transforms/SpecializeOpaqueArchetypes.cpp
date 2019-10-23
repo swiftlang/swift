@@ -508,10 +508,12 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
           if (!dc)
             dc = context->getModule().getSwiftModule();
           auto opaque = opaqueTy->getDecl();
-          return ReplaceOpaqueTypesWithUnderlyingTypes::
+          OpaqueSubstitutionKind subKind =
+              ReplaceOpaqueTypesWithUnderlyingTypes::
               shouldPerformSubstitution(opaque,
                                         context->getModule().getSwiftModule(),
                                         context->getResilienceExpansion());
+          return subKind != OpaqueSubstitutionKind::DontSubstitute;
         }
         return false;
       });

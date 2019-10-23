@@ -4876,7 +4876,7 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 
-enum OpaqueSubstitutionKind {
+enum class OpaqueSubstitutionKind {
   // Don't substitute the opaque type for the underlying type.
   DontSubstitute,
   // Substitute without looking at the type and context.
@@ -4885,7 +4885,7 @@ enum OpaqueSubstitutionKind {
   AlwaysSubstitute,
   // Substitute in the same module into a maximal resilient context.
   // Can be done if the underlying type is accessible from the context we
-  // substitute into. Private types cannot be accesses from a different TU.
+  // substitute into. Private types cannot be accessed from a different TU.
   SubstituteSameModuleMaximalResilience,
   // Substitute in a different module from the opaque definining decl. Can only
   // be done if the underlying type is public.

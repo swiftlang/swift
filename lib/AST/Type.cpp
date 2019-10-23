@@ -2660,13 +2660,13 @@ bool canSubstituteTypeInto(Type ty, DeclContext *dc,
     return true;
 
   switch (kind) {
-  case DontSubstitute:
+  case OpaqueSubstitutionKind::DontSubstitute:
     return false;
 
-  case AlwaysSubstitute:
+  case OpaqueSubstitutionKind::AlwaysSubstitute:
     return true;
 
-  case SubstituteSameModuleMaximalResilience:
+  case OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience:
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
         nominal->getDeclContext()->getParentSourceFile() ==
@@ -2674,7 +2674,7 @@ bool canSubstituteTypeInto(Type ty, DeclContext *dc,
       return true;
     return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
 
-  case SubstituteNonResilientModule:
+  case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
     return nominal->getEffectiveAccess() > AccessLevel::Internal;
   }
