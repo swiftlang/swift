@@ -3397,6 +3397,11 @@ ERROR(unresolved_label_corrected,none,
       "use of unresolved label %0; did you mean %1?",
       (Identifier, Identifier))
 
+ERROR(foreach_sequence_does_not_conform_to_expected_protocol,none,
+      "for-in loop requires %0 to conform to %1"
+      "%select{|; did you mean to unwrap optional?}2",
+      (Type, Type, bool))
+
 // Switch Stmt
 ERROR(no_match_operator,none,
       "no binary '~=' operator available for 'switch' statement", ())

@@ -221,6 +221,8 @@ enum ContextualTypePurpose {
                              ///< result type.
   CTP_Condition,        ///< Condition expression of various statements e.g.
                         ///< `if`, `for`, `while` etc.
+  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
+                        ///< is expected to conform to 'Sequence' protocol.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };

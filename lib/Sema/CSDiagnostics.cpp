@@ -734,6 +734,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
+  case CTP_ForEachStmt:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -1936,6 +1937,21 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseYieldByReferenceMismatch())
       return true;
 
+    if (CTP == CTP_ForEachStmt) {
+      if (FromType->isAnyExistentialType()) {
+        emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                       /*isExistentialType=*/true, FromType, ToType);
+        return true;
+      }
+
+      emitDiagnostic(
+          anchor->getLoc(),
+          diag::foreach_sequence_does_not_conform_to_expected_protocol,
+          FromType, ToType, bool(FromType->getOptionalObjectType()))
+          .highlight(anchor->getSourceRange());
+      return true;
+    }
+
     auto contextualType = getToType();
     if (auto msg = getDiagnosticFor(CTP, contextualType->isExistentialType())) {
       diagnostic = *msg;
@@ -1973,6 +1989,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return diag::cannot_convert_to_return_type_nil;
 
   case CTP_ThrowStmt:
+  case CTP_ForEachStmt:
   case CTP_YieldByReference:
     return None;
 
@@ -2747,6 +2764,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
+  case CTP_ForEachStmt:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:

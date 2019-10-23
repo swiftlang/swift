@@ -3363,6 +3363,25 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                          formUnsolvedResult);
         }
       }
+
+      // If the left-hand side of a 'sequence element' constraint
+      // is a dependent member type without any type variables it
+      // means that conformance check has been "fixed".
+      // Let's record other side of the conversion as a "hole"
+      // to give the solver a chance to continue and avoid
+      // producing diagnostics for both missing conformance and
+      // invalid element type.
+      if (shouldAttemptFixes()) {
+        if (auto last = locator.last()) {
+          if (last->is<LocatorPathElt::SequenceElementType>() &&
+              desugar1->is<DependentMemberType>() &&
+              !desugar1->hasTypeVariable()) {
+            recordHole(typeVar2);
+            return getTypeMatchSuccess();
+          }
+        }
+      }
+
       return formUnsolvedResult();
     }
 
