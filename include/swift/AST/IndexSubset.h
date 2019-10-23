@@ -57,6 +57,10 @@ private:
   /// The number of bit words in the index subset.
   unsigned numBitWords;
 
+  static unsigned getNumBytesNeededForCapacity(unsigned capacity) {
+    return getNumBitWordsNeededForCapacity(capacity) * bitWordSize;
+  }
+
   BitWord *getBitWordsData() {
     return reinterpret_cast<BitWord *>(this + 1);
   }
