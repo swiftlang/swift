@@ -269,11 +269,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
 struct AutoDiffConfig {
   IndexSubset *parameterIndices;
   IndexSubset *resultIndices;
-  GenericSignatureImpl* derivativeGenericSignature;
+  GenericSignature derivativeGenericSignature;
 
   /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
                               IndexSubset *resultIndices,
-                              GenericSignatureImpl *derivativeGenericSignature)
+                              GenericSignature derivativeGenericSignature)
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
 
@@ -443,7 +443,7 @@ namespace llvm {
 
 using swift::AutoDiffConfig;
 using swift::AutoDiffDerivativeFunctionKind;
-using swift::GenericSignatureImpl;
+using swift::GenericSignature;
 using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
 
@@ -453,27 +453,29 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            static_cast<GenericSignatureImpl *>(ptr)};
+            DenseMapInfo<GenericSignature>::getEmptyKey()};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            static_cast<GenericSignatureImpl *>(ptr)};
+            DenseMapInfo<GenericSignature>::getTombstoneKey()};
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {
     unsigned combinedHash = hash_combine(
         ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
         DenseMapInfo<void *>::getHashValue(Val.resultIndices),
-        DenseMapInfo<void *>::getHashValue(Val.derivativeGenericSignature));
+        DenseMapInfo<GenericSignature>::getHashValue(
+            Val.derivativeGenericSignature));
     return combinedHash;
   }
 
   static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
     return LHS.parameterIndices == RHS.parameterIndices &&
         LHS.resultIndices == RHS.resultIndices &&
-        LHS.derivativeGenericSignature == RHS.derivativeGenericSignature;
+        DenseMapInfo<GenericSignature>::isEqual(LHS.derivativeGenericSignature,
+                                                RHS.derivativeGenericSignature);
   }
 };
 
