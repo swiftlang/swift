@@ -542,11 +542,17 @@ namespace {
     /// given callee locator.
     llvm::DenseMap<ConstraintLocator *, ConcreteDeclRef> CachedConcreteRefs;
 
+    /// Resolves the contextual substitutions for a reference to a declaration
+    /// at a given locator. This should be preferred to
+    /// Solution::resolveConcreteDeclRef as it caches the result.
     ConcreteDeclRef
     resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocatorBuilder locator) {
       if (!decl)
         return ConcreteDeclRef();
 
+      // Cache the resulting concrete reference. Ideally this would be done on
+      // Solution, however unfortunately that would require a const_cast which
+      // would be undefined behaviour if we ever had a `const Solution`.
       auto *loc = getConstraintSystem().getConstraintLocator(locator);
       auto &ref = CachedConcreteRefs[loc];
       if (!ref)
@@ -3044,7 +3050,9 @@ namespace {
       auto *calleeLoc = CalleeLocators[expr];
       assert(calleeLoc);
 
-      // Resolve the callee for the application if we have one.
+      // Resolve the callee for the application if we have one. Note that we're
+      // using `resolveConcreteDeclRef` instead `solution.resolveLocatorToDecl`
+      // here to benefit from ExprRewriter's cache of concrete refs.
       ConcreteDeclRef callee;
       if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc)) {
         auto *decl = overload->choice.getDeclOrNull();
@@ -5216,12 +5224,12 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-Expr *ExprRewriter::coerceCallArguments(
-    Expr *arg, AnyFunctionType *funcType, ConcreteDeclRef callee,
-    ApplyExpr *apply,
-    ArrayRef<Identifier> argLabels,
-    bool hasTrailingClosure,
-    ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
+                                        ConcreteDeclRef callee,
+                                        ApplyExpr *apply,
+                                        ArrayRef<Identifier> argLabels,
+                                        bool hasTrailingClosure,
+                                        ConstraintLocatorBuilder locator) {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto params = funcType->getParams();
 
