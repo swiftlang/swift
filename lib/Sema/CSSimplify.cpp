@@ -2699,20 +2699,64 @@ bool ConstraintSystem::repairFailures(
       if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
         return false;
 
-      // If this is an attempt to assign something to a value of optional type
-      // there is a possiblity that the problem is related to escapiness, so
-      // fix has to be delayed.
-      if (hasConversionOrRestriction(
-              ConversionRestrictionKind::ValueToOptional))
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
         return false;
 
-      // If the destination of an assignment is l-value type
-      // it leaves only possible reason for failure - a type mismatch.
-      if (getType(AE->getDest())->is<LValueType>()) {
-        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
-            *this, lhs, rhs, getConstraintLocator(locator)));
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::ValueToOptional)) {
+        lhs = lhs->lookThroughAllOptionalTypes();
+        rhs = rhs->lookThroughAllOptionalTypes();
+
+        // If both object types are functions, let's allow the solver to
+        // structurally compare them before trying to fix anything.
+        if (lhs->is<FunctionType>() && rhs->is<FunctionType>())
+          return false;
+
+        // If either object type is a bound generic or existential it means
+        // that follow-up to value-to-optional is going to be:
+        //
+        // 1. "deep equality" check, which is handled by generic argument(s)
+        //    mismatch fix, or
+        // 2. "existential" check, which is handled by a missing conformance
+        //    fix.
+        if (lhs->is<BoundGenericType>() || rhs->isAnyExistentialType())
+          return false;
+      }
+
+      auto *destExpr = AE->getDest();
+      // Literal expression as well as call/operator application can't be
+      // used as an assignment destination because resulting type is immutable.
+      if (isa<ApplyExpr>(destExpr) || isa<LiteralExpr>(destExpr)) {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
         return true;
       }
+
+      // If destination has a function type, it might either be
+      // a property with a function type or a method reference,
+      // e.g. `foo.bar = 42` neither can be used if the destination
+      // is not l-value.
+      if (!getType(destExpr)->is<LValueType>() && rhs->is<FunctionType>()) {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+        return true;
+      }
+
+      // Let's try to match source and destination types one more
+      // time to see whether they line up, if they do - the problem is
+      // related to immutability, otherwise it's a type mismatch.
+      auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
+                               TMF_ApplyingFix, locator);
+
+      if (getType(destExpr)->is<LValueType>() || result.isFailure()) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+      } else {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+      }
+
+      return true;
     }
 
     return false;

@@ -1701,7 +1701,9 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       return !storage->isSettable(nullptr) ||
              !storage->isSetterAccessibleFrom(DC);
 
-    return false;
+    // If this is not something which could possibly be mutable,
+    // then it's immutable.
+    return true;
   };
 
   // Provide specific diagnostics for assignment to subscripts whose base expr
