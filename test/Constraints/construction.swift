@@ -94,13 +94,12 @@ _ = b as! Derived
 // NOTE: Int and other integer-literal convertible types
 //  are special cased in the library.
 Int(i) // expected-warning{{unused}}
-_ = i as Int
+_ = i as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{7-14=}}
 Z(z) // expected-error{{no exact matches in call to initializer}}
-
 Z.init(z)  // expected-error {{no exact matches in call to initializer}}
 
 
-_ = z as Z
+_ = z as Z // expected-warning {{redundant cast to 'Z' has no effect}} {{7-12=}}
 
 // Construction from inouts.
 struct FooRef { }

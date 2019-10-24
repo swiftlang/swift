@@ -4,8 +4,8 @@
 
 import Security
 
-_ = kSecClass as CFString
-_ = kSecClassGenericPassword as CFString
+_ = kSecClass as CFString // expected-warning {{redundant cast to 'CFString' has no effect}} {{15-27=}}
+_ = kSecClassGenericPassword as CFString // expected-warning {{redundant cast to 'CFString' has no effect}} {{30-42=}}
 _ = kSecClassGenericPassword as CFDictionary // expected-error {{'CFString?' is not convertible to 'CFDictionary'}} {{30-32=as!}}
 
 func testIntegration() {

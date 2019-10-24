@@ -86,6 +86,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case ExplicitTypeCoercion:
     case Condition:
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
@@ -133,6 +134,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::KeyPathRoot:
   case ConstraintLocator::KeyPathValue:
   case ConstraintLocator::KeyPathComponentResult:
+  case ConstraintLocator::ExplicitTypeCoercion:
   case ConstraintLocator::Condition:
     return 0;
 
@@ -458,7 +460,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case KeyPathComponentResult:
       out << "key path component result";
       break;
-
+        
+    case ExplicitTypeCoercion:
+      out << "type coercion";
+      break;
+      
     case Condition:
       out << "condition expression";
       break;

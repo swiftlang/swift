@@ -3000,6 +3000,11 @@ void constraints::simplifyLocator(Expr *&anchor,
       path = path.slice(1);
       continue;
     }
+        
+    case ConstraintLocator::ExplicitTypeCoercion: {
+      path = path.slice(1);
+      continue;
+    }
 
     default:
       // FIXME: Lots of other cases to handle.

@@ -102,7 +102,7 @@ public func testTopLevel() {
 
 _ = __PrivAnonymousA
 _ = __E0PrivA
-_ = __PrivE1A as __PrivE1
+_ = __PrivE1A as __PrivE1 // expected-warning {{redundant cast to '__PrivE1' has no effect}} {{15-27=}}
 _ = NSEnum.__privA
 _ = NSEnum.B
 _ = NSOptions.__privA

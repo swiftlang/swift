@@ -9,7 +9,8 @@ _ = nil as Fract? // expected-error{{use of undeclared type 'Fract'}}
 _ = nil as Darwin.Fract? // okay
 
 _ = 0 as OSErr
-_ = noErr as OSStatus // noErr is from the overlay
+// noErr is from the overlay
+_ = noErr as OSStatus // expected-warning {{redundant cast to 'OSStatus' (aka 'Int32') has no effect}} {{11-23=}}
 _ = 0 as UniChar
 
 _ = ProcessSerialNumber()

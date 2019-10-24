@@ -71,16 +71,16 @@ func testImportMacTypes() {
 
 func testImportCFTypes() {
   let t1_unqual: UInt = CFTypeID_test
-  _ = t1_unqual as CoreFoundation.CFTypeID
+  _ = t1_unqual as CoreFoundation.CFTypeID // expected-warning {{redundant cast to 'CFTypeID' (aka 'UInt') has no effect}} {{17-44=}}
 
   let t2_unqual: UInt = CFOptionFlags_test
-  _ = t2_unqual as CoreFoundation.CFOptionFlags
+  _ = t2_unqual as CoreFoundation.CFOptionFlags // expected-warning {{redundant cast to 'CFOptionFlags' (aka 'UInt') has no effect}} {{17-49=}}
 
   let t3_unqual: UInt = CFHashCode_test
-  _ = t3_unqual as CoreFoundation.CFHashCode
+  _ = t3_unqual as CoreFoundation.CFHashCode // expected-warning {{redundant cast to 'CFHashCode' (aka 'UInt') has no effect}} {{17-46=}}
 
   let t4_unqual: Int = CFIndex_test
-  _ = t4_unqual as CoreFoundation.CFIndex
+  _ = t4_unqual as CoreFoundation.CFIndex // expected-warning {{redundant cast to 'CFIndex' (aka 'Int') has no effect}} {{17-43=}}
 }
 
 func testImportSEL() {

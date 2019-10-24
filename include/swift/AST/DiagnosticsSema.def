@@ -949,18 +949,22 @@ ERROR(super_initializer_not_in_initializer,none,
 WARNING(isa_is_always_true,none, "'%0' test is always true",
         (StringRef))
 WARNING(isa_is_foreign_check,none,
-      "'is' test is always true because %0 is a Core Foundation type",
-      (Type))
+        "'is' test is always true because %0 is a Core Foundation type",
+        (Type))
 WARNING(conditional_downcast_coercion,none,
-      "conditional cast from %0 to %1 always succeeds",
-      (Type, Type))
-
+        "conditional cast from %0 to %1 always succeeds",
+        (Type, Type))
+WARNING(unnecessary_same_type_coercion,none,
+        "redundant cast to %0 has no effect",
+        (Type))
+WARNING(unnecessary_same_typealias_type_coercion,none,
+        "redundant cast from %0 to %1 has no effect",
+        (Type, Type))
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
-
 WARNING(forced_downcast_coercion,none,
-      "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
-      (Type, Type))
+        "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
+        (Type, Type))
 
 // Note: the Boolean at the end indicates whether bridging is required after
 // the cast.

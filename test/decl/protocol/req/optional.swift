@@ -144,7 +144,7 @@ func optionalPropertyGeneric<T : P1>(_ t: T) {
 
   // ... and that we can use it
   let i = propertyRef!
-  _ = i as Int
+  _ = i as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{9-16=}}
 }
 
 // Optional subscript references in generics.
@@ -157,7 +157,7 @@ func optionalSubscriptGeneric<T : P1>(_ t: T) {
 
   // ... and that we can use it
   let i = subscriptRef!
-  _ = i as ObjCClass?
+  _ = i as ObjCClass? // expected-warning {{redundant cast to 'ObjCClass?' has no effect}} {{9-23=}}
 }
 
 // Optional method references in existentials.
@@ -182,7 +182,7 @@ func optionalPropertyExistential(_ t: P1) {
 
   // ... and that we can use it
   let i = propertyRef!
-  _ = i as Int
+  _ = i as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{9-16=}}
 }
 
 // Optional subscript references in existentials.
@@ -195,7 +195,7 @@ func optionalSubscriptExistential(_ t: P1) {
 
   // ... and that we can use it
   let i = subscriptRef!
-  _ = i as ObjCClass?
+  _ = i as ObjCClass? // expected-warning {{redundant cast to 'ObjCClass?' has no effect}} {{9-23=}}
 }
 
 // -----------------------------------------------------------------------
