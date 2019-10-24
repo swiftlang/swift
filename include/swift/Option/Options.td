@@ -428,9 +428,12 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental differentiable programming features">;
+// SWIFT_ENABLE_TENSORFLOW
+// NOTE: This flag will be removed when JVP/differential generation is robust.
 def enable_experimental_forward_mode_differentiation : Flag<["-"], "enable-experimental-forward-mode-differentiation">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental forward mode differentiation">;
+// SWIFT_ENABLE_TENSORFLOW END
 
 def enable_experimental_quasiquotes : Flag<["-"], "enable-experimental-quasiquotes">,
   Flags<[FrontendOption]>,

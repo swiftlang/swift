@@ -231,8 +231,10 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_enable_experimental_dependencies);
   inputArgs.AddLastArg(arguments,
                        options::OPT_experimental_dependency_include_intrafile);
+  // SWIFT_ENABLE_TENSORFLOW
   inputArgs.AddLastArg(
       arguments, options::OPT_enable_experimental_forward_mode_differentiation);
+  // SWIFT_ENABLE_TENSORFLOW END
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_quasiquotes);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);

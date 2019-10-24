@@ -331,8 +331,10 @@ namespace swift {
     /// `@differentiable` declaration attribute, etc.
     bool EnableExperimentalDifferentiableProgramming = false;
 
+    // SWIFT_ENABLE_TENSORFLOW
     /// Whether to enable forward mode differentiation
     bool EnableExperimentalForwardModeDifferentiation = false;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Whether to enable #quote, #unquote and @quoted.
     bool EnableExperimentalQuasiquotes = false;
