@@ -121,9 +121,8 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // Whether we have explicit initialization.
   bool isExplicitlyInitialized = false;
   if (auto pbd = var->getParentPatternBinding()) {
-    auto &entry = pbd->getPatternEntryForVarDecl(var);
-    isExplicitlyInitialized =
-      entry.isInitialized() && entry.getEqualLoc().isValid();
+    const auto i = pbd->getPatternEntryIndexForVarDecl(var);
+    isExplicitlyInitialized = pbd->isExplicitlyInitialized(i);
   }
 
   // Whether we can default-initialize this property.
@@ -236,8 +235,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       // Create the parameter.
       auto *arg = new (ctx)
-          ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), Loc,
+          ParamDecl(SourceLoc(), Loc,
                     var->getName(), Loc, var->getName(), decl);
+      arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
@@ -651,8 +651,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited |
-       ParameterList::WithoutTypes);
+       ParameterList::Inherited);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -669,7 +668,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
-    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,
@@ -687,7 +685,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Set the interface type of the initializer.
   ctor->setGenericSignature(genericSig);
-  ctor->computeType();
+  (void)ctor->getInterfaceType();
 
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
@@ -812,13 +810,13 @@ static bool areAllStoredPropertiesDefaultInitializable(NominalTypeDecl *decl) {
     // generation of the default initializer.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->hasStorage() && !pbd->isStatic()) {
-        for (auto entry : pbd->getPatternList()) {
-          if (entry.isInitialized()) continue;
+        for (auto idx : range(pbd->getNumPatternEntries())) {
+          if (pbd->isInitialized(idx)) continue;
 
           // If one of the bound variables is @NSManaged, go ahead no matter
           // what.
           bool CheckDefaultInitializer = true;
-          entry.getPattern()->forEachVariable([&](VarDecl *vd) {
+          pbd->getPattern(idx)->forEachVariable([&](VarDecl *vd) {
             if (vd->getAttrs().hasAttribute<NSManagedAttr>())
               CheckDefaultInitializer = false;
           });
@@ -835,7 +833,7 @@ static bool areAllStoredPropertiesDefaultInitializable(NominalTypeDecl *decl) {
   return true;
 }
 
-static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
+static void addImplicitConstructorsToStruct(StructDecl *decl) {
   assert(!decl->hasClangNode() &&
          "ClangImporter is responsible for adding implicit constructors");
   assert(!decl->hasUnreferenceableStorage() &&
@@ -886,6 +884,7 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
 
   if (FoundMemberwiseInitializedProperty) {
     // Create the implicit memberwise constructor.
+    auto &ctx = decl->getASTContext();
     auto ctor = createImplicitConstructor(
         decl, ImplicitConstructorKind::Memberwise, ctx);
     decl->addMember(ctor);
@@ -895,7 +894,7 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
     TypeChecker::defineDefaultConstructor(decl);
 }
 
-static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
+static void addImplicitConstructorsToClass(ClassDecl *decl) {
   // Bail out if we're validating one of our constructors already;
   // we'll revisit the issue later.
   if (!decl->hasClangNode()) {
@@ -913,6 +912,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   // variable.
   bool FoundDesignatedInit = false;
 
+  auto &ctx = decl->getASTContext();
   SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   if (decl->hasClangNode()) {
@@ -1106,9 +1106,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   }
 
   if (auto *structDecl = dyn_cast<StructDecl>(decl))
-    addImplicitConstructorsToStruct(structDecl, Context);
+    addImplicitConstructorsToStruct(structDecl);
   if (auto *classDecl = dyn_cast<ClassDecl>(decl))
-    addImplicitConstructorsToClass(classDecl, Context);
+    addImplicitConstructorsToClass(classDecl);
 }
 
 void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,

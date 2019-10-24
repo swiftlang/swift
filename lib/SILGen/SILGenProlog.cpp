@@ -420,7 +420,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
+void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 ParameterList *paramList,
                                 ParamDecl *selfParam,
                                 DeclContext *DC,
@@ -445,6 +445,9 @@ void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
+  assert((captureInfo.hasBeenComputed() ||
+          !TypeConverter::canCaptureFromParent(DC)) &&
+         "can't emit prolog of function with uncomputed captures");
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(
@@ -498,11 +501,11 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
     return;
   }
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(ParamDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
+  var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
 
   auto *arg =

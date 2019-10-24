@@ -84,7 +84,7 @@ func SR698(_ a: Int, b: Int) {}
 SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 
 // SR-979 - Two inout crash compiler
-func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{23-29=}}
+func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
 // expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
 func SR979d(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
@@ -124,7 +124,7 @@ prefix func %<T>(x: T) -> T { return x } // No error expected - the < is conside
 
 struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
   // expected-note@-1 {{did you mean to write an 'AnyObject' constraint?}} {{16-21=AnyObject}}
-  weak let value: T // expected-error {{'weak' must be a mutable variable, because it may change at runtime}} expected-error {{'weak' variable should have optional type 'T?'}}
+  weak let value: T // expected-error {{'weak' must be a mutable variable, because it may change at runtime}} expected-error {{'weak' variable should have optional type 'T?'}} expected-error {{'weak' must not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
 }
 
 let x: () = ()
@@ -145,6 +145,3 @@ enum sr8202_enum<@indirect T> {} // expected-error {{'indirect' is a declaration
 protocol P {
   @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@availability' attribute cannot be applied to this declaration}}
 }
-
-struct genericParamIncomplete1<@> {} // expected-error {{expected an attribute name}} expected-error {{expected an identifier to name generic parameter}}
-struct genericParamIncomplete2<@objc> {} // expected-error {{expected an identifier to name generic parameter}}

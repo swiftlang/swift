@@ -71,14 +71,14 @@ _ = sr7918_Suit.foo(&myRNG) // expected-error {{cannot pass immutable value as i
 //=-------------- SR-7786 --------------=/
 struct sr7786 {
   func foo() -> UInt { return 0 }
-  func foo<T: UnsignedInteger>(bar: T) -> T {
+  func foo<T: UnsignedInteger>(bar: T) -> T { // expected-note {{where 'T' = 'Int'}}
     return bar
   }
 }
 
 let s = sr7786()
 let a = s.foo()
-let b = s.foo(bar: 123) // expected-error {{argument type 'Int' does not conform to expected type 'UnsignedInteger'}}
+let b = s.foo(bar: 123) // expected-error {{instance method 'foo(bar:)' requires that 'Int' conform to 'UnsignedInteger'}}
 let c: UInt = s.foo(bar: 123)
 let d = s.foo(bar: 123 as UInt)
 

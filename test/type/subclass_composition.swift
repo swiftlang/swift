@@ -126,8 +126,8 @@ func basicSubtyping(
   let _: Derived & AnyObject = derived
 
   let _ = base as Base<Int> & P1
-  let _ = base as Base<Int> & AnyObject
-  let _ = derived as Derived & AnyObject
+  let _ = base as Base<Int> & AnyObject // expected-warning {{redundant cast to 'Base<Int>' has no effect}} {{16-41=}}
+  let _ = derived as Derived & AnyObject // expected-warning {{redundant cast to 'Derived' has no effect}} {{19-42=}}
 
   let _ = base as? Base<Int> & P1 // expected-warning {{always succeeds}}
   let _ = base as? Base<Int> & AnyObject // expected-warning {{always succeeds}}
@@ -170,7 +170,7 @@ func basicSubtyping(
   let _ = baseAndP1 as Base<Int>
   let _ = derivedAndP3 as Base<Int>
   let _ = derivedAndP2 as Derived
-  let _ = derivedAndAnyObject as Derived
+  let _ = derivedAndAnyObject as Derived // expected-warning {{redundant cast to 'Derived' has no effect}} {{31-42=}}
 
   let _ = baseAndP1 as? Base<Int> // expected-warning {{always succeeds}}
   let _ = derivedAndP3 as? Base<Int> // expected-warning {{always succeeds}}
@@ -299,12 +299,14 @@ func dependentMemberTypes<T : BaseIntAndP2>(
   _: BaseIntAndP2.FullyConcrete) {}
 
 func conformsToAnyObject<T : AnyObject>(_: T) {}
+// expected-note@-1 {{where 'T' = 'P1'}}
 func conformsToP1<T : P1>(_: T) {}
 // expected-note@-1 {{required by global function 'conformsToP1' where 'T' = 'P1'}}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}
 // expected-note@-2 {{where 'T' = 'T1'}}
+// expected-note@-3 2 {{where 'T' = 'Base<Int>'}}
 
 func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}
@@ -341,8 +343,8 @@ func metatypeSubtyping(
 
   let _ = baseIntAndP2 as Base<Int>.Type
   let _ = baseIntAndP2AndAnyObject as Base<Int>.Type
-  let _ = derivedAndAnyObject as Derived.Type
-  let _ = baseIntAndP2AndAnyObject as BaseAndP2<Int>.Type
+  let _ = derivedAndAnyObject as Derived.Type // expected-warning {{redundant cast to 'Derived.Type' has no effect}} {{31-47=}}
+  let _ = baseIntAndP2AndAnyObject as BaseAndP2<Int>.Type // expected-warning {{redundant cast to 'BaseAndP2<Int>.Type' (aka '(Base<Int> & P2).Type') has no effect}} {{36-59=}}
 
   let _ = baseIntAndP2 as? Base<Int>.Type // expected-warning {{always succeeds}}
   let _ = baseIntAndP2AndAnyObject as? Base<Int>.Type // expected-warning {{always succeeds}}
@@ -409,8 +411,7 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
 
   // Errors
   conformsToAnyObject(p1)
-  // expected-error@-1 {{cannot invoke 'conformsToAnyObject' with an argument list of type '(P1)'}}
-  // expected-note@-2 {{expected an argument list of type '(T)'}}
+  // expected-error@-1 {{global function 'conformsToAnyObject' requires that 'P1' be a class type}}
 
   conformsToP1(p1)
   // expected-error@-1 {{value of protocol type 'P1' cannot conform to 'P1'; only struct/enum/class types can conform to protocols}}
@@ -420,10 +421,10 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // about `& P2` in generic parameter.
 
   conformsToBaseIntAndP2(base)
-  // expected-error@-1 {{argument type 'Base<Int>' does not conform to expected type 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
 
   conformsToBaseIntAndP2(badBase)
-  // expected-error@-1 {{argument type 'Base<Int>' does not conform to expected type 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
   // expected-error@-2 {{cannot convert value of type 'Base<String>' to expected argument type 'Base<Int>'}}
 
   conformsToBaseIntAndP2(fakeDerived)

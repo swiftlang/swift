@@ -252,7 +252,7 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
   SyntaxParsingContext Discarding(SyntaxContext);
-  Discarding.setDiscard();
+  Discarding.disable();
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
@@ -879,16 +879,11 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            lpLoc,
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
-                           trailingClosure);
+                           trailingClosure,
+                           SyntaxKind::ExprList);
     assert(trailingClosure == nullptr);
-    if (!yieldLabelLocs.empty()) {
-      for (auto labelLoc : yieldLabelLocs) {
-        if (labelLoc.isValid()) {
-          diagnose(labelLoc, diag::unexpected_arg_label_yield);
-          break;
-        }
-      }
-    }
+    assert(yieldLabels.empty());
+    assert(yieldLabelLocs.empty());
   } else {
     SourceLoc beginLoc = Tok.getLoc();
 

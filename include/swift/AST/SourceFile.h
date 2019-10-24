@@ -276,6 +276,7 @@ public:
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
+  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -432,6 +433,9 @@ public:
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
+  /// Do not call when inside an inactive clause (\c
+  /// InInactiveClauseEnvironment)) because it will later on result in a lookup
+  /// to something that won't be in the ASTScope tree.
   void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
     UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
   }

@@ -30,6 +30,10 @@ class GenericContext;
 class GenericParamList;
 class TypeAliasDecl;
 class TypeDecl;
+namespace ast_scope {
+class ASTScopeImpl;
+class ScopeCreator;
+} // namespace ast_scope
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -274,38 +278,12 @@ public:
   void cacheResult(GenericParamList *value) const;
 };
 
-struct PrecedenceGroupDescriptor {
-  DeclContext *dc;
-  Identifier ident;
-  SourceLoc nameLoc;
-
-  SourceLoc getLoc() const;
-
-  friend llvm::hash_code hash_value(const PrecedenceGroupDescriptor &owner) {
-    return hash_combine(llvm::hash_value(owner.dc),
-                        llvm::hash_value(owner.ident.getAsOpaquePointer()),
-                        llvm::hash_value(owner.nameLoc.getOpaquePointerValue()));
-  }
-
-  friend bool operator==(const PrecedenceGroupDescriptor &lhs,
-                         const PrecedenceGroupDescriptor &rhs) {
-    return lhs.dc == rhs.dc &&
-           lhs.ident == rhs.ident &&
-           lhs.nameLoc == rhs.nameLoc;
-  }
-
-  friend bool operator!=(const PrecedenceGroupDescriptor &lhs,
-                         const PrecedenceGroupDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
-
-class LookupPrecedenceGroupRequest
-    : public SimpleRequest<LookupPrecedenceGroupRequest,
-                           PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
-                           CacheKind::Cached> {
+/// Expand the given ASTScope. Requestified to detect recursion.
+class ExpandASTScopeRequest
+    : public SimpleRequest<ExpandASTScopeRequest,
+                           ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
+                                                     ast_scope::ScopeCreator *),
+                           CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -313,15 +291,15 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PrecedenceGroupDecl *>
-  evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
+  llvm::Expected<ast_scope::ASTScopeImpl *>
+  evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
+           ast_scope::ScopeCreator *) const;
 
 public:
-  // Source location
-  SourceLoc getNearestLoc() const;
-                               
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
+  Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
+  void cacheResult(ast_scope::ASTScopeImpl *) const {}
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

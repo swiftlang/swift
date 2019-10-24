@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-function-builder-one-way-constraints
-// RUN: %target-typecheck-verify-swift -debug-constraints -enable-function-builder-one-way-constraints > %t.log 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-constraints > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 enum Either<T,U> {

@@ -495,6 +495,51 @@ struct ComposedInit {
   }
 }
 
+// rdar://problem/55982409 - crash due to improperly inferred 'final'
+@propertyWrapper
+public struct MyWrapper<T> {
+  public var wrappedValue: T
+  public var projectedValue: Self { self }
+  public init(wrappedValue: T) { self.wrappedValue = wrappedValue }
+}
+
+open class TestMyWrapper {
+  public init() {}
+  @MyWrapper open var useMyWrapper: Int? = nil
+}
+
+// rdar://problem/54352235 - crash due to reference to private backing var
+extension UsesMyPublished {
+  // CHECK-LABEL: sil hidden [ossa] @$s21property_wrapper_defs15UsesMyPublishedC0A9_wrappersE6setFooyySiF : $@convention(method) (Int, @guaranteed UsesMyPublished) -> ()
+  // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter.1
+  // CHECK-NOT: assign_by_wrapper
+  // CHECK: return
+  func setFoo(_ x: Int) {
+    foo = x
+  }
+}
+
+// SR-11603 - crash due to incorrect lvalue computation
+@propertyWrapper
+struct StructWrapper<T> {
+  var wrappedValue: T
+}
+
+@propertyWrapper
+class ClassWrapper<T> {
+  var wrappedValue: T
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+struct SR_11603 {
+  @StructWrapper @ClassWrapper var prop: Int
+
+  func foo() {
+    prop = 1234
+  }
+}
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
@@ -503,3 +548,6 @@ struct ComposedInit {
 // CHECK-NEXT:  #ClassUsingWrapper.init!allocator.1: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
 // CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator.1: @$s17property_wrappers17ClassUsingWrapperCfD
 // CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_vtable [serialized] TestMyWrapper
+// CHECK: #TestMyWrapper.$useMyWrapper!getter.1

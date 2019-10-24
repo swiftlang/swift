@@ -152,7 +152,7 @@ func missingControllingExprInFor() {
   for ; true { // expected-error {{C-style for statement has been removed in Swift 3}}
   }
 
-  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}} expected-error{{variable 'i' is not bound by any pattern}}
     i += 1
   }
 }
@@ -174,11 +174,13 @@ func missingControllingExprInForEach() {
   {
   }
 
+  // expected-error @+3 {{variable 'i' is not bound by any pattern}}
   // expected-error @+2 {{expected 'in' after for-each pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
   for i {
   }
 
+  // expected-error @+3 {{variable 'i' is not bound by any pattern}}
   // expected-error @+2 {{expected 'in' after for-each pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
   for var i {
@@ -199,6 +201,7 @@ func missingControllingExprInForEach() {
   for for in {
   }
 
+  // expected-error @+1 {{variable 'i' is not bound by any pattern}}
   for i in { // expected-error {{expected Sequence expression for for-each loop}}
   }
 
@@ -436,17 +439,20 @@ struct ErrorTypeInVarDeclFunctionType1 {
 }
 
 struct ErrorTypeInVarDeclArrayType1 {
-  var v1 : Int[2] // expected-error {{array types are now written with the brackets around the element type}}
+  var v1 : Int[+] // expected-error {{unexpected ']' in type; did you mean to write an array type?}}
+  // expected-error @-1 {{expected expression after unary operator}}
+  // expected-error @-2 {{expected expression}}
   var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType2 {
-  var v1 : Int[4 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-  var v2 : Int
+  var v1 : Int[+ // expected-error {{unary operator cannot be separated from its operand}}
+  var v2 : Int // expected-error {{expected expression}}
 }
 
 struct ErrorTypeInVarDeclArrayType3 {
-  var v1 : Int[ // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+  var v1 : Int[
+  ;  // expected-error {{expected expression}}
   var v2 : Int
 }
 
@@ -476,7 +482,7 @@ struct ErrorTypeInVarDeclDictionaryType {
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
-  func foo() -> Int[ { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+  func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
     return [0]
   }
   func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
@@ -486,32 +492,32 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0]
+    return [0]  // expected-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType3 {
-  func foo() -> Int[0] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-22=}}
+  func foo() -> Int[0] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
     return [0]
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType4 {
-  func foo() -> Int[0_1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-24=}}
+  func foo() -> Int[0_1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
     return [0]
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType5 {
-  func foo() -> Int[0b1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-24=}}
+  func foo() -> Int[0b1] { // expected-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}}
     return [0]
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11'}}
-  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{20-20=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{expected '{' in body of function declaration}} expected-error {{expected declaration}}
+  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved operator '++'; did you mean '+= 1'?}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
   }
 }
 
@@ -664,7 +670,9 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {} // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+func a(s: S[{{g) -> Int {}
+// expected-error@+2 {{expected parameter name followed by ':'}}
+// expected-error@+1 {{expected ',' separator}}
 }}}
 #endif
   
@@ -752,7 +760,7 @@ let curlyQuotes2 = “hello world!"
 
 
 // <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
-let ￼tryx  = 123        // expected-error {{invalid character in source file}}  {{5-8= }}
+let ￼tryx  = 123        // expected-error 2 {{invalid character in source file}}  {{5-8= }}
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service

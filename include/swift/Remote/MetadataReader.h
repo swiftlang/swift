@@ -2613,6 +2613,13 @@ private:
     if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &dataPtr))
       return StoredPointer();
 
+    // Newer Objective-C runtimes implement a size optimization where the RO
+    // field is a tagged union. If the low-bit is set, then the pointer needs
+    // to be dereferenced once more to yield the real class_ro_t pointer.
+    if (dataPtr & 1)
+      if (!Reader->readInteger(RemoteAddress(dataPtr^1), &dataPtr))
+        return StoredPointer();
+
     return dataPtr;
   }
 

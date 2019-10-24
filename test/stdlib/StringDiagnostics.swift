@@ -27,7 +27,7 @@ func testNonAmbiguousStringComparisons() {
   let s2 = "b"
   var x = false // expected-warning {{variable 'x' was written to, but never read}}
   x = s1 > s2
-  x = s1 as String > s2
+  x = s1 as String > s2 // expected-warning {{redundant cast to 'String' has no effect}} {{10-20=}}
 }
 
 func testAmbiguousStringComparisons(s: String) {
@@ -63,23 +63,27 @@ func testStringDeprecation(hello: String) {
 func acceptsCollection<C: Collection>(_: C) {}
 func acceptsBidirectionalCollection<C: BidirectionalCollection>(_: C) {}
 func acceptsRandomAccessCollection<C: RandomAccessCollection>(_: C) {}
+// expected-note@-1 {{where 'C' = 'String.UTF8View'}}
+// expected-note@-2 {{where 'C' = 'String.UnicodeScalarView'}}
+// expected-note@-3 {{where 'C' = 'String.UTF16View'}}
+// expected-note@-4 {{where 'C' = 'String'}}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)
   acceptsBidirectionalCollection(s.utf8) 
-  acceptsRandomAccessCollection(s.utf8) // expected-error{{argument type 'String.UTF8View' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsRandomAccessCollection(s.utf8) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UTF8View' conform to 'RandomAccessCollection'}}
 
   acceptsCollection(s.utf16) 
   acceptsBidirectionalCollection(s.utf16)
-  acceptsRandomAccessCollection(s.utf16) // expected-error{{argument type 'String.UTF16View' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsRandomAccessCollection(s.utf16) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UTF16View' conform to 'RandomAccessCollection'}}
 
   acceptsCollection(s.unicodeScalars)
   acceptsBidirectionalCollection(s.unicodeScalars)
-  acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{argument type 'String.UnicodeScalarView' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsRandomAccessCollection(s.unicodeScalars) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UnicodeScalarView' conform to 'RandomAccessCollection'}}
 
   acceptsCollection(s)
   acceptsBidirectionalCollection(s)
-  acceptsRandomAccessCollection(s) // expected-error{{argument type 'String' does not conform to expected type 'RandomAccessCollection'}}
+  acceptsRandomAccessCollection(s) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String' conform to 'RandomAccessCollection'}}
 }
 
 // In previous versions of Swift, code would accidentally select

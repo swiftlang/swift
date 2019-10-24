@@ -118,8 +118,10 @@ enum Voluntary<T> : Equatable {
 var n : Voluntary<Int> = .Naught
 if case let .Naught(value) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
                                   // expected-note@-1 {{remove associated values to make the pattern match}} {{20-27=}}
+                                  // expected-error@-2 {{variable 'value' is not bound by any pattern}}
 if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
                                                    // expected-note@-1 {{remove associated values to make the pattern match}} {{20-44=}}
+                                                   // expected-error@-2 {{variable 'value1' is not bound by any pattern}}
 
 
 
@@ -282,10 +284,12 @@ case (1, 2, 3):
 case +++(_, var d, 3):
 // expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
 // expected-error@-2{{'var' binding pattern cannot appear in an expression}}
+// expected-error@-3 {{variable 'd' is not bound by any pattern}}
   ()
 case (_, var e, 3) +++ (1, 2, 3):
 // expected-error@-1{{'_' can only appear in a pattern}}
 // expected-error@-2{{'var' binding pattern cannot appear in an expression}}
+// expected-error@-3 {{variable 'e' is not bound by any pattern}}
   ()
 case (let (_, _, _)) + 1:
 // expected-error@-1 2 {{'var' binding pattern cannot appear in an expression}}
@@ -301,6 +305,7 @@ class Derived : Base { }
 
 switch [Derived(), Derived(), Base()] {
 case let ds as [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
+  // expected-error@-1 {{variable 'ds' is not bound by any pattern}}
   ()
 case is [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
   ()

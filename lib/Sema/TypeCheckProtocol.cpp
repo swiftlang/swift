@@ -1889,8 +1889,7 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
     return SourceLoc();
   }
 
-  return getOptionalityLoc(params->get(getParameterIndex())->getTypeLoc()
-                           .getTypeRepr());
+  return getOptionalityLoc(params->get(getParameterIndex())->getTypeRepr());
 }
 
 SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
@@ -2070,12 +2069,19 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    auto diag = diags.diagnose(match.Witness, 
-                               diag::protocol_witness_type_conflict,
-                               getTypeForDisplay(module, match.Witness),
-                               withAssocTypes);
-    if (!isa<TypeDecl>(req))
-      fixItOverrideDeclarationTypes(diag, match.Witness, req);
+    if (!isa<TypeDecl>(req)) {
+      computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
+        return diags.diagnose(match.Witness,
+                              diag::protocol_witness_type_conflict,
+                              getTypeForDisplay(module, match.Witness),
+                              withAssocTypes);
+      });
+    } else {
+      diags.diagnose(match.Witness,
+                     diag::protocol_witness_type_conflict,
+                     getTypeForDisplay(module, match.Witness),
+                     withAssocTypes);
+    }
     break;
   }
 
@@ -2470,9 +2476,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
                                                     DC);
-    aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
-    aliasDecl->computeType();
     
     aliasDecl->setImplicit();
     if (type->hasError())

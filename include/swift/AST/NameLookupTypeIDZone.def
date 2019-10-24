@@ -18,6 +18,10 @@
 SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
               NominalTypeDecl *(CustomAttr *, DeclContext *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
+              ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
+              SeparatelyCached,
+              NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
               NominalTypeDecl *(ExtensionDecl *), SeparatelyCached,
               NoLocationInfo)
@@ -30,9 +34,6 @@ SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(
                   llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
               Uncached, HasNearestLocation)
-SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
-              PrecedenceGroupDecl *(DeclContext *, Identifier, SourceLoc),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
               SelfBounds(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>),
               Uncached, NoLocationInfo)

@@ -150,6 +150,10 @@ enum class FixKind : uint8_t {
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
 
+  /// If there are more arguments than parameters, let's fix that up
+  /// by removing extraneous arguments.
+  RemoveExtraneousArguments,
+
   /// Allow single tuple closure parameter destructuring into N arguments.
   AllowClosureParameterDestructuring,
 
@@ -192,6 +196,10 @@ enum class FixKind : uint8_t {
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
+  
+  /// Remove an unnecessary coercion ('as') if the types are already equal.
+  /// e.g. Double(1) as Double
+  RemoveUnnecessaryCoercion,
 
   /// Allow a single argument type mismatch. This is the most generic
   /// failure related to argument-to-parameter conversions.
@@ -310,21 +318,6 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
-                                     ConstraintLocator *locator);
-};
-
-
-/// Replace a coercion ('as') with a forced checked cast ('as!').
-class CoerceToCheckedCast final : public ConstraintFix {
-  CoerceToCheckedCast(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::CoerceToCheckedCast, locator) {}
-
-public:
-  std::string getName() const override { return "as to as!"; }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static CoerceToCheckedCast *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
 };
 
@@ -487,8 +480,8 @@ protected:
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+                     ConstraintLocator *locator, bool warning = false)
+      : ConstraintFix(cs, kind, locator, warning), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -1034,6 +1027,55 @@ private:
   }
 };
 
+class RemoveExtraneousArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<
+          RemoveExtraneousArguments,
+          std::pair<unsigned, AnyFunctionType::Param>> {
+  friend TrailingObjects;
+
+  using IndexedParam = std::pair<unsigned, AnyFunctionType::Param>;
+
+  FunctionType *ContextualType;
+  unsigned NumExtraneous;
+
+  RemoveExtraneousArguments(ConstraintSystem &cs, FunctionType *contextualType,
+                            llvm::ArrayRef<IndexedParam> extraArgs,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
+        ContextualType(contextualType), NumExtraneous(extraArgs.size()) {
+    std::uninitialized_copy(extraArgs.begin(), extraArgs.end(),
+                            getExtraArgumentsBuf().begin());
+  }
+
+public:
+  std::string getName() const override { return "remove extraneous argument(s)"; }
+
+  ArrayRef<IndexedParam> getExtraArguments() const {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
+  /// logic would be obsolete.
+  ///
+  /// Determine whether presence of extraneous arguments indicates
+  /// potential name shadowing problem with local `min`/`max` shadowing
+  /// global definitions with different number of arguments.
+  static bool isMinMaxNameShadowing(ConstraintSystem &cs,
+                                    ConstraintLocatorBuilder locator);
+
+  static RemoveExtraneousArguments *
+  create(ConstraintSystem &cs, FunctionType *contextualType,
+         llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<IndexedParam> getExtraArgumentsBuf() {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
+  }
+};
+
 class MoveOutOfOrderArgument final : public ConstraintFix {
   using ParamBinding = SmallVector<unsigned, 1>;
 
@@ -1302,6 +1344,24 @@ public:
                                       ConstraintLocator *locator);
 };
 
+class RemoveUnnecessaryCoercion : public ContextualMismatch {
+protected:
+  RemoveUnnecessaryCoercion(ConstraintSystem &cs, Type fromType, Type toType,
+                            ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::RemoveUnnecessaryCoercion, fromType,
+                           toType, locator, /*isWarning*/ true) {}
+
+public:
+  std::string getName() const override {
+    return "remove unnecessary explicit type coercion";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static bool attempt(ConstraintSystem &cs, Type fromType, Type toType,
+                      ConstraintLocatorBuilder locator);
+};
+
 class IgnoreAssignmentDestinationType final : public ContextualMismatch {
   IgnoreAssignmentDestinationType(ConstraintSystem &cs, Type sourceTy,
                                   Type destTy, ConstraintLocator *locator)
@@ -1347,8 +1407,9 @@ protected:
                               paramType, locator) {}
 
   AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
-                        Type paramType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, kind, argType, paramType, locator) {}
+                        Type paramType, ConstraintLocator *locator,
+                        bool warning = false)
+      : ContextualMismatch(cs, kind, argType, paramType, locator, warning) {}
 
 public:
   std::string getName() const override {
@@ -1412,6 +1473,22 @@ public:
   static UseValueTypeOfRawRepresentative *
   attempt(ConstraintSystem &cs, Type argType, Type paramType,
           ConstraintLocatorBuilder locator);
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class CoerceToCheckedCast final : public ContextualMismatch {
+  CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
+                      ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
+                           locator) {}
+
+public:
+  std::string getName() const { return "as to as!"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const;
+
+  static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -103,15 +103,15 @@ func testNil() {
 }
 
 func testBitwiseOps() {
-  _ = DISPATCH_TIME_FOREVER as CUnsignedLongLong
+  _ = DISPATCH_TIME_FOREVER as CUnsignedLongLong // expected-warning {{redundant cast to 'CUnsignedLongLong' (aka 'UInt64') has no effect}} {{29-50=}}
   _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt
-  _ = BIT_SHIFT_3 as CLongLong
-  _ = BIT_SHIFT_4 as CUnsignedInt
+  _ = BIT_SHIFT_3 as CLongLong // expected-warning {{redundant cast to 'CLongLong' (aka 'Int64') has no effect}} {{19-32=}}
+  _ = BIT_SHIFT_4 as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{19-35=}}
 
-  _ = RSHIFT_ONE as CUnsignedInt
+  _ = RSHIFT_ONE as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{18-34=}}
   _ = RSHIFT_INVALID // expected-error {{use of unresolved identifier 'RSHIFT_INVALID'}}
 
-  _ = XOR_HIGH as CUnsignedLongLong
+  _ = XOR_HIGH as CUnsignedLongLong // expected-warning {{redundant cast to 'CUnsignedLongLong' (aka 'UInt64') has no effect}} {{16-37=}}
 
   var attributes = 0 as CInt
   attributes |= ATTR_BOLD
@@ -121,30 +121,30 @@ func testBitwiseOps() {
 }
 
 func testIntegerArithmetic() {
-  _ = ADD_ZERO as CInt
-  _ = ADD_ONE as CInt
-  _ = ADD_TWO as CInt
-  _ = ADD_MINUS_TWO as CInt
-  _ = ADD_MIXED_WIDTH as CLongLong
-  _ = ADD_MIXED_SIGN as CLongLong
-  _ = ADD_UNDERFLOW as CUnsignedInt
-  _ = ADD_OVERFLOW as CUnsignedInt
+  _ = ADD_ZERO as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{16-24=}}
+  _ = ADD_ONE as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{15-23=}}
+  _ = ADD_TWO as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{15-23=}}
+  _ = ADD_MINUS_TWO as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{21-29=}}
+  _ = ADD_MIXED_WIDTH as CLongLong // expected-warning {{redundant cast to 'CLongLong' (aka 'Int64') has no effect}} {{23-36=}}
+  _ = ADD_MIXED_SIGN as CLongLong // expected-warning {{redundant cast to 'CLongLong' (aka 'Int64') has no effect}} {{22-35=}}
+  _ = ADD_UNDERFLOW as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{21-37=}}
+  _ = ADD_OVERFLOW as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{20-36=}}
 
-  _ = SUB_ONE as CInt
-  _ = SUB_ZERO as CInt
-  _ = SUB_MINUS_ONE as CInt
-  _ = SUB_MIXED_WIDTH as CLongLong
-  _ = SUB_MIXED_SIGN as CUnsignedInt
-  _ = SUB_UNDERFLOW as CUnsignedInt
-  _ = SUB_OVERFLOW as CUnsignedInt
+  _ = SUB_ONE as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{15-23=}}
+  _ = SUB_ZERO as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{16-24=}}
+  _ = SUB_MINUS_ONE as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{21-29=}}
+  _ = SUB_MIXED_WIDTH as CLongLong // expected-warning {{redundant cast to 'CLongLong' (aka 'Int64') has no effect}} {{23-36=}}
+  _ = SUB_MIXED_SIGN as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{22-38=}}
+  _ = SUB_UNDERFLOW as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{21-37=}}
+  _ = SUB_OVERFLOW as CUnsignedInt // expected-warning {{redundant cast to 'CUnsignedInt' (aka 'UInt32') has no effect}} {{20-36=}}
 
-  _ = MULT_POS as CInt
-  _ = MULT_NEG as CInt
-  _ = MULT_MIXED_TYPES as CLongLong
+  _ = MULT_POS as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{16-24=}}
+  _ = MULT_NEG as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{16-24=}}
+  _ = MULT_MIXED_TYPES as CLongLong // expected-warning {{redundant cast to 'CLongLong' (aka 'Int64') has no effect}} {{24-37=}}
 
-  _ = DIVIDE_INTEGRAL as CInt
-  _ = DIVIDE_NONINTEGRAL as CInt
-  _ = DIVIDE_MIXED_TYPES as CLongLong
+  _ = DIVIDE_INTEGRAL as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{23-31=}}
+  _ = DIVIDE_NONINTEGRAL as CInt // expected-warning {{redundant cast to 'CInt' (aka 'Int32') has no effect}} {{26-34=}}
+  _ = DIVIDE_MIXED_TYPES as CLongLong // expected-warning {{redundant cast to 'CLongLong' (aka 'Int64') has no effect}} {{26-39=}}
   _ = DIVIDE_INVALID // expected-error {{use of unresolved identifier 'DIVIDE_INVALID'}}
 }
 

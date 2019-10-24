@@ -77,6 +77,9 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
   auto memberType = member->getInterfaceType();
+  if (memberType->is<ErrorType>())
+    return memberType;
+
   if (derivedDecl) {
     auto *dc = derivedDecl->getDeclContext();
     auto owningType = dc->getDeclaredInterfaceType();
@@ -84,8 +87,6 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 
     memberType = owningType->adjustSuperclassMemberDeclType(member, derivedDecl,
                                                             memberType);
-    if (memberType->hasError())
-      return memberType;
   }
 
   if (method) {
@@ -284,8 +285,8 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
     if (!paramTy || !parentParamTy)
       return;
 
-    TypeLoc TL = decl->getTypeLoc();
-    if (!TL.getTypeRepr())
+    auto *repr = decl->getTypeRepr();
+    if (!repr)
       return;
 
     bool paramIsOptional =  (bool) paramTy->getOptionalObjectType();
@@ -305,11 +306,11 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
                                  member->getDescriptiveKind(),
                                  isa<SubscriptDecl>(member),
                                  parentParamTy, paramTy);
-      if (TL.getTypeRepr()->isSimple()) {
-        diag.fixItInsertAfter(TL.getSourceRange().End, "?");
+      if (repr->isSimple()) {
+        diag.fixItInsertAfter(repr->getEndLoc(), "?");
       } else {
-        diag.fixItInsert(TL.getSourceRange().Start, "(");
-        diag.fixItInsertAfter(TL.getSourceRange().End, ")?");
+        diag.fixItInsert(repr->getStartLoc(), "(");
+        diag.fixItInsertAfter(repr->getEndLoc(), ")?");
       }
       return;
     }
@@ -318,25 +319,24 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     // Allow silencing this warning using parens.
-    if (TL.getType()->hasParenSugar())
+    if (paramTy->hasParenSugar())
       return;
 
-    diags.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
-                   member->getDescriptiveKind(), parentParamTy, paramTy)
-      .highlight(TL.getSourceRange());
+    diags
+        .diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
+                  member->getDescriptiveKind(), parentParamTy, paramTy)
+        .highlight(repr->getSourceRange());
 
-    auto sugaredForm =
-      dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TL.getTypeRepr());
-    if (sugaredForm) {
-      diags.diagnose(sugaredForm->getExclamationLoc(),
-                     diag::override_unnecessary_IUO_remove)
-        .fixItRemove(sugaredForm->getExclamationLoc());
+    if (auto iuoRepr = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
+      diags
+          .diagnose(iuoRepr->getExclamationLoc(),
+                    diag::override_unnecessary_IUO_remove)
+          .fixItRemove(iuoRepr->getExclamationLoc());
     }
 
-    diags.diagnose(TL.getSourceRange().Start,
-                   diag::override_unnecessary_IUO_silence)
-      .fixItInsert(TL.getSourceRange().Start, "(")
-      .fixItInsertAfter(TL.getSourceRange().End, ")");
+    diags.diagnose(repr->getStartLoc(), diag::override_unnecessary_IUO_silence)
+        .fixItInsert(repr->getStartLoc(), "(")
+        .fixItInsertAfter(repr->getEndLoc(), ")");
   };
 
   // FIXME: If we ever allow argument reordering, this is incorrect.
@@ -423,44 +423,40 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base);
 static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
   auto &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
-  DiagnosticTransaction tentativeDiags(diags);
 
-  {
-    Type baseTy = base->getInterfaceType();
-    if (baseTy->hasError())
-      return false;
+  Type baseTy = base->getInterfaceType();
+  if (baseTy->hasError())
+    return false;
 
-    Optional<InFlightDiagnostic> activeDiag;
-    if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
-      // Special-case initializers, whose "type" isn't useful besides the
-      // input arguments.
-      auto *fnType = baseTy->getAs<AnyFunctionType>();
-      baseTy = fnType->getResult();
-      Type argTy = FunctionType::composeInput(ctx,
-                                              baseTy->getAs<AnyFunctionType>()
-                                                    ->getParams(),
-                                              false);
-      auto diagKind = diag::override_type_mismatch_with_fixits_init;
-      unsigned numArgs = baseInit->getParameters()->size();
-      activeDiag.emplace(diags.diagnose(decl, diagKind,
-                                        /*plural*/std::min(numArgs, 2U),
-                                        argTy));
-    } else {
-      if (isa<AbstractFunctionDecl>(base))
-        baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
+  if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
+    // Special-case initializers, whose "type" isn't useful besides the
+    // input arguments.
+    auto *fnType = baseTy->getAs<AnyFunctionType>();
+    baseTy = fnType->getResult();
+    Type argTy = FunctionType::composeInput(
+        ctx, baseTy->getAs<AnyFunctionType>()->getParams(), false);
+    auto diagKind = diag::override_type_mismatch_with_fixits_init;
+    unsigned numArgs = baseInit->getParameters()->size();
+    return computeFixitsForOverridenDeclaration(
+        decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
+          if (!HasNotes)
+            return None;
+          return diags.diagnose(decl, diagKind,
+                                /*plural*/ std::min(numArgs, 2U), argTy);
+        });
+  } else {
+    if (isa<AbstractFunctionDecl>(base))
+      baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
-      activeDiag.emplace(
-        diags.diagnose(decl,
-                       diag::override_type_mismatch_with_fixits,
-                       base->getDescriptiveKind(), baseTy));
-    }
-
-    if (fixItOverrideDeclarationTypes(*activeDiag, decl, base))
-      return true;
+    return computeFixitsForOverridenDeclaration(
+        decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
+          if (!HasNotes)
+            return None;
+          return diags.diagnose(decl, diag::override_type_mismatch_with_fixits,
+                                base->getDescriptiveKind(), baseTy);
+        });
   }
 
-  // There weren't any fixes we knew how to make. Drop this diagnostic.
-  tentativeDiags.abort();
   return false;
 }
 

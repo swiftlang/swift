@@ -255,22 +255,20 @@ missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in
 // -------------------------------------------
 // Extra arguments
 // -------------------------------------------
-// FIXME: Diagnostics could be improved with all extra arguments and
-// note pointing to the declaration being called.
-func extraargs1(x: Int) {}
+func extraargs1(x: Int) {} // expected-note {{'extraargs1(x:)' declared here}}
 
 extraargs1(x: 1, y: 2) // expected-error{{extra argument 'y' in call}}
-extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
+extraargs1(x: 1, 2, 3) // expected-error{{extra arguments at positions #2, #3 in call}}
 
 // -------------------------------------------
 // Argument name mismatch
 // -------------------------------------------
 
-func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
+func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { } // expected-note {{'mismatch1(thisFoo:bar:wibble:)' declared here}}
 
 mismatch1(foo: 5) // expected-error {{extra argument 'foo' in call}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
-mismatch1(food: 1, zap: 2) // expected-error{{extra argument 'food' in call}}
+mismatch1(food: 1, zap: 2) // expected-error{{extra arguments at positions #1, #2 in call}}
 
 // -------------------------------------------
 // Subscript keyword arguments

@@ -90,9 +90,9 @@ func testTollFree1(_ ccmduct: CCMutableDuct) {
 }
 
 func testChainedAliases(_ fridge: CCRefrigerator) {
-  _ = fridge as CCRefrigerator
+  _ = fridge as CCRefrigerator // expected-warning {{redundant cast to 'CCRefrigerator' has no effect}} {{14-32=}}
 
-  _ = fridge as CCFridge
+  _ = fridge as CCFridge // expected-warning {{redundant cast to 'CCFridge' (aka 'CCRefrigerator') has no effect}} {{14-26=}}
   _ = fridge as CCFridgeRef // expected-error{{'CCFridgeRef' has been renamed to 'CCFridge'}} {{17-28=CCFridge}}
 }
 

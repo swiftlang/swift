@@ -1085,7 +1085,7 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *pai,
   // are cleaning up has the same live range as the partial_apply. Otherwise, we
   // may be inserting destroy_addr of alloc_stack that have already been passed
   // to a dealloc_stack.
-  for (unsigned i : reversed(indices(args))) {
+  for (unsigned i : llvm::reverse(indices(args))) {
     SILValue arg = args[i];
     SILParameterInfo paramInfo = params[i];
 
@@ -1433,12 +1433,18 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
   if (decl.isForeign)
     return false;
 
+  auto *afd = decl.getAbstractFunctionDecl();
+  assert(afd && "Expected abstract function decl!");
+  return calleesAreStaticallyKnowable(module, afd);
+}
+
+/// Are the callees that could be called through Decl statically
+/// knowable based on the Decl and the compilation mode?
+bool swift::calleesAreStaticallyKnowable(SILModule &module,
+                                         AbstractFunctionDecl *afd) {
   const DeclContext *assocDC = module.getAssociatedContext();
   if (!assocDC)
     return false;
-
-  auto *afd = decl.getAbstractFunctionDecl();
-  assert(afd && "Expected abstract function decl!");
 
   // Only handle members defined within the SILModule's associated context.
   if (!afd->isChildContextOf(assocDC))

@@ -314,10 +314,12 @@ func testStaticReport(_ b: Bool, ptr: Builtin.RawPointer) -> () {
 
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12testCondFail{{[_0-9a-zA-Z]*}}F"(i1, i1)
 func testCondFail(_ b: Bool, c: Bool) {
-  // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
+  // CHECK: [[EXPECT:%.*]] = call i1 @llvm.expect.i1(i1 %0, i1 false)
+  // CHECK: br i1 [[EXPECT]], label %[[FAIL:.*]], label %[[CONT:.*]]
   Builtin.condfail_message(b, StaticString("message").unsafeRawPointer)
   // CHECK: [[CONT]]
-  // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
+  // CHECK: [[EXPECT:%.*]] = call i1 @llvm.expect.i1(i1 %1, i1 false)
+  // CHECK: br i1 [[EXPECT]], label %[[FAIL2:.*]], label %[[CONT:.*]]
   Builtin.condfail_message(c, StaticString("message").unsafeRawPointer)
   // CHECK: [[CONT]]
   // CHECK: ret void

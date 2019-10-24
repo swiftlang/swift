@@ -5,6 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// rdar://56144412
+// XFAIL: asserts
 // RUN: not %target-swift-frontend %s -emit-ir
 func t(UInt=__FUNCTION__
 func&t(

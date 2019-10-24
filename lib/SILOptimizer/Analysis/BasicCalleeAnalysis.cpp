@@ -25,7 +25,24 @@
 
 using namespace swift;
 
-bool CalleeList::allCalleesVisible() {
+void CalleeList::dump() const {
+  print(llvm::errs());
+}
+
+void CalleeList::print(llvm::raw_ostream &os) const {
+  os << "Incomplete callee list? : "
+               << (isIncomplete() ? "Yes" : "No");
+  if (!allCalleesVisible())
+    os <<", not all callees visible";
+  os << '\n';
+  os << "Known callees:\n";
+  for (auto *CalleeFn : *this) {
+    os << "  " << CalleeFn->getName() << "\n";
+  }
+  os << "\n";
+}
+
+bool CalleeList::allCalleesVisible() const {
   if (isIncomplete())
     return false;
 
@@ -81,48 +98,45 @@ CalleeCache::getOrCreateCalleesForMethod(SILDeclRef Decl) {
   return It->second;
 }
 
-/// Update the callees for each method of a given class, along with
-/// all the overridden methods from superclasses.
-void CalleeCache::computeClassMethodCalleesForClass(ClassDecl *CD) {
-  assert(!CD->hasClangNode());
+/// Update the callees for each method of a given vtable.
+void CalleeCache::computeClassMethodCallees() {
+  SmallPtrSet<AbstractFunctionDecl *, 16> unknownCallees;
 
-  for (auto *Member : CD->getMembers()) {
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(Member);
-    if (!AFD)
-      continue;
+  // First mark all method declarations which might be overridden in another
+  // translation unit, i.e. outside the visibility of the optimizer.
+  // This is a little bit more complicated than to just check the VTable
+  // entry.Method itself, because an overridden method might be more accessible
+  // than the base method (e.g. a public method overrides a private method).
+  for (auto &VTable : M.getVTableList()) {
+    assert(!VTable.getClass()->hasClangNode());
 
-    if (auto *ConstrDecl = dyn_cast<ConstructorDecl>(AFD)) {
-      computeClassMethodCallees(CD, SILDeclRef(AFD,
-                                               SILDeclRef::Kind::Initializer));
-      if (ConstrDecl->isRequired()) {
-        computeClassMethodCallees(CD, SILDeclRef(AFD,
-                                                 SILDeclRef::Kind::Allocator));
+    for (Decl *member : VTable.getClass()->getMembers()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+        // If a method implementation might be overridden in another translation
+        // unit, also mark all the base methods as 'unknown'.
+        bool unknown = false;
+        do {
+          if (!calleesAreStaticallyKnowable(M, afd))
+            unknown = true;
+          if (unknown)
+            unknownCallees.insert(afd);
+          afd = afd->getOverriddenDecl();
+        } while (afd);
       }
-    } else {
-      computeClassMethodCallees(CD, SILDeclRef(AFD));
     }
   }
-}
 
-void CalleeCache::computeClassMethodCallees(ClassDecl *CD, SILDeclRef Method) {
-  auto *CalledFn = M.lookUpFunctionInVTable(CD, Method);
-  if (!CalledFn)
-    return;
-
-  bool canCallUnknown = !calleesAreStaticallyKnowable(M, Method);
-
-  // Update the callees for this method and all the methods it
-  // overrides by adding this function to their lists.
-  do {
-    auto &TheCallees = getOrCreateCalleesForMethod(Method);
-    assert(TheCallees.getPointer() && "Unexpected null callees!");
-
-    TheCallees.getPointer()->push_back(CalledFn);
-    if (canCallUnknown)
-      TheCallees.setInt(true);
-
-    Method = Method.getNextOverriddenVTableEntry();
-  } while (Method);
+  // Second step: collect all implementations of a method.
+  for (auto &VTable : M.getVTableList()) {
+    for (const SILVTable::Entry &entry : VTable.getEntries()) {
+      if (auto *afd = entry.Method.getAbstractFunctionDecl()) {
+        CalleesAndCanCallUnknown &callees = getOrCreateCalleesForMethod(entry.Method);
+        if (unknownCallees.count(afd) != 0)
+          callees.setInt(1);
+        callees.getPointer()->push_back(entry.Implementation);
+      }
+    }
+  }
 }
 
 void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
@@ -183,8 +197,8 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
 /// Witness Table.
 void CalleeCache::computeMethodCallees() {
   SWIFT_FUNC_STAT;
-  for (auto &VTable : M.getVTableList())
-    computeClassMethodCalleesForClass(VTable.getClass());
+
+  computeClassMethodCallees();
 
   for (auto &WTable : M.getWitnessTableList())
     computeWitnessMethodCalleesForWitnessTable(WTable);
@@ -283,4 +297,23 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
     return CalleeList();
   SILDeclRef Destructor = SILDeclRef(Class->getDestructor());
   return getCalleeList(Destructor);
+}
+
+void BasicCalleeAnalysis::dump() const {
+  print(llvm::errs());
+}
+
+void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
+  if (!Cache) {
+    os << "<no cache>\n";
+  }
+  llvm::DenseSet<SILDeclRef> printed;
+  for (auto &VTable : M.getVTableList()) {
+    for (const SILVTable::Entry &entry : VTable.getEntries()) {
+      if (printed.insert(entry.Method).second) {
+        os << "callees for " << entry.Method << ":\n";
+        Cache->getCalleeList(entry.Method).print(os);
+      }
+    }
+  }
 }

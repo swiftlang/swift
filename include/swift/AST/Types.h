@@ -49,6 +49,7 @@ enum class AllocationArena;
 class ArchetypeType;
 class AssociatedTypeDecl;
 class ASTContext;
+enum BufferPointerTypeKind : unsigned;
 class ClassDecl;
 class DependentMemberType;
 class GenericTypeParamDecl;
@@ -713,6 +714,14 @@ public:
   /// current type.
   Type wrapInPointer(PointerTypeKind kind);
   
+  /// Determines the element type of a known Unsafe[Mutable][Raw]BufferPointer
+  /// variant, or returns null if the type is not a buffer pointer.
+  Type getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK);
+  Type getAnyBufferPointerElementType() {
+    BufferPointerTypeKind Ignore;
+    return getAnyBufferPointerElementType(Ignore);
+  }
+
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
@@ -1057,6 +1066,9 @@ public:
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
+
+  /// Return the type T after looking through at most one optional type.
+  Type lookThroughSingleOptionalType();
 
   /// Return the type T after looking through all of the optional
   /// types.
@@ -4864,17 +4876,33 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 
+enum class OpaqueSubstitutionKind {
+  // Don't substitute the opaque type for the underlying type.
+  DontSubstitute,
+  // Substitute without looking at the type and context.
+  // Can be done because the underlying type is from a minimally resilient
+  // function (therefore must not contain private or internal types).
+  AlwaysSubstitute,
+  // Substitute in the same module into a maximal resilient context.
+  // Can be done if the underlying type is accessible from the context we
+  // substitute into. Private types cannot be accessed from a different TU.
+  SubstituteSameModuleMaximalResilience,
+  // Substitute in a different module from the opaque definining decl. Can only
+  // be done if the underlying type is public.
+  SubstituteNonResilientModule
+};
+
 /// A function object that can be used as a \c TypeSubstitutionFn and
 /// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
-  ModuleDecl *contextModule;
+  const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
-  ReplaceOpaqueTypesWithUnderlyingTypes(ModuleDecl *contextModule,
+  ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion)
-      : contextModule(contextModule), contextExpansion(contextExpansion) {}
+      : inContext(inContext), contextExpansion(contextExpansion) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -4884,11 +4912,12 @@ public:
                                               Type replacementType,
                                               ProtocolDecl *protocol) const;
 
-  bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
+  OpaqueSubstitutionKind
+  shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
 
-  static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
-                                        ModuleDecl *contextModule,
-                                        ResilienceExpansion contextExpansion);
+  static OpaqueSubstitutionKind
+  shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
+                            ResilienceExpansion contextExpansion);
 };
 
 /// An archetype that represents the dynamic type of an opened existential.

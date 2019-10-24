@@ -720,145 +720,6 @@ static bool validateTypedPattern(TypeChecker &TC,
 
   assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
 
-  // Track whether the decl in this typed pattern should be
-  // implicitly unwrapped as needed during expression type checking.
-  if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
-      TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto *subPattern = TP->getSubPattern();
-
-    while (auto *parenPattern = dyn_cast<ParenPattern>(subPattern))
-      subPattern = parenPattern->getSubPattern();
-
-    if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      // FIXME: This needs to be done as part of
-      // IsImplicitlyUnwrappedOptionalRequest::evaluate(); we just
-      // need to find the right TypedPattern there for the VarDecl
-      // in order to recover it's TypeRepr.
-      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
-    } else {
-      assert(isa<AnyPattern>(subPattern) &&
-             "Unexpected pattern nested in typed pattern!");
-    }
-  }
-
-  return hadError;
-}
-
-static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
-                                  TypeResolutionOptions options,
-                                  TypeChecker &TC) {
-  if (auto ty = decl->getTypeLoc().getType())
-    return ty->hasError();
-
-  auto origContext = options.getContext();
-  options.setContext(None);
-
-  // If the element is a variadic parameter, resolve the parameter type as if
-  // it were in non-parameter position, since we want functions to be
-  // @escaping in this case.
-  options.setContext(decl->isVariadic() ?
-                       TypeResolverContext::VariadicFunctionInput :
-                       TypeResolverContext::FunctionInput);
-  options |= TypeResolutionFlags::Direct;
-
-  bool hadError = false;
-
-  auto &TL = decl->getTypeLoc();
-
-  // We might have a null typeLoc if this is a closure parameter list,
-  // where parameters are allowed to elide their types.
-  if (!TL.isNull()) {
-    hadError |= TypeChecker::validateType(TC.Context, TL, resolution, options);
-  }
-
-  Type Ty = TL.getType();
-  if (decl->isVariadic() && !Ty.isNull() && !hadError) {
-    Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
-    if (Ty.isNull()) {
-      hadError = true;
-    }
-    TL.setType(Ty);
-
-    // Disallow variadic parameters in enum elements.
-    if (!hadError && origContext == TypeResolverContext::EnumElementDecl) {
-      TC.diagnose(decl->getStartLoc(), diag::enum_element_ellipsis);
-      hadError = true;
-    }
-  }
-
-  if (hadError)
-    TL.setInvalidType(TC.Context);
-
-  return hadError;
-}
-
-/// Type check a parameter list.
-bool TypeChecker::typeCheckParameterList(ParameterList *PL,
-                                         DeclContext *dc,
-                                         TypeResolutionOptions options) {
-  auto resolution = TypeResolution::forInterface(dc);
-
-  bool hadError = false;
-  
-  for (auto param : *PL) {
-    auto typeRepr = param->getTypeLoc().getTypeRepr();
-    if (!typeRepr &&
-        param->hasInterfaceType()) {
-      hadError |= param->isInvalid();
-      continue;
-    }
-
-    hadError |= validateParameterType(param, resolution, options, *this);
-    
-    auto type = param->getTypeLoc().getType();
-
-    // If there was no type specified, and if we're not looking at a
-    // ClosureExpr, then we have a parse error (no type was specified).  The
-    // parser will have already diagnosed this, but treat this as a type error
-    // as well to get the ParamDecl marked invalid and to get an ErrorType.
-    if (!type) {
-      // Closure argument lists are allowed to be missing types.
-      if (options.isAnyExpr())
-        continue;
-      param->setInvalid();
-    }
-    
-    if (param->isInvalid() || type->hasError()) {
-      param->markInvalid();
-      hadError = true;
-    } else {
-      param->setInterfaceType(type);
-    }
-
-    if (!hadError) {
-      auto *nestedRepr = typeRepr;
-
-      // Look through parens here; other than parens, specifiers
-      // must appear at the top level of a parameter type.
-      while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
-        if (!tupleRepr->isParenType())
-          break;
-        nestedRepr = tupleRepr->getElementType(0);
-      }
-
-      if (isa<InOutTypeRepr>(nestedRepr)) {
-        param->setSpecifier(ParamDecl::Specifier::InOut);
-      } else if (isa<SharedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(ParamDecl::Specifier::Shared);
-      } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(ParamDecl::Specifier::Owned);
-      }
-    }
-
-    if (param->isInOut() && param->isDefaultArgument()) {
-      diagnose(param->getDefaultValue()->getLoc(),
-               swift::diag::cannot_provide_default_value_inout,
-               param->getName());
-      param->markInvalid();
-      hadError = true;
-    }
-  }
-  
   return hadError;
 }
 
@@ -924,7 +785,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
       }
     }
     return true;
@@ -1116,30 +978,16 @@ recur:
     if (var->isInvalid())
       type = ErrorType::get(Context);
 
-    Type interfaceType = type;
-    if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
-
     // In SIL mode, VarDecls are written as having reference storage types.
-    if (type->is<ReferenceStorageType>()) {
-      assert(interfaceType->is<ReferenceStorageType>());
-      type = type->getReferenceStorageReferent();
-    } else {
-      if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-        interfaceType = checkReferenceOwnershipAttr(var, interfaceType, attr);
-    }
+    type = type->getReferenceStorageReferent();
 
     // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
-    var->setInterfaceType(interfaceType);
-    var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
+    var->setNamingPattern(NP);
 
-    var->getTypeLoc() = tyLoc;
-    var->getTypeLoc().setType(var->getType());
-
-    // FIXME: Should probably just remove the forbidden prefix stuff, it no
-    // longer makes a lot of sense in a request-based world.
-    checkForForbiddenPrefix(var);
+    // FIXME: This call can be removed once pattern binding validation is
+    // sufficiently requestified.
+    TypeChecker::checkForForbiddenPrefix(Context, var->getBaseName());
 
     // If we are inferring a variable to have type AnyObject.Type,
     // "()", an uninhabited type, or optional thereof, emit a diagnostic.
@@ -1646,7 +1494,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (param->isInvalid())
       return true;
 
-    if (auto type = param->getTypeLoc().getType())
+    if (auto type = param->getType())
       return !isValidType(type);
 
     return true;
@@ -1660,7 +1508,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      param->setType(ty);
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
   };

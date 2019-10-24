@@ -156,6 +156,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
   switch (getKind()) {
   case Kind::Empty:
+  case Kind::EmptyTailAllocatedCType:
     return getType().getUndefAddress();
 
   case Kind::Fixed:

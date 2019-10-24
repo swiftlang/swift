@@ -2,27 +2,35 @@
 
 for var i = 0; i < 10; i++ {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 0; i < 10; i += 1 {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 0; i <= 10; i++ {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 0; i <= 10; i += 1 {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 10; i > 0; i-- {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 10; i > 0; i -= 1 {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 10; i >= 0; i-- {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 for var i = 10; i >= 0; i -= 1 {}
 // expected-error @-1 {{C-style for statement has been removed in Swift 3}}  {{none}}
+// expected-error @-2 {{variable 'i' is not bound by any pattern}}
 
 let start = Int8(4)
 let count = Int8(10)

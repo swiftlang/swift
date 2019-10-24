@@ -23,7 +23,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-% for node in SYNTAX_NODES + PARSEONLY_NODES:
+% for node in SYNTAX_NODES:
 %   for child in node.children:
 %     if child.is_optional:
 Optional<Parsed${child.type_name}>

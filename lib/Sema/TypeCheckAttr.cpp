@@ -1058,8 +1058,8 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
-                                         TypeChecker &TC,
                                          bool hasKeywordArguments) {
+  auto &ctx = decl->getASTContext();
   // There are two cases to check.
   // 1. `dynamicallyCall(withArguments:)`.
   //    In this case, the method is valid if the argument has type `A` where
@@ -1081,7 +1081,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   // `ExpressibleByArrayLiteral`.
   if (!hasKeywordArguments) {
     auto arrayLitProto =
-      TC.Context.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
     return TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
                                            ConformanceCheckOptions()).hasValue();
   }
@@ -1089,35 +1089,33 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
   // conforms to `ExpressibleByStringLiteral`.
   auto stringLitProtocol =
-    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+    ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
-    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
   auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
                                                   ConformanceCheckOptions());
   if (!dictConf) return false;
-  auto keyType = dictConf.getValue().getTypeWitnessByName(
-      argType, TC.Context.Id_Key);
+  auto keyType = dictConf.getValue().getTypeWitnessByName(argType, ctx.Id_Key);
   return TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
                                          ConformanceCheckOptions()).hasValue();
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
 /// @dynamicCallable attribute requirement with the given argument name.
-static bool hasValidDynamicCallableMethod(TypeChecker &TC,
-                                          NominalTypeDecl *decl,
+static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
                                           Identifier argumentName,
                                           bool hasKeywordArgs) {
+  auto &ctx = decl->getASTContext();
   auto declType = decl->getDeclaredType();
-  auto methodName = DeclName(TC.Context,
-                             DeclBaseName(TC.Context.Id_dynamicallyCall),
+  auto methodName = DeclName(ctx, DeclBaseName(ctx.Id_dynamicallyCall),
                              { argumentName });
-  auto candidates = TC.lookupMember(decl, declType, methodName);
+  auto candidates = TypeChecker::lookupMember(decl, declType, methodName);
   if (candidates.empty()) return false;
 
   // Filter valid candidates.
   candidates.filter([&](LookupResultEntry entry, bool isOuter) {
     auto candidate = cast<FuncDecl>(entry.getValueDecl());
-    return isValidDynamicCallableMethod(candidate, decl, TC, hasKeywordArgs);
+    return isValidDynamicCallableMethod(candidate, decl, hasKeywordArgs);
   });
 
   // If there are no valid candidates, return false.
@@ -1133,10 +1131,10 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
 
   bool hasValidMethod = false;
   hasValidMethod |=
-    hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withArguments,
+    hasValidDynamicCallableMethod(decl, TC.Context.Id_withArguments,
                                   /*hasKeywordArgs*/ false);
   hasValidMethod |=
-    hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withKeywordArguments,
+    hasValidDynamicCallableMethod(decl, TC.Context.Id_withKeywordArguments,
                                   /*hasKeywordArgs*/ true);
   if (!hasValidMethod) {
     TC.diagnose(attr->getLocation(), diag::invalid_dynamic_callable_type, type);
@@ -1167,22 +1165,22 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                                 DeclContext *DC,
-                                                TypeChecker &TC,
                                                 bool ignoreLabel) {
   // It could be
   // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
   // - `subscript(dynamicMember: String*)`
-  return isValidKeyPathDynamicMemberLookup(decl, TC, ignoreLabel) ||
-         isValidStringDynamicMemberLookup(decl, DC, TC, ignoreLabel);
+  return isValidKeyPathDynamicMemberLookup(decl, ignoreLabel) ||
+         isValidStringDynamicMemberLookup(decl, DC, ignoreLabel);
 }
 
 bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                             DeclContext *DC, TypeChecker &TC,
+                                             DeclContext *DC,
                                              bool ignoreLabel) {
+  auto &ctx = decl->getASTContext();
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember,
+  if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
                                  ignoreLabel))
     return false;
 
@@ -1190,7 +1188,7 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
   auto paramType = param->getType();
 
   auto stringLitProto =
-    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+    ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
 
   // If this is `subscript(dynamicMember: String*)`
   return bool(TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
@@ -1198,17 +1196,17 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                              TypeChecker &TC,
                                               bool ignoreLabel) {
-  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember,
+  auto &ctx = decl->getASTContext();
+  if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
                                  ignoreLabel))
     return false;
 
   const auto *param = decl->getIndices()->get(0);
   if (auto NTD = param->getType()->getAnyNominal()) {
-    return NTD == TC.Context.getKeyPathDecl() ||
-           NTD == TC.Context.getWritableKeyPathDecl() ||
-           NTD == TC.Context.getReferenceWritableKeyPathDecl();
+    return NTD == ctx.getKeyPathDecl() ||
+           NTD == ctx.getWritableKeyPathDecl() ||
+           NTD == ctx.getReferenceWritableKeyPathDecl();
   }
   return false;
 }
@@ -1245,7 +1243,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
       // FIXME(InterfaceTypeRequest): Remove this.
       (void)cand->getInterfaceType();
-      return isValidDynamicMemberLookupSubscript(cand, decl, TC);
+      return isValidDynamicMemberLookupSubscript(cand, decl);
     });
 
     if (candidates.empty()) {
@@ -1269,7 +1267,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)cand->getInterfaceType();
-    return isValidDynamicMemberLookupSubscript(cand, decl, TC,
+    return isValidDynamicMemberLookupSubscript(cand, decl,
                                                /*ignoreLabel*/ true);
   });
 
@@ -2684,6 +2682,7 @@ void TypeChecker::checkParameterAttributes(ParameterList *params) {
 
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
                                               ReferenceOwnershipAttr *attr) {
+  auto &Diags = var->getASTContext().Diags;
   auto *dc = var->getDeclContext();
 
   // Don't check ownership attribute if the type is invalid.
@@ -2699,9 +2698,8 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   switch (optionalityOf(ownershipKind)) {
   case ReferenceOwnershipOptionality::Disallowed:
     if (isOptional) {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
-               ownershipKind)
-        .fixItReplace(attr->getRange(), "weak");
+      var->diagnose(diag::invalid_ownership_with_optional, ownershipKind)
+          .fixItReplace(attr->getRange(), "weak");
       attr->setInvalid();
     }
     break;
@@ -2709,8 +2707,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     break;
   case ReferenceOwnershipOptionality::Required:
     if (var->isLet()) {
-      diagnose(var->getStartLoc(), diag::invalid_ownership_is_let,
-               ownershipKind);
+      var->diagnose(diag::invalid_ownership_is_let, ownershipKind);
       attr->setInvalid();
     }
 
@@ -2722,10 +2719,8 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
       if (var->getAttrs().hasAttribute<IBOutletAttr>())
         break;
 
-      auto diag = diagnose(var->getStartLoc(),
-                           diag::invalid_ownership_not_optional,
-                           ownershipKind,
-                           OptionalType::get(type));
+      auto diag = var->diagnose(diag::invalid_ownership_not_optional,
+                                ownershipKind, OptionalType::get(type));
       auto typeRange = var->getTypeSourceRangeForDiagnostics();
       if (type->hasSimpleTypeRepr()) {
         diag.fixItInsertAfter(typeRange.End, "?");
@@ -2750,16 +2745,17 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
       D = diag::invalid_ownership_protocol_type;
     }
 
-    diagnose(var->getStartLoc(), D, ownershipKind, underlyingType);
+    var->diagnose(D, ownershipKind, underlyingType);
     attr->setInvalid();
   }
 
   ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
   if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
-    diagnose(attr->getLocation(),
-             diag::invalid_ownership_incompatible_class,
-             underlyingType, ownershipKind)
-      .fixItRemove(attr->getRange());
+    Diags
+        .diagnose(attr->getLocation(),
+                  diag::invalid_ownership_incompatible_class, underlyingType,
+                  ownershipKind)
+        .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 
@@ -2767,11 +2763,11 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
     // properties of Objective-C protocols.
-    auto D = Context.isSwiftVersionAtLeast(5)
-           ? diag::ownership_invalid_in_protocols
-           : diag::ownership_invalid_in_protocols_compat_warning;
-    diagnose(attr->getLocation(), D, ownershipKind)
-      .fixItRemove(attr->getRange());
+    auto D = var->getASTContext().isSwiftVersionAtLeast(5)
+                 ? diag::ownership_invalid_in_protocols
+                 : diag::ownership_invalid_in_protocols_compat_warning;
+    Diags.diagnose(attr->getLocation(), D, ownershipKind)
+        .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 
@@ -2779,7 +2775,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     return type;
 
   // Change the type to the appropriate reference storage type.
-  return ReferenceStorageType::get(type, ownershipKind, Context);
+  return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
 Optional<Diag<>>

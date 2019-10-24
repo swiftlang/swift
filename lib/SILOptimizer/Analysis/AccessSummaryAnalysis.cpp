@@ -564,7 +564,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
   llvm::raw_string_ostream os(sbuf);
 
   SILType containingType = baseType;
-  for (unsigned index : reversed(reversedIndices)) {
+  for (unsigned index : llvm::reverse(reversedIndices)) {
     os << ".";
 
     if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {

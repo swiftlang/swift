@@ -1058,7 +1058,7 @@ namespace {
 
               // Add edges between this type variable and every other type
               // variable in the path.
-              for (auto otherTypeVar : reversed(currentPath)) {
+              for (auto otherTypeVar : llvm::reverse(currentPath)) {
                 // When we run into our own type variable, we're done.
                 if (otherTypeVar == typeVar)
                   break;
@@ -1121,7 +1121,7 @@ namespace {
       SmallVector<TypeVariableType *, 4> orderedReps;
       orderedReps.reserve(representativeTypeVars.size());
       SmallPtrSet<TypeVariableType *, 4> visited;
-      for (auto rep : reversed(representativeTypeVars)) {
+      for (auto rep : llvm::reverse(representativeTypeVars)) {
         // Perform a postorder depth-first search through the one-way digraph,
         // starting at this representative, to establish the dependency
         // ordering amongst components that are reachable

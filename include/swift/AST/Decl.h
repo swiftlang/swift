@@ -71,6 +71,7 @@ namespace swift {
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class ModuleDecl;
+  class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -91,6 +92,12 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class OpaqueReturnTypeRepr;
+
+  namespace ast_scope {
+  class AbstractPatternEntryScope;
+  class PatternEntryDeclScope;
+  class PatternEntryInitializerScope;
+  } // namespace ast_scope
 
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -275,17 +282,10 @@ bool conflicting(ASTContext &ctx,
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
-public:
-  enum class ValidationState {
-    Unchecked,
-    Checking,
-    Checked,
-  };
-
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+2+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -299,9 +299,6 @@ protected:
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
     FromClang : 1,
-
-    /// The validation state of this declaration.
-    ValidationState : 2,
 
     /// Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -369,17 +366,13 @@ protected:
     IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 2+1+NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
+    /// Whether we've computed the specifier yet.
+    SpecifierComputed : 1,
+
     /// The specifier associated with this parameter.  This determines
     /// the storage semantics of the value e.g. mutability.
     Specifier : 2,
-
-    /// True if the type is implicitly specified in the source, but this has an
-    /// apparently valid typeRepr.  This is used in accessors, which look like:
-    ///    set (value) {
-    /// but need to get the typeRepr from the property as a whole so Sema can
-    /// resolve the type.
-    IsTypeLocImplicit : 1,
 
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
@@ -670,6 +663,13 @@ private:
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
 
+  struct CachedExternalSourceLocs {
+    SourceLoc Loc;
+    SourceLoc StartLoc;
+    SourceLoc EndLoc;
+  };
+  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
+  const CachedExternalSourceLocs *calculateSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -679,7 +679,6 @@ protected:
     Bits.Decl.Invalid = false;
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
-    Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
@@ -767,7 +766,7 @@ public:
 
   /// Returns the preferred location when referring to declarations
   /// in diagnostics.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc(bool SerializedOK = true) const;
 
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
@@ -820,37 +819,7 @@ public:
   /// Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { Bits.Decl.Implicit = implicit; }
 
-  /// Get the validation state.
-  ValidationState getValidationState() const {
-    return ValidationState(Bits.Decl.ValidationState);
-  }
-
-private:
-  friend class DeclValidationRAII;
-
-  /// Set the validation state.
-  void setValidationState(ValidationState VS) {
-    assert(VS > getValidationState() && "Validation is unidirectional");
-    Bits.Decl.ValidationState = unsigned(VS);
-  }
-
 public:
-  /// Whether the declaration is in the middle of validation or not.
-  bool isBeingValidated() const {
-    switch (getValidationState()) {
-    case ValidationState::Unchecked:
-    case ValidationState::Checked:
-      return false;
-    case ValidationState::Checking:
-      return true;
-    }
-    llvm_unreachable("Unknown ValidationState");
-  }
-
-  bool hasValidationStarted() const {
-    return getValidationState() > ValidationState::Unchecked;
-  }
-
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
   }
@@ -969,25 +938,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
-  }
-};
-
-/// Use RAII to track Decl validation progress and non-reentrancy.
-class DeclValidationRAII {
-  Decl *D;
-
-public:
-  DeclValidationRAII(const DeclValidationRAII &) = delete;
-  DeclValidationRAII(DeclValidationRAII &&) = delete;
-  void operator =(const DeclValidationRAII &) = delete;
-  void operator =(DeclValidationRAII &&) = delete;
-
-  DeclValidationRAII(Decl *decl) : D(decl) {
-    D->setValidationState(Decl::ValidationState::Checking);
-  }
-
-  ~DeclValidationRAII() {
-    D->setValidationState(Decl::ValidationState::Checked);
   }
 };
 
@@ -1888,7 +1838,7 @@ class PatternBindingEntry {
     /// Whether the contents of this initializer were subsumed by
     /// some other initialization, e.g., a lazy property's initializer
     /// gets subsumed by the getter body.
-    Subsumed    = 1 << 2
+    Subsumed = 1 << 2,
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1914,22 +1864,47 @@ class PatternBindingEntry {
     StringRef InitStringRepresentation;
   };
 
+  enum class PatternFlags {
+    IsText = 1 << 0,
+    IsFullyValidated = 1 << 1,
+  };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 1, bool> InitContextAndIsText;
+  llvm::PointerIntPair<DeclContext *, 2, OptionSet<PatternFlags>>
+      InitContextAndFlags;
 
   /// Values captured by this initializer.
   CaptureInfo Captures;
 
+  friend class Parser;
   friend class PatternBindingInitializer;
+  friend class PatternBindingDecl;
+  friend class ast_scope::AbstractPatternEntryScope;
+  friend class ast_scope::PatternEntryDeclScope;
+  friend class ast_scope::PatternEntryInitializerScope;
+
+private:
+  // FIXME: This API is transitional. Once the callers of
+  // typeCheckPatternBinding are requestified, merge this bit with
+  // Flags::Checked.
+  friend class PatternBindingEntryRequest;
+
+  bool isFullyValidated() const {
+    return InitContextAndFlags.getInt().contains(
+        PatternFlags::IsFullyValidated);
+  }
+  void setFullyValidated() {
+    InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
+                               PatternFlags::IsFullyValidated);
+  }
 
 public:
   /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
-      InitContextAndIsText({InitContext, false}) {
-  }
+      : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
+        InitContextAndFlags({InitContext, None}) {}
 
+private:
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
 
@@ -1938,7 +1913,7 @@ public:
 
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
-        InitContextAndIsText.getInt())
+        InitContextAndFlags.getInt().contains(PatternFlags::IsText))
       return nullptr;
     return InitExpr.initAfterSynthesis;
   }
@@ -1958,7 +1933,8 @@ public:
   /// deserialized from a partial module.
   void setInitStringRepresentation(StringRef str) {
     InitStringRepresentation = str;
-    InitContextAndIsText.setInt(true);
+    InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
+                               PatternFlags::IsText);
   }
 
   /// Whether this pattern entry can generate a string representation of its
@@ -1967,12 +1943,14 @@ public:
 
   /// Retrieve the location of the equal '=' token.
   SourceLoc getEqualLoc() const {
-    return InitContextAndIsText.getInt() ? SourceLoc() : InitExpr.EqualLoc;
+    return InitContextAndFlags.getInt().contains(PatternFlags::IsText)
+               ? SourceLoc()
+               : InitExpr.EqualLoc;
   }
 
   /// Set the location of the equal '=' token.
   void setEqualLoc(SourceLoc equalLoc) {
-    assert(!InitContextAndIsText.getInt() &&
+    assert(!InitContextAndFlags.getInt().contains(PatternFlags::IsText) &&
            "cannot set equal loc for textual initializer");
     InitExpr.EqualLoc = equalLoc;
   }
@@ -2003,13 +1981,11 @@ public:
 
   // Retrieve the declaration context for the initializer.
   DeclContext *getInitContext() const {
-    return InitContextAndIsText.getPointer();
+    return InitContextAndFlags.getPointer();
   }
 
   /// Override the initializer context.
-  void setInitContext(DeclContext *dc) {
-    InitContextAndIsText.setPointer(dc);
-  }
+  void setInitContext(DeclContext *dc) { InitContextAndFlags.setPointer(dc); }
 
   SourceLoc getStartLoc() const;
 
@@ -2025,8 +2001,10 @@ public:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+
+  unsigned getNumBoundVariables() const;
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2048,6 +2026,8 @@ class PatternBindingDecl final : public Decl,
     private llvm::TrailingObjects<PatternBindingDecl, PatternBindingEntry> {
   friend TrailingObjects;
   friend class Decl;
+  friend class PatternBindingEntryRequest;
+
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
@@ -2111,6 +2091,9 @@ public:
   Expr *getExecutableInit(unsigned i) const {
     return getPatternList()[i].getExecutableInit();
   }
+  Expr *getOriginalInit(unsigned i) const {
+    return getPatternList()[i].getOriginalInit();
+  }
 
   SourceRange getOriginalInitRange(unsigned i) const {
     return getPatternList()[i].getOriginalInitRange();
@@ -2130,11 +2113,11 @@ public:
     return getPatternList()[i].getInitContext();
   }
 
-  const CaptureInfo &getCaptureInfo(unsigned i) const {
+  CaptureInfo getCaptureInfo(unsigned i) const {
     return getPatternList()[i].getCaptureInfo();
   }
 
-  void setCaptureInfo(unsigned i, const CaptureInfo &captures) {
+  void setCaptureInfo(unsigned i, CaptureInfo captures) {
     getMutablePatternList()[i].setCaptureInfo(captures);
   }
 
@@ -2146,13 +2129,6 @@ public:
   /// "a" and "b" will have index 0, since they correspond to the first pattern,
   /// and "c" and "d" will have index 1 since they correspond to the second one.
   unsigned getPatternEntryIndexForVarDecl(const VarDecl *VD) const;
-  
-  /// Return the PatternEntry (a pattern + initializer pair) for the specified
-  /// VarDecl.
-  const PatternBindingEntry &getPatternEntryForVarDecl(
-    const VarDecl *VD) const {
-    return getPatternList()[getPatternEntryIndexForVarDecl(VD)];
-  }
   
   bool isInitializerChecked(unsigned i) const {
     return getPatternList()[i].isInitializerChecked();
@@ -2176,7 +2152,7 @@ public:
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
   bool isDefaultInitializable() const {
-    for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
+    for (unsigned i : range(getNumPatternEntries()))
       if (!isDefaultInitializable(i))
         return false;
 
@@ -2185,10 +2161,24 @@ public:
 
   /// Can the pattern at index i be default initialized?
   bool isDefaultInitializable(unsigned i) const;
-  
+
+  /// Does this pattern have a user-provided initializer expression?
+  bool isExplicitlyInitialized(unsigned i) const;
+
+  /// Whether the pattern entry at the given index can generate a string
+  /// representation of its initializer expression.
+  bool hasInitStringRepresentation(unsigned i) const {
+    return getPatternList()[i].hasInitStringRepresentation();
+  }
+
+  SourceLoc getEqualLoc(unsigned i) const;
+
   /// When the pattern binding contains only a single variable with no
   /// destructuring, retrieve that variable.
   VarDecl *getSingleVar() const;
+
+  /// Return the first variable initialized by the pattern at the given index.
+  VarDecl *getAnchoringVarDecl(unsigned i) const;
 
   bool isStatic() const { return Bits.PatternBindingDecl.IsStatic; }
   void setStatic(bool s) { Bits.PatternBindingDecl.IsStatic = s; }
@@ -2200,6 +2190,17 @@ public:
   }
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
+
+  /// Is the pattern binding entry for this variable  currently being computed?
+  bool isComputingPatternBindingEntry(const VarDecl *vd) const;
+
+  /// Gets the text of the initializer expression for the pattern entry at the
+  /// given index, stripping out inactive branches of any #ifs inside the
+  /// expression.
+  StringRef getInitStringRepresentation(unsigned i,
+                                        SmallVectorImpl<char> &scratch) const {
+    return getPatternList()[i].getInitStringRepresentation(scratch);
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
@@ -2406,6 +2407,7 @@ class ValueDecl : public Decl {
   friend class IsFinalRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
+  friend class InterfaceTypeRequest;
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
 protected:
@@ -2982,9 +2984,6 @@ public:
   /// Retrieve a sugared interface type containing the structure of the interface
   /// type before any semantic validation has occured.
   Type getStructuralType() const;
-
-  /// Set the interface type of this typealias declaration from the underlying type.
-  void computeType();
   
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
@@ -3173,10 +3172,6 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Set the interface type of this associated type declaration to a dependent
-  /// member type of 'Self'.
-  void computeType();
-
   /// Retrieve the associated type "anchor", which is the associated type
   /// declaration that will be used to describe this associated type in the
   /// ABI.
@@ -3229,6 +3224,14 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
 
   llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
+
+// Kinds of buffer pointer types.
+enum BufferPointerTypeKind : unsigned {
+  BPTK_UnsafeMutableRawBufferPointer,
+  BPTK_UnsafeRawBufferPointer,
+  BPTK_UnsafeMutableBufferPointer,
+  BPTK_UnsafeBufferPointer,
+};
 
 enum KeyPathTypeKind : unsigned char {
   KPTK_AnyKeyPath,
@@ -3366,10 +3369,6 @@ public:
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
-  /// Set the interface type of this nominal type to the metatype of the
-  /// declared interface type.
-  void computeType();
-
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
@@ -3452,6 +3451,18 @@ public:
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
+
+  /// Return the range of semantics attributes attached to this NominalTypeDecl.
+  auto getSemanticsAttrs() const
+      -> decltype(getAttrs().getAttributes<SemanticsAttr>()) {
+    return getAttrs().getAttributes<SemanticsAttr>();
+  }
+
+  bool hasSemanticsAttr(StringRef attrValue) const {
+    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
+      return attrValue.equals(attr->Value);
+    });
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4788,6 +4799,9 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
+  friend class NamingPatternRequest;
+  NamedPattern *NamingPattern = nullptr;
+
 public:
   enum class Introducer : uint8_t {
     Let = 0,
@@ -4800,11 +4814,6 @@ protected:
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
-
-  /// This is the type specified, including location information.
-  TypeLoc typeLoc;
-
-  Type typeInContext;
 
 public:
   VarDecl(bool isStatic, Introducer introducer, bool isCaptureList,
@@ -4822,23 +4831,9 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  TypeLoc &getTypeLoc() { return typeLoc; }
-  TypeLoc getTypeLoc() const { return typeLoc; }
-
-  bool hasType() const {
-    // We have a type if either the type has been computed already or if
-    // this is a deserialized declaration with an interface type.
-    return !typeInContext.isNull();
-  }
-
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const;
-
-  /// Set the type of the variable within its context.
-  void setType(Type t);
-
-  void markInvalid();
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.
@@ -4877,6 +4872,14 @@ public:
   /// returns null.
   ///
   Pattern *getParentPattern() const;
+
+  /// Returns the parsed type of this variable declaration.  For parameters, this
+  /// is the parsed type the user explicitly wrote.  For variables, this is the
+  /// type the user wrote in the typed pattern that binds this variable.
+  ///
+  /// Note that there are many cases where the user may elide types.  This will
+  /// return null in those cases.
+  TypeRepr *getTypeReprOrParentPatternTypeRepr() const;
 
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
@@ -4917,6 +4920,9 @@ public:
     assert(v && v != this);
     Parent = v;
   }
+
+  NamedPattern *getNamingPattern() const;
+  void setNamingPattern(NamedPattern *Pat);
 
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
@@ -4961,15 +4967,19 @@ public:
   /// binding has no initial value, this returns null.
   ///
   Expr *getParentInitializer() const {
-    if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).getInit();
+    if (auto *PBD = getParentPatternBinding()) {
+      const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+      return PBD->getInit(i);
+    }
     return nullptr;
   }
 
   /// Whether there exists an initializer for this \c VarDecl.
   bool isParentInitialized() const {
-    if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    if (auto *PBD = getParentPatternBinding()) {
+      const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+      return PBD->isInitialized(i);
+    }
     return false;
   }
 
@@ -5158,12 +5168,21 @@ public:
   }
 };
 
+enum class ParamSpecifier : uint8_t {
+  Default = 0,
+  InOut = 1,
+  Shared = 2,
+  Owned = 3,
+};
+
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   Identifier ArgumentName;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
+
+  TypeRepr *TyRepr = nullptr;
 
   struct StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
@@ -5184,23 +5203,15 @@ class ParamDecl : public VarDecl {
   llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
       DefaultValueAndFlags;
 
-public:
-  enum class Specifier : uint8_t {
-    Default = 0,
-    InOut = 1,
-    Shared = 2,
-    Owned = 3,
-  };
+  friend class ParamSpecifierRequest;
 
-  ParamDecl(Specifier specifier,
-            SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+public:
+  ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
-  /// Clone constructor, allocates a new ParamDecl identical to the first.
-  /// Intentionally not defined as a typical copy constructor to avoid
-  /// accidental copies.
-  ParamDecl(ParamDecl *PD, bool withTypes);
+  /// Create a new ParamDecl identical to the first except without the interface type.
+  static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
   
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
@@ -5217,10 +5228,11 @@ public:
   SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-    
-  bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
-  void setIsTypeLocImplicit(bool val) { Bits.ParamDecl.IsTypeLocImplicit = val; }
-  
+
+  /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
+  TypeRepr *getTypeRepr() const { return TyRepr; }
+  void setTypeRepr(TypeRepr *repr) { TyRepr = repr; }
+
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
   }
@@ -5255,12 +5267,12 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  const CaptureInfo &getDefaultArgumentCaptureInfo() const {
+  CaptureInfo getDefaultArgumentCaptureInfo() const {
     assert(DefaultValueAndFlags.getPointer());
     return DefaultValueAndFlags.getPointer()->Captures;
   }
 
-  void setDefaultArgumentCaptureInfo(const CaptureInfo &captures);
+  void setDefaultArgumentCaptureInfo(CaptureInfo captures);
 
   /// Extracts the text of the default argument attached to the provided
   /// ParamDecl, removing all inactive #if clauses and providing only the
@@ -5323,10 +5335,17 @@ public:
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
 
-  /// Return the raw specifier value for this parameter.
-  Specifier getSpecifier() const {
-    return static_cast<Specifier>(Bits.ParamDecl.Specifier);
+  using Specifier = ParamSpecifier;
+
+  Optional<Specifier> getCachedSpecifier() const {
+    if (Bits.ParamDecl.SpecifierComputed)
+      return Specifier(Bits.ParamDecl.Specifier);
+
+    return None;
   }
+
+  /// Return the raw specifier value for this parameter.
+  Specifier getSpecifier() const;
   void setSpecifier(Specifier Spec);
 
   /// Is the type of this parameter 'inout'?
@@ -5483,10 +5502,6 @@ public:
   Type getElementInterfaceType() const;
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
-
-  /// Compute the interface type of this subscript from the parameter and
-  /// element types.
-  void computeType();
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
@@ -5818,24 +5833,15 @@ public:
     Bits.AbstractFunctionDecl.Synthesized = value;
   }
 
-private:
-  void computeNeedsNewVTableEntry();
-
-  void computeSelfDeclType();
-
 public:
-  /// Compute the interface type of this function declaration from the
-  /// parameter types.
-  void computeType(AnyFunctionType::ExtInfo Info = FunctionType::ExtInfo());
-
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
@@ -6362,10 +6368,6 @@ public:
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
-
-  /// Set the interface type of this enum element to the constructor function
-  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
-  void computeType();
 
   Type getArgumentInterfaceType() const;
 

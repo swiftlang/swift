@@ -26,6 +26,21 @@ CHANGELOG
 Swift 5.2
 ---------
 
+* [SR-2189][]:
+
+  The compiler now supports local functions whose default arguments capture
+  values from outer scopes.
+
+  ```swift
+  func outer(x: Int) -> (Int, Int) {
+    func inner(y: Int = x) -> Int {
+      return y
+    }
+
+    return (inner(), inner(y: 0))
+  }
+  ```
+
 * [SR-11429][]:
 
   The compiler will now correctly strip argument labels from function references
@@ -77,40 +92,6 @@ Swift 5.2
       // As a result, the setter is now implicitly nonmutating, just like it would
       // be if 'Foo' had a class constraint.
       set { someProperty = newValue }
-    }
-  }
-  ```
-  
-  As a result, this could lead to code that currently compiles today to throw an error.
-  
-  ```swift
-  protocol Foo {
-    var someProperty: Int { get set }
-  }
-  
-  class Bar: Foo {
-    var someProperty = 0
-  }
-  
-  extension Foo where Self: Bar {
-    var anotherProperty1: Int {
-      get { return someProperty }
-      // This will now error, because the protocol requirement
-      // is implicitly mutating and the setter is implicitly 
-      // nonmutating.
-      set { someProperty = newValue } // Error
-    }
-  }
-  ```
-
-  **Workaround**: Define a new mutable variable inside the setter that has a reference to `self`:
-  
-  ```swift
-  var anotherProperty1: Int {
-    get { return someProperty }
-    set {
-      var mutableSelf = self
-      mutableSelf.someProperty = newValue // Okay
     }
   }
   ```
@@ -7837,6 +7818,7 @@ Swift 1.0
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2176]: <https://bugs.swift.org/browse/SR-2176>
+[SR-2189]: <https://bugs.swift.org/browse/SR-2189>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>

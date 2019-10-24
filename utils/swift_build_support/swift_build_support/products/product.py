@@ -42,6 +42,13 @@ class Product(object):
         """
         return True
 
+    def should_build(self, host_target):
+        """should_build() -> Bool
+
+        Whether or not this product should be built with the given arguments.
+        """
+        raise NotImplementedError
+
     def build(self, host_target):
         """build() -> void
 
@@ -49,10 +56,25 @@ class Product(object):
         """
         raise NotImplementedError
 
+    def should_test(self, host_target):
+        """should_test() -> Bool
+
+        Whether or not this product should be tested with the given arguments.
+        """
+        raise NotImplementedError
+
     def test(self, host_target):
         """test() -> void
 
         Run the tests, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
+    def should_install(self, host_target):
+        """should_install() -> Bool
+
+        Whether or not this product should be installed with the given
+        arguments.
         """
         raise NotImplementedError
 
@@ -64,6 +86,19 @@ class Product(object):
         raise NotImplementedError
 
     def __init__(self, args, toolchain, source_dir, build_dir):
+        """
+        Parameters
+        ----------
+        args : `argparse.Namespace`
+            The arguments passed by the user to the invocation of the script.
+        toolchain : `swift_build_support.toolchain.Toolchain`
+            The toolchain being used to build the product. The toolchain will
+            point to the tools that the builder should use to build (like the
+            compiler or the linker).
+        build_dir: string
+            The directory in which the product should put all of its build
+            products.
+        """
         self.args = args
         self.toolchain = toolchain
         self.source_dir = source_dir

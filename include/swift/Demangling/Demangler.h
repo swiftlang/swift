@@ -23,11 +23,6 @@
 
 //#define NODE_FACTORY_DEBUGGING
 
-#ifdef NODE_FACTORY_DEBUGGING
-#include <iostream>
-#endif
-
-
 using namespace swift::Demangle;
 using llvm::StringRef;
 
@@ -86,7 +81,7 @@ public:
 
   NodeFactory() {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "## New NodeFactory\n";
+    fprintf(stderr, "%s## New NodeFactory\n", indent().c_str());
     nestingLevel++;
 #endif
   }
@@ -96,8 +91,7 @@ public:
   /// Only if this memory overflows, the factory begins to malloc.
   void providePreallocatedMemory(char *Memory, size_t Size) {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "++ provide preallocated memory, size = "
-                          << Size << '\n';
+    fprintf(stderr, "%s++ provide preallocated memory, size = %zu\n", indent().c_str(), Size);
 #endif
     assert(!CurPtr && !End && !CurrentSlab);
     CurPtr = Memory;
@@ -116,8 +110,7 @@ public:
     CurPtr = BorrowFrom.CurPtr;
     End = BorrowFrom.End;
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "++ borrow memory, size = "
-                          << (End - CurPtr) << '\n';
+    fprintf(stderr, "%s++ borrow memory, size = %zu\n", indent().c_str(), (End - CurPtr));
 #endif
   }
 
@@ -125,8 +118,7 @@ public:
     freeSlabs(CurrentSlab);
 #ifdef NODE_FACTORY_DEBUGGING
     nestingLevel--;
-    std::cerr << indent() << "## Delete NodeFactory: allocated memory = "
-                          << allocatedMemory  << '\n';
+    fprintf(stderr, "%s## Delete NodeFactory: allocated memory = %zu\n", indent().c_str(), allocatedMemory)
 #endif
     if (BorrowedFrom) {
       BorrowedFrom->isBorrowed = false;
@@ -141,8 +133,7 @@ public:
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "alloc " << ObjectSize << ", CurPtr = "
-              << (void *)CurPtr << "\n";
+    fprintf(stderr, "%salloc %zu, CurPtr = %p\n", indent().c_str(), ObjectSize, (void *)CurPtr)
     allocatedMemory += ObjectSize;
 #endif
 
@@ -163,9 +154,8 @@ public:
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << indent() << "** new slab " << newSlab << ", allocsize = "
-                << AllocSize << ", CurPtr = " << (void *)CurPtr
-                << ", End = " << (void *)End << "\n";
+      fprintf(stderr, "%s** new slab %p, allocsize = %zu, CurPtr = %p, End = %p\n",
+            indent().c_str(), newSlab, AllocSize, (void *)CurPtr, (void *)End);
 #endif
     }
     T *AllocatedObj = (T *)CurPtr;
@@ -189,9 +179,8 @@ public:
     size_t AdditionalAlloc = MinGrowth * sizeof(T);
 
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "realloc: capacity = " << Capacity
-              << " (size = " << OldAllocSize << "), growth = " << MinGrowth
-              << " (size = " << AdditionalAlloc << ")\n";
+    fprintf(stderr, "%srealloc: capacity = %d (size = %zu), growth = %zu (size = %zu)\n",
+          indent().c_str(), Capacity, OldAllocSize, MinGrowth, AdditionalAlloc);
 #endif
     if ((char *)Objects + OldAllocSize == CurPtr
         && CurPtr + AdditionalAlloc <= End) {
@@ -200,7 +189,7 @@ public:
       CurPtr += AdditionalAlloc;
       Capacity += MinGrowth;
 #ifdef NODE_FACTORY_DEBUGGING
-      std::cerr << indent() << "** can grow: " << (void *)CurPtr << '\n';
+      fprintf(stderr, "%s** can grow: %p\n", indent().c_str(), (void *)CurPtr);
       allocatedMemory += AdditionalAlloc;
 #endif
       return;
