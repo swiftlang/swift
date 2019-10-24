@@ -197,7 +197,8 @@ enum class FixKind : uint8_t {
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
   
-  /// Remove an unnecessary coercion ('as') if the types are already equal. e.g. Double(1) as Double
+  /// Remove an unnecessary coercion ('as') if the types are already equal.
+  /// e.g. Double(1) as Double
   RemoveUnnecessaryCoercion,
 
   /// Allow a single argument type mismatch. This is the most generic
@@ -1345,19 +1346,19 @@ public:
 
 class RemoveUnnecessaryCoercion : public ContextualMismatch {
 protected:
-  RemoveUnnecessaryCoercion(ConstraintSystem &cs,
-                            Type fromType, Type toType,
+  RemoveUnnecessaryCoercion(ConstraintSystem &cs, Type fromType, Type toType,
                             ConstraintLocator *locator)
-  : ContextualMismatch(cs, FixKind::RemoveUnnecessaryCoercion, fromType, toType,
-                       locator, /*isWarning*/ true) {}
-  
+      : ContextualMismatch(cs, FixKind::RemoveUnnecessaryCoercion, fromType,
+                           toType, locator, /*isWarning*/ true) {}
+
 public:
-  std::string getName() const override { return "remove unnecessary explicit type coercion"; }
-  
+  std::string getName() const override {
+    return "remove unnecessary explicit type coercion";
+  }
+
   bool diagnose(Expr *root, bool asNote = false) const override;
-  
-  static bool attempt(ConstraintSystem &cs,
-                      Type fromType, Type toType,
+
+  static bool attempt(ConstraintSystem &cs, Type fromType, Type toType,
                       ConstraintLocatorBuilder locator);
 };
 

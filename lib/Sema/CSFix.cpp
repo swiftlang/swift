@@ -867,22 +867,24 @@ bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
 bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
                                         Type toType,
                                         ConstraintLocatorBuilder locator) {
-  if (auto last = locator.last()) {
-    if (last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
-      auto expr = cast<CoerceExpr>(locator.getAnchor());
-      auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
+  auto last = locator.last();
+  bool isExplicitCoercion =
+      last && last->is<LocatorPathElt::ExplicitTypeCoercion>();
+  if (!isExplicitCoercion)
+    return false;
 
-      // only diagnosing for coercion where the left-side is a DeclRefExpr
-      // or a explicit/implicit coercion e.g. Double(1) as Double
-      if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
-          (isa<DeclRefExpr>(expr->getSubExpr()) ||
-           isa<CoerceExpr>(expr->getSubExpr()))) {
-        auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
-            cs, fromType, toType, cs.getConstraintLocator(locator));
+  auto expr = cast<CoerceExpr>(locator.getAnchor());
+  auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
 
-        return cs.recordFix(fix);
-      }
-    }
+  // only diagnosing for coercion where the left-side is a DeclRefExpr
+  // or a explicit/implicit coercion e.g. Double(1) as Double
+  if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
+      (isa<DeclRefExpr>(expr->getSubExpr()) ||
+       isa<CoerceExpr>(expr->getSubExpr()))) {
+    auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
+        cs, fromType, toType, cs.getConstraintLocator(locator));
+
+    return cs.recordFix(fix);
   }
   return false;
 }

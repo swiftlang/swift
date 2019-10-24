@@ -2588,7 +2588,7 @@ bool ConstraintSystem::repairFailures(
   };
 
   if (path.empty() ||
-      path.back().getKind() == ConstraintLocator::ExplicitTypeCoercion) {
+      path.back().is<LocatorPathElt::ExplicitTypeCoercion>()) {
     if (!anchor)
       return false;
 
