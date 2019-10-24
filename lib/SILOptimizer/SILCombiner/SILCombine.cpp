@@ -211,46 +211,52 @@ bool SILCombiner::constantFoldArrayMap(SILFunction &F) {
   for (auto& block : F) {
     SmallVector<std::pair<SILValue, SILValue>, 8> foundElements;
     bool foundCreateArr = false;
-    ReturnInst *oldReturn = nullptr;
-    ApplyInst *oldApplyInst = nullptr;
-    FunctionRefInst *closureToApply = nullptr;
-
-    for (auto first = block.begin(); first != block.end(); (void)++first) {
-      if (auto *returnInst = dyn_cast<ReturnInst>(first)) {
-        oldReturn = returnInst;
-      }
-      
-      if (auto *closure = dyn_cast<FunctionRefInst>(first)) {
-        if (auto *fn = closure->getReferencedFunctionOrNull()) {
-          // This is not the reference to the current function, it's the reference to the closure.
-          if (fn->getName().contains("optimize_me")) {
-            closureToApply = closure;
-          }
-        }
-      }
-      
-      if (auto *applyInst = dyn_cast<ApplyInst>(first)) {
-        if (auto *func = applyInst->getReferencedFunctionOrNull()) {
-          // TODO: replace the following with semantic attribute checks
-          if (func->getName().contains("mapy")) {
-            // This is the call to the old map function
-            oldApplyInst = applyInst;
-          }
-          if (func->getName().contains("allocateUninitializedArray")) {
-            foundCreateArr = true;
-          }
-        }
-      }
-      
-      if (!foundCreateArr) continue;
-      if (auto *ptr = dyn_cast<PointerToAddressInst>(first)) {
-        if (auto elements = getArrayLiteralElements(ptr)) {
-          foundElements = elements.getValue();
-        }
-      }
-    }
+    
+    auto matchedResult = match(block.begin(), block.end(),
+                               AnyRange(),
+                               make_info_block<ApplyInst, false>([&foundCreateArr](ApplyInst *applyInst) -> bool {
+                                 auto *func = applyInst->getReferencedFunctionOrNull();
+      													 if (func == nullptr) return false;
+                                 if (func->getName().contains("allocateUninitializedArray")) {
+                                   foundCreateArr = true;
+                                   return true;
+                                 }
+                                 return false;
+                               }),
+                               AnyRange(),
+                               make_info_block<PointerToAddressInst, false>([&foundCreateArr, &foundElements](PointerToAddressInst *ptr) -> bool {
+                                  if (!foundCreateArr) return false;
+                                  if (auto elements = getArrayLiteralElements(ptr)) {
+                                    foundElements = elements.getValue();
+                                    return true;
+                                  }
+                                  return false;
+                               }),
+                               AnyRange(),
+                               make_info_block<FunctionRefInst, true>([](FunctionRefInst *closure) -> bool {
+                                 if (auto *fn = closure->getReferencedFunctionOrNull()) {
+        												 	 // This is not the reference to the current function, it's the reference to the closure.
+        												 	 if (fn->getName().contains("optimize_me")) {
+                                     return true;
+                                 	 }
+      													 }
+      													 return false;
+                               }),
+                               AnyRange(),
+                               make_info_block<ApplyInst, true>([](ApplyInst *applyInst) -> bool {
+                                 auto *func = applyInst->getReferencedFunctionOrNull();
+                                 if (func == nullptr) return false;
+                                 if (func->getName().contains("mapy")) {
+                                   return true;
+                                 }
+                                 return false;
+                               }),
+                               InfoBlock<ReturnInst, true>());
+    
+    if (matchedResult == None) continue;
+    auto [closureToApply, oldApplyInst, oldReturn] = matchedResult.getValue();
         
-    if (!closureToApply || !foundCreateArr || !oldApplyInst || !oldReturn || foundElements.size() < 1) continue;
+    if (foundElements.size() < 1) continue;
             
     Builder.setInsertionPoint(oldApplyInst);
     for (auto& argPair : foundElements) {
