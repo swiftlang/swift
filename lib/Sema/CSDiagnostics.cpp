@@ -1321,6 +1321,12 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
+    auto &TC = getTypeChecker();
+    // Let's check whether this is an attempt to assign
+    // variable or property to itself.
+    if (TC.diagnoseSelfAssignment(assignExpr))
+      return true;
+
     diagExpr = assignExpr->getDest();
   }
 
@@ -1415,6 +1421,58 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   AssignmentFailure failure(diagExpr, getConstraintSystem(), loc,
                             subElementDiagID, rvalueDiagID);
   return failure.diagnose();
+}
+
+static Decl *findSimpleReferencedDecl(const Expr *E) {
+  if (auto *LE = dyn_cast<LoadExpr>(E))
+    E = LE->getSubExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl();
+
+  return nullptr;
+}
+
+static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
+  E = E->getValueProvidingExpr();
+
+  if (auto *LE = dyn_cast<LoadExpr>(E))
+    return findReferencedDecl(LE->getSubExpr());
+
+  if (auto *AE = dyn_cast<AssignExpr>(E))
+    return findReferencedDecl(AE->getDest());
+
+  if (auto *D = findSimpleReferencedDecl(E))
+    return std::make_pair(nullptr, D);
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
+      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
+  }
+
+  return std::make_pair(nullptr, nullptr);
+}
+
+bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
+  auto *assignExpr = dyn_cast<AssignExpr>(expr);
+  if (!assignExpr)
+    return false;
+
+  auto *dstExpr = assignExpr->getDest();
+  auto *srcExpr = assignExpr->getSrc();
+
+  auto dstDecl = findReferencedDecl(dstExpr);
+  auto srcDecl = findReferencedDecl(srcExpr);
+
+  if (dstDecl.second && dstDecl == srcDecl) {
+    diagnose(expr->getLoc(), dstDecl.first ? diag::self_assignment_prop
+                                           : diag::self_assignment_var)
+        .highlight(dstExpr->getSourceRange())
+        .highlight(srcExpr->getSourceRange());
+    return true;
+  }
+
+  return false;
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
