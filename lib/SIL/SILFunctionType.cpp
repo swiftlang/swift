@@ -2805,8 +2805,9 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
     if (inFunction) {
       auto opaqueTypesSubsituted = aa;
       auto *dc = inFunction->getDeclContext();
-      if (!dc)
-        dc = inFunction->getModule().getSwiftModule();
+      auto *currentModule = inFunction->getModule().getSwiftModule();
+      if (!dc || !dc->isChildContextOf(currentModule))
+        dc = currentModule;
       ReplaceOpaqueTypesWithUnderlyingTypes replacer(
           dc, inFunction->getResilienceExpansion());
       if (aa.getASTType()->hasOpaqueArchetype())

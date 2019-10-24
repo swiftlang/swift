@@ -31,12 +31,18 @@ llvm::cl::opt<bool>
 
 using namespace swift;
 
+static DeclContext *
+getDeclContextIfInCurrentModule(const SILFunction &fn) {
+  auto *dc = fn.getDeclContext();
+  auto *currentModule = fn.getModule().getSwiftModule();
+  if (dc && dc->isChildContextOf(currentModule))
+    return dc;
+  return currentModule;
+}
+
 static Type substOpaqueTypesWithUnderlyingTypes(
     Type ty, SILFunction *context) {
-  auto *dc = context->getDeclContext();
-  if (!dc)
-    dc = context->getModule().getSwiftModule();
-
+  auto *dc = getDeclContextIfInCurrentModule(*context);
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       dc, context->getResilienceExpansion());
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
@@ -44,9 +50,7 @@ static Type substOpaqueTypesWithUnderlyingTypes(
 
 static SubstitutionMap
 substOpaqueTypesWithUnderlyingTypes(SubstitutionMap map, SILFunction *context) {
-  auto *dc = context->getDeclContext();
-  if (!dc)
-    dc = context->getModule().getSwiftModule();
+  auto *dc = getDeclContextIfInCurrentModule(*context);
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       dc, context->getResilienceExpansion());
   return map.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
@@ -331,9 +335,7 @@ protected:
     SILType &Sty = TypeCache[Ty];
     if (Sty)
       return Sty;
-    auto *dc = Original.getDeclContext();
-    if (!dc)
-      dc = Original.getModule().getSwiftModule();
+    auto *dc = getDeclContextIfInCurrentModule(Original);
 
     // Apply the opaque types substitution.
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(
@@ -351,9 +353,7 @@ protected:
 
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
-    auto *dc = Original.getDeclContext();
-    if (!dc)
-      dc = Original.getModule().getSwiftModule();
+    auto *dc = getDeclContextIfInCurrentModule(Original);
     // Apply the opaque types substitution.
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(
         dc, Original.getResilienceExpansion());
@@ -504,9 +504,6 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
 
       return ty.findIf([=](Type type) -> bool {
         if (auto opaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
-          auto *dc = context->getDeclContext();
-          if (!dc)
-            dc = context->getModule().getSwiftModule();
           auto opaque = opaqueTy->getDecl();
           OpaqueSubstitutionKind subKind =
               ReplaceOpaqueTypesWithUnderlyingTypes::

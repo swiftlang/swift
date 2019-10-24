@@ -2653,8 +2653,14 @@ substOpaqueTypesWithUnderlyingTypes(Type ty, DeclContext *inContext,
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
-bool canSubstituteTypeInto(Type ty, DeclContext *dc,
-                           OpaqueSubstitutionKind kind) {
+/// Checks that \p dc has access to \p ty for the purposes of an opaque
+/// substitution described by \p kind.
+///
+/// This is purely an implementation detail check about whether type metadata
+/// will be accessible. It's not intended to enforce any rules about what
+/// opaque substitutions are or are not allowed.
+static bool canSubstituteTypeInto(Type ty, DeclContext *dc,
+                                  OpaqueSubstitutionKind kind) {
   auto nominal = ty->getAnyNominal();
   if (!nominal)
     return true;
