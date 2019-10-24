@@ -924,8 +924,10 @@ void GenericParamList::addTrailingWhereClause(
 }
 
 void GenericParamList::setDepth(unsigned depth) {
-  for (auto param : *this)
-    param->setDepth(depth);
+  for (auto param : *this) {
+    param->getASTContext().evaluator.cacheOutput(
+        GenericTypeParamDepthRequest{param}, std::move(depth));
+  }
 }
 
 TrailingWhereClause::TrailingWhereClause(
@@ -3787,6 +3789,13 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
     endLoc = getInherited().back().getSourceRange().End;
   }
   return SourceRange(getNameLoc(), endLoc);
+}
+
+unsigned GenericTypeParamDecl::getDepth() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GenericTypeParamDepthRequest{const_cast<GenericTypeParamDecl *>(this)},
+      GenericTypeParamDecl::InvalidDepth);
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,

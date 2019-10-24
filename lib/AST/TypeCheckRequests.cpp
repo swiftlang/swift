@@ -1071,3 +1071,21 @@ void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setInheritsSuperclassInitializers(value);
 }
+
+//----------------------------------------------------------------------------//
+// GenericTypeParamDepthRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<unsigned> GenericTypeParamDepthRequest::getCachedResult() const {
+  auto *gpDecl = std::get<0>(getStorage());
+  const auto depth = gpDecl->getDepthUncached();
+  if (depth != GenericTypeParamDecl::InvalidDepth) {
+    return depth;
+  }
+  return None;
+}
+
+void GenericTypeParamDepthRequest::cacheResult(unsigned depth) const {
+  auto *gpDecl = std::get<0>(getStorage());
+  gpDecl->setDepth(depth);
+}

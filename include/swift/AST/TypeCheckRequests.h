@@ -1668,6 +1668,27 @@ public:
   void cacheResult(bool value) const;
 };
 
+class GenericTypeParamDepthRequest
+    : public SimpleRequest<GenericTypeParamDepthRequest,
+                           unsigned(GenericTypeParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<unsigned> evaluate(Evaluator &evaluator,
+                                    GenericTypeParamDecl *GTP) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<unsigned> getCachedResult() const;
+  void cacheResult(unsigned value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

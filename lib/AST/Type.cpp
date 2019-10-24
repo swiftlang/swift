@@ -1141,19 +1141,7 @@ CanType TypeBase::computeCanonicalType() {
 
   case TypeKind::GenericTypeParam: {
     GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
-    auto gpDecl = gp->getDecl();
-
-    // If we haven't set a depth for this generic parameter, try to do so.
-    // FIXME: This is a dreadful hack.
-    if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
-      auto resolver = gpDecl->getASTContext().getLazyResolver();
-      assert(resolver && "Need to resolve generic parameter depth");
-      if (auto decl =
-            gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
-        if (auto valueDecl = decl->getAsGenericContext())
-          (void)valueDecl->getGenericSignature();
-    }
-
+    auto *gpDecl = gp->getDecl();
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
     Result = GenericTypeParamType::get(gpDecl->getDepth(), gpDecl->getIndex(),

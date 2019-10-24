@@ -576,6 +576,12 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
   return sig->getGenericParams().back()->getDepth();
 }
 
+llvm::Expected<unsigned>
+GenericTypeParamDepthRequest::evaluate(Evaluator &evaluator,
+                                       GenericTypeParamDecl *gpDecl) const {
+  return gpDecl->getDeclContext()->getGenericContextDepth();
+}
+
 llvm::Expected<GenericSignature>
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
@@ -609,7 +615,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     return GC->getParent()->getGenericSignatureOfContext();
   }
 
-  // Setup the depth of the generic parameters.
+  // Cache the depth of the generic parameters.
   gp->setDepth(GC->getGenericContextDepth());
 
   // Accessors can always use the generic context of their storage

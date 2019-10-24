@@ -3045,6 +3045,15 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
+  friend class GenericTypeParamDepthRequest;
+
+private:
+  unsigned getDepthUncached() const { return Bits.GenericTypeParamDecl.Depth; }
+  void setDepth(unsigned depth) {
+    Bits.GenericTypeParamDecl.Depth = depth;
+    assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
+  }
+
 public:
   static const unsigned InvalidDepth = 0xFFFF;
 
@@ -3069,15 +3078,7 @@ public:
   /// \endcode
   ///
   /// Here 'T' has depth 0 and 'U' has depth 1. Both have index 0.
-  unsigned getDepth() const { return Bits.GenericTypeParamDecl.Depth; }
-
-  /// Set the depth of this generic type parameter.
-  ///
-  /// \sa getDepth
-  void setDepth(unsigned depth) {
-    Bits.GenericTypeParamDecl.Depth = depth;
-    assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
-  }
+  unsigned getDepth() const;
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
