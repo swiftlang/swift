@@ -4898,9 +4898,9 @@ enum class OpaqueSubstitutionKind {
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
-  DeclContext *inContext;
+  const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
-  ReplaceOpaqueTypesWithUnderlyingTypes(DeclContext *inContext,
+  ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion)
       : inContext(inContext), contextExpansion(contextExpansion) {}
 

@@ -31,7 +31,7 @@ llvm::cl::opt<bool>
 
 using namespace swift;
 
-static DeclContext *
+static const DeclContext *
 getDeclContextIfInCurrentModule(const SILFunction &fn) {
   auto *dc = fn.getDeclContext();
   auto *currentModule = fn.getModule().getSwiftModule();

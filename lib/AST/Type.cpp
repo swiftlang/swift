@@ -2647,7 +2647,7 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 }
 
 static Type
-substOpaqueTypesWithUnderlyingTypes(Type ty, DeclContext *inContext,
+substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
@@ -2659,7 +2659,7 @@ substOpaqueTypesWithUnderlyingTypes(Type ty, DeclContext *inContext,
 /// This is purely an implementation detail check about whether type metadata
 /// will be accessible. It's not intended to enforce any rules about what
 /// opaque substitutions are or are not allowed.
-static bool canSubstituteTypeInto(Type ty, DeclContext *dc,
+static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   OpaqueSubstitutionKind kind) {
   auto nominal = ty->getAnyNominal();
   if (!nominal)
@@ -2735,7 +2735,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
 static ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    DeclContext *inContext,
+                                    const DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ref.subst(origType, replacer, replacer,
