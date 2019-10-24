@@ -77,7 +77,7 @@ sil_differentiability_witness hidden [parameters 0 1] [results 0] [where T : _Di
 // CHECK:   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
 // CHECK: }
 
-// Test SIL differentiability witness for external function.
+// Test SIL differentiability witness for bodiless original function, with defined jvp/vjp.
 
 sil @externalFn1 : $@convention(thin) (Float) -> Float
 
@@ -102,12 +102,25 @@ sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@conven
 // CHECK:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK: }
 
-// Test SIL differentiability witness declaration.
+// Test SIL differentiability witness for bodiless original function, with bodiless jvp/vjp.
 
 sil @externalFn2 : $@convention(thin) (Float) -> Float
 
-sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float
+sil @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 
-// CHECK-LABEL: // differentiability witness for externalFn2
-// CHECK: sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float
+sil @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
+  jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// Test SIL differentiability witness declaration.
+
+sil @externalFn3 : $@convention(thin) (Float) -> Float
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float
+
+// CHECK-LABEL: // differentiability witness for externalFn3
+// CHECK: sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float
 // CHECK-NOT: {
