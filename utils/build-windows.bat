@@ -65,7 +65,7 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 call :test_swift %exitOnError%
 
 goto :end
