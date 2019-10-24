@@ -3487,8 +3487,6 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
-  assert(ownerNominal == baseTy->getAnyNominal());
-
   // Gather all of the substitutions for all levels of generic arguments.
   auto genericSig = dc->getGenericSignatureOfContext();
   if (!genericSig)
@@ -3498,6 +3496,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   unsigned n = params.size();
 
   while (baseTy && n > 0) {
+    if (baseTy->is<ErrorType>())
+      break;
+
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
