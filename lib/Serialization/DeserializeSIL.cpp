@@ -3407,14 +3407,19 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   (void)kind;
 
   DeclID originalNameId, jvpNameId, vjpNameId;
-  unsigned rawLinkage, isSerialized, numParameterIndices, numResultIndices;
+  unsigned rawLinkage, isDeclaration, isSerialized, numParameterIndices,
+           numResultIndices;
   GenericSignatureID derivativeGenSigID;
   ArrayRef<uint64_t> rawParameterAndResultIndices;
 
   DifferentiabilityWitnessLayout::readRecord(
-      scratch, originalNameId, rawLinkage, isSerialized, derivativeGenSigID,
-      jvpNameId, vjpNameId, numParameterIndices, numResultIndices,
-      rawParameterAndResultIndices);
+      scratch, originalNameId, rawLinkage, isDeclaration, isSerialized,
+      derivativeGenSigID, jvpNameId, vjpNameId, numParameterIndices,
+      numResultIndices, rawParameterAndResultIndices);
+
+  if (isDeclaration) {
+    assert(!isSerialized && "declaration must not be serialized");
+  }
 
   auto linkage = fromStableSILLinkage(rawLinkage);
   assert(linkage && "Expected value linkage for sil_differentiability_witness");
@@ -3424,11 +3429,15 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   auto *original = getFuncForReference(originalName);
   assert(original && "Original function must be found");
   auto *jvp = getFuncForReference(jvpName);
-  if (!jvpName.empty())
+  if (!jvpName.empty()) {
+    assert(!isDeclaration && "JVP must not be defined in declaration");
     assert(jvp && "JVP function must be found if JVP name is not empty");
+  }
   auto *vjp = getFuncForReference(vjpName);
-  if (!vjpName.empty())
+  if (!vjpName.empty()) {
+    assert(!isDeclaration && "VJP must not be defined in declaration");
     assert(vjp && "VJP function must be found if VJP name is not empty");
+  }
   auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
   SmallVector<unsigned, 8> parameterAndResultIndices(
@@ -3446,7 +3455,15 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));
 
-  auto *diffWitness = SILDifferentiabilityWitness::create(
+  if (isDeclaration) {
+    auto *diffWitness = SILDifferentiabilityWitness::createDeclaration(
+        SILMod, *linkage, original, parameterIndices, resultIndices,
+        derivativeGenSig);
+    diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ false);
+    return diffWitness;
+  }
+
+  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
       SILMod, *linkage, original, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized);
   diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);

@@ -17,14 +17,14 @@
 
 using namespace swift;
 
-SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
+SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-    bool isSerialized, DeclAttribute *attribute) {
+    GenericSignature derivativeGenSig, DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
-      derivativeGenSig, jvp, vjp, isSerialized, attribute);
+      derivativeGenSig, /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isDeclaration*/ true, /*isSerialized*/ false, attribute);
   // Register the differentiability witness in the module.
   assert(!module.DifferentiabilityWitnessMap.count(diffWitness->getKey()) &&
          "Cannot create duplicate differentiability witness in a module");
@@ -33,6 +33,24 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   return diffWitness;
 }
 
+SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
+    SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+    bool isSerialized, DeclAttribute *attribute) {
+  auto *diffWitness = new (module) SILDifferentiabilityWitness(
+      module, linkage, originalFunction, parameterIndices, resultIndices,
+      derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
+      attribute);
+  // Register the differentiability witness in the module.
+  assert(!module.DifferentiabilityWitnessMap.count(diffWitness->getKey()) &&
+         "Cannot create duplicate differentiability witness in a module");
+  module.DifferentiabilityWitnessMap[diffWitness->getKey()] = diffWitness;
+  module.getDifferentiabilityWitnessList().push_back(diffWitness);
+  return diffWitness;
+}
+
+
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
-  return std::make_pair(originalFunction->getName(), getConfig());
+  return std::make_pair(getOriginalFunction()->getName(), getConfig());
 }
