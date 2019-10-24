@@ -55,3 +55,19 @@ extension SIMD3 {
 extension SIMD3 where SIMD3.Scalar == Float {
     static let pickMe = SIMD3(.pickMe)
 }
+
+// Test case with circular overrides
+protocol P {
+    associatedtype A
+    func run(a: A)
+}
+
+class C1 {
+    func run(a: Int) {}
+}
+
+class C2: C1, P {
+    override func run(a: A) {}
+    // expected-error@-1 {{circular reference}}
+    // expected-note@-2 2{{through reference here}}
+}
