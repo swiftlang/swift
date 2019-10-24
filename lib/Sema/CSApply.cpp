@@ -58,14 +58,13 @@ static bool isOpenedAnyObject(Type type) {
   return archetype->getOpenedExistentialType()->isAnyObject();
 }
 
-SubstitutionMap Solution::computeSubstitutions(
-                               GenericSignature sig,
-                               ConstraintLocatorBuilder locatorBuilder) const {
+SubstitutionMap
+Solution::computeSubstitutions(GenericSignature sig,
+                               ConstraintLocator *locator) const {
   if (sig.isNull())
     return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.
-  auto locator = getConstraintSystem().getConstraintLocator(locatorBuilder);
   auto openedTypes = OpenedTypes.find(locator);
 
   // If we have a member reference on an existential, there are no
@@ -94,6 +93,17 @@ SubstitutionMap Solution::computeSubstitutions(
   return SubstitutionMap::get(sig,
                               QueryTypeSubstitutionMap{subs},
                               lookupConformanceFn);
+}
+
+ConcreteDeclRef
+Solution::resolveConcreteDeclRef(ValueDecl *decl,
+                                 ConstraintLocator *locator) const {
+  if (!decl)
+    return ConcreteDeclRef();
+
+  // Get the generic signatue of the decl and compute the substitutions.
+  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+  return ConcreteDeclRef(decl, computeSubstitutions(sig, locator));
 }
 
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
@@ -490,13 +500,9 @@ namespace {
         return typeExpr;
       }
 
-      auto substitutions =
-          solution.computeSubstitutions(
-            decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            locator);
+      auto ref = resolveConcreteDeclRef(decl, locator);
       auto declRefExpr =
-        new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
-                              loc, implicit, semantics, type);
+          new (ctx) DeclRefExpr(ref, loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       return forceUnwrapIfExpected(declRefExpr, choice, locator);
@@ -526,6 +532,35 @@ namespace {
 
     /// A stack of expressions being walked, used to compute existential depth.
     llvm::SmallVector<Expr *, 8> ExprStack;
+
+    /// A map of apply exprs to their callee locators. This is necessary
+    /// because after rewriting an apply's function expr, its callee locator
+    /// will no longer be equivalent to the one stored in the solution.
+    llvm::DenseMap<ApplyExpr *, ConstraintLocator *> CalleeLocators;
+
+    /// A cache of decl references with their contextual substitutions for a
+    /// given callee locator.
+    llvm::DenseMap<ConstraintLocator *, ConcreteDeclRef> CachedConcreteRefs;
+
+    /// Resolves the contextual substitutions for a reference to a declaration
+    /// at a given locator. This should be preferred to
+    /// Solution::resolveConcreteDeclRef as it caches the result.
+    ConcreteDeclRef
+    resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocatorBuilder locator) {
+      if (!decl)
+        return ConcreteDeclRef();
+
+      // Cache the resulting concrete reference. Ideally this would be done on
+      // Solution, however unfortunately that would require a const_cast which
+      // would be undefined behaviour if we ever had a `const Solution`.
+      auto *loc = getConstraintSystem().getConstraintLocator(locator);
+      auto &ref = CachedConcreteRefs[loc];
+      if (!ref)
+        ref = solution.resolveConcreteDeclRef(decl, loc);
+
+      assert(ref.getDecl() == decl);
+      return ref;
+    }
 
     /// Members which are AbstractFunctionDecls but not FuncDecls cannot
     /// mutate self.
@@ -751,12 +786,7 @@ namespace {
       }
 
       // Build a member reference.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(
-            member->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            memberLocator);
-      auto memberRef = ConcreteDeclRef(member, substitutions);
-
+      auto memberRef = resolveConcreteDeclRef(member, memberLocator);
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
@@ -1001,7 +1031,7 @@ namespace {
         }
       }
 
-      return finishApply(apply, openedType, locator);
+      return finishApply(apply, memberRef, openedType, locator);
     }
     
     /// Describes either a type or the name of a type to be resolved.
@@ -1060,12 +1090,14 @@ namespace {
     /// \param apply The function application to finish type-checking, which
     /// may be a newly-built expression.
     ///
+    /// \param callee The callee for the function being applied.
+    ///
     /// \param openedType The "opened" type this expression had during
     /// type checking, which will be used to specialize the resulting,
     /// type-checked expression appropriately.
     ///
     /// \param locator The locator for the original expression.
-    Expr *finishApply(ApplyExpr *apply, Type openedType,
+    Expr *finishApply(ApplyExpr *apply, ConcreteDeclRef callee, Type openedType,
                       ConstraintLocatorBuilder locator);
 
     // Resolve `@dynamicCallable` applications.
@@ -1129,6 +1161,7 @@ namespace {
     ///
     /// \param arg The argument expression.
     /// \param funcType The function type.
+    /// \param callee The callee for the function being applied.
     /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
     /// \param hasTrailingClosure Whether the last argument is a trailing
@@ -1138,7 +1171,7 @@ namespace {
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *
     coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
-                        ApplyExpr *apply,
+                        ConcreteDeclRef callee, ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
                         bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
@@ -1362,14 +1395,17 @@ namespace {
 
       // If we opened up an existential when performing the subscript, open
       // the base accordingly.
+      auto memberLoc = locator.withPathElement(locatorKind);
       auto knownOpened = solution.OpenedExistentialTypes.find(
-                           getConstraintSystem().getConstraintLocator(
-                             locator.withPathElement(locatorKind)));
+          cs.getConstraintLocator(memberLoc));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
       }
- 
+
+      // Compute the concrete reference to the subscript.
+      auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
+
       // Figure out the index and result types.
       Type resultTy;
       if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup &&
@@ -1379,7 +1415,7 @@ namespace {
         resultTy = subscriptFnTy->getResult();
 
         // Coerce the index argument.
-        index = coerceCallArguments(index, subscriptFnTy, nullptr,
+        index = coerceCallArguments(index, subscriptFnTy, subscriptRef, nullptr,
                                     argLabels, hasTrailingClosure,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));
@@ -1397,15 +1433,6 @@ namespace {
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
       };
-
-      // Form the subscript expression.
-
-      // Compute the substitutions used to reference the subscript.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(
-          subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
-          locator.withPathElement(locatorKind));
-      ConcreteDeclRef subscriptRef(subscript, substitutions);
 
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
@@ -1472,18 +1499,12 @@ namespace {
 
     /// Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, Expr *base,
+                                   ConcreteDeclRef ref, Expr *base,
                                    DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
-
-      // Compute the concrete reference.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(ctor->getGenericSignature(), locator);
-
-      auto ref = ConcreteDeclRef(ctor, substitutions);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -2398,10 +2419,11 @@ namespace {
       // Build the member reference.
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+      auto *exprLoc = cs.getConstraintLocator(expr);
       auto result = buildMemberRef(
           base, selected.openedFullType, expr->getDotLoc(), selected.choice,
           expr->getNameLoc(), selected.openedType,
-          cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
+          exprLoc, memberLocator, expr->isImplicit(),
           selected.choice.getFunctionRefKind(), AccessSemantics::Ordinary,
           isDynamic);
       if (!result)
@@ -2413,11 +2435,13 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
+        auto callee = resolveConcreteDeclRef(selected.choice.getDecl(),
+                                             memberLocator);
         ApplyExpr *apply = CallExpr::create(
             tc.Context, result, arg, expr->getArgumentLabels(),
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
-        result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+        result = finishApply(apply, callee, Type(), exprLoc);
 
         // FIXME: Application could fail, because some of the solutions
         // are not expressible in AST (yet?), like certain tuple-to-tuple
@@ -2592,12 +2616,13 @@ namespace {
       }
 
       // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, base, nameLoc,
-                                               ctorLocator, implicit);
+      auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
+      Expr *ctorRef = buildOtherConstructorRef(openedType, callee, base,
+                                               nameLoc, ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
 
-      return finishApply(call, cs.getType(expr),
+      return finishApply(call, callee, cs.getType(expr),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
     }
@@ -3022,9 +3047,19 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      return finishApply(expr, cs.getType(expr),
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr)));
+      auto *calleeLoc = CalleeLocators[expr];
+      assert(calleeLoc);
+
+      // Resolve the callee for the application if we have one. Note that we're
+      // using `resolveConcreteDeclRef` instead `solution.resolveLocatorToDecl`
+      // here to benefit from ExprRewriter's cache of concrete refs.
+      ConcreteDeclRef callee;
+      if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc)) {
+        auto *decl = overload->choice.getDeclOrNull();
+        callee = resolveConcreteDeclRef(decl, calleeLoc);
+      }
+      return finishApply(expr, callee, cs.getType(expr),
+                         cs.getConstraintLocator(expr));
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
@@ -4525,17 +4560,11 @@ namespace {
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
 
-        auto dc = property->getInnermostDeclContext();
-
-        // Compute substitutions to refer to the member.
-        SubstitutionMap subs = solution.computeSubstitutions(
-            dc->getGenericSignatureOfContext(), locator);
-
         auto resolvedTy = overload.openedType;
         resolvedTy = simplifyType(resolvedTy);
 
-        auto ref = ConcreteDeclRef(property, subs);
-
+        // Compute the concrete reference to the member.
+        auto ref = resolveConcreteDeclRef(property, locator);
         return KeyPathExpr::Component::forProperty(ref, resolvedTy,
                                                    componentLoc);
       }
@@ -4561,12 +4590,9 @@ namespace {
           subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
           /*canonicalVararg=*/false);
 
-      SubstitutionMap subs;
-      if (auto sig = dc->getGenericSignatureOfContext()) {
-        // Compute substitutions to refer to the member.
-        subs = solution.computeSubstitutions(sig, locator);
-        indexType = indexType.subst(subs);
-      }
+      // Compute substitutions to refer to the member.
+      auto ref = resolveConcreteDeclRef(subscript, locator);
+      indexType = indexType.subst(ref.getSubstitutions());
 
       // If this is a @dynamicMemberLookup reference to resolve a property
       // through the subscript(dynamicMember:) member, restore the
@@ -4599,11 +4625,10 @@ namespace {
       auto subscriptType =
           simplifyType(overload.openedType)->castTo<AnyFunctionType>();
       auto resolvedTy = subscriptType->getResult();
-      auto ref = ConcreteDeclRef(subscript, subs);
 
       // Coerce the indices to the type the subscript expects.
       auto *newIndexExpr =
-          coerceCallArguments(indexExpr, subscriptType,
+          coerceCallArguments(indexExpr, subscriptType, ref,
                               /*applyExpr*/ nullptr, labels,
                               /*hasTrailingClosure*/ false, locator);
 
@@ -4658,6 +4683,12 @@ namespace {
 
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
+      // If we have an apply, make a note of its callee locator prior to
+      // rewriting.
+      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+        auto *calleeLoc = cs.getCalleeLocator(cs.getConstraintLocator(expr));
+        CalleeLocators[apply] = calleeLoc;
+      }
       ExprStack.push_back(expr);
     }
 
@@ -4714,201 +4745,17 @@ namespace {
   };
 } // end anonymous namespace
 
-
-/// Resolve a locator to the specific declaration it references, if possible.
-///
-/// \param cs The constraint system in which the locator will be resolved.
-///
-/// \param locator The locator to resolve.
-///
-/// \param findOvlChoice A function that searches for the overload choice
-/// associated with the given locator, or an empty optional if there is no such
-/// overload.
-///
-/// \returns the decl to which the locator resolved.
-///
-static ConcreteDeclRef resolveLocatorToDecl(
-    ConstraintSystem &cs, ConstraintLocator *locator,
-    llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
-        findOvlChoice,
-    llvm::function_ref<ConcreteDeclRef(ValueDecl *decl, Type openedType,
-                                       ConstraintLocator *declLocator)>
-        getConcreteDeclRef) {
-  assert(locator && "Null locator");
-  if (!locator->getAnchor())
+ConcreteDeclRef
+Solution::resolveLocatorToDecl(ConstraintLocator *locator) const {
+  // Get the callee locator without looking through applies, ensuring we only
+  // return a decl for a direct reference.
+  auto *calleeLoc =
+      constraintSystem->getCalleeLocator(locator, /*lookThroughApply*/ false);
+  auto overload = getOverloadChoiceIfAvailable(calleeLoc);
+  if (!overload)
     return ConcreteDeclRef();
 
-  auto anchor = locator->getAnchor();
-  // Unwrap any specializations, constructor calls, implicit conversions, and
-  // '.'s.
-  // FIXME: This is brittle.
-  do {
-    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
-      anchor = specialize->getSubExpr();
-      continue;
-    }
-
-    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
-      anchor = implicit->getSubExpr();
-      continue;
-    }
-
-    if (auto identity = dyn_cast<IdentityExpr>(anchor)) {
-      anchor = identity->getSubExpr();
-      continue;
-    }
-
-    if (auto tryExpr = dyn_cast<AnyTryExpr>(anchor)) {
-      if (isa<OptionalTryExpr>(tryExpr))
-        break;
-
-      anchor = tryExpr->getSubExpr();
-      continue;
-    }
-
-    if (auto selfApply = dyn_cast<SelfApplyExpr>(anchor)) {
-      anchor = selfApply->getFn();
-      continue;
-    }
-
-    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
-      anchor = dotSyntax->getRHS();
-      continue;
-    }
-
-    if (auto *OEE = dyn_cast<OpenExistentialExpr>(anchor)) {
-      anchor = OEE->getSubExpr();
-      continue;
-    }
-
-    break;
-  } while (true);
-  
-  // Simple case: direct reference to a declaration.
-  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
-    return dre->getDeclRef();
-    
-  // Simple case: direct reference to a declaration.
-  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
-    return mre->getMember();
-  
-  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
-    return ctorRef->getDeclRef();
-
-  if (isa<OverloadedDeclRefExpr>(anchor) ||
-      isa<UnresolvedDeclRefExpr>(anchor)) {
-    // Overloaded and unresolved cases: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-  
-  if (isa<UnresolvedMemberExpr>(anchor)) {
-    // Unresolved member: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor,
-                           ConstraintLocator::UnresolvedMember);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-
-  if (isa<UnresolvedDotExpr>(anchor)) {
-    // Unresolved member: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor,
-                                                 ConstraintLocator::Member);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-
-  if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
-    // Subscript expressions may have a declaration. If so, use it.
-    if (subscript->hasDecl())
-      return subscript->getDecl();
-
-    // Otherwise, find the resolved overload.
-    auto anchorLocator =
-      cs.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-
-  if (auto subscript = dyn_cast<DynamicSubscriptExpr>(anchor)) {
-    // Dynamic subscripts are always resolved.
-    return subscript->getMember();
-  }
-
-  return ConcreteDeclRef();
-}
-
-ConcreteDeclRef Solution::resolveLocatorToDecl(
-                  ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-
-  // Simplify the locator.
-  SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-
-  // If we didn't map down to a specific expression, we can't handle a default
-  // argument.
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
-
-  if (auto resolved
-        = ::resolveLocatorToDecl(cs, locator,
-            [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-              auto known = overloadChoices.find(locator);
-              if (known == overloadChoices.end()) {
-                return None;
-              }
-
-              return known->second;
-            },
-            [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
-                  -> ConcreteDeclRef {
-              SubstitutionMap subs =
-                computeSubstitutions(
-                  decl->getInnermostDeclContext()
-                      ->getGenericSignatureOfContext(),
-                locator);
-              return ConcreteDeclRef(decl, subs);
-            })) {
-    return resolved;
-  }
-
-  return ConcreteDeclRef();
-}
-
-/// Given a constraint locator, find the declaration reference
-/// to the callee, it is a call to a declaration.
-static ConcreteDeclRef
-findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
-                  ConstraintLocator *locator) {
-  if (locator->getPath().empty() || !locator->getAnchor())
-    return nullptr;
-
-  // If the locator points to a function application, find the function itself.
-  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
-    assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
-           "ApplyArgument adds no flags");
-    SmallVector<LocatorPathElt, 4> newPath;
-    newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
-
-    unsigned newFlags = locator->getSummaryFlags();
-    newPath.push_back(ConstraintLocator::ApplyFunction);
-
-    assert(newPath.back().getNewSummaryFlags() == 0 &&
-           "added element that changes the flags?");
-    locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
-  }
-
-  return solution.resolveLocatorToDecl(locator);
+  return resolveConcreteDeclRef(overload->choice.getDeclOrNull(), locator);
 }
 
 /// Produce the caller-side default argument for this default argument, or
@@ -5377,12 +5224,12 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-Expr *ExprRewriter::coerceCallArguments(
-    Expr *arg, AnyFunctionType *funcType,
-    ApplyExpr *apply,
-    ArrayRef<Identifier> argLabels,
-    bool hasTrailingClosure,
-    ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
+                                        ConcreteDeclRef callee,
+                                        ApplyExpr *apply,
+                                        ArrayRef<Identifier> argLabels,
+                                        bool hasTrailingClosure,
+                                        ConstraintLocatorBuilder locator) {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto params = funcType->getParams();
 
@@ -5398,10 +5245,6 @@ Expr *ExprRewriter::coerceCallArguments(
       llvm::any_of(params, [](const AnyFunctionType::Param &param) {
         return param.getPlainType()->hasUnresolvedType();
       });
-
-  // Find the callee declaration.
-  ConcreteDeclRef callee =
-    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
@@ -6872,9 +6715,11 @@ static Expr *finishApplyCallAsFunctionMethod(
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
   // Coerce argument to input type of the `callAsFunction` method.
+  auto callee = rewriter.resolveConcreteDeclRef(choice.getDecl(),
+                                                applyFunctionLoc);
   SmallVector<Identifier, 2> argLabelsScratch;
   auto *arg = rewriter.coerceCallArguments(
-      apply->getArg(), openedMethodType, apply,
+      apply->getArg(), openedMethodType, callee, apply,
       apply->getArgumentLabels(argLabelsScratch), apply->hasTrailingClosure(),
       applyFunctionLoc);
   if (!arg)
@@ -6971,7 +6816,8 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   return result;
 }
 
-Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
+Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
+                                Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
   
@@ -6982,9 +6828,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
     = [&](ApplyExpr *apply,
-          ValueDecl *decl,
+          ConcreteDeclRef declRef,
           Type openedType) -> Expr* {
-      switch (cs.TC.getDeclTypeCheckingSemantics(decl)) {
+      switch (cs.TC.getDeclTypeCheckingSemantics(declRef.getDecl())) {
       case DeclTypeCheckingSemantics::TypeOf: {
         // Resolve into a DynamicTypeExpr.
         auto arg = apply->getArg();
@@ -6992,7 +6838,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         SmallVector<Identifier, 2> argLabelsScratch;
 
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
-        arg = coerceCallArguments(arg, fnType,
+        arg = coerceCallArguments(arg, fnType, declRef,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
                                   hasTrailingClosure,
@@ -7142,7 +6988,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       dyn_cast<DeclRefExpr>(getSemanticExprForDeclOrMemberRef(fn))) {
     if (auto special =
         finishApplyOfDeclWithSpecialTypeCheckingSemantics(apply,
-                                                          declRef->getDecl(),
+                                                          declRef->getDeclRef(),
                                                           openedType)) {
       return special;
     }
@@ -7187,7 +7033,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    Expr *arg = coerceCallArguments(origArg, fnType,
+    Expr *arg = coerceCallArguments(origArg, fnType, callee,
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
                                     hasTrailingClosure,
@@ -7264,6 +7110,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  auto ctorRef = resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
   Expr *declRef = buildMemberRef(fn, selected->openedFullType,
                                  /*dotLoc=*/SourceLoc(), choice,
                                  DeclNameLoc(fn->getEndLoc()),
@@ -7277,7 +7124,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   apply->setFn(declRef);
 
   // Tail-recur to actually call the constructor.
-  return finishApply(apply, openedType, locator);
+  return finishApply(apply, ctorRef, openedType, locator);
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of

@@ -146,9 +146,6 @@ ParsedSyntaxRecorder::make${node.syntax_kind}(
   for (auto &element : elements) {
     layout.push_back(element.takeRaw());
   }
-  #ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(layout);
-  #endif
   if (SPCtx.shouldDefer())
     return defer${node.syntax_kind}(layout, SPCtx);
   return record${node.syntax_kind}(layout, SPCtx.getRecorder());

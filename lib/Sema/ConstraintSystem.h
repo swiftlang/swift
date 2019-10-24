@@ -697,7 +697,12 @@ public:
   /// \param locator The locator that describes where the substitutions came
   /// from.
   SubstitutionMap computeSubstitutions(GenericSignature sig,
-                                       ConstraintLocatorBuilder locator) const;
+                                       ConstraintLocator *locator) const;
+
+  /// Resolves the contextual substitutions for a reference to a declaration
+  /// at a given locator.
+  ConcreteDeclRef
+  resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocator *locator) const;
 
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
@@ -715,7 +720,8 @@ public:
   Type getFixedType(TypeVariableType *typeVar) const;
 
   /// Try to resolve the given locator to a declaration within this
-  /// solution.
+  /// solution. Note that this only returns a decl for a direct reference such
+  /// as \c x.foo and will not return a decl for \c x.foo().
   ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
 
   /// Retrieve the overload choice associated with the given
@@ -2044,7 +2050,13 @@ public:
   /// anchored on \c functionA(functionB()) with path elements pointing to the
   /// argument \c functionB(), the returned callee locator will describe
   /// \c functionA rather than \c functionB.
-  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator);
+  ///
+  /// \param locator The input locator.
+  /// \param lookThroughApply Whether to look through applies. If false, a
+  /// callee locator will only be returned for a direct reference such as
+  /// \c x.foo rather than \c x.foo().
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
+                                      bool lookThroughApply = true);
 
 public:
 
