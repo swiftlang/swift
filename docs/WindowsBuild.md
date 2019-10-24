@@ -178,7 +178,7 @@ cmake -G Ninja^
   -DClang_DIR="S:/b/llvm/lib/cmake/clang"^
   -DSwift_DIR="S:/b/swift/lib/cmake/swift"^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DLLDB_ALLOW_STATIC_BINDINGS=YES^
+  -DLLDB_USE_STATIC_BINDINGS=YES^
   -DLLVM_ENABLE_ASSERTIONS=ON^
   -DPYTHON_HOME="%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64"^
   S:\lldb
