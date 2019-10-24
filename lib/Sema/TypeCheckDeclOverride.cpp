@@ -77,6 +77,9 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
   auto memberType = member->getInterfaceType();
+  if (memberType->is<ErrorType>())
+    return memberType;
+
   if (derivedDecl) {
     auto *dc = derivedDecl->getDeclContext();
     auto owningType = dc->getDeclaredInterfaceType();
@@ -84,8 +87,6 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 
     memberType = owningType->adjustSuperclassMemberDeclType(member, derivedDecl,
                                                             memberType);
-    if (memberType->hasError())
-      return memberType;
   }
 
   if (method) {

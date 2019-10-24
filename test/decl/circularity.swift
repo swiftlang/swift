@@ -55,3 +55,32 @@ extension SIMD3 {
 extension SIMD3 where SIMD3.Scalar == Float {
     static let pickMe = SIMD3(.pickMe)
 }
+
+// Test case with circular overrides
+protocol P {
+    associatedtype A
+    // expected-note@-1 {{protocol requires nested type 'A'; do you want to add it?}}
+    func run(a: A)
+}
+
+class C1 {
+    func run(a: Int) {}
+}
+
+class C2: C1, P {
+    override func run(a: A) {}
+    // expected-error@-1 {{circular reference}}
+    // expected-note@-2 2{{through reference here}}
+}
+
+// Another crash to the above
+open class G1<A> {
+    open func run(a: A) {}
+}
+
+class C3: G1<A>, P {
+    // expected-error@-1 {{type 'C3' does not conform to protocol 'P'}}
+    // expected-error@-2 {{use of undeclared type 'A'}}
+    override func run(a: A) {}
+    // expected-error@-1 {{method does not override any method from its superclass}}
+}
