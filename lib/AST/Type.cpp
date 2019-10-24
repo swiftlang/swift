@@ -2647,26 +2647,32 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 }
 
 static Type
-substOpaqueTypesWithUnderlyingTypes(Type ty, DeclContext *inContext,
+substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
-bool canSubstituteTypeInto(Type ty, DeclContext *dc,
-                           OpaqueSubstitutionKind kind) {
+/// Checks that \p dc has access to \p ty for the purposes of an opaque
+/// substitution described by \p kind.
+///
+/// This is purely an implementation detail check about whether type metadata
+/// will be accessible. It's not intended to enforce any rules about what
+/// opaque substitutions are or are not allowed.
+static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
+                                  OpaqueSubstitutionKind kind) {
   auto nominal = ty->getAnyNominal();
   if (!nominal)
     return true;
 
   switch (kind) {
-  case DontSubstitute:
+  case OpaqueSubstitutionKind::DontSubstitute:
     return false;
 
-  case AlwaysSubstitute:
+  case OpaqueSubstitutionKind::AlwaysSubstitute:
     return true;
 
-  case SubstituteSameModuleMaximalResilience:
+  case OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience:
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
         nominal->getDeclContext()->getParentSourceFile() ==
@@ -2674,7 +2680,7 @@ bool canSubstituteTypeInto(Type ty, DeclContext *dc,
       return true;
     return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
 
-  case SubstituteNonResilientModule:
+  case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
     return nominal->getEffectiveAccess() > AccessLevel::Internal;
   }
@@ -2729,7 +2735,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
 static ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    DeclContext *inContext,
+                                    const DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ref.subst(origType, replacer, replacer,
