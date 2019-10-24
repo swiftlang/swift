@@ -64,12 +64,6 @@ static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
     "differentiation-skip-folding-differentiable-function-extraction",
     llvm::cl::init(true));
 
-/// This flag is used to enable full JVP generation.
-/// It will be removed when JVP/differential generation is robust.
-static llvm::cl::opt<bool> RunJVPGeneration(
-    "run-jvp-generation",
-    llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -8030,8 +8024,9 @@ bool ADContext::processDifferentiableAttribute(
     // Diagnose:
     // - Functions with no return.
     // - Functions with unsupported control flow.
-    if (RunJVPGeneration && (diagnoseNoReturn(*this, original, invoker) ||
-        diagnoseUnsupportedControlFlow(*this, original, invoker)))
+    if (getASTContext().LangOpts.EnableExperimentalForwardModeDifferentiation &&
+        (diagnoseNoReturn(*this, original, invoker) ||
+         diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
 
     jvp = createEmptyJVP(*this, original, attr, isDerivativeFnExported);
@@ -8041,7 +8036,8 @@ bool ADContext::processDifferentiableAttribute(
     // does not exist. If custom VJP exists but custom JVP does not, skip JVP
     // generation because generated JVP may not match semantics of custom VJP.
     // Instead, create an empty JVP.
-    if (RunJVPGeneration && !vjp) {
+    if (getASTContext().LangOpts.EnableExperimentalForwardModeDifferentiation &&
+        !vjp) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
       if (original->getBlocks().size() > 1) {

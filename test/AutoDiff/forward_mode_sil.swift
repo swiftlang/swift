@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -run-jvp-generation -Xllvm -debug-only=differentiation %s 2>&1 | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -Xllvm -run-jvp-generation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -emit-sil -verify -enable-experimental-forward-mode-differentiation -Xllvm -debug-only=differentiation %s 2>&1 | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -enable-experimental-forward-mode-differentiation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 // REQUIRES: asserts
 
 
