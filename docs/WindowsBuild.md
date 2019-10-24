@@ -22,11 +22,8 @@ Visual Studio 2017 or newer is needed to build swift on Windows.
 1. Clone `apple/swift-lldb` into a folder named `lldb`
 1. Clone `apple/swift-llbuild` into a folder named `llbuild`
 1. Clone `apple/swift-package-manager` info a folder named `swift-package-manager`
-1. Clone `curl` into a folder named `curl`
-1. Clone `libxml2` into a folder named `libxml2`
 
-- Currently, other repositories in the Swift project have not been tested and
-  may not be supported.
+- Currently, other repositories in the Swift project have not been tested and may not be supported.
 
 This guide assumes your sources live at the root of `S:`. If your sources live elsewhere, you can create a substitution for this:
 
@@ -47,8 +44,6 @@ git clone https://github.com/apple/swift-corelibs-xctest
 git clone https://github.com/apple/swift-lldb lldb
 git clone https://github.com/apple/swift-llbuild llbuild
 git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager
-git clone https://github.com/curl/curl.git
-git clone https://gitlab.gnome.org/GNOME/libxml2.git
 ```
 
 ## 3. Acquire ICU, SQLite3, curl, libxml2
