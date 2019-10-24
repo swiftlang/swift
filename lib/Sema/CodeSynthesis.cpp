@@ -864,6 +864,8 @@ static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                            false);
 }
 
+/// For a class with a superclass, automatically define overrides
+/// for all of the superclass's designated initializers.
 static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   // Bail out if we're validating one of our constructors already;
   // we'll revisit the issue later.
@@ -911,123 +913,126 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
     }
   }
 
+  // We can only inherit initializers if we have a superclass.
+  // FIXME: We should be bailing out earlier in the function, but unfortunately
+  // that currently regresses associated type inference for cases like
+  // compiler_crashers_2_fixed/0124-sr5825.swift due to the fact that we no
+  // longer eagerly compute the interface types of the other constructors.
+  auto superclassTy = decl->getSuperclass();
+  if (!superclassTy)
+    return;
+
   // Check whether the user has defined a designated initializer for this class,
   // and whether all of its stored properties have initial values.
   bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
   bool defaultInitable =
       areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
 
-  // For a class with a superclass, automatically define overrides
-  // for all of the superclass's designated initializers.
-  if (Type superclassTy = decl->getSuperclass()) {
-    bool canInheritInitializers = defaultInitable && !foundDesignatedInit;
-
-    // We can't define these overrides if we have any uninitialized
-    // stored properties.
-    if (!defaultInitable && !foundDesignatedInit && !decl->hasClangNode())
-      return;
-
-    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
-    assert(superclassDecl && "Superclass of class is not a class?");
-    if (!superclassDecl->addedImplicitInitializers())
-      ctx.getLazyResolver()->resolveImplicitConstructors(superclassDecl);
-
-    auto ctors = TypeChecker::lookupConstructors(
-        decl, superclassTy,
-        NameLookupFlags::IgnoreAccessControl);
-
-    bool canInheritConvenienceInitalizers =
-        !superclassDecl->hasMissingDesignatedInitializers();
-    SmallVector<ConstructorDecl *, 4> requiredConvenienceInitializers;
-    for (auto memberResult : ctors) {
-      auto member = memberResult.getValueDecl();
-
-      // Skip unavailable superclass initializers.
-      if (AvailableAttr::isUnavailable(member))
-        continue;
-
-      // Skip invalid superclass initializers.
-      auto superclassCtor = dyn_cast<ConstructorDecl>(member);
-      if (superclassCtor->isInvalid())
-        continue;
-
-      // If we have an override for this constructor, it's okay.
-      if (overriddenInits.count(superclassCtor) > 0)
-        continue;
-
-      // We only care about required or designated initializers.
-      if (!superclassCtor->isDesignatedInit()) {
-        if (superclassCtor->isRequired()) {
-          assert(superclassCtor->isInheritable() &&
-                 "factory initializers cannot be 'required'");
-          requiredConvenienceInitializers.push_back(superclassCtor);
-        }
-        continue;
-      }
-
-      // Otherwise, it may no longer be safe to inherit convenience
-      // initializers.
-      canInheritConvenienceInitalizers &= canInheritInitializers;
-
-      // Everything after this is only relevant for Swift classes being defined.
-      if (decl->hasClangNode())
-        continue;
-
-      // If the superclass initializer is not accessible from the derived
-      // class, don't synthesize an override, since we cannot reference the
-      // superclass initializer's method descriptor at all.
-      //
-      // FIXME: This should be checked earlier as part of calculating
-      // canInheritInitializers.
-      if (!superclassCtor->isAccessibleFrom(decl))
-        continue;
-
-      // Diagnose a missing override of a required initializer.
-      if (superclassCtor->isRequired() && !canInheritInitializers) {
-        diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
-        continue;
-      }
-
-      // A designated or required initializer has not been overridden.
-
-      bool alreadyDeclared = false;
-      for (const auto &ctorAndType : declaredInitializers) {
-        auto *ctor = ctorAndType.first;
-        auto type = ctorAndType.second;
-        auto parentType = getMemberTypeForComparison(
-            ctx, superclassCtor, ctor);
-
-        if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
-          alreadyDeclared = true;
-          break;
-        }
-      }
-
-      // If we have already introduced an initializer with this parameter type,
-      // don't add one now.
-      if (alreadyDeclared)
-        continue;
-
-      // If we're inheriting initializers, create an override delegating
-      // to 'super.init'. Otherwise, create a stub which traps at runtime.
-      auto kind = canInheritInitializers
-                    ? DesignatedInitKind::Chaining
-                    : DesignatedInitKind::Stub;
-
-      if (auto ctor = createDesignatedInitOverride(
-                        decl, superclassCtor, kind, ctx)) {
-        decl->addMember(ctor);
-      }
-    }
-
-    if (canInheritConvenienceInitalizers) {
-      decl->setInheritsSuperclassInitializers();
-    } else {
-      for (ConstructorDecl *requiredCtor : requiredConvenienceInitializers)
-        diagnoseMissingRequiredInitializer(decl, requiredCtor, ctx);
-    }
-
+  // We can't define these overrides if we have any uninitialized
+  // stored properties.
+  if (!defaultInitable && !foundDesignatedInit && !decl->hasClangNode())
     return;
+
+  auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+  assert(superclassDecl && "Superclass of class is not a class?");
+  if (!superclassDecl->addedImplicitInitializers())
+    ctx.getLazyResolver()->resolveImplicitConstructors(superclassDecl);
+
+  auto ctors = TypeChecker::lookupConstructors(
+      decl, superclassTy,
+      NameLookupFlags::IgnoreAccessControl);
+
+  bool canInheritInitializers = defaultInitable && !foundDesignatedInit;
+
+  bool canInheritConvenienceInitalizers =
+      !superclassDecl->hasMissingDesignatedInitializers();
+  SmallVector<ConstructorDecl *, 4> requiredConvenienceInitializers;
+  for (auto memberResult : ctors) {
+    auto member = memberResult.getValueDecl();
+
+    // Skip unavailable superclass initializers.
+    if (AvailableAttr::isUnavailable(member))
+      continue;
+
+    // Skip invalid superclass initializers.
+    auto superclassCtor = dyn_cast<ConstructorDecl>(member);
+    if (superclassCtor->isInvalid())
+      continue;
+
+    // If we have an override for this constructor, it's okay.
+    if (overriddenInits.count(superclassCtor) > 0)
+      continue;
+
+    // We only care about required or designated initializers.
+    if (!superclassCtor->isDesignatedInit()) {
+      if (superclassCtor->isRequired()) {
+        assert(superclassCtor->isInheritable() &&
+               "factory initializers cannot be 'required'");
+        requiredConvenienceInitializers.push_back(superclassCtor);
+      }
+      continue;
+    }
+
+    // Otherwise, it may no longer be safe to inherit convenience
+    // initializers.
+    canInheritConvenienceInitalizers &= canInheritInitializers;
+
+    // Everything after this is only relevant for Swift classes being defined.
+    if (decl->hasClangNode())
+      continue;
+
+    // If the superclass initializer is not accessible from the derived
+    // class, don't synthesize an override, since we cannot reference the
+    // superclass initializer's method descriptor at all.
+    //
+    // FIXME: This should be checked earlier as part of calculating
+    // canInheritInitializers.
+    if (!superclassCtor->isAccessibleFrom(decl))
+      continue;
+
+    // Diagnose a missing override of a required initializer.
+    if (superclassCtor->isRequired() && !canInheritInitializers) {
+      diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
+      continue;
+    }
+
+    // A designated or required initializer has not been overridden.
+
+    bool alreadyDeclared = false;
+    for (const auto &ctorAndType : declaredInitializers) {
+      auto *ctor = ctorAndType.first;
+      auto type = ctorAndType.second;
+      auto parentType = getMemberTypeForComparison(
+          ctx, superclassCtor, ctor);
+
+      if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
+        alreadyDeclared = true;
+        break;
+      }
+    }
+
+    // If we have already introduced an initializer with this parameter type,
+    // don't add one now.
+    if (alreadyDeclared)
+      continue;
+
+    // If we're inheriting initializers, create an override delegating
+    // to 'super.init'. Otherwise, create a stub which traps at runtime.
+    auto kind = canInheritInitializers
+                  ? DesignatedInitKind::Chaining
+                  : DesignatedInitKind::Stub;
+
+    if (auto ctor = createDesignatedInitOverride(
+                      decl, superclassCtor, kind, ctx)) {
+      decl->addMember(ctor);
+    }
+  }
+
+  if (canInheritConvenienceInitalizers) {
+    decl->setInheritsSuperclassInitializers();
+  } else {
+    for (ConstructorDecl *requiredCtor : requiredConvenienceInitializers)
+      diagnoseMissingRequiredInitializer(decl, requiredCtor, ctx);
   }
 }
 
