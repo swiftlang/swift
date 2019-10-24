@@ -157,14 +157,14 @@ class BuildScriptInvocation(object):
             if args.build_tvos and args.build_tvos_device:
                 targets.extend(StdlibDeploymentTarget.AppleTV.targets)
             if args.build_watchos and args.build_watchos_simulator:
-                targets.extend(StdlibDeploymentTarget.AppleWatchSimulator.targets)
+                targets.extend(StdlibDeploymentTarget
+                               .AppleWatchSimulator.targets)
             if args.build_watchos and args.build_watchos_device:
                 targets.extend(StdlibDeploymentTarget.AppleWatch.targets)
             return targets
         else:
             # All other machines only configure their host stdlib by default.
             return [host_target]
-
 
     @staticmethod
     def apply_default_arguments(toolchain, args):
