@@ -258,12 +258,8 @@ public:
   ~RequestRefactoringEditConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::Replacement> Replacements) override;
-  void
-  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                   swift::DiagnosticKind Kind, StringRef FormatString,
-                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                   const swift::DiagnosticInfo &Info,
-                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(swift::SourceManager &SM,
+                        const swift::DiagnosticInfo &Info) override;
 };
 
 class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
@@ -276,12 +272,8 @@ public:
   ~RequestRenameRangeConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
-  void
-  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                   swift::DiagnosticKind Kind, StringRef FormatString,
-                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                   const swift::DiagnosticInfo &Info,
-                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(swift::SourceManager &SM,
+                        const swift::DiagnosticInfo &Info) override;
 };
 
 struct SwiftStatistics {
