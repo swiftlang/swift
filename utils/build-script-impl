@@ -2454,7 +2454,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
                     -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
                     -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                    -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=1
                     -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
                     -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
