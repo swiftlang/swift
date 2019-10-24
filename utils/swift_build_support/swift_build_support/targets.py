@@ -228,32 +228,6 @@ class StdlibDeploymentTarget(object):
         raise NotImplementedError('System "%s" with architecture "%s" is not '
                                   'supported' % (system, machine))
 
-    @staticmethod
-    def default_stdlib_deployment_targets():
-        """
-        Return targets for the Swift stdlib, based on the build machine.
-        If the build machine is not one of the recognized ones, return None.
-        """
-
-        host_target = StdlibDeploymentTarget.host_target()
-        if host_target is None:
-            return None
-
-        # OS X build machines configure all Darwin platforms by default.
-        # Put iOS native targets last so that we test them last
-        # (it takes a long time).
-        if host_target == StdlibDeploymentTarget.OSX.x86_64:
-            return [host_target] + \
-                StdlibDeploymentTarget.iOSSimulator.targets + \
-                StdlibDeploymentTarget.AppleTVSimulator.targets + \
-                StdlibDeploymentTarget.AppleWatchSimulator.targets + \
-                StdlibDeploymentTarget.iOS.targets + \
-                StdlibDeploymentTarget.AppleTV.targets + \
-                StdlibDeploymentTarget.AppleWatch.targets
-        else:
-            # All other machines only configure their host stdlib by default.
-            return [host_target]
-
     @classmethod
     def get_target_for_name(cls, name):
         return cls._targets_by_name.get(name)
