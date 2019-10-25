@@ -164,9 +164,6 @@ SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 /// The candidate witness during protocol conformance checking.
 CUSTOM_LOCATOR_PATH_ELT(Witness)
 
-/// An explicit type coercion.
-SIMPLE_LOCATOR_PATH_ELT(ExplicitTypeCoercion)
-
 /// The condition associated with 'if' expression or ternary operator.
 SIMPLE_LOCATOR_PATH_ELT(Condition)
 
