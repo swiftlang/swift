@@ -282,10 +282,10 @@ ACCEPTS_ANY_OWNERSHIP_INST(ConvertEscapeToNoEscape)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
   ACCEPTS_ANY_OWNERSHIP_INST(Name##ToRef)                                      \
-  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
+  ACCEPTS_ANY_OWNERSHIP_INST(StrongCopy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
-  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
+  ACCEPTS_ANY_OWNERSHIP_INST(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 

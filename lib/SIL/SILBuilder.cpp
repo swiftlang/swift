@@ -295,7 +295,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   case SILInstructionKind::Store##Name##Inst: \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::Copy##Name##ValueInst:                              \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
     return false;
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::LoadInst:
@@ -304,7 +304,6 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
-  case SILInstructionKind::CopyUnownedValueInst:
     return false;
   default:
     break;

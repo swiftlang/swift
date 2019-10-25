@@ -51,17 +51,17 @@ public:
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name) \
-  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef) \
-  CONSTANT_OWNERSHIP_INST(Owned, Copy##Name##Value)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
+  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
+  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   CONSTANT_OWNERSHIP_INST(None, RefTo##Name)                                   \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, Copy##Name##Value)
+  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)

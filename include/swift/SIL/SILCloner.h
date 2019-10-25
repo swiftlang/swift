@@ -1325,10 +1325,10 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
                                                getOpType(Inst->getType())));   \
   }                                                                            \
   template <typename ImplClass>                                                \
-  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
-      Copy##Name##ValueInst *Inst) {                                           \
+  void SILCloner<ImplClass>::visitStrongCopy##Name##ValueInst(                 \
+      StrongCopy##Name##ValueInst *Inst) {                                     \
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
-    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
+    recordClonedInstruction(Inst, getBuilder().createStrongCopy##Name##Value(  \
                                       getOpLocation(Inst->getLoc()),           \
                                       getOpValue(Inst->getOperand())));        \
   }

@@ -1542,13 +1542,13 @@ public:
   }
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \
   }
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    *this << getIDAndType(I->getOperand()); \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
+    *this << getIDAndType(I->getOperand());                                    \
   }
 #include "swift/AST/ReferenceStorage.def"
 

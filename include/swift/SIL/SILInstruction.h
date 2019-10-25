@@ -6480,22 +6480,24 @@ class CopyValueInst
 };
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  class Copy##Name##ValueInst                                                  \
-      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                    SingleValueInstruction> {                  \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
     friend class SILBuilder;                                                   \
-    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
-                          SILType type)                                        \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  class Copy##Name##ValueInst                                                  \
-      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                    SingleValueInstruction> {                  \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
     friend class SILBuilder;                                                   \
-    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
-                          SILType type)                                        \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
 #include "swift/AST/ReferenceStorage.def"
