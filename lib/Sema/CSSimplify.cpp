@@ -2686,6 +2686,15 @@ bool ConstraintSystem::repairFailures(
       if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
         return true;
 
+      // If destination is `AnyObject` it means that source doesn't conform.
+      if (rhs->getWithoutSpecifierType()
+              ->lookThroughAllOptionalTypes()
+              ->isAnyObject()) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+        return true;
+      }
+
       // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
       // give solver a chance to determine which generic parameters are
       // mismatched and produce a fix for that.
