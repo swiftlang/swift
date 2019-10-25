@@ -200,6 +200,7 @@ KNOWN_SETTINGS=(
     install-swiftpm             ""               "whether to install swiftpm"
     install-swiftsyntax         ""               "whether to install swiftsyntax"
     skip-install-swiftsyntax-module ""           "set to skip installing swiftsyntax modules"
+    swiftsyntax-verify-generated-files ""        "set to verify that the generated files in the source tree match the ones that would be generated from current master"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libcxx              ""               "whether to install libc++"
@@ -1244,7 +1245,7 @@ PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
-# LLBuild, SwiftPM, SwiftSyntax and XCTest are dependent on Foundation, so 
+# LLBuild, SwiftPM, SwiftSyntax and XCTest are dependent on Foundation, so
 # Foundation must be added to the list of build products first.
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
@@ -1264,12 +1265,12 @@ fi
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
 fi
-# SwiftPM and SwiftSyntax are dependent on XCTest, so XCTest must be added to 
+# SwiftPM and SwiftSyntax are dependent on XCTest, so XCTest must be added to
 # the list of build products first.
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
-# SwiftSyntax is dependent on SwiftPM, so SwiftPM must be added to the list of 
+# SwiftSyntax is dependent on SwiftPM, so SwiftPM must be added to the list of
 # build products first.
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
@@ -1852,6 +1853,9 @@ function set_swiftsyntax_build_command() {
         --syntax-parser-lib-dir="$(build_directory ${host} swift)/lib"
         --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
         --filecheck-exec="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck")
+    if [[ "${SWIFTSYNTAX_VERIFY_GENERATED_FILES}" ]] ; then
+        swiftsyntax_build_command+=(--verify-generated-files)
+    fi
 }
 
 #
