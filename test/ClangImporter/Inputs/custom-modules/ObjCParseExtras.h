@@ -249,3 +249,14 @@ struct TrivialToCopy {
 
 @interface OverrideInExtensionSub : OverrideInExtensionBase
 @end
+
+@interface SuperclassWithDesignatedInitInCategory
+@end
+
+@interface SubclassWithSwiftPrivateDesignatedInit : SuperclassWithDesignatedInitInCategory
+-(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
+@end
+
+@interface SuperclassWithDesignatedInitInCategory ()
+-(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
+@end
