@@ -2087,8 +2087,7 @@ public:
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
-    if (F->hasOwnership() &&
-        v.getOwnershipKind() == ValueOwnershipKind::Any)
+    if (F->hasOwnership() && v.getOwnershipKind() == ValueOwnershipKind::None)
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);

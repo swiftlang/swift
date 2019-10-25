@@ -266,7 +266,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
   // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Any);
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::None);
   else if (Id == 1)
     return SILUndef::get(Type, SILMod, ValueOwnershipKind::Owned);
 

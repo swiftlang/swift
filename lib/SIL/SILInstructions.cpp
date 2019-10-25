@@ -483,7 +483,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
-  resultOwnerships.push_back(ValueOwnershipKind::Any);
+  resultOwnerships.push_back(ValueOwnershipKind::None);
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
@@ -914,7 +914,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBaseWithTrailingOperands(
           Elems, Loc, Ty,
           HasOwnership ? *mergeSILValueOwnership(Elems)
-                       : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                       : ValueOwnershipKind(ValueOwnershipKind::None)) {
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
@@ -1395,7 +1395,7 @@ SelectValueInst::SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand,
     : InstructionBaseWithTrailingOperands(
           Operand, CaseValuesAndResults, DebugLoc, Type,
           HasOwnership ? *mergeSILValueOwnership(CaseValuesAndResults)
-                       : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
+                       : ValueOwnershipKind(ValueOwnershipKind::None)) {}
 
 SelectValueInst *
 SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
@@ -1834,7 +1834,7 @@ OpenExistentialRefInst::OpenExistentialRefInst(SILDebugLocation DebugLoc,
     : UnaryInstructionBase(DebugLoc, Operand, Ty,
                            HasOwnership
                                ? Operand.getOwnershipKind()
-                               : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                               : ValueOwnershipKind(ValueOwnershipKind::None)) {
   assert(Operand->getType().isObject() && "Operand must be an object.");
   assert(Ty.isObject() && "Result type must be an object type.");
 }

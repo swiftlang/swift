@@ -386,7 +386,7 @@ namespace {
       if (!P.consumeIf(tok::at_sign)) {
         // If we fail, we must have @any ownership. We check elsewhere in the
         // parser that this matches what the function signature wants.
-        OwnershipKind = ValueOwnershipKind::Any;
+        OwnershipKind = ValueOwnershipKind::None;
         return false;
       }
 
@@ -3003,8 +3003,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
  // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
  case SILInstructionKind::UncheckedOwnershipConversionInst: {
-   ValueOwnershipKind LHSKind = ValueOwnershipKind::Any;
-   ValueOwnershipKind RHSKind = ValueOwnershipKind::Any;
+   ValueOwnershipKind LHSKind = ValueOwnershipKind::None;
+   ValueOwnershipKind RHSKind = ValueOwnershipKind::None;
    SourceLoc Loc;
 
    if (parseTypedValueRef(Val, Loc, B) ||
@@ -5326,7 +5326,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
-        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any;
+        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::None;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,

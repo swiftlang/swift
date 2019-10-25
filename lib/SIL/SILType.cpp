@@ -417,7 +417,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F) const {
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
-               ? ValueOwnershipKind::Any
+               ? ValueOwnershipKind::None
                : ValueOwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
@@ -425,7 +425,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F) const {
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
-      return ValueOwnershipKind::Any;
+      return ValueOwnershipKind::None;
     return ValueOwnershipKind::Unowned;
   }
 

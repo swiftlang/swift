@@ -1416,7 +1416,7 @@ namespace {
         case ParameterConvention::Direct_Owned:
         case ParameterConvention::Indirect_In:
           if (!input.hasCleanup() &&
-              input.getOwnershipKind() != ValueOwnershipKind::Any)
+              input.getOwnershipKind() != ValueOwnershipKind::None)
             input = input.copyUnmanaged(SGF, Loc);
           break;
 
@@ -1633,7 +1633,7 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
-    if (value.getOwnershipKind() == ValueOwnershipKind::Any)
+    if (value.getOwnershipKind() == ValueOwnershipKind::None)
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed:

@@ -5070,7 +5070,7 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
       : InstructionBaseWithTrailingOperands(
             Elements, DebugLoc, Ty,
             HasOwnership ? *mergeSILValueOwnership(Elements)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
     SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
@@ -5117,7 +5117,7 @@ class TupleInst final : public InstructionBaseWithTrailingOperands<
       : InstructionBaseWithTrailingOperands(
             Elems, DebugLoc, Ty,
             HasOwnership ? *mergeSILValueOwnership(Elems)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -5192,9 +5192,8 @@ class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy)
       : InstructionBase(DebugLoc, ResultTy,
-                        Operand
-                            ? Operand.getOwnershipKind()
-                            : ValueOwnershipKind(ValueOwnershipKind::Any)),
+                        Operand ? Operand.getOwnershipKind()
+                                : ValueOwnershipKind(ValueOwnershipKind::None)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5488,7 +5487,7 @@ private:
             Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
             DefaultCount,
             HasOwnership ? *mergeSILValueOwnership(CaseValues)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
