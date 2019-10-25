@@ -332,7 +332,7 @@ namespace swift {
     bool EnableExperimentalDifferentiableProgramming = false;
 
     // SWIFT_ENABLE_TENSORFLOW
-    /// Whether to enable forward mode differentiation
+    /// Whether to enable forward mode differentiation.
     bool EnableExperimentalForwardModeDifferentiation = false;
     // SWIFT_ENABLE_TENSORFLOW END
 
