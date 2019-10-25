@@ -4415,7 +4415,7 @@ namespace {
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
-                                       Optional<CtorInitializerKind> kindIn,
+                                       CtorInitializerKind kind,
                                        bool required,
                                        ObjCSelector selector,
                                        ImportedName importedName,
@@ -6081,9 +6081,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   }
 
   bool redundant;
-  auto result =
-      importConstructor(objcMethod, dc, implicit, kind, required, selector,
-                        importedName, params, variadic, redundant);
+  auto result = importConstructor(objcMethod, dc, implicit,
+                                  kind.getValueOr(importedName.getInitKind()),
+                                  required, selector, importedName, params,
+                                  variadic, redundant);
 
   // If this is a compatibility stub, mark it as such.
   if (result && correctSwiftName)
@@ -6193,7 +6194,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
 /// constructor declaration appropriately.
 ConstructorDecl *SwiftDeclConverter::importConstructor(
     const clang::ObjCMethodDecl *objcMethod, DeclContext *dc, bool implicit,
-    Optional<CtorInitializerKind> kindIn, bool required, ObjCSelector selector,
+    CtorInitializerKind kind, bool required, ObjCSelector selector,
     ImportedName importedName, ArrayRef<const clang::ParmVarDecl *> args,
     bool variadic, bool &redundant) {
   redundant = false;
@@ -6201,35 +6202,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Figure out the type of the container.
   auto ownerNominal = dc->getSelfNominalTypeDecl();
   assert(ownerNominal && "Method in non-type context?");
-
-  // Find the interface, if we can.
-  const clang::ObjCInterfaceDecl *interface = nullptr;
-  if (auto classDecl = dyn_cast<ClassDecl>(ownerNominal)) {
-    interface =
-        dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
-  }
-
-  // If we weren't told what kind of initializer this should be,
-  // figure it out now.
-  CtorInitializerKind kind;
-
-  if (kindIn) {
-    kind = *kindIn;
-
-    // If we know this is a designated initializer, mark it as such.
-    if (interface && hasDesignatedInitializers(interface) &&
-        isDesignatedInitializer(interface, objcMethod))
-      kind = CtorInitializerKind::Designated;
-  } else {
-    // If the owning Objective-C class has designated initializers and this
-    // is not one of them, treat it as a convenience initializer.
-    if (interface && hasDesignatedInitializers(interface) &&
-        !isDesignatedInitializer(interface, objcMethod)) {
-      kind = CtorInitializerKind::Convenience;
-    } else {
-      kind = CtorInitializerKind::Designated;
-    }
-  }
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
@@ -7274,9 +7246,9 @@ void SwiftDeclConverter::importInheritedConstructors(
   };
 
   // The kind of initializer to import. If this class has designated
-  // initializers, everything it imports is a convenience initializer.
+  // initializers, everything it inherits is a convenience initializer.
   Optional<CtorInitializerKind> kind;
-  if (hasDesignatedInitializers(curObjCClass))
+  if (curObjCClass->hasDesignatedInitializers())
     kind = CtorInitializerKind::Convenience;
 
 
