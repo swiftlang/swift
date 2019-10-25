@@ -79,7 +79,7 @@ extension AtomicUInt {
     _ desired: UInt,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
-    _ptr._atomicExchangeWord(desired, ordering: .acquiringAndReleasing)
+    _ptr._atomicExchangeWord(desired, ordering: ordering)
   }
 }
 
