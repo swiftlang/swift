@@ -345,7 +345,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // the specialized attribute's substitution list. Visit only
   // SubstitutableTypes, skipping DependentTypes.
   auto GenericSig =
-    GenericFunc->getLoweredFunctionType()->getGenericSignature();
+    GenericFunc->getLoweredFunctionType()->getInvocationGenericSignature();
   auto SubMap = ReInfo.getClonerParamSubstitutionMap();
 
   GenericSig->forEachParam([&](GenericTypeParamType *ParamTy, bool Canonical) {
@@ -713,7 +713,7 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
 
   LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
              dbgs() << "  Generic Sig:";
-             dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
+             dbgs().indent(2); FT->getInvocationGenericSignature()->print(dbgs());
              dbgs() << "  Generic Env:";
              dbgs().indent(2);
              GenericFunc->getGenericEnvironment()->dump(dbgs());
@@ -752,7 +752,7 @@ void EagerSpecializerTransform::run() {
     if (F.isDynamicallyReplaceable())
       continue;
 
-    if (!F.getLoweredFunctionType()->getGenericSignature())
+    if (!F.getLoweredFunctionType()->getInvocationGenericSignature())
       continue;
 
     // Create a specialized function with ReabstractionInfo for each attribute.

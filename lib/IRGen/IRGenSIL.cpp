@@ -898,7 +898,9 @@ public:
 
   void visitSILBasicBlock(SILBasicBlock *BB);
 
-  void emitErrorResultVar(SILResultInfo ErrorInfo, DebugValueInst *DbgValue);
+  void emitErrorResultVar(CanSILFunctionType FnTy,
+                          SILResultInfo ErrorInfo,
+                          DebugValueInst *DbgValue);
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
@@ -2120,7 +2122,7 @@ emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                  CanSILFunctionType substCalleeType) {
   // This use of getSelfInstanceType() assumes that the instance type is
   // always a meaningful formal type.
-  auto substSelfType = substCalleeType->getSelfInstanceType();
+  auto substSelfType = substCalleeType->getSelfInstanceType(IGF.IGM.getSILModule());
   auto substConformance = substCalleeType->getWitnessMethodConformance();
 
   llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
@@ -2146,7 +2148,8 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     // Convert a metatype 'self' argument to the ObjC class pointer.
     // FIXME: why on earth is this not correctly represented in SIL?
     if (auto metatype = dyn_cast<AnyMetatypeType>(
-                       calleeInfo.OrigFnType->getSelfParameter().getType())) {
+       calleeInfo.OrigFnType->getSelfParameter()
+            .getArgumentType(IGF.IGM.getSILModule(), calleeInfo.OrigFnType))) {
       selfValue = getObjCClassForValue(IGF, selfValue, metatype);
     }
 
@@ -2305,7 +2308,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                                    &witnessMetadata, llArgs);
 
   // Lower the arguments and return value in the callee's generic context.
-  GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
+  GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   // Allocate space for the coroutine buffer.
   Optional<Address> coroutineBuffer;
@@ -2485,18 +2488,20 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   // NB: We collect the arguments under the substituted type.
   auto args = i->getArguments();
-  auto params = i->getSubstCalleeType()->getParameters();
+  auto calleeTy = i->getSubstCalleeType();
+  auto params = calleeTy->getParameters();
   params = params.slice(params.size() - args.size(), args.size());
   
   Explosion llArgs;
 
   // Lower the parameters in the callee's generic context.
   {
-    GenericContextScope scope(IGM, i->getOrigCalleeType()->getGenericSignature());
+    GenericContextScope scope(IGM,
+                            i->getOrigCalleeType()->getSubstGenericSignature());
     for (auto index : indices(args)) {
-      assert(args[index]->getType() == IGM.silConv.getSILType(params[index]));
-      emitApplyArgument(*this, args[index],
-                        IGM.silConv.getSILType(params[index]), llArgs);
+      auto paramTy = IGM.silConv.getSILType(params[index], calleeTy);
+      assert(args[index]->getType() == paramTy);
+      emitApplyArgument(*this, args[index], paramTy, llArgs);
     }
   }
   
@@ -2682,7 +2687,7 @@ void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
   auto coroutineType = CurSILFn->getLoweredFunctionType();
   SILFunctionConventions coroConv(coroutineType, getSILModule());
 
-  GenericContextScope scope(IGM, coroutineType->getGenericSignature());
+  GenericContextScope scope(IGM, coroutineType->getInvocationGenericSignature());
 
   // Collect all the yielded values.
   Explosion values;
@@ -3634,13 +3639,15 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
 }
 
 /// Emit the artificial error result argument.
-void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
+void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
+                                          SILResultInfo ErrorInfo,
                                           DebugValueInst *DbgValue) {
   // We don't need a shadow error variable for debugging on ABI's that return
   // swifterror in a register.
   if (IGM.IsSwiftErrorInRegister)
     return;
-  auto ErrorResultSlot = getErrorResultSlot(IGM.silConv.getSILType(ErrorInfo));
+  auto ErrorResultSlot = getErrorResultSlot(
+                                  IGM.silConv.getSILType(ErrorInfo, FnTy));
   auto Var = DbgValue->getVarInfo();
   assert(Var && "error result without debug info");
   auto Storage = emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(),
@@ -3648,8 +3655,9 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
   if (!IGM.DebugInfo)
     return;
   auto DbgTy = DebugTypeInfo::getErrorResult(
-      ErrorInfo.getType(), ErrorResultSlot->getType(), IGM.getPointerSize(),
-      IGM.getPointerAlignment());
+   ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy),
+   ErrorResultSlot->getType(),
+   IGM.getPointerSize(), IGM.getPointerAlignment());
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
                                          getDebugScope(), nullptr, *Var,
                                          IndirectValue, ArtificialValue);
@@ -3667,7 +3675,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     // representation in SIL.
     if (!i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
       auto funcTy = CurSILFn->getLoweredFunctionType();
-      emitErrorResultVar(funcTy->getErrorResult(), i);
+      emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
     return;
   }

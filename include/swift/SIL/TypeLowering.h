@@ -1008,11 +1008,13 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(SILType type1, SILType type2,
+  ABIDifference checkForABIDifferences(SILModule &M,
+                                       SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
   /// Same as above but for SIL function types.
-  ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
+  ABIDifference checkFunctionForABIDifferences(SILModule &M,
+                                               SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
 

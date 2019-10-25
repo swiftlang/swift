@@ -2610,6 +2610,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee,
                                           TypeRepr *witnessMethodProtocol) {
+#warning "todo: type resolution for subst function types"
   options.setContext(None);
 
   bool hasError = false;
@@ -2648,9 +2649,9 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       elementOptions.setContext(TypeResolverContext::FunctionInput);
       auto param = resolveSILParameter(elt.Type, elementOptions);
       params.push_back(param);
-      if (!param.getType()) return nullptr;
+      if (!param.getInterfaceType()) return nullptr;
 
-      if (param.getType()->hasError())
+      if (param.getInterfaceType()->hasError())
         hasError = true;
     }
 
@@ -2684,26 +2685,27 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = param.getType()->mapTypeOutOfContext()
+      auto transParamType = param.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceParams.push_back(param.getWithType(transParamType));
+      interfaceParams.push_back(param.getWithInterfaceType(transParamType));
     }
     for (auto &yield : yields) {
-      auto transYieldType = yield.getType()->mapTypeOutOfContext()
+      auto transYieldType = yield.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceYields.push_back(yield.getWithType(transYieldType));
+      interfaceYields.push_back(yield.getWithInterfaceType(transYieldType));
     }
     for (auto &result : results) {
-      auto transResultType = result.getType()->mapTypeOutOfContext()
+      auto transResultType = result.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceResults.push_back(result.getWithType(transResultType));
+      interfaceResults.push_back(result.getWithInterfaceType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = errorResult->getType()->mapTypeOutOfContext()
+      auto transErrorResultType = errorResult->getInterfaceType()
+          ->mapTypeOutOfContext()
           ->getCanonicalType();
       interfaceErrorResult =
-        errorResult->getWithType(transErrorResultType);
+        errorResult->getWithInterfaceType(transErrorResultType);
     }
   } else {
     interfaceParams = params;
@@ -2721,7 +2723,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     if (!protocolType)
       return ErrorType::get(Context);
 
-    Type selfType = params.back().getType();
+    Type selfType = params.back().getInterfaceType();
     // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
       auto next = metatypeType->getInstanceType();
@@ -2740,6 +2742,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                               callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
+                              SubstitutionMap(), false,
                               Context, witnessMethodConformance);
 }
 
@@ -2749,7 +2752,7 @@ SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
   AttributedTypeRepr attrRepr(attrs, repr);
   options.setContext(TypeResolverContext::FunctionInput);
   SILParameterInfo paramInfo = resolveSILParameter(&attrRepr, options);
-  return SILYieldInfo(paramInfo.getType(), paramInfo.getConvention());
+  return SILYieldInfo(paramInfo.getInterfaceType(), paramInfo.getConvention());
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(
@@ -2823,7 +2826,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
       // The treatment from this point on is basically completely different.
       auto yield = resolveSILYield(attrs, attrRepr->getTypeRepr(), options);
-      if (yield.getType()->hasError())
+      if (yield.getInterfaceType()->hasError())
         return true;
 
       yields.push_back(yield);

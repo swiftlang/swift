@@ -494,7 +494,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
   // Bail if the result type of the converted callee is different from the callee's
   // result type of the apply instruction.
-  if (SubstCalleeTy->getAllResultsType() != ConvertCalleeTy->getAllResultsType()) {
+  if (SubstCalleeTy->getAllResultsSubstType(AI.getModule())
+        != ConvertCalleeTy->getAllResultsSubstType(AI.getModule())) {
     return nullptr;
   }
 
@@ -546,8 +547,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
   SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
                                             Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
-             AI.getSubstCalleeType()->getAllResultsType() &&
+  assert(FullApplySite::isa(NAI).getSubstCalleeType()
+                               ->getAllResultsSubstType(AI.getModule())
+           == AI.getSubstCalleeType()
+               ->getAllResultsSubstType(AI.getModule()) &&
          "Function types should be the same");
   return NAI;
 }

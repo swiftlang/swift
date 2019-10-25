@@ -603,12 +603,12 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Constant:
     assert(!SILModuleConventions(mod).isSILIndirect(
-        SILParameterInfo(substCalleeType, conv)));
+                                      SILParameterInfo(substCalleeType, conv)));
     return Map::compatibilityMap(ValueOwnershipKind::Owned,
                                  UseLifetimeConstraint::MustBeInvalidated);
   case ParameterConvention::Indirect_In_Guaranteed:
     assert(!SILModuleConventions(mod).isSILIndirect(
-        SILParameterInfo(substCalleeType, conv)));
+                                      SILParameterInfo(substCalleeType, conv)));
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
                                  UseLifetimeConstraint::MustBeLive);
   case ParameterConvention::Indirect_Inout:

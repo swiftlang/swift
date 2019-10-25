@@ -1458,7 +1458,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
 
   // We're converting between C function pointer types. They better be
   // ABI-compatible, since we can't emit a thunk.
-  switch (SGF.SGM.Types.checkForABIDifferences(loweredResultTy, loweredDestTy)){
+  switch (SGF.SGM.Types.checkForABIDifferences(SGF.SGM.M,
+                                               loweredResultTy, loweredDestTy)){
   case TypeConverter::ABIDifference::Trivial:
     result = fnEmitter();
     assert(result.getType() == loweredResultTy);
@@ -2665,13 +2666,16 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   
   SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
   
+#warning "todo: should be a substituted function type of the common key path interface type"
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
                              /*noescape*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
-    params, {}, result, None, SGM.getASTContext());
+    params, {}, result, None,
+    SubstitutionMap(), false,
+    SGM.getASTContext());
   
   // Find the function and see if we already created it.
   auto name = Mangle::ASTMangler()
@@ -2698,17 +2702,17 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
   auto entry = thunk->begin();
-  auto resultArgTy = result.getSILStorageType();
-  auto baseArgTy = params[0].getSILStorageType();
+  auto resultArgTy = result.getSILStorageType(SGM.M, signature);
+  auto baseArgTy = params[0].getSILStorageType(SGM.M, signature);
   if (genericEnv) {
-    resultArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, resultArgTy);
-    baseArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, baseArgTy);
+    resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
+    baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
   }
   auto resultArg = entry->createFunctionArgument(resultArgTy);
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
   if (!indexes.empty()) {
-    auto indexArgTy = params[1].getSILStorageType();
+    auto indexArgTy = params[1].getSILStorageType(SGM.M, signature);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -2811,7 +2815,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                              /*noescape*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
-    params, {}, {}, None, SGM.getASTContext());
+    params, {}, {}, None,
+    SubstitutionMap(), false,
+    SGM.getASTContext());
   
   // Mangle the name of the thunk to see if we already created it.
   auto name = Mangle::ASTMangler()
@@ -2839,18 +2845,18 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
   auto entry = thunk->begin();
-  auto valueArgTy = params[0].getSILStorageType();
-  auto baseArgTy = params[1].getSILStorageType();
+  auto valueArgTy = params[0].getSILStorageType(SGM.M, signature);
+  auto baseArgTy = params[1].getSILStorageType(SGM.M, signature);
   if (genericEnv) {
-    valueArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, valueArgTy);
-    baseArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, baseArgTy);
+    valueArgTy = genericEnv->mapTypeIntoContext(SGM.M, valueArgTy);
+    baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
   }
   auto valueArg = entry->createFunctionArgument(valueArgTy);
   auto baseArg = entry->createFunctionArgument(baseArgTy);
   SILValue indexPtrArg;
   
   if (!indexes.empty()) {
-    auto indexArgTy = params[2].getSILStorageType();
+    auto indexArgTy = params[2].getSILStorageType(SGM.M, signature);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
 
@@ -2985,7 +2991,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*noescape*/ false),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
-      params, /*yields*/ {}, results, None, C);
+      params, /*yields*/ {}, results, None,
+      SubstitutionMap(), false,
+      C);
     
     // Mangle the name of the thunk to see if we already created it.
     auto name = Mangle::ASTMangler()
@@ -3004,8 +3012,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
-    auto lhsPtr = entry->createFunctionArgument(params[0].getSILStorageType());
-    auto rhsPtr = entry->createFunctionArgument(params[1].getSILStorageType());
+    auto lhsPtr =
+      entry->createFunctionArgument(params[0].getSILStorageType(SGM.M, signature));
+    auto rhsPtr =
+      entry->createFunctionArgument(params[1].getSILStorageType(SGM.M, signature));
 
     Scope scope(subSGF, loc);
 
@@ -3156,7 +3166,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*noescape*/ false),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
-      params, /*yields*/ {}, results, None, C);
+      params, /*yields*/ {}, results, None,
+      SubstitutionMap(), false, C);
     
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
@@ -3177,7 +3188,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
-    auto indexPtr = entry->createFunctionArgument(params[0].getSILStorageType());
+    auto indexPtr = entry->createFunctionArgument(
+                                params[0].getSILStorageType(SGM.M, signature));
 
     SILValue hashCode;
 
@@ -3652,7 +3664,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   auto pattern = KeyPathPattern::get(SGF.SGM.M,
                                      needsGenericContext
                                        ? SGF.F.getLoweredFunctionType()
-                                             ->getGenericSignature()
+                                             ->getInvocationGenericSignature()
                                        : nullptr,
                                      rootTy, baseTy,
                                      loweredComponents,

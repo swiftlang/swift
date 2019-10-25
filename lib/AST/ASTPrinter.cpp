@@ -3927,6 +3927,17 @@ public:
     PrintAST(Printer, Options).printGenericSignature(genericSig, flags);
   }
 
+  void printSubstitutions(SubstitutionMap subs) {
+    Printer << " <";
+    interleave(subs.getReplacementTypes(),
+               [&](Type type) {
+                 visit(type);
+               }, [&]{
+                 Printer << ", ";
+               });
+    Printer << ">";
+  }
+  
   void visitGenericFunctionType(GenericFunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
     SWIFT_DEFER {
@@ -3989,11 +4000,14 @@ public:
     printFunctionExtInfo(T->getExtInfo(),
                          T->getWitnessMethodConformanceOrNone());
     printCalleeConvention(T->getCalleeConvention());
-    if (auto sig = T->getGenericSignature()) {
+    if (auto sig = T->getSubstGenericSignature()) {
       printGenericSignature(sig,
                             PrintAST::PrintParams |
                             PrintAST::PrintRequirements);
       Printer << " ";
+      if (T->isGenericSignatureImplied()) {
+        Printer << "in ";
+      }
     }
 
     Printer << "(";
@@ -4027,10 +4041,15 @@ public:
       assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
       Printer.printSeparator(first, ", ");
       Printer << "@error ";
-      T->getErrorResult().getType().print(Printer, Options);
+      T->getErrorResult().getInterfaceType().print(Printer, Options);
     }
 
     if (totalResults != 1) Printer << ")";
+  
+    if (auto substitutions = T->getSubstitutions()) {
+      Printer << " for ";
+      printSubstitutions(substitutions);
+    }
   }
 
   void visitSILBlockStorageType(SILBlockStorageType *T) {
@@ -4070,14 +4089,7 @@ public:
 
     // The arguments to the layout, if any, do come from the outer environment.
     if (auto subMap = T->getSubstitutions()) {
-      Printer << " <";
-      interleave(subMap.getReplacementTypes(),
-                 [&](Type type) {
-                   visit(type);
-                 }, [&]{
-                   Printer << ", ";
-                 });
-      Printer << ">";
+      printSubstitutions(subMap);
     }
   }
 
@@ -4476,7 +4488,7 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
   Printer << getStringForParameterConvention(getConvention());
-  getType().print(Printer, Opts);
+  getInterfaceType().print(Printer, Opts);
 }
 
 static StringRef getStringForResultConvention(ResultConvention conv) {
@@ -4500,7 +4512,7 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   Printer << getStringForResultConvention(getConvention());
-  getType().print(Printer, Opts);
+  getInterfaceType().print(Printer, Opts);
 }
 
 std::string Type::getString(const PrintOptions &PO) const {

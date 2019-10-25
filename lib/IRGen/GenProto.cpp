@@ -293,7 +293,7 @@ enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
 }
 
 void PolymorphicConvention::initGenerics() {
-  Generics = FnType->getGenericSignature();
+  Generics = FnType->getInvocationGenericSignature();
 }
 
 void PolymorphicConvention::considerNewTypeSource(MetadataSource::Kind kind,
@@ -322,7 +322,7 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
 }
 
 void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
-  CanType selfTy = fnType->getSelfInstanceType();
+  CanType selfTy = fnType->getSelfInstanceType(IGM.getSILModule());
   auto conformance = fnType->getWitnessMethodConformance();
 
   // First, bind type metadata for Self.
@@ -330,7 +330,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
                        MetadataSource::InvalidSourceIndex,
                        selfTy);
 
-  if (fnType->getSelfInstanceType()->is<GenericTypeParamType>()) {
+  if (selfTy->is<GenericTypeParamType>()) {
     // The Self type is abstract, so we can fulfill its metadata from
     // the Self metadata parameter.
     addSelfMetadataFulfillment(selfTy);
@@ -347,7 +347,7 @@ void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
 
 void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
   // If this is a static method, get the instance type.
-  CanType selfTy = fnType->getSelfInstanceType();
+  CanType selfTy = fnType->getSelfInstanceType(IGM.getSILModule());
   unsigned paramIndex = fnType->getParameters().size() - 1;
 
   // Bind type metadata for Self.
@@ -364,7 +364,7 @@ void PolymorphicConvention::considerObjCGenericSelf(CanSILFunctionType fnType) {
 void PolymorphicConvention::considerParameter(SILParameterInfo param,
                                               unsigned paramIndex,
                                               bool isSelfParameter) {
-  auto type = param.getType();
+  auto type = param.getArgumentType(IGM.getSILModule(), FnType);
   switch (param.getConvention()) {
       // Indirect parameters do give us a value we can use, but right now
       // we don't bother, for no good reason. But if this is 'self',
@@ -454,7 +454,7 @@ void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
 
   // Check if any requirements were fulfilled by metadata stored inside a
   // captured value.
-  auto generics = fnType->getGenericSignature();
+  auto generics = fnType->getInvocationGenericSignature();
 
   for (auto genericParam : generics->getGenericParams()) {
     auto genericParamType = genericParam->getCanonicalType();
@@ -514,7 +514,8 @@ CanType EmitPolymorphicParameters::getTypeInContext(CanType type) const {
 }
 
 CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) const {
-  return getTypeInContext(FnType->getParameters()[paramIndex].getType());
+  return getTypeInContext(FnType->getParameters()[paramIndex]
+                          .getArgumentType(IGM.getSILModule(), FnType));
 }
 
 void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
@@ -543,7 +544,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       assert(metadata && "no Self metadata for witness method");
 
       // Mark this as the cached metatype for Self.
-      auto selfTy = FnType->getSelfInstanceType();
+      auto selfTy = FnType->getSelfInstanceType(IGM.getSILModule());
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
       auto *CD = selfTy.getClassOrBoundGenericClass();
@@ -566,7 +567,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       auto conformance = FnType->getWitnessMethodConformance();
       auto selfProto = conformance.getRequirement();
 
-      auto selfTy = FnType->getSelfInstanceType();
+      auto selfTy = FnType->getSelfInstanceType(IGM.getSILModule());
       CanType argTy = getTypeInContext(selfTy);
 
       setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
@@ -697,7 +698,8 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
     return;
 
   assert(nativeParam.size() == 1);
-  auto paramType = SubstFnType->getParameters()[paramIndex].getType();
+  auto paramType = SubstFnType->getParameters()[paramIndex]
+                            .getArgumentType(IGM.getSILModule(), SubstFnType);
   llvm::Value *instanceRef = nativeParam.getAll()[0];
   SILType instanceType = SILType::getPrimitiveObjectType(paramType);
   llvm::Value *metadata =
@@ -2777,14 +2779,15 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   return wtable;
 }
 
-static CanType getSubstSelfType(CanSILFunctionType origFnType,
+static CanType getSubstSelfType(IRGenModule &IGM,
+                                CanSILFunctionType origFnType,
                                 SubstitutionMap subs) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
   assert(!origFnType->getParameters().empty());
 
   auto selfParam = origFnType->getParameters().back();
-  CanType inputType = selfParam.getType();
+  CanType inputType = selfParam.getArgumentType(IGM.getSILModule(), origFnType);
   // If the parameter is a direct metatype parameter, this is a static method
   // of the instance type. We can assume this because:
   // - metatypes cannot directly conform to protocols
@@ -2833,7 +2836,8 @@ namespace {
 
         // Needs a special argument.
         case MetadataSource::Kind::GenericLValueMetadata: {
-          out.add(IGF.emitTypeMetadataRef(getSubstSelfType(FnType, subs)));
+          out.add(
+              IGF.emitTypeMetadataRef(getSubstSelfType(IGF.IGM, FnType, subs)));
           continue;
         }
 
@@ -2886,7 +2890,8 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
 
     case MetadataSource::Kind::SelfMetadata: {
       assert(witnessMetadata && "no metadata structure for witness method");
-      auto self = IGF.emitTypeMetadataRef(getSubstSelfType(FnType, subs));
+      auto self = IGF.emitTypeMetadataRef(
+                                      getSubstSelfType(IGF.IGM, FnType, subs));
       witnessMetadata->SelfMetadata = self;
       continue;
     }
@@ -2935,11 +2940,11 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
       continue;
 
     case MetadataSource::Kind::GenericLValueMetadata:
-      bindings.addTypeMetadata(getSubstSelfType(origType, subs));
+      bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
       continue;
 
     case MetadataSource::Kind::SelfMetadata:
-      bindings.addTypeMetadata(getSubstSelfType(origType, subs));
+      bindings.addTypeMetadata(getSubstSelfType(IGM, origType, subs));
       continue;
 
     case MetadataSource::Kind::SelfWitnessTable:
@@ -2971,6 +2976,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*yields*/ {},
                                 /*results*/ {}, /*error*/ None,
+                                /*subs*/ SubstitutionMap(), /*implied*/ false,
                                 IGM.Context);
 
   // Figure out what we're actually still required to pass 

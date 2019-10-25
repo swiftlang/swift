@@ -122,7 +122,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
   if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
-      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+      M.Types.checkFunctionForABIDifferences(M,
+                                             derivedInfo.SILFnType,
                                              overrideInfo.SILFnType) ==
           TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind);
