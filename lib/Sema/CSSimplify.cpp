@@ -4516,6 +4516,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
+    // If there is a missing conformance between source and destination
+    // of the assignment, let's ignore current the types and instead use
+    // source/destination types directly to make it possible to diagnose
+    // protocol compositions.
+    if (anchor && isa<AssignExpr>(anchor)) {
+      auto *assignment = cast<AssignExpr>(anchor);
+      auto srcType = getType(assignment->getSrc())->getWithoutSpecifierType();
+      // If the source type is something that can't possibly conform
+      // to a protocol e.g. a function type, let's record this is a
+      // type mismatch, otherwise this is a specific missing conformance.
+      auto dstType = srcType->is<FunctionType>()
+                         ? getType(assignment->getDest())
+                         : protocolTy;
+
+      auto *fix = IgnoreAssignmentDestinationType::create(
+          *this, srcType, dstType, getConstraintLocator(locator));
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     if (path.empty())
       return SolutionKind::Error;
 
