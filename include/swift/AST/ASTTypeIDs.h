@@ -35,6 +35,8 @@ class ModuleDecl;
 class NominalTypeDecl;
 class OperatorDecl;
 class OpaqueTypeDecl;
+class ParamDecl;
+enum class ParamSpecifier : uint8_t;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;

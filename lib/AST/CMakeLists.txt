@@ -31,6 +31,7 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   # SWIFT_ENABLE_TENSORFLOW
   AutoDiff.cpp
+  IndexSubset.cpp
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp

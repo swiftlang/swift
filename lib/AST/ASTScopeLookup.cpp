@@ -40,7 +40,6 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
     SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
     const DeclContext *const startingContext, DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;
-
   const auto *start =
       findStartingScopeForLookup(sourceFile, name, loc, startingContext);
   if (start)
@@ -59,7 +58,6 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 
   auto *const fileScope = sourceFile->getScope().impl;
   // Parser may have added decls to source file, since previous lookup
-  fileScope->addNewDeclsToScopeTree();
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
@@ -116,7 +114,7 @@ ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
 const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
     SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
     ScopeCreator &scopeCreator) {
-  reexpandIfObsolete(scopeCreator);
+  expandAndBeCurrentDetectingRecursion(scopeCreator);
   auto child = findChildContaining(loc, sourceMgr);
   if (!child)
     return this;

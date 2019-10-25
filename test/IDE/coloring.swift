@@ -271,10 +271,39 @@ func bar(x: Int) -> (Int, Float) {
   foo(Float())
 }
 
-// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
+// Check cases where an ObjectLiteralExpr appears in the AST
+//
 #colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
-// CHECK: test(<object-literal>#imageLiteral(resourceName: "test")</object-literal>, test: <int>0</int>)
+// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
 test(#imageLiteral(resourceName: "test"), test: 0)
+// CHECK: test(<object-literal>#imageLiteral(resourceName: "test")</object-literal>, test: <int>0</int>)
+
+// Check best-effort fallback handling when no ObjectLiteralExpr appears in the
+// AST.
+//
+_: Foo = #colorLiteral(red: 1.0, green: 0, blue: 1.0, alpha: 1.0)
+// CHECK: <kw>_</kw>: Foo = <object-literal>#colorLiteral(red: 1.0, green: 0, blue: 1.0, alpha: 1.0)</object-literal>
+_ = [#imageLiteral(resourceName: "foo.png")] + ;
+// CHECK: <kw>_</kw> = [<object-literal>#imageLiteral(resourceName: "foo.png")</object-literal>] + ;
+import let bad = #fileLiteral(resourceName: "foo.txt")
+// CHECK: <kw>import</kw> <kw>let</kw> bad = <object-literal>#fileLiteral(resourceName: "foo.txt")</object-literal>
+import let fixme = #fileLiteral(badArg: 65);
+// CHECK: <kw>import</kw> <kw>let</kw> fixme = <kw>#fileLiteral</kw>(badArg: <int>65</int>);
+let x = #colorLiteral(red: 1.0 / 2.0, green: 0.1 + 0.2, blue: 0.5, alpha: 0.5)
+// CHECK: <kw>let</kw> x = <object-literal>#colorLiteral(red: 1.0 / 2.0, green: 0.1 + 0.2, blue: 0.5, alpha: 0.5)</object-literal>
+
+// Some editors (including Xcode) don't support multi-line object literals well, so
+// check we don't report them regardless of whether they exist in the AST or not.
+//
+_: Foo = #colorLiteral(red: 1.0, green: 0,
+// CHECK: <kw>_</kw>: Foo = <kw>#colorLiteral</kw>(red: <float>1.0</float>, green: <int>0</int>,
+blue: 1.0, alpha: 1.0)
+// CHECK: blue: <float>1.0</float>, alpha: <float>1.0</float>)
+// CHECK: <kw>let</kw> x = <kw>#colorLiteral</kw>(red: <float>1.0</float>, green: <float>1.0</float>,
+let x = #colorLiteral(red: 1.0, green: 1.0,
+// CHECK: blue: <float>1.0</float>, alpha: <float>1.0</float>)
+blue: 1.0, alpha: 1.0)
+
 
 class GenC<T1,T2> {}
 

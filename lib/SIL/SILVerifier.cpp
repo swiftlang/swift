@@ -2109,13 +2109,14 @@ public:
         require(initConv.getNumDirectSILResults() == 1,
                 "wrong number of init function results");
         require(Dest->getType().getObjectType() ==
-                initConv.getDirectSILResultTypes().front(),
+                *initConv.getDirectSILResultTypes().begin(),
                 "wrong init function result type");
         break;
       case 1:
         require(initConv.getNumDirectSILResults() == 0,
                 "wrong number of init function results");
-        require(Dest->getType() == initConv.getIndirectSILResultTypes().front(),
+        require(Dest->getType() ==
+                *initConv.getIndirectSILResultTypes().begin(),
                 "wrong indirect init function result type");
         break;
       default:

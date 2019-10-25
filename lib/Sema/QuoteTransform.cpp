@@ -39,7 +39,7 @@ public:
   void pop() { locs.pop_back(); }
 
   SourceLoc getLoc() {
-    for (auto loc : reversed(locs)) {
+    for (auto loc : llvm::reverse(locs)) {
       if (loc.isValid()) {
         return loc.Start;
       }

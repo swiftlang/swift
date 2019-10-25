@@ -439,7 +439,7 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
-        !isa<SubscriptDecl>(DC);
+        !isa<SubscriptDecl>(DC) && !isa<EnumElementDecl>(DC);
 }
 
 namespace {
@@ -2760,7 +2760,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    for (auto *genericParams : swift::reversed(allGenericParams))
+    for (auto *genericParams : llvm::reverse(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);
@@ -3334,17 +3334,6 @@ public:
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
-    // Accessor synthesis and type checking is now sufficiently lazy that
-    // we might have unvalidated accessors in a primary file.
-    //
-    // FIXME: Once accessor synthesis and getInterfaceType() itself are
-    // request-ified this goes away.
-    if (!fn->hasInterfaceType()) {
-      assert(fn->isImplicit());
-      // FIXME: Remove this one
-      (void)fn->getInterfaceType();
-    }
-
     using namespace decls_block;
     verifyAttrSerializable(fn);
 

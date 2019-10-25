@@ -282,7 +282,7 @@ public:
   template <typename Subclass>
   using DowncastUserFilterRange =
       DowncastFilterRange<Subclass,
-                          llvm::iterator_range<llvm::mapped_iterator<
+                          iterator_range<llvm::mapped_iterator<
                               use_iterator, UseToUser, SILInstruction *>>>;
 
   /// Iterate over the use list of this ValueBase visiting all users that are of

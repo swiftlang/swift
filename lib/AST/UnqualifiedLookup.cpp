@@ -778,7 +778,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
   assert(isa<TopLevelCodeDecl>(dc) ||
          isa<Initializer>(dc) ||
          isa<TypeAliasDecl>(dc) ||
-         isa<SubscriptDecl>(dc));
+         isa<SubscriptDecl>(dc) ||
+         isa<EnumElementDecl>(dc));
   finishLookingInContext(
     AddGenericParameters::Yes,
     dc,

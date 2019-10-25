@@ -111,8 +111,6 @@ public:
     /// The cloned pattern is for an inherited constructor; mark default
     /// arguments as inherited, and mark unnamed arguments as named.
     Inherited = 0x02,
-    /// The cloned pattern will strip type information.
-    WithoutTypes = 0x04,
   };
 
   friend OptionSet<CloneFlags> operator|(CloneFlags flag1, CloneFlags flag2) {

@@ -3382,7 +3382,7 @@ namespace {
 
       // Local function to add the optional injections to final result.
       auto addFinalOptionalInjections = [&](Expr *result) {
-        for (auto destType : reversed(destOptionalInjections)) {
+        for (auto destType : llvm::reverse(destOptionalInjections)) {
           result =
             cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(result,
                                                                  destType));
@@ -4490,11 +4490,12 @@ namespace {
       auto closure = new (ctx)
           AutoClosureExpr(E, leafTy, discriminator, cs.DC);
       auto param = new (ctx) ParamDecl(
-          ParamDecl::Specifier::Default, SourceLoc(),
+          SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
       param->setType(baseTy);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
+      param->setSpecifier(ParamSpecifier::Default);
 
       // The outer closure.
       //
@@ -4504,12 +4505,13 @@ namespace {
       auto outerClosure = new (ctx)
           AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
       auto outerParam =
-          new (ctx) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+          new (ctx) ParamDecl(SourceLoc(),
                               /*argument label*/ SourceLoc(), Identifier(),
                               /*parameter name*/ SourceLoc(),
                               ctx.getIdentifier("$kp$"), outerClosure);
       outerParam->setType(keyPathTy);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
+      outerParam->setSpecifier(ParamSpecifier::Default);
 
       // let paramRef = "$0"
       auto *paramRef = new (ctx)
@@ -5916,7 +5918,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
                       diag::invalid_differentiable_function_conversion_expr,
                       isToTypeLinear);
           if (paramDecl->getType()->is<AnyFunctionType>()) {
-            auto *typeRepr = paramDecl->getTypeLoc().getTypeRepr();
+            auto *typeRepr = paramDecl->getTypeRepr();
             while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
               typeRepr = attributed->getTypeRepr();
             std::string attributeString = "@differentiable";
@@ -5927,7 +5929,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
             tc.diagnose(paramDecl->getLoc(),
                 diag::invalid_differentiable_function_conversion_parameter,
                 attributeString)
-               .highlight(paramDecl->getTypeLoc().getSourceRange())
+               .highlight(paramDecl->getTypeRepr()->getSourceRange())
                .fixItInsert(paramListLoc, attributeString + " ");
           }
           return;
@@ -7628,7 +7630,7 @@ namespace {
         auto builder =
             Rewriter.solution.builderTransformedClosures.find(closure);
         if (builder != Rewriter.solution.builderTransformedClosures.end()) {
-          auto singleExpr = builder->second.second;
+          auto singleExpr = builder->second.singleExpr;
           auto returnStmt = new (tc.Context) ReturnStmt(
              singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
           auto braceStmt = BraceStmt::create(
@@ -7759,7 +7761,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         auto result = solution.builderTransformedClosures.find(closure);
         if (result != solution.builderTransformedClosures.end()) {
-          auto *transformedExpr = result->second.second;
+          auto *transformedExpr = result->second.singleExpr;
           // Since this closure has been transformed into something
           // else let's look inside transformed expression instead.
           transformedExpr->walk(*this);

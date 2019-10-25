@@ -2372,8 +2372,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
         status |= parseExprList(tok::l_paren, tok::r_paren,
                                 /*isPostfix=*/false, /*isExprBasic=*/true,
                                 lParenLoc, args, argLabels, argLabelLocs,
-                                rParenLoc, trailingClosure,
-                                SyntaxKind::TupleExprElementList);
+                                rParenLoc, trailingClosure);
         assert(!trailingClosure && "Cannot parse a trailing closure here");
         hasInitializer = true;
       }
@@ -4929,8 +4928,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
         // Clone the parameter.  Do not clone the parameter type;
         // this will be filled in by the type-checker.
         auto accessorParam =
-          new (P->Context) ParamDecl(storageParam->getSpecifier(),
-                                     storageParam->getSpecifierLoc(),
+          new (P->Context) ParamDecl(storageParam->getSpecifierLoc(),
                                      storageParam->getArgumentNameLoc(),
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
@@ -4992,13 +4990,11 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   auto result = new (P.Context)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 Identifier(), nameLoc, name, P.CurDeclContext);
+
   if (isNameImplicit)
     result->setImplicit();
-
-  // AST Walker shouldn't go into the type recursively.
-  result->setIsTypeLocImplicit(true);
 
   return result;
 }

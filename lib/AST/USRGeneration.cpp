@@ -258,7 +258,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<std::string>
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
-  if (!D->hasInterfaceType())
+  if (!D->getInterfaceType())
     return std::string();
 
   if (isa<ModuleDecl>(D))
@@ -279,7 +279,7 @@ bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
   }
 }
 
-bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
+bool ide::printValueDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   auto result = evaluateOrDefault(D->getASTContext().evaluator,
                                   USRGenerationRequest { D },
                                   std::string());
@@ -327,17 +327,33 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   for (auto D : ED->getMembers()) {
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       OS << getUSRSpacePrefix() << "e:";
-      return printDeclUSR(VD, OS);
+      return printValueDeclUSR(VD, OS);
     }
   }
   OS << getUSRSpacePrefix() << "e:";
-  printDeclUSR(nominal, OS);
+  printValueDeclUSR(nominal, OS);
   for (auto Inherit : ED->getInherited()) {
     if (auto T = Inherit.getType()) {
       if (T->getAnyNominal())
-        return printDeclUSR(T->getAnyNominal(), OS);
+        return printValueDeclUSR(T->getAnyNominal(), OS);
     }
   }
   return true;
 }
 
+bool ide::printDeclUSR(const Decl *D, raw_ostream &OS) {
+  if (D->isImplicit())
+    return true;
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (ide::printValueDeclUSR(VD, OS)) {
+      return true;
+    }
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (ide::printExtensionUSR(ED, OS)) {
+      return true;
+    }
+  } else {
+    return true;
+  }
+  return false;
+}

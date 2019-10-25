@@ -410,8 +410,9 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   (void)rawType;
 
   auto *rawDecl = new (C)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
+  rawDecl->setSpecifier(ParamSpecifier::Default);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
@@ -429,7 +430,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the interface type of the initializer.
-  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType();
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);

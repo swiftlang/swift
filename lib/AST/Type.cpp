@@ -4680,7 +4680,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
+  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
     derivativeFunction = makeFunctionType(
@@ -4719,7 +4719,7 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
   // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
+  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
     originalType = makeFunctionType(

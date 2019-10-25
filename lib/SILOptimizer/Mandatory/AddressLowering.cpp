@@ -408,7 +408,7 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
 
   // Create an AllocStack for every opaque value defined in the function.  Visit
   // values in post-order to create storage for aggregates before subobjects.
-  for (auto &valueStorageI : reversed(pass.valueStorageMap))
+  for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap))
     allocateForValue(valueStorageI.first, valueStorageI.second);
 }
 
@@ -460,10 +460,11 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes()) {
     auto bodyResultTy = pass.F->mapTypeIntoContext(resultTy);
     auto var = new (ctx)
-        ParamDecl(ParamDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
+        ParamDecl(SourceLoc(), SourceLoc(),
                   ctx.getIdentifier("$return_value"), SourceLoc(),
                   ctx.getIdentifier("$return_value"),
                   pass.F->getDeclContext());
+    var->setSpecifier(ParamSpecifier::InOut);
 
     pass.F->begin()->insertFunctionArgument(argIdx,
                                             bodyResultTy.getAddressType(),
@@ -1507,7 +1508,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
   //
   // Add the rest of the instructions to the dead list in post order.
   // FIXME: make sure we cleaned up address-only BB arguments.
-  for (auto &valueStorageI : reversed(pass.valueStorageMap)) {
+  for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap)) {
     // TODO: MultiValueInstruction: ApplyInst
     auto *deadInst = dyn_cast<SingleValueInstruction>(valueStorageI.first);
     if (!deadInst)

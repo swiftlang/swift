@@ -235,8 +235,9 @@ struct Initialization {
   @Wrapper(stored: 17)
   var x2: Double
 
-  @Wrapper(stored: 17)
-  var x3 = 42 // expected-error{{extra argument 'wrappedValue' in call}}
+  @Wrapper(stored: 17) // expected-error {{initializer expects a single parameter of type 'T' [with T = (wrappedValue: Int, stored: Int)]}}
+  // expected-note@-1 {{did you mean to pass a tuple?}}
+  var x3 = 42
 
   @Wrapper(stored: 17)
   var x4
@@ -1722,4 +1723,69 @@ struct TestConcrete1 {
   func g(s1: P) {
     // ...
   }
+}
+
+// SR-11477
+
+// Two initializers that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W1 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  init(name: String = "DefaultParamInit") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Two initializers with default arguments that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W2 { // Okay
+  let name: String
+
+  init(anotherName: String = "DefaultParamInit1") {
+    self.name = anotherName
+  }
+
+  init(name: String = "DefaultParamInit2") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Single initializer that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W3 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// rdar://problem/56213175 - backward compatibility issue with Swift 5.1,
+// which unconditionally skipped protocol members.
+protocol ProtocolWithWrapper {
+  associatedtype Wrapper = Float // expected-note{{associated type 'Wrapper' declared here}}
+}
+
+struct UsesProtocolWithWrapper: ProtocolWithWrapper {
+  @Wrapper var foo: Int // expected-warning{{ignoring associated type 'Wrapper' in favor of module-scoped property wrapper 'Wrapper'; please qualify the reference with 'property_wrappers'}}{{4-4=property_wrappers.}}
 }

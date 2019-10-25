@@ -153,9 +153,8 @@ STMT_NODES = [
     Node('YieldList', kind='Syntax',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('ElementList', kind='ExprList',
+             Child('ElementList', kind='TupleExprElementList',
                    collection_element_name='Element'),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
              Child('RightParen', kind='RightParenToken'),
          ]),
 

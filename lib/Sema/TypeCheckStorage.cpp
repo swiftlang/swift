@@ -269,9 +269,8 @@ void swift::validatePatternBindingEntries(TypeChecker &tc,
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  auto storageDC = storage->getDeclContext();
-  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
-                 storageDC->hasValueSemantics());
+  bool result = (!storage->isStatic() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -299,7 +298,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storageDC))
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -325,9 +324,8 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  auto storageDC = storage->getDeclContext();
-  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
-                 storageDC->hasValueSemantics());
+  bool result = (!storage->isStatic() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
@@ -432,8 +430,7 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
 
   // Clone the parameter list over for a new decl, so we get new ParamDecls.
   auto indices = subscript->getIndices()->clone(context,
-                                                ParameterList::Implicit|
-                                                ParameterList::WithoutTypes);
+                                                ParameterList::Implicit);
 
   // Give all of the parameters meaningless names so that we can forward
   // them properly.  If it's declared anonymously, SILGen will think
@@ -586,8 +583,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    TargetImpl target,
                                    bool isLValue,
                                    ASTContext &ctx) {
-  (void)accessor->getInterfaceType();
-  
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
@@ -1678,9 +1673,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   else
     getter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
-  if (storage->isStatic())
-    getter->setStatic();
-
   if (!storage->requiresOpaqueAccessor(AccessorKind::Get))
     getter->setForcedStaticDispatch(true);
 
@@ -1696,17 +1688,16 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   SourceLoc loc = storage->getLoc();
 
-  bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
 
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   // Add a "(value : T, indices...)" argument list.
-  auto *param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                    SourceLoc(), SourceLoc(),
+  auto *param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), loc,
                                     ctx.getIdentifier("value"),
                                     storage->getDeclContext());
+  param->setSpecifier(ParamSpecifier::Default);
   param->setImplicit();
 
   auto *params = buildIndexForwardingParamList(storage, param, ctx);
@@ -1725,9 +1716,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   else
     setter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
-  if (isStatic)
-    setter->setStatic();
-
   // All mutable storage requires a setter.
   assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
 
@@ -1744,7 +1732,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   SourceLoc loc = storage->getLoc();
 
-  bool isStatic = storage->isStatic();
   bool isMutating = storage->isGetterMutating();
   if (kind == AccessorKind::Modify)
     isMutating |= storage->isSetterMutating();
@@ -1770,9 +1757,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
-
-  if (isStatic)
-    accessor->setStatic();
 
   // If the storage does not provide this accessor as an opaque accessor,
   // we can't add a dynamically-dispatched method entry for the accessor,
@@ -2436,12 +2420,16 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
                                           StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
+    SourceLoc typeLoc;
+    if (auto *repr = var->getTypeRepr())
+      typeLoc = repr->getLoc();
+    
     if (info.hasStorage()) {
       // Protocols cannot have stored properties.
       if (var->isLet()) {
         var->diagnose(diag::protocol_property_must_be_computed_var)
-          .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
-          .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
+            .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
+            .fixItInsertAfter(typeLoc, " { get }");
       } else {
         auto diag = var->diagnose(diag::protocol_property_must_be_computed);
         auto braces = var->getBracesRange();
@@ -2449,7 +2437,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
         if (braces.isValid())
           diag.fixItReplace(braces, "{ get <#set#> }");
         else
-          diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
+          diag.fixItInsertAfter(typeLoc, " { get <#set#> }");
       }
     }
   }

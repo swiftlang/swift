@@ -730,6 +730,12 @@ Type TypeChecker::applyGenericArguments(Type type,
   if (!result)
     return result;
 
+  if (!options.contains(TypeResolutionFlags::AllowUnavailable)) {
+    if (options.isAnyExpr() || dc->getParent()->isLocalContext())
+      if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        diagnoseGenericTypeExportability(loc, result, dc);
+  }
+
   // Migration hack.
   bool isMutablePointer;
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
@@ -1657,10 +1663,9 @@ static bool validateAutoClosureAttr(DiagnosticEngine &Diags, const SourceLoc &lo
 /// has `@autoclosure` attribute, and if so, validate that such use is correct.
 /// \returns true if there was an error, false otherwise.
 static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
-                                            const TypeLoc &loc,
+                                            const TypeRepr *TR,
                                             Type type,
                                             TypeResolutionOptions options) {
-  auto *TR = loc.getTypeRepr();
   if (!TR || TR->isInvalid())
     return false;
 
@@ -1683,7 +1688,7 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
       isValid &= llvm::none_of(
           fnType->getParams(), [&](const FunctionType::Param &param) {
             return param.isAutoClosure() &&
-                   validateAutoClosureAttr(Diags, loc.getLoc(),
+                   validateAutoClosureAttr(Diags, TR->getLoc(),
                                            param.getPlainType());
           });
     }
@@ -1702,30 +1707,8 @@ bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
-  Type type = Loc.getType();
-  if (type.isNull()) {
-    type = resolution.resolveType(Loc.getTypeRepr(), options);
-    if (!type) {
-      type = ErrorType::get(Context);
-      // Diagnose types that are illegal in SIL.
-    } else if (options.contains(TypeResolutionFlags::SILType)
-               && !type->isLegalSILType()) {
-      Context.Diags.diagnose(Loc.getLoc(), diag::illegal_sil_type, type);
-      Loc.setInvalidType(Context);
-      return true;
-    } else if (validateAutoClosureAttributeUse(Context.Diags, Loc,
-                                               type, options)) {
-      type = ErrorType::get(Context);
-    }
-  }
-
+  Type type = resolution.resolveType(Loc.getTypeRepr(), options);
   Loc.setType(type);
-  if (!type->hasError()) {
-    const DeclContext *DC = resolution.getDeclContext();
-    if (options.isAnyExpr() || DC->getParent()->isLocalContext())
-      if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        TypeChecker::diagnoseGenericTypeExportability(Loc, DC);
-  }
 
   return type->hasError();
 }
@@ -1833,16 +1816,34 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
-  FrontendStatsTracer StatsTracer(getASTContext().Stats, "resolve-type", TyR);
-  PrettyStackTraceTypeRepr stackTrace(getASTContext(), "resolving", TyR);
+  auto &ctx = getASTContext();
+
+  FrontendStatsTracer StatsTracer(ctx.Stats, "resolve-type", TyR);
+  PrettyStackTraceTypeRepr stackTrace(ctx, "resolving", TyR);
 
   TypeResolver typeResolver(*this);
   auto result = typeResolver.resolveType(TyR, options);
-  
-  // If we resolved down to an error, make sure to mark the typeRepr as invalid
-  // so we don't produce a redundant diagnostic.
-  if (result && result->hasError())
-    TyR->setInvalid();
+
+  if (result) {
+    // If we resolved down to an error, make sure to mark the typeRepr as invalid
+    // so we don't produce a redundant diagnostic.
+    if (result->hasError()) {
+      TyR->setInvalid();
+      return result;
+    }
+
+    auto loc = TyR->getLoc();
+
+    if (options.contains(TypeResolutionFlags::SILType)
+        && !result->isLegalSILType()) {
+      ctx.Diags.diagnose(loc, diag::illegal_sil_type, result);
+      return ErrorType::get(ctx);
+    }
+
+    if (validateAutoClosureAttributeUse(ctx.Diags, TyR, result, options))
+      return ErrorType::get(ctx);
+  }
+
   return result;
 }
 

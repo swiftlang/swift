@@ -1085,7 +1085,7 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *pai,
   // are cleaning up has the same live range as the partial_apply. Otherwise, we
   // may be inserting destroy_addr of alloc_stack that have already been passed
   // to a dealloc_stack.
-  for (unsigned i : reversed(indices(args))) {
+  for (unsigned i : llvm::reverse(indices(args))) {
     SILValue arg = args[i];
     SILParameterInfo paramInfo = params[i];
 

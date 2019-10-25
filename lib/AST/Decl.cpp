@@ -1191,7 +1191,7 @@ createExtensionGenericParams(ASTContext &ctx,
   });
 
   GenericParamList *toParams = nullptr;
-  for (auto *gpList : reversed(allGenericParams)) {
+  for (auto *gpList : llvm::reverse(allGenericParams)) {
     gpList->setOuterParameters(toParams);
     toParams = gpList;
   }
@@ -1362,14 +1362,15 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
     auto DC = singleVar->getDeclContext();
     if (DC->isTypeContext()) {
       auto specifier = (DC->getDeclaredInterfaceType()->hasReferenceSemantics()
-                        ? ParamDecl::Specifier::Default
-                        : ParamDecl::Specifier::InOut);
+                        ? ParamSpecifier::Default
+                        : ParamSpecifier::InOut);
 
       ASTContext &C = DC->getASTContext();
-      SelfParam = new (C) ParamDecl(specifier, SourceLoc(), SourceLoc(),
+      SelfParam = new (C) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), singleVar->getLoc(),
                                     C.Id_self, this);
       SelfParam->setImplicit();
+      SelfParam->setSpecifier(specifier);
       SelfParam->setInterfaceType(DC->getSelfInterfaceType());
     }
   }
@@ -2588,7 +2589,7 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 }
 
 OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
-  TypeLoc returnLoc;
+  TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
       while (auto *PP = dyn_cast<ParenPattern>(P))
@@ -2600,19 +2601,19 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
           assert(NP->getDecl() == VD);
           (void) NP;
 
-          returnLoc = TP->getTypeLoc();
+          returnRepr = TP->getTypeLoc().getTypeRepr();
         }
       }
     } else {
-      returnLoc = VD->getTypeLoc();
+      returnRepr = VD->getTypeRepr();
     }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
-    returnLoc = FD->getBodyResultTypeLoc();
+    returnRepr = FD->getBodyResultTypeLoc().getTypeRepr();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    returnLoc = SD->getElementTypeLoc();
+    returnRepr = SD->getElementTypeLoc().getTypeRepr();
   }
 
-  return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnLoc.getTypeRepr());
+  return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnRepr);
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
@@ -3377,16 +3378,6 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-void NominalTypeDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  Type declaredInterfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(declaredInterfaceTy, getASTContext()));
-
-  if (declaredInterfaceTy->hasError())
-    setInvalid();
-}
-
 enum class DeclTypeKind : unsigned {
   DeclaredType,
   DeclaredInterfaceType
@@ -3638,25 +3629,6 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
-void TypeAliasDecl::computeType() {
-  assert(!hasInterfaceType());
-      
-  // Set the interface type of this declaration.
-  ASTContext &ctx = getASTContext();
-
-  auto genericSig = getGenericSignature();
-  SubstitutionMap subs;
-  if (genericSig)
-    subs = genericSig->getIdentitySubstitutionMap();
-
-  Type parent;
-  auto parentDC = getDeclContext();
-  if (parentDC->isTypeContext())
-    parent = parentDC->getSelfInterfaceType();
-  auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
-  setInterfaceType(MetatypeType::get(sugaredType, ctx));
-}
-
 Type TypeAliasDecl::getUnderlyingType() const {
   auto &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -3764,14 +3736,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       TrailingWhere(trailingWhere), Resolver(definitionResolver),
       ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
-}
-
-void AssociatedTypeDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  auto &ctx = getASTContext();
-  auto interfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
 Type AssociatedTypeDecl::getDefaultDefinitionType() const {
@@ -3957,9 +3921,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 
   // Propagate access control and versioned-ness.
   DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
-
-  // Wire up generic environment of DD.
-  DD->setGenericSignature(CD->getGenericSignatureOfContext());
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
@@ -4263,14 +4224,6 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                     sizeof(EnumElementDecl*) * Elements.size(),
                   alignof(EnumCaseDecl));
   return ::new (buf) EnumCaseDecl(CaseLoc, Elements, DC);
-}
-
-EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large enum decls.
-  for (EnumElementDecl *Elt : getAllElements())
-    if (Elt->getName() == Name)
-      return Elt;
-  return nullptr;
 }
 
 bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
@@ -5267,7 +5220,7 @@ SourceRange VarDecl::getSourceRange() const {
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   // For a parameter, map back to its parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
-    if (auto typeRepr = PD->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = PD->getTypeRepr())
       return typeRepr->getSourceRange();
   }
   
@@ -5548,15 +5501,11 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
 void ParamDecl::setSpecifier(Specifier specifier) {
   // FIXME: Revisit this; in particular shouldn't __owned parameters be
   // ::Let also?
-  setIntroducer(specifier == ParamDecl::Specifier::Default
+  setIntroducer(specifier == ParamSpecifier::Default
                 ? VarDecl::Introducer::Let
                 : VarDecl::Introducer::Var);
   Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
-  setImplInfo(
-    StorageImplInfo::getSimpleStored(
-      isImmutableSpecifier(specifier)
-      ? StorageIsNotMutable
-      : StorageIsMutable));
+  Bits.ParamDecl.SpecifierComputed = true;
 }
 
 bool ParamDecl::isAnonClosureParam() const {
@@ -5569,6 +5518,15 @@ bool ParamDecl::isAnonClosureParam() const {
     return false;
 
   return nameStr[0] == '$';
+}
+
+ParamDecl::Specifier ParamDecl::getSpecifier() const {
+  auto &ctx = getASTContext();
+
+  auto mutableThis = const_cast<ParamDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParamSpecifierRequest{mutableThis},
+                           ParamDecl::Specifier::Default);
 }
 
 StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
@@ -5765,18 +5723,12 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
-      // Do not suggest the fix-it in implicit getters
+      // Do not suggest the fix it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
-
-        auto accessorDC = AD->getDeclContext();
-        // Do not suggest the fix-it if `Self` is a class type.
-        if (accessorDC->isTypeContext() && !accessorDC->hasValueSemantics()) {
-          return;
-        }
       }
-
+                   
       auto &d = getASTContext().Diags;
       d.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
                  isa<AccessorDecl>(FD))
@@ -5807,50 +5759,37 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(Specifier specifier, SourceLoc specifierLoc,
+ParamDecl::ParamDecl(SourceLoc specifierLoc,
                      SourceLoc argumentNameLoc, Identifier argumentName,
                      SourceLoc parameterNameLoc, Identifier parameterName,
                      DeclContext *dc)
     : VarDecl(DeclKind::Param,
               /*IsStatic*/ false,
-              specifier == ParamDecl::Specifier::Default
-                  ? VarDecl::Introducer::Let
-                  : VarDecl::Introducer::Var,
+              VarDecl::Introducer::Let,
               /*IsCaptureList*/ false, parameterNameLoc, parameterName, dc,
-              StorageIsMutable_t(!isImmutableSpecifier(specifier))),
+              StorageIsNotMutable),
       ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
-
-  Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
-  Bits.ParamDecl.IsTypeLocImplicit = false;
+  Bits.ParamDecl.SpecifierComputed = false;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
-/// Clone constructor, allocates a new ParamDecl identical to the first.
-/// Intentionally not defined as a copy constructor to avoid accidental copies.
-ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
-  : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getIntroducer(),
-            /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->getDeclContext(),
-            StorageIsMutable_t(!isImmutableSpecifier(PD->getSpecifier()))),
-    ArgumentName(PD->getArgumentName()),
-    ArgumentNameLoc(PD->getArgumentNameLoc()),
-    SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndFlags(nullptr, PD->DefaultValueAndFlags.getInt()) {
-  Bits.ParamDecl.Specifier = static_cast<unsigned>(PD->getSpecifier());
-  Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
-  Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
-  typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
-  if (!withTypes && typeLoc.getTypeRepr())
-    typeLoc.setType(Type());
+ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
+  auto *Clone = new (Ctx) ParamDecl(
+      PD->getSpecifierLoc(), PD->getArgumentNameLoc(), PD->getArgumentName(),
+      PD->getArgumentNameLoc(), PD->getParameterName(), PD->getDeclContext());
+  Clone->DefaultValueAndFlags.setPointerAndInt(
+      nullptr, PD->DefaultValueAndFlags.getInt());
+  Clone->Bits.ParamDecl.defaultArgumentKind =
+      PD->Bits.ParamDecl.defaultArgumentKind;
+  if (auto *repr = PD->getTypeRepr())
+    Clone->setTypeRepr(repr->clone(Ctx));
 
-  if (withTypes && PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType());
-
-  setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  Clone->setSpecifier(PD->getSpecifier());
+  Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  return Clone;
 }
-
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
@@ -5890,9 +5829,9 @@ SourceRange ParamDecl::getSourceRange() const {
     startLoc = APINameLoc;
   else if (nameLoc.isValid())
     startLoc = nameLoc;
-  else {
-    startLoc = getTypeLoc().getSourceRange().Start;
-  }
+  else if (auto *repr = getTypeRepr())
+    startLoc = repr->getStartLoc();
+
   if (startLoc.isInvalid())
     return SourceRange();
 
@@ -5906,9 +5845,9 @@ SourceRange ParamDecl::getSourceRange() const {
   }
   
   // If the typeloc has a valid location, use it to end the range.
-  if (auto typeRepr = getTypeLoc().getTypeRepr()) {
+  if (auto typeRepr = getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
-    if (endLoc.isValid() && !isTypeLocImplicit())
+    if (endLoc.isValid())
       return SourceRange(startLoc, endLoc);
   }
 
@@ -6276,30 +6215,11 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 }
 
 Type SubscriptDecl::getElementInterfaceType() const {
-  auto elementTy = getInterfaceType();
-  if (elementTy->is<ErrorType>())
-    return elementTy;
-  return elementTy->castTo<AnyFunctionType>()->getResult();
-}
-
-void SubscriptDecl::computeType() {
-  auto elementTy = getElementTypeLoc().getType();
-
-  SmallVector<AnyFunctionType::Param, 2> argTy;
-  getIndices()->getParams(argTy);
-
-  Type funcTy;
-  if (auto sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, argTy, elementTy);
-  else
-    funcTy = FunctionType::get(argTy, elementTy);
-
-  // Record the interface type.
-  setInterfaceType(funcTy);
-      
-  // Make sure that there are no unresolved dependent types in the
-  // generic signature.
-  assert(!funcTy->findUnresolvedDependentMemberType());
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<SubscriptDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           ErrorType::get(ctx));
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6433,7 +6353,9 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   }
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator, ParseAbstractFunctionBodyRequest{mutableThis}, nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParseAbstractFunctionBodyRequest{mutableThis},
+                           nullptr);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -6648,39 +6570,11 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
 
   // Create and save our 'self' parameter.
   auto &ctx = getASTContext();
-  *selfDecl = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                  SourceLoc(), SourceLoc(), Identifier(),
+  *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
 
-  // If we already have an interface type, compute the 'self' parameter type.
-  // Otherwise, we'll do it later.
-  if (hasInterfaceType())
-    computeSelfDeclType();
-
   return *selfDecl;
-}
-
-void AbstractFunctionDecl::computeSelfDeclType() {
-  assert(hasImplicitSelfDecl());
-  assert(hasInterfaceType());
-
-  auto *selfDecl = getImplicitSelfDecl(/*createIfNeeded=*/false);
-
-  // If we haven't created a 'self' parameter yet, do nothing, we'll compute
-  // the type later.
-  if (selfDecl == nullptr)
-    return;
-
-  auto selfParam = computeSelfParam(this,
-                                    /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
-  selfDecl->setInterfaceType(selfParam.getPlainType());
-
-  auto specifier = selfParam.getParameterFlags().isInOut()
-                       ? ParamDecl::Specifier::InOut
-                       : ParamDecl::Specifier::Default;
-  selfDecl->setSpecifier(specifier);
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
@@ -6742,34 +6636,18 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 }
 
 void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
-  auto &ctx = getASTContext();
   auto sig = getGenericSignature();
   bool hasSelf = hasImplicitSelfDecl();
 
   // Result
   Type resultTy;
   if (auto fn = dyn_cast<FuncDecl>(this)) {
-    resultTy = fn->getBodyResultTypeLoc().getType();
-    if (!resultTy) {
-      resultTy = TupleType::getEmpty(ctx);
-    }
-
+    resultTy = fn->getResultInterfaceType();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    auto *dc = ctor->getDeclContext();
-
-    if (hasSelf) {
-      if (!dc->isTypeContext())
-        resultTy = ErrorType::get(ctx);
-      else
-        resultTy = dc->getSelfInterfaceType();
-    }
-
-    // Adjust result type for failability.
-    if (ctor->isFailable())
-      resultTy = OptionalType::get(resultTy);
+    resultTy = ctor->getResultInterfaceType();
   } else {
     assert(isa<DestructorDecl>(this));
-    resultTy = TupleType::getEmpty(ctx);
+    resultTy = TupleType::getEmpty(getASTContext());
   }
 
   // (Args...) -> Result
@@ -6804,14 +6682,6 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 
   // Record the interface type.
   setInterfaceType(funcTy);
-
-  // Compute the type of the 'self' parameter if we're created one already.
-  if (hasSelf)
-    computeSelfDeclType();
-      
-  // Make sure that there are no unresolved dependent types in the
-  // generic signature.
-  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
@@ -7027,14 +6897,11 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  Type resultTy = getInterfaceType();
-  if (resultTy.isNull() || resultTy->is<ErrorType>())
-    return resultTy;
-
-  if (hasImplicitSelfDecl())
-    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-
-  return resultTy->castTo<AnyFunctionType>()->getResult();
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           ErrorType::get(ctx));
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -7157,40 +7024,24 @@ SourceRange FuncDecl::getSourceRange() const {
   return StartLoc;
 }
 
+EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                                 ParameterList *Params,
+                                 SourceLoc EqualsLoc,
+                                 LiteralExpr *RawValueExpr,
+                                 DeclContext *DC)
+  : DeclContext(DeclContextKind::EnumElementDecl, DC),
+    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
+    EqualsLoc(EqualsLoc),
+    RawValueExpr(RawValueExpr) {
+  setParameterList(Params);
+}
+
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
   if (auto *PL = getParameterList())
     return {getStartLoc(), PL->getSourceRange().End};
   return {getStartLoc(), getNameLoc()};
-}
-
-void EnumElementDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  auto &ctx = getASTContext();
-  auto *ED = getParentEnum();
-
-  // The type of the enum element is either (Self.Type) -> Self
-  // or (Self.Type) -> (Args...) -> Self.
-  auto resultTy = ED->getDeclaredInterfaceType();
-
-  AnyFunctionType::Param selfTy(MetatypeType::get(resultTy, ctx));
-
-  if (auto *PL = getParameterList()) {
-    SmallVector<AnyFunctionType::Param, 4> argTy;
-    PL->getParams(argTy);
-
-    resultTy = FunctionType::get(argTy, resultTy);
-  }
-
-  if (auto genericSig = ED->getGenericSignature())
-    resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
-  else
-    resultTy = FunctionType::get({selfTy}, resultTy);
-
-  // Record the interface type.
-  setInterfaceType(resultTy);
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
@@ -7212,6 +7063,13 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     elements.emplace_back(eltType, param.getLabel());
   }
   return TupleType::get(elements, ctx);
+}
+
+void EnumElementDecl::setParameterList(ParameterList *params) {
+  Params = params;
+
+  if (params)
+    params->setDeclContextOfParamDecls(this);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
@@ -7268,10 +7126,19 @@ SourceRange ConstructorDecl::getSourceRange() const {
 }
 
 Type ConstructorDecl::getResultInterfaceType() const {
-  Type ArgTy = getInterfaceType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  return ArgTy;
+  Type resultTy;
+
+  auto *dc = getDeclContext();
+  if (!dc->isTypeContext())
+    resultTy = ErrorType::get(getASTContext());
+  else
+    resultTy = dc->getSelfInterfaceType();
+
+  // Adjust result type for failability.
+  if (isFailable())
+    return OptionalType::get(resultTy);
+
+  return resultTy;
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {

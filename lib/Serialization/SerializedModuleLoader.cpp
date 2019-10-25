@@ -263,10 +263,43 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFile(
   return std::error_code();
 }
 
+void
+SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
+                                                      AccessPathElem ModuleID,
+                                                      StringRef ModulePath,
+                                            StringRef ModuleSourceInfoFilename,
+                              std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+  if (!ModuleSourceInfoBuffer)
+    return;
+  llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
+  llvm::SmallString<128> PathWithoutProjectDir(ModulePath);
+  llvm::sys::path::replace_extension(PathWithoutProjectDir,
+                  file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
+  llvm::SmallString<128> PathWithProjectDir = PathWithoutProjectDir.str();
+  StringRef FileName = llvm::sys::path::filename(PathWithoutProjectDir);
+  llvm::sys::path::remove_filename(PathWithProjectDir);
+  llvm::sys::path::append(PathWithProjectDir, "Project");
+  llvm::sys::path::append(PathWithProjectDir, FileName);
+
+  // Try to open the module source info file from the "Project" directory.
+  // If it does not exist, ignore the error.
+  if (auto ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithProjectDir)) {
+    *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
+    return;
+  }
+  // Try to open the module source info file adjacent to the .swiftmodule file.
+  if (auto ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithoutProjectDir)) {
+    *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
+    return;
+  }
+}
+
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
     AccessPathElem ModuleID, StringRef ModulePath, StringRef ModuleDocPath,
+    StringRef ModuleSourceInfoFileName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   assert(((ModuleBuffer && ModuleDocBuffer) ||
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
@@ -294,6 +327,10 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
+  // Open .swiftsourceinfo file if it's present.
+  openModuleSourceInfoFileIfPresent(ModuleID, ModulePath,
+                                    ModuleSourceInfoFileName,
+                                    ModuleSourceInfoBuffer);
   auto ModuleDocErr =
     openModuleDocFile(ModuleID, ModuleDocPath, ModuleDocBuffer);
   if (ModuleDocErr)
@@ -306,9 +343,10 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
 
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename,
+    StringRef ModuleDocFilename, StringRef ModuleSourceInfoFileName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   if (LoadMode == ModuleLoadingMode::OnlyInterface)
     return std::make_error_code(std::errc::not_supported);
 
@@ -319,8 +357,10 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
   return SerializedModuleLoaderBase::openModuleFiles(ModuleID,
                                                      ModulePath,
                                                      ModuleDocPath,
+                                                     ModuleSourceInfoFileName,
                                                      ModuleBuffer,
-                                                     ModuleDocBuffer);
+                                                     ModuleDocBuffer,
+                                                     ModuleSourceInfoBuffer);
 }
 
 bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
@@ -361,15 +401,19 @@ bool SerializedModuleLoader::maybeDiagnoseTargetMismatch(
 struct ModuleFilenamePair {
   llvm::SmallString<64> module;
   llvm::SmallString<64> moduleDoc;
+  llvm::SmallString<64> moduleSourceInfo;
 
   ModuleFilenamePair(StringRef baseName)
-    : module(baseName), moduleDoc(baseName)
+    : module(baseName), moduleDoc(baseName), moduleSourceInfo(baseName)
   {
     module += '.';
     module += file_types::getExtension(file_types::TY_SwiftModuleFile);
 
     moduleDoc += '.';
     moduleDoc += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
+
+    moduleSourceInfo += '.';
+    moduleSourceInfo += file_types::getExtension(file_types::TY_SwiftSourceInfoFile);
   }
 };
 
@@ -377,6 +421,7 @@ bool
 SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
            bool &isFramework, bool &isSystemModule) {
   llvm::SmallString<64> moduleName(moduleID.first.str());
   ModuleFilenamePair fileNames(moduleName);
@@ -400,7 +445,9 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     for (const auto &targetFileNames : targetFileNamePairs) {
       auto result = findModuleFilesInDirectory(moduleID, currPath,
                         targetFileNames.module, targetFileNames.moduleDoc,
-                        moduleBuffer, moduleDocBuffer);
+                        targetFileNames.moduleSourceInfo,
+                        moduleBuffer, moduleDocBuffer,
+                        moduleSourceInfoBuffer);
       if (!result) {
         return true;
       } else if (result == std::errc::not_supported) {
@@ -452,7 +499,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
           auto result = findModuleFilesInDirectory(
               moduleID, path, fileNames.module.str(), fileNames.moduleDoc.str(),
-              moduleBuffer, moduleDocBuffer);
+              fileNames.moduleSourceInfo.str(),
+              moduleBuffer, moduleDocBuffer, moduleSourceInfoBuffer);
           if (!result)
             return true;
           else if (result == std::errc::not_supported)
@@ -520,6 +568,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     ModuleDecl &M, Optional<SourceLoc> diagLoc,
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework, bool treatAsPartialModule) {
   assert(moduleInputBuffer);
 
@@ -540,6 +589,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
   serialization::ValidationInfo loadInfo =
       ModuleFile::load(std::move(moduleInputBuffer),
                        std::move(moduleDocInputBuffer),
+                       std::move(moduleSourceInfoInputBuffer),
                        isFramework, loadedModuleFile,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
@@ -770,7 +820,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   // Look on disk.
   bool isFramework = false;
   bool isSystemModule = false;
-  return findModule(mID, nullptr, nullptr, isFramework, isSystemModule);
+  return findModule(mID, nullptr, nullptr, nullptr, isFramework, isSystemModule);
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
@@ -792,9 +842,11 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer;
 
   // Look on disk.
   if (!findModule(moduleID, &moduleInputBuffer, &moduleDocInputBuffer,
+                  &moduleSourceInfoInputBuffer,
                   isFramework, isSystemModule)) {
     return nullptr;
   }
@@ -814,8 +866,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
-               std::move(moduleDocInputBuffer), isFramework,
-               /*treatAsPartialModule*/false)) {
+               std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
+               isFramework, /*treatAsPartialModule*/false)) {
     M->setFailedToLoad();
   }
 
@@ -850,7 +902,7 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto *M = ModuleDecl::create(moduleID.first, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer), {},
+  if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer), {}, {},
                isFramework, treatAsPartialModule)) {
     return nullptr;
   }
@@ -884,9 +936,10 @@ void SerializedModuleLoaderBase::loadObjCMethods(
 
 std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename,
+    StringRef ModuleDocFilename, StringRef ModuleSourceInfoFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   // This is a soft error instead of an llvm_unreachable because this API is
   // primarily used by LLDB which makes it more likely that unwitting changes to
   // the Swift compiler accidentally break the contract.
@@ -1008,6 +1061,11 @@ void SerializedASTFile::lookupObjCMethods(
 Optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
+}
+
+Optional<BasicDeclLocs>
+SerializedASTFile::getBasicLocsForDecl(const Decl *D) const {
+  return File.getBasicDeclLocsForDecl(D);
 }
 
 Optional<StringRef>

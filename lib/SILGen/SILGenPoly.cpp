@@ -3655,7 +3655,7 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
       CleanupLocation::get(loc), NotForUnwind);
 
   // Deallocate local allocations.
-  for (auto *alloc : reversed(localAllocations))
+  for (auto *alloc : llvm::reverse(localAllocations))
     thunkSGF.B.createDeallocStack(loc, alloc);
 
   // Create return.

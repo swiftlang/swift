@@ -1231,7 +1231,7 @@ namespace {
           Expr *target = nullptr;
           bool foundApply = false;
           bool foundRebind = false;
-          for (auto ancestor : reversed(ExprStack)) {
+          for (auto ancestor : llvm::reverse(ExprStack)) {
             if (isa<RebindSelfInConstructorExpr>(ancestor)) {
               // If we already have a rebind, then we're re-typechecking an
               // expression and are done.
@@ -1345,17 +1345,17 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
-  TypeResolutionOptions options(TypeResolverContext::ClosureExpr);
-  options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
   bool hadParameterError = false;
 
-  if (TC.typeCheckParameterList(PL, closure, options)) {
-    // If we encounter an error validating the parameter list, don't bail.
-    // Instead, go on to validate any potential result type, and bail
-    // afterwards.  This allows for better diagnostics, and keeps the
-    // closure expression type well-formed.
-    hadParameterError = true;
+  // If we encounter an error validating the parameter list, don't bail.
+  // Instead, go on to validate any potential result type, and bail
+  // afterwards.  This allows for better diagnostics, and keeps the
+  // closure expression type well-formed.
+  for (auto param : *PL) {
+    // FIXME: Forces computation of isInvalid().
+    (void) param->getInterfaceType();
+
+    hadParameterError |= param->isInvalid();
   }
 
   // Validate the result type, if present.
@@ -2035,7 +2035,7 @@ void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
-  for (auto history : reversed(conformances)) {
+  for (auto history : llvm::reverse(conformances)) {
     diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
                    history.ConformingType, history.Protocol);
   }

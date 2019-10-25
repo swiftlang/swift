@@ -648,6 +648,13 @@ void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
   nameTracker->addTopLevelName(name.getBaseName(), isCascading);
 }
 
+namespace {
+  /// Whether we're looking up outer results or not.
+  enum class LookupOuterResults {
+    Excluded,
+    Included
+  };
+}
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given parsed type representation.
@@ -1878,11 +1885,15 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
 directReferencesForUnqualifiedTypeLookup(DeclName name,
-                                         SourceLoc loc, DeclContext *dc) {
+                                         SourceLoc loc, DeclContext *dc,
+                                         LookupOuterResults lookupOuter) {
   DirectlyReferencedTypeDecls results;
   UnqualifiedLookup::Options options =
       UnqualifiedLookup::Flags::TypeLookup |
       UnqualifiedLookup::Flags::AllowProtocolMembers;
+  if (lookupOuter == LookupOuterResults::Included)
+    options |= UnqualifiedLookup::Flags::IncludeOuterResults;
+
   UnqualifiedLookup lookup(name, dc, loc, options);
   for (const auto &result : lookup.Results) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
@@ -1957,7 +1968,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
       current =
         directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
                                                  component->getIdLoc(),
-                                                 dc);
+                                                 dc,
+                                                 LookupOuterResults::Excluded);
 
       // If we didn't find anything, fail now.
       if (current.empty())
@@ -2195,6 +2207,19 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   return nominalTypes.empty() ? nullptr : nominalTypes[0];
 }
 
+/// Whether there are only associated types in the set of declarations.
+static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
+  if (decls.empty())
+    return false;
+
+  for (auto decl : decls) {
+    if (!isa<AssociatedTypeDecl>(decl))
+      return false;
+  }
+
+  return true;
+}
+
 llvm::Expected<NominalTypeDecl *>
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
@@ -2216,6 +2241,48 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                             modulesFound, anyObject);
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
+
+  // If we found declarations that are associated types, look outside of
+  // the current context to see if we can recover.
+  if (declsAreAssociatedTypes(decls)) {
+    if (auto typeRepr = typeLoc.getTypeRepr()) {
+      if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
+        auto assocType = cast<AssociatedTypeDecl>(decls.front());
+
+        modulesFound.clear();
+        anyObject = false;
+        decls = directReferencesForUnqualifiedTypeLookup(
+            identTypeRepr->getIdentifier(), identTypeRepr->getIdLoc(), dc,
+            LookupOuterResults::Included);
+        nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+                                             modulesFound, anyObject);
+        if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front())) {
+          auto nominal = nominals.front();
+          if (nominal->getDeclContext()->isModuleScopeContext()) {
+            // Complain, producing module qualification in a Fix-It.
+            auto moduleName = nominal->getParentModule()->getName();
+            ctx.Diags.diagnose(typeRepr->getLoc(),
+                               diag::warn_property_wrapper_module_scope,
+                               identTypeRepr->getIdentifier(),
+                               moduleName)
+              .fixItInsert(typeRepr->getLoc(),
+                           moduleName.str().str() + ".");
+            ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
+                               assocType->getDescriptiveKind(),
+                               assocType->getFullName());
+
+            ComponentIdentTypeRepr *components[2] = {
+              new (ctx) SimpleIdentTypeRepr(typeRepr->getLoc(), moduleName),
+              identTypeRepr
+            };
+
+            typeLoc = TypeLoc(IdentTypeRepr::create(ctx, components));
+            return nominal;
+          }
+        }
+      }
+    }
+  }
 
   return nullptr;
 }

@@ -466,9 +466,10 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
   auto *keyedByDecl = new (C)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, DC);
   keyedByDecl->setImplicit();
+  keyedByDecl->setSpecifier(ParamSpecifier::Default);
   keyedByDecl->setInterfaceType(returnType);
 
   // container(keyedBy:) method name
@@ -724,8 +725,9 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   // Params: (Encoder)
   auto *encoderParam = new (C)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
+      ParamDecl(SourceLoc(), SourceLoc(), C.Id_to,
                 SourceLoc(), C.Id_encoder, conformanceDC);
+  encoderParam->setSpecifier(ParamSpecifier::Default);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
@@ -748,7 +750,6 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  encodeDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
 
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
@@ -1003,9 +1004,10 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // Params: (Decoder)
   auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
-      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
+      SourceLoc(), SourceLoc(), C.Id_from,
       SourceLoc(), C.Id_decoder, conformanceDC);
   decoderParamDecl->setImplicit();
+  decoderParamDecl->setSpecifier(ParamSpecifier::Default);
   decoderParamDecl->setInterfaceType(decoderType);
 
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
@@ -1028,7 +1030,6 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  initDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
 
   initDecl->copyFormalAccessFrom(derived.Nominal,

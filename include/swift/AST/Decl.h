@@ -369,17 +369,13 @@ protected:
     IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 2+1+NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
+    /// Whether we've computed the specifier yet.
+    SpecifierComputed : 1,
+
     /// The specifier associated with this parameter.  This determines
     /// the storage semantics of the value e.g. mutability.
     Specifier : 2,
-
-    /// True if the type is implicitly specified in the source, but this has an
-    /// apparently valid typeRepr.  This is used in accessors, which look like:
-    ///    set (value) {
-    /// but need to get the typeRepr from the property as a whole so Sema can
-    /// resolve the type.
-    IsTypeLocImplicit : 1,
 
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
@@ -2982,9 +2978,6 @@ public:
   /// Retrieve a sugared interface type containing the structure of the interface
   /// type before any semantic validation has occured.
   Type getStructuralType() const;
-
-  /// Set the interface type of this typealias declaration from the underlying type.
-  void computeType();
   
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
@@ -3172,10 +3165,6 @@ public:
   void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
     TrailingWhere = trailingWhereClause;
   }
-
-  /// Set the interface type of this associated type declaration to a dependent
-  /// member type of 'Self'.
-  void computeType();
 
   /// Retrieve the associated type "anchor", which is the associated type
   /// declaration that will be used to describe this associated type in the
@@ -3365,10 +3354,6 @@ public:
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
-
-  /// Set the interface type of this nominal type to the metatype of the
-  /// declared interface type.
-  void computeType();
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
@@ -3565,8 +3550,6 @@ public:
     return SourceRange(EnumLoc, getBraces().End);
   }
 
-  EnumElementDecl *getElement(Identifier Name) const;
-  
 public:
   /// A range for iterating the elements of an enum.
   using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
@@ -4827,8 +4810,7 @@ protected:
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
-  /// This is the type specified, including location information.
-  TypeLoc typeLoc;
+  TypeRepr *ParentRepr = nullptr;
 
   Type typeInContext;
 
@@ -4848,8 +4830,10 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  TypeLoc &getTypeLoc() { return typeLoc; }
-  TypeLoc getTypeLoc() const { return typeLoc; }
+  /// Retrieve the TypeRepr corresponding to the parsed type of the parent
+  /// pattern, if it exists.
+  TypeRepr *getTypeRepr() const { return ParentRepr; }
+  void setTypeRepr(TypeRepr *repr) { ParentRepr = repr; }
 
   bool hasType() const {
     // We have a type if either the type has been computed already or if
@@ -5184,6 +5168,13 @@ public:
   }
 };
 
+enum class ParamSpecifier : uint8_t {
+  Default = 0,
+  InOut = 1,
+  Shared = 2,
+  Owned = 3,
+};
+
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   Identifier ArgumentName;
@@ -5210,23 +5201,15 @@ class ParamDecl : public VarDecl {
   llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
       DefaultValueAndFlags;
 
-public:
-  enum class Specifier : uint8_t {
-    Default = 0,
-    InOut = 1,
-    Shared = 2,
-    Owned = 3,
-  };
+  friend class ParamSpecifierRequest;
 
-  ParamDecl(Specifier specifier,
-            SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+public:
+  ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
-  /// Clone constructor, allocates a new ParamDecl identical to the first.
-  /// Intentionally not defined as a typical copy constructor to avoid
-  /// accidental copies.
-  ParamDecl(ParamDecl *PD, bool withTypes);
+  /// Create a new ParamDecl identical to the first except without the interface type.
+  static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
   
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
@@ -5243,10 +5226,7 @@ public:
   SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-    
-  bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
-  void setIsTypeLocImplicit(bool val) { Bits.ParamDecl.IsTypeLocImplicit = val; }
-  
+
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
   }
@@ -5349,10 +5329,17 @@ public:
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
 
-  /// Return the raw specifier value for this parameter.
-  Specifier getSpecifier() const {
-    return static_cast<Specifier>(Bits.ParamDecl.Specifier);
+  using Specifier = ParamSpecifier;
+
+  Optional<Specifier> getCachedSpecifier() const {
+    if (Bits.ParamDecl.SpecifierComputed)
+      return Specifier(Bits.ParamDecl.Specifier);
+
+    return None;
   }
+
+  /// Return the raw specifier value for this parameter.
+  Specifier getSpecifier() const;
   void setSpecifier(Specifier Spec);
 
   /// Is the type of this parameter 'inout'?
@@ -5509,10 +5496,6 @@ public:
   Type getElementInterfaceType() const;
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
-
-  /// Compute the interface type of this subscript from the parameter and
-  /// element types.
-  void computeType();
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
@@ -5843,11 +5826,6 @@ public:
   void setSynthesized(bool value = true) {
     Bits.AbstractFunctionDecl.Synthesized = value;
   }
-
-private:
-  void computeNeedsNewVTableEntry();
-
-  void computeSelfDeclType();
 
 public:
   /// Compute the interface type of this function declaration from the
@@ -6383,13 +6361,7 @@ public:
                   ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
-                  DeclContext *DC)
-  : DeclContext(DeclContextKind::EnumElementDecl, DC),
-    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    Params(Params),
-    EqualsLoc(EqualsLoc),
-    RawValueExpr(RawValueExpr)
-  {}
+                  DeclContext *DC);
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
@@ -6399,12 +6371,9 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  /// Set the interface type of this enum element to the constructor function
-  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
-  void computeType();
-
   Type getArgumentInterfaceType() const;
 
+  void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
 
   /// Retrieves a fully typechecked raw value expression associated

@@ -103,7 +103,6 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
       TAD->setAccess(AccessLevel::Public);
-      TAD->computeType();
       Entry = TAD;
     }
   }
@@ -686,6 +685,32 @@ TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
   return nullptr;
 }
 
+Optional<BasicDeclLocs>
+SourceFile::getBasicLocsForDecl(const Decl *D) const {
+  auto *FileCtx = D->getDeclContext()->getModuleScopeContext();
+  assert(FileCtx == this && "D doesn't belong to this source file");
+  if (FileCtx != this) {
+    // D doesn't belong to this file. This shouldn't happen in practice.
+    return None;
+  }
+  if (D->getLoc().isInvalid())
+    return None;
+  SourceManager &SM = getASTContext().SourceMgr;
+  BasicDeclLocs Result;
+  Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+  auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
+    if (Loc.isValid()) {
+      std::tie(Home.Line, Home.Column) = SM.getLineAndColumn(Loc);
+    }
+  };
+#define SET(X) setLineColumn(Result.X, D->get##X());
+  SET(Loc)
+  SET(StartLoc)
+  SET(EndLoc)
+#undef SET
+  return Result;
+}
+
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   // FIXME: Should this do extra access control filtering?
   FORWARD(getDisplayDecls, (Results));
@@ -1205,7 +1230,7 @@ void
 ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
                                                   StringRef delim) const {
   SmallVector<StringRef, 8> elements(*this, {});
-  swift::interleave(swift::reversed(elements),
+  swift::interleave(llvm::reverse(elements),
                     [&out](StringRef next) { out << next; },
                     [&out, delim] { out << delim; });
 }

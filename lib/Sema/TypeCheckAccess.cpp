@@ -865,18 +865,18 @@ public:
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccess(P->getTypeLoc(), SD, /*mayBeInferred*/false,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *thisComplainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr &&
-             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-          minAccessScope = typeAccessScope;
-          complainRepr = thisComplainRepr;
-          downgradeToWarning = downgradeDiag;
-        }
-      });
+      checkTypeAccess(
+          P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+              DowngradeToWarning downgradeDiag) {
+            if (typeAccessScope.isChildOf(minAccessScope) ||
+                (!complainRepr &&
+                 typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+              minAccessScope = typeAccessScope;
+              complainRepr = thisComplainRepr;
+              downgradeToWarning = downgradeDiag;
+            }
+          });
     }
 
     checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
@@ -930,18 +930,18 @@ public:
     auto downgradeToWarning = DowngradeToWarning::No;
 
     for (auto *P : *fn->getParameters()) {
-      checkTypeAccess(P->getTypeLoc(), fn, /*mayBeInferred*/false,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *thisComplainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr &&
-             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-          minAccessScope = typeAccessScope;
-          complainRepr = thisComplainRepr;
-          downgradeToWarning = downgradeDiag;
-        }
-      });
+      checkTypeAccess(
+          P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+              DowngradeToWarning downgradeDiag) {
+            if (typeAccessScope.isChildOf(minAccessScope) ||
+                (!complainRepr &&
+                 typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+              minAccessScope = typeAccessScope;
+              complainRepr = thisComplainRepr;
+              downgradeToWarning = downgradeDiag;
+            }
+          });
     }
 
     bool problemIsResult = false;
@@ -990,18 +990,18 @@ public:
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
-      checkTypeAccess(P->getTypeLoc(), EED, /*mayBeInferred*/false,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-        auto diagID = diag::enum_case_access;
-        if (downgradeToWarning == DowngradeToWarning::Yes)
-          diagID = diag::enum_case_access_warn;
-        auto diag = TC.diagnose(EED, diagID,
-                                EED->getFormalAccess(), typeAccess);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
+      checkTypeAccess(
+          P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+              DowngradeToWarning downgradeToWarning) {
+            auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+            auto diagID = diag::enum_case_access;
+            if (downgradeToWarning == DowngradeToWarning::Yes)
+              diagID = diag::enum_case_access_warn;
+            auto diag =
+                TC.diagnose(EED, diagID, EED->getFormalAccess(), typeAccess);
+            highlightOffendingType(TC, diag, complainRepr);
+          });
     }
   }
 };
@@ -1375,17 +1375,17 @@ public:
     checkGenericParamAccess(SD->getGenericParams(), SD);
 
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccess(P->getTypeLoc(), SD, /*mayBeInferred*/false,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        auto diagID = diag::subscript_type_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          diagID = diag::subscript_type_usable_from_inline_warn;
-        auto diag = TC.diagnose(SD, diagID,
-                                /*problemIsElement=*/false);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
+      checkTypeAccess(
+          P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+              DowngradeToWarning downgradeDiag) {
+            auto diagID = diag::subscript_type_usable_from_inline;
+            if (!TC.Context.isSwiftVersionAtLeast(5))
+              diagID = diag::subscript_type_usable_from_inline_warn;
+            auto diag = TC.diagnose(SD, diagID,
+                                    /*problemIsElement=*/false);
+            highlightOffendingType(TC, diag, complainRepr);
+          });
     }
 
     checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
@@ -1418,17 +1418,17 @@ public:
       : isTypeContext ? FK_Method : FK_Function;
 
     for (auto *P : *fn->getParameters()) {
-      checkTypeAccess(P->getTypeLoc(), fn, /*mayBeInferred*/false,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        auto diagID = diag::function_type_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          diagID = diag::function_type_usable_from_inline_warn;
-        auto diag = TC.diagnose(fn, diagID, functionKind,
-                                /*problemIsResult=*/false);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
+      checkTypeAccess(
+          P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+              DowngradeToWarning downgradeDiag) {
+            auto diagID = diag::function_type_usable_from_inline;
+            if (!TC.Context.isSwiftVersionAtLeast(5))
+              diagID = diag::function_type_usable_from_inline_warn;
+            auto diag = TC.diagnose(fn, diagID, functionKind,
+                                    /*problemIsResult=*/false);
+            highlightOffendingType(TC, diag, complainRepr);
+          });
     }
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
@@ -1450,16 +1450,16 @@ public:
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
-      checkTypeAccess(P->getTypeLoc(), EED, /*mayBeInferred*/false,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto diagID = diag::enum_case_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          diagID = diag::enum_case_usable_from_inline_warn;
-        auto diag = TC.diagnose(EED, diagID);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
+      checkTypeAccess(
+          P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+              DowngradeToWarning downgradeToWarning) {
+            auto diagID = diag::enum_case_usable_from_inline;
+            if (!TC.Context.isSwiftVersionAtLeast(5))
+              diagID = diag::enum_case_usable_from_inline_warn;
+            auto diag = TC.diagnose(EED, diagID);
+            highlightOffendingType(TC, diag, complainRepr);
+          });
     }
   }
 };
@@ -1887,8 +1887,8 @@ public:
     checkGenericParams(SD->getGenericParams(), SD);
 
     for (auto &P : *SD->getIndices()) {
-      checkType(P->getTypeLoc(), SD, getDiagnoseCallback(SD),
-                getDiagnoseCallback(SD));
+      checkType(P->getInterfaceType(), P->getTypeRepr(), SD,
+                getDiagnoseCallback(SD), getDiagnoseCallback(SD));
     }
     checkType(SD->getElementTypeLoc(), SD, getDiagnoseCallback(SD),
               getDiagnoseCallback(SD));
@@ -1898,8 +1898,8 @@ public:
     checkGenericParams(fn->getGenericParams(), fn);
 
     for (auto *P : *fn->getParameters())
-      checkType(P->getTypeLoc(), fn, getDiagnoseCallback(fn),
-                getDiagnoseCallback(fn));
+      checkType(P->getInterfaceType(), P->getTypeRepr(), fn,
+                getDiagnoseCallback(fn), getDiagnoseCallback(fn));
   }
 
   void visitFuncDecl(FuncDecl *FD) {
@@ -1912,8 +1912,8 @@ public:
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList())
-      checkType(P->getTypeLoc(), EED, getDiagnoseCallback(EED),
-                getDiagnoseCallback(EED));
+      checkType(P->getInterfaceType(), P->getTypeRepr(), EED,
+                getDiagnoseCallback(EED), getDiagnoseCallback(EED));
   }
 
   void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
