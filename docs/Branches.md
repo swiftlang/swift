@@ -70,4 +70,4 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 ### LLVM Project
 - `swift/swift-x.y-branch` (the *latest* release branch) is automerged into `swift/master`
 - llvm.org's `master` is automerged into `swift/master-next`
-- llvm.org's release branch *may* be automerged into `swift-x.y-branch`, if they are in sync
+- llvm.org's release branch *may* be automerged into `swift/swift-x.y-branch`, if they are in sync
