@@ -228,7 +228,7 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
 
   // If we have an object and the object has any ownership, the same
   // property applies.
-  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::Any)
+  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::None)
     return true;
 
   return hasCleanup();

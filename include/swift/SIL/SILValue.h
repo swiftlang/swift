@@ -117,14 +117,14 @@ struct ValueOwnershipKind {
     /// instruction exactly once along any path through the program.
     Guaranteed,
 
-    /// A SILValue with Any ownership kind is an independent value outside of
+    /// A SILValue with None ownership kind is an independent value outside of
     /// the ownership system. It is used to model trivially typed values as well
-    /// as trivial cases of non-trivial enums. Naturally Any can be merged with
+    /// as trivial cases of non-trivial enums. Naturally None can be merged with
     /// any ValueOwnershipKind allowing us to naturally model merge and branch
     /// points in the SSA graph.
-    Any,
+    None,
 
-    LastValueOwnershipKind = Any,
+    LastValueOwnershipKind = None,
   } Value;
 
   using UnderlyingType = std::underlying_type<innerty>::type;
@@ -167,7 +167,7 @@ struct ValueOwnershipKind {
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
     switch (Value) {
-    case ValueOwnershipKind::Any:
+    case ValueOwnershipKind::None:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
       return UseLifetimeConstraint::MustBeLive;
@@ -188,7 +188,7 @@ struct ValueOwnershipKind {
 
   template <typename RangeTy>
   static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
-    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
     return accumulate(
         std::forward<RangeTy>(r), initial,
         [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
@@ -519,7 +519,7 @@ struct OperandOwnershipKindMap {
 
   void addCompatibilityConstraint(ValueOwnershipKind kind,
                                   UseLifetimeConstraint constraint) {
-    add(ValueOwnershipKind::Any, UseLifetimeConstraint::MustBeLive);
+    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
     add(kind, constraint);
   }
 

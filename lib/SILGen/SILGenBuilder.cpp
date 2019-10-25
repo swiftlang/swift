@@ -149,7 +149,7 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
          "value");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::Any) {
+      originalValue.getOwnershipKind() == ValueOwnershipKind::None) {
     return originalValue;
   }
 
@@ -283,7 +283,7 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                       "address only type");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::Any) {
+      originalValue.getOwnershipKind() == ValueOwnershipKind::None) {
     return originalValue;
   }
 
@@ -658,7 +658,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         StoreOwnershipQualifier qualifier) {
   CleanupCloner cloner(*this, value);
   if (value.getType().isTrivial(SGF.F) ||
-      value.getOwnershipKind() == ValueOwnershipKind::Any)
+      value.getOwnershipKind() == ValueOwnershipKind::None)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -696,7 +696,7 @@ void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
 void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
                                                ManagedValue value,
                                                SILValue address) {
-  if (value.getOwnershipKind() == ValueOwnershipKind::Any) {
+  if (value.getOwnershipKind() == ValueOwnershipKind::None) {
     createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
     return;
   }

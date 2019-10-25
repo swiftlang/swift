@@ -1227,7 +1227,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto *fBlock = dynamicCast.getFailureBlock();
     if (B.hasOwnership()) {
       fBlock->replacePhiArgumentAndReplaceAllUses(0, mi->getType(),
-                                                  ValueOwnershipKind::Any);
+                                                  ValueOwnershipKind::None);
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,

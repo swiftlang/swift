@@ -347,7 +347,7 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 
   if (auto *Undef = dyn_cast<SILUndef>(Val)) {
     // The first two IDs are reserved for SILUndef.
-    if (Undef->getOwnershipKind() == ValueOwnershipKind::Any)
+    if (Undef->getOwnershipKind() == ValueOwnershipKind::None)
       return 0;
 
     assert(Undef->getOwnershipKind() == ValueOwnershipKind::Owned);
