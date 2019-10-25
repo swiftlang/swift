@@ -210,6 +210,7 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Anchored.swift
+  AtomicInitializableReference.swift
   AtomicMemoryOrderings.swift
   AtomicUnmanaged.swift
   AtomicUnsafeMutablePointer.swift
