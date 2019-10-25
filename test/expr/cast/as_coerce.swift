@@ -173,3 +173,7 @@ typealias Double2 = Double
 let sr11295ta1: Double1 = 1.0
 _ = sr11295ta1 as Double2 // expected-warning {{redundant cast from 'Double1' (aka 'Double') to 'Double2' (aka 'Double') has no effect}} {{16-27=}}
 _ = sr11295ta1 as Double1 // expected-warning {{redundant cast to 'Double1' (aka 'Double') has no effect}} {{16-27=}}
+
+// rdar://problem/56608085
+var f56608085: (Float) -> Float = { $0 as Float } // Ok
+var f56608085_1 = { $0 as Float } // Ok
