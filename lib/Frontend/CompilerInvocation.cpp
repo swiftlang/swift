@@ -358,6 +358,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
     Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
 
+  // TODO: Ignore if enable-experimental-differentiable-programming is false
+  Opts.EnableExperimentalForwardModeDifferentiation |=
+      Args.hasArg(OPT_enable_experimental_forward_mode_differentiation);
   if (Args.hasArg(OPT_enable_experimental_quasiquotes))
     Opts.EnableExperimentalQuasiquotes = true;
 

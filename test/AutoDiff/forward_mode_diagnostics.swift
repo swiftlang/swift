@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -run-jvp-generation -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil -verify %s
 
 // TODO: move these tests back into `autodiff_diagnostics.swift` once
 // forward mode reaches feature parity with reverse mode.
