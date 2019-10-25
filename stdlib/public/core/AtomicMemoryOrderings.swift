@@ -187,12 +187,12 @@ extension AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 2)
   }
 
-  /// An acquiring-and-releasing operation is a combination of `.acquiring` and
-  /// `.releasing`; it prevents all neighboring load and store operations on the
-  /// current thread from appearing to happen in a different order in relation
-  /// to the atomic operation.
+  /// An barrier operation is a combination of `.acquiring` and `.releasing`; it
+  /// prevents all neighboring load and store operations on the current thread
+  /// from appearing to happen in a different order in relation to the atomic
+  /// operation.
   @_transparent // Debug performance
-  public static var acquiringAndReleasing: AtomicUpdateOrdering {
+  public static var barrier: AtomicUpdateOrdering {
     AtomicUpdateOrdering(_rawValue: 3)
   }
 }
@@ -223,7 +223,7 @@ extension AtomicUpdateOrdering: CustomStringConvertible {
     case .relaxed: return "relaxed"
     case .acquiring: return "acquiring"
     case .releasing: return "releasing"
-    case .acquiringAndReleasing: return "acquiringAndReleasing"
+    case .barrier: return "barrier"
     default: return "AtomicUpdateOrdering(\(_rawValue))"
     }
   }
