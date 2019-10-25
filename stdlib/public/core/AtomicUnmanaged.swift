@@ -82,7 +82,7 @@ extension AtomicUnmanaged {
   /// Perform an atomic compare and exchange operation with
   /// with the specified memory ordering.
   ///
-  /// This operation is equivalent to the following pseudo code:
+  /// This operation is equivalent to the following pseudocode:
   ///
   /// ```
   /// atomic(self, ordering: ordering) { value in
@@ -95,6 +95,9 @@ extension AtomicUnmanaged {
   ///   }
   /// }
   /// ```
+  ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
   @_transparent @_alwaysEmitIntoClient
   public func compareExchange(
     expected: inout Value,

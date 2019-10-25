@@ -52,7 +52,7 @@ extension UnsafeMutableRawPointer {
   /// memory ordering.
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
@@ -67,7 +67,7 @@ extension UnsafeMutableRawPointer {
   /// memory ordering.
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
@@ -89,7 +89,7 @@ extension UnsafeMutableRawPointer {
   /// this pointer, with ${docOrder} memory ordering.
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
@@ -104,7 +104,7 @@ extension UnsafeMutableRawPointer {
   /// this pointer, with the specified memory ordering.
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
@@ -128,7 +128,7 @@ extension UnsafeMutableRawPointer {
   /// pointer, returning the previous value, with ${docOrder} memory ordering.
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   ///
   /// - Returns: The original value.
   @_alwaysEmitIntoClient
@@ -149,7 +149,7 @@ extension UnsafeMutableRawPointer {
   /// this pointer, with the specified memory ordering.
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
@@ -176,7 +176,7 @@ extension UnsafeMutableRawPointer {
   /// Perform an atomic compare and exchange operation with
   /// ${docOrder} memory ordering.
   ///
-  /// This operation is equivalent to the following pseudo code:
+  /// This operation is equivalent to the following pseudocode:
   ///
   /// ```
   /// atomic(self, ordering: .${swiftOrder}) { value in
@@ -190,8 +190,11 @@ extension UnsafeMutableRawPointer {
   /// }
   /// ```
   ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
+  ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
@@ -211,7 +214,7 @@ extension UnsafeMutableRawPointer {
   /// Perform an atomic compare and exchange operation with the specified memory
   /// ordering.
   ///
-  /// This operation is equivalent to the following pseudo code:
+  /// This operation is equivalent to the following pseudocode:
   ///
   /// ```
   /// atomic(self, ordering: ordering) { value in
@@ -226,7 +229,7 @@ extension UnsafeMutableRawPointer {
   /// ```
   ///
   /// - Warning: It is the responsibility of the caller to guarantee that `self`
-  ///   is correctly aligned for accessing an UInt value.
+  ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
@@ -269,6 +272,9 @@ extension UnsafeMutableRawPointer {
   ///
   % end
   /// - Returns: The original value before the operation.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for atomic access of an UInt value.
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
@@ -292,6 +298,9 @@ extension UnsafeMutableRawPointer {
   ///
   % end
   /// - Returns: The original value before the operation.
+  ///
+  /// - Warning: It is the responsibility of the caller to guarantee that `self`
+  ///   is correctly aligned for atomic access of an UInt value.
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
