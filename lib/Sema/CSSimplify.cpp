@@ -1871,8 +1871,33 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
-    // Match up the replacement types of the respective substitution maps.
-    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+
+    if (!shouldAttemptFixes()) {
+      // Match up the replacement types of the respective substitution maps.
+      return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+    }
+
+    unsigned numMismatches = 0;
+    auto result =
+        matchDeepTypeArguments(*this, subflags, args1, args2, locator,
+                               [&numMismatches](unsigned) { ++numMismatches; });
+
+    if (numMismatches > 0) {
+      auto *anchor = locator.getAnchor();
+      // TODO(diagnostics): Only assignments are supported at the moment.
+      if (!(anchor && isa<AssignExpr>(anchor)))
+        return getTypeMatchFailure(locator);
+
+      auto *fix = IgnoreAssignmentDestinationType::create(
+          *this, type1, type2, getConstraintLocator(locator));
+
+      if (recordFix(fix, /*impact=*/numMismatches))
+        return getTypeMatchFailure(locator);
+
+      return getTypeMatchSuccess();
+    }
+
+    return result;
   }
 
   // Handle protocol compositions.
