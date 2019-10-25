@@ -552,6 +552,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--long-test"]
         if args.stress_test:
             impl_args += ["--stress-test"]
+        if args.skip_local_build:
+            impl_args += ["--skip-local-build"]
         if args.only_executable_test:
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
