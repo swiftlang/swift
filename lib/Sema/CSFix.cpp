@@ -881,6 +881,13 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
       (isa<DeclRefExpr>(expr->getSubExpr()) ||
        isa<CoerceExpr>(expr->getSubExpr()))) {
+
+    // If coerced type is not known upfront let's not warn
+    // because the type could be inferred from coercion.
+    auto coercedType = cs.getType(expr->getSubExpr());
+    if (coercedType->is<TypeVariableType>())
+      return false;
+
     auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
         cs, fromType, toType, cs.getConstraintLocator(locator));
 
