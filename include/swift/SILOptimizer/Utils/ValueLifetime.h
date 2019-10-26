@@ -22,13 +22,11 @@
 
 namespace swift {
 
-/// This computes the lifetime of a single SILValue.
-///
-/// This does not compute a set of jointly postdominating use points. Instead it
-/// assumes that the value's existing uses already jointly postdominate the
-/// definition. This makes sense for values that are returned +1 from an
-/// instruction, like partial_apply, and therefore must be released on all paths
-/// via strong_release or apply.
+/// Computes the lifetime frontier for a given value with respect to a
+/// given set of uses. The lifetime frontier is the list of instructions
+/// following the last uses. The set of uses can be passed by the clients
+/// of the analysis and can be a super set of the uses of the SILValue
+/// e.g. it can be the set of transitive uses of the SILValue.
 class ValueLifetimeAnalysis {
 public:
 
@@ -70,19 +68,25 @@ public:
     UsersMustPostDomDef
   };
 
-  /// Computes and returns the lifetime frontier for the value in \p frontier.
+  /// Computes and returns the lifetime frontier for the value in \p frontier
+  /// with respect to the set of uses in the userSet.
   ///
   /// Returns true if all instructions in the frontier could be found in
   /// non-critical edges.
   /// Returns false if some frontier instructions are located on critical edges.
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
-  /// split, otherwise nothing is done and the returned \p frontier is not
-  /// valid.
+  /// split, otherwise the returned \p frontier consists of only those
+  /// instructions of the frontier that are not in the critical edges. Note that
+  /// the method getCriticalEdges can be used to retrieve the critical edges.
   ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
   /// prevents unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &frontier, Mode mode,
                        DeadEndBlocks *deBlocks = nullptr);
+
+  ArrayRef<std::pair<TermInst *, unsigned>> getCriticalEdges() {
+    return criticalEdges;
+  }
 
   /// Returns true if the instruction \p Inst is located within the value's
   /// lifetime.
@@ -91,7 +95,8 @@ public:
 
   /// Returns true if the value is alive at the begin of block \p bb.
   bool isAliveAtBeginOfBlock(SILBasicBlock *bb) {
-    return liveBlocks.count(bb) && bb != defValue->getParent();
+    return liveBlocks.count(bb) &&
+           (bb != defValue->getParent() || hasUsersBeforeDef);
   }
 
   /// Checks if there is a dealloc_ref inside the value's live range.
@@ -111,6 +116,14 @@ private:
   /// The set of instructions where the value is used, or the users-list
   /// provided with the constructor.
   llvm::SmallPtrSet<SILInstruction *, 16> userSet;
+
+  /// Indicates whether the basic block containing def has users of def that
+  /// precede def. This field is initialized by propagateLiveness.
+  bool hasUsersBeforeDef;
+
+  /// Critical edges that couldn't be split to compute the frontier. This could
+  /// be non-empty when the analysis is invoked with DontModifyCFG mode.
+  llvm::SmallVector<std::pair<TermInst *, unsigned>, 16> criticalEdges;
 
   /// Propagates the liveness information up the control flow graph.
   void propagateLiveness();
