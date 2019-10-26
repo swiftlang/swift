@@ -551,6 +551,10 @@ ERROR(cannot_convert_subscript_assign_protocol,none,
 ERROR(cannot_convert_subscript_assign_nil,none,
       "'nil' cannot be assigned to subscript of type %0", (Type))
 
+NOTE(cannot_convert_candidate_result_to_contextual_type,none,
+     "%0 produces %1, not the expected contextual result type %2",
+     (DeclName, Type, Type))
+
 // for ... in expression
 ERROR(cannot_convert_sequence_element_value,none,
       "cannot convert sequence element type %0 to expected type %1",

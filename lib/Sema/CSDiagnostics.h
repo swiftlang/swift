@@ -1971,6 +1971,16 @@ private:
   /// valid for the duration of the call, and suggests an alternative to use.
   void emitSuggestionNotes() const;
 };
+	
+class AssignmentTypeMismatchFailure final : public ContextualFailure {
+public:
+  AssignmentTypeMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                ContextualTypePurpose context, Type srcType,
+                                Type dstType, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, context, srcType, dstType, locator) {}
+
+  bool diagnoseAsNote() override;
+};
 
 } // end namespace constraints
 } // end namespace swift

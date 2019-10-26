@@ -897,7 +897,7 @@ bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
   auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
                                                : CTP_AssignSource;
 
-  ContextualFailure failure(
+  AssignmentTypeMismatchFailure failure(
       root, cs, CTP, getFromType(), getToType(),
       cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
   return failure.diagnose(asNote);

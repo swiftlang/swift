@@ -5761,3 +5761,20 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   emitSuggestionNotes();
   return true;
 }
+
+bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
+  auto *anchor = getAnchor();
+  auto &cs = getConstraintSystem();
+
+  if (auto overload = getChoiceFor(cs.getConstraintLocator(anchor))) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl,
+                     diag::cannot_convert_candidate_result_to_contextual_type,
+                     decl->getFullName(), getFromType(), getToType());
+      return true;
+    }
+  }
+
+  return false;
+}
+
