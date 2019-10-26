@@ -39,15 +39,15 @@ class C2 : P4 {} // expected-error{{type 'C2' does not conform to protocol 'P4'}
 //   in structs.
 // =============================================================================
 
-protocol LocalMutabilityProto {
-    mutating func foo()
-    subscript() -> Int { get nonmutating set }
+protocol MutabilityProto {
+  mutating func foo()
+  subscript() -> Int { get nonmutating set }
 }
 
-class Class1: LocalMutabilityProto { // expected-error{{type 'Class1' does not conform to protocol 'LocalMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{37-37=\n    func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
+class Class1: MutabilityProto { // expected-error{{type 'Class1' does not conform to protocol 'MutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{32-32=\n    func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
-struct Struct1: LocalMutabilityProto { // expected-error{{type 'Struct1' does not conform to protocol 'LocalMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{39-39=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        nonmutating set {\n            <#code#>\n        \}\n    \}\n}}
+struct Struct1: MutabilityProto { // expected-error{{type 'Struct1' does not conform to protocol 'MutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{34-34=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        nonmutating set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
 import fixit_stub_mutability_proto_module
@@ -56,4 +56,19 @@ class Class2: ExternalMutabilityProto { // expected-error{{type 'Class2' does no
 }
 
 struct Struct2: ExternalMutabilityProto { // expected-error{{type 'Struct2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{42-42=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        mutating get {\n            <#code#>\n        \}\n        nonmutating set(newValue) {\n            <#code#>\n        \}\n    \}\n}}
+}
+
+protocol PropertyMutabilityProto {
+  var computed: Int { mutating get nonmutating set }
+  var stored: Int { mutating get set }
+}
+
+class Class3: PropertyMutabilityProto { // expected-error{{type 'Class3' does not conform to protocol 'PropertyMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{40-40=\n    var computed: Int\n\n    var stored: Int\n}}
+}
+
+struct Struct3: PropertyMutabilityProto { // expected-error{{type 'Struct3' does not conform to protocol 'PropertyMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{42-42=\n    var computed: Int {\n        mutating get {\n            <#code#>\n        \}\n        nonmutating set {\n            <#code#>\n        \}\n    \}\n\n    var stored: Int\n}}
+}
+
+class Class4 {}
+extension Class4: PropertyMutabilityProto { // expected-error{{type 'Class4' does not conform to protocol 'PropertyMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{44-44=\n    var computed: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    var stored: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }

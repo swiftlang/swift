@@ -2627,13 +2627,13 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.FunctionDefinitions = true;
     Options.PrintAccessorBodiesInProtocols = true;
 
+    bool AdopterIsClass = Adopter->getSelfClassDecl() != nullptr;
     // Skip 'mutating' only inside classes: mutating methods usually
     // don't have a sensible non-mutating implementation.
-    bool isClass = Adopter->getSelfClassDecl() != nullptr;
-    if (isClass)
+    if (AdopterIsClass)
       Options.ExcludeAttrList.push_back(DAK_Mutating);
     // 'nonmutating' is only meaningful on value type member accessors.
-    if (isClass || !isa<AbstractStorageDecl>(Requirement))
+    if (AdopterIsClass || !isa<AbstractStorageDecl>(Requirement))
       Options.ExcludeAttrList.push_back(DAK_NonMutating);
 
     // FIXME: Once we support move-only types, remove this if the
@@ -2650,10 +2650,19 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
-    if (!isa<ExtensionDecl>(Adopter)) {
+    if (isa<NominalTypeDecl>(Adopter)) {
       // Create a variable declaration instead of a computed property in
-      // nominal types
+      // nominal types...
       Options.PrintPropertyAccessors = false;
+
+      // ...but a non-mutating setter requirement will force us into a
+      // computed property in non-class adopters; don't leave the user
+      // wondering why a conformance fails.
+      if (!AdopterIsClass)
+        if (const auto VD = dyn_cast<VarDecl>(Requirement))
+          if (const auto Set = VD->getAccessor(AccessorKind::Set))
+            if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
+              Options.PrintPropertyAccessors = true;
     }
     Requirement->print(Printer, Options);
     Printer << "\n";
