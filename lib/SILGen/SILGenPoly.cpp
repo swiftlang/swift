@@ -103,7 +103,6 @@
 using namespace swift;
 using namespace Lowering;
 
-#warning "todo: handle substitutions throughout this file--audit CanSILFunctionType() and getInterfaceType() calls"
 
 /// A helper function that pulls an element off the front of an array.
 template <class T>

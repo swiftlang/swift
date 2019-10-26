@@ -201,7 +201,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
   CanType swiftValueType = conformance->getType()->getCanonicalType();
-#warning "todo: preserve substituted type?"
   auto genericSig = witnessFnTy->getInvocationGenericSignature();
   SubstitutionMap typeSubMap = witness.getSubstitutions();
 
@@ -549,7 +548,6 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   GenericEnvironment *genericEnv = nullptr;
   SubstitutionMap subs;
   if (funcType->hasArchetype() || blockType->hasArchetype()) {
-#warning "todo: preserve substitution?"
     genericSig = F.getLoweredFunctionType()->getInvocationGenericSignature();
     genericEnv = F.getGenericEnvironment();
 

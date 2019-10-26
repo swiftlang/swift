@@ -1059,7 +1059,6 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     .withNoEscape(extInfo.isNoEscape());
   
-#warning "todo: substituted function types?"
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
@@ -2588,7 +2587,6 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   TypeSubstitutionFn subs,
                                   LookupConformanceFn conformances) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
-#warning "todo: should produce a substituted function type"
   SILTypeSubstituter substituter(silModule.Types, subs, conformances,
                                  getSubstGenericSignature(),
                                  /*shouldSubstituteOpaqueTypes*/ false);

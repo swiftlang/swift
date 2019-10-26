@@ -418,7 +418,6 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                              /*pseudogeneric*/false,
                              /*non-escaping*/false);
 
-#warning "todo: should be a substituted function type of the common key path interface"
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
                                          ParameterConvention::Direct_Unowned,

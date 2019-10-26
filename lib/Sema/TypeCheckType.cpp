@@ -2610,7 +2610,6 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee,
                                           TypeRepr *witnessMethodProtocol) {
-#warning "todo: type resolution for subst function types"
   options.setContext(None);
 
   bool hasError = false;
