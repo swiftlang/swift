@@ -23,6 +23,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class BraceStmt;
+class ConstructorDecl;
 class CustomAttr;
 class Decl;
 class EnumDecl;

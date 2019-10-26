@@ -1149,9 +1149,6 @@ private:
   Optional<Type> boolType;
 
 public:
-  /// Define the default constructor for the given struct or class.
-  static void defineDefaultConstructor(NominalTypeDecl *decl);
-
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);

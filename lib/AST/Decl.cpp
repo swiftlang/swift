@@ -3834,6 +3834,49 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   Bits.StructDecl.HasUnreferenceableStorage = false;
 }
 
+bool NominalTypeDecl::hasMemberwiseInitializer() const {
+  // Currently only structs can have memberwise initializers.
+  auto *sd = dyn_cast<StructDecl>(this);
+  if (!sd)
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<StructDecl *>(sd);
+  return evaluateOrDefault(ctx.evaluator, HasMemberwiseInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
+  if (!hasMemberwiseInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
+}
+
+bool NominalTypeDecl::hasDefaultInitializer() const {
+  // Currently only structs and classes can have default initializers.
+  if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, HasDefaultInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
+  if (!hasDefaultInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           SynthesizeDefaultInitRequest{mutableThis}, nullptr);
+}
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
