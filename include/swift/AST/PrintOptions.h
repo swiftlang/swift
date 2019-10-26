@@ -487,6 +487,7 @@ struct PrintOptions {
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
     result.SkipUnderscoredKeywords = true;
+    result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
     return result;
   }
 
