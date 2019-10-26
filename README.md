@@ -243,7 +243,7 @@ produced will have the bundle identifier ``com.example.YYYYMMDD``. It
 will be created in the directory you run the script with a filename 
 of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
-Beyond building the toolchain, ``build-toolchain`` also supports the 
+Beyond building the toolchain, ``build-toolchain`` also supports the
 following (non-exhaustive) set of useful options::
 
 - ``--dry-run``: Perform a dry run build. This is off by default.
