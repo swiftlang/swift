@@ -2979,6 +2979,10 @@ bool ConstraintSystem::repairFailures(
       }
     }
 
+    // If either type has a hole, consider this fixed.
+    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+      return true;
+
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
@@ -3041,6 +3045,10 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
+    // If either type has a hole, consider this fixed.
+    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+      return true;
+
     // If dependent members are present here it's because
     // base doesn't conform to associated type's protocol.
     if (lhs->hasDependentMember() || rhs->hasDependentMember())
@@ -3079,6 +3087,10 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
+    // If either type is a hole, consider this fixed
+    if (lhs->isHole() || rhs->isHole())
+      return true;
+
     auto purpose = getContextualTypePurpose();
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
@@ -4703,6 +4715,9 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   if (!objectTy) {
     // Let's see if we can apply a specific fix here.
     if (shouldAttemptFixes()) {
+      if (optTy->isHole())
+        return SolutionKind::Solved;
+
       auto *fix =
           RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
 
@@ -7168,6 +7183,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       if (auto *typeVar = subType->getAs<TypeVariableType>())
         recordPotentialHole(typeVar);
     });
+
+    if (desugar2->isHole())
+      return SolutionKind::Solved;
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
     // Let's make this fix as high impact so if there is a function or member
