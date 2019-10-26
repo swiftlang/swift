@@ -357,7 +357,13 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
+
+#if defined(__GNUC__)
 #warning "todo: mangle substituted types"
+#else
+#pragma message("TODO: mangle substituted types")
+#endif
+
   assert(ThunkType->getSubstitutions().empty() && "not implemented");
   GenericSignature GenSig = ThunkType->getSubstGenericSignature();
   if (GenSig)
@@ -1425,7 +1431,12 @@ static char getResultConvention(ResultConvention conv) {
 };
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
+
+#if defined(__GNUC__)
 #warning "todo: handle substituted types"
+#else
+#pragma message("TODO: handle substituted types")
+#endif
 
   llvm::SmallVector<char, 32> OpArgs;
 
