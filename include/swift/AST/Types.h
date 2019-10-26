@@ -71,6 +71,7 @@ class NominalTypeDecl;
 class GenericTypeDecl;
 class EnumDecl;
 class EnumElementDecl;
+class SILFunctionType;
 class StructDecl;
 class ProtocolDecl;
 class TypeVariableType;
@@ -80,6 +81,8 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
+
+typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
 enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
@@ -3409,9 +3412,19 @@ public:
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
-  CanType getType() const {
+  /// Return the unsubstituted parameter type that describes the abstract
+  /// calling convention of the parameter.
+  ///
+  /// For most purposes, you probably want \c getArgumentType .
+  CanType getInterfaceType() const {
     return TypeAndConvention.getPointer();
   }
+  
+  /// Return the type of a call argument matching this parameter.
+  ///
+  /// \c t must refer back to the function type this is a parameter for.
+  CanType getArgumentType(SILModule &M,
+                          const SILFunctionType *t) const;
   ParameterConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
@@ -3456,10 +3469,12 @@ public:
   /// storage. Therefore they will be passed using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque arguments might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctionConventions.h
+  SILType getSILStorageType(SILModule &M,
+                            const SILFunctionType *t) const; // in SILFunctionConventions.h
+  SILType getSILStorageInterfaceType() const;
 
   /// Return a version of this parameter info with the type replaced.
-  SILParameterInfo getWithType(CanType type) const {
+  SILParameterInfo getWithInterfaceType(CanType type) const {
     return SILParameterInfo(type, getConvention());
   }
 
@@ -3470,11 +3485,11 @@ public:
   /// Type::transform does.
   template<typename F>
   SILParameterInfo map(const F &fn) const {
-    return getWithType(fn(getType()));
+    return getWithInterfaceType(fn(getInterfaceType()));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(getType().getPointer());
+    id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
   }
 
@@ -3489,7 +3504,8 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
+    return getInterfaceType() == rhs.getInterfaceType()
+      && getConvention() == rhs.getConvention();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -3541,9 +3557,20 @@ public:
     assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
   }
 
-  CanType getType() const {
+  /// Return the unsubstituted parameter type that describes the abstract
+  /// calling convention of the parameter.
+  ///
+  /// For most purposes, you probably want \c getReturnValueType .
+  CanType getInterfaceType() const {
     return TypeAndConvention.getPointer();
   }
+  
+  /// The type of a return value corresponding to this result.
+  ///
+  /// \c t must refer back to the function type this is a parameter for.
+  CanType getReturnValueType(SILModule &M,
+                             const SILFunctionType *t) const;
+  
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
@@ -3553,10 +3580,11 @@ public:
   /// storage. Therefore they will be returned using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque results might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctionConventions.h
-
+  SILType getSILStorageType(SILModule &M,
+                            const SILFunctionType *t) const; // in SILFunctionConventions.h
+  SILType getSILStorageInterfaceType() const;
   /// Return a version of this result info with the type replaced.
-  SILResultInfo getWithType(CanType type) const {
+  SILResultInfo getWithInterfaceType(CanType type) const {
     return SILResultInfo(type, getConvention());
   }
 
@@ -3577,7 +3605,7 @@ public:
   /// Type::transform does.
   template <typename F>
   SILResultInfo map(F &&fn) const {
-    return getWithType(fn(getType()));
+    return getWithInterfaceType(fn(getInterfaceType()));
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
@@ -3616,13 +3644,13 @@ public:
     : SILParameterInfo(type, conv) {
   }
 
-  SILYieldInfo getWithType(CanType type) const {
+  SILYieldInfo getWithInterfaceType(CanType type) const {
     return SILYieldInfo(type, getConvention());
   }
 
   template<typename F>
   SILYieldInfo map(const F &fn) const {
-    return getWithType(fn(getType()));
+    return getWithInterfaceType(fn(getInterfaceType()));
   }
 };
 
@@ -3641,8 +3669,6 @@ enum class SILCoroutineKind : uint8_t {
   YieldMany,
 };
   
-class SILFunctionType;
-typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 class SILFunctionConventions;
 
 /// SILFunctionType - The lowered type of a function value, suitable
@@ -3799,8 +3825,9 @@ private:
   //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
   //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
 
-  CanGenericSignature GenericSig;
+  llvm::PointerIntPair<CanGenericSignature, 1, bool> GenericSigAndIsImplied;
   Optional<ProtocolConformanceRef> WitnessMethodConformance;
+  SubstitutionMap Substitutions;
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     return {getTrailingObjects<SILParameterInfo>(), NumParameters};
@@ -3861,6 +3888,8 @@ private:
                   ArrayRef<SILYieldInfo> yieldResults,
                   ArrayRef<SILResultInfo> normalResults,
                   Optional<SILResultInfo> errorResult,
+                  SubstitutionMap substitutions,
+                  bool genericSigIsImplied,
                   const ASTContext &ctx,
                   RecursiveTypeProperties properties,
                   Optional<ProtocolConformanceRef> witnessMethodConformance);
@@ -3874,6 +3903,8 @@ public:
                                 ArrayRef<SILYieldInfo> interfaceYields,
                                 ArrayRef<SILResultInfo> interfaceResults,
                                 Optional<SILResultInfo> interfaceErrorResult,
+                                SubstitutionMap substitutions,
+                                bool genericSigIsImplied,
                                 const ASTContext &ctx,
               Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
@@ -3894,7 +3925,7 @@ public:
   ///   - a single indirect result and no direct results.
   ///
   /// If the result is formally indirect, return the empty tuple.
-  SILType getFormalCSemanticResult();
+  SILType getFormalCSemanticResult(SILModule &M);
 
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
@@ -4003,14 +4034,15 @@ public:
   /// this function depends on the current SIL stage and is known by
   /// SILFunctionConventions. It may be a wider tuple that includes formally
   /// indirect results.
-  SILType getDirectFormalResultsType();
+  SILType getDirectFormalResultsType(SILModule &M);
 
   /// Get a single non-address SILType for all SIL results regardless of whether
   /// they are formally indirect. The actual SIL result type of an apply
   /// instruction that calls this function depends on the current SIL stage and
   /// is known by SILFunctionConventions. It may be a narrower tuple that omits
   /// formally indirect results.
-  SILType getAllResultsType();
+  SILType getAllResultsSubstType(SILModule &M);
+  SILType getAllResultsInterfaceType();
 
   /// Does this function have a blessed Swift-native error result?
   bool hasErrorResult() const {
@@ -4041,15 +4073,36 @@ public:
     return getParameters().back();
   }
 
-  bool isPolymorphic() const { return !GenericSig.isNull(); }
-  CanGenericSignature getGenericSignature() const { return GenericSig; }
+  /// Get the generic signature used to apply the substitutions of a substituted function type
+  CanGenericSignature getSubstGenericSignature() const {
+    return GenericSigAndIsImplied.getPointer();
+  }
+  /// Get the generic signature used by callers to invoke the function.
+  CanGenericSignature getInvocationGenericSignature() const {
+    if (isGenericSignatureImplied()) {
+      return CanGenericSignature();
+    } else {
+      return getSubstGenericSignature();
+    }
+  }
+                                    
+  bool isGenericSignatureImplied() const {
+    return GenericSigAndIsImplied.getInt();
+  }
+  SubstitutionMap getSubstitutions() const {
+    return Substitutions;
+  }
 
-  CanType getSelfInstanceType() const;
+  bool isPolymorphic() const {
+    return !getInvocationGenericSignature().isNull();
+  }
+
+  CanType getSelfInstanceType(SILModule &M) const;
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
   /// Self type.
-  ClassDecl *getWitnessMethodClass() const;
+  ClassDecl *getWitnessMethodClass(SILModule &M) const;
 
   /// If this is a @convention(witness_method) function, return the conformance
   /// for which the method is a witness.
@@ -4095,7 +4148,11 @@ public:
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
   }
 
-  bool isNoReturnFunction() const; // Defined in SILType.cpp
+  bool isNoReturnFunction(SILModule &M) const; // Defined in SILType.cpp
+                                    
+  /// Create a SILFunctionType with the same parameters, results, and attributes as this one, but with
+  /// a different set of substitutions.
+  CanSILFunctionType withSubstitutions(SubstitutionMap subs) const;
 
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;
@@ -4139,7 +4196,7 @@ public:
   /// assertions are disabled, this just returns true.
   ABICompatibilityCheckResult
   isABICompatibleWith(CanSILFunctionType other,
-                      SILFunction *context = nullptr) const;
+                      SILFunction &context) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionMap subs);
@@ -4147,11 +4204,16 @@ public:
                                       TypeSubstitutionFn subs,
                                       LookupConformanceFn conformances);
 
+  SILType substInterfaceType(SILModule &M,
+                             SILType interfaceType) const;
+
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericSignature(), getExtInfo(), getCoroutineKind(),
+    Profile(ID, getSubstGenericSignature(), getExtInfo(), getCoroutineKind(),
             getCalleeConvention(), getParameters(), getYields(),
             getResults(), getOptionalErrorResult(),
-            getWitnessMethodConformanceOrNone());
+            getWitnessMethodConformanceOrNone(),
+            isGenericSignatureImplied(),
+            getSubstitutions());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature genericSig,
@@ -4162,7 +4224,9 @@ public:
                       ArrayRef<SILYieldInfo> yields,
                       ArrayRef<SILResultInfo> results,
                       Optional<SILResultInfo> errorResult,
-                      Optional<ProtocolConformanceRef> conformance);
+                      Optional<ProtocolConformanceRef> conformance,
+                      bool isGenericSigImplied,
+                      SubstitutionMap substitutions);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

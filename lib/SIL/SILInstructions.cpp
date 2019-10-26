@@ -2062,7 +2062,7 @@ ConvertFunctionInst *ConvertFunctionInst::create(
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(opTI->isABICompatibleWith(resTI, &F).isCompatible() &&
+    assert(opTI->isABICompatibleWith(resTI, F).isCompatible() &&
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;
@@ -2092,7 +2092,7 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(opTI->isABICompatibleWith(resTI, &F)
+    assert(opTI->isABICompatibleWith(resTI, F)
                .isCompatibleUpToNoEscapeConversion() &&
            "Can not convert in between ABI incompatible function types");
   }

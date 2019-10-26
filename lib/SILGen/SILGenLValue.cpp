@@ -1209,7 +1209,8 @@ namespace {
     bool doesAccessorMutateSelf(SILGenFunction &SGF,
                                 SILDeclRef accessor) const {
       auto accessorSelf = SGF.SGM.Types.getConstantSelfParameter(accessor);
-      return accessorSelf.getType() && accessorSelf.isIndirectMutating();
+      return accessorSelf.getInterfaceType()
+        && accessorSelf.isIndirectMutating();
     }
     
     void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
@@ -2011,8 +2012,9 @@ namespace {
       auto projectFnType = projectFn->getLoweredFunctionType();
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = SubstitutionMap::get(projectFnType->getGenericSignature(),
-                                       keyPathTy->getGenericArgs(), {});
+      auto subs = SubstitutionMap::get(
+                                 projectFnType->getInvocationGenericSignature(),
+                                 keyPathTy->getGenericArgs(), {});
 
       auto substFnType = projectFnType->substGenericArgs(SGF.SGM.M, subs);
 

@@ -609,7 +609,8 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
-        getCalleeFunction()->getLoweredFunctionType()->getGenericSignature(),
+        getCalleeFunction()->getLoweredFunctionType()
+                           ->getInvocationGenericSignature(),
         ForInlining);
 
   auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();

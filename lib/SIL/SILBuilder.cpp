@@ -54,6 +54,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SubstitutionMap subs,
                                         ParameterConvention calleeConvention,
                                         PartialApplyInst::OnStackKind onStack) {
+#warning "todo: preserve substitution through partial apply?"
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs);
@@ -79,9 +80,11 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   results.append(FTI->getResults().begin(), FTI->getResults().end());
   for (auto &result : results) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
-      result = SILResultInfo(result.getType(), ResultConvention::Unowned);
+      result = SILResultInfo(result.getReturnValueType(M, FTI),
+                             ResultConvention::Unowned);
     else if (result.getConvention() == ResultConvention::Autoreleased)
-      result = SILResultInfo(result.getType(), ResultConvention::Owned);
+      result = SILResultInfo(result.getReturnValueType(M, FTI),
+                             ResultConvention::Owned);
   }
 
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
@@ -91,6 +94,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                             FTI->getYields(),
                                             results,
                                             FTI->getOptionalErrorResult(),
+                                            SubstitutionMap(),
+                                            false,
                                             M.getASTContext());
 
   return SILType::getPrimitiveObjectType(appliedFnType);

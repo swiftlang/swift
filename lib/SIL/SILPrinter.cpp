@@ -1083,7 +1083,7 @@ public:
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutionMap(),
-                       AI->getOrigCalleeType()->getGenericSignature());
+                       AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
@@ -2417,7 +2417,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
   
-  auto sig = getLoweredFunctionType()->getGenericSignature();
+  auto sig = getLoweredFunctionType()->getSubstGenericSignature();
   auto *env = getGenericEnvironment();
   if (sig && env) {
     llvm::SmallString<16> disambiguatedNameBuf;

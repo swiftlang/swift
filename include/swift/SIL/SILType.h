@@ -291,7 +291,7 @@ public:
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
-  bool isNoReturnFunction() const;
+  bool isNoReturnFunction(SILModule &M) const;
 
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {

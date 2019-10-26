@@ -85,11 +85,13 @@ public:
   SILGenFunction &SGF;
   SILBasicBlock *parent;
   SILLocation loc;
+  CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
+                  CanSILFunctionType fnTy,
                   ArrayRef<SILParameterInfo> &parameters)
-    : SGF(sgf), parent(parent), loc(l), parameters(parameters) {}
+    : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters) {}
 
   ManagedValue visitType(CanType t) {
     return visitType(t, /*isInOut=*/false);
@@ -106,7 +108,8 @@ public:
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
 
-    auto paramType = SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo));
+    auto paramType =
+      SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, loc.getAsASTNode<ValueDecl>());
 
@@ -235,7 +238,8 @@ struct ArgumentInitHelper {
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    EmitBBArguments argEmitter(SGF, parent, l, parameters);
+    EmitBBArguments argEmitter(SGF, parent, l,
+                               f.getLoweredFunctionType(), parameters);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     if (isInOut)

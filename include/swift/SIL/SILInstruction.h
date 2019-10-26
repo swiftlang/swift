@@ -1928,7 +1928,7 @@ public:
   }
 
   bool isCalleeNoReturn() const {
-    return getSubstCalleeSILType().isNoReturnFunction();
+    return getSubstCalleeSILType().isNoReturnFunction(this->getModule());
   }
 
   bool isCalleeThin() const {

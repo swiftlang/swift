@@ -44,7 +44,8 @@ SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
-  if (getLoweredFunctionType()->getGenericSignature()) {
+#warning "todo: base on decl type params?"
+  if (getLoweredFunctionType()->getInvocationGenericSignature()) {
     Attr->F = this;
     SpecializeAttrSet.push_back(Attr);
   }
@@ -229,7 +230,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
 
 bool SILFunction::isNoReturnFunction() const {
   return SILType::getPrimitiveObjectType(getLoweredFunctionType())
-      .isNoReturnFunction();
+      .isNoReturnFunction(getModule());
 }
 
 const TypeLowering &

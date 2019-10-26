@@ -340,7 +340,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
   auto fnTy = F->getLoweredFunctionType();
 
   auto &Types = F->getModule().Types;
-  Lowering::GenericContextScope scope(Types, fnTy->getGenericSignature());
+  Lowering::GenericContextScope scope(Types, fnTy->getInvocationGenericSignature());
 
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
@@ -363,7 +363,8 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!param.isFormalIndirect());
-    auto paramTy = param.getSILStorageType();
+    auto paramTy = param.getSILStorageType(fnConv.silConv.getModule(),
+                                           fnConv.funcTy);
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
@@ -424,10 +425,11 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
 
   // Create the thin function type for the cloned closure.
   auto ClonedTy = SILFunctionType::get(
-      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
       ClonedInterfaceArgTys, OrigFTI->getYields(),
       OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
+      SubstitutionMap(), false,
       M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())

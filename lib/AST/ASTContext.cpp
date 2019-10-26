@@ -3147,7 +3147,9 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
                               ArrayRef<SILYieldInfo> yields,
                               ArrayRef<SILResultInfo> results,
                               Optional<SILResultInfo> errorResult,
-                              Optional<ProtocolConformanceRef> conformance) {
+                              Optional<ProtocolConformanceRef> conformance,
+                              bool isGenericSignatureImplied,
+                              SubstitutionMap substitutions) {
   id.AddPointer(genericParams.getPointer());
   id.AddInteger(info.getFuncAttrKey());
   id.AddInteger(unsigned(coroutineKind));
@@ -3165,6 +3167,9 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   // Just allow the profile length to implicitly distinguish the
   // presence of an error result.
   if (errorResult) errorResult->profile(id);
+  id.AddBoolean(isGenericSignatureImplied);
+  substitutions.profile(id);
+  id.AddBoolean((bool)conformance);
   if (conformance)
     id.AddPointer(conformance->getRequirement());
 }
@@ -3176,12 +3181,16 @@ SILFunctionType::SILFunctionType(GenericSignature genericSig, ExtInfo ext,
                                  ArrayRef<SILYieldInfo> yields,
                                  ArrayRef<SILResultInfo> normalResults,
                                  Optional<SILResultInfo> errorResult,
+                                 SubstitutionMap substitutions,
+                                 bool genericSigIsImplied,
                                  const ASTContext &ctx,
                                  RecursiveTypeProperties properties,
                       Optional<ProtocolConformanceRef> witnessMethodConformance)
     : TypeBase(TypeKind::SILFunction, &ctx, properties),
-      GenericSig(genericSig),
-      WitnessMethodConformance(witnessMethodConformance) {
+      GenericSigAndIsImplied(CanGenericSignature(genericSig),
+                             genericSigIsImplied),
+      WitnessMethodConformance(witnessMethodConformance),
+      Substitutions(substitutions) {
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfo = ext.Bits;
@@ -3229,7 +3238,19 @@ SILFunctionType::SILFunctionType(GenericSignature genericSig, ExtInfo ext,
     assert(!WitnessMethodConformance &&
            "non-witness_method SIL function with a conformance");
 
-  // Make sure the interface types are sane.
+  // Make sure the type follows invariants.
+  assert((!substitutions || genericSig)
+         && "can only have substitutions with a generic signature");
+  assert((!genericSigIsImplied || substitutions)
+         && "genericSigIsImplied should only be set for a type with generic "
+            "types and substitutions");
+        
+  if (substitutions) {
+    assert(substitutions.getGenericSignature()->getCanonicalSignature()
+             == genericSig->getCanonicalSignature()
+           && "substitutions must match generic signature");
+  }
+        
   if (genericSig) {
     assert(!genericSig->areAllParamsConcrete() &&
            "If all generic parameters are concrete, SILFunctionType should "
@@ -3242,35 +3263,35 @@ SILFunctionType::SILFunctionType(GenericSignature genericSig, ExtInfo ext,
 
     for (auto param : getParameters()) {
       (void)param;
-      assert(!param.getType()->hasError()
+      assert(!param.getInterfaceType()->hasError()
              && "interface type of parameter should not contain error types");
-      assert(!param.getType()->hasArchetype()
+      assert(!param.getInterfaceType()->hasArchetype()
              && "interface type of parameter should not contain context archetypes");
     }
     for (auto result : getResults()) {
       (void)result;
-      assert(!result.getType()->hasError()
+      assert(!result.getInterfaceType()->hasError()
              && "interface type of result should not contain error types");
-      assert(!result.getType()->hasArchetype()
+      assert(!result.getInterfaceType()->hasArchetype()
              && "interface type of result should not contain context archetypes");
     }
     for (auto yield : getYields()) {
       (void)yield;
-      assert(!yield.getType()->hasError()
+      assert(!yield.getInterfaceType()->hasError()
              && "interface type of yield should not contain error types");
-      assert(!yield.getType()->hasArchetype()
+      assert(!yield.getInterfaceType()->hasArchetype()
              && "interface type of yield should not contain context archetypes");
     }
     if (hasErrorResult()) {
-      assert(!getErrorResult().getType()->hasError()
+      assert(!getErrorResult().getInterfaceType()->hasError()
              && "interface type of result should not contain error types");
-      assert(!getErrorResult().getType()->hasArchetype()
+      assert(!getErrorResult().getInterfaceType()->hasArchetype()
              && "interface type of result should not contain context archetypes");
     }
   }
   for (auto result : getResults()) {
     (void)result;
-    if (auto *FnType = result.getType()->getAs<SILFunctionType>()) {
+    if (auto *FnType = result.getInterfaceType()->getAs<SILFunctionType>()) {
       assert(!FnType->isNoEscape() &&
              "Cannot return an @noescape function type");
     }
@@ -3300,6 +3321,8 @@ CanSILFunctionType SILFunctionType::get(GenericSignature genericSig,
                                         ArrayRef<SILYieldInfo> yields,
                                         ArrayRef<SILResultInfo> normalResults,
                                         Optional<SILResultInfo> errorResult,
+                                        SubstitutionMap substitutions,
+                                        bool genericSigIsImplied,
                                         const ASTContext &ctx,
                     Optional<ProtocolConformanceRef> witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
@@ -3309,7 +3332,8 @@ CanSILFunctionType SILFunctionType::get(GenericSignature genericSig,
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
-                           witnessMethodConformance);
+                           witnessMethodConformance, genericSigIsImplied,
+                           substitutions);
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -3332,14 +3356,14 @@ CanSILFunctionType SILFunctionType::get(GenericSignature genericSig,
   static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
-    properties |= param.getType()->getRecursiveProperties();
+    properties |= param.getInterfaceType()->getRecursiveProperties();
   for (auto &yield : yields)
-    properties |= yield.getType()->getRecursiveProperties();
+    properties |= yield.getInterfaceType()->getRecursiveProperties();
   for (auto &result : normalResults)
-    properties |= result.getType()->getRecursiveProperties();
+    properties |= result.getInterfaceType()->getRecursiveProperties();
   if (errorResult)
-    properties |= errorResult->getType()->getRecursiveProperties();
-
+    properties |= errorResult->getInterfaceType()->getRecursiveProperties();
+  
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   if (genericSig) {
@@ -3347,9 +3371,14 @@ CanSILFunctionType SILFunctionType::get(GenericSignature genericSig,
     properties.removeHasDependentMember();
   }
 
+  for (auto replacement : substitutions.getReplacementTypes()) {
+    properties |= replacement->getRecursiveProperties();
+  }
+
   auto fnType =
       new (mem) SILFunctionType(genericSig, ext, coroutineKind, callee,
                                 params, yields, normalResults, errorResult,
+                                substitutions, genericSigIsImplied,
                                 ctx, properties, witnessMethodConformance);
   ctx.getImpl().SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
