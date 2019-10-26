@@ -44,7 +44,6 @@ SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
-#warning "todo: base on decl type params?"
   if (getLoweredFunctionType()->getInvocationGenericSignature()) {
     Attr->F = this;
     SpecializeAttrSet.push_back(Attr);

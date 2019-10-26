@@ -5044,7 +5044,6 @@ public:
     }
 
     GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
-#warning "todo: serialize/deserialize subst function types"
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,

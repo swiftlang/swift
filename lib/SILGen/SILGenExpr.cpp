@@ -2666,7 +2666,6 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   
   SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
   
-#warning "todo: should be a substituted function type of the common key path interface type"
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,

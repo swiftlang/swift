@@ -54,7 +54,6 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SubstitutionMap subs,
                                         ParameterConvention calleeConvention,
                                         PartialApplyInst::OnStackKind onStack) {
-#warning "todo: preserve substitution through partial apply?"
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs);

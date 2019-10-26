@@ -3941,7 +3941,6 @@ public:
     auto stableRepresentation =
       getRawStableSILFunctionTypeRepresentation(representation);
 
-#warning "todo: serialize subst types"
     SmallVector<TypeID, 8> variableData;
     for (auto param : fnTy->getParameters()) {
       variableData.push_back(S.addTypeRef(param.getInterfaceType()));

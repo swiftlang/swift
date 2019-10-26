@@ -150,7 +150,6 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
         MaxTypeDepth = TypeDepth;
       Width += TypeWidth;
     }
-#warning "todo: include substitution replacement types?"
     Depth += MaxTypeDepth;
     return std::make_pair(Depth, Width);
   }
@@ -771,7 +770,6 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   }
   assert(FnTy);
 
-#warning "todo: eliminate substituted function types"
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
       CanSpecializedGenericSig, FnTy->getExtInfo(),

@@ -203,7 +203,6 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
 static bool usesGenerics(SILFunction *F,
                          ArrayRef<SILParameterInfo> InterfaceParams,
                          ArrayRef<SILResultInfo> InterfaceResults) {
-#warning "todo: rework for subst function types and silfunction generic sigs"
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   auto HasGenericSignature = FTy->getSubstGenericSignature() != nullptr;
   if (!HasGenericSignature)
