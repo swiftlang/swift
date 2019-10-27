@@ -1716,15 +1716,15 @@ public:
     printRec(S->getBody());
     OS << '\n';
     Indent += 2;
-    visitCatches(S->getCatches());
+    for (auto N : S->getRawCatches()) {
+      OS << '\n';
+      if (N.is<Stmt *>())
+        printRec(N.get<Stmt *>());
+      else
+        printRec(N.get<Decl *>());
+    }
     Indent -= 2;
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitCatches(ArrayRef<CaseStmt *> clauses) {
-    for (auto clause : clauses) {
-      visitCaseStmt(clause);
-    }
   }
 };
 

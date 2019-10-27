@@ -2922,7 +2922,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 }
 
 void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
-                                       ArrayRef<CaseStmt *> clauses,
+                                       AsCaseStmtRange clauses,
                                        JumpDest catchFallthroughDest) {
 
   auto completionHandler = [&](PatternMatchEmission &emission,
@@ -3039,7 +3039,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
 
   // Add a row for each label of each case.
   SmallVector<ClauseRow, 8> clauseRows;
-  clauseRows.reserve(S->getCatches().size());
+  clauseRows.reserve(S->getRawCatches().size());
   for (auto caseBlock : S->getCatches()) {
     // If we have multiple case label itmes, create a shared case block to
     // generate the shared block.

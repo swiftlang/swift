@@ -264,9 +264,9 @@ void ForEachStmt::setPattern(Pattern *p) {
 
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
-                                 ArrayRef<CaseStmt *> catches,
+                                 ArrayRef<ASTNode> catches,
                                  Optional<bool> implicit) {
-  void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
+  void *mem = ctx.Allocate(totalSizeToAlloc<ASTNode>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }

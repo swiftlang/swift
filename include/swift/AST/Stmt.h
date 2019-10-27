@@ -1028,6 +1028,20 @@ public:
   }
 };
 
+/// Helper used by SwitchStmt and DoCatchStmt to support #if
+struct AsCaseStmtWithSkippingNonCaseStmts {
+  AsCaseStmtWithSkippingNonCaseStmts() {}
+  Optional<CaseStmt *> operator()(const ASTNode &N) const {
+    if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt *>()))
+      return CS;
+    return None;
+  }
+};
+
+using AsCaseStmtRange =
+    OptionalTransformRange<ArrayRef<ASTNode>,
+                           AsCaseStmtWithSkippingNonCaseStmts>;
+
 /// Switch statement.
 class SwitchStmt final : public LabeledStmt,
     private llvm::TrailingObjects<SwitchStmt, ASTNode> {
@@ -1075,20 +1089,7 @@ public:
     return {getTrailingObjects<ASTNode>(), Bits.SwitchStmt.CaseCount};
   }
 
-private:
-  struct AsCaseStmtWithSkippingNonCaseStmts {
-    AsCaseStmtWithSkippingNonCaseStmts() {}
-    Optional<CaseStmt*> operator()(const ASTNode &N) const {
-      if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt*>()))
-        return CS;
-      return None;
-    }
-  };
-
 public:
-  using AsCaseStmtRange = OptionalTransformRange<ArrayRef<ASTNode>,
-                            AsCaseStmtWithSkippingNonCaseStmts>;
-  
   /// Get the list of case clauses.
   AsCaseStmtRange getCases() const {
     return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingNonCaseStmts());
@@ -1100,43 +1101,49 @@ public:
 };
 
 /// DoCatchStmt - do statement with trailing 'catch' clauses.
-class DoCatchStmt final
-    : public LabeledStmt,
-      private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
+class DoCatchStmt final : public LabeledStmt,
+                          private llvm::TrailingObjects<DoCatchStmt, ASTNode> {
   friend TrailingObjects;
 
   SourceLoc DoLoc;
   Stmt *Body;
 
   DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
-              ArrayRef<CaseStmt *> catches, Optional<bool> implicit)
+              ArrayRef<ASTNode> catches, Optional<bool> implicit)
       : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
                     labelInfo),
         DoLoc(doLoc), Body(body) {
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
-                            getTrailingObjects<CaseStmt *>());
+                            getTrailingObjects<ASTNode>());
   }
 
 public:
   static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                              SourceLoc doLoc, Stmt *body,
-                             ArrayRef<CaseStmt *> catches,
+                             ArrayRef<ASTNode> catches,
                              Optional<bool> implicit = None);
 
   SourceLoc getDoLoc() const { return DoLoc; }
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
-  SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
+  SourceLoc getEndLoc() const { return getRawCatches().back().getEndLoc(); }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
 
-  ArrayRef<CaseStmt *> getCatches() const {
-    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+  ArrayRef<ASTNode> getRawCatches() const {
+    return {getTrailingObjects<ASTNode>(), Bits.DoCatchStmt.NumCatches};
   }
-  MutableArrayRef<CaseStmt *> getMutableCatches() {
-    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+
+  MutableArrayRef<ASTNode> getMutableRawCatches() {
+    return {getTrailingObjects<ASTNode>(), Bits.DoCatchStmt.NumCatches};
+  }
+
+  /// Get the list of catch clauses.
+  AsCaseStmtRange getCatches() const {
+    return AsCaseStmtRange(getRawCatches(),
+                           AsCaseStmtWithSkippingNonCaseStmts());
   }
 
   /// Does this statement contain a syntactically exhaustive catch

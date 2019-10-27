@@ -1893,7 +1893,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
     SyntaxParsingContext CatchListCtxt(SyntaxContext,
                                        SyntaxKind::CatchClauseList);
     // Parse 'catch' clauses
-    SmallVector<CaseStmt *, 4> allClauses;
+    SmallVector<ASTNode, 4> allClauses;
     do {
       ParserResult<CaseStmt> clause = parseStmtCatch();
       status |= clause;

@@ -1492,11 +1492,18 @@ Stmt *Traversal::visitDoCatchStmt(DoCatchStmt *stmt) {
   }
 
   // Transform each of the catch clauses:
-  for (CaseStmt *&clause : stmt->getMutableCatches()) {
-    if (auto newClause = doIt(clause)) {
-      clause = cast<CaseStmt>(newClause);
+  for (ASTNode &clause : stmt->getMutableRawCatches()) {
+    if (Stmt *aCase = clause.dyn_cast<Stmt *>()) {
+      assert(isa<CaseStmt>(aCase));
+      if (Stmt *aStmt = doIt(aCase)) {
+        clause = aStmt;
+      } else
+        return nullptr;
     } else {
-      return nullptr;
+      assert(isa<IfConfigDecl>(clause.get<Decl *>()) ||
+             isa<PoundDiagnosticDecl>(clause.get<Decl *>()));
+      if (doIt(clause.get<Decl *>()))
+        return nullptr;
     }
   }
 
