@@ -1976,8 +1976,8 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
     bool isFirst = true;
     while (true) {
       SyntaxParsingContext ItemContext(SyntaxContext, SyntaxKind::CaseItem);
-      if (Tok.is(tok::l_brace))
-        ItemContext.setDiscard();
+      //if (Tok.is(tok::l_brace))
+        //ItemContext.setDiscard()
       GuardedPattern PatternResult;
       parseGuardedPattern(*this, PatternResult, status, boundDecls,
                           GuardedPatternContext::Catch, isFirst);
