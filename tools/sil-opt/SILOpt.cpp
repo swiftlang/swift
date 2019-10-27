@@ -81,6 +81,11 @@ static llvm::cl::opt<bool> DisableSILOwnershipVerifier(
     llvm::cl::desc(
         "Do not verify SIL ownership invariants during SIL verification"));
 
+static llvm::cl::opt<bool> EnableOwnershipLoweringAfterDiagnostics(
+    "enable-ownership-lowering-after-diagnostics",
+    llvm::cl::desc("Enable ownership lowering after diagnostics"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
@@ -333,6 +338,8 @@ int main(int argc, char **argv) {
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
+  SILOpts.StripOwnershipAfterSerialization =
+      EnableOwnershipLoweringAfterDiagnostics;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
