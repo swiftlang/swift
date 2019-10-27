@@ -244,6 +244,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundFilePathExpr': 240,
     'DerivativeRegistrationAttributeArguments': 241,
     'QualifiedDeclName': 242,
+    'CatchItem': 243,
+    'CatchItemList': 244,
 }
 
 
