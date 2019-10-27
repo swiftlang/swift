@@ -1181,3 +1181,21 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Just make sure that we do not crash here.
+//
+// CHECK-LABEL: sil [ossa] @insert_destroy_when_moving_up_lattice : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: } // end sil function 'insert_destroy_when_moving_up_lattice'
+sil [ossa] @insert_destroy_when_moving_up_lattice : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%arg : @owned $Builtin.NativeObject):
+  %0 = alloc_stack $Optional<Builtin.NativeObject>
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  %2 = tuple(%arg : $Builtin.NativeObject, %1 : $Optional<Builtin.NativeObject>)
+  (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Optional<Builtin.NativeObject>)
+  store %4 to [init] %0 : $*Optional<Builtin.NativeObject>
+  destroy_addr %0 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %0 : $*Optional<Builtin.NativeObject>
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

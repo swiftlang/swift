@@ -2026,8 +2026,28 @@ ConstantFolder::processWorkList() {
           if (r->use_empty())
             continue;
 
-          // Otherwise, do the RAUW.
-          User->getResult(Index)->replaceAllUsesWith(C);
+          // Make sure that our uses are not all uninteresting folder inserted
+          // uses. If so, continue.
+          if (llvm::all_of(r->getUses(), [&](Operand *op) {
+                return uninterestingFolderInsertedUses.count(op->getUser());
+              }))
+            continue;
+
+          // Otherwise, do the RAUW, inserting a compensating destroy if we are
+          // moving up the ownership lattice from .owned -> .none and will not
+          // be able to eliminate the underlying value due to it not being a
+          // single value instruction.
+          bool needsCompensatingDestroy =
+              isa<MultipleValueInstructionResult>(r) &&
+              r.getOwnershipKind() == ValueOwnershipKind::Owned &&
+              C.getOwnershipKind() == ValueOwnershipKind::None;
+          r->replaceAllUsesWith(C);
+          if (needsCompensatingDestroy) {
+            auto *def = r->getDefiningInstruction();
+            SILBuilderWithScope b(std::next(def->getIterator()));
+            auto *newDestroy = b.createDestroyValue(def->getLoc(), r);
+            uninterestingFolderInsertedUses.insert(newDestroy);
+          }
 
           // The new constant could be further folded now, add it to the
           // worklist.

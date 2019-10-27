@@ -20,6 +20,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <functional>
 
 namespace swift {
@@ -69,6 +70,10 @@ private:
 
   /// Called for each constant folded instruction.
   std::function<void (SILInstruction *)> Callback;
+
+  /// A set of uses inserted by the folder that should not cause a value to be
+  /// revisited.
+  llvm::SmallPtrSet<SILInstruction *, 8> uninterestingFolderInsertedUses;
 
   bool constantFoldStringConcatenation(ApplyInst *AI);
 
