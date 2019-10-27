@@ -737,7 +737,9 @@ namespace {
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; }           \
   bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }         \
-  bool visitCopy##Name##ValueInst(Copy##Name##ValueInst *RHS) { return true; }
+  bool visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *RHS) {    \
+    return true;                                                               \
+  }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     LOADABLE_REF_STORAGE_HELPER(Name) \
     bool visitStrongRetain##Name##Inst(const StrongRetain##Name##Inst *RHS) { \

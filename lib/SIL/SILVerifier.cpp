@@ -2138,7 +2138,7 @@ public:
     require(!F.hasOwnership(),                                                 \
             #name "_release is only in functions with unqualified ownership"); \
   }                                                                            \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void StrongcheckCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
                                 "Operand of " #name "_retain");                \
     closure();                                                                 \
@@ -2159,7 +2159,7 @@ public:
   })
 #define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
   LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void checkStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
                                 "Operand of " #name "_retain");                \
     (void)ty;                                                                  \
