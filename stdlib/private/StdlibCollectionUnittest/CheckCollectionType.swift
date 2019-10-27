@@ -131,6 +131,46 @@ public struct FindLastTest {
   }
 }
 
+public struct ChuckedCollectionTest {
+    public let expected: [[Int]]
+    public let collection: [Int]
+    public let size: Int
+    public let loc: SourceLoc
+
+    public init (
+        expected: [[Int]], collection: [Int], size: Int,
+        file: String = #file, line: UInt = #line
+        ) {
+        self.expected = expected
+        self.collection = collection
+        self.size = size
+        self.loc = SourceLoc(file, line, comment: "chunks(of size:) data")
+    }
+}
+
+public let chunckedCollectionTests = [
+    ChuckedCollectionTest(
+        expected: [],
+        collection: [],
+        size: 1
+    ),
+    ChuckedCollectionTest(
+        expected: [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10]],
+        collection: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        size: 3
+    ),
+    ChuckedCollectionTest(
+        expected: [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]],
+        collection: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        size: 5
+    ),
+    ChuckedCollectionTest(
+        expected: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]],
+        collection: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        size: 11
+    )
+]
+
 public let subscriptRangeTests = [
   // Slice an empty collection.
   SubscriptRangeTest(

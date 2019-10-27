@@ -204,6 +204,7 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
+  ChunkedCollection.swift
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift

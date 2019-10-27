@@ -766,5 +766,20 @@ CollectionTypeTests.test("AssociatedTypes/RACollectionWithIntIndex") {
     indicesType: CountableRange<Int>.self)
 }
 
+CollectionTypeTests.test("chunks(of:)/Size") {
+  for test in chunckedCollectionTests {
+    var collection = MinimalMutableRandomAccessCollection(elements: test.collection)
+    expectEqual(
+      test.expected, 
+      collection.chunks(of: test.size).map { [Int]($0) },
+      stackTrace: SourceLocStack().with(test.loc)
+      )
+    expectEqual(
+      test.expected.reversed(), 
+      collection.chunks(of: test.size).reversed().map { [Int]($0) },
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+  }
+}
 
 runAllTests()
