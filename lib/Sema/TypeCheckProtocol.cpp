@@ -327,13 +327,13 @@ swift::matchWitness(
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
 
-  // If the witness is invalid, record that and stop now.
-  if (witness->isInvalid())
-    return RequirementMatch(witness, MatchKind::WitnessInvalid);
-
   // If we're currently validating the witness, bail out.
   if (witness->isRecursiveValidation())
     return RequirementMatch(witness, MatchKind::Circularity);
+  
+  // If the witness is invalid, record that and stop now.
+  if (witness->isInvalid())
+    return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // Get the requirement and witness attributes.
   const auto &reqAttrs = req->getAttrs();
