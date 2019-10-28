@@ -774,6 +774,9 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto path = getLocator()->getPath();
 
+  auto fromType = getFromType();
+  auto toType = getToType();
+
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     if (isa<AssignExpr>(anchor)) {
@@ -810,6 +813,16 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::GenericArgument: {
+      // In cases like `[[Int]]` vs. `[[String]]`
+      if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
+        diagnostic = getDiagnosticFor(CTP_AssignSource);
+        fromType = getType(assignExpr->getSrc());
+        toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+
     default:
       return false;
     }
@@ -818,7 +831,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType());
+  emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
   emitNotesForMismatches();
   return true;
 }

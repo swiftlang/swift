@@ -2720,6 +2720,14 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
 
+      // An attempt to assign `Int?` to `String?`.
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::OptionalToOptional)) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+        return true;
+      }
+
       // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
       // give solver a chance to determine which generic parameters are
       // mismatched and produce a fix for that.
@@ -2753,7 +2761,8 @@ bool ConstraintSystem::repairFailures(
         //    mismatch fix, or
         // 2. "existential" check, which is handled by a missing conformance
         //    fix.
-        if (lhs->is<BoundGenericType>() || rhs->isAnyExistentialType())
+        if ((lhs->is<BoundGenericType>() && rhs->is<BoundGenericType>()) ||
+            rhs->isAnyExistentialType())
           return false;
       }
 
