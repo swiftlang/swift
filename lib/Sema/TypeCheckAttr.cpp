@@ -3920,7 +3920,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
                                      ->castTo<AnyFunctionType>();
   
   // Get checked wrt param indices.
-  auto *wrtParamIndices = attr->getParameterIndexSubset();
+  auto *wrtParamIndices = attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.
