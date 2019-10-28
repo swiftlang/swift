@@ -1187,3 +1187,12 @@ bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }
+
+sil [ossa] @mark_dependence_test_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $Builtin.NativeObject on %1 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

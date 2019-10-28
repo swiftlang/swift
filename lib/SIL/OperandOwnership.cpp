@@ -854,7 +854,7 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
     MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
   if (getValue() == mdi->getValue()) {
-    auto kind = getValue().getOwnershipKind();
+    auto kind = mdi->getOwnershipKind();
     if (kind == ValueOwnershipKind::None)
       return Map::allLive();
     auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
