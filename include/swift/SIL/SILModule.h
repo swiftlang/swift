@@ -204,11 +204,8 @@ private:
   DefaultWitnessTableListType defaultWitnessTables;
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Lookup table for SIL differentiability witnesses from original functions.
-  /// Indexed by key type: original function, parameter indices, result indices,
-  /// and derivative generic signature.
-  llvm::DenseMap<SILDifferentiabilityWitnessKey, SILDifferentiabilityWitness *>
-      DifferentiabilityWitnessMap;
+  /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
+  llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
 
   /// The list of SILDifferentiabilityWitnesses in the module.
   DifferentiabilityWitnessListType differentiabilityWitnesses;
@@ -608,6 +605,15 @@ public:
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Look up the differentiability witness with the given name.
+  SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);
+
+  /// Look up the differentiability witness corresponding to the given key.
+  SILDifferentiabilityWitness *
+  lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
+  // SWIFT_ENABLE_TENSORFLOW_END
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.

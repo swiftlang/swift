@@ -10,6 +10,22 @@ sil_stage raw
 import Swift
 import Builtin
 
+sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+
+sil_differentiability_witness [parameters 0 1] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+
+sil_differentiability_witness [parameters 0] [results 0] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+sil_differentiability_witness [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+sil_differentiability_witness [parameters 0] [results 0] <T where T : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil_differentiability_witness [parameters 0 1] [results 0] <T where T : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil_differentiability_witness [parameters 0 1] [results 0] <T where T : Differentiable, T == T.TangentVector> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil_differentiability_witness [parameters 0 1] [results 0] <T where T : Differentiable, T: AdditiveArithmetic> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
 sil @foo : $@convention(thin) (Float, Float, Float) -> Float
 
 sil @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)

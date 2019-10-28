@@ -14,6 +14,9 @@
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/ASTMangler.h"
+// SWIFT_ENABLE_TENSORFLOW_END
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -572,6 +575,22 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
     return E->Implementation;
 
   return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(StringRef name) {
+  auto it = DifferentiabilityWitnessMap.find(name);
+  if (it != DifferentiabilityWitnessMap.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  return lookUpDifferentiabilityWitness(
+      mangler.mangleSILDifferentiabilityWitnessKey(key));
 }
 
 void SILModule::registerDeserializationNotificationHandler(
