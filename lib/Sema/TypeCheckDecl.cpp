@@ -512,10 +512,13 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   if (!PBD)
     return;
   
-  auto entry = PBD->getPatternEntryForVarDecl(VD);
-  
+  auto initIndex = PBD->getPatternEntryIndexForVarDecl(VD);
+  auto init = PBD->getInit(initIndex);
+  if (!init)
+    return;
+
   // Make sure property is being set with a constructor
-  auto ctor = dyn_cast<CallExpr>(entry.getInit());
+  auto ctor = dyn_cast<CallExpr>(init);
   if (!ctor)
     return;
   auto ctorCalledVal = ctor->getCalledValue();
