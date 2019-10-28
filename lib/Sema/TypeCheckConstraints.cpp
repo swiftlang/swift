@@ -2815,10 +2815,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       // compute a type for.
       if (var->hasInterfaceType() &&
           !var->getType()->hasUnboundGenericType() &&
-          !var->getType()->hasError())
+          !var->isInvalid())
         return;
 
-      var->setInterfaceType(ErrorType::get(Context));
+      var->setInvalid();
     });
   }
 
@@ -3034,7 +3034,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
         // compute a type for.
         if (var->hasInterfaceType() && !var->getType()->hasError())
           return;
-        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
       });
     };
 

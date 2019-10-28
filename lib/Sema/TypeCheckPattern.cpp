@@ -787,7 +787,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
-        var->setInterfaceType(ErrorType::get(Context));
         var->setInvalid();
       }
     }
