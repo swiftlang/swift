@@ -28,7 +28,9 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
+#include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -152,6 +154,10 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   SILCombineCanonicalize scCanonicalize(Worklist);
 
+  for (auto &block : F) {
+    MadeChange |= stringCompareConstantFolding(&block);
+  }
+
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
     SILInstruction *I = Worklist.pop_back_val();
@@ -230,6 +236,133 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   }
 
   // Cleanup the builder and return whether or not we made any changes.
+  return Changed;
+}
+
+// Insert the instruction New before instruction Old in Old's parent BB. Add
+// New to the worklist.
+SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
+                                                 SILInstruction &Old) {
+  assert(New && New->getParent() == nullptr &&
+         "New instruction already inserted into a basic block!");
+  SILBasicBlock *BB = Old.getParent();
+  BB->insert(&Old, New); // Insert inst
+  Worklist.add(New);
+  return New;
+}
+
+// This method is to be used when an instruction is found to be dead,
+// replaceable with another preexisting expression. Here we add all uses of I
+// to the worklist, replace all uses of I with the new value, then return I,
+// so that the combiner will know that I was modified.
+void SILCombiner::replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
+  Worklist.addUsersToWorklist(&I); // Add all modified instrs to worklist.
+
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
+                          << "    with " << *V << '\n');
+
+  I.replaceAllUsesWith(V);
+}
+
+void SILCombiner::replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+  Worklist.addUsersToWorklist(oldValue); // Add all modified instrs to worklist.
+
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << oldValue << "\n"
+                          << "    with " << newValue << '\n');
+
+  oldValue->replaceAllUsesWith(newValue);
+}
+
+/// Replace all of the results of the old instruction with the
+/// corresponding results of the new instruction.
+void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
+                                              SILInstruction *newI) {
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << *oldI << "\n"
+                          << "    with " << *newI << '\n');
+
+  auto oldResults = oldI->getResults();
+  auto newResults = newI->getResults();
+  assert(oldResults.size() == newResults.size());
+  for (auto i : indices(oldResults)) {
+    // Add all modified instrs to worklist.
+    Worklist.addUsersToWorklist(oldResults[i]);
+
+    oldResults[i]->replaceAllUsesWith(newResults[i]);
+  }
+}
+
+// Some instructions can never be "trivially dead" due to side effects or
+// producing a void value. In those cases, since we cannot rely on
+// SILCombines trivially dead instruction DCE in order to delete the
+// instruction, visit methods should use this method to delete the given
+// instruction and upon completion of their peephole return the value returned
+// by this method.
+SILInstruction *
+SILCombiner::eraseInstFromFunction(SILInstruction &I,
+                                   SILBasicBlock::iterator &InstIter,
+                                   bool AddOperandsToWorklist) {
+  // Delete any debug users first.
+  for (auto result : I.getResults()) {
+    while (!result->use_empty()) {
+      auto *user = result->use_begin()->getUser();
+      assert(user->isDebugInstruction());
+      if (InstIter == user->getIterator())
+        ++InstIter;
+      Worklist.remove(user);
+      user->eraseFromParent();
+    }
+  }
+  if (InstIter == I.getIterator())
+    ++InstIter;
+
+  eraseSingleInstFromFunction(I, Worklist, AddOperandsToWorklist);
+  MadeChange = true;
+  // Dummy return, so the caller doesn't need to explicitly return nullptr.
+  return nullptr;
+}
+
+bool SILCombiner::stringCompareConstantFolding(SILBasicBlock *Pred) {
+  bool Changed = false;
+
+  // Find all apply instructions
+  for (auto begin = Pred->begin(); begin != Pred->end(); ++begin) {
+    if (auto *AI = dyn_cast<ApplyInst>(begin)) {
+      if (auto *FN = dyn_cast<FunctionRefInst>(AI->getCalleeOrigin())) {
+        // Only keep going if this is an apply instruction
+        if (!FN->getReferencedFunctionOrNull()->hasSemanticsAttr(
+                "string.equals"))
+          continue;
+      } else
+        continue;
+
+      StringRef FirstArg; // Keep track of one of the arguments
+
+      for (auto &Arg : AI->getArgumentOperands()) {
+        auto info = StringLiteralInfo::create(Arg.get());
+        if (!info)
+          continue;
+        if (!info.getValue().isAscii)
+          continue;
+
+        // Get the string literal which is the first argument
+        if (FirstArg.empty()) {
+          FirstArg = info.getValue().value;
+          continue;
+        }
+
+        APInt IsSame(1, FirstArg == info.getValue().value);
+        SILBuilder B(AI);
+        SILType IntBoolTy =
+            SILType::getBuiltinIntegerType(1, B.getASTContext());
+        auto C1 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, IsSame);
+        auto TrueStruct = B.createStruct(AI->getLoc(), AI->getType(), {C1});
+
+        AI->replaceAllUsesWith(TrueStruct);
+        Changed |= true;
+      }
+    }
+  }
+
   return Changed;
 }
 

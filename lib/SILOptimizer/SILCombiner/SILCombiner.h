@@ -244,6 +244,8 @@ public:
   bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
 
+  bool stringCompareConstantFolding(SILBasicBlock *Pred);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);

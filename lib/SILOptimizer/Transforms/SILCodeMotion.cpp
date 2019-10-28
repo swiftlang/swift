@@ -377,6 +377,7 @@ bool BBEnumTagDataflowState::initWithFirstPred(SILBasicBlock *FirstPredBB) {
 
 void BBEnumTagDataflowState::mergeSinglePredTermInfoIntoState(
     SILBasicBlock *Pred) {
+
   // Grab the terminator of our one predecessor and if it is a switch enum, mix
   // it into this state.
   TermInst *PredTerm = Pred->getTerminator();
