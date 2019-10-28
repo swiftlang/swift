@@ -358,7 +358,7 @@ bool SILCombiner::stringCompareConstantFolding(SILBasicBlock *Pred) {
         auto TrueStruct = B.createStruct(AI->getLoc(), AI->getType(), {C1});
 
         AI->replaceAllUsesWith(TrueStruct);
-        Changed |= true;
+        Changed = true;
       }
     }
   }
