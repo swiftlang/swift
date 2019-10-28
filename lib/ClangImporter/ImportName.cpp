@@ -1789,11 +1789,9 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
                                       ImportNameVersion version,
                                       clang::DeclarationName givenName) {
   CacheKeyType key(decl, version);
-  if (!givenName) {
-    if (auto cachedRes = importNameCache[key]) {
-      ++ImportNameNumCacheHits;
-      return cachedRes;
-    }
+  if (importNameCache.count(key) && !givenName) {
+    ++ImportNameNumCacheHits;
+    return importNameCache[key];
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
