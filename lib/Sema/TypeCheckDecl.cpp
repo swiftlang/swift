@@ -674,7 +674,9 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
-    if (current == other || other->isInvalid())
+    //
+    // FIXME: Breaking a cycle here with hasInterfaceType() is bogus.
+    if (current == other || (other->hasInterfaceType() && other->isInvalid()))
       continue;
 
     // Skip declarations in other modules.
