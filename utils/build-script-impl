@@ -2443,6 +2443,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 cmake_options=(
                     "${cmake_options[@]}"
                     -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
+                    -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                     -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                     -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
