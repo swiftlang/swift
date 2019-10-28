@@ -193,9 +193,14 @@ ErrorTests.test("test dealloc empty error box") {
 
 var errors: [Error] = []
 ErrorTests.test("willThrow") {
-  typealias WillThrow = @convention(c) (Error) -> Void
+  // Error isn't allowed in a @convention(c) function when ObjC interop is
+  // not available, so pass it through an OpaquePointer.
+  typealias WillThrow = @convention(c) (OpaquePointer) -> Void
   let willThrow = pointerToSwiftCoreSymbol(name: "_swift_willThrow")!
-  willThrow.storeBytes(of: { errors.append($0) }, as: WillThrow.self)
+  let callback: WillThrow = {
+    errors.append(unsafeBitCast($0, to: Error.self))
+  }
+  willThrow.storeBytes(of: callback, as: WillThrow.self)
   expectTrue(errors.isEmpty)
   do {
     throw UnsignedError.negativeOne
