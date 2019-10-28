@@ -34,6 +34,10 @@
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
 
+namespace llvm {
+class DataLayout;
+}
+
 namespace swift {
 
 struct TBDGenOptions;
@@ -45,6 +49,7 @@ public:
   llvm::MachO::InterfaceFile &Symbols;
   llvm::MachO::TargetList Targets;
   StringSet *StringSymbols;
+  const llvm::DataLayout &DataLayout;
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
@@ -71,12 +76,13 @@ private:
 
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
-                llvm::MachO::TargetList targets, StringSet *stringSymbols,
+                llvm::MachO::ArchitectureSet archs, StringSet *stringSymbols,
+                const llvm::DataLayout &dataLayout,
                 const UniversalLinkageInfo &universalLinkInfo,
                 ModuleDecl *swiftModule, const TBDGenOptions &opts)
-      : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
-        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
-        Opts(opts) {}
+      : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
+        DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
+        SwiftModule(swiftModule), Opts(opts) {}
 
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if

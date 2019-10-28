@@ -60,6 +60,18 @@ namespace Lowering {
 class TypeConverter;
 }
 
+struct ModuleBuffers {
+  std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer;
+  ModuleBuffers(std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer,
+                std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer = nullptr,
+                std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer = nullptr):
+                  ModuleBuffer(std::move(ModuleBuffer)),
+                  ModuleDocBuffer(std::move(ModuleDocBuffer)),
+                  ModuleSourceInfoBuffer(std::move(ModuleSourceInfoBuffer)) {}
+};
+
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
 ///   - information about the build environment,
@@ -392,15 +404,9 @@ class CompilerInstance {
   /// Contains buffer IDs for input source code files.
   std::vector<unsigned> InputSourceCodeBufferIDs;
 
-  struct PartialModuleInputs {
-    std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
-    std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
-    std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer;
-  };
-
   /// Contains \c MemoryBuffers for partial serialized module files and
   /// corresponding partial serialized module documentation files.
-  std::vector<PartialModuleInputs> PartialModules;
+  std::vector<ModuleBuffers> PartialModules;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
@@ -555,18 +561,6 @@ private:
   /// Set failed on failure.
 
   Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
-
-  struct ModuleBuffers {
-    std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
-    std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
-    std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer;
-    ModuleBuffers(std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer = nullptr,
-                  std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer = nullptr):
-                    ModuleBuffer(std::move(ModuleBuffer)),
-                    ModuleDocBuffer(std::move(ModuleDocBuffer)),
-                    ModuleSourceInfoBuffer(std::move(ModuleSourceInfoBuffer)) {}
-  };
 
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.

@@ -768,7 +768,7 @@ deriveEquatable_eq(
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
   // Compute the interface type.
-  eqDecl->computeType();
+  (void)eqDecl->getInterfaceType();
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
 
@@ -892,7 +892,7 @@ deriveHashable_hashInto(
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  hashDecl->computeType();
+  (void)hashDecl->getInterfaceType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
 
   C.addSynthesizedDecl(hashDecl);
@@ -1241,7 +1241,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of hashValue().
-  getterDecl->computeType();
+  (void)getterDecl->getInterfaceType();
 
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);

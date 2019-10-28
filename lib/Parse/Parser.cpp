@@ -26,15 +26,11 @@
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/ParsedSyntaxNodes.h"
-#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Parse/HiddenLibSyntaxAction.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -147,7 +143,7 @@ private:
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
                      /*DelayBodyParsing=*/false);
-    TheParser.SyntaxContext->setDiscard();
+    TheParser.SyntaxContext->disable();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
@@ -173,7 +169,10 @@ static void parseDelayedDecl(
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
-  TheParser.SyntaxContext->setDiscard();
+
+  // Disable libSyntax creation in the delayed parsing.
+  TheParser.SyntaxContext->disable();
+
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
     CodeCompletion.reset(
@@ -384,7 +383,9 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.getASTContext().LangOpts.AttachCommentsToDecls
                   ? CommentRetentionMode::AttachToNextToken
                   : CommentRetentionMode::None,
-              TriviaRetentionMode::WithTrivia)),
+              SF.shouldBuildSyntaxTree()
+                  ? TriviaRetentionMode::WithTrivia
+                  : TriviaRetentionMode::WithoutTrivia)),
           SF, SIL, PersistentState, std::move(SPActions), DelayBodyParsing) {}
 
 namespace {
@@ -518,16 +519,9 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(
-                    SyntaxContext, SF, L->getBufferID(),
-                    std::make_shared<HiddenLibSyntaxAction>(
-                        SPActions,
-                        std::make_shared<SyntaxTreeCreator>(
-                            SF.getASTContext().SourceMgr,
-                            L->getBufferID(),
-                            SF.SyntaxParsingCache,
-                            SF.getASTContext().getSyntaxArena())))),
-    Generator(SF.getASTContext(), *this) {
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
+                                           L->getBufferID(),
+                                           std::move(SPActions))) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
@@ -582,41 +576,8 @@ SourceLoc Parser::consumeToken() {
   return consumeTokenWithoutFeedingReceiver();
 }
 
-ParsedTokenSyntax Parser::consumeTokenSyntax() {
-  TokReceiver->receive(Tok);
-  ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
-      Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
-  consumeTokenWithoutFeedingReceiver();
-  return ParsedToken;
-}
-
 SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
-}
-
-ParsedTokenSyntax
-Parser::consumeStartingCharacterOfCurrentTokenSyntax(tok Kind, size_t Len) {
-  // Consumes prefix of token and returns its location.
-  // (like '?', '<', '>' or '!' immediately followed by '<')
-  assert(Len >= 1);
-
-  // Current token can be either one-character token we want to consume...
-  if (Tok.getLength() == Len) {
-    Tok.setKind(Kind);
-    return consumeTokenSyntax();
-  }
-
-  auto Loc = Tok.getLoc();
-
-  // ... or a multi-character token with the first N characters being the one
-  // that we want to consume as a separate token.
-  assert(Tok.getLength() > Len);
-  auto Token = markSplitTokenSyntax(Kind, Tok.getText().substr(0, Len));
-
-  auto NewState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(Len));
-  restoreParserPosition(ParserPosition(NewState, Loc),
-                        /*enableDiagnostics=*/true);
-  return Token;
 }
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
@@ -643,14 +604,6 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
   return PreviousLoc;
 }
 
-ParsedTokenSyntax Parser::markSplitTokenSyntax(tok Kind, StringRef Txt) {
-  SplitTokens.emplace_back();
-  SplitTokens.back().setToken(Kind, Txt);
-  TokReceiver->receive(SplitTokens.back());
-  return ParsedSyntaxRecorder::makeToken(SplitTokens.back(), LeadingTrivia,
-                                         ParsedTrivia(), *SyntaxContext);
-}
-
 void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
@@ -659,63 +612,14 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
   TokReceiver->receive(SplitTokens.back());
 }
 
-ParsedTokenSyntax Parser::consumeStartingLessSyntax() {
-  assert(startsWithLess(Tok) && "Token does not start with '<'");
-  return consumeStartingCharacterOfCurrentTokenSyntax(tok::l_angle);
-}
-
 SourceLoc Parser::consumeStartingLess() {
   assert(startsWithLess(Tok) && "Token does not start with '<'");
   return consumeStartingCharacterOfCurrentToken(tok::l_angle);
 }
 
-ParsedTokenSyntax Parser::consumeStartingGreaterSyntax() {
-  assert(startsWithGreater(Tok) && "Token does not start with '>'");
-  return consumeStartingCharacterOfCurrentTokenSyntax(tok::r_angle);
-}
-
 SourceLoc Parser::consumeStartingGreater() {
   assert(startsWithGreater(Tok) && "Token does not start with '>'");
   return consumeStartingCharacterOfCurrentToken(tok::r_angle);
-}
-
-void Parser::skipSingleSyntax(SmallVectorImpl<ParsedSyntax> &Skipped) {
-  switch (Tok.getKind()) {
-  case tok::l_paren:
-    Skipped.push_back(consumeTokenSyntax());
-    skipUntilSyntax(Skipped, tok::r_paren);
-    if (auto RParen = consumeTokenSyntaxIf(tok::r_paren))
-      Skipped.push_back(std::move(*RParen));
-    break;
-  case tok::l_brace:
-    Skipped.push_back(consumeTokenSyntax());
-    skipUntilSyntax(Skipped, tok::r_brace);
-    if (auto RBrace = consumeTokenSyntaxIf(tok::r_brace))
-      Skipped.push_back(std::move(*RBrace));
-    break;
-  case tok::l_square:
-    Skipped.push_back(consumeTokenSyntax());
-    skipUntilSyntax(Skipped, tok::r_square);
-    if (auto RSquare = consumeTokenSyntaxIf(tok::r_square))
-      Skipped.push_back(std::move(*RSquare));
-    break;
-  case tok::pound_if:
-  case tok::pound_else:
-  case tok::pound_elseif:
-    Skipped.push_back(consumeTokenSyntax());
-    // skipUntil also implicitly stops at tok::pound_endif.
-    skipUntilSyntax(Skipped, tok::pound_else, tok::pound_elseif);
-
-    if (Tok.isAny(tok::pound_else, tok::pound_elseif))
-      skipSingleSyntax(Skipped);
-    else if (auto Endif = consumeTokenSyntaxIf(tok::pound_endif))
-      Skipped.push_back(std::move(*Endif));
-    break;
-
-  default:
-    Skipped.push_back(consumeTokenSyntax());
-    break;
-  }
 }
 
 void Parser::skipSingle() {
@@ -754,68 +658,6 @@ void Parser::skipSingle() {
   }
 }
 
-void Parser::ignoreToken() {
-  assert(!Tok.is(tok::eof) && "Lexing eof token");
-  ParsedTriviaList Skipped;
-  Skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
-  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
-            std::back_inserter(Skipped));
-  Skipped.emplace_back(TriviaKind::GarbageText, Tok.getText().size());
-  std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
-            std::back_inserter(Skipped));
-
-  TokReceiver->receive(Tok);
-  L->lex(Tok, LeadingTrivia, TrailingTrivia);
-
-  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
-            std::back_inserter(Skipped));
-  LeadingTrivia = {std::move(Skipped)};
-}
-
-void Parser::ignoreSingle() {
-  switch (Tok.getKind()) {
-  case tok::l_paren:
-      ignoreToken();
-    ignoreUntil(tok::r_paren);
-    ignoreIf(tok::r_paren);
-    break;
-  case tok::l_brace:
-    ignoreToken();
-    ignoreUntil(tok::r_brace);
-    ignoreIf(tok::r_brace);
-    break;
-  case tok::l_square:
-    ignoreToken();
-    ignoreUntil(tok::r_square);
-    ignoreIf(tok::r_square);
-    break;
-  case tok::pound_if:
-  case tok::pound_else:
-  case tok::pound_elseif:
-    ignoreToken();
-    ignoreUntil(tok::pound_endif);
-    ignoreIf(tok::pound_endif);
-    break;
-  default:
-    ignoreToken();
-    break;
-  }
-}
-
-void Parser::ignoreUntil(tok Kind) {
-  while (Tok.isNot(Kind, tok::eof, tok::pound_endif, tok::code_complete))
-    ignoreSingle();
-}
-
-void Parser::skipUntilSyntax(llvm::SmallVectorImpl<ParsedSyntax> &Skipped,
-                             tok T1, tok T2) {
-  // tok::NUM_TOKENS is a sentinel that means "don't skip".
-  if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
-
-  while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::code_complete))
-    skipSingleSyntax(Skipped);
-}
-
 void Parser::skipUntil(tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
   if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
@@ -828,72 +670,6 @@ void Parser::skipUntilAnyOperator() {
   while (Tok.isNot(tok::eof, tok::pound_endif, tok::code_complete) &&
          Tok.isNotAnyOperator())
     skipSingle();
-}
-
-bool Parser::ignoreUntilGreaterInTypeList() {
-  while (true) {
-    switch (Tok.getKind()) {
-    case tok::eof:
-    case tok::l_brace:
-    case tok::r_brace:
-    case tok::code_complete:
-      return false;
-
-#define KEYWORD(X) case tok::kw_##X:
-#define POUND_KEYWORD(X) case tok::pound_##X:
-#include "swift/Syntax/TokenKinds.def"
-      if (isStartOfStmt() || isStartOfDecl() || Tok.is(tok::pound_endif))
-        return false;
-      break;
-    default:
-      if (startsWithGreater(Tok))
-        return true;
-      break;
-    }
-    ignoreSingle();
-  }
-}
-
-void Parser::skipUntilGreaterInTypeListSyntax(
-    SmallVectorImpl<ParsedSyntax> &Skipped, bool protocolComposition) {
-  while (true) {
-    switch (Tok.getKind()) {
-    case tok::eof:
-    case tok::l_brace:
-    case tok::r_brace:
-    case tok::code_complete:
-      return;
-
-#define KEYWORD(X) case tok::kw_##X:
-#define POUND_KEYWORD(X) case tok::pound_##X:
-#include "swift/Syntax/TokenKinds.def"
-      // 'Self' can appear in types, skip it.
-      if (Tok.is(tok::kw_Self))
-        break;
-      if (isStartOfStmt() || isStartOfDecl() || Tok.is(tok::pound_endif))
-        return;
-      break;
-
-    case tok::l_paren:
-    case tok::r_paren:
-    case tok::l_square:
-    case tok::r_square:
-      // In generic type parameter list, skip '[' ']' '(' ')', because they
-      // can appear in types.
-      if (protocolComposition)
-        return;
-      break;
-
-    default:
-      if (Tok.isAnyOperator() && startsWithGreater(Tok)) {
-        Skipped.push_back(consumeStartingGreaterSyntax());
-        return;
-      }
-
-      break;
-    }
-    skipSingleSyntax(Skipped);
-  }
 }
 
 /// Skip until a token that starts with '>', and consume it if found.
@@ -1000,45 +776,6 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
   }
 }
 
-void Parser::skipListUntilDeclRBraceSyntax(
-    SmallVectorImpl<ParsedSyntax> &Skipped, SourceLoc startLoc, tok T1, tok T2) {
-  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
-                   tok::pound_else, tok::pound_elseif)) {
-    auto Comma = consumeTokenSyntaxIf(tok::comma);
-
-    bool hasDelimiter = Tok.getLoc() == startLoc || Comma;
-    bool possibleDeclStartsLine = Tok.isAtStartOfLine();
-
-    if (Comma)
-      Skipped.push_back(std::move(*Comma));
-
-    if (isStartOfDecl()) {
-      // Could have encountered something like `_ var:` 
-      // or `let foo:` or `var:`
-      if (Tok.isAny(tok::kw_var, tok::kw_let)) {
-        if (possibleDeclStartsLine && !hasDelimiter) {
-          break;
-        }
-
-        Parser::BacktrackingScope backtrack(*this);
-        // Consume the let or var
-        auto LetOrVar = consumeTokenSyntax();
-        Skipped.push_back(std::move(LetOrVar));
-        
-        // If the following token is either <identifier> or :, it means that
-        // this `var` or `let` should be interpreted as a label
-        if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
-            peekToken().is(tok::colon)) {
-          backtrack.cancelBacktrack();
-          continue;
-        }
-      }
-      break;
-    }
-    skipSingleSyntax(Skipped);
-  }
-}
-
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif) &&
@@ -1132,19 +869,6 @@ bool Parser::StructureMarkerRAII::pushStructureMarker(
 //===----------------------------------------------------------------------===//
 // Primitive Parsing
 //===----------------------------------------------------------------------===//
-
-Optional<ParsedTokenSyntax> Parser::parseIdentifierSyntax(const Diagnostic &D) {
-  switch (Tok.getKind()) {
-  case tok::kw_self:
-  case tok::kw_Self:
-  case tok::identifier:
-    return consumeIdentifierSyntax();
-  default:
-    checkForInputIncomplete();
-    diagnose(Tok, D);
-    return None;
-  }
-}
 
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
@@ -1241,40 +965,6 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   }
 
   return false;
-}
-
-Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
-                                                     const Diagnostic &D) {
-  if (Tok.is(K)) {
-    TokLoc = Tok.getLoc();
-    return consumeTokenSyntax();
-  }
-
-  checkForInputIncomplete();
-  diagnose(Tok, D);
-  return None;
-}
-
-ParsedSyntaxResult<ParsedTokenSyntax>
-Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
-                                 bool silenceDiag) {
-  if (Tok.is(K))
-    return makeParsedResult(consumeTokenSyntax(K));
-  checkForInputIncomplete();
-
-  if (!silenceDiag) {
-    diagnose(Tok, ErrorDiag);
-
-    Diag<> OtherNote;
-    switch (K) {
-    case tok::r_paren:  OtherNote = diag::opening_paren; break;
-    case tok::r_square: OtherNote = diag::opening_bracket; break;
-    case tok::r_brace:  OtherNote = diag::opening_brace; break;
-    default: llvm_unreachable("unknown matching token!");
-    }
-    diagnose(OtherLoc, OtherNote);
-  }
-  return makeParserError();
 }
 
 SourceLoc Parser::getLocForMissingMatchingToken() const {

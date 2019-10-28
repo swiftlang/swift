@@ -1442,6 +1442,10 @@ void RequirementSource::print(llvm::raw_ostream &out,
 static Type formProtocolRelativeType(ProtocolDecl *proto,
                                      Type baseType,
                                      Type type) {
+  // Error case: hand back the erroneous type.
+  if (type->hasError())
+    return type;
+
   // Basis case: we've hit the base potential archetype.
   if (baseType->isEqual(type))
     return proto->getSelfInterfaceType();

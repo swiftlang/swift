@@ -990,6 +990,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
   StringRef ModuleDocFilename,
   StringRef ModuleSourceInfoFilename,
+  SmallVectorImpl<char> *ModuleInterfacePath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
@@ -1036,6 +1037,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   if (ModuleBuffer) {
     *ModuleBuffer = std::move(*ModuleBufferOrErr);
+    if (ModuleInterfacePath)
+      *ModuleInterfacePath = InPath;
   }
   // Open .swiftsourceinfo file if it's present.
   SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,

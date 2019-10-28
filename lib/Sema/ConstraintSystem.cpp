@@ -20,6 +20,7 @@
 #include "CSDiagnostics.h"
 #include "CSFix.h"
 #include "TypeCheckType.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Statistic.h"
@@ -414,7 +415,8 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 ConstraintLocator *
-ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
+ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
+                                   bool lookThroughApply) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -455,26 +457,28 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
   if (isa<SubscriptExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
-  if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-    auto *fnExpr = applyExpr->getFn();
-    // For an apply of a metatype, we have a short-form constructor. Unlike
-    // other locators to callees, these are anchored on the apply expression
-    // rather than the function expr.
-    auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
-    if (fnTy->is<AnyMetatypeType>()) {
-      auto *fnLocator =
-          getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
-      return getConstraintLocator(fnLocator,
-                                  ConstraintLocator::ConstructorMember);
-    }
+  if (lookThroughApply) {
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+      auto *fnExpr = applyExpr->getFn();
+      // For an apply of a metatype, we have a short-form constructor. Unlike
+      // other locators to callees, these are anchored on the apply expression
+      // rather than the function expr.
+      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
+      if (fnTy->is<AnyMetatypeType>()) {
+        auto *fnLocator =
+            getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
+        return getConstraintLocator(fnLocator,
+                                    ConstraintLocator::ConstructorMember);
+      }
 
-    // Otherwise fall through and look for locators anchored on the function
-    // expr. For CallExprs, this can look through things like parens and
-    // optional chaining.
-    if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
-      anchor = callExpr->getDirectCallee();
-    } else {
-      anchor = fnExpr;
+      // Otherwise fall through and look for locators anchored on the function
+      // expr. For CallExprs, this can look through things like parens and
+      // optional chaining.
+      if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
+        anchor = callExpr->getDirectCallee();
+      } else {
+        anchor = fnExpr;
+      }
     }
   }
 
@@ -1460,13 +1464,20 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   if (decl->isImplicitlyUnwrappedOptional())
     return Type();
 
+  // In a pattern binding initializer, all of its bound variables have no
+  // effective overload type.
+  if (auto *PBI = dyn_cast<PatternBindingInitializer>(useDC)) {
+    if (auto *VD = dyn_cast<VarDecl>(decl)) {
+      if (PBI->getBinding() == VD->getParentPatternBinding()) {
+        return Type();
+      }
+    }
+  }
+
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
-  if (!type) {
-    type = decl->getInterfaceType();
-    if (!type) {
-      return Type();
-    }
+  if (!type || type->hasError()) {
+    return Type();
   }
 
   // If we have a generic function type, drop the generic signature; we don't
@@ -2982,6 +2993,12 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
       break;
+    }
+
+    case ConstraintLocator::Condition: {
+      anchor = cast<IfExpr>(anchor)->getCondExpr();
+      path = path.slice(1);
+      continue;
     }
 
     default:

@@ -67,7 +67,7 @@ func test0(c c: C) {
   a.x = x
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
   // CHECK:   [[T2:%.*]] = load_borrow [[READ]] : $*@sil_unowned C     
-  // CHECK:   [[T3:%.*]] = copy_unowned_value  [[T2]] : $@sil_unowned C  
+  // CHECK:   [[T3:%.*]] = strong_copy_unowned_value  [[T2]] : $@sil_unowned C  
   // CHECK:   end_borrow [[T2]]
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
   // CHECK:   [[XP:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
@@ -97,7 +97,7 @@ func testunowned_local() -> C {
   unowned let uc = c
 
   // CHECK: [[tmp2:%.*]] = load_borrow [[PB_UC]]
-  // CHECK: [[tmp3:%.*]] = copy_unowned_value [[tmp2]]
+  // CHECK: [[tmp3:%.*]] = strong_copy_unowned_value [[tmp2]]
   // CHECK: end_borrow [[tmp2]]
   return uc
 
@@ -115,7 +115,7 @@ func test_unowned_let_capture(_ aC : C) {
 // CHECK-LABEL: sil private [ossa] @$s7unowned05test_A12_let_captureyyAA1CCFSiyXEfU_ : $@convention(thin) (@guaranteed @sil_unowned C) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
-// CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned C
+// CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = strong_copy_unowned_value [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   destroy_value [[UNOWNED_ARG]]

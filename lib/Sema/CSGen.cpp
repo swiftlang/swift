@@ -1281,8 +1281,9 @@ namespace {
       SmallVector<AnyFunctionType::Param, 8> params;
       AnyFunctionType::decomposeInput(constrParamType, params);
 
+      auto funcType = constr->getMethodInterfaceType()->castTo<FunctionType>();
       ::matchCallArguments(
-          CS, args, params, ConstraintKind::ArgumentConversion,
+          CS, funcType, args, params, ConstraintKind::ArgumentConversion,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
@@ -2577,10 +2578,10 @@ namespace {
       if (!boolDecl)
         return Type();
 
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getCondExpr()),
-                       boolDecl->getDeclaredType(),
-                       CS.getConstraintLocator(expr->getCondExpr()));
+      CS.addConstraint(
+          ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
+          boolDecl->getDeclaredType(),
+          CS.getConstraintLocator(expr, LocatorPathElt::Condition()));
 
       // The branches must be convertible to a common type.
       return CS.addJoinConstraint(CS.getConstraintLocator(expr),

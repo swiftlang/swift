@@ -416,9 +416,9 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
-    std::cout << "<null type reference>\n";
+    fprintf(stdout, "<null type reference>\n");
   } else {
-    TR->dump(std::cout);
+    TR->dump(stdout);
   }
 }
 
@@ -428,9 +428,9 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 
@@ -439,9 +439,9 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto TI = Context->getMetadataTypeInfo(Metadata);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 
@@ -450,9 +450,9 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto TI = Context->getInstanceTypeInfo(Object);
   if (TI == nullptr) {
-    std::cout << "<null type info>\n";
+    fprintf(stdout, "%s", "<null type info>\n");
   } else {
-    TI->dump(std::cout);
+    TI->dump(stdout);
   }
 }
 

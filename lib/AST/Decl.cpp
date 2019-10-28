@@ -410,6 +410,10 @@ template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
+template<typename Class>
+inline char checkSourceLocType(SourceLoc (Class::*)(bool) const);
+inline TwoChars checkSourceLocType(SourceLoc (Decl::*)(bool) const);
+
 template<typename Class> 
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
@@ -455,8 +459,8 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
   // Attributes on PatternBindingDecls are attached to VarDecls in AST.
   if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
-    for (auto Entry : PBD->getPatternList())
-      Entry.getPattern()->forEachVariable([&](VarDecl *VD) {
+    for (auto i : range(PBD->getNumPatternEntries()))
+      PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
         for (auto Attr : VD->getAttrs())
           if (Attr->getRange().isValid())
             Range.widen(Attr->getRangeWithAt());
@@ -482,12 +486,52 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-SourceLoc Decl::getLoc() const {
+const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
+  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  auto Locs = File->getBasicLocsForDecl(this);
+  if (!Locs.hasValue()) {
+    static const Decl::CachedExternalSourceLocs NullLocs{};
+    return &NullLocs;
+  }
+  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
+  auto &SM = getASTContext().SourceMgr;
+#define CASE(X)                                                               \
+Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
+                                       Locs->X.Column);
+  CASE(Loc)
+  CASE(StartLoc)
+  CASE(EndLoc)
+#undef CASE
+  return Result;
+}
+
+SourceLoc Decl::getLoc(bool SerializedOK) const {
 #define DECL(ID, X) \
 static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
               #ID "Decl is re-defining getLoc()");
 #include "swift/AST/DeclNodes.def"
-  return getLocFromSource();
+  if (isa<ModuleDecl>(this))
+    return SourceLoc();
+  // When the decl is context-free, we should get loc from source buffer.
+  if (!getDeclContext())
+    return getLocFromSource();
+  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  switch(File->getKind()) {
+  case FileUnitKind::Source:
+    return getLocFromSource();
+  case FileUnitKind::SerializedAST: {
+    if (!SerializedOK)
+      return SourceLoc();
+    if (!CachedLocs) {
+      CachedLocs = calculateSerializedLocs();
+    }
+    return CachedLocs->Loc;
+  }
+  case FileUnitKind::Builtin:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
+    return SourceLoc();
+  }
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -1400,7 +1444,9 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
 }
 
 Expr *PatternBindingEntry::getOriginalInit() const {
-  return InitContextAndIsText.getInt() ? nullptr : InitExpr.originalInit;
+  return InitContextAndFlags.getInt().contains(PatternFlags::IsText)
+             ? nullptr
+             : InitExpr.originalInit;
 }
 
 SourceRange PatternBindingEntry::getOriginalInitRange() const {
@@ -1411,7 +1457,8 @@ SourceRange PatternBindingEntry::getOriginalInitRange() const {
 
 void PatternBindingEntry::setOriginalInit(Expr *E) {
   InitExpr.originalInit = E;
-  InitContextAndIsText.setInt(false);
+  InitContextAndFlags.setInt(InitContextAndFlags.getInt() -
+                             PatternFlags::IsText);
 }
 
 bool PatternBindingEntry::isInitialized() const {
@@ -1437,7 +1484,8 @@ void PatternBindingEntry::setInit(Expr *E) {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
   InitExpr.initAfterSynthesis = E;
-  InitContextAndIsText.setInt(false);
+  InitContextAndFlags.setInt(InitContextAndFlags.getInt() -
+                             PatternFlags::IsText);
 }
 
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
@@ -1445,6 +1493,12 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   getPattern()->collectVariables(variables);
   assert(!variables.empty());
   return variables[0];
+}
+
+unsigned PatternBindingEntry::getNumBoundVariables() const {
+  unsigned varCount = 0;
+  getPattern()->forEachVariable([&](VarDecl *) { ++varCount; });
+  return varCount;
 }
 
 SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
@@ -1486,7 +1540,7 @@ SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
 }
 
 bool PatternBindingEntry::hasInitStringRepresentation() const {
-  if (InitContextAndIsText.getInt())
+  if (InitContextAndFlags.getInt().contains(PatternFlags::IsText))
     return !InitStringRepresentation.empty();
   return getInit() && getInit()->getSourceRange().isValid();
 }
@@ -1497,7 +1551,8 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   assert(hasInitStringRepresentation() &&
          "must check if pattern has string representation");
 
-  if (InitContextAndIsText.getInt() && !InitStringRepresentation.empty())
+  if (InitContextAndFlags.getInt().contains(PatternFlags::IsText) &&
+      !InitStringRepresentation.empty())
     return InitStringRepresentation;
   auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
   auto init = getOriginalInit();
@@ -1556,6 +1611,10 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)
     return getPatternList()[0].getPattern()->getSingleVar();
   return nullptr;
+}
+
+VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
+  return getPatternList()[i].getAnchoringVarDecl();
 }
 
 bool VarDecl::isInitExposedToClients() const {
@@ -1684,6 +1743,24 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
 
   // Otherwise, we can't default initialize this binding.
   return false;
+}
+
+
+bool PatternBindingDecl::isComputingPatternBindingEntry(
+    const VarDecl *vd) const {
+  unsigned i = getPatternEntryIndexForVarDecl(vd);
+  return getASTContext().evaluator.hasActiveRequest(
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
+}
+
+bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
+  const auto &entry = getPatternList()[i];
+  return entry.isInitialized() && entry.getEqualLoc().isValid();
+}
+
+SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
+  const auto &entry = getPatternList()[i];
+  return entry.getEqualLoc();
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -2706,13 +2783,18 @@ bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
 
+static bool isComputingInterfaceType(const ValueDecl *VD) {
+  return VD->getASTContext().evaluator.hasActiveRequest(
+            InterfaceTypeRequest{const_cast<ValueDecl *>(VD)});
+}
+
 bool ValueDecl::isRecursiveValidation() const {
-  if (hasValidationStarted() && !hasInterfaceType())
+  if (isComputingInterfaceType(this) && !hasInterfaceType())
     return true;
 
   if (auto *vd = dyn_cast<VarDecl>(this))
     if (auto *pbd = vd->getParentPatternBinding())
-      if (pbd->isBeingValidated())
+      if (pbd->isComputingPatternBindingEntry(vd))
         return true;
 
   auto *dc = getDeclContext();
@@ -2728,30 +2810,24 @@ bool ValueDecl::isRecursiveValidation() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  if (!hasInterfaceType()) {
-    // Our clients that don't register the lazy resolver are relying on the
-    // fact that they can't pull an interface type out to avoid doing work.
-    // This is a necessary evil until we can wean them off.
-    if (auto resolver = getASTContext().getLazyResolver()) {
-      resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
-      if (!hasInterfaceType())
-        return ErrorType::get(getASTContext());
-    }
+  // Our clients that don't register the lazy resolver are relying on the
+  // fact that they can't pull an interface type out to avoid doing work.
+  // This is a necessary evil until we can wean them off.
+  if (!getASTContext().getLazyResolver()) {
+    return TypeAndAccess.getPointer();
   }
-  return TypeAndAccess.getPointer();
+
+  if (auto Ty =
+          evaluateOrDefault(getASTContext().evaluator,
+                            InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
+                            ErrorType::get(getASTContext())))
+    return Ty;
+  return ErrorType::get(getASTContext());
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (type) {
-    assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasArchetype() && "Archetype in interface type");
-
-    if (type->hasError())
-      setInvalid();
-  }
-
-  TypeAndAccess.setPointer(type);
+  getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{this},
+                                        std::move(type));
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
@@ -3758,6 +3834,49 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   Bits.StructDecl.HasUnreferenceableStorage = false;
 }
 
+bool NominalTypeDecl::hasMemberwiseInitializer() const {
+  // Currently only structs can have memberwise initializers.
+  auto *sd = dyn_cast<StructDecl>(this);
+  if (!sd)
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<StructDecl *>(sd);
+  return evaluateOrDefault(ctx.evaluator, HasMemberwiseInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
+  if (!hasMemberwiseInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
+}
+
+bool NominalTypeDecl::hasDefaultInitializer() const {
+  // Currently only structs and classes can have default initializers.
+  if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, HasDefaultInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
+  if (!hasDefaultInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           SynthesizeDefaultInitRequest{mutableThis}, nullptr);
+}
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
@@ -3845,7 +3964,7 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
     CD->recordObjCMethod(DD, DD->getObjCSelector());
 
   // Assign DD the interface type (Self) -> () -> ()
-  DD->computeType();
+  (void)DD->getInterfaceType();
 
   return DD;
 }
@@ -3924,7 +4043,7 @@ ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) cons
   do {
     // If we hit circularity, we will diagnose at some point in typeCheckDecl().
     // However we have to explicitly guard against that here because we get
-    // called as part of validateDecl().
+    // called as part of the interface type request.
     if (!visited.insert(CD).second)
       break;
 
@@ -5226,9 +5345,11 @@ Stmt *VarDecl::getRecursiveParentPatternStmt() const {
 ///
 Pattern *VarDecl::getParentPattern() const {
   // If this has a PatternBindingDecl parent, use its pattern.
-  if (auto *PBD = getParentPatternBinding())
-    return PBD->getPatternEntryForVarDecl(this).getPattern();
-  
+  if (auto *PBD = getParentPatternBinding()) {
+    const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+    return PBD->getPattern(i);
+  }
+
   // If this is a statement parent, dig the pattern out of it.
   if (auto *stmt = getParentPatternStmt()) {
     if (auto *FES = dyn_cast<ForEachStmt>(stmt))
@@ -5263,6 +5384,17 @@ Pattern *VarDecl::getParentPattern() const {
   // Otherwise, this is a case we do not know or understand. Return nullptr to
   // signal we do not have any information.
   return nullptr;
+}
+
+NamedPattern *VarDecl::getNamingPattern() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           NamingPatternRequest{const_cast<VarDecl *>(this)},
+                           nullptr);
+}
+
+void VarDecl::setNamingPattern(NamedPattern *Pat) {
+  getASTContext().evaluator.cacheOutput(NamingPatternRequest{this},
+                                        std::move(Pat));
 }
 
 TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
@@ -5559,7 +5691,7 @@ static bool propertyWrapperInitializedViaInitialValue(
 
   // If there was an initializer on the original property, initialize
   // via the initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isValid())
+  if (PBD->getEqualLoc(0).isValid())
     return true;
 
   // If there was an initializer on the outermost wrapper, initialize
@@ -5628,7 +5760,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
-      // Do not suggest the fix it in implicit getters
+      // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
@@ -5858,8 +5990,7 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
     return nullptr;
 
   // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isInvalid()
-      && !PBD->isDefaultInitializable())
+  if (PBD->getEqualLoc(0).isInvalid() && !PBD->isDefaultInitializable())
     return nullptr;
 
   ASTContext &ctx = var->getASTContext();
@@ -6360,8 +6491,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     scratch += "init";
 
     // If the first argument name doesn't start with a preposition, add "with".
-    if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-          == PK_None) {
+    if (!isPreposition(camel_case::getFirstWord(firstName.str()))) {
       camel_case::appendSentenceCase(scratch, "With");
     }
 
@@ -6420,10 +6550,8 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
       // If the first argument name doesn't start with a preposition, and the
       // method name doesn't end with a preposition, add "with".
       auto firstName = argNames[argIndex++];
-      if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-            == PK_None &&
-          getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
-            == PK_None) {
+      if (!isPreposition(camel_case::getFirstWord(firstName.str())) &&
+          !isPreposition(camel_case::getLastWord(firstPiece.str()))) {
         camel_case::appendSentenceCase(scratch, "With");
       }
 
@@ -6541,55 +6669,6 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
   OpaqueReturnTypeIdentifier = getASTContext().getIdentifier(mangleBuf);
   return OpaqueReturnTypeIdentifier;
-}
-
-void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
-  auto sig = getGenericSignature();
-  bool hasSelf = hasImplicitSelfDecl();
-
-  // Result
-  Type resultTy;
-  if (auto fn = dyn_cast<FuncDecl>(this)) {
-    resultTy = fn->getResultInterfaceType();
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    resultTy = ctor->getResultInterfaceType();
-  } else {
-    assert(isa<DestructorDecl>(this));
-    resultTy = TupleType::getEmpty(getASTContext());
-  }
-
-  // (Args...) -> Result
-  Type funcTy;
-
-  {
-    SmallVector<AnyFunctionType::Param, 4> argTy;
-    getParameters()->getParams(argTy);
-
-    // 'throws' only applies to the innermost function.
-    info = info.withThrows(hasThrows());
-    // Defer bodies must not escape.
-    if (auto fd = dyn_cast<FuncDecl>(this))
-      info = info.withNoEscape(fd->isDeferBody());
-
-    if (sig && !hasSelf) {
-      funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
-    } else {
-      funcTy = FunctionType::get(argTy, resultTy, info);
-    }
-  }
-
-  // (Self) -> (Args...) -> Result
-  if (hasSelf) {
-    // Substitute in our own 'self' parameter.
-    auto selfParam = computeSelfParam(this);
-    if (sig)
-      funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy);
-    else
-      funcTy = FunctionType::get({selfParam}, funcTy);
-  }
-
-  // Record the interface type.
-  setInterfaceType(funcTy);
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
@@ -7322,21 +7401,6 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),
          lowerThan.size() * sizeof(Relation));
-}
-
-llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
-    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
-  auto *dc = descriptor.dc;
-  PrecedenceGroupDecl *group = nullptr;
-  if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    group = sf->lookupPrecedenceGroup(descriptor.ident, cascading,
-                                      descriptor.nameLoc);
-  } else {
-    group = dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
-                                                         descriptor.nameLoc);
-  }
-  return group;
 }
 
 PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {

@@ -316,6 +316,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }
+  if (Invocation.getDiagnosticOptions().EnableDescriptiveDiagnostics) {
+    Diagnostics.setUseDescriptiveDiagnostics(true);
+  }
 }
 
 // The ordering of ModuleLoaders is important!
@@ -363,10 +366,11 @@ bool CompilerInstance::setUpModuleLoaders() {
       return true;
     }
   }
-
+  auto IgnoreSourceInfoFile =
+    Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
   if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
     auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
-        *Context, getDependencyTracker());
+        *Context, getDependencyTracker(), MLM, IgnoreSourceInfoFile);
     this->MemoryBufferLoader = MemoryBufferLoader.get();
     Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
@@ -390,12 +394,13 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface);
+        FEOpts.RemarkOnRebuildFromModuleInterface, IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(PIML));
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
-    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
+    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
+                                   IgnoreSourceInfoFile);
   this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
 
@@ -497,9 +502,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
   if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
-    PartialModules.push_back(
-        {std::move(buffers->ModuleBuffer), std::move(buffers->ModuleDocBuffer),
-         std::move(buffers->ModuleSourceInfoBuffer)});
+    PartialModules.push_back(std::move(*buffers));
     return None;
   }
   assert(buffers->ModuleDocBuffer.get() == nullptr);
@@ -511,7 +514,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   return bufferID;
 }
 
-Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
+Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
   if (auto b = input.buffer()) {
     return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
@@ -929,8 +932,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer),
+    if (!SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/"",
+                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
                       std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
                       /*treatAsPartialModule*/true))
       hadLoadError = true;

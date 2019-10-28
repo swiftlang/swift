@@ -472,7 +472,7 @@ destroyFoldedValueAtEndOfUse(SILValue foldedVal, SILValue originalVal,
                              SILFunction *fun) {
   // Folded value should have either trivial or owned ownership as it is an
   // integer or string constant.
-  assert(foldedVal.getOwnershipKind() == ValueOwnershipKind::Any ||
+  assert(foldedVal.getOwnershipKind() == ValueOwnershipKind::None ||
          foldedVal.getOwnershipKind() == ValueOwnershipKind::Owned);
 
   // If the ownership kinds of folded and original values are both either

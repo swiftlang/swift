@@ -57,8 +57,8 @@ bb0:
   return %1 : $()
 }
 
-sil [ossa] @copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
+sil [ossa] @strong_copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
-  %1 = copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
+  %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }

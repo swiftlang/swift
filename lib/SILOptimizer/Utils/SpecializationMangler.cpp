@@ -79,7 +79,7 @@ std::string GenericSpecializationMangler::mangle(GenericSignature Sig) {
 
   if (!Sig) {
     SILFunctionType *FTy = Function->getLoweredFunctionType();
-    Sig = FTy->getGenericSignature();
+    Sig = FTy->getInvocationGenericSignature();
   }
 
   bool First = true;

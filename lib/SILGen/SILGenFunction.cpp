@@ -557,6 +557,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
+                  SubstitutionMap(), false,
                   ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
@@ -643,6 +644,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(argc->getType().getASTType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
+                  SubstitutionMap(), false,
                   getASTContext());
 
     SILGenFunctionBuilder builder(SGM);
@@ -665,6 +667,31 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
   }
 }
+
+#ifndef NDEBUG
+/// If \c false, \c function is either a declaration that inherently cannot
+/// capture variables, or it is in a context it cannot capture variables from.
+/// In either case, it is expected that Sema may not have computed its
+/// \c CaptureInfo.
+///
+/// This call exists for use in assertions; do not use it to skip capture
+/// processing.
+static bool canCaptureFromParent(SILDeclRef function) {
+  switch (function.kind) {
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return false;
+
+  default:
+    if (function.hasDecl()) {
+      if (auto dc = dyn_cast<DeclContext>(function.getDecl())) {
+        return TypeConverter::canCaptureFromParent(dc);
+      }
+    }
+    return false;
+  }
+}
+#endif
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
@@ -706,6 +733,11 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   CaptureInfo captureInfo;
   if (function.getAnyFunctionRef())
     captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
+  else {
+    assert(!canCaptureFromParent(function));
+    captureInfo = CaptureInfo::empty();
+  }
+
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
@@ -761,7 +793,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   prepareEpilog(varType, false, CleanupLocation::get(loc));
 
   auto pbd = var->getParentPatternBinding();
-  auto entry = pbd->getPatternEntryForVarDecl(var);
+  const auto i = pbd->getPatternEntryIndexForVarDecl(var);
+  auto *anchorVar = pbd->getAnchoringVarDecl(i);
   auto subs = getForwardingSubstitutionMap();
   auto contextualType = dc->mapTypeIntoContext(interfaceType);
   auto resultType = contextualType->getCanonicalType();
@@ -775,7 +808,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     SmallVector<CleanupHandle, 4> cleanups;
     auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
 
-    emitApplyOfStoredPropertyInitializer(loc, entry, subs, resultType,
+    emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs, resultType,
                                          origResultType,
                                          SGFContext(init.get()));
 
@@ -786,7 +819,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     Scope scope(Cleanups, CleanupLocation(var));
 
     // If we have no indirect results, just return the result.
-    auto result = emitApplyOfStoredPropertyInitializer(loc, entry, subs,
+    auto result = emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs,
                                                        resultType,
                                                        origResultType,
                                                        SGFContext())

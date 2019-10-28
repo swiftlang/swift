@@ -47,3 +47,19 @@ public struct ResilientContainer {
     print(x)
   }
 }
+
+public struct WrapperP2<Wrapped: ExternalP2>: ExternalP2 {
+  public init(_ wrapped: Wrapped) {}
+  public func myValue3() -> Int64 { 0 }
+}
+
+public func externalResilientWrapper<Wrapped: ExternalP2>(_ wrapped: Wrapped) -> some ExternalP2 {
+  return WrapperP2(wrapped)
+}
+
+@inlinable
+@inline(never)
+public func inlinableExternalResilientWrapper<Wrapped: ExternalP2>(_ wrapped: Wrapped) -> some ExternalP2 {
+  return WrapperP2(wrapped)
+}
+

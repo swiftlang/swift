@@ -31,7 +31,6 @@
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Runtime/Unreachable.h"
 
-#include <iostream>
 #include <set>
 #include <vector>
 #include <unordered_map>

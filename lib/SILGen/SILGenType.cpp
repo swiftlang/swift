@@ -122,7 +122,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
   if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
-      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+      M.Types.checkFunctionForABIDifferences(M,
+                                             derivedInfo.SILFnType,
                                              overrideInfo.SILFnType) ==
           TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind);
@@ -1019,7 +1020,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+    for (auto i : range(pd->getNumPatternEntries())) {
       if (pd->getExecutableInit(i)) {
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
@@ -1154,7 +1155,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+    for (auto i : range(pd->getNumPatternEntries())) {
       if (pd->getExecutableInit(i)) {
         assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);

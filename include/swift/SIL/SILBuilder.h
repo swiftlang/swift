@@ -911,11 +911,11 @@ public:
     return insert(new (getModule())                                            \
                       RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty));    \
   }                                                                            \
-  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc,              \
-                                                 SILValue operand) {           \
+  StrongCopy##Name##ValueInst *createStrongCopy##Name##Value(                  \
+      SILLocation Loc, SILValue operand) {                                     \
     auto type = getFunction().getLoweredType(                                  \
         operand->getType().getASTType().getReferenceStorageReferent());        \
-    return insert(new (getModule()) Copy##Name##ValueInst(                     \
+    return insert(new (getModule()) StrongCopy##Name##ValueInst(               \
         getSILDebugLocation(Loc), operand, type));                             \
   }
 
@@ -2087,8 +2087,7 @@ public:
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
-    if (F->hasOwnership() &&
-        v.getOwnershipKind() == ValueOwnershipKind::Any)
+    if (F->hasOwnership() && v.getOwnershipKind() == ValueOwnershipKind::None)
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);

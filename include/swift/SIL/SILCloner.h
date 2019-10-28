@@ -1325,10 +1325,10 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
                                                getOpType(Inst->getType())));   \
   }                                                                            \
   template <typename ImplClass>                                                \
-  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
-      Copy##Name##ValueInst *Inst) {                                           \
+  void SILCloner<ImplClass>::visitStrongCopy##Name##ValueInst(                 \
+      StrongCopy##Name##ValueInst *Inst) {                                     \
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
-    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
+    recordClonedInstruction(Inst, getBuilder().createStrongCopy##Name##Value(  \
                                       getOpLocation(Inst->getLoc()),           \
                                       getOpValue(Inst->getOperand())));        \
   }
@@ -2315,8 +2315,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
 
   ValueOwnershipKind Kind = SILValue(Inst).getOwnershipKind();
   if (getOpValue(Inst->getOperand()).getOwnershipKind() ==
-      ValueOwnershipKind::Any) {
-    Kind = ValueOwnershipKind::Any;
+      ValueOwnershipKind::None) {
+    Kind = ValueOwnershipKind::None;
   }
   recordClonedInstruction(Inst, getBuilder().createUncheckedOwnershipConversion(
                                     getOpLocation(Inst->getLoc()),

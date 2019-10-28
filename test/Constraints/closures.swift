@@ -273,6 +273,7 @@ func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
   func append<Key: AnyObject>(value: T, forKey key: Key) where Key: Hashable {}
+  // expected-note@-1 {{where 'Key' = 'Object?'}}
 }
 class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
 struct S<T> {
@@ -280,9 +281,8 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+3 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
-    // expected-note @+2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note @+1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' be a class type}}
+    // expected-note @+1 {{wrapped type 'Object' satisfies this requirement}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }
@@ -292,11 +292,11 @@ func simplified1069() {
   class C {}
   struct S {
     func genericallyNonOptional<T: AnyObject>(_ a: T, _ b: T, _ c: T) { }
+    // expected-note@-1 {{where 'T' = 'Optional<C>'}}
 
     func f(_ a: C?, _ b: C?, _ c: C) {
-      genericallyNonOptional(a, b, c) // expected-error 2{{value of optional type 'C?' must be unwrapped to a value of type 'C'}}
-      // expected-note @-1 2{{coalesce}}
-      // expected-note @-2 2{{force-unwrap}}
+      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' be a class type}}
+      // expected-note @-1 {{wrapped type 'C' satisfies this requirement}}
     }
   }
 }
@@ -304,7 +304,7 @@ func simplified1069() {
 // Make sure we cannot infer an () argument from an empty parameter list.
 func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
-  acceptNothingToInt({ac1($0)})
+  acceptNothingToInt({ac1($0)}) // expected-error@:27 {{argument passed to call that takes no arguments}}
   // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
 }
 
@@ -372,6 +372,7 @@ func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
   bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-1:19 {{cannot convert value of type '([String : String], Any)' to closure result type '[(String, String)]'}}
 }
 
 

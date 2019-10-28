@@ -26,6 +26,21 @@ CHANGELOG
 Swift 5.2
 ---------
 
+* [SR-2189][]:
+
+  The compiler now supports local functions whose default arguments capture
+  values from outer scopes.
+
+  ```swift
+  func outer(x: Int) -> (Int, Int) {
+    func inner(y: Int = x) -> Int {
+      return y
+    }
+
+    return (inner(), inner(y: 0))
+  }
+  ```
+
 * [SR-11429][]:
 
   The compiler will now correctly strip argument labels from function references
@@ -58,6 +73,29 @@ Swift 5.2
   (foo as Magic)(5)
   ```
 
+* [SR-11298][]:
+
+  A class-constrained protocol extension, where the extended protocol does
+  not impose a class constraint, will now infer the constraint implicitly.
+
+  ```swift
+  protocol Foo {}
+  class Bar: Foo {
+    var someProperty: Int = 0
+  }
+
+  // Even though 'Foo' does not impose a class constraint, it is automatically
+  // inferred due to the Self: Bar constraint.
+  extension Foo where Self: Bar {
+    var anotherProperty: Int {
+      get { return someProperty }
+      // As a result, the setter is now implicitly nonmutating, just like it would
+      // be if 'Foo' had a class constraint.
+      set { someProperty = newValue }
+    }
+  }
+  ```
+
 * [SE-0253][]:
 
   Values of types that declare `func callAsFunction` methods can be called
@@ -83,7 +121,7 @@ Swift 5.2
 
 * [SR-4206][]:
 
-  A method override is no longer allowed to have a generic signature with 
+  A method override is no longer allowed to have a generic signature with
   requirements not imposed by the base method. For example:
 
   ```
@@ -7780,6 +7818,7 @@ Swift 1.0
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2176]: <https://bugs.swift.org/browse/SR-2176>
+[SR-2189]: <https://bugs.swift.org/browse/SR-2189>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
@@ -7799,4 +7838,5 @@ Swift 1.0
 [SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
+[SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>

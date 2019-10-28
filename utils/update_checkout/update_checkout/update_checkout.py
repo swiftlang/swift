@@ -11,6 +11,7 @@
 from __future__ import print_function
 
 import argparse
+import errno
 import json
 import os
 import platform
@@ -399,6 +400,28 @@ def skip_list_for_platform(config):
     return skip_list
 
 
+# Python 2.7 in Windows doesn't support os.symlink
+os_symlink = getattr(os, "symlink", None)
+if callable(os_symlink):
+    pass
+else:
+    def symlink_ms(source, link_name):
+        source = os.path.normpath(source)
+        link_name = os.path.normpath(link_name)
+        if os.path.isdir(link_name):
+            os.rmdir(link_name)
+        elif os.exists(link_name):
+            os.remove(link_name)
+        import ctypes
+        csl = ctypes.windll.kernel32.CreateSymbolicLinkW
+        csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
+        csl.restype = ctypes.c_ubyte
+        flags = 1 if os.path.isdir(source) else 0
+        if csl(link_name, source, flags) == 0:
+            raise ctypes.WinError()
+    os.symlink = symlink_ms
+
+
 def symlink_llvm_monorepo(args):
     print("Create symlink for LLVM Project")
     llvm_projects = ['clang',
@@ -413,7 +436,15 @@ def symlink_llvm_monorepo(args):
                                 project)
         dst_path = os.path.join(args.source_root, project)
         if not os.path.islink(dst_path):
-            os.symlink(src_path, dst_path)
+            try:
+                os.symlink(src_path, dst_path)
+            except OSError as e:
+                if e.errno == errno.EEXIST:
+                    print("File '%s' already exists. Remove it, so "
+                          "update-checkout can create the symlink to the "
+                          "llvm-monorepo." % dst_path)
+                else:
+                    raise e
 
 
 def main():
@@ -497,10 +528,6 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="The root directory to checkout repositories",
         default=SWIFT_SOURCE_ROOT,
         dest='source_root')
-    parser.add_argument(
-        '--symlink-llvm-monorepo',
-        help='Create symlink from LLVM-Project to source root directory',
-        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -572,8 +599,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:
-        if args.symlink_llvm_monorepo:
-            symlink_llvm_monorepo(args)
+        symlink_llvm_monorepo(args)
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

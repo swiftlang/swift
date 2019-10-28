@@ -609,11 +609,3 @@ enum SR_10084_E_16 {
   typealias Z = Int // expected-note {{'Z' previously declared here}}
   case Z // expected-error {{invalid redeclaration of 'Z'}}
 }
-
-// N.B. Validating the pattern binding initializer for `raw` used to cause
-// recursive validation of the VarDecl. Check that we don't regress now that
-// this isn't the case.
-public struct Cyclic {
-  static func pickMe(please: Bool) -> Int { return 42 }
-  public static let pickMe = Cyclic.pickMe(please: true)
-}

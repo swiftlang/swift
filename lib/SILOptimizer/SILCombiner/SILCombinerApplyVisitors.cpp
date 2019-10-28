@@ -494,7 +494,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
   // Bail if the result type of the converted callee is different from the callee's
   // result type of the apply instruction.
-  if (SubstCalleeTy->getAllResultsType() != ConvertCalleeTy->getAllResultsType()) {
+  if (SubstCalleeTy->getAllResultsSubstType(AI.getModule())
+        != ConvertCalleeTy->getAllResultsSubstType(AI.getModule())) {
     return nullptr;
   }
 
@@ -546,8 +547,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
   SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
                                             Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
-             AI.getSubstCalleeType()->getAllResultsType() &&
+  assert(FullApplySite::isa(NAI).getSubstCalleeType()
+                               ->getAllResultsSubstType(AI.getModule())
+           == AI.getSubstCalleeType()
+               ->getAllResultsSubstType(AI.getModule()) &&
          "Function types should be the same");
   return NAI;
 }
@@ -600,9 +603,23 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
     if (addr->getType().getStructOrBoundGenericStruct()) {
       addr = builder.createStructElementAddr(loc, addr, storedProperty);
     } else if (addr->getType().getClassOrBoundGenericClass()) {
-      LoadInst *Ref = builder.createLoad(loc, addr,
+      SingleValueInstruction *Ref = builder.createLoad(loc, addr,
                                          LoadOwnershipQualifier::Unqualified);
       insertEndAccess(beginAccess, /*isModify*/ false, builder);
+
+      // Handle the case where the storedProperty is in a super class.
+      while (Ref->getType().getClassOrBoundGenericClass() !=
+             storedProperty->getDeclContext()) {
+        SILType superCl = Ref->getType().getSuperclass();
+        if (!superCl) {
+          // This should never happen, because the property should be in the
+          // decl or in a superclass of it. Just handle this to be on the safe
+          // side.
+          return SILValue();
+        }
+        Ref = builder.createUpcast(loc, Ref, superCl);
+      }
+
       addr = builder.createRefElementAddr(loc, Ref, storedProperty);
 
       // Class members need access enforcement.
@@ -1586,9 +1603,17 @@ FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
                                   TAI->getSubstitutionMap(), arguments,
                                   TAI->getNormalBB(), TAI->getErrorBB());
   } else {
+    auto *AI = cast<ApplyInst>(apply);
+    auto fTy = callee->getType().getAs<SILFunctionType>();
+    // The optimizer can generate a thin_to_thick_function from a throwing thin
+    // to a non-throwing thick function (in case it can prove that the function
+    // is not throwing).
+    // Therefore we have to check if the new callee (= the argument of the
+    // thin_to_thick_function) is a throwing function and set the not-throwing
+    // flag in this case.
     return Builder.createApply(apply.getLoc(), callee,
                                apply.getSubstitutionMap(), arguments,
-                               cast<ApplyInst>(apply)->isNonThrowing());
+                               AI->isNonThrowing() || fTy->hasErrorResult());
   }
 }
 

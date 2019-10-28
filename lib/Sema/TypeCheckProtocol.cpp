@@ -2069,12 +2069,19 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    auto diag = diags.diagnose(match.Witness, 
-                               diag::protocol_witness_type_conflict,
-                               getTypeForDisplay(module, match.Witness),
-                               withAssocTypes);
-    if (!isa<TypeDecl>(req))
-      fixItOverrideDeclarationTypes(diag, match.Witness, req);
+    if (!isa<TypeDecl>(req)) {
+      computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
+        return diags.diagnose(match.Witness,
+                              diag::protocol_witness_type_conflict,
+                              getTypeForDisplay(module, match.Witness),
+                              withAssocTypes);
+      });
+    } else {
+      diags.diagnose(match.Witness,
+                     diag::protocol_witness_type_conflict,
+                     getTypeForDisplay(module, match.Witness),
+                     withAssocTypes);
+    }
     break;
   }
 
@@ -2619,6 +2626,15 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.SkipAttributes = true;
     Options.FunctionDefinitions = true;
     Options.PrintAccessorBodiesInProtocols = true;
+
+    // Skip 'mutating' only inside classes: mutating methods usually
+    // don't have a sensible non-mutating implementation.
+    bool isClass = Adopter->getSelfClassDecl() != nullptr;
+    if (isClass)
+      Options.ExcludeAttrList.push_back(DAK_Mutating);
+    // 'nonmutating' is only meaningful on value type member accessors.
+    if (isClass || !isa<AbstractStorageDecl>(Requirement))
+      Options.ExcludeAttrList.push_back(DAK_NonMutating);
 
     // FIXME: Once we support move-only types, remove this if the
     //        conforming type is move-only. Until then, don't suggest printing

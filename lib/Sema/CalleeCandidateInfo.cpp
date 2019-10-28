@@ -281,8 +281,9 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     CandidateCloseness getResult() const {
       return result;
     }
-    void extraArgument(unsigned argIdx) override {
+    bool extraArgument(unsigned argIdx) override {
       result = CC_ArgumentCountMismatch;
+      return true;
     }
     Optional<unsigned> missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
@@ -313,12 +314,14 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
   } listener;
-  
+
   // Use matchCallArguments to determine how close the argument list is (in
   // shape) to the specified candidates parameters.  This ignores the concrete
   // types of the arguments, looking only at the argument labels etc.
+  SmallVector<AnyFunctionType::Param, 4> arguments(actualArgs.begin(),
+                                                   actualArgs.end());
   SmallVector<ParamBinding, 4> paramBindings;
-  if (matchCallArguments(actualArgs, candArgs,
+  if (matchCallArguments(arguments, candArgs,
                          candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,

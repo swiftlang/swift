@@ -430,9 +430,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
-    auto memberType = typeDecl->getDeclaredInterfaceType();
+    // HACK: Lookups rooted at a typealias are trying to look for its underlying
+    // type so they shouldn't also find that same typealias.
+    if (decl == dyn_cast<TypeAliasDecl>(dc)) {
+      continue;
+    }
 
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
@@ -477,8 +483,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                         typeDecl, type);
+    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                              typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)

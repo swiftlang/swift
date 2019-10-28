@@ -72,7 +72,8 @@ bool SILInliner::canInlineApplySite(FullApplySite apply) {
   return true;
 }
 
-namespace swift {
+namespace {
+
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
   SILLocation Loc;
@@ -102,14 +103,15 @@ public:
   }
 
   void preprocess(SILBasicBlock *returnToBB) {
-    // Get the end_apply, abort_apply instructions.
-    auto Token = BeginApply->getTokenResult();
-    for (auto *TokenUse : Token->getUses()) {
-      if (auto End = dyn_cast<EndApplyInst>(TokenUse->getUser())) {
-        collectEndApply(End);
-      } else {
-        collectAbortApply(cast<AbortApplyInst>(TokenUse->getUser()));
-      }
+    SmallVector<EndApplyInst *, 1> endApplyInsts;
+    SmallVector<AbortApplyInst *, 1> abortApplyInsts;
+    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts);
+    while (!endApplyInsts.empty()) {
+      auto *endApply = endApplyInsts.pop_back_val();
+      collectEndApply(endApply);
+    }
+    while (!abortApplyInsts.empty()) {
+      collectAbortApply(abortApplyInsts.pop_back_val());
     }
   }
 
@@ -228,7 +230,8 @@ public:
     assert(!BeginApply->hasUsesOfAnyResult());
   }
 };
-} // namespace swift
+
+} // end anonymous namespace
 
 namespace swift {
 class SILInlineCloner
@@ -609,7 +612,8 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
-        getCalleeFunction()->getLoweredFunctionType()->getGenericSignature(),
+        getCalleeFunction()->getLoweredFunctionType()
+                           ->getInvocationGenericSignature(),
         ForInlining);
 
   auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
@@ -848,7 +852,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst: \
   case SILInstructionKind::Store##Name##Inst:

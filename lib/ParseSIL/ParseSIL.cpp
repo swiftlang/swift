@@ -155,13 +155,6 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
-  if (!FullParse && !*Done) {
-    // Only parsed a part of the source file.
-    // Add artificial EOF to be able to finalize the tree.
-    P.SyntaxContext->addRawSyntax(
-      ParsedRawSyntaxNode::makeDeferredMissing(tok::eof, P.Tok.getLoc()));
-  }
-
   if (STreeCreator) {
     auto rawNode = P.finalizeSyntaxTree();
     STreeCreator->acceptSyntaxRoot(rawNode, SF);
@@ -393,7 +386,7 @@ namespace {
       if (!P.consumeIf(tok::at_sign)) {
         // If we fail, we must have @any ownership. We check elsewhere in the
         // parser that this matches what the function signature wants.
-        OwnershipKind = ValueOwnershipKind::Any;
+        OwnershipKind = ValueOwnershipKind::None;
         return false;
       }
 
@@ -1266,7 +1259,7 @@ bool SILParser::parseSILType(SILType &Result,
   SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText().startswith("*")) {
     category = SILValueCategory::Address;
-    P.consumeStartingCharacterOfCurrentToken(tok::oper_binary_unspaced);
+    P.consumeStartingCharacterOfCurrentToken();
   }
 
   // Parse attributes.
@@ -2970,12 +2963,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     REFCOUNTING_INSTRUCTION(RetainValue)
     REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
     REFCOUNTING_INSTRUCTION(RetainValueAddr)
-#define UNCHECKED_REF_STORAGE(Name, ...) UNARY_INSTRUCTION(Copy##Name##Value)
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-    REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
-    REFCOUNTING_INSTRUCTION(Name##Retain) \
-    REFCOUNTING_INSTRUCTION(Name##Release) \
-    UNARY_INSTRUCTION(Copy##Name##Value)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  REFCOUNTING_INSTRUCTION(StrongRetain##Name)                                  \
+  REFCOUNTING_INSTRUCTION(Name##Retain)                                        \
+  REFCOUNTING_INSTRUCTION(Name##Release)                                       \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
@@ -3010,8 +3004,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
  // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
  case SILInstructionKind::UncheckedOwnershipConversionInst: {
-   ValueOwnershipKind LHSKind = ValueOwnershipKind::Any;
-   ValueOwnershipKind RHSKind = ValueOwnershipKind::Any;
+   ValueOwnershipKind LHSKind = ValueOwnershipKind::None;
+   ValueOwnershipKind RHSKind = ValueOwnershipKind::None;
    SourceLoc Loc;
 
    if (parseTypedValueRef(Val, Loc, B) ||
@@ -3118,7 +3112,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILType, 4> operandTypes;
     {
       Scope genericsScope(&P, ScopeKind::Generics);
-      generics = P.parseSILGenericParams().getPtrOrNull();
+      generics = P.maybeParseGenericParams().getPtrOrNull();
       patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
       
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
@@ -5333,7 +5327,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
-        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any;
+        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::None;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,
@@ -5724,7 +5718,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   GenericEnvironment *patternEnv;
   Scope toplevelScope(&P, ScopeKind::TopLevel);
   Scope genericsScope(&P, ScopeKind::Generics);
-  generics = P.parseSILGenericParams().getPtrOrNull();
+  generics = P.maybeParseGenericParams().getPtrOrNull();
   patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
   
   if (patternEnv) {
@@ -6037,7 +6031,7 @@ Optional<ProtocolConformanceRef> SILParser::parseProtocolConformance(
   // Make sure we don't leave it uninitialized in the caller
   genericEnv = nullptr;
 
-  auto *genericParams = P.parseSILGenericParams().getPtrOrNull();
+  auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
   if (genericParams) {
     genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
   }

@@ -33,7 +33,7 @@ entry(%s : $CP):
 
   %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
-  %v_copy = copy_unmanaged_value %v : $@sil_unmanaged CP
+  %v_copy = strong_copy_unmanaged_value %v : $@sil_unmanaged CP
   // CHECK: call void @swift_release(%swift.refcounted* %0)
   strong_release %v_copy : $CP
 

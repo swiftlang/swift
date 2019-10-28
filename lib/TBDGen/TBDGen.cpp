@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -32,8 +33,11 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/IR/Mangler.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 #include "llvm/TextAPI/MachO/TextAPIReader.h"
@@ -52,10 +56,15 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 }
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
-  Symbols.addSymbol(kind, name, Targets);
+  // The linker expects to see mangled symbol names in TBD files, so make sure
+  // to mangle before inserting the symbol.
+  SmallString<32> mangled;
+  llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+
+  Symbols.addSymbol(kind, mangled, Archs);
 
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
-    auto isNewValue = StringSymbols->insert(name).second;
+    auto isNewValue = StringSymbols->insert(mangled).second;
     (void)isNewValue;
     assert(isNewValue && "symbol appears twice");
   }
@@ -597,7 +606,10 @@ convertToPacked(const version::Version &version) {
 }
 
 static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
-  return LangOpts.EnableAppExtensionRestrictions;
+  // Existing linkers respect these flags to determine app extension safety.
+  return LangOpts.EnableAppExtensionRestrictions ||
+         llvm::sys::Process::GetEnv("LD_NO_ENCRYPT") ||
+         llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
@@ -615,15 +627,41 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
-  file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
-  file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
+  if (auto currentVersion = opts.CurrentVersion) {
+    file.setCurrentVersion(convertToPacked(*currentVersion));
+  }
+  if (auto compatibilityVersion = opts.CompatibilityVersion) {
+    file.setCompatibilityVersion(convertToPacked(*compatibilityVersion));
+  }
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
   llvm::MachO::Target target(triple);
   file.addTarget(target);
 
-  TBDGenVisitor visitor(file, {target}, symbols, linkInfo, M, opts);
+  auto getPlatformKind =
+      [](const llvm::Triple &Target) -> llvm::MachO::PlatformKind {
+    switch (Target.getOS()) {
+    default:
+      return llvm::MachO::PlatformKind::unknown;
+    case llvm::Triple::MacOSX:
+      return llvm::MachO::PlatformKind::macOS;
+    case llvm::Triple::IOS:
+      return llvm::MachO::PlatformKind::iOS;
+    case llvm::Triple::TvOS:
+      return llvm::MachO::PlatformKind::tvOS;
+    case llvm::Triple::WatchOS:
+      return llvm::MachO::PlatformKind::watchOS;
+    }
+  };
+  auto arch = llvm::MachO::getArchitectureFromName(target.getArchName());
+  file.addArch(arch);
+  file.setPlatform(getPlatformKind(target));
+
+  auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  TBDGenVisitor visitor(file, arch, symbols,
+                        clang->getTargetInfo().getDataLayout(),
+                        linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {

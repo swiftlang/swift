@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-% for node in SYNTAX_NODES + PARSEONLY_NODES:
+% for node in SYNTAX_NODES:
 %   if node.is_buildable():
 %     for child in node.children:
 %       child_elt = None
@@ -88,8 +88,6 @@ void Parsed${node.name}Builder::finishLayout(bool deferred) {
 %     child_node = NODE_MAP.get(child.syntax_kind)
 %     if child_node and child_node.is_syntax_collection():
 %       child_elt = child_node.collection_element_name
-%       child_elt_type = child_node.collection_element_type
-%       child_elt_name = child.name + 'Member'
 %     if child_elt:
   if (!${child_elt_name}s.empty()) {
     if (deferred) {
@@ -122,10 +120,6 @@ void Parsed${node.name}Builder::finishLayout(bool deferred) {
   }
 %     end
 %   end
-
-#ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(Layout);
-#endif
 % end
 }
 

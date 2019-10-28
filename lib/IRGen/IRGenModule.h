@@ -813,7 +813,8 @@ public:
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
-  clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
+  clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
+                                           CanSILFunctionType funcTy);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&

@@ -120,9 +120,11 @@ class TestDecimal : TestDecimalSuper {
         expectFalse(zero.isNaN)
         expectFalse(zero.isSignaling)
 
-        let d1 = Decimal(1234567890123456789 as UInt64)
-        expectEqual(d1._exponent, 0)
-        expectEqual(d1._length, 4)
+        if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+            let d1 = Decimal(1234567890123456789 as UInt64)
+            expectEqual(d1._exponent, 0)
+            expectEqual(d1._length, 4)
+        }
     }
     func test_Constants() {
         expectEqual(8, NSDecimalMaxSize)
@@ -303,7 +305,9 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(Decimal(68040), Decimal(386).advanced(by: Decimal(67654)))
         expectEqual(Decimal(1.234), abs(Decimal(1.234)))
         expectEqual(Decimal(1.234), abs(Decimal(-1.234)))
-        expectTrue(Decimal.nan.magnitude.isNaN)
+        if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+            expectTrue(Decimal.nan.magnitude.isNaN)
+        }
         var a = Decimal(1234)
         var r = a
         expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&r, &a, 1, .plain))
@@ -335,7 +339,9 @@ class TestDecimal : TestDecimalSuper {
                 expectEqual(.noError, NSDecimalPower(&result, &actual, j, .plain))
                 let expected = Decimal(pow(Double(i), Double(j)))
                 expectEqual(expected, result, "\(result) == \(i)^\(j)")
-                expectEqual(expected, pow(actual, j))
+                if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+                    expectEqual(expected, pow(actual, j))
+                }
             }
         }
     }

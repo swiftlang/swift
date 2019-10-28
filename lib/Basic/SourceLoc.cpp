@@ -213,7 +213,8 @@ StringRef SourceManager::extractText(CharSourceRange Range,
                        Range.getByteLength());
 }
 
-unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
+Optional<unsigned>
+SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());
   // Search the buffers back-to front, so later alias buffers are
   // visited first.
@@ -226,7 +227,18 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
         less_equal(Loc.Value.getPointer(), Buf->getBufferEnd()))
       return i;
   }
+  return None;
+}
+
+unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
+  auto Id = findBufferContainingLocInternal(Loc);
+  if (Id.hasValue())
+    return *Id;
   llvm_unreachable("no buffer containing location found");
+}
+
+bool SourceManager::isOwning(SourceLoc Loc) const {
+  return findBufferContainingLocInternal(Loc).hasValue();
 }
 
 void SourceRange::widen(SourceRange Other) {
@@ -357,3 +369,30 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   return None;
 }
 
+unsigned SourceManager::getExternalSourceBufferId(StringRef Path) {
+  auto It = BufIdentIDMap.find(Path);
+  if (It != BufIdentIDMap.end()) {
+    return It->getSecond();
+  }
+  unsigned Id = 0u;
+  auto InputFileOrErr = swift::vfs::getFileOrSTDIN(*getFileSystem(), Path);
+  if (InputFileOrErr) {
+    // This assertion ensures we can look up from the map in the future when
+    // using the same Path.
+    assert(InputFileOrErr.get()->getBufferIdentifier() == Path);
+    Id = addNewSourceBuffer(std::move(InputFileOrErr.get()));
+  }
+  return Id;
+}
+
+SourceLoc
+SourceManager::getLocFromExternalSource(StringRef Path, unsigned Line,
+                                        unsigned Col) {
+  auto BufferId = getExternalSourceBufferId(Path);
+  if (BufferId == 0u)
+    return SourceLoc();
+  auto Offset = resolveFromLineCol(BufferId, Line, Col);
+  if (!Offset.hasValue())
+    return SourceLoc();
+  return getLocForOffset(BufferId, *Offset);
+}

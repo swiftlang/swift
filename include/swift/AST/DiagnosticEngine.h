@@ -670,6 +670,9 @@ namespace swift {
     /// Print diagnostic names after their messages
     bool printDiagnosticNames = false;
 
+    /// Use descriptive diagnostic style when available.
+    bool useDescriptiveDiagnostics = false;
+
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
@@ -711,6 +714,13 @@ namespace swift {
     }
     bool getPrintDiagnosticNames() const {
       return printDiagnosticNames;
+    }
+
+    void setUseDescriptiveDiagnostics(bool val) {
+       useDescriptiveDiagnostics = val;
+    }
+    bool getUseDescriptiveDiagnostics() const {
+      return useDescriptiveDiagnostics;
     }
 
     void ignoreDiagnostic(DiagID id) {

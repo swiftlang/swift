@@ -357,7 +357,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
-  GenericSignature GenSig = ThunkType->getGenericSignature();
+  assert(ThunkType->getSubstitutions().empty() && "not implemented");
+  GenericSignature GenSig = ThunkType->getSubstGenericSignature();
   if (GenSig)
     CurGenericSignature = GenSig->getCanonicalSignature();
 
@@ -1466,13 +1467,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
-    appendType(param.getType());
+    appendType(param.getInterfaceType());
   }
 
   // Mangle the results.
   for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
-    appendType(result.getType());
+    appendType(result.getInterfaceType());
   }
 
   // Mangle the error result if present.
@@ -1480,10 +1481,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     auto error = fn->getErrorResult();
     OpArgs.push_back('z');
     OpArgs.push_back(getResultConvention(error.getConvention()));
-    appendType(error.getType());
+    appendType(error.getInterfaceType());
   }
   if (fn->isPolymorphic())
-    appendGenericSignature(fn->getGenericSignature());
+    appendGenericSignature(fn->getSubstGenericSignature());
 
   OpArgs.push_back('_');
 
@@ -1606,8 +1607,8 @@ namespace {
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
 static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
-  for (auto entry : binding->getPatternList()) {
-    auto var = FindFirstVariable().visit(entry.getPattern());
+  for (auto idx : range(binding->getNumPatternEntries())) {
+    auto var = FindFirstVariable().visit(binding->getPattern(idx));
     if (var) return var;
   }
   // Pattern-binding bound without variables exists in erroneous code, e.g.

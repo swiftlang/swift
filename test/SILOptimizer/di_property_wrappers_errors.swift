@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s -enable-ownership-stripping-after-serialization
+
 @propertyWrapper
 final class ClassWrapper<T> {
   var wrappedValue: T {
