@@ -1050,7 +1050,7 @@ fi
 ALL_HOSTS=("${ALL_HOSTS[@]}" "${CROSS_COMPILE_HOSTS[@]}")
 
 function has_cross_compile_hosts() {
-    if [[ ${#ALL_HOSTS[@]} -gt 1 ]]; then
+    if [[ ${#CROSS_COMPILE_HOSTS[@]} -ge 1 ]]; then
         echo "1"
     fi
 }
