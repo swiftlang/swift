@@ -184,10 +184,8 @@ extension Result {
     ///     let safeInt = nonFailingIntResult.get()
     ///     // safeInt == 42
     ///
-    /// - Parameter transform: A closure that takes the failure value of this
-    ///   instance.
-    /// - Returns: A `Result` instance with the result of evaluating `transform`
-    ///   as the new success value if this instance represents a failure.
+    /// - Parameter replacement: A success value to replace any failure value
+    /// - Returns: A `Result` instance with the result of a success or the replacement value.
     func replaceFailure(with replacement: Success) -> Result<Success, Never> {
         switch self {
         case let .success(success):
