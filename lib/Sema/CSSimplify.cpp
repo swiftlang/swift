@@ -2741,8 +2741,15 @@ bool ConstraintSystem::repairFailures(
       if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
         return false;
 
-      if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
-        return false;
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::MetatypeToExistentialMetatype) ||
+          hasConversionOrRestriction(
+              ConversionRestrictionKind::ExistentialMetatypeToMetatype) ||
+          hasConversionOrRestriction(ConversionRestrictionKind::Superclass)) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+        return true;
+      }
 
       if (hasConversionOrRestriction(
               ConversionRestrictionKind::ValueToOptional)) {
