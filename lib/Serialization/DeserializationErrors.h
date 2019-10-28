@@ -207,7 +207,7 @@ public:
   }
 
   DeclBaseName getLastName() const {
-    for (auto &piece : reversed(path)) {
+    for (auto &piece : llvm::reverse(path)) {
       DeclBaseName result = piece.getAsBaseName();
       if (!result.empty())
         return result;

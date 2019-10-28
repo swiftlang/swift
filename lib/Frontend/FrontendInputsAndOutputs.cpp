@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/Range.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -433,6 +434,12 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.ModuleDocOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleSourceInfoOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleSourceInfoOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {

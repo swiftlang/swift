@@ -17,7 +17,6 @@ extension ContainsMinMax {
 }
 
 func foo(_: Int, _: Int) {}
-// expected-note@-1 {{'foo' declared here}}
 
 protocol ContainsFoo {}
 extension ContainsFoo {
@@ -34,9 +33,10 @@ extension NonConditional {
         _ = min(3, 4)
         // expected-error@-1{{use of 'min' refers to instance method}}
         // expected-note@-2{{use 'Swift.' to reference the global function}}
-        _ = foo(5, 6)
-        // expected-error@-1{{use of 'foo' refers to instance method}}
-        // expected-note@-2{{use 'name_lookup_min_max_conditional_conformance.' to reference the global function}}
+
+        // FIXME(diagnostics): Better diagnostic in this case would be to suggest to add `name_lookup_min_max_conditional_conformance.`
+        // to call because name `foo` is shadowed by instance method without arguments. Would be fixed by `resolveDeclRefExpr` refactoring.
+        _ = foo(5, 6) // expected-error {{argument passed to call that takes no arguments}}
     }
 }
 
@@ -52,7 +52,10 @@ extension Conditional {
         _ = min(3, 4)
         // expected-warning@-1{{use of 'min' as reference to global function in module 'Swift' will change in future versions of Swift to reference instance method in generic struct 'Conditional' which comes via a conditional conformance}}
         // expected-note@-2{{use 'Swift.' to continue to reference the global function}}
+
+        // FIXME(diagnostics): Same as line 39, there should be only one error here about shadowing.
         _ = foo(5, 6)
-        // expected-error@-1{{referencing instance method 'foo()' on 'Conditional' requires that 'T' conform to 'ContainsFoo'}}
+        // expected-error@-1 {{referencing instance method 'foo()' on 'Conditional' requires that 'T' conform to 'ContainsFoo'}}
+        // expected-error@-2 {{argument passed to call that takes no arguments}}
     }
 }

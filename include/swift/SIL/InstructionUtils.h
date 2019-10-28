@@ -149,23 +149,34 @@ void findClosuresForFunctionValue(SILValue V,
 /// NOTE: If we perform this transformation, our builtin will no longer have any
 /// substitutions since we only substitute to concrete static overloads.
 struct PolymorphicBuiltinSpecializedOverloadInfo {
+  const BuiltinInfo *builtinInfo;
   Identifier staticOverloadIdentifier;
   SmallVector<SILType, 8> argTypes;
   SILType resultType;
-  bool hasOutParam = false;
+  bool hasOutParam;
 
-#ifndef NDEBUG
 private:
-  bool isInitialized = false;
-#endif
+  bool isInitialized;
 
 public:
-  PolymorphicBuiltinSpecializedOverloadInfo() = default;
+  PolymorphicBuiltinSpecializedOverloadInfo()
+      : builtinInfo(nullptr), staticOverloadIdentifier(), argTypes(),
+        resultType(), hasOutParam(false), isInitialized(false) {}
 
+  /// Returns true if we were able to map the polymorphic builtin to a static
+  /// overload. False otherwise.
+  ///
+  /// NOTE: This does not mean that the static overload actually exists.
+  bool init(BuiltinInst *bi);
+
+  bool doesOverloadExist() const {
+    CanBuiltinType builtinType = argTypes.front().getAs<BuiltinType>();
+    return canBuiltinBeOverloadedForType(builtinInfo->ID, builtinType);
+  }
+
+private:
   bool init(SILFunction *fn, BuiltinValueKind builtinKind,
             ArrayRef<SILType> oldOperandTypes, SILType oldResultType);
-
-  bool init(BuiltinInst *bi);
 };
 
 /// Given a polymorphic builtin \p bi, analyze its types and create a builtin

@@ -792,7 +792,6 @@ public:
           /*IsStatic*/ false, VarDecl::Introducer::Var,
           /*IsCaptureList*/ false, S->getInLoc(),
           TC.Context.getIdentifier(name), DC);
-      iterator->setType(iteratorTy);
       iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
       iterator->setImplicit();
       S->setIteratorVar(iterator);
@@ -1065,7 +1064,10 @@ public:
 
       // If that failed, mark any variables binding pieces of the pattern
       // as invalid to silence follow-on errors.
-      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+      pattern->forEachVariable([&](VarDecl *VD) {
+        VD->setInterfaceType(ErrorType::get(TC.Context));
+        VD->setInvalid();
+      });
     }
     labelItem.setPattern(pattern);
 
@@ -1136,13 +1138,16 @@ public:
         }
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        if (vd->hasType() && initialCaseVarDecl->hasType() &&
+        if (vd->getInterfaceType() && initialCaseVarDecl->getType() &&
             !initialCaseVarDecl->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
-          vd->markInvalid();
-          initialCaseVarDecl->markInvalid();
+          vd->setInterfaceType(ErrorType::get(TC.Context));
+          vd->setInvalid();
+
+          initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
+          initialCaseVarDecl->setInvalid();
         }
 
         if (initialCaseVarDecl->isLet() == vd->isLet()) {
@@ -1162,8 +1167,11 @@ public:
         if (foundVP)
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-        vd->markInvalid();
-        initialCaseVarDecl->markInvalid();
+        vd->setInterfaceType(ErrorType::get(TC.Context));
+        vd->setInvalid();
+
+        initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
+        initialCaseVarDecl->setInvalid();
       }
     });
 
@@ -1230,8 +1238,11 @@ public:
           TC.diagnose(previous->getLoc(),
                       diag::type_mismatch_fallthrough_pattern_list,
                       previous->getType(), expected->getType());
-          previous->markInvalid();
-          expected->markInvalid();
+          previous->setInterfaceType(ErrorType::get(TC.Context));
+          previous->setInvalid();
+
+          expected->setInterfaceType(ErrorType::get(TC.Context));
+          expected->setInvalid();
         }
 
         // Ok, we found our match. Make the previous fallthrough statement var
@@ -1322,8 +1333,6 @@ public:
           if (!prev->hasName() || expected->getName() != prev->getName()) {
             continue;
           }
-          if (prev->hasType())
-            expected->setType(prev->getType());
           if (prev->hasInterfaceType())
             expected->setInterfaceType(prev->getInterfaceType());
           break;
@@ -1468,7 +1477,8 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
       });
     }
 
@@ -1835,82 +1845,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
-static Optional<unsigned>
-getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
-  ArrayRef<ParamDecl *> params = paramList->getArray();
-  for (unsigned i = 0; i < params.size(); ++i) {
-    if (params[i] == decl) return i;
-  }
-  return None;
-}
-
-static void
-checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
-  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
-    return;
-
-  auto *DC = PD->getInnermostDeclContext();
-  const SourceFile *SF = DC->getParentSourceFile();
-  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
-         "explicit inherited default argument outside of a module interface?");
-
-  // The containing decl should be a designated initializer.
-  auto ctor = dyn_cast<ConstructorDecl>(DC);
-  if (!ctor || ctor->isConvenienceInit()) {
-    TC.diagnose(
-        PD, diag::inherited_default_value_not_in_designated_constructor);
-    return;
-  }
-
-  // The decl it overrides should also be a designated initializer.
-  auto overridden = ctor->getOverriddenDecl();
-  if (!overridden || overridden->isConvenienceInit()) {
-    TC.diagnose(
-        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
-    if (overridden)
-      TC.diagnose(overridden, diag::overridden_here);
-    return;
-  }
-
-  // The corresponding parameter should have a default value.
-  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
-  assert(idx && "containing decl does not contain param?");
-  ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
-  if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
-    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
-    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
-  }
-}
-
-/// Check the default arguments that occur within this pattern.
-void TypeChecker::checkDefaultArguments(ParameterList *params,
-                                        ValueDecl *VD) {
-  for (auto *param : *params) {
-    checkInheritedDefaultValueRestrictions(*this, param);
-    if (!param->getDefaultValue() ||
-        !param->hasInterfaceType() ||
-        param->getInterfaceType()->hasError())
-      continue;
-
-    Expr *e = param->getDefaultValue();
-    auto *initContext = param->getDefaultArgumentInitContext();
-
-    auto resultTy =
-        typeCheckParameterDefault(e, initContext, param->getType(),
-                                  /*isAutoClosure=*/param->isAutoClosure());
-
-    if (resultTy) {
-      param->setDefaultValue(e);
-    }
-
-    checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)contextualizeInitializer(initContext, e);
-  }
-}
-
 static Type getFunctionBuilderType(FuncDecl *FD) {
   Type builderType = FD->getFunctionBuilderType();
 
@@ -2143,8 +2077,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
-  tc.validateDecl(AFD);
-  tc.checkDefaultArguments(AFD->getParameters(), AFD);
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)AFD->getInterfaceType();
 
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())

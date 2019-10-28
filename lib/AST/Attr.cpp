@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -1125,7 +1126,7 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause,
                                bool exported,
                                SpecializationKind kind,
-                               GenericSignature *specializedSignature)
+                               GenericSignature specializedSignature)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause),
@@ -1143,7 +1144,7 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        TrailingWhereClause *clause,
                                        bool exported,
                                        SpecializationKind kind,
-                                       GenericSignature *specializedSignature) {
+                                       GenericSignature specializedSignature) {
   return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
                                   specializedSignature);
 }

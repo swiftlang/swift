@@ -1001,7 +1001,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
-      witnessSurrogate = C.TheUnknownObjectType;
+      witnessSurrogate = C.getAnyObjectType();
       break;
     case ReferenceCounting::Bridge:
       witnessSurrogate = C.TheBridgeObjectType;

@@ -25,6 +25,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -121,7 +122,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
   if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
-      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+      M.Types.checkFunctionForABIDifferences(M,
+                                             derivedInfo.SILFnType,
                                              overrideInfo.SILFnType) ==
           TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind);
@@ -152,7 +154,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
       cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
-      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
+      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
@@ -1017,7 +1020,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+    for (auto i : range(pd->getNumPatternEntries())) {
       if (pd->getExecutableInit(i)) {
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
@@ -1034,6 +1037,14 @@ public:
       emitTypeMemberGlobalVariable(SGM, vd);
       visitAccessors(vd);
       return;
+    }
+
+    // If this variable has an attached property wrapper with an initialization
+    // function, emit the backing initializer function.
+    if (auto wrapperInfo = vd->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.initializeFromOriginal && !vd->isStatic()) {
+        SGM.emitPropertyWrapperBackingInitializer(vd);
+      }
     }
 
     visitAbstractStorageDecl(vd);
@@ -1144,7 +1155,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+    for (auto i : range(pd->getNumPatternEntries())) {
       if (pd->getExecutableInit(i)) {
         assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);

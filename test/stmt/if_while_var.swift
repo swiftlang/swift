@@ -30,7 +30,9 @@ guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initi
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
 
 if case let x? = nonOptionalStruct() { } // expected-error{{'?' pattern cannot match values of type 'NonOptionalStruct'}}
+// expected-error@-1{{variable 'x' is not bound by any pattern}}
 if case let x? = nonOptionalEnum() { } // expected-error{{'?' pattern cannot match values of type 'NonOptionalEnum'}}
+// expected-error@-1{{variable 'x' is not bound by any pattern}}
 
 class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
@@ -64,6 +66,7 @@ if var x = opt {} // expected-warning {{value 'x' was defined but never used; co
 let someInteger = 1
 if let y = someInteger {}  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
 if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match values of type 'Int'}}
+// expected-error@-1{{variable 'y' is not bound by any pattern}}
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,
@@ -88,7 +91,7 @@ if 1 != 2, case let x? : Int? = 42 {} // expected-warning {{immutable value 'x' 
 
 // Test error recovery.
 // <rdar://problem/19939746> Improve error recovery for malformed if statements
-if 1 != 2, { // expected-error {{'() -> ()' is not convertible to 'Bool'}}
+if 1 != 2, { // expected-error {{cannot convert value of type '() -> ()' to expected condition type 'Bool'}}
 } // expected-error {{expected '{' after 'if' condition}}
 if 1 != 2, 4 == 57 {}
 if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}

@@ -40,12 +40,42 @@
 using namespace swift;
 using namespace swift::Lowering;
 
-SILType SILFunctionType::getDirectFormalResultsType() {
+SILType SILFunctionType::substInterfaceType(SILModule &M,
+                                            SILType interfaceType) const {
+  if (getSubstitutions().empty())
+    return interfaceType;
+  
+  return interfaceType.subst(M, getSubstitutions());
+}
+
+CanType SILParameterInfo::getArgumentType(SILModule &M,
+                                          const SILFunctionType *t) const {
+  // TODO: We should always require a function type.
+  if (t)
+    return t->substInterfaceType(M,
+                          SILType::getPrimitiveAddressType(getInterfaceType()))
+            .getASTType();
+  
+  return getInterfaceType();
+}
+
+CanType SILResultInfo::getReturnValueType(SILModule &M,
+                                          const SILFunctionType *t) const {
+  // TODO: We should always require a function type.
+  if (t)
+    return t->substInterfaceType(M,
+                          SILType::getPrimitiveAddressType(getInterfaceType()))
+            .getASTType();
+
+  return getInterfaceType();
+}
+
+SILType SILFunctionType::getDirectFormalResultsType(SILModule &M) {
   CanType type;
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {
-    type = getSingleDirectFormalResult().getType();
+    type = getSingleDirectFormalResult().getReturnValueType(M, this);
   } else {
     auto &cache = getMutableFormalResultsCache();
     if (cache) {
@@ -54,7 +84,7 @@ SILType SILFunctionType::getDirectFormalResultsType() {
       SmallVector<TupleTypeElt, 4> elts;
       for (auto result : getResults())
         if (!result.isFormalIndirect())
-          elts.push_back(result.getType());
+          elts.push_back(result.getReturnValueType(M, this));
       type = CanType(TupleType::get(elts, getASTContext()));
       cache = type;
     }
@@ -62,12 +92,12 @@ SILType SILFunctionType::getDirectFormalResultsType() {
   return SILType::getPrimitiveObjectType(type);
 }
 
-SILType SILFunctionType::getAllResultsType() {
+SILType SILFunctionType::getAllResultsInterfaceType() {
   CanType type;
   if (getNumResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumResults() == 1) {
-    type = getResults()[0].getType();
+    type = getResults()[0].getInterfaceType();
   } else {
     auto &cache = getMutableAllResultsCache();
     if (cache) {
@@ -75,7 +105,7 @@ SILType SILFunctionType::getAllResultsType() {
     } else {
       SmallVector<TupleTypeElt, 4> elts;
       for (auto result : getResults())
-        elts.push_back(result.getType());
+        elts.push_back(result.getInterfaceType());
       type = CanType(TupleType::get(elts, getASTContext()));
       cache = type;
     }
@@ -83,14 +113,18 @@ SILType SILFunctionType::getAllResultsType() {
   return SILType::getPrimitiveObjectType(type);
 }
 
-SILType SILFunctionType::getFormalCSemanticResult() {
-  assert(getLanguage() == SILFunctionLanguage::C);
-  assert(getNumResults() <= 1);
-  return getDirectFormalResultsType();
+SILType SILFunctionType::getAllResultsSubstType(SILModule &M) {
+  return substInterfaceType(M, getAllResultsInterfaceType());
 }
 
-CanType SILFunctionType::getSelfInstanceType() const {
-  auto selfTy = getSelfParameter().getType();
+SILType SILFunctionType::getFormalCSemanticResult(SILModule &M) {
+  assert(getLanguage() == SILFunctionLanguage::C);
+  assert(getNumResults() <= 1);
+  return getDirectFormalResultsType(M);
+}
+
+CanType SILFunctionType::getSelfInstanceType(SILModule &M) const {
+  auto selfTy = getSelfParameter().getArgumentType(M, this);
 
   // If this is a static method, get the instance type.
   if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
@@ -100,9 +134,11 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 ClassDecl *
-SILFunctionType::getWitnessMethodClass() const {
-  auto selfTy = getSelfInstanceType();
-  auto genericSig = getGenericSignature();
+SILFunctionType::getWitnessMethodClass(SILModule &M) const {
+  // TODO: When witnesses use substituted types, we'd get this from the
+  // substitution map.
+  auto selfTy = getSelfInstanceType(M);
+  auto genericSig = getSubstGenericSignature();
   if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto superclass = genericSig->getSuperclassBound(paramTy);
@@ -136,8 +172,6 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       if (!typeDecl)
         return CanType();
 
-      assert(typeDecl->hasInterfaceType() &&
-             "bridged type must be type-checked");
       return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
     })();
   }
@@ -182,11 +216,13 @@ CanSILFunctionType Lowering::adjustFunctionType(
       type->getWitnessMethodConformanceOrNone() == witnessMethodConformance)
     return type;
 
-  return SILFunctionType::get(type->getGenericSignature(),
+  return SILFunctionType::get(type->getSubstGenericSignature(),
                               extInfo, type->getCoroutineKind(), callee,
                               type->getParameters(), type->getYields(),
                               type->getResults(),
                               type->getOptionalErrorResult(),
+                              type->getSubstitutions(),
+                              type->isGenericSignatureImplied(),
                               type->getASTContext(),
                               witnessMethodConformance);
 }
@@ -208,9 +244,11 @@ CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
             : Lowering::DefaultThickCalleeConvention)
        : ParameterConvention::Direct_Unowned);
 
-  return get(getGenericSignature(), newExt, getCoroutineKind(),
+  return get(getSubstGenericSignature(), newExt, getCoroutineKind(),
              calleeConvention, getParameters(), getYields(),
-             getResults(), getOptionalErrorResult(), getASTContext(),
+             getResults(), getOptionalErrorResult(),
+             getSubstitutions(), isGenericSignatureImplied(),
+             getASTContext(),
              getWitnessMethodConformanceOrNone());
 }
 
@@ -1021,10 +1059,12 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     .withNoEscape(extInfo.isNoEscape());
   
+  
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
-                              results, errorResult, TC.Context,
-                              witnessMethodConformance);
+                              results, errorResult,
+                              SubstitutionMap(), false,
+                              TC.Context, witnessMethodConformance);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1288,6 +1328,7 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
+    case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer: {
       auto conv = DefaultConventions(NormalParameterConvention::Guaranteed);
@@ -1815,6 +1856,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -2045,6 +2087,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
+    case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
@@ -2341,41 +2384,52 @@ public:
   // When a function appears inside of another type, we only perform
   // substitutions if it does not have a generic signature.
   CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType) {
-    if (origType->getGenericSignature())
+    if (origType->getSubstGenericSignature()) {
+      if (auto subs = origType->getSubstitutions()) {
+        // Substitute the substitutions.
+        auto newSubs = subs.subst(Subst, Conformances);
+        return origType->withSubstitutions(newSubs);
+      }
+      
       return origType;
+    }
 
     return substSILFunctionType(origType);
   }
 
   // Entry point for use by SILType::substGenericArgs().
   CanSILFunctionType substSILFunctionType(CanSILFunctionType origType) {
+    // TODO: Maybe this can be retired once substituted function types are
+    // used pervasively.
+    assert(!origType->getSubstitutions());
+    
     SmallVector<SILResultInfo, 8> substResults;
     substResults.reserve(origType->getNumResults());
     for (auto origResult : origType->getResults()) {
-      substResults.push_back(subst(origResult));
+      substResults.push_back(substInterface(origResult));
     }
 
     auto substErrorResult = origType->getOptionalErrorResult();
     assert(!substErrorResult ||
-           (!substErrorResult->getType()->hasTypeParameter() &&
-            !substErrorResult->getType()->hasArchetype()));
+           (!substErrorResult->getInterfaceType()->hasTypeParameter() &&
+            !substErrorResult->getInterfaceType()->hasArchetype()));
 
     SmallVector<SILParameterInfo, 8> substParams;
     substParams.reserve(origType->getParameters().size());
     for (auto &origParam : origType->getParameters()) {
-      substParams.push_back(subst(origParam));
+      substParams.push_back(substInterface(origParam));
     }
 
     SmallVector<SILYieldInfo, 8> substYields;
     substYields.reserve(origType->getYields().size());
     for (auto &origYield : origType->getYields()) {
-      substYields.push_back(subst(origYield));
+      substYields.push_back(substInterface(origYield));
     }
 
     Optional<ProtocolConformanceRef> witnessMethodConformance;
     if (auto conformance = origType->getWitnessMethodConformanceOrNone()) {
       assert(origType->getExtInfo().hasSelfParam());
-      auto selfType = origType->getSelfParameter().getType();
+      auto selfType = origType->getSelfParameter().getInterfaceType();
       // The Self type can be nested in a few layers of metatypes (etc.).
       while (auto metatypeType = dyn_cast<MetatypeType>(selfType)) {
         auto next = metatypeType.getInstanceType();
@@ -2395,6 +2449,7 @@ public:
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
                                 substYields, substResults, substErrorResult,
+                                SubstitutionMap(), false,
                                 TC.Context, witnessMethodConformance);
   }
 
@@ -2403,16 +2458,17 @@ public:
                                      type.getCategory());
   }
 
-  SILResultInfo subst(SILResultInfo orig) {
-    return SILResultInfo(visit(orig.getType()), orig.getConvention());
+  SILResultInfo substInterface(SILResultInfo orig) {
+    return SILResultInfo(visit(orig.getInterfaceType()), orig.getConvention());
   }
 
-  SILYieldInfo subst(SILYieldInfo orig) {
-    return SILYieldInfo(visit(orig.getType()), orig.getConvention());
+  SILYieldInfo substInterface(SILYieldInfo orig) {
+    return SILYieldInfo(visit(orig.getInterfaceType()), orig.getConvention());
   }
 
-  SILParameterInfo subst(SILParameterInfo orig) {
-    return SILParameterInfo(visit(orig.getType()), orig.getConvention());
+  SILParameterInfo substInterface(SILParameterInfo orig) {
+    return SILParameterInfo(visit(orig.getInterfaceType()),
+                            orig.getConvention());
   }
 
   /// Tuples need to have their component types substituted by these
@@ -2532,7 +2588,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   LookupConformanceFn conformances) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
   SILTypeSubstituter substituter(silModule.Types, subs, conformances,
-                                 getGenericSignature(),
+                                 getSubstGenericSignature(),
                                  /*shouldSubstituteOpaqueTypes*/ false);
   return substituter.substSILFunctionType(CanSILFunctionType(this));
 }
@@ -2594,6 +2650,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return nullptr;
@@ -2802,9 +2859,12 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
     // Opaque types are compatible with their substitution.
     if (inFunction) {
       auto opaqueTypesSubsituted = aa;
+      auto *dc = inFunction->getDeclContext();
+      auto *currentModule = inFunction->getModule().getSwiftModule();
+      if (!dc || !dc->isChildContextOf(currentModule))
+        dc = currentModule;
       ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-          inFunction->getModule().getSwiftModule(),
-          inFunction->getResilienceExpansion());
+          dc, inFunction->getResilienceExpansion());
       if (aa.getASTType()->hasOpaqueArchetype())
         opaqueTypesSubsituted = aa.subst(inFunction->getModule(), replacer,
                                          replacer, CanGenericSignature(), true);
@@ -2865,7 +2925,7 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
         // *NOTE* We swallow the specific error here for now. We will still get
         // that the function types are incompatible though, just not more
         // specific information.
-        return aFunc->isABICompatibleWith(bFunc, inFunction).isCompatible();
+        return aFunc->isABICompatibleWith(bFunc, *inFunction).isCompatible();
       }
     }
 
@@ -2891,7 +2951,7 @@ using ABICompatibilityCheckResult =
 
 ABICompatibilityCheckResult
 SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
-                                     SILFunction *context) const {
+                                     SILFunction &context) const {
   // The calling convention and function representation can't be changed.
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
@@ -2907,9 +2967,10 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     if (result1.getConvention() != result2.getConvention())
       return ABICompatibilityCheckResult::DifferentReturnValueConventions;
 
-    if (!areABICompatibleParamsOrReturns(result1.getSILStorageType(),
-                                         result2.getSILStorageType(),
-                                         context)) {
+    if (!areABICompatibleParamsOrReturns(
+                         result1.getSILStorageType(context.getModule(), this),
+                         result2.getSILStorageType(context.getModule(), other),
+                         &context)) {
       return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
     }
   }
@@ -2923,8 +2984,10 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     if (error1.getConvention() != error2.getConvention())
       return ABICompatibilityCheckResult::DifferentErrorResultConventions;
 
-    if (!areABICompatibleParamsOrReturns(error1.getSILStorageType(),
-                                         error2.getSILStorageType(), context))
+    if (!areABICompatibleParamsOrReturns(
+                           error1.getSILStorageType(context.getModule(), this),
+                           error2.getSILStorageType(context.getModule(), other),
+                           &context))
       return ABICompatibilityCheckResult::ABIIncompatibleErrorResults;
   }
 
@@ -2940,8 +3003,10 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
 
     if (param1.getConvention() != param2.getConvention())
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
-    if (!areABICompatibleParamsOrReturns(param1.getSILStorageType(),
-                                         param2.getSILStorageType(), context))
+    if (!areABICompatibleParamsOrReturns(
+                           param1.getSILStorageType(context.getModule(), this),
+                           param2.getSILStorageType(context.getModule(), other),
+                           &context))
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
   }
 
@@ -2983,4 +3048,15 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
     return "Escape to no escape conversion";
   }
   llvm_unreachable("Covered switch isn't completely covered?!");
+}
+
+CanSILFunctionType
+SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
+  return SILFunctionType::get(getSubstGenericSignature(),
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getErrorResult(),
+                          subs, isGenericSignatureImplied(),
+                          const_cast<SILFunctionType*>(this)->getASTContext());
 }

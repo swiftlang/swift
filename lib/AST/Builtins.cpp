@@ -80,8 +80,6 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheRawPointerType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
-  if (Name == "UnknownObject")
-    return Context.TheUnknownObjectType;
   if (Name == "BridgeObject")
     return Context.TheBridgeObjectType;
   if (Name == "SILToken")
@@ -151,8 +149,7 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
 
 /// Build a builtin function declaration.
 static FuncDecl *
-getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
-                   FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
+getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   auto &Context = ResType->getASTContext();
   
   ModuleDecl *M = Context.TheBuiltinModule;
@@ -160,11 +157,10 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
 
   SmallVector<ParamDecl*, 4> params;
   for (Type argType : argTypes) {
-    auto PD = new (Context)
-        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), Identifier(), DC);
+    auto PD = new (Context) ParamDecl(SourceLoc(), SourceLoc(),
+                                      Identifier(), SourceLoc(), Identifier(), DC);
+    PD->setSpecifier(ParamSpecifier::Default);
     PD->setInterfaceType(argType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -180,8 +176,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*GenericParams=*/nullptr,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
-  FD->computeType(Info);
-  FD->setValidationToChecked();
+  (void)FD->getInterfaceType();
   FD->setImplicit();
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -193,7 +188,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericSignature *Sig) {
+                          GenericSignature Sig) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -206,12 +201,11 @@ getBuiltinGenericFunction(Identifier Id,
     auto specifier =
       ParamDecl::getParameterSpecifierForValueOwnership(
         ArgParamTypes[i].getParameterFlags().getValueOwnership());
-    auto PD = new (Context) ParamDecl(specifier,
-                                      SourceLoc(), SourceLoc(),
+    auto PD = new (Context) ParamDecl(SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
                                       Identifier(), DC);
+    PD->setSpecifier(specifier);
     PD->setInterfaceType(paramIfaceType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -229,8 +223,7 @@ getBuiltinGenericFunction(Identifier Id,
                                TypeLoc::withoutLoc(ResType), DC);
 
   func->setGenericSignature(Sig);
-  func->computeType();
-  func->setValidationToChecked();
+  (void)func->getInterfaceType();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
 
@@ -459,7 +452,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericSignature *GenericSig = nullptr;
+    GenericSignature GenericSig = GenericSignature();
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -479,7 +472,7 @@ namespace {
           ctx.evaluator,
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
-          nullptr);
+          GenericSignature());
     }
 
     template <class G>
@@ -1256,6 +1249,13 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   llvm_unreachable("bad overloaded builtin kind");
 }
 
+bool swift::canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty) {
+  if (ID == BuiltinValueKind::None)
+    return false;
+
+  return isBuiltinTypeOverloaded(Ty, OverloadedBuiltinKinds[unsigned(ID)]);
+}
+
 /// Table of string intrinsic names indexed by enum value.
 static const char *const IntrinsicNameTable[] = {
     "not_intrinsic",
@@ -1373,6 +1373,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
+  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
     // These types cannot be expressed in swift yet.
     return Type();
@@ -2092,9 +2093,6 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinNativeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);
-    break;
-  case BuiltinTypeKind::BuiltinUnknownObject:
-    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
     break;
   case BuiltinTypeKind::BuiltinBridgeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);

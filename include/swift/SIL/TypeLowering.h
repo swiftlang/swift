@@ -592,7 +592,7 @@ class TypeConverter {
   llvm::BumpPtrAllocator IndependentBPA;
 
   struct CachingTypeKey {
-    GenericSignature *Sig;
+    CanGenericSignature Sig;
     AbstractionPattern::CachingKey OrigType;
     CanType SubstType;
 
@@ -846,7 +846,7 @@ public:
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
 
   /// Get the generic environment for a constant.
-  GenericSignature *getConstantGenericSignature(SILDeclRef constant);
+  GenericSignature getConstantGenericSignature(SILDeclRef constant);
 
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
@@ -972,6 +972,24 @@ public:
   CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
   bool hasLoweredLocalCaptures(SILDeclRef fn);
 
+#ifndef NDEBUG
+  /// If \c false, \c childDC is in a context it cannot capture variables from,
+  /// so it is expected that Sema may not have computed its \c CaptureInfo.
+  ///
+  /// This call exists for use in assertions; do not use it to skip capture
+  /// processing.
+  static bool canCaptureFromParent(DeclContext *childDC) {
+    // This call was added because Sema leaves the captures of functions that
+    // cannot capture anything uncomputed.
+    // TODO: Make Sema set them to CaptureInfo::empty() instead.
+
+    if (childDC)
+      if (auto decl = childDC->getAsDecl())
+         return decl->getDeclContext()->isLocalContext();
+    return true;
+  }
+#endif
+
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.
     Trivial,
@@ -990,11 +1008,13 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(SILType type1, SILType type2,
+  ABIDifference checkForABIDifferences(SILModule &M,
+                                       SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
   /// Same as above but for SIL function types.
-  ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
+  ABIDifference checkFunctionForABIDifferences(SILModule &M,
+                                               SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
 
@@ -1090,7 +1110,7 @@ namespace llvm {
     }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
-        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.Sig);
+        DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
       auto hashOrig =
         CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =

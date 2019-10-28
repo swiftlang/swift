@@ -24,9 +24,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -194,7 +196,6 @@ namespace {
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
-    IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
     IMPL(Class, Reference)
@@ -294,7 +295,7 @@ namespace {
           return getConcreteReferenceStorageReferent(bound->getCanonicalType());
         }
 
-        return TC.Context.TheUnknownObjectType;
+        return TC.Context.getAnyObjectType();
       }
 
       return type;
@@ -1267,10 +1268,6 @@ namespace {
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
-        // FIXME: Remove this once getInterfaceType() is a request.
-        if (!field->hasInterfaceType())
-          TC.Context.getLazyResolver()->resolveDeclSignature(field);
-
         auto substFieldType =
           field->getInterfaceType().subst(subMap)->getCanonicalType();
 
@@ -1313,11 +1310,7 @@ namespace {
           properties.setNonTrivial();
           continue;
         }
-
-        // FIXME: Remove this once getInterfaceType() is a request.
-        if (!elt->hasInterfaceType())
-          TC.Context.getLazyResolver()->resolveDeclSignature(elt);
-
+        
         auto substEltType =
           elt->getArgumentInterfaceType().subst(subMap)->getCanonicalType();
         
@@ -1727,7 +1720,7 @@ getTypeLoweringForExpansion(TypeKey key,
   return nullptr;
 }
 
-static GenericSignature *
+static GenericSignature 
 getEffectiveGenericSignature(DeclContext *dc,
                              CaptureInfo captureInfo) {
   if (dc->getParent()->isLocalContext() &&
@@ -1737,14 +1730,14 @@ getEffectiveGenericSignature(DeclContext *dc,
   return dc->getGenericSignatureOfContext();
 }
 
-static GenericSignature *
+static GenericSignature 
 getEffectiveGenericSignature(AnyFunctionRef fn,
                              CaptureInfo captureInfo) {
   return getEffectiveGenericSignature(fn.getAsDeclContext(), captureInfo);
 }
 
 static CanGenericSignature
-getCanonicalSignatureOrNull(GenericSignature *sig) {
+getCanonicalSignatureOrNull(GenericSignature sig) {
   if (!sig || sig->areAllParamsConcrete())
       return nullptr;
 
@@ -1780,11 +1773,11 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   // Get the generic signature from the surrounding context.
-  auto *sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
+  auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(vd)) {
     auto *param = getParameterAt(afd, c.defaultArgIndex);
     if (param->getDefaultValue()) {
-      auto &captureInfo = param->getDefaultArgumentCaptureInfo();
+      auto captureInfo = param->getDefaultArgumentCaptureInfo();
       sig = getEffectiveGenericSignature(afd, captureInfo);
     }
   }
@@ -1815,6 +1808,27 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                  {}, resultTy);
 }
 
+/// Get the type of a property wrapper backing initializer,
+/// (property-type) -> backing-type.
+static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
+                                                     TypeConverter &TC,
+                                                     VarDecl *VD) {
+  CanType resultType =
+      VD->getPropertyWrapperBackingPropertyType()->getCanonicalType();
+
+  auto *DC = VD->getInnermostDeclContext();
+  CanType inputType =
+    VD->getParentPattern()->getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
+
+  auto sig = DC->getGenericSignatureOfContext();
+
+  AnyFunctionType::Param param(
+      inputType, Identifier(),
+      ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
+                                 resultType);
+}
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
@@ -1882,7 +1896,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
-  auto *genericSig = getEffectiveGenericSignature(closure, captureInfo);
+  auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
 
   auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                                funcType->throws());
@@ -1895,11 +1909,6 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
-
-  if (vd && !vd->hasInterfaceType()) {
-    Context.getLazyResolver()->resolveDeclSignature(vd);
-  }
-
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
@@ -1954,6 +1963,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getDefaultArgGeneratorInterfaceType(c);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(cast<VarDecl>(vd));
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return getPropertyWrapperBackingInitializerInterfaceType(*this,
+                                                             cast<VarDecl>(vd));
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, false);
@@ -1965,7 +1977,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-GenericSignature *
+GenericSignature 
 TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
   
@@ -1992,6 +2004,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return vd->getDeclContext()->getGenericSignatureOfContext();
   }
 
@@ -2000,7 +2013,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
 
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  if (auto *sig = getConstantGenericSignature(c))
+  if (auto sig = getConstantGenericSignature(c))
     return sig->getGenericEnvironment();
   return nullptr;
 }
@@ -2100,6 +2113,9 @@ TypeConverter::hasLoweredLocalCaptures(SILDeclRef fn) {
 
 CaptureInfo
 TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
+  PrettyStackTraceSILLocation stack("getting lowered local captures",
+                                    fn.getAsRegularLocation(), Context);
+
   fn.isForeign = 0;
   fn.isCurried = 0;
   fn.isDirectReference = 0;
@@ -2121,11 +2137,14 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
 
-  std::function<void (const CaptureInfo &captureInfo)> collectCaptures;
+  std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
-  collectCaptures = [&](const CaptureInfo &captureInfo) {
+  collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
+    assert(captureInfo.hasBeenComputed() ||
+           !TypeConverter::canCaptureFromParent(dc));
+
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
@@ -2252,7 +2271,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (!visitedFunctions.insert(curFn).second)
       return;
 
-    collectCaptures(curFn.getCaptureInfo());
+    PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
+    auto dc = curFn.getAsDeclContext();
+    collectCaptures(curFn.getCaptureInfo(), dc);
 
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
@@ -2263,17 +2284,22 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (auto *AFD = curFn.getAbstractFunctionDecl()) {
       for (auto *P : *AFD->getParameters()) {
         if (P->getDefaultValue())
-          collectCaptures(P->getDefaultArgumentCaptureInfo());
+          collectCaptures(P->getDefaultArgumentCaptureInfo(), dc);
       }
     }
   };
 
   collectConstantCaptures = [&](SILDeclRef curFn) {
     if (curFn.isDefaultArgGenerator()) {
+      PrettyStackTraceSILLocation stack("lowering local captures",
+                                        fn.getAsRegularLocation(), Context);
+      
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(afd, curFn.defaultArgIndex);
-        if (param->getDefaultValue())
-          collectCaptures(param->getDefaultArgumentCaptureInfo());
+        if (param->getDefaultValue()) {
+          auto dc = afd->getInnermostDeclContext();
+          collectCaptures(param->getDefaultArgumentCaptureInfo(), dc);
+        }
         return;
       }
 
@@ -2310,21 +2336,19 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the uniqued set of transitive captures.
-  auto inserted = LoweredCaptures.insert({fn, CaptureInfo()});
+  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
+                   capturesOpaqueValue, capturesGenericParams};
+  auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
-  auto &cachedCaptures = inserted.first->second;
-  cachedCaptures.setGenericParamCaptures(capturesGenericParams);
-  cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
-  cachedCaptures.setOpaqueValue(capturesOpaqueValue);
-  cachedCaptures.setCaptures(Context.AllocateCopy(resultingCaptures));
-  
-  return cachedCaptures;
+  (void)inserted;
+  return info;
 }
 
 /// Given that type1 is known to be a subtype of type2, check if the two
 /// types have the same calling convention representation.
 TypeConverter::ABIDifference
-TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
+TypeConverter::checkForABIDifferences(SILModule &M,
+                                      SILType type1, SILType type2,
                                       bool thunkOptionals) {
   // Unwrap optionals, but remember that we did.
   bool type1WasOptional = false;
@@ -2379,7 +2403,7 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
             fnTy1->getRepresentation() != SILFunctionTypeRepresentation::Block)
           return ABIDifference::NeedsThunk;
 
-      return checkFunctionForABIDifferences(fnTy1, fnTy2);
+      return checkFunctionForABIDifferences(M, fnTy1, fnTy2);
     }
   }
   
@@ -2414,7 +2438,8 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
           return ABIDifference::NeedsThunk;
         
         for (unsigned i = 0, e = tuple1->getNumElements(); i < e; i++) {
-          if (checkForABIDifferences(type1.getTupleElementType(i),
+          if (checkForABIDifferences(M,
+                                     type1.getTupleElementType(i),
                                      type2.getTupleElementType(i))
                 != ABIDifference::Trivial)
             return ABIDifference::NeedsThunk;
@@ -2432,7 +2457,8 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
 }
 
 TypeConverter::ABIDifference
-TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
+TypeConverter::checkFunctionForABIDifferences(SILModule &M,
+                                              SILFunctionType *fnTy1,
                                               SILFunctionType *fnTy2) {
   // Fast path -- if both functions were unwrapped from a CanSILFunctionType,
   // we might have pointer equality here.
@@ -2461,8 +2487,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (result1.getConvention() != result2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(result1.getSILStorageType(),
-                               result2.getSILStorageType(),
+    if (checkForABIDifferences(M,
+                               result1.getSILStorageType(M, fnTy1),
+                               result2.getSILStorageType(M, fnTy2),
              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
@@ -2475,8 +2502,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (yield1.getConvention() != yield2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(yield1.getSILStorageType(),
-                               yield2.getSILStorageType(),
+    if (checkForABIDifferences(M,
+                               yield1.getSILStorageType(M, fnTy1),
+                               yield2.getSILStorageType(M, fnTy2),
              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
@@ -2491,8 +2519,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (error1.getConvention() != error2.getConvention())
       return ABIDifference::NeedsThunk;
 
-    if (checkForABIDifferences(error1.getSILStorageType(),
-                               error2.getSILStorageType(),
+    if (checkForABIDifferences(M,
+                               error1.getSILStorageType(M, fnTy1),
+                               error2.getSILStorageType(M, fnTy2),
               /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
@@ -2508,8 +2537,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     // make sure to flip the relation around.
     std::swap(param1, param2);
 
-    if (checkForABIDifferences(param1.getSILStorageType(),
-                               param2.getSILStorageType(),
+    if (checkForABIDifferences(M,
+                               param1.getSILStorageType(M, fnTy1),
+                               param2.getSILStorageType(M, fnTy2),
               /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
@@ -2615,11 +2645,6 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
 
   auto &C = M.getASTContext();
-
-  // FIXME: Remove this once getInterfaceType() is a request.
-  if (!elt->hasInterfaceType())
-    Context.getLazyResolver()->resolveDeclSignature(elt);
-
   auto boxSignature = getCanonicalSignatureOrNull(
       enumDecl->getGenericSignature());
 
@@ -2690,9 +2715,6 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
 
       if (elt->isIndirect())
         continue;
-
-      if (!elt->hasInterfaceType())
-        TC.Context.getLazyResolver()->resolveDeclSignature(elt);
 
       // Although one might assume enums have a fields count of 1
       // Which holds true for current uses of this code

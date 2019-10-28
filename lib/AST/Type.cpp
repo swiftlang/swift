@@ -161,7 +161,7 @@ bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
-bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
+bool CanType::isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
                                   bool functionsCount) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -170,7 +170,6 @@ bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
     llvm_unreachable("sugared canonical type?");
 
   // These types are always class references.
-  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::Class:
@@ -248,7 +247,7 @@ bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
 ///   - existentials with class or class protocol bounds
 /// But not:
 ///   - function types
-bool TypeBase::allowsOwnership(GenericSignature *sig) {
+bool TypeBase::allowsOwnership(GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
@@ -419,7 +418,7 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 
   auto *type = this;
 
-  GenericSignature *sig = dc->getGenericSignatureOfContext();
+  GenericSignature sig = dc->getGenericSignatureOfContext();
   if (auto *genericFn = type->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
     type = FunctionType::get(genericFn->getParams(),
@@ -623,6 +622,59 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
     return boundTy->getGenericArgs()[0];
   }
   return Type();
+}
+
+Type TypeBase::wrapInPointer(PointerTypeKind kind) {
+  ASTContext &ctx = getASTContext();
+  NominalTypeDecl *pointerDecl = ([&ctx, kind] {
+    switch (kind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
+      llvm_unreachable("these pointer types don't take arguments");
+    case PTK_UnsafePointer:
+      return ctx.getUnsafePointerDecl();
+    case PTK_UnsafeMutablePointer:
+      return ctx.getUnsafeMutablePointerDecl();
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return ctx.getAutoreleasingUnsafeMutablePointerDecl();
+    }
+    llvm_unreachable("bad kind");
+  }());
+
+  assert(pointerDecl);
+  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
+}
+
+Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
+  auto &C = getASTContext();
+  if (auto nominalTy = getAs<NominalType>()) {
+    if (nominalTy->getDecl() == C.getUnsafeMutableRawBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeMutableRawBufferPointer;
+    } else if (nominalTy->getDecl() == C.getUnsafeRawBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeRawBufferPointer;
+    } else {
+      return Type();
+    }
+    return C.TheEmptyTupleType;
+  }
+  if (auto boundTy = getAs<BoundGenericType>()) {
+    if (boundTy->getDecl() == C.getUnsafeMutableBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeMutableBufferPointer;
+    } else if (boundTy->getDecl() == C.getUnsafeBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeBufferPointer;
+    } else {
+      return Type();
+    }
+    return boundTy->getGenericArgs()[0];
+  }
+  return Type();
+}
+
+Type TypeBase::lookThroughSingleOptionalType() {
+  Type type(this);
+  if (auto objType = type->getOptionalObjectType())
+    type = objType;
+  return type;
 }
 
 Type TypeBase::lookThroughAllOptionalTypes() {
@@ -1098,8 +1150,8 @@ CanType TypeBase::computeCanonicalType() {
       assert(resolver && "Need to resolve generic parameter depth");
       if (auto decl =
             gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
-        if (auto valueDecl = dyn_cast<ValueDecl>(decl))
-          resolver->resolveDeclSignature(valueDecl);
+        if (auto valueDecl = decl->getAsGenericContext())
+          (void)valueDecl->getGenericSignature();
     }
 
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
@@ -1230,7 +1282,7 @@ CanType TypeBase::computeCanonicalType() {
   return CanonicalType = CanType(Result);
 }
 
-CanType TypeBase::getCanonicalType(GenericSignature *sig) {
+CanType TypeBase::getCanonicalType(GenericSignature sig) {
   if (!sig)
     return getCanonicalType();
 
@@ -1620,9 +1672,29 @@ bool TypeBase::isBindableTo(Type b) {
         if (func->getExtInfo() != substFunc->getExtInfo())
           return false;
         
-        // TODO: Generic signatures
-        if (func->getGenericSignature() || substFunc->getGenericSignature())
-          return false;
+        // Compare substituted function types.
+        if (func->getSubstGenericSignature()
+            || substFunc->getSubstGenericSignature()) {
+          if (func->getSubstGenericSignature()
+                != substFunc->getSubstGenericSignature())
+            return false;
+          
+          auto sig = func->getSubstGenericSignature();
+          
+          auto origSubs = func->getSubstitutions();
+          auto substSubs = substFunc->getSubstitutions();
+          
+          if (!origSubs || !substSubs)
+            return false;
+          
+          for (unsigned i : indices(origSubs.getReplacementTypes())) {
+            if (!visit(origSubs.getReplacementTypes()[i]->getCanonicalType(sig),
+                     substSubs.getReplacementTypes()[i]->getCanonicalType(sig)))
+              return false;
+          }
+          
+          return true;
+        }
         
         if (func->getParameters().size() != substFunc->getParameters().size())
           return false;
@@ -1633,8 +1705,8 @@ bool TypeBase::isBindableTo(Type b) {
           if (func->getParameters()[i].getConvention()
                 != substFunc->getParameters()[i].getConvention())
             return false;
-          if (!visit(func->getParameters()[i].getType(),
-                     substFunc->getParameters()[i].getType()))
+          if (!visit(func->getParameters()[i].getInterfaceType(),
+                     substFunc->getParameters()[i].getInterfaceType()))
             return false;
         }
 
@@ -1643,8 +1715,8 @@ bool TypeBase::isBindableTo(Type b) {
               != substFunc->getResults()[i].getConvention())
             return false;
 
-          if (!visit(func->getResults()[i].getType(),
-                     substFunc->getResults()[i].getType()))
+          if (!visit(func->getResults()[i].getInterfaceType(),
+                     substFunc->getResults()[i].getInterfaceType()))
             return false;
         }
         
@@ -1669,7 +1741,7 @@ bool TypeBase::isBindableTo(Type b) {
         auto substSubMap = substBGT->getContextSubstitutionMap(
             moduleDecl, decl, decl->getGenericEnvironment());
 
-        auto *genericSig = decl->getGenericSignature();
+        auto genericSig = decl->getGenericSignature();
         for (auto gp : genericSig->getGenericParams()) {
           auto orig = Type(gp).subst(origSubMap)->getCanonicalType();
           auto subst = Type(gp).subst(substSubMap)->getCanonicalType();
@@ -2533,7 +2605,7 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
 {
 }
 
-GenericSignature *OpaqueTypeArchetypeType::getBoundSignature() const {
+GenericSignature OpaqueTypeArchetypeType::getBoundSignature() const {
   return Environment->getGenericSignature();
 }
 
@@ -2549,31 +2621,33 @@ getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
   return std::make_pair(archetype, opaqueRoot);
 }
 
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+OpaqueSubstitutionKind
+ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  return shouldPerformSubstitution(opaque, contextModule, contextExpansion);
+  return shouldPerformSubstitution(opaque, inContext->getParentModule(),
+                                   contextExpansion);
 }
-
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+OpaqueSubstitutionKind
+ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
   
   // Don't allow replacement if the naming decl is dynamically replaceable.
   if (namingDecl && namingDecl->isDynamic())
-    return false;
+    return OpaqueSubstitutionKind::DontSubstitute;
 
   // Allow replacement of opaque result types of inlineable function regardless
   // of resilience and in which context.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(namingDecl)) {
     if (afd->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      return true;
+      return OpaqueSubstitutionKind::AlwaysSubstitute;
     }
   } else if (auto *asd = dyn_cast<AbstractStorageDecl>(namingDecl)) {
     auto *getter = asd->getOpaqueAccessor(AccessorKind::Get);
     if (getter &&
         getter->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      return true;
+      return OpaqueSubstitutionKind::AlwaysSubstitute;
     }
   }
 
@@ -2583,18 +2657,53 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
   auto module = namingDecl->getModuleContext();
   if (contextExpansion == ResilienceExpansion::Maximal &&
       module == contextModule)
-    return true;
+    return OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience;
 
   // Allow general replacement from non resilient modules. Otherwise, disallow.
-  return !module->isResilient();
+  if (module->isResilient())
+    return OpaqueSubstitutionKind::DontSubstitute;
+
+  return OpaqueSubstitutionKind::SubstituteNonResilientModule;
 }
 
 static Type
-substOpaqueTypesWithUnderlyingTypes(Type ty, ModuleDecl *contextModule,
+substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
-                                                 contextExpansion);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+/// Checks that \p dc has access to \p ty for the purposes of an opaque
+/// substitution described by \p kind.
+///
+/// This is purely an implementation detail check about whether type metadata
+/// will be accessible. It's not intended to enforce any rules about what
+/// opaque substitutions are or are not allowed.
+static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
+                                  OpaqueSubstitutionKind kind) {
+  auto nominal = ty->getAnyNominal();
+  if (!nominal)
+    return true;
+
+  switch (kind) {
+  case OpaqueSubstitutionKind::DontSubstitute:
+    return false;
+
+  case OpaqueSubstitutionKind::AlwaysSubstitute:
+    return true;
+
+  case OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience:
+    // In the same file any visibility is okay.
+    if (!dc->isModuleContext() &&
+        nominal->getDeclContext()->getParentSourceFile() ==
+        dc->getParentSourceFile())
+      return true;
+    return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
+
+  case OpaqueSubstitutionKind::SubstituteNonResilientModule:
+    // Can't access types that are not public from a different module.
+    return nominal->getEffectiveAccess() > AccessLevel::Internal;
+  }
 }
 
 Type ReplaceOpaqueTypesWithUnderlyingTypes::
@@ -2606,7 +2715,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
 
-  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
+  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return maybeOpaqueType;
   }
 
@@ -2624,20 +2734,30 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // for its type arguments.
   auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
+  // Check that we are allowed to substitute the underlying type into the
+  // context.
+  auto inContext = this->inContext;
+  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
+        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
+          return true;
+        return false;
+      }))
+    return maybeOpaqueType;
+
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy, contextModule,
+    return substOpaqueTypesWithUnderlyingTypes(substTy, inContext,
                                                contextExpansion);
   }
+
   return substTy;
 }
 
 static ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    ModuleDecl *contextModule,
+                                    const DeclContext *inContext,
                                     ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
-                                                 contextExpansion);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
@@ -2657,7 +2777,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
 
-  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
+  auto substitutionKind = shouldPerformSubstitution(opaqueRoot->getDecl());
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
     return abstractRef;
   }
 
@@ -2677,12 +2798,23 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // Then apply the substitutions from the root opaque archetype, to specialize
   // for its type arguments.
   auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+
+  // Check that we are allowed to substitute the underlying type into the
+  // context.
+  auto inContext = this->inContext;
+  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
+        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
+          return true;
+        return false;
+      }))
+    return abstractRef;
+
   auto substRef =
       partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, contextModule,
+    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, inContext,
                                                contextExpansion);
   }
   return substRef;
@@ -3113,8 +3245,8 @@ LookUpConformanceInSignature::operator()(CanType dependentType,
                                          ProtocolDecl *conformedProtocol) const {
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
-  return Sig.lookupConformance(conformingReplacementType->getCanonicalType(),
-                               conformedProtocol);
+  return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),
+                                conformedProtocol);
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
@@ -3207,7 +3339,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     requirements.push_back(*substReqt);
   }
 
-  GenericSignature *genericSig = nullptr;
+  GenericSignature genericSig = GenericSignature();
   if (anySemanticChanges) {
     // If there were semantic changes, we need to build a new generic
     // signature.
@@ -3215,7 +3347,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     genericSig = evaluateOrDefault(
         ctx.evaluator,
         AbstractGenericSignatureRequest{nullptr, genericParams, requirements},
-        nullptr);
+        GenericSignature());
   } else {
     // Use the mapped generic signature.
     genericSig = GenericSignature::get(genericParams, requirements);
@@ -3261,7 +3393,23 @@ static Type substType(Type derivedType,
                              boxTy->getLayout(),
                              newSubMap);
     }
-    
+
+    // Special-case TypeAliasType; we need to substitute conformances.
+    if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
+      Type parentTy;
+      if (auto origParentTy = aliasTy->getParent())
+        parentTy = substType(origParentTy,
+                             substitutions, lookupConformances, options);
+      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
+                                    substitutions, lookupConformances, options);
+      if (parentTy && parentTy->isExistentialType())
+        return underlyingTy;
+      auto subMap = aliasTy->getSubstitutionMap()
+          .subst(substitutions, lookupConformances, options);
+      return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
+                                     subMap, underlyingTy));
+    }
+
     // We only substitute for substitutable types and dependent member types.
     
     // For dependent member types, we may need to look up the member if the
@@ -3450,10 +3598,8 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
-  assert(ownerNominal == baseTy->getAnyNominal());
-
   // Gather all of the substitutions for all levels of generic arguments.
-  auto *genericSig = dc->getGenericSignatureOfContext();
+  auto genericSig = dc->getGenericSignatureOfContext();
   if (!genericSig)
     return substitutions;
 
@@ -3461,6 +3607,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   unsigned n = params.size();
 
   while (baseTy && n > 0) {
+    if (baseTy->is<ErrorType>())
+      break;
+
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
@@ -3512,8 +3661,8 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     ModuleDecl *module, const DeclContext *dc,
     GenericEnvironment *genericEnv) {
-  auto *genericSig = dc->getGenericSignatureOfContext();
-  if (genericSig == nullptr)
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (genericSig.isNull())
     return SubstitutionMap();
   return SubstitutionMap::get(
     genericSig,
@@ -3540,7 +3689,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
       isa<SubscriptDecl>(member)) {
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
-      auto *sig = innerDC->getGenericSignatureOfContext();
+      auto sig = innerDC->getGenericSignatureOfContext();
       for (auto param : sig->getInnermostGenericParams()) {
         auto *genericParam = param->getCanonicalType()
             ->castTo<GenericTypeParamType>();
@@ -3558,9 +3707,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
 SubstitutionMap TypeBase::getMemberSubstitutionMap(
     ModuleDecl *module, const ValueDecl *member,
     GenericEnvironment *genericEnv) {
-  auto *genericSig = member->getInnermostDeclContext()
+  auto genericSig = member->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-  if (genericSig == nullptr)
+  if (genericSig.isNull())
     return SubstitutionMap();
   auto subs = getMemberSubstitutions(member, genericEnv);
   return SubstitutionMap::get(
@@ -3631,13 +3780,13 @@ Identifier DependentMemberType::getName() const {
 static bool transformSILResult(
                            SILResultInfo &result, bool &changed,
                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = result.getType().transformRec(fn);
+  Type transType = result.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != result.getType()) {
+  if (canTransType != result.getInterfaceType()) {
     changed = true;
-    result = result.getWithType(canTransType);
+    result = result.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3645,13 +3794,13 @@ static bool transformSILResult(
 static bool transformSILYield(
                             SILYieldInfo &yield, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = yield.getType().transformRec(fn);
+  Type transType = yield.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != yield.getType()) {
+  if (canTransType != yield.getInterfaceType()) {
     changed = true;
-    yield = yield.getWithType(canTransType);
+    yield = yield.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3659,13 +3808,13 @@ static bool transformSILYield(
 static bool transformSILParameter(
                             SILParameterInfo &param, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = param.getType().transformRec(fn);
+  Type transType = param.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != param.getType()) {
+  if (canTransType != param.getInterfaceType()) {
     changed = true;
-    param = param.getWithType(canTransType);
+    param = param.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3759,6 +3908,19 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
+    
+    if (auto subs = fnTy->getSubstitutions()) {
+#ifndef NDEBUG
+      // This interface isn't suitable for updating the substitution map in a
+      // substituted SILFunctionType.
+      // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
+      for (Type type : fnTy->getSubstitutions().getReplacementTypes()) {
+        assert(type->isEqual(type.transformRec(fn))
+               && "Substituted SILFunctionType can't be transformed");
+      }
+#endif
+      return fnTy;
+    }
 
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
     for (SILParameterInfo param : fnTy->getParameters()) {
@@ -3787,7 +3949,7 @@ case TypeKind::Id:
 
     if (!changed) return *this;
 
-    return SILFunctionType::get(fnTy->getGenericSignature(),
+    return SILFunctionType::get(fnTy->getSubstGenericSignature(),
                                 fnTy->getExtInfo(),
                                 fnTy->getCoroutineKind(),
                                 fnTy->getCalleeConvention(),
@@ -3795,6 +3957,8 @@ case TypeKind::Id:
                                 transInterfaceYields,
                                 transInterfaceResults,
                                 transErrorResult,
+                                SubstitutionMap(),
+                                false,
                                 Ptr->getASTContext(),
                                 fnTy->getWitnessMethodConformanceOrNone());
   }
@@ -3963,33 +4127,29 @@ case TypeKind::Id:
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType && !oldParentType->hasTypeParameter() &&
-        !oldParentType->hasArchetype()) {
+    if (oldParentType) {
       newParentType = oldParentType.transformRec(fn);
       if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
     for (Type oldReplacementType : subMap.getReplacementTypes()) {
-      if (oldReplacementType->hasTypeParameter() ||
-          oldReplacementType->hasArchetype())
-        return newUnderlyingType;
-
       Type newReplacementType = oldReplacementType.transformRec(fn);
       if (!newReplacementType)
         return newUnderlyingType;
 
       // If anything changed with the replacement type, we lose the sugar.
       // FIXME: This is really unfortunate.
-      if (!newReplacementType->isEqual(oldReplacementType))
+      if (newReplacementType.getPointer() != oldReplacementType.getPointer())
         return newUnderlyingType;
     }
 
-    if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+    if (oldParentType.getPointer() == newParentType.getPointer() &&
+        oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
     return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
-                                   newUnderlyingType);
+                              newUnderlyingType);
   }
 
   case TypeKind::Paren: {
@@ -4335,9 +4495,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   case TypeKind::BuiltinBridgeObject:
     return ReferenceCounting::Bridge;
-
-  case TypeKind::BuiltinUnknownObject:
-    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
     return getClassReferenceCounting(cast<ClassType>(type)->getDecl());

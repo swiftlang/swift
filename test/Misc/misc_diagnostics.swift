@@ -22,8 +22,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists:}}
 
-if (1) {} // expected-error{{'Int' is not convertible to 'Bool'}}
-if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
+if (1) {} // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+if 1 {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
@@ -137,9 +137,9 @@ func test20770032() {
 
 func tuple_splat1(_ a : Int, _ b : Int) { // expected-note 2 {{'tuple_splat1' declared here}}
   let x = (1,2)
-  tuple_splat1(x)          // expected-error {{missing argument for parameter #2 in call}}
+  tuple_splat1(x)          // expected-error {{global function 'tuple_splat1' expects 2 separate arguments}}
   tuple_splat1(1, 2)       // Ok.
-  tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
+  tuple_splat1((1, 2))     // expected-error {{global function 'tuple_splat1' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
 }
 
 // This take a tuple as a value, so it isn't a tuple splat.

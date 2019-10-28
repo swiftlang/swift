@@ -1799,9 +1799,15 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
   }
 }
 
-bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
-                                          ValueDecl *decl,
-                                          const ValueDecl *base) {
+namespace {
+enum NoteKind_t {
+  FixItReplace,
+  FixItInsert,
+};
+
+static bool fixItOverrideDeclarationTypesImpl(
+    ValueDecl *decl, const ValueDecl *base,
+    SmallVectorImpl<std::tuple<NoteKind_t, SourceRange, std::string>> &notes) {
   // For now, just rewrite cases where the base uses a value type and the
   // override uses a reference type, and the value type is bridged to the
   // reference type. This is a way to migrate code that makes use of types
@@ -1864,7 +1870,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     options.SynthesizeSugarOnTypes = true;
 
     newOverrideTy->print(baseTypeStr, options);
-    diag.fixItReplace(typeRange, baseTypeStr.str());
+    notes.emplace_back(FixItReplace, typeRange, baseTypeStr.str().str());
     return true;
   };
 
@@ -1884,7 +1890,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
         overrideFnTy->getExtInfo().isNoEscape() &&
         // The overridden function type should be escaping.
         !baseFnTy->getExtInfo().isNoEscape()) {
-      diag.fixItInsert(typeRange.Start, "@escaping ");
+      notes.emplace_back(FixItInsert, typeRange, "@escaping ");
       return true;
     }
     return false;
@@ -1922,7 +1928,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       for_each(*fn->getParameters(),
                *baseFn->getParameters(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypesImpl(param, baseParam, notes);
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
@@ -1948,7 +1954,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       for_each(*subscript->getIndices(),
                *baseSubscript->getIndices(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypesImpl(param, baseParam, notes);
       });
     }
 
@@ -1963,6 +1969,26 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   }
 
   llvm_unreachable("unknown overridable member");
+}
+};
+
+bool swift::computeFixitsForOverridenDeclaration(
+    ValueDecl *decl, const ValueDecl *base,
+    llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag) {
+  SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
+  bool hasNotes = ::fixItOverrideDeclarationTypesImpl(decl, base, Notes);
+
+  Optional<InFlightDiagnostic> diagnostic = diag(hasNotes);
+  if (!diagnostic) return hasNotes;
+
+  for (const auto &note : Notes) {
+    if (std::get<0>(note) == FixItReplace) {
+      diagnostic->fixItReplace(std::get<1>(note), std::get<2>(note));
+    } else {
+      diagnostic->fixItInsert(std::get<1>(note).Start, std::get<2>(note));
+    }
+  }
+  return hasNotes;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2053,8 +2079,8 @@ public:
     if (!PBD) return false;
 
     bool sawMutation = false;
-    for (const auto &PBE : PBD->getPatternList()) {
-      PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
         auto it = VarDecls.find(VD);
         sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
       });
@@ -2077,7 +2103,7 @@ public:
     
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
-    if (VD->isInvalid() || !VD->hasType()) {
+    if (!VD->getInterfaceType() || VD->isInvalid()) {
       sawError = true;
       return false;
     }
@@ -2140,6 +2166,12 @@ public:
       }
     }
 
+    // Don't walk into implicit accessors, since eg. an observer's setter
+    // references the variable, but we don't want to consider it as a real
+    // "use".
+    if (isa<AccessorDecl>(D) && D->isImplicit())
+      return false;
+
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
       // variables.
@@ -2167,8 +2199,8 @@ public:
           Decl *D = node.get<Decl *>();
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
-          for (PatternBindingEntry PBE : PBD->getPatternList()) {
-            PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+          for (auto idx : range(PBD->getNumPatternEntries())) {
+            PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
               VarDecls[VD] = RK_Read|RK_Written;
             });
           }
@@ -2464,11 +2496,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
-            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
+            !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
           SourceRange replaceRange(
               pbd->getStartLoc(),
-              pbd->getPatternList()[0].getPattern()->getEndLoc());
+              pbd->getPattern(0)->getEndLoc());
           Diags.diagnose(var->getLoc(), diag::pbd_never_used,
                          var->getName(), varKind)
             .fixItReplace(replaceRange, "_");
@@ -3961,7 +3993,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   if (!TC.Context.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
-    diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+    diagAvailability(E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
@@ -4174,10 +4206,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasInterfaceType())
-    validateDecl(afd);
-
-  if (afd->isInvalid() || isa<DestructorDecl>(afd))
+  if (!afd->getInterfaceType() || afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -4257,10 +4286,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->hasInterfaceType())
-    validateDecl(var);
-
-  if (var->isInvalid() || !var->hasInterfaceType())
+  if (!var->getInterfaceType() || var->isInvalid())
     return None;
 
   if (var->getName().empty())

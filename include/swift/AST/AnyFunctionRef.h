@@ -52,13 +52,13 @@ public:
     }
   }
 
-  const CaptureInfo &getCaptureInfo() const {
+  CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-  void setCaptureInfo(const CaptureInfo &captures) const {
+  void setCaptureInfo(CaptureInfo captures) const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setCaptureInfo(captures);
       return;
@@ -198,7 +198,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getGenericSignature();
     }

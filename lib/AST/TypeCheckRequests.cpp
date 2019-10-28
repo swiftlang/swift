@@ -12,6 +12,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -167,15 +168,15 @@ bool EnumRawTypeRequest::isCached() const {
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {
   auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.RawType.getInt())
-    return enumDecl->LazySemanticInfo.RawType.getPointer();
+  if (enumDecl->LazySemanticInfo.hasRawType())
+    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
 
   return None;
 }
 
 void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+  enumDecl->LazySemanticInfo.cacheRawType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -564,11 +565,6 @@ void swift::simple_display(
     out << propertyWrapper.valueVar->printRef();
   else
     out << "null";
-  out << ", ";
-  if (propertyWrapper.wrappedValueInit)
-    out << propertyWrapper.wrappedValueInit->printRef();
-  else
-    out << "null";
   out << " }";
 }
 
@@ -818,7 +814,7 @@ void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
 // GenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
-Optional<GenericSignature *> GenericSignatureRequest::getCachedResult() const {
+Optional<GenericSignature> GenericSignatureRequest::getCachedResult() const {
   auto *GC = std::get<0>(getStorage());
   if (GC->GenericSigAndBit.getInt()) {
     return GC->GenericSigAndBit.getPointer();
@@ -826,13 +822,13 @@ Optional<GenericSignature *> GenericSignatureRequest::getCachedResult() const {
   return None;
 }
 
-void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
+void GenericSignatureRequest::cacheResult(GenericSignature value) const {
   auto *GC = std::get<0>(getStorage());
   GC->GenericSigAndBit.setPointerAndInt(value, true);
 }
 
 //----------------------------------------------------------------------------//
-// GenericSignatureRequest computation.
+// InferredGenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
 void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
@@ -844,7 +840,7 @@ void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsImplicitlyUnwrappedOptionalRequest computation.
+// UnderlyingTypeRequest computation.
 //----------------------------------------------------------------------------//
 
 Optional<Type>
@@ -858,4 +854,209 @@ UnderlyingTypeRequest::getCachedResult() const {
 void UnderlyingTypeRequest::cacheResult(Type value) const {
   auto *typeAlias = std::get<0>(getStorage());
   typeAlias->UnderlyingTy.setType(value);
+}
+
+void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// EnumRawValuesRequest computation.
+//----------------------------------------------------------------------------//
+
+bool EnumRawValuesRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
+}
+
+Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+  auto *ED = std::get<0>(getStorage());
+  if (ED->LazySemanticInfo.hasCheckedRawValues())
+    return true;
+  return None;
+}
+
+void EnumRawValuesRequest::cacheResult(bool) const {
+  auto *ED = std::get<0>(getStorage());
+  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues |
+      EnumDecl::HasFixedRawValuesAndTypes;
+  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+}
+
+void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // This request computes the raw type, and so participates in cycles involving
+  // it. For now, the raw type provides a rich enough circularity diagnostic
+  // that we can silence ourselves.
+}
+
+void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
+
+}
+
+//----------------------------------------------------------------------------//
+// IsStaticRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsStaticRequest::getCachedResult() const {
+  auto *FD = std::get<0>(getStorage());
+  return FD->getCachedIsStatic();
+}
+
+void IsStaticRequest::cacheResult(bool result) const {
+  auto *FD = std::get<0>(getStorage());
+  FD->setStatic(result);
+}
+
+//----------------------------------------------------------------------------//
+// NeedsNewVTableEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> NeedsNewVTableEntryRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.NeedsNewVTableEntryComputed)
+    return decl->LazySemanticInfo.NeedsNewVTableEntry;
+  return None;
+}
+
+void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
+  decl->LazySemanticInfo.NeedsNewVTableEntry = value;
+}
+
+//----------------------------------------------------------------------------//
+// ParamSpecifierRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ParamSpecifier> ParamSpecifierRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedSpecifier();
+}
+
+void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setSpecifier(specifier);
+}
+
+//----------------------------------------------------------------------------//
+// ResultTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
+    return funcDecl->getBodyResultTypeLoc();
+  auto *subscriptDecl = cast<SubscriptDecl>(decl);
+  return subscriptDecl->getElementTypeLoc();
+}
+
+Optional<Type> ResultTypeRequest::getCachedResult() const {
+  if (auto type = getResultTypeLoc().getType())
+    return type;
+
+  return None;
+}
+
+void ResultTypeRequest::cacheResult(Type type) const {
+  getResultTypeLoc().setType(type);
+}
+
+//----------------------------------------------------------------------------//
+// PatternBindingEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<const PatternBindingEntry *>
+PatternBindingEntryRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  if (!PBD->getPatternList()[idx].isFullyValidated()) {
+    return None;
+  }
+  return &PBD->getPatternList()[idx];
+}
+
+void PatternBindingEntryRequest::cacheResult(
+    const PatternBindingEntry *value) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setFullyValidated();
+}
+
+//----------------------------------------------------------------------------//
+// NamingPatternRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
+  auto *VD = std::get<0>(getStorage());
+  if (auto *Pat = VD->NamingPattern) {
+    return Pat;
+  }
+  return None;
+}
+
+void NamingPatternRequest::cacheResult(NamedPattern *value) const {
+  auto *VD = std::get<0>(getStorage());
+  VD->NamingPattern = value;
+}
+
+//----------------------------------------------------------------------------//
+// InterfaceTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> InterfaceTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto Ty = decl->TypeAndAccess.getPointer()) {
+    return Ty;
+  }
+  return None;
+}
+
+void InterfaceTypeRequest::cacheResult(Type type) const {
+  auto *decl = std::get<0>(getStorage());
+  if (type) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+    assert(!type->hasArchetype() && "Archetype in interface type");
+
+    if (type->hasError())
+      decl->setInvalid();
+  }
+  decl->TypeAndAccess.setPointer(type);
+}
+
+//----------------------------------------------------------------------------//
+// LookupPrecedenceGroupRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc.getLoc();
+}
+
+void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto &desc = std::get<0>(getStorage());
+  if (auto pathDir = desc.pathDirection) {
+    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
+  } else {
+    diags.diagnose(desc.nameLoc, diag::circular_reference);
+  }
+}
+
+void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+  auto &desc = std::get<0>(getStorage());
+  diag.diagnose(desc.nameLoc,
+                 diag::circular_reference_through_precedence_group, desc.ident);
+}
+
+SourceLoc PrecedenceGroupDescriptor::getLoc() const {
+  return nameLoc;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const PrecedenceGroupDescriptor &desc) {
+  out << "precedence group " << desc.ident << " at ";
+  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
 }

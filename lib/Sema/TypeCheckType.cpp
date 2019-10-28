@@ -58,16 +58,13 @@ TypeResolution TypeResolution::forStructural(DeclContext *dc) {
   return TypeResolution(dc, TypeResolutionStage::Structural);
 }
 
-TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            LazyResolver *resolver) {
-  return forInterface(dc, dc->getGenericSignatureOfContext(), resolver);
+TypeResolution TypeResolution::forInterface(DeclContext *dc) {
+  return forInterface(dc, dc->getGenericSignatureOfContext());
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature *genericSig,
-                                            LazyResolver *resolver) {
+                                            GenericSignature genericSig) {
   TypeResolution result(dc, TypeResolutionStage::Interface);
-  result.Resolver = resolver;
   result.complete.genericSig = genericSig;
   result.complete.builder = nullptr;
   return result;
@@ -98,7 +95,7 @@ GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   return complete.builder;
 }
 
-GenericSignature *TypeResolution::getGenericSignature() const {
+GenericSignature TypeResolution::getGenericSignature() const {
   switch (stage) {
   case TypeResolutionStage::Contextual:
     return dc->getGenericSignatureOfContext();
@@ -214,25 +211,16 @@ Type TypeResolution::resolveDependentMemberType(
     ref->setValue(singleType, nullptr);
   }
 
+  auto *concrete = ref->getBoundDecl();
+
   // If the nested type has been resolved to an associated type, use it.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(ref->getBoundDecl())) {
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(concrete)) {
     return DependentMemberType::get(baseTy, assocType);
   }
 
   // Otherwise, the nested type comes from a concrete type,
   // or it's a typealias declared in protocol or protocol extension.
   // Substitute the base type into it.
-  auto concrete = ref->getBoundDecl();
-  auto lazyResolver = ctx.getLazyResolver();
-  if (lazyResolver)
-    lazyResolver->resolveDeclSignature(concrete);
-  if (!concrete->hasInterfaceType()) {
-    ctx.Diags.diagnose(ref->getIdLoc(), diag::recursive_decl_reference,
-                       concrete->getDescriptiveKind(), concrete->getName());
-    concrete->diagnose(diag::kind_declared_here,
-                       DescriptiveDeclKind::Type);
-    return ErrorType::get(ctx);
-  }
 
   // Make sure that base type didn't get replaced along the way.
   assert(baseTy->isTypeParameter());
@@ -388,46 +376,6 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-static Type getPointerType(TypeChecker &tc, SourceLoc loc, Type pointeeType,
-                           PointerTypeKind kind) {
-  auto pointerDecl = [&] {
-    switch (kind) {
-    case PTK_UnsafeMutableRawPointer:
-    case PTK_UnsafeRawPointer:
-      llvm_unreachable("these pointer types don't take arguments");
-    case PTK_UnsafePointer:
-      return tc.Context.getUnsafePointerDecl();
-    case PTK_UnsafeMutablePointer:
-      return tc.Context.getUnsafeMutablePointerDecl();
-    case PTK_AutoreleasingUnsafeMutablePointer:
-      return tc.Context.getAutoreleasingUnsafeMutablePointerDecl();
-    }
-    llvm_unreachable("bad kind");
-  }();
-  if (!pointerDecl) {
-    tc.diagnose(loc, diag::pointer_type_not_found,
-                kind == PTK_UnsafePointer ? 0 :
-                kind == PTK_UnsafeMutablePointer ? 1 : 2);
-    return Type();
-  }
-
-  tc.validateDecl(pointerDecl);
-  if (pointerDecl->isInvalid())
-    return Type();
-
-  // TODO: validate generic signature?
-
-  return BoundGenericType::get(pointerDecl, nullptr, pointeeType);
-}
-
-Type TypeChecker::getUnsafePointerType(SourceLoc loc, Type pointeeType) {
-  return getPointerType(*this, loc, pointeeType, PTK_UnsafePointer);
-}
-
-Type TypeChecker::getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType) {
-  return getPointerType(*this, loc, pointeeType, PTK_UnsafeMutablePointer);
-}
-
 Type TypeChecker::getStringType(DeclContext *dc) {
   if (auto typeDecl = Context.getStringDecl())
     return typeDecl->getDeclaredInterfaceType();
@@ -536,9 +484,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                     dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
               if (ugAliasDecl == aliasDecl) {
                 if (resolution.getStage() == TypeResolutionStage::Structural &&
-                    !aliasDecl->hasInterfaceType()) {
-                  return resolution.mapTypeIntoContext(
-                      aliasDecl->getStructuralType());
+                    aliasDecl->getUnderlyingTypeRepr() != nullptr) {
+                  return aliasDecl->getStructuralType();
                 }
                 return resolution.mapTypeIntoContext(
                     aliasDecl->getDeclaredInterfaceType());
@@ -552,9 +499,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                   dyn_cast<TypeAliasType>(extendedType.getPointer())) {
             if (aliasType->getDecl() == aliasDecl) {
               if (resolution.getStage() == TypeResolutionStage::Structural &&
-                  !aliasDecl->hasInterfaceType()) {
-                return resolution.mapTypeIntoContext(
-                    aliasDecl->getStructuralType());
+                  aliasDecl->getUnderlyingTypeRepr() != nullptr) {
+                return aliasDecl->getStructuralType();
               }
               return resolution.mapTypeIntoContext(
                   aliasDecl->getDeclaredInterfaceType());
@@ -579,8 +525,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
 
       // Otherwise, return the appropriate type.
       if (resolution.getStage() == TypeResolutionStage::Structural &&
-          !aliasDecl->hasInterfaceType()) {
-        return resolution.mapTypeIntoContext(aliasDecl->getStructuralType());
+          aliasDecl->getUnderlyingTypeRepr() != nullptr) {
+        return aliasDecl->getStructuralType();
       }
       return resolution.mapTypeIntoContext(
           aliasDecl->getDeclaredInterfaceType());
@@ -645,7 +591,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
         // extension.
         //
         // Get the superclass of the 'Self' type parameter.
-        auto *sig = foundDC->getGenericSignatureOfContext();
+        auto sig = foundDC->getGenericSignatureOfContext();
         if (!sig)
           return ErrorType::get(ctx);
         auto superclassType = sig->getSuperclassBound(selfType);
@@ -758,16 +704,6 @@ Type TypeChecker::applyGenericArguments(Type type,
     }  
   }
 
-  // Cannot extend a bound generic type.
-  if (options.is(TypeResolverContext::ExtensionBinding)) {
-    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags.diagnose(loc, diag::extension_specialization,
-               genericDecl->getName())
-        .highlight(generic->getSourceRange());
-    }
-    return ErrorType::get(ctx);
-  }
-
   // FIXME: More principled handling of circularity.
   if (!genericDecl->getGenericSignature()) {
     diags.diagnose(loc, diag::recursive_decl_reference,
@@ -794,6 +730,12 @@ Type TypeChecker::applyGenericArguments(Type type,
   if (!result)
     return result;
 
+  if (!options.contains(TypeResolutionFlags::AllowUnavailable)) {
+    if (options.isAnyExpr() || dc->getParent()->isLocalContext())
+      if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        diagnoseGenericTypeExportability(loc, result, dc);
+  }
+
   // Migration hack.
   bool isMutablePointer;
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
@@ -816,7 +758,7 @@ Type TypeChecker::applyUnboundGenericArguments(
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
-  assert(genericSig != nullptr);
+  assert(!genericSig.isNull());
 
   TypeSubstitutionMap subs;
 
@@ -979,38 +921,6 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC, TypeResolution resolution,
                             GenericIdentTypeRepr *generic,
                             TypeResolutionOptions options) {
-  auto fromDC = resolution.getDeclContext();
-  assert(fromDC && "No declaration context for type resolution?");
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  auto &diags = ctx.Diags;
-  auto lazyResolver = ctx.getLazyResolver();
-
-  // Hack: Don't validate nested typealiases if we only need the structural
-  // type.
-  auto prevalidatingAlias = [](TypeDecl *typeDecl, TypeResolution res) {
-    return isa<TypeAliasDecl>(typeDecl)
-        && !typeDecl->hasInterfaceType()
-        && typeDecl->getDeclContext()->isTypeContext()
-        && res.getStage() == TypeResolutionStage::Structural;
-  };
-
-  // Don't validate nominal type declarations during extension binding.
-  if ((!options.is(TypeResolverContext::ExtensionBinding) ||
-       !isa<NominalTypeDecl>(typeDecl)) &&
-      !prevalidatingAlias(typeDecl, resolution)) {
-    // Validate the declaration.
-    if (lazyResolver && !typeDecl->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(typeDecl);
-
-    // If we were not able to validate recursively, bail out.
-    if (!typeDecl->hasInterfaceType()) {
-      diags.diagnose(loc, diag::recursive_decl_reference,
-                     typeDecl->getDescriptiveKind(), typeDecl->getName());
-      typeDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
-      return ErrorType::get(ctx);
-    }
-  }
 
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
@@ -1021,11 +931,13 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
       !options.is(TypeResolverContext::TypeAliasDecl) &&
       !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
     diagnoseUnboundGenericType(type, loc);
-    return ErrorType::get(ctx);
+    return ErrorType::get(typeDecl->getASTContext());
   }
 
   if (type->hasError() && foundDC &&
       (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
+    auto fromDC = resolution.getDeclContext();
+    assert(fromDC && "No declaration context for type resolution?");
     maybeDiagnoseBadConformanceRef(fromDC, foundDC->getDeclaredInterfaceType(),
                                    loc, typeDecl);
   }
@@ -1639,13 +1551,10 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
     DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
   if (AllowPotentiallyUnavailableProtocol)
     flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
-  ASTContext &ctx = DC->getASTContext();
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
     if (auto *typeDecl = comp->getBoundDecl()) {
-      assert(ctx.getLazyResolver() && "Must have a type checker!");
-      TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-      if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(), flags)) {
+      if (diagnoseDeclAvailability(typeDecl, DC, comp->getIdLoc(), flags)) {
         return true;
       }
     }
@@ -1754,10 +1663,9 @@ static bool validateAutoClosureAttr(DiagnosticEngine &Diags, const SourceLoc &lo
 /// has `@autoclosure` attribute, and if so, validate that such use is correct.
 /// \returns true if there was an error, false otherwise.
 static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
-                                            const TypeLoc &loc,
+                                            const TypeRepr *TR,
                                             Type type,
                                             TypeResolutionOptions options) {
-  auto *TR = loc.getTypeRepr();
   if (!TR || TR->isInvalid())
     return false;
 
@@ -1780,7 +1688,7 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
       isValid &= llvm::none_of(
           fnType->getParams(), [&](const FunctionType::Param &param) {
             return param.isAutoClosure() &&
-                   validateAutoClosureAttr(Diags, loc.getLoc(),
+                   validateAutoClosureAttr(Diags, TR->getLoc(),
                                            param.getPlainType());
           });
     }
@@ -1799,30 +1707,8 @@ bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
-  Type type = Loc.getType();
-  if (type.isNull()) {
-    type = resolution.resolveType(Loc.getTypeRepr(), options);
-    if (!type) {
-      type = ErrorType::get(Context);
-      // Diagnose types that are illegal in SIL.
-    } else if (options.contains(TypeResolutionFlags::SILType)
-               && !type->isLegalSILType()) {
-      Context.Diags.diagnose(Loc.getLoc(), diag::illegal_sil_type, type);
-      Loc.setInvalidType(Context);
-      return true;
-    } else if (validateAutoClosureAttributeUse(Context.Diags, Loc,
-                                               type, options)) {
-      type = ErrorType::get(Context);
-    }
-  }
-
+  Type type = resolution.resolveType(Loc.getTypeRepr(), options);
   Loc.setType(type);
-  if (!type->hasError()) {
-    const DeclContext *DC = resolution.getDeclContext();
-    if (options.isAnyExpr() || DC->getParent()->isLocalContext())
-      if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        TypeChecker::diagnoseGenericTypeExportability(Loc, DC);
-  }
 
   return type->hasError();
 }
@@ -1925,16 +1811,34 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
-  FrontendStatsTracer StatsTracer(getASTContext().Stats, "resolve-type", TyR);
-  PrettyStackTraceTypeRepr stackTrace(getASTContext(), "resolving", TyR);
+  auto &ctx = getASTContext();
+
+  FrontendStatsTracer StatsTracer(ctx.Stats, "resolve-type", TyR);
+  PrettyStackTraceTypeRepr stackTrace(ctx, "resolving", TyR);
 
   TypeResolver typeResolver(*this);
   auto result = typeResolver.resolveType(TyR, options);
-  
-  // If we resolved down to an error, make sure to mark the typeRepr as invalid
-  // so we don't produce a redundant diagnostic.
-  if (result && result->hasError())
-    TyR->setInvalid();
+
+  if (result) {
+    // If we resolved down to an error, make sure to mark the typeRepr as invalid
+    // so we don't produce a redundant diagnostic.
+    if (result->hasError()) {
+      TyR->setInvalid();
+      return result;
+    }
+
+    auto loc = TyR->getLoc();
+
+    if (options.contains(TypeResolutionFlags::SILType)
+        && !result->isLegalSILType()) {
+      ctx.Diags.diagnose(loc, diag::illegal_sil_type, result);
+      return ErrorType::get(ctx);
+    }
+
+    if (validateAutoClosureAttributeUse(ctx.Diags, TyR, result, options))
+      return ErrorType::get(ctx);
+  }
+
   return result;
 }
 
@@ -2543,7 +2447,6 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   if (definingDeclNode->getKind() == Node::Kind::Global)
     definingDeclNode = definingDeclNode->getChild(0);
   ASTBuilder builder(Context);
-  builder.Resolver = resolution.Resolver;
   auto opaqueNode =
     builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
   opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
@@ -2745,9 +2648,9 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       elementOptions.setContext(TypeResolverContext::FunctionInput);
       auto param = resolveSILParameter(elt.Type, elementOptions);
       params.push_back(param);
-      if (!param.getType()) return nullptr;
+      if (!param.getInterfaceType()) return nullptr;
 
-      if (param.getType()->hasError())
+      if (param.getInterfaceType()->hasError())
         hasError = true;
     }
 
@@ -2781,26 +2684,27 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = param.getType()->mapTypeOutOfContext()
+      auto transParamType = param.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceParams.push_back(param.getWithType(transParamType));
+      interfaceParams.push_back(param.getWithInterfaceType(transParamType));
     }
     for (auto &yield : yields) {
-      auto transYieldType = yield.getType()->mapTypeOutOfContext()
+      auto transYieldType = yield.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceYields.push_back(yield.getWithType(transYieldType));
+      interfaceYields.push_back(yield.getWithInterfaceType(transYieldType));
     }
     for (auto &result : results) {
-      auto transResultType = result.getType()->mapTypeOutOfContext()
+      auto transResultType = result.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceResults.push_back(result.getWithType(transResultType));
+      interfaceResults.push_back(result.getWithInterfaceType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = errorResult->getType()->mapTypeOutOfContext()
+      auto transErrorResultType = errorResult->getInterfaceType()
+          ->mapTypeOutOfContext()
           ->getCanonicalType();
       interfaceErrorResult =
-        errorResult->getWithType(transErrorResultType);
+        errorResult->getWithInterfaceType(transErrorResultType);
     }
   } else {
     interfaceParams = params;
@@ -2818,7 +2722,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     if (!protocolType)
       return ErrorType::get(Context);
 
-    Type selfType = params.back().getType();
+    Type selfType = params.back().getInterfaceType();
     // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
       auto next = metatypeType->getInstanceType();
@@ -2837,6 +2741,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                               callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
+                              SubstitutionMap(), false,
                               Context, witnessMethodConformance);
 }
 
@@ -2846,7 +2751,7 @@ SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
   AttributedTypeRepr attrRepr(attrs, repr);
   options.setContext(TypeResolverContext::FunctionInput);
   SILParameterInfo paramInfo = resolveSILParameter(&attrRepr, options);
-  return SILYieldInfo(paramInfo.getType(), paramInfo.getConvention());
+  return SILYieldInfo(paramInfo.getInterfaceType(), paramInfo.getConvention());
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(
@@ -2920,7 +2825,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
       // The treatment from this point on is basically completely different.
       auto yield = resolveSILYield(attrs, attrRepr->getTypeRepr(), options);
-      if (yield.getType()->hasError())
+      if (yield.getInterfaceType()->hasError())
         return true;
 
       yields.push_back(yield);
@@ -3086,10 +2991,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
   if (auto dictTy = TypeChecker::getDictionaryType(repr->getBrackets().Start,
                                                    keyTy, valueTy)) {
-    // Check the requirements on the generic arguments.
-    if (auto lazyResolver = Context.getLazyResolver())
-      lazyResolver->resolveDeclSignature(dictDecl);
-
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
 
     Type args[] = {keyTy, valueTy};
@@ -3445,15 +3346,6 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
           aliasDecl, baseTy,
           aliasDecl->getASTContext());
     }
-
-    // FIXME: If this is a protocol typealias and we haven't built the
-    // protocol's generic environment yet, do so now, to ensure the
-    // typealias's underlying type has fully resolved dependent
-    // member types.
-    if (auto *protoDecl = dyn_cast<ProtocolDecl>(aliasDecl->getDeclContext())) {
-      ASTContext &ctx = protoDecl->getASTContext();
-      ctx.getLazyResolver()->resolveProtocolEnvironment(protoDecl);
-    }
   }
 
   Type resultType;
@@ -3543,8 +3435,6 @@ public:
         T->setInvalid();
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
-      if (!alias->hasInterfaceType())
-        return;
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
       type.findIf([&](Type type) -> bool {
         if (T->isInvalid())

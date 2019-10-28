@@ -117,16 +117,6 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   //   var x: Int // <- we get to valuate x's var decl here, but its type
   //              //    hasn't yet been evaluated
   // }
-  //
-  // Validate the decl eagerly.
-  if (!varDecl->hasInterfaceType())
-    tc.validateDecl(varDecl);
-
-  // If the var decl didn't validate, it may still not have a type; confirm it
-  // has a type before ensuring the type conforms to Codable.
-  if (!varDecl->hasInterfaceType())
-    return TypeNotValidated;
-
   bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
   return typeConformsToCodable(context, varDecl->getValueInterfaceType(),
                                isIUO, proto);
@@ -271,9 +261,6 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
                 derived.getProtocolType());
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
-
-  // If the decl hasn't been validated yet, do so.
-  tc.validateDecl(codingKeysTypeDecl);
 
   // CodingKeys may be a typealias. If so, follow the alias to its canonical
   // type.
@@ -479,9 +466,10 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
   auto *keyedByDecl = new (C)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, DC);
   keyedByDecl->setImplicit();
+  keyedByDecl->setSpecifier(ParamSpecifier::Default);
   keyedByDecl->setInterfaceType(returnType);
 
   // container(keyedBy:) method name
@@ -596,7 +584,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedEncodingContainerDecl(),
-                                             codingKeysType,
+                                             codingKeysEnum->getDeclaredInterfaceType(),
                                              VarDecl::Introducer::Var);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -737,8 +725,9 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   // Params: (Encoder)
   auto *encoderParam = new (C)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
+      ParamDecl(SourceLoc(), SourceLoc(), C.Id_to,
                 SourceLoc(), C.Id_encoder, conformanceDC);
+  encoderParam->setSpecifier(ParamSpecifier::Default);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
@@ -761,10 +750,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  encodeDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
-  encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
+  (void)encodeDecl->getInterfaceType();
 
-  encodeDecl->setValidationToChecked();
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -819,7 +806,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedDecodingContainerDecl(),
-                                             codingKeysType,
+                                             codingKeysEnum->getDeclaredInterfaceType(),
                                              VarDecl::Introducer::Let);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -1017,9 +1004,10 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // Params: (Decoder)
   auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
-      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
+      SourceLoc(), SourceLoc(), C.Id_from,
       SourceLoc(), C.Id_decoder, conformanceDC);
   decoderParamDecl->setImplicit();
+  decoderParamDecl->setSpecifier(ParamSpecifier::Default);
   decoderParamDecl->setInterfaceType(decoderType);
 
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
@@ -1042,10 +1030,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  initDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
+  (void)initDecl->getInterfaceType();
 
-  initDecl->setValidationToChecked();
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
 

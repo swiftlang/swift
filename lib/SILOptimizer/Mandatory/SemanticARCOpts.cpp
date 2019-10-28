@@ -24,7 +24,7 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -420,8 +420,10 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // our end borrow scope set. If they do not, then the copy_value is lifetime
   // extending the guaranteed value, we can not eliminate it.
   {
-    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck(
-        destroys.begin(), destroys.end());
+    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck;
+    for (auto *dvi : destroys) {
+      destroysForLinearLifetimeCheck.push_back(&dvi->getAllOperands()[0]);
+    }
     SmallVector<BranchPropagatedUser, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
@@ -659,14 +661,14 @@ public:
     SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
     for (auto *use : borrowInst->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
-        baseEndBorrows.push_back(BranchPropagatedUser(use->getUser()));
+        baseEndBorrows.emplace_back(use);
       }
     }
     
     SmallVector<BranchPropagatedUser, 4> valueDestroys;
     for (auto *use : Load->getUses()) {
       if (isa<DestroyValueInst>(use->getUser())) {
-        valueDestroys.push_back(BranchPropagatedUser(use->getUser()));
+        valueDestroys.emplace_back(use);
       }
     }
     

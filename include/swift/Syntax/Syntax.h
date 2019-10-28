@@ -39,7 +39,6 @@ namespace syntax {
 
 struct SyntaxVisitor;
 class SourceFileSyntax;
-class TokenSyntax;
 
 template <typename SyntaxNode>
 SyntaxNode make(RC<RawSyntax> Raw) {
@@ -83,7 +82,7 @@ public:
   SyntaxKind getKind() const;
 
   /// Get the shared raw syntax.
-  RC<RawSyntax> getRaw() const;
+  const RC<RawSyntax> &getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
   SyntaxNodeId getId() const { return getRaw()->getId(); }
@@ -168,15 +167,6 @@ public:
 
   /// Returns true if the node is "present" in the source.
   bool isPresent() const;
-
-
-  /// Returns the first non-missing token in this syntax. Returns None if there
-  /// is no non-missing token.
-  Optional<TokenSyntax> getFirstToken();
-
-  /// Returns the last non-missing token in this syntax. Returns None if there
-  /// is no non-missing token.
-  Optional<TokenSyntax> getLastToken();
 
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts = SyntaxPrintOptions()) const;

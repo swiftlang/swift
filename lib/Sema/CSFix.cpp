@@ -126,13 +126,39 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
   MissingForcedDowncastFailure failure(root, getConstraintSystem(),
+                                       getFromType(), getToType(),
                                        getLocator());
   return failure.diagnose(asNote);
 }
 
-CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
-                                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) CoerceToCheckedCast(cs, locator);
+CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
+                                                  Type fromType, Type toType,
+                                                  ConstraintLocator *locator) {
+  // If any of the types has a type variable, don't add the fix. 
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return nullptr;
+
+  auto &TC = cs.getTypeChecker();
+
+  auto *expr = locator->getAnchor();
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    expr = assignExpr->getSrc();
+  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
+  if (!coerceExpr)
+    return nullptr;
+
+  auto subExpr = coerceExpr->getSubExpr();
+  auto castKind =
+      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                              cs.DC, coerceExpr->getLoc(), subExpr,
+                              coerceExpr->getCastTypeLoc().getSourceRange());
+
+  // Invalid cast.
+  if (castKind == CheckedCastKind::Unresolved)
+    return nullptr;
+
+  return new (cs.getAllocator())
+      CoerceToCheckedCast(cs, fromType, toType, locator);
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {
@@ -478,7 +504,8 @@ AllowClosureParamDestructuring::create(ConstraintSystem &cs,
 
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
-  MissingArgumentsFailure failure(root, cs, NumSynthesized, getLocator());
+  MissingArgumentsFailure failure(root, cs, getSynthesizedArguments(),
+                                  getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -489,6 +516,42 @@ AddMissingArguments::create(ConstraintSystem &cs,
   unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
   return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
+}
+
+bool RemoveExtraneousArguments::diagnose(Expr *root, bool asNote) const {
+  ExtraneousArgumentsFailure failure(root, getConstraintSystem(),
+                                     ContextualType, getExtraArguments(),
+                                     getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool RemoveExtraneousArguments::isMinMaxNameShadowing(
+    ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+  auto *anchor = dyn_cast_or_null<CallExpr>(locator.getAnchor());
+  if (!anchor)
+    return false;
+
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor->getFn())) {
+    if (auto *baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+      auto *decl = baseExpr->getDecl();
+      if (baseExpr->isImplicit() && decl &&
+          decl->getFullName() == cs.getASTContext().Id_self) {
+        auto memberName = UDE->getName();
+        return memberName.isSimpleName("min") || memberName.isSimpleName("max");
+      }
+    }
+  }
+
+  return false;
+}
+
+RemoveExtraneousArguments *RemoveExtraneousArguments::create(
+    ConstraintSystem &cs, FunctionType *contextualType,
+    llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<IndexedParam>(extraArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(RemoveExtraneousArguments));
+  return new (mem)
+      RemoveExtraneousArguments(cs, contextualType, extraArgs, locator);
 }
 
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
@@ -706,14 +769,49 @@ bool AllowTupleSplatForSingleParameter::attempt(
 
   const auto &param = params.front();
 
-  auto *paramTy = param.getOldType()->getAs<TupleType>();
-  if (!paramTy || paramTy->getNumElements() != args.size())
+  if (param.isInOut() || param.isVariadic() || param.isAutoClosure())
+    return true;
+
+  auto paramTy = param.getOldType();
+
+  // Parameter type has to be either a tuple (with the same arity as
+  // argument list), or a type variable.
+  if (!(paramTy->is<TupleType>() &&
+        paramTy->castTo<TupleType>()->getNumElements() == args.size()) &&
+      !paramTy->is<TypeVariableType>())
     return true;
 
   SmallVector<TupleTypeElt, 4> argElts;
-  for (const auto &arg : args) {
-    argElts.push_back(
-        {arg.getPlainType(), arg.getLabel(), arg.getParameterFlags()});
+
+  for (unsigned index : indices(args)) {
+    const auto &arg = args[index];
+
+    auto label = arg.getLabel();
+    auto flags = arg.getParameterFlags();
+
+    // In situations where there is a single labeled parameter
+    // we need to form a tuple with omits first label e.g.
+    //
+    // func foo<T>(x: T) {}
+    // foo(x: 0, 1)
+    //
+    // We'd want to suggest argument list to be `x: (0, 1)` instead
+    // of `(x: 0, 1)` which would be incorrect.
+    if (param.hasLabel() && label == param.getLabel()) {
+      if (index == 0) {
+        label = Identifier();
+      } else {
+        // If label match anything other than first argument,
+        // this can't be a tuple splat.
+        return true;
+      }
+    }
+
+    // Tuple can't have `inout` elements.
+    if (flags.isInOut())
+      return true;
+
+    argElts.push_back({arg.getPlainType(), label});
   }
 
   bindings[0].clear();
@@ -759,6 +857,26 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
+bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto *AE = cast<AssignExpr>(getAnchor());
+  auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
+                                               : CTP_AssignSource;
+
+  ContextualFailure failure(
+      root, cs, CTP, getFromType(), getToType(),
+      cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
+  return failure.diagnose(asNote);
+}
+
+IgnoreAssignmentDestinationType *
+IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
+                                        Type destTy,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
+}
+
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   InOutConversionFailure failure(root, cs, getFromType(), getToType(),
@@ -793,6 +911,36 @@ static bool isValueOfRawRepresentable(ConstraintSystem &cs,
   }
 
   return false;
+}
+
+ExpandArrayIntoVarargs *
+ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
+                                Type paramType,
+                                ConstraintLocatorBuilder locator) {
+  auto constraintLocator = cs.getConstraintLocator(locator);
+  auto elementType = cs.isArrayType(argType);
+  if (elementType &&
+      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
+          ->getParameterFlags()
+          .isVariadic()) {
+    auto options = ConstraintSystem::TypeMatchOptions(
+        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
+        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
+    auto result =
+        cs.matchTypes(*elementType, paramType,
+                      ConstraintKind::ArgumentConversion, options, locator);
+    if (result.isSuccess())
+      return new (cs.getAllocator())
+          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
+  }
+
+  return nullptr;
+}
+
+bool ExpandArrayIntoVarargs::diagnose(Expr *root, bool asNote) const {
+  ExpandArrayIntoVarargsFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 ExplicitlyConstructRawRepresentable *

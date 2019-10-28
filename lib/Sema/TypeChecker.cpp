@@ -68,8 +68,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasInterfaceType()) {
-    validateDecl(protocol);
+  if (protocol && !protocol->getInterfaceType()) {
     if (protocol->isInvalid())
       return nullptr;
   }
@@ -210,7 +209,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (auto *stdlib = Context.getStdlibModule()) {
+  if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
     return stdlib;
   }
 
@@ -230,7 +229,9 @@ static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    if (auto nominal = ext->getExtendedNominal()) {
+    assert(!ext->canNeverBeBound() &&
+           "Only extensions that can ever be bound get here.");
+    if (auto nominal = ext->computeExtendedNominal()) {
       bindExtensionToNominal(ext, nominal);
       return true;
     }
@@ -329,7 +330,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
-  for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
+  for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
     TypeChecker::computeCaptures(FD);
   }
 
@@ -352,12 +353,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
-  // Eagerly build a scope tree before type checking
-  // because type-checking mutates the AST and that throws off the scope-based
-  // lookups.
+  // Eagerly build the top-level scopes tree before type checking
+  // because type-checking expressions mutates the AST and that throws off the
+  // scope-based lookups. Only the top-level scopes because extensions have not
+  // been bound yet.
   if (SF.getASTContext().LangOpts.EnableASTScopeLookup &&
       SF.isSuitableForASTScopes())
-    SF.getScope().buildScopeTreeEagerly();
+    SF.getScope()
+        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
   auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
@@ -391,6 +394,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
+
+    if (Options.contains(TypeCheckingFlags::SkipNonInlinableFunctionBodies))
+      // Disable this optimization if we're compiling SwiftOnoneSupport, because
+      // we _definitely_ need to look inside every declaration to figure out
+      // what gets prespecialized.
+      if (!SF.getParentModule()->isOnoneSupportModule())
+        TC.setSkipNonInlinableBodies(true);
 
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
@@ -605,19 +615,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 GenericEnvironment *
 swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
-  return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
-}
-
-void swift::typeCheckCompletionDecl(Decl *D) {
-  auto &Ctx = D->getASTContext();
-
-  DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-
-  if (auto ext = dyn_cast<ExtensionDecl>(D))
-    TC.validateExtension(ext);
-  else
-    TC.validateDecl(cast<ValueDecl>(D));
+  return TypeChecker::handleSILGenericParams(genericParams, DC);
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -731,38 +729,18 @@ TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
   return TypeChecker::createForContext(Ctx);
 }
 
-// checkForForbiddenPrefix is for testing purposes.
+void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
+  if (C.LangOpts.DebugForbidTypecheckPrefix.empty())
+    return;
 
-void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
+  // Don't touch special names or empty names.
+  if (Name.isSpecial() || Name.empty())
     return;
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (!VD->getBaseName().isSpecial())
-      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
-  }
-}
 
-void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (!E->getName().isSpecial())
-    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
-}
-
-void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  checkForForbiddenPrefix(Ident.empty() ? StringRef() : Ident.str());
-}
-
-void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (Name.empty())
-    return;
-  if (Name.startswith(Context.LangOpts.DebugForbidTypecheckPrefix)) {
+  StringRef Str = Name.getIdentifier().str();
+  if (Str.startswith(C.LangOpts.DebugForbidTypecheckPrefix)) {
     std::string Msg = "forbidden typecheck occurred: ";
-    Msg += Name;
+    Msg += Str;
     llvm::report_fatal_error(Msg);
   }
 }

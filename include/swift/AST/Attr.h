@@ -1279,27 +1279,27 @@ public:
 
 private:
   TrailingWhereClause *trailingWhereClause;
-  GenericSignature *specializedSignature;
+  GenericSignature specializedSignature;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind,
-                 GenericSignature *specializedSignature);
+                 GenericSignature specializedSignature);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
                                 bool exported, SpecializationKind kind,
-                                GenericSignature *specializedSignature
+                                GenericSignature specializedSignature
                                     = nullptr);
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature *getSpecializedSgnature() const {
+  GenericSignature getSpecializedSgnature() const {
     return specializedSignature;
   }
 
-  void setSpecializedSignature(GenericSignature *newSig) {
+  void setSpecializedSignature(GenericSignature newSig) {
     specializedSignature = newSig;
   }
 
@@ -1672,7 +1672,7 @@ private:
 public:
   template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<llvm::iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<const_iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
                              const_iterator>;
 

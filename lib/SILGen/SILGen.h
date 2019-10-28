@@ -239,6 +239,9 @@ public:
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
 
+  /// Emits the backing initializer for a property with an attached wrapper.
+  void emitPropertyWrapperBackingInitializer(VarDecl *var);
+
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
@@ -441,7 +444,7 @@ public:
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                                const CaptureInfo &captureInfo);
+                                                    CaptureInfo captureInfo);
 
   /// Map the substitutions for the original declaration to substitutions for
   /// the overridden declaration.

@@ -159,7 +159,7 @@ struct SomeStruct {
       return 42
     }
     nonmutating
-    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-5=mutating }}
+    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}} {{5-16=mutating}}
       iv = newValue // expected-error {{cannot assign to property: 'self' is immutable}}
     }
   }
@@ -370,7 +370,7 @@ func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
 func testSelectorStyleArguments2(let x: Int, // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
                                  let bar y: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
 // expected-error @-1 {{expected ',' separator}}
-// expected-error @-2 {{parameter requires an explicit type}}
+// expected-error @-2 {{expected ':' following argument label and parameter name}}
 }
 func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
@@ -679,5 +679,25 @@ struct SS {
     i = i // expected-error {{cannot assign to value: 'i' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
     j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
+  }
+}
+
+protocol JustAProtocol {
+  var name: String { get set }
+}
+
+extension JustAProtocol {
+  var foo: String {
+    get { return name }
+    nonmutating set { name = newValue } // expected-error {{cannot assign to property: 'self' is immutable}} 
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+  }
+
+  nonmutating func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    name = "Hello" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    name = "World" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }

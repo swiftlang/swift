@@ -254,6 +254,10 @@ def stats_output_dir: Separate<["-"], "stats-output-dir">,
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
+def experimental_skip_non_inlinable_function_bodies:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;
@@ -364,6 +368,12 @@ def emit_module_interface_path :
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
+def emit_module_source_info_path :
+  Separate<["-"], "emit-module-source-info-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
+
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
@@ -413,6 +423,11 @@ def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
 def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
+
+// Experimental feature options
+def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental differentiable programming features">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -508,6 +523,9 @@ def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
 def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
+def no_toolchain_stdlib_rpath: Flag<["-"], "no-toolchain-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Do not add an rpath entry for the toolchain's standard library (default)">;
 def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't add any rpath entries.">;

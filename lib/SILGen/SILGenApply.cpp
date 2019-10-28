@@ -1787,7 +1787,8 @@ static void emitRawApply(SILGenFunction &SGF,
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
+      SGF.getTryApplyErrorDest(loc, substFnType,
+                               substFnType->getErrorResult(),
                                options & ApplyOptions::DoesNotThrow);
 
     SGF.B.createTryApply(loc, fnValue, subs, argValues,
@@ -1868,15 +1869,17 @@ class ClaimedParamsRef {
 public:
   static constexpr const unsigned NoSkip = (unsigned)-1;
 private:
+  CanSILFunctionType FnTy;
   ArrayRef<SILParameterInfo> Params;
   
   // The index of the param excluded from this range, if any, or ~0.
   unsigned SkipParamIndex;
   
   friend struct ParamLowering;
-  explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params,
+  explicit ClaimedParamsRef(CanSILFunctionType fnTy,
+                            ArrayRef<SILParameterInfo> params,
                             unsigned skip)
-    : Params(params), SkipParamIndex(skip)
+    : FnTy(fnTy), Params(params), SkipParamIndex(skip)
   {
     // Eagerly chop a skipped parameter off either end.
     if (SkipParamIndex == 0) {
@@ -1890,10 +1893,13 @@ private:
     return SkipParamIndex != (unsigned)NoSkip;
   }
 public:
-  ClaimedParamsRef() : Params({}), SkipParamIndex(-1) {}
-  explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params)
-    : Params(params), SkipParamIndex(NoSkip)
+  ClaimedParamsRef() : FnTy(), Params({}), SkipParamIndex(-1) {}
+  explicit ClaimedParamsRef(CanSILFunctionType fnTy,
+                            ArrayRef<SILParameterInfo> params)
+    : FnTy(fnTy), Params(params), SkipParamIndex(NoSkip)
   {}
+  
+  CanSILFunctionType getFunctionType() const { return FnTy; }
 
   struct iterator : public std::iterator<std::random_access_iterator_tag,
                                          SILParameterInfo>
@@ -2003,20 +2009,21 @@ public:
   
   ClaimedParamsRef slice(unsigned start) const {
     if (start >= SkipParamIndex)
-      return ClaimedParamsRef(Params.slice(start + 1), NoSkip);
-    return ClaimedParamsRef(Params.slice(start),
+      return ClaimedParamsRef(FnTy, Params.slice(start + 1), NoSkip);
+    return ClaimedParamsRef(FnTy,
+                            Params.slice(start),
                             hasSkip() ? SkipParamIndex - start : NoSkip);
   }
   ClaimedParamsRef slice(unsigned start, unsigned count) const {
     if (start >= SkipParamIndex)
-      return ClaimedParamsRef(Params.slice(start + 1, count), NoSkip);
+      return ClaimedParamsRef(FnTy, Params.slice(start + 1, count), NoSkip);
     unsigned newSkip = SkipParamIndex;
     if (hasSkip())
       newSkip -= start;
     
     if (newSkip < count)
-      return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
-    return ClaimedParamsRef(Params.slice(start, count), NoSkip);
+      return ClaimedParamsRef(FnTy, Params.slice(start, count+1), newSkip);
+    return ClaimedParamsRef(FnTy, Params.slice(start, count), NoSkip);
   }
 };
 
@@ -2686,9 +2693,9 @@ private:
       loweredSubstArgType =
         SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
     }
-    SILType loweredSubstParamType =
-      SILType::getPrimitiveType(param.getType(),
-                                loweredSubstArgType.getCategory());
+    SILType loweredSubstParamType = SILType::getPrimitiveType(
+                param.getArgumentType(SGF.SGM.M, ParamInfos.getFunctionType()),
+                loweredSubstArgType.getCategory());
 
     // If the caller takes the argument indirectly, the argument has an
     // inout type.
@@ -2705,7 +2712,7 @@ private:
         return;
     }
 
-     if (SGF.silConv.isSILIndirect(param)) {
+    if (SGF.silConv.isSILIndirect(param)) {
       emitIndirect(std::move(arg), loweredSubstArgType, origParamType, param);
       return;
     }
@@ -2812,7 +2819,7 @@ private:
     // Otherwise, simultaneously emit and reabstract.
     } else {
       result = std::move(arg).materialize(SGF, origParamType,
-                                          SGF.getSILType(param));
+                          SGF.getSILType(param, ParamInfos.getFunctionType()));
     }
 
     Args.push_back(result);
@@ -2920,9 +2927,9 @@ private:
                                             arg.getSubstRValueType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
-                                         arg.getSubstRValueType(),
-                                         origParamType.getType(),
-                                         param.getSILStorageType());
+             arg.getSubstRValueType(),
+             origParamType.getType(),
+             param.getSILStorageType(SGF.SGM.M, ParamInfos.getFunctionType()));
         }
         llvm_unreachable("bad language");
       }();
@@ -3144,10 +3151,10 @@ private:
     /// If the context requires reabstraction
     bool RequiresReabstraction;
   };
-  static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
-                                                    SILParameterInfo param) {
-    bool requiresReabstraction =
-        loweredArgType.getASTType() != param.getType();
+  EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
+                                             SILParameterInfo param) {
+    bool requiresReabstraction = loweredArgType.getASTType()
+      != param.getArgumentType(SGF.SGM.M, ParamInfos.getFunctionType());
     // If the parameter is consumed, we have to emit at +1.
     if (param.isConsumed()) {
       return {SGFContext(), requiresReabstraction};
@@ -3235,7 +3242,8 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
     value = SGF.B.createFormalAccessLoadBorrow(loc, value);
   }
 
-  assert(param.getType() == value.getType().getASTType());
+  assert(param.getArgumentType(SGF.SGM.M, params.getFunctionType())
+            == value.getType().getASTType());
   args[argIndex++] = value;
 }
 
@@ -3372,7 +3380,8 @@ struct ParamLowering {
         return {};
       }
       ClaimedForeignSelf = foreignSelf.getSelfIndex();
-      return ClaimedParamsRef(Params[ClaimedForeignSelf],
+      return ClaimedParamsRef(fnConv.funcTy,
+                              Params[ClaimedForeignSelf],
                               ClaimedParamsRef::NoSkip);
     }
 
@@ -3381,13 +3390,13 @@ struct ParamLowering {
              "not claiming all params after foreign self?!");
       auto result = Params;
       Params = {};
-      return ClaimedParamsRef(result, ClaimedForeignSelf);
+      return ClaimedParamsRef(fnConv.funcTy, result, ClaimedForeignSelf);
     }
 
     assert(count <= Params.size());
     auto result = Params.slice(Params.size() - count, count);
     Params = Params.slice(0, Params.size() - count);
-    return ClaimedParamsRef(result, (unsigned)-1);
+    return ClaimedParamsRef(fnConv.funcTy, result, (unsigned)-1);
   }
 
   ArrayRef<SILParameterInfo>
@@ -4198,7 +4207,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   }
 
   // Uncurry the arguments in calling convention order.
-  for (auto &argSet : reversed(args))
+  for (auto &argSet : llvm::reverse(args))
     uncurriedArgs.append(argSet.begin(), argSet.end());
   args = {};
 
@@ -4430,14 +4439,14 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // Emit the raw application.
-  GenericSignature *genericSig =
-    fn.getType().castTo<SILFunctionType>()->getGenericSignature();
+  GenericSignature genericSig =
+    fn.getType().castTo<SILFunctionType>()->getInvocationGenericSignature();
 
   // When calling a closure that's defined in a generic context but does not
   // capture any generic parameters, we will have substitutions, but the
   // function type won't have a generic signature. Drop the substitutions in
   // this case.
-  if (genericSig == nullptr) {
+  if (genericSig.isNull()) {
     subs = SubstitutionMap();
 
   // Otherwise, the substitutions should match the generic signature.
@@ -4457,7 +4466,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // Pop the argument scope.
   argScope.pop();
 
-  if (substFnType->isNoReturnFunction())
+  if (substFnType->isNoReturnFunction(SGM.M))
     loc.markAutoGenerated();
 
   // Explode the direct results.
@@ -4465,7 +4474,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   SmallVector<ManagedValue, 4> directResults;
   auto addManagedDirectResult = [&](SILValue result,
                                     const SILResultInfo &resultInfo) {
-    auto &resultTL = getTypeLowering(resultInfo.getType());
+    auto &resultTL =
+      getTypeLowering(resultInfo.getReturnValueType(SGM.M, substFnType));
 
     switch (resultInfo.getConvention()) {
     case ResultConvention::Indirect:
@@ -4636,13 +4646,15 @@ void SILGenFunction::emitYield(SILLocation loc,
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
     substYieldTys.push_back({
-      F.mapTypeIntoContext(origYield.getType())->getCanonicalType(),
+      F.mapTypeIntoContext(origYield.getArgumentType(SGM.M, fnType))
+       ->getCanonicalType(),
       origYield.getConvention()
     });
   }
 
   ArgEmitter emitter(*this, fnType->getRepresentation(), /*yield*/ true,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substYieldTys),
+                     /*isForCoroutine*/ false,
+                     ClaimedParamsRef(fnType, substYieldTys),
                      yieldArgs, delayedArgs,
                      /*foreign error*/ None, ImportAsMemberStatus());
 
@@ -4871,7 +4883,8 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
     // Determine the self metatype type.
     CanSILFunctionType substFnType =
       initConstant.SILFnType->substGenericArgs(SGM.M, subs);
-    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter());
+    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter(),
+                                         substFnType);
 
     if (overriddenSelfType) {
       // If the 'self' type has been overridden, form a metatype to the
@@ -4974,7 +4987,8 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
     // Determine the self metatype type.
     CanSILFunctionType substFnType =
         declRefConstant.SILFnType->substGenericArgs(SGM.M, subs);
-    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter());
+    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter(),
+                                         substFnType);
     selfMetaTy = selfParamMetaTy;
   }
 
@@ -5006,28 +5020,42 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   return emission.apply(C);
 }
 
-RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
-                                                          SubstitutionMap subs,
-                                                          SILDeclRef ctorRef,
-                                                          Type wrapperTy,
-                                                    CanAnyFunctionType funcTy) {
-  Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
+RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
+    SILLocation loc,
+    VarDecl *var,
+    RValue &&originalValue,
+    SGFContext C) {
+  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
 
-  MetatypeType *MTty = MetatypeType::get(wrapperTy);
-  auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
-  ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
-  RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);
+  SubstitutionMap subs;
+  auto varDC = var->getInnermostDeclContext();
+  if (auto genericSig = varDC->getGenericSignatureOfContext()) {
+    subs = SubstitutionMap::get(
+        genericSig,
+        [&](SubstitutableType *type) {
+          if (auto gp = type->getAs<GenericTypeParamType>()) {
+            return F.mapTypeIntoContext(gp);
+          }
 
-  ArgumentSource ArgSrc(loc, std::move(metatypeRVal));
-  FormalEvaluationScope writebacks(*this);
-  CallEmission emission(*this, std::move(callee), std::move(writebacks));
+          return Type(type);
+        },
+        LookUpConformanceInModule(varDC->getParentModule()));
+  }
 
-  AnyFunctionType::Param selfParam((Type(MTty)), Identifier(),
-                                   ParameterTypeFlags());
-  emission.addSelfParam(loc, std::move(ArgSrc), selfParam, funcTy.getResult());
+  FormalEvaluationScope writebackScope(*this);
 
-  RValue RV = emission.apply();
-  return RV;
+  auto callee = Callee::forDirect(*this, constant, subs, loc);
+  auto substFnType = callee.getSubstFormalType();
+
+  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
+
+  PreparedArguments args(substFnType->getAs<AnyFunctionType>()->getParams());
+  args.add(loc, std::move(originalValue));
+  emission.addCallSite(loc, std::move(args),
+                       substFnType->getResult()->getCanonicalType(),
+                       /*throws=*/false);
+  
+  return emission.apply(C);
 }
 
 /// Emit a literal that applies the various initializers.
@@ -5529,6 +5557,7 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
                                         SmallVectorImpl<ManagedValue> &outVals,
                                         PreparedArguments &&args) {
   auto substParams = substFnType->getParams();
+  auto &tl = SGF.getTypeLowering(origFnType, substFnType);
 
   SmallVector<SILParameterInfo, 4> substParamTys;
   for (auto substParam : substParams) {
@@ -5540,10 +5569,12 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<DelayedArgument, 2> delayedArgs;
 
   ArgEmitter emitter(SGF, SILFunctionTypeRepresentation::Thin,
-                     /*yield*/ false,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
-                     argValues, delayedArgs,
-                     /*foreign error*/ None, ImportAsMemberStatus());
+     /*yield*/ false,
+     /*isForCoroutine*/ false,
+     ClaimedParamsRef(tl.getLoweredType().castTo<SILFunctionType>(),
+                      substParamTys),
+     argValues, delayedArgs,
+     /*foreign error*/ None, ImportAsMemberStatus());
 
   emitter.emitPreparedArgs(std::move(args), origFnType);
 

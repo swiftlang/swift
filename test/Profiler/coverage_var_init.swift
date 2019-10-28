@@ -1,6 +1,10 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_var_init %s | %FileCheck %s
 
 final class VarInit {
+  // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC018initializedWrapperE0SivpfP"
+  // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+1]]:38 : 0
+  @Wrapper var initializedWrapperInit = 2
+
   // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC04lazydE033_49373CB2DFB47C8DC62FA963604688DFLLSSvgSSyXEfU_"
   // CHECK-NEXT: [[@LINE+1]]:42 -> [[@LINE+3]]:4 : 0
   private lazy var lazyVarInit: String = {
@@ -23,7 +27,13 @@ final class VarInit {
     print(lazyVarInit)
     print(basicVarInit)
     print(simpleVar)
+    print(initializedWrapperInit)
   }
+}
+
+@propertyWrapper struct Wrapper {
+  init(wrappedValue: Int) {}
+  var wrappedValue: Int { 1 }
 }
 
 VarInit().coverageFunction()

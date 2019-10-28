@@ -817,7 +817,7 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
     if (auto *OVD = OD.dyn_cast<const ValueDecl*>()) {
       if (shouldCopyAssociatedUSRForDecl(OVD)) {
         llvm::raw_svector_ostream OS(SS);
-        Ignored = printDeclUSR(OVD, OS);
+        Ignored = printValueDeclUSR(OVD, OS);
       }
     } else if (auto *OND = OD.dyn_cast<const clang::NamedDecl*>()) {
       Ignored = clang::index::generateUSRForDecl(OND, SS);
@@ -868,7 +868,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
-  if (!VD || !VD->hasInterfaceType())
+  if (!VD)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -1918,7 +1918,7 @@ public:
   /// protocol compositions.
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature *genericSig) {
+  Type eraseArchetypes(Type type, GenericSignature genericSig) {
     if (!genericSig)
       return type;
 
@@ -2043,11 +2043,11 @@ public:
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-    auto *GenericSig = VD->getInnermostDeclContext()
+    auto GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
-    assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
+    assert(!T.isNull());
 
     if (ExprType) {
       Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
@@ -2135,7 +2135,7 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
-    if (!VD->hasValidSignature())
+    if (!VD->hasInterfaceType())
       return;
 
     // Add a type annotation.
@@ -2431,7 +2431,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (!AFD || !AFD->hasInterfaceType() ||
+    if (!AFD || !AFD->getInterfaceType() ||
         !AFD->getInterfaceType()->is<AnyFunctionType>()) {
       // Probably, calling closure type expression.
       foundFunction(AFT);
@@ -2792,8 +2792,7 @@ public:
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
-    if (TAD->hasInterfaceType()) {
-      auto underlyingType = TAD->getUnderlyingType();
+    if (auto underlyingType = TAD->getUnderlyingType()) {
       if (underlyingType->hasError()) {
         Type parentType;
         if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -2984,10 +2983,9 @@ public:
 
     if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
       return;
-
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
+    
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)D->getInterfaceType();
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
@@ -3144,9 +3142,6 @@ public:
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
@@ -3155,8 +3150,6 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
-        if (!Ele->hasInterfaceType())
-          D->getASTContext().getLazyResolver()->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                           /*HasTypeContext=*/true);
       }
@@ -4329,9 +4322,6 @@ public:
         // A 'class' member with an initial value cannot be overriden either.
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
-
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||

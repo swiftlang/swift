@@ -314,9 +314,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return out.add(v);                                                         \
   }
 #define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
-  assert(Builtin.ID != BuiltinValueKind::id &&                                 \
-         "This builtin should never be seen by IRGen. It is invalid in "       \
-         "Lowered sil");
+  if (Builtin.ID == BuiltinValueKind::id) {                                    \
+    /* This builtin must be guarded so that dynamically it is never called. */ \
+    IGF.emitTrap("invalid use of polymorphic builtin", /*Unreachable*/ false); \
+    auto returnValue = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);               \
+    /* Consume the arguments of the builtin. */                                \
+    (void)args.claimAll();                                                     \
+    return out.add(returnValue);                                               \
+  }
 
 #define BUILTIN_RUNTIME_CALL(id, name, attrs)                                  \
   if (Builtin.ID == BuiltinValueKind::id) {                                    \

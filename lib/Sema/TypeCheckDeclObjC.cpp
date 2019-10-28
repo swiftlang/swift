@@ -225,10 +225,9 @@ static void diagnoseFunctionParamNotRepresentable(
     AFD->diagnose(diag::objc_invalid_on_func_param_type,
                   ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (P->hasType()) {
-    Type ParamTy = P->getType();
+  if (Type ParamTy = P->getType()) {
     SourceRange SR;
-    if (auto typeRepr = P->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = P->getTypeRepr())
       SR = typeRepr->getSourceRange();
     diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
@@ -241,12 +240,6 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
-
-  if (!AFD->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-                                      const_cast<AbstractFunctionDecl *>(AFD));
-  }
-
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
   bool IsObjC = true;
   unsigned NumParams = PL->size();
@@ -494,6 +487,8 @@ bool swift::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = AFD->getASTContext();
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)AFD->getInterfaceType();
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(AFD, Reason))
@@ -689,11 +684,6 @@ bool swift::isRepresentableInObjC(
     auto nsError = ctx.getNSErrorDecl();
     Type errorParameterType;
     if (nsError) {
-      if (!nsError->hasInterfaceType()) {
-        auto resolver = ctx.getLazyResolver();
-        assert(resolver);
-        resolver->resolveDeclSignature(nsError);
-      }
       errorParameterType = nsError->getDeclaredInterfaceType();
       errorParameterType = OptionalType::get(errorParameterType);
       errorParameterType
@@ -822,18 +812,11 @@ bool swift::isRepresentableInObjC(
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
+  // FIXME: Computes isInvalid() below.
+  (void) VD->getInterfaceType();
+
   if (VD->isInvalid())
     return false;
-
-  if (!VD->hasInterfaceType()) {
-    VD->getASTContext().getLazyResolver()->resolveDeclSignature(
-                                              const_cast<VarDecl *>(VD));
-    if (!VD->hasInterfaceType()) {
-      VD->diagnose(diag::recursive_decl_reference, VD->getDescriptiveKind(),
-                   VD->getName());
-      return false;
-    }
-  }
 
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
@@ -888,11 +871,6 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
       describeObjCReason(SD, Reason);
     }
     return true;
-  }
-
-  if (!SD->hasInterfaceType()) {
-    SD->getASTContext().getLazyResolver()->resolveDeclSignature(
-                                              const_cast<SubscriptDecl *>(SD));
   }
 
   // Figure out the type of the indices.
@@ -1027,11 +1005,8 @@ static void checkObjCBridgingFunctions(ModuleDecl *mod,
                    NLKind::QualifiedLookup, results);
 
   for (auto D : results) {
-    if (!D->hasInterfaceType()) {
-      auto resolver = ctx.getLazyResolver();
-      assert(resolver);
-      resolver->resolveDeclSignature(D);
-    }
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)D->getInterfaceType();
   }
 }
 
@@ -1344,13 +1319,8 @@ static bool isCIntegerType(Type type) {
                               foundDecls);
     for (auto found : foundDecls) {
       auto foundType = dyn_cast<TypeDecl>(found);
-      if (!foundType) continue;
-
-      if (!foundType->hasInterfaceType()) {
-        auto resolver = ctx.getLazyResolver();
-        assert(resolver);
-        resolver->resolveDeclSignature(foundType);
-      }
+      if (!foundType)
+        continue;
 
       if (foundType->getDeclaredInterfaceType()->isEqual(type))
         return true;
@@ -1398,6 +1368,11 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
     return false;
   }
 
+  // We need at least one case to have a raw value.
+  if (enumDecl->getAllElements().empty()) {
+    enumDecl->diagnose(diag::empty_enum_raw_type);
+  }
+  
   return true;
 }
 
@@ -1418,7 +1393,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Classes can be @objc.
 
     // Protocols and enums can also be @objc, but this is covered by the
-    // isObjC() check a the beginning.;
+    // isObjC() check at the beginning.
     isObjC = shouldMarkAsObjC(VD, /*allowImplicit=*/false);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable

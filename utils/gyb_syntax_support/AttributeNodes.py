@@ -21,7 +21,7 @@ ATTRIBUTE_NODES = [
                    description='The name of the attribute.'),
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
-             Child('ArgumentList', kind='FunctionCallArgumentList',
+             Child('ArgumentList', kind='TupleExprElementList',
                    collection_element_name='Argument', is_optional=True),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
@@ -79,6 +79,7 @@ ATTRIBUTE_NODES = [
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
+         omit_when_empty=True,
          element='Syntax', element_name='Attribute',
          element_choices=[
              'Attribute',

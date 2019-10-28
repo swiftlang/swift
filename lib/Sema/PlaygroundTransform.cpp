@@ -279,7 +279,7 @@ public:
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -745,7 +745,6 @@ public:
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setType(MaybeLoadInitExpr->getType());
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
@@ -904,7 +903,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
-              TypeChecker::createForContext(ctx).checkFunctionErrorHandling(FD);
+              TypeChecker::checkFunctionErrorHandling(FD);
             }
             return false;
           }
@@ -916,8 +915,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker::createForContext(ctx)
-                .checkTopLevelErrorHandling(TLCD);
+              TypeChecker::checkTopLevelErrorHandling(TLCD);
             }
             return false;
           }

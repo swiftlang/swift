@@ -77,9 +77,10 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
 
   // rawValue param to init(rawValue:)
   auto *rawValueDecl = new (C) ParamDecl(
-      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
+      SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
+  rawValueDecl->setSpecifier(ParamSpecifier::Default);
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
 
@@ -119,8 +120,9 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
 
   // rawValue
   auto *rawDecl =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(SourceLoc(), SourceLoc(),
                         paramName, SourceLoc(), paramName, parentDC);
+  rawDecl->setSpecifier(ParamSpecifier::Default);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
 
@@ -142,11 +144,9 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   synthesizer(initDecl);
 
   // Compute the interface type of the initializer.
-  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  initDecl->computeType();
+  (void)initDecl->getInterfaceType();
 
   initDecl->setAccess(derived.Nominal->getFormalAccess());
-  initDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(initDecl);
 
@@ -333,8 +333,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 static bool canSynthesizeCodingKey(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   // Validate the enum and its raw type.
-  derived.TC.validateDecl(enumDecl);
-
+  
   // If the enum has a raw type (optional), it must be String or Int.
   Type rawType = enumDecl->getRawType();
   if (rawType) {

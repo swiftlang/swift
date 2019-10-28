@@ -279,6 +279,14 @@ void InFlightDiagnostic::flush() {
     Engine->flushActiveDiagnostic();
 }
 
+void Diagnostic::addChildNote(Diagnostic &&D) {
+  assert(storedDiagnosticInfos[(unsigned)D.ID].kind == DiagnosticKind::Note &&
+         "Only notes can have a parent.");
+  assert(storedDiagnosticInfos[(unsigned)ID].kind != DiagnosticKind::Note &&
+         "Notes can't have children.");
+  ChildNotes.push_back(std::move(D));
+}
+
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
@@ -398,7 +406,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
     return false;
 
   // Don't show generic type parameters.
-  if (type->hasTypeParameter())
+  if (type->getCanonicalType()->hasTypeParameter())
     return false;
 
   // Only show 'aka' if there's a typealias involved; other kinds of sugar
@@ -803,10 +811,11 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
   TentativeDiagnostics.clear();
 }
 
-void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+Optional<DiagnosticInfo>
+DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic.getID());
   if (behavior == DiagnosticState::Behavior::Ignore)
-    return;
+    return None;
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
@@ -846,7 +855,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           // FIXME: Horrible, horrible hackaround. We're not getting a
           // DeclContext everywhere we should.
           if (!dc) {
-            return;
+            return None;
           }
 
           while (!dc->isModuleContext()) {
@@ -923,17 +932,37 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
   }
 
-  // Pass the diagnostic off to the consumer.
-  DiagnosticInfo Info;
-  Info.ID = diagnostic.getID();
-  Info.Ranges = diagnostic.getRanges();
-  Info.FixIts = diagnostic.getFixIts();
-  for (auto &Consumer : Consumers) {
-    Consumer->handleDiagnostic(
-        SourceMgr, loc, toDiagnosticKind(behavior),
-        diagnosticStringFor(Info.ID, getPrintDiagnosticNames()),
-        diagnostic.getArgs(), Info, getDefaultDiagnosticLoc());
+  return DiagnosticInfo(
+      diagnostic.getID(), loc, toDiagnosticKind(behavior),
+      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames()),
+      diagnostic.getArgs(), getDefaultDiagnosticLoc(), /*child note info*/ {},
+      diagnostic.getRanges(), diagnostic.getFixIts(), diagnostic.isChildNote());
+}
+
+void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+  if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
+    SmallVector<DiagnosticInfo, 1> childInfo;
+    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
+    auto childNotes = diagnostic.getChildNotes();
+    for (unsigned idx = 0; idx < childNotes.size(); ++idx) {
+      if (auto child = diagnosticInfoForDiagnostic(childNotes[idx])) {
+        childInfo.push_back(*child);
+        childInfoPtrs.push_back(&childInfo[idx]);
+      }
+    }
+    info->ChildDiagnosticInfo = childInfoPtrs;
+    for (auto &consumer : Consumers) {
+      consumer->handleDiagnostic(SourceMgr, info->Loc, info->Kind,
+                                 info->FormatString, info->FormatArgs, *info,
+                                 info->BufferIndirectlyCausingDiagnostic);
+    }
   }
+
+  // For compatibility with DiagnosticConsumers which don't know about child
+  // notes. These can be ignored by consumers which do take advantage of the
+  // grouping.
+  for (auto &childNote : diagnostic.getChildNotes())
+    emitDiagnostic(childNote);
 }
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,

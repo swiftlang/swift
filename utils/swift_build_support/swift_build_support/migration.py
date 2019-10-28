@@ -32,8 +32,31 @@ def parse_args(parser, argv):
     """
     args, unknown_args = parser.parse_known_args(
         list(arg for arg in argv if arg != '--'))
+
+    args, unknown_args = process_disambiguation_arguments(args, unknown_args)
+
     args.build_script_impl_args = unknown_args
     return args
+
+
+def process_disambiguation_arguments(args, unknown_args): 
+    """
+    These arguments are only listed in the driver arguments to stop argparse 
+    from auto expanding arguments like --install-swift to the known argument 
+    --install-swiftevolve. Remove them from args and add them to unknown_args
+    again.
+    """
+    if hasattr(args, 'impl_skip_test_swift'):
+        if args.impl_skip_test_swift:
+            unknown_args.append('--skip-test-swift')
+        del args.impl_skip_test_swift
+
+    if hasattr(args, 'impl_install_swift'):
+        if args.impl_install_swift:
+            unknown_args.append('--install-swift')
+        del args.impl_install_swift
+
+    return args, unknown_args
 
 
 def check_impl_args(build_script_impl, argv):

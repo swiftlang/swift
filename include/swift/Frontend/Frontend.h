@@ -60,6 +60,18 @@ namespace Lowering {
 class TypeConverter;
 }
 
+struct ModuleBuffers {
+  std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer;
+  ModuleBuffers(std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer,
+                std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer = nullptr,
+                std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer = nullptr):
+                  ModuleBuffer(std::move(ModuleBuffer)),
+                  ModuleDocBuffer(std::move(ModuleDocBuffer)),
+                  ModuleSourceInfoBuffer(std::move(ModuleSourceInfoBuffer)) {}
+};
+
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
 ///   - information about the build environment,
@@ -392,14 +404,9 @@ class CompilerInstance {
   /// Contains buffer IDs for input source code files.
   std::vector<unsigned> InputSourceCodeBufferIDs;
 
-  struct PartialModuleInputs {
-    std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
-    std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
-  };
-
   /// Contains \c MemoryBuffers for partial serialized module files and
   /// corresponding partial serialized module documentation files.
-  std::vector<PartialModuleInputs> PartialModules;
+  std::vector<ModuleBuffers> PartialModules;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;
@@ -559,9 +566,7 @@ private:
   /// and a buffer for the corresponding module doc file if one exists.
   /// On failure, return a null pointer for the first element of the returned
   /// pair.
-  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
-            std::unique_ptr<llvm::MemoryBuffer>>
-  getInputBufferAndModuleDocBufferIfPresent(const InputFile &input);
+  Optional<ModuleBuffers> getInputBuffersIfPresent(const InputFile &input);
 
   /// Try to open the module doc file corresponding to the input parameter.
   /// Return None for error, nullptr if no such file exists, or the buffer if
@@ -569,6 +574,11 @@ private:
   Optional<std::unique_ptr<llvm::MemoryBuffer>>
   openModuleDoc(const InputFile &input);
 
+  /// Try to open the module source info file corresponding to the input parameter.
+  /// Return None for error, nullptr if no such file exists, or the buffer if
+  /// one was found.
+  Optional<std::unique_ptr<llvm::MemoryBuffer>>
+  openModuleSourceInfo(const InputFile &input);
 public:
   /// Parses and type-checks all input files.
   void performSema();

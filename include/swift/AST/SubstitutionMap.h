@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_SUBSTITUTION_MAP_H
 #define SWIFT_AST_SUBSTITUTION_MAP_H
 
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -29,7 +30,6 @@ namespace llvm {
 
 namespace swift {
 
-class GenericSignature;
 class GenericEnvironment;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
@@ -89,7 +89,7 @@ private:
 
   /// Form a substitution map for the given generic signature with the
   /// specified replacement types and conformances.
-  SubstitutionMap(GenericSignature *genericSig,
+  SubstitutionMap(GenericSignature genericSig,
                   ArrayRef<Type> replacementTypes,
                   ArrayRef<ProtocolConformanceRef> conformances);
 
@@ -102,7 +102,7 @@ public:
   /// Build an interface type substitution map for the given generic
   /// signature and a vector of Substitutions that correspond to the
   /// requirements of this generic signature.
-  static SubstitutionMap get(GenericSignature *genericSig,
+  static SubstitutionMap get(GenericSignature genericSig,
                              ArrayRef<Type> replacementTypes,
                              ArrayRef<ProtocolConformanceRef> conformances) {
     return SubstitutionMap(genericSig, replacementTypes, conformances);
@@ -110,18 +110,18 @@ public:
 
   /// Build an interface type substitution map for the given generic
   /// signature using the mapping in the given substitutions.
-  static SubstitutionMap get(GenericSignature *genericSig,
+  static SubstitutionMap get(GenericSignature genericSig,
                              SubstitutionMap substitutions);
 
   /// Build an interface type substitution map for the given generic signature
   /// from a type substitution function and conformance lookup function.
-  static SubstitutionMap get(GenericSignature *genericSig,
+  static SubstitutionMap get(GenericSignature genericSig,
                              TypeSubstitutionFn subs,
                              LookupConformanceFn lookupConformance);
 
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature getGenericSignature() const;
 
   /// Retrieve the array of protocol conformances, which line up with the
   /// requirements of the generic signature.
@@ -196,8 +196,8 @@ public:
   static SubstitutionMap
   getOverrideSubstitutions(const ClassDecl *baseClass,
                            const ClassDecl *derivedClass,
-                           GenericSignature *baseSig,
-                           GenericSignature *derivedSig,
+                           GenericSignature baseSig,
+                           GenericSignature derivedSig,
                            Optional<SubstitutionMap> derivedSubs);
 
   /// Combine two substitution maps as follows.
@@ -218,7 +218,7 @@ public:
                           CombineSubstitutionMaps how,
                           unsigned baseDepthOrIndex,
                           unsigned origDepthOrIndex,
-                          GenericSignature *genericSig);
+                          GenericSignature genericSig);
 
   /// Swap archetypes in the substitution map's replacement types with their
   /// interface types.

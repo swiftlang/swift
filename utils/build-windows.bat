@@ -65,7 +65,7 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 call :test_swift %exitOnError%
 
 goto :end
@@ -79,10 +79,13 @@ setlocal enableextensions enabledelayedexpansion
 
 git config --global core.autocrlf false
 git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-clang clang %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-llvm llvm %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-lldb lldb %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-compiler-rt compiler-rt %exitOnError%
+git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
+mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
+mklink /D "%source_root%\llvm" "%source_root%\llvm-project\llvm"
+mklink /D "%source_root%\lldb" "%source_root%\llvm-project\lldb"
+mklink /D "%source_root%\compiler-rt" "%source_root%\llvm-project\compiler-rt"
+mklink /D "%source_root%\libcxx" "%source_root%\llvm-project\libcxx"
+mklink /D "%source_root%\clang-tools-extra" "%source_root%\llvm-project\clang-tools-extra"
 git clone --depth 1 --single-branch https://github.com/apple/swift-corelibs-libdispatch %exitOnError%
 
 goto :eof
@@ -145,7 +148,7 @@ cmake "%source_root%\llvm"^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
-    -DCMAKE_INSTALL_PREFIX=%install_directory%^
+    -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
     -DLLVM_ENABLE_PDB:BOOL=YES^
     -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
@@ -215,27 +218,27 @@ cmake "%source_root%\swift"^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
-    -DCMAKE_INSTALL_PREFIX=%install_directory%^
-    -DClang_DIR=%build_root%\llvm\lib\cmake\clang^
-    -DSWIFT_PATH_TO_CMARK_BUILD=%build_root%\cmark^
-    -DSWIFT_PATH_TO_CMARK_SOURCE=%source_root%\cmark^
-    -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE=%source_root%\swift-corelibs-libdispatch^
-    -DLLVM_DIR=%build_root%\llvm\lib\cmake\llvm^
-    -DSWIFT_INCLUDE_DOCS=NO^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=%source_root%\icu-%icu_version%\include\unicode^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=%source_root%\icu-%icu_version%\include^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N=%source_root%\icu-%icu_version%\lib64\icuin.lib^
-    -DSWIFT_BUILD_DYNAMIC_STDLIB=YES^
-    -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES^
-    -DSWIFT_BUILD_STATIC_STDLIB=NO^
-    -DSWIFT_BUILD_STATIC_SDK_OVERLAY=NO^
-    -DLLVM_INSTALL_TOOLCHAIN_ONLY=YES^
-    -DSWIFT_BUILD_SOURCEKIT=YES^
-    -DSWIFT_ENABLE_SOURCEKIT_TESTS=NO^
+    -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
+    -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
+    -DSWIFT_PATH_TO_CMARK_BUILD:PATH=%build_root%\cmark^
+    -DSWIFT_PATH_TO_CMARK_SOURCE:PATH=%source_root%\cmark^
+    -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH=%source_root%\swift-corelibs-libdispatch^
+    -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
+    -DSWIFT_INCLUDE_DOCS:BOOL=NO^
+    -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
+    -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
+    -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE:PATH=%source_root%\icu-%icu_version%\include^
+    -DSWIFT_WINDOWS_x86_64_ICU_I18N:PATH=%source_root%\icu-%icu_version%\lib64\icuin.lib^
+    -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=YES^
+    -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=YES^
+    -DSWIFT_BUILD_STATIC_STDLIB:BOOL=NO^
+    -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=NO^
+    -DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=YES^
+    -DSWIFT_BUILD_SOURCEKIT:BOOL=YES^
+    -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=NO^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
-    -DPYTHON_EXECUTABLE=%PYTHON_HOME%\python.exe^
+    -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
@@ -271,21 +274,17 @@ cmake "%source_root%\lldb"^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
     -DCMAKE_CXX_COMPILER=clang-cl^
-    -DCMAKE_INSTALL_PREFIX=%install_directory%^
-    -DLLDB_PATH_TO_CMARK_SOURCE=%source_root%\cmark^
-    -DLLDB_PATH_TO_CLANG_SOURCE=%source_root%\clang^
-    -DLLDB_PATH_TO_LLVM_SOURCE=%source_root%\llvm^
-    -DLLDB_PATH_TO_SWIFT_SOURCE=%source_root%\swift^
-    -DLLDB_PATH_TO_CMARK_BUILD=%build_root%\cmark^
-    -DLLDB_PATH_TO_CLANG_BUILD=%build_root%\llvm^
-    -DLLDB_PATH_TO_LLVM_BUILD=%build_root%\llvm^
-    -DLLDB_PATH_TO_SWIFT_BUILD=%build_root%\swift^
-    -DLLVM_ENABLE_ASSERTIONS=YES^
-    -DLLVM_ALLOW_STATIC_BINDINGS=YES^
-    -DPYTHON_HOME=%PYTHON_HOME%^
+    -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
+    -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
+    -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
+    -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
+    -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
+    -DLLDB_USE_STATIC_BINDINGS:BOOL=YES^
+    -DPYTHON_HOME:PATH=%PYTHON_HOME%^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -DLLDB_INCLUDE_TESTS:BOOL=NO %exitOnError%
 
 popd
 
@@ -296,7 +295,7 @@ goto :eof
 endlocal
 
 
-:build_lldb
+:build_libdispatch
 :: Configures, builds, and installs Dispatch
 setlocal enableextensions enabledelayedexpansion
 
@@ -308,13 +307,13 @@ cmake "%source_root%\swift-corelibs-libdispatch"^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
     -DCMAKE_CXX_COMPILER=clang-cl^
-    -DCMAKE_SWIFT_COMPILER=%install_directory%\bin\swiftc.exe^
-    -DSwift_DIR=%build_root%\swift\lib\cmake\swift^
-    -DCMAKE_INSTALL_PREFIX=%install_directory%^
-    -DBUILD_SHARED_LIBS=YES^
-    -DENABLE_TESTING=NO^
+    -DCMAKE_SWIFT_COMPILER:PATH=%install_directory%\bin\swiftc.exe^
+    -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
+    -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
+    -DBUILD_SHARED_LIBS:BOOL=YES^
+    -DENABLE_TESTING:BOOL=NO^
     -DCMAKE_C_COMPILER_TARGET=x86_64-unknown-windows-msvc^
-    -DENABLE_SWIFT=YES^
+    -DENABLE_SWIFT:BOOL=YES^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%

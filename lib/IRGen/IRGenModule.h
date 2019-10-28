@@ -813,7 +813,8 @@ public:
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
-  clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
+  clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
+                                           CanSILFunctionType funcTy);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -1069,7 +1070,7 @@ public:
   llvm::SetVector<CanType> BuiltinTypes;
 
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  getTypeRef(Type type, GenericSignature genericSig, MangledTypeRefRole role);
   
   std::pair<llvm::Constant *, unsigned>
   getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
@@ -1080,7 +1081,7 @@ public:
 
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
-                                            GenericSignature *genericSig,
+                                            GenericSignature genericSig,
                                             bool shouldSetLowBit);
   llvm::Constant *getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,

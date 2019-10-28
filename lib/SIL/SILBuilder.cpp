@@ -79,9 +79,11 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   results.append(FTI->getResults().begin(), FTI->getResults().end());
   for (auto &result : results) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
-      result = SILResultInfo(result.getType(), ResultConvention::Unowned);
+      result = SILResultInfo(result.getReturnValueType(M, FTI),
+                             ResultConvention::Unowned);
     else if (result.getConvention() == ResultConvention::Autoreleased)
-      result = SILResultInfo(result.getType(), ResultConvention::Owned);
+      result = SILResultInfo(result.getReturnValueType(M, FTI),
+                             ResultConvention::Owned);
   }
 
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
@@ -91,6 +93,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                             FTI->getYields(),
                                             results,
                                             FTI->getOptionalErrorResult(),
+                                            SubstitutionMap(),
+                                            false,
                                             M.getASTContext());
 
   return SILType::getPrimitiveObjectType(appliedFnType);
@@ -291,7 +295,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   case SILInstructionKind::Store##Name##Inst: \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::Copy##Name##ValueInst:                              \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
     return false;
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::LoadInst:
@@ -300,7 +304,6 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
-  case SILInstructionKind::CopyUnownedValueInst:
     return false;
   default:
     break;

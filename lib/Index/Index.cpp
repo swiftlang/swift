@@ -20,6 +20,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
@@ -182,7 +183,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
           if (ide::printExtensionUSR(ExtD, OS))
             return true;
         } else {
-          if (ide::printDeclUSR(D, OS))
+          if (ide::printValueDeclUSR(D, OS))
             return true;
         }
         result.USR = stringStorage.copyString(OS.str());
@@ -836,7 +837,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   if (!shouldIndex(D, /*IsRef=*/false))
     return false;
 
-  SourceLoc Loc = D->getLoc();
+  SourceLoc Loc = D->getLoc(/*SerializedOK*/false);
   if (Loc.isInvalid() && !IsModuleFile)
     return false;
 
@@ -1185,7 +1186,7 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
   if (auto *extD = dyn_cast<ExtensionDecl>(container))
     loc = getLocForExtension(extD);
   else
-    loc = container->getLoc();
+    loc = container->getLoc(/*SerializedOK*/false);
 
   IndexSymbol info;
   if (initIndexSymbol(witness, loc, /*IsRef=*/true, info))
@@ -1207,6 +1208,8 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
+  if (Loc.isValid() && SrcMgr.findBufferContainingLoc(Loc) != BufferID)
+    return true;
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Always base the symbol information on the canonical VarDecl
     D = VD->getCanonicalVarDecl();
@@ -1265,7 +1268,7 @@ static NominalTypeDecl *getNominalParent(ValueDecl *D) {
 
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
-  if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
+  if (initIndexSymbol(D, D->getLoc(/*SerializedOK*/false), /*IsRef=*/false, Info))
     return true;
 
   if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {

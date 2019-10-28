@@ -440,15 +440,6 @@ static bool findNonMembers(TypeChecker &TC,
     if (!isValid(D))
       return false;
 
-    if (!D->hasInterfaceType())
-      TC.validateDecl(D);
-
-    // FIXME: Circularity hack.
-    if (!D->hasInterfaceType()) {
-      AllDeclRefs = false;
-      continue;
-    }
-
     if (matchesDeclRefKind(D, refKind))
       ResultValues.push_back(D);
   }
@@ -897,12 +888,6 @@ namespace {
         continue;
       }
 
-      // Coercions can be used for disambiguation.
-      if (auto coerce = dyn_cast<CoerceExpr>(callee)) {
-        callee = coerce->getSubExpr();
-        continue;
-      }
-
       // We're done.
       break;
     }
@@ -1134,7 +1119,8 @@ namespace {
         return finish(walkToClosureExprPre(closure), expr);
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        TC.checkForForbiddenPrefix(unresolved);
+        TypeChecker::checkForForbiddenPrefix(
+            TC.Context, unresolved->getName().getBaseName());
         return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
       }
 
@@ -1246,7 +1232,7 @@ namespace {
           Expr *target = nullptr;
           bool foundApply = false;
           bool foundRebind = false;
-          for (auto ancestor : reversed(ExprStack)) {
+          for (auto ancestor : llvm::reverse(ExprStack)) {
             if (isa<RebindSelfInConstructorExpr>(ancestor)) {
               // If we already have a rebind, then we're re-typechecking an
               // expression and are done.
@@ -1360,24 +1346,24 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
-  TypeResolutionOptions options(TypeResolverContext::ClosureExpr);
-  options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
   bool hadParameterError = false;
 
-  auto resolution = TypeResolution::forContextual(closure);
-  if (TC.typeCheckParameterList(PL, resolution, options)) {
-    // If we encounter an error validating the parameter list, don't bail.
-    // Instead, go on to validate any potential result type, and bail
-    // afterwards.  This allows for better diagnostics, and keeps the
-    // closure expression type well-formed.
-    hadParameterError = true;
+  // If we encounter an error validating the parameter list, don't bail.
+  // Instead, go on to validate any potential result type, and bail
+  // afterwards.  This allows for better diagnostics, and keeps the
+  // closure expression type well-formed.
+  for (auto param : *PL) {
+    // FIXME: Forces computation of isInvalid().
+    (void) param->getInterfaceType();
+
+    hadParameterError |= param->isInvalid();
   }
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(TC.Context, closure->getExplicitResultTypeLoc(),
-                                resolution,
+      TypeChecker::validateType(TC.Context,
+                                closure->getExplicitResultTypeLoc(),
+                                TypeResolution::forContextual(closure),
                                 TypeResolverContext::InExpression)) {
     return false;
   }
@@ -2050,7 +2036,7 @@ void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
-  for (auto history : reversed(conformances)) {
+  for (auto history : llvm::reverse(conformances)) {
     diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
                    history.ConformingType, history.Protocol);
   }
@@ -2686,8 +2672,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, initType, Locator,
-                                   false /* ignoreTopLevelInjection */);
+      expr = solution.coerceToType(expr, initType, Locator);
       if (!expr)
         return nullptr;
 
@@ -2834,12 +2819,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      if (var->hasType() &&
+      if (var->hasInterfaceType() &&
           !var->getType()->hasUnboundGenericType() &&
           !var->getType()->hasError())
         return;
 
-      var->markInvalid();
+      var->setInterfaceType(ErrorType::get(Context));
     });
   }
 
@@ -2848,7 +2833,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber) {
-  const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2856,7 +2840,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
   if (!DC->isLocalContext()) {
-    initContext = cast_or_null<PatternBindingInitializer>(pbe.getInitContext());
+    initContext = cast_or_null<PatternBindingInitializer>(
+        PBD->getInitContext(patternNumber));
     if (initContext)
       DC = initContext;
   }
@@ -2923,6 +2908,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
+      auto *contextualLocator =
+          cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
@@ -2939,11 +2926,16 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       sequenceProto->getDeclaredType(), Locator);
+                       sequenceProto->getDeclaredType(), contextualLocator);
 
-      auto elementLocator =
-        cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceElementType);
+      // Since we are using "contextual type" here, it has to be recorded
+      // in the constraint system for diagnostics to have access to "purpose".
+      cs.setContextualType(
+          expr, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+          CTP_ForEachStmt);
+
+      auto elementLocator = cs.getConstraintLocator(
+          contextualLocator, ConstraintLocator::SequenceElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
@@ -3009,31 +3001,13 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return !resultTy;
   }
 
-  /// Expression type checking listener for conditions.
-  class ConditionListener : public ExprTypeCheckListener {
-    Expr *OrigExpr = nullptr;
+  auto *boolDecl = Context.getBoolDecl();
+  if (!boolDecl)
+    return true;
 
-  public:
-    // Add the appropriate Boolean constraint.
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // Save the original expression.
-      OrigExpr = expr;
-      
-      // Otherwise, the result must be convertible to Bool.
-      auto boolDecl = cs.getASTContext().getBoolDecl();
-      if (!boolDecl)
-        return true;
-      
-      // Condition must convert to Bool.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       boolDecl->getDeclaredType(),
-                       cs.getConstraintLocator(expr));
-      return false;
-    }
-  };
-
-  ConditionListener listener;
-  auto resultTy = typeCheckExpression(expr, dc, &listener);
+  auto resultTy = typeCheckExpression(
+      expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
+      CTP_Condition);
   return !resultTy;
 }
 
@@ -3064,9 +3038,9 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasType() && !var->getType()->hasError())
+        if (var->hasInterfaceType() && !var->getType()->hasError())
           return;
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
       });
     };
 
@@ -3121,7 +3095,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          DC);
-  matchVar->setType(rhsType);
   matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
@@ -3165,9 +3138,32 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
                                              /*Implicit=*/true);
-  
+
   // Check the expression as a condition.
-  bool hadError = typeCheckCondition(matchCall, DC);
+  //
+  // TODO: Type-check of `~=` operator can't (yet) use `typeCheckCondition`
+  // because that utilizes contextual type which interferes with diagnostics.
+  // We don't yet have a full access to pattern-matching context in
+  // constraint system, which is required to enable these situations
+  // to be properly diagnosed.
+  struct ConditionListener : public ExprTypeCheckListener {
+    // Add the appropriate Boolean constraint.
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+      // Otherwise, the result must be convertible to Bool.
+      auto boolDecl = cs.getASTContext().getBoolDecl();
+      if (!boolDecl)
+        return true;
+
+      // Condition must convert to Bool.
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                       boolDecl->getDeclaredType(),
+                       cs.getConstraintLocator(expr));
+      return false;
+    }
+  };
+
+  ConditionListener listener;
+  bool hadError = !typeCheckExpression(matchCall, DC, &listener);
   // Save the type-checked expression in the pattern.
   EP->setMatchExpr(matchCall);
   // Set the type on the pattern.
@@ -3461,7 +3457,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
-                                       /*ignoreTopLevelInjection*/false,
                                        typeFromPattern);
   if (!result) {
     return true;
@@ -4425,11 +4420,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                              ConformanceCheckFlags::InExpression)) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
-          if (!nsError->hasInterfaceType()) {
-            auto resolver = Context.getLazyResolver();
-            assert(resolver);
-            resolver->resolveDeclSignature(nsError);
-          }
           Type NSErrorTy = nsError->getDeclaredInterfaceType();
           if (isSubtypeOf(fromType, NSErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to

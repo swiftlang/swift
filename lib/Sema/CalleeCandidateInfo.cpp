@@ -61,7 +61,7 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
     : declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
 
   if (auto *PD = dyn_cast<ParamDecl>(decl)) {
-    if (PD->hasValidSignature())
+    if (PD->hasInterfaceType())
       entityType = PD->getType();
     else
       entityType = PD->getASTContext().TheUnresolvedType;
@@ -281,11 +281,13 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     CandidateCloseness getResult() const {
       return result;
     }
-    void extraArgument(unsigned argIdx) override {
+    bool extraArgument(unsigned argIdx) override {
       result = CC_ArgumentCountMismatch;
+      return true;
     }
-    void missingArgument(unsigned paramIdx) override {
+    Optional<unsigned> missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
+      return None;
     }
     bool missingLabel(unsigned paramIdx) override {
       result = CC_ArgumentLabelMismatch;
@@ -312,12 +314,14 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
   } listener;
-  
+
   // Use matchCallArguments to determine how close the argument list is (in
   // shape) to the specified candidates parameters.  This ignores the concrete
   // types of the arguments, looking only at the argument labels etc.
+  SmallVector<AnyFunctionType::Param, 4> arguments(actualArgs.begin(),
+                                                   actualArgs.end());
   SmallVector<ParamBinding, 4> paramBindings;
-  if (matchCallArguments(actualArgs, candArgs,
+  if (matchCallArguments(arguments, candArgs,
                          candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,
@@ -593,9 +597,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = TypeChecker::lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
-        if (!ctor.getValueDecl()->hasInterfaceType())
-          CS.getTypeChecker().validateDecl(ctor.getValueDecl());
-        if (ctor.getValueDecl()->hasInterfaceType())
+        if (ctor.getValueDecl()->getInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });
       }
     }

@@ -83,14 +83,6 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   assert(rawTy);
   rawTy = toRawDecl->mapTypeIntoContext(rawTy);
 
-#ifndef NDEBUG
-  for (auto elt : enumDecl->getAllElements()) {
-    assert(elt->getTypeCheckedRawValueExpr() &&
-           "Enum element has no literal - missing a call to checkEnumRawValues()");
-    assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
-  }
-#endif
-
   if (enumDecl->isObjC()) {
     // Special case: ObjC enums are represented by their raw value, so just use
     // a bitcast.
@@ -297,14 +289,6 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   assert(rawTy);
   rawTy = initDecl->mapTypeIntoContext(rawTy);
 
-#ifndef NDEBUG
-  for (auto elt : enumDecl->getAllElements()) {
-    assert(elt->getTypeCheckedRawValueExpr() &&
-           "Enum element has no literal - missing a call to checkEnumRawValues()");
-    assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
-  }
-#endif
-
   bool isStringEnum =
     (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());
   llvm::SmallVector<Expr *, 16> stringExprs;
@@ -426,8 +410,9 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   (void)rawType;
 
   auto *rawDecl = new (C)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
+  rawDecl->setSpecifier(ParamSpecifier::Default);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
@@ -445,11 +430,9 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the interface type of the initializer.
-  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  initDecl->computeType();
+  (void)initDecl->getInterfaceType();
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
-  initDecl->setValidationToChecked();
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.
@@ -465,10 +448,6 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto &tc = derived.TC;
 
-  // Validate the enum and its raw type.
-  tc.validateDecl(enumDecl);
-
-  // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
   if (!rawType)
     return false;
@@ -504,7 +483,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
     if (elt->hasAssociatedValues())
       return false;
 
-    tc.validateDecl(elt);
+    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+    (void)elt->getInterfaceType();
     if (elt->isInvalid()) {
       return false;
     }

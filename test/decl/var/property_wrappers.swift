@@ -99,13 +99,13 @@ struct InitialValueTypeMismatch<Value> {
 }
 
 @propertyWrapper
-struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
-  var wrappedValue: Value? = nil
+struct MultipleInitialValues<Value> {
+  var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 }
 
@@ -236,7 +236,7 @@ struct Initialization {
   var x2: Double
 
   @Wrapper(stored: 17)
-  var x3 = 42 // expected-error{{extra argument 'wrappedValue' in call}}
+  var x3 = 42 // expected-error {{extra argument 'wrappedValue' in call}}
 
   @Wrapper(stored: 17)
   var x4
@@ -719,8 +719,7 @@ struct DefaultedPrivateMemberwiseLets {
 func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
-  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
-  // expected-error@-1 {{cannot convert value of type 'Wrapper<Bool>' to expected argument type 'Int'}}
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{argument passed to call that takes no arguments}}
 }
 
 
@@ -1116,8 +1115,8 @@ struct MissingPropertyWrapperUnwrap {
 }
 
 struct InvalidPropertyDelegateUse {
-  @Foo var x: Int = 42 // expected-error {{cannot invoke initializer for ty}}
-  // expected-note@-1{{overloads for 'Foo<_>' exist with these partially matching paramet}}
+  // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
+  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
@@ -1580,12 +1579,14 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject {
+extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{'SR_11288_S4.SR_11288_Wrapper4.Type' (aka 'SR_11288_S0.Type') requires that 'SR_11288_S4' conform to 'AnyObject'}}
+  // FIXME: We shouldn't diagnose the arg-to-param mismatch (rdar://problem/56345248)
+  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
+  // expected-error @-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
@@ -1696,4 +1697,112 @@ struct SR_11381_W<T> {
 
 struct SR_11381_S {
   @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+}
+
+// rdar://problem/53349209 - regression in property wrapper inference
+struct Concrete1: P {}
+
+@propertyWrapper struct ConcreteWrapper {
+  var wrappedValue: Concrete1 { get { fatalError() } }
+}
+
+struct TestConcrete1 {
+  @ConcreteWrapper() var s1
+
+  func f() {
+    // Good:
+    let _: P = self.s1
+
+    // Bad:
+    self.g(s1: self.s1)
+
+    // Ugly:
+    self.g(s1: self.s1 as P)
+  }
+
+  func g(s1: P) {
+    // ...
+  }
+}
+
+// SR-11477
+
+// Two initializers that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W1 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  init(name: String = "DefaultParamInit") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Two initializers with default arguments that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W2 { // Okay
+  let name: String
+
+  init(anotherName: String = "DefaultParamInit1") {
+    self.name = anotherName
+  }
+
+  init(name: String = "DefaultParamInit2") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Single initializer that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W3 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// rdar://problem/56213175 - backward compatibility issue with Swift 5.1,
+// which unconditionally skipped protocol members.
+protocol ProtocolWithWrapper {
+  associatedtype Wrapper = Float // expected-note{{associated type 'Wrapper' declared here}}
+}
+
+struct UsesProtocolWithWrapper: ProtocolWithWrapper {
+  @Wrapper var foo: Int // expected-warning{{ignoring associated type 'Wrapper' in favor of module-scoped property wrapper 'Wrapper'; please qualify the reference with 'property_wrappers'}}{{4-4=property_wrappers.}}
+}
+
+// rdar://problem/56350060 - [Dynamic key path member lookup] Assertion when subscripting with a key path
+func test_rdar56350060() {
+  @propertyWrapper
+  @dynamicMemberLookup
+  struct DynamicWrapper<Value> {
+    var wrappedValue: Value { fatalError() }
+
+    subscript<T>(keyPath keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      fatalError()
+    }
+
+    subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      return self[keyPath: keyPath] // Ok
+    }
+  }
 }

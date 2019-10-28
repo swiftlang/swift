@@ -17,14 +17,16 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
@@ -274,6 +276,7 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
                          SILCoroutineKind::None,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
+                         SubstitutionMap(), false,
                          M.getASTContext());
   auto getterName = M.allocateCopy(getterNameTmp);
   return FunctionBuilder.getOrCreateFunction(

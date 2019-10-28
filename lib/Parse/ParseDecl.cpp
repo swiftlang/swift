@@ -1916,7 +1916,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
                                 /*isPostfix=*/false, /*isExprBasic=*/true,
                                 lParenLoc, args, argLabels, argLabelLocs,
                                 rParenLoc, trailingClosure,
-                                SyntaxKind::FunctionCallArgumentList);
+                                SyntaxKind::TupleExprElementList);
         assert(!trailingClosure && "Cannot parse a trailing closure here");
         hasInitializer = true;
       }
@@ -2687,7 +2687,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
   SyntaxParsingContext Discarding(SyntaxContext);
-  Discarding.setDiscard();
+  Discarding.disable();
   SourceLoc CurrentLoc = Tok.getLoc();
 
   SourceLoc EndLoc = PreviousLoc;
@@ -3517,16 +3517,10 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
   return Status;
 }
 
-enum class TokenProperty {
-  None,
-  StartsWithLess,
-};
-
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        tok ResyncT3, tok ResyncT4,
-                        TokenProperty ResyncP1) {
+                        StringRef DeclKindName,
+                        llvm::function_ref<bool(const Token &)> canRecover) {
   if (P.Tok.is(tok::identifier)) {
     Loc = P.consumeIdentifier(&Result);
 
@@ -3565,9 +3559,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
       .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
 
     // Recover if the next token is one of the expected tokens.
-    auto Next = P.peekToken();
-    if (Next.isAny(ResyncT1, ResyncT2, ResyncT3, ResyncT4) ||
-        (ResyncP1 != TokenProperty::None && P.startsWithLess(Next))) {
+    if (canRecover(P.peekToken())) {
       llvm::SmallString<32> Name(P.Tok.getText());
       // Append an invalid character so that nothing can resolve to this name.
       Name += "#";
@@ -3582,38 +3574,6 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
 
   P.diagnose(P.Tok, diag::expected_identifier_in_decl, DeclKindName);
   return makeParserError();
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
-                                 TokenProperty::None);
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        tok ResyncT3, tok ResyncT4) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 ResyncT3, ResyncT4, TokenProperty::None);
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        TokenProperty ResyncP1) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 tok::NUM_TOKENS, tok::NUM_TOKENS, ResyncP1);
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        tok ResyncT3, TokenProperty ResyncP1) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 ResyncT3, tok::NUM_TOKENS, ResyncP1);
 }
 
 /// Add a fix-it to remove the space in consecutive identifiers.
@@ -4134,8 +4094,9 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc IdLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, Id, IdLoc, "typealias",
-                                    tok::colon, tok::equal);
+  Status |= parseIdentifierDeclName(
+      *this, Id, IdLoc, "typealias",
+      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
   if (Status.isError()) {
     TmpCtxt->setTransparent();
     return nullptr;
@@ -4249,9 +4210,10 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   } else {
     AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
   }
-  
-  Status = parseIdentifierDeclName(*this, Id, IdLoc, "associatedtype",
-                                   tok::colon, tok::equal);
+
+  Status = parseIdentifierDeclName(
+      *this, Id, IdLoc, "associatedtype",
+      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
   if (Status.isError())
     return nullptr;
   
@@ -4354,8 +4316,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
         // Clone the parameter.  Do not clone the parameter type;
         // this will be filled in by the type-checker.
         auto accessorParam =
-          new (P->Context) ParamDecl(storageParam->getSpecifier(),
-                                     storageParam->getSpecifierLoc(),
+          new (P->Context) ParamDecl(storageParam->getSpecifierLoc(),
                                      storageParam->getArgumentNameLoc(),
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
@@ -4417,13 +4378,11 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   auto result = new (P.Context)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 Identifier(), nameLoc, name, P.CurDeclContext);
+
   if (isNameImplicit)
     result->setImplicit();
-
-  // AST Walker shouldn't go into the type recursively.
-  result->setIsTypeLocImplicit(true);
 
   return result;
 }
@@ -4655,9 +4614,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   if (peekToken().is(tok::r_brace)) {
     accessors.LBLoc = consumeToken(tok::l_brace);
     // Give syntax node an empty accessor list.
-    SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
-    SyntaxContext->addSyntax(
-      ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    if (SyntaxContext->isEnabled()) {
+      SourceLoc listLoc = leadingTriviaLoc();
+      SyntaxContext->addSyntax(
+          ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    }
     accessors.RBLoc = consumeToken(tok::r_brace);
 
     // In the limited syntax, fall out and let the caller handle it.
@@ -4972,12 +4933,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
-static void flagInvalidAccessor(AccessorDecl *func) {
-  if (func) {
-    func->setInvalid();
-  }
-}
-
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
@@ -4988,7 +4943,7 @@ static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
   P.diagnose(first->getLoc(), diag::previous_accessor,
              getAccessorNameForDiagnostic(first, /*article*/ false),
              /*already*/ false);
-  flagInvalidAccessor(second);
+  second->setInvalid();
 }
 
 template <class... DiagArgs>
@@ -4998,11 +4953,11 @@ static void diagnoseAndIgnoreObservers(Parser &P,
                         typename std::enable_if<true, DiagArgs>::type... args) {
   if (auto &accessor = accessors.WillSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*willSet*/ 0, args...);
-    flagInvalidAccessor(accessor);
+    accessor->setInvalid();
   }
   if (auto &accessor = accessors.DidSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*didSet*/ 1, args...);
-    flagInvalidAccessor(accessor);
+    accessor->setInvalid();
   }
 }
 
@@ -5014,7 +4969,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // was invalid.
   if (invalid) {
     for (auto accessor : Accessors) {
-      flagInvalidAccessor(accessor);
+      accessor->setInvalid();
     }
   }
 
@@ -5142,12 +5097,12 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // Now that we've parsed all of our patterns, initializers and accessors, we
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
-    auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                          VarLoc, PBDEntries, BaseContext);
+    auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
+                                           VarLoc, PBDEntries, BaseContext);
 
     // Wire up any initializer contexts we needed.
     for (unsigned i : indices(PBDEntries)) {
-      if (auto initContext = PBDEntries[i].getInitContext())
+      if (auto initContext = PBD->getInitContext(i))
         cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
     }
 
@@ -5204,7 +5159,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       VD->getAttrs() = Attributes;
       setLocalDiscriminator(VD);
       Decls.push_back(VD);
-      if (hasOpaqueReturnTy && sf) {
+      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
         sf->addUnvalidatedDeclWithOpaqueResultType(VD);
       }
     });
@@ -5472,8 +5427,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     // because we're aggressive about recovering/providing good diagnostics for
     // beginners.
     auto NameStatus = parseIdentifierDeclName(
-        *this, SimpleName, NameLoc, "function", tok::l_paren, tok::arrow,
-        tok::l_brace, TokenProperty::StartsWithLess);
+        *this, SimpleName, NameLoc, "function", [&](const Token &next) {
+          return next.isAny(tok::l_paren, tok::arrow, tok::l_brace) ||
+                 startsWithLess(next);
+        });
     if (NameStatus.isError())
       return nullptr;
   }
@@ -5518,7 +5475,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               CurDeclContext);
 
   // Let the source file track the opaque return type mapping, if any.
-  if (FuncRetTy && isa<OpaqueReturnTypeRepr>(FuncRetTy)) {
+  if (FuncRetTy && isa<OpaqueReturnTypeRepr>(FuncRetTy) &&
+      !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
     }
@@ -5716,9 +5674,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   SourceLoc EnumNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, EnumName, EnumNameLoc, "enum",
-                                    tok::colon, tok::l_brace,
-                                    TokenProperty::StartsWithLess);
+  Status |= parseIdentifierDeclName(
+      *this, EnumName, EnumNameLoc, "enum", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
+      });
   if (Status.isError())
     return nullptr;
 
@@ -5822,9 +5781,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     }
 
     if (Tok.is(tok::identifier)) {
-      Status |= parseIdentifierDeclName(*this, Name, NameLoc, "enum 'case'",
-                                        tok::l_paren, tok::kw_case, tok::colon,
-                                        tok::r_brace);
+      Status |= parseIdentifierDeclName(
+          *this, Name, NameLoc, "enum 'case'", [](const Token &next) {
+            return next.isAny(tok::l_paren, tok::kw_case, tok::colon,
+                              tok::r_brace);
+          });
       assert(Status.isSuccess());
       if (DotLoc.isValid())
         diagnose(DotLoc, diag::enum_case_dot_prefix)
@@ -5996,9 +5957,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   SourceLoc StructNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, StructName, StructNameLoc, "struct",
-                                    tok::colon, tok::l_brace,
-                                    TokenProperty::StartsWithLess);
+  Status |= parseIdentifierDeclName(
+      *this, StructName, StructNameLoc, "struct", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
+      });
   if (Status.isError())
     return nullptr;
 
@@ -6087,9 +6049,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   SourceLoc ClassNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, ClassName, ClassNameLoc, "class",
-                                    tok::colon, tok::l_brace,
-                                    TokenProperty::StartsWithLess);
+  Status |= parseIdentifierDeclName(
+      *this, ClassName, ClassNameLoc, "class", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
+      });
   if (Status.isError())
     return nullptr;
 
@@ -6206,8 +6169,9 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Identifier ProtocolName;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, ProtocolName, NameLoc, "protocol",
-                                    tok::colon, tok::l_brace);
+  Status |= parseIdentifierDeclName(
+      *this, ProtocolName, NameLoc, "protocol",
+      [&](const Token &next) { return next.isAny(tok::colon, tok::l_brace); });
   if (Status.isError())
     return nullptr;
 
@@ -6387,7 +6351,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
-  if (ElementTy.get() && isa<OpaqueReturnTypeRepr>(ElementTy.get())) {
+  if (ElementTy.get() && isa<OpaqueReturnTypeRepr>(ElementTy.get()) &&
+      !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
     }

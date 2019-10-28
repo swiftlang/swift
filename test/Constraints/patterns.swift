@@ -290,7 +290,7 @@ switch staticMembers {
 
   case .init(0): break
   case .init(_): break // expected-error{{'_' can only appear in a pattern}}
-  case .init(let x): break // expected-error{{cannot appear in an expression}}
+  case .init(let x): break // expected-error{{cannot appear in an expression}} expected-error{{variable 'x' is not bound by any pattern}}
   case .init(opt: 0): break // expected-error{{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
   // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
@@ -302,12 +302,12 @@ switch staticMembers {
   case .method: break // expected-error{{cannot match}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
-  case .method(let x): break // expected-error{{cannot appear in an expression}}
+  case .method(let x): break // expected-error{{cannot appear in an expression}} expected-error{{variable 'x' is not bound by any pattern}}
 
   case .method(withLabel:): break // expected-error{{cannot match}}
   case .method(withLabel: 0): break
   case .method(withLabel: _): break // expected-error{{'_' can only appear in a pattern}}
-  case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
+  case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}} expected-error{{variable 'x' is not bound by any pattern}}
 
   case .optMethod: break // expected-error{{cannot match}}
   case .optMethod(0): break

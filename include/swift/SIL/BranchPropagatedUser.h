@@ -31,17 +31,28 @@ class BranchPropagatedUser {
   InnerTy user;
 
 public:
-  BranchPropagatedUser(SILInstruction *inst) : user(inst) {
-    assert(!isa<CondBranchInst>(inst));
+  BranchPropagatedUser(Operand *op) : user() {
+    auto *opUser = op->getUser();
+    auto *cbi = dyn_cast<CondBranchInst>(opUser);
+    if (!cbi) {
+      user = InnerTy(opUser, 0);
+      return;
+    }
+    unsigned operandIndex = op->getOperandNumber();
+    if (cbi->isConditionOperandIndex(operandIndex)) {
+      // TODO: Is this correct?
+      user = InnerTy(cbi, CondBranchInst::TrueIdx);
+      return;
+    }
+    bool isTrueOperand = cbi->isTrueOperandIndex(operandIndex);
+    if (isTrueOperand) {
+      user = InnerTy(cbi, CondBranchInst::TrueIdx);
+    } else {
+      user = InnerTy(cbi, CondBranchInst::FalseIdx);
+    }
   }
-
-  BranchPropagatedUser(CondBranchInst *cbi) : user(cbi) {}
-
-  BranchPropagatedUser(CondBranchInst *cbi, unsigned successorIndex)
-      : user(cbi, successorIndex) {
-    assert(successorIndex == CondBranchInst::TrueIdx ||
-           successorIndex == CondBranchInst::FalseIdx);
-  }
+  BranchPropagatedUser(const Operand *op)
+      : BranchPropagatedUser(const_cast<Operand *>(op)) {}
 
   BranchPropagatedUser(const BranchPropagatedUser &other) : user(other.user) {}
   BranchPropagatedUser &operator=(const BranchPropagatedUser &other) {
@@ -96,6 +107,19 @@ public:
     NumLowBitsAvailable =
         llvm::PointerLikeTypeTraits<InnerTy>::NumLowBitsAvailable
   };
+
+private:
+  BranchPropagatedUser(SILInstruction *inst) : user(inst) {
+    assert(!isa<CondBranchInst>(inst));
+  }
+
+  BranchPropagatedUser(CondBranchInst *cbi) : user(cbi) {}
+
+  BranchPropagatedUser(CondBranchInst *cbi, unsigned successorIndex)
+      : user(cbi, successorIndex) {
+    assert(successorIndex == CondBranchInst::TrueIdx ||
+           successorIndex == CondBranchInst::FalseIdx);
+  }
 };
 
 } // namespace swift

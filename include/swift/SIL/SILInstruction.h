@@ -168,12 +168,12 @@ public:
   reverse_iterator rbegin() const;
   reverse_iterator rend() const;
 
-  using range = llvm::iterator_range<iterator>;
+  using range = iterator_range<iterator>;
   range getValues() const;
-  using reverse_range = llvm::iterator_range<reverse_iterator>;
+  using reverse_range = iterator_range<reverse_iterator>;
   reverse_range getReversedValues() const;
 
-  using type_range = llvm::iterator_range<
+  using type_range = iterator_range<
     llvm::mapped_iterator<iterator, SILType(*)(SILValue), SILType>>;
   type_range getTypes() const;
 
@@ -1315,14 +1315,18 @@ public:
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
 struct SILDebugVariable {
+  StringRef Name;
+  unsigned ArgNo : 16;
+  unsigned Constant : 1;
+
   SILDebugVariable() : ArgNo(0), Constant(false) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
       : ArgNo(ArgNo), Constant(Constant) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
       : Name(Name), ArgNo(ArgNo), Constant(Constant) {}
-  StringRef Name;
-  unsigned ArgNo : 16;
-  unsigned Constant : 1;
+  bool operator==(const SILDebugVariable &V) {
+    return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name;
+  }
 };
 
 /// A DebugVariable where storage for the strings has been
@@ -1861,7 +1865,8 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
-  SILValue getCallee() const { return getAllOperands()[Callee].get(); }
+  const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
 
   /// Gets the origin of the callee by looking through function type conversions
   /// until we find a function_ref, partial_apply, or unrecognized value.
@@ -1923,7 +1928,7 @@ public:
   }
 
   bool isCalleeNoReturn() const {
-    return getSubstCalleeSILType().isNoReturnFunction();
+    return getSubstCalleeSILType().isNoReturnFunction(this->getModule());
   }
 
   bool isCalleeThin() const {
@@ -5065,7 +5070,7 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
       : InstructionBaseWithTrailingOperands(
             Elements, DebugLoc, Ty,
             HasOwnership ? *mergeSILValueOwnership(Elements)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
     SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
@@ -5112,7 +5117,7 @@ class TupleInst final : public InstructionBaseWithTrailingOperands<
       : InstructionBaseWithTrailingOperands(
             Elems, DebugLoc, Ty,
             HasOwnership ? *mergeSILValueOwnership(Elems)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -5187,9 +5192,8 @@ class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy)
       : InstructionBase(DebugLoc, ResultTy,
-                        Operand
-                            ? Operand.getOwnershipKind()
-                            : ValueOwnershipKind(ValueOwnershipKind::Any)),
+                        Operand ? Operand.getOwnershipKind()
+                                : ValueOwnershipKind(ValueOwnershipKind::None)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5483,7 +5487,7 @@ private:
             Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
             DefaultCount,
             HasOwnership ? *mergeSILValueOwnership(CaseValues)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -6476,22 +6480,24 @@ class CopyValueInst
 };
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  class Copy##Name##ValueInst                                                  \
-      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                    SingleValueInstruction> {                  \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
     friend class SILBuilder;                                                   \
-    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
-                          SILType type)                                        \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  class Copy##Name##ValueInst                                                  \
-      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                    SingleValueInstruction> {                  \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
     friend class SILBuilder;                                                   \
-    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
-                          SILType type)                                        \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
 #include "swift/AST/ReferenceStorage.def"
@@ -7212,7 +7218,10 @@ private:
          ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
-  SILValue getCondition() const { return getAllOperands()[ConditionIdx].get(); }
+  const Operand *getConditionOperand() const {
+    return &getAllOperands()[ConditionIdx];
+  }
+  SILValue getCondition() const { return getConditionOperand()->get(); }
   void setCondition(SILValue newCondition) {
     getAllOperands()[ConditionIdx].set(newCondition);
   }
@@ -7256,6 +7265,11 @@ public:
   MutableArrayRef<Operand> getFalseOperands() {
     // The remaining arguments are 'false' operands.
     return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
+
+  /// Returns true if \p op is mapped to the condition operand of the cond_br.
+  bool isConditionOperand(Operand *op) const {
+    return getConditionOperand() == op;
   }
 
   bool isConditionOperandIndex(unsigned OpIndex) const {

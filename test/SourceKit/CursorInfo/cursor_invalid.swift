@@ -25,7 +25,7 @@ func resyncParser2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=4:13 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: source.lang.swift.decl.var.local (4:13-4:14)
 // CHECK1: c
-// CHECK1: <Declaration>let c</Declaration>
+// CHECK1: <Declaration>let c: <Type usr="s:14cursor_invalid1CC">C</Type></Declaration>
 // CHECK1: OVERRIDES BEGIN
 // CHECK1: OVERRIDES END
 

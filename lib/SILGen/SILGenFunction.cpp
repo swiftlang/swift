@@ -22,6 +22,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
@@ -127,6 +128,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<DeclContext>(ref.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
@@ -555,6 +557,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
+                  SubstitutionMap(), false,
                   ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
@@ -641,6 +644,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILResultInfo(argc->getType().getASTType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
+                  SubstitutionMap(), false,
                   getASTContext());
 
     SILGenFunctionBuilder builder(SGM);
@@ -664,8 +668,34 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
 }
 
+#ifndef NDEBUG
+/// If \c false, \c function is either a declaration that inherently cannot
+/// capture variables, or it is in a context it cannot capture variables from.
+/// In either case, it is expected that Sema may not have computed its
+/// \c CaptureInfo.
+///
+/// This call exists for use in assertions; do not use it to skip capture
+/// processing.
+static bool canCaptureFromParent(SILDeclRef function) {
+  switch (function.kind) {
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return false;
+
+  default:
+    if (function.hasDecl()) {
+      if (auto dc = dyn_cast<DeclContext>(function.getDecl())) {
+        return TypeConverter::canCaptureFromParent(dc);
+      }
+    }
+    return false;
+  }
+}
+#endif
+
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
+  auto *dc = function.getDecl()->getInnermostDeclContext();
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation Loc(value);
@@ -684,18 +714,57 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     }
   }
 
+  // For a property wrapper backing initializer, form a parameter list
+  // containing the wrapped value.
+  ParameterList *params = nullptr;
+  if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+    auto &ctx = getASTContext();
+    auto param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                                     ctx.getIdentifier("$input_value"),
+                                     SourceLoc(),
+                                     ctx.getIdentifier("$input_value"),
+                                     dc);
+    param->setSpecifier(ParamSpecifier::Owned);
+    param->setInterfaceType(function.getDecl()->getInterfaceType());
+
+    params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
+  }
+
   CaptureInfo captureInfo;
   if (function.getAnyFunctionRef())
     captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
-  auto *dc = function.getDecl()->getInnermostDeclContext();
+  else {
+    assert(!canCaptureFromParent(function));
+    captureInfo = CaptureInfo::empty();
+  }
+
   auto interfaceType = value->getType()->mapTypeOutOfContext();
-  emitProlog(captureInfo, /*paramList=*/nullptr, /*selfParam=*/nullptr,
+  emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
   if (EmitProfilerIncrement)
     emitProfilerIncrement(value);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
-  emitReturnExpr(Loc, value);
+
+  {
+    llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
+
+    // For a property wrapper backing initializer, bind the opaque value used
+    // in the initializer expression to the given parameter.
+    if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+      auto var = cast<VarDecl>(function.getDecl());
+      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto param = params->get(0);
+      opaqueValue.emplace(*this, wrappedInfo.underlyingValue,
+                          maybeEmitValueOfLocalVarDecl(param));
+
+      assert(value == wrappedInfo.initializeFromOriginal);
+    }
+
+    emitReturnExpr(Loc, value);
+  }
+
   emitEpilog(Loc);
+  mergeCleanupBlocks();
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
@@ -724,7 +793,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   prepareEpilog(varType, false, CleanupLocation::get(loc));
 
   auto pbd = var->getParentPatternBinding();
-  auto entry = pbd->getPatternEntryForVarDecl(var);
+  const auto i = pbd->getPatternEntryIndexForVarDecl(var);
+  auto *anchorVar = pbd->getAnchoringVarDecl(i);
   auto subs = getForwardingSubstitutionMap();
   auto contextualType = dc->mapTypeIntoContext(interfaceType);
   auto resultType = contextualType->getCanonicalType();
@@ -738,7 +808,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     SmallVector<CleanupHandle, 4> cleanups;
     auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
 
-    emitApplyOfStoredPropertyInitializer(loc, entry, subs, resultType,
+    emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs, resultType,
                                          origResultType,
                                          SGFContext(init.get()));
 
@@ -749,7 +819,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     Scope scope(Cleanups, CleanupLocation(var));
 
     // If we have no indirect results, just return the result.
-    auto result = emitApplyOfStoredPropertyInitializer(loc, entry, subs,
+    auto result = emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs,
                                                        resultType,
                                                        origResultType,
                                                        SGFContext())

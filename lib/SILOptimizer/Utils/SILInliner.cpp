@@ -16,7 +16,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -609,7 +609,8 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
-        getCalleeFunction()->getLoweredFunctionType()->getGenericSignature(),
+        getCalleeFunction()->getLoweredFunctionType()
+                           ->getInvocationGenericSignature(),
         ForInlining);
 
   auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
@@ -848,7 +849,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst: \
   case SILInstructionKind::Store##Name##Inst:

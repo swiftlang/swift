@@ -25,7 +25,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;

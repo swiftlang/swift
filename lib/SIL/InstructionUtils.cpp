@@ -329,12 +329,12 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::Name##RetainValueInst:                              \
   case SILInstructionKind::Name##ReleaseValueInst:                             \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case SILInstructionKind::Name##RetainInst:                                   \
   case SILInstructionKind::Name##ReleaseInst:                                  \
   case SILInstructionKind::StrongRetain##Name##Inst:                           \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
     return true;
   }
@@ -536,10 +536,8 @@ void swift::findClosuresForFunctionValue(
 bool PolymorphicBuiltinSpecializedOverloadInfo::init(
     SILFunction *fn, BuiltinValueKind builtinKind,
     ArrayRef<SILType> oldOperandTypes, SILType oldResultType) {
-#ifndef NDEBUG
   assert(!isInitialized && "Expected uninitialized info");
   SWIFT_DEFER { isInitialized = true; };
-#endif
   if (!isPolymorphicBuiltin(builtinKind))
     return false;
 
@@ -598,14 +596,18 @@ bool PolymorphicBuiltinSpecializedOverloadInfo::init(
 
   auto &ctx = fn->getASTContext();
   staticOverloadIdentifier = ctx.getIdentifier(staticOverloadName);
+
+  // Ok, we have our overload identifier. Grab the builtin info from the
+  // cache. If we did not actually found a valid builtin value kind for our
+  // overload, then we do not have a static overload for the passed in types, so
+  // return false.
+  builtinInfo = &fn->getModule().getBuiltinInfo(staticOverloadIdentifier);
   return true;
 }
 
 bool PolymorphicBuiltinSpecializedOverloadInfo::init(BuiltinInst *bi) {
-#ifndef NDEBUG
   assert(!isInitialized && "Can not init twice?!");
   SWIFT_DEFER { isInitialized = true; };
-#endif
 
   // First quickly make sure we have a /real/ BuiltinValueKind, not an intrinsic
   // or None.

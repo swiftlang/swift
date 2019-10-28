@@ -155,13 +155,6 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
-  if (!FullParse && !*Done) {
-    // Only parsed a part of the source file.
-    // Add artificial EOF to be able to finalize the tree.
-    P.SyntaxContext->addRawSyntax(
-      ParsedRawSyntaxNode::makeDeferredMissing(tok::eof, P.Tok.getLoc()));
-  }
-
   if (STreeCreator) {
     auto rawNode = P.finalizeSyntaxTree();
     STreeCreator->acceptSyntaxRoot(rawNode, SF);
@@ -393,7 +386,7 @@ namespace {
       if (!P.consumeIf(tok::at_sign)) {
         // If we fail, we must have @any ownership. We check elsewhere in the
         // parser that this matches what the function signature wants.
-        OwnershipKind = ValueOwnershipKind::Any;
+        OwnershipKind = ValueOwnershipKind::None;
         return false;
       }
 
@@ -1266,7 +1259,7 @@ bool SILParser::parseSILType(SILType &Result,
   SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText().startswith("*")) {
     category = SILValueCategory::Address;
-    P.consumeStartingCharacterOfCurrentToken(tok::oper_binary_unspaced);
+    P.consumeStartingCharacterOfCurrentToken();
   }
 
   // Parse attributes.
@@ -1517,6 +1510,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         ParseState = 1;
       } else if (!ParseState && Id.str() == "propertyinit") {
         Kind = SILDeclRef::Kind::StoredPropertyInitializer;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "backinginit") {
+        Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
         ParseState = 1;
       } else if (Id.str() == "foreign") {
         IsObjC = true;
@@ -2967,12 +2963,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     REFCOUNTING_INSTRUCTION(RetainValue)
     REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
     REFCOUNTING_INSTRUCTION(RetainValueAddr)
-#define UNCHECKED_REF_STORAGE(Name, ...) UNARY_INSTRUCTION(Copy##Name##Value)
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-    REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
-    REFCOUNTING_INSTRUCTION(Name##Retain) \
-    REFCOUNTING_INSTRUCTION(Name##Release) \
-    UNARY_INSTRUCTION(Copy##Name##Value)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  REFCOUNTING_INSTRUCTION(StrongRetain##Name)                                  \
+  REFCOUNTING_INSTRUCTION(Name##Retain)                                        \
+  REFCOUNTING_INSTRUCTION(Name##Release)                                       \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
@@ -3007,8 +3004,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
  // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
  case SILInstructionKind::UncheckedOwnershipConversionInst: {
-   ValueOwnershipKind LHSKind = ValueOwnershipKind::Any;
-   ValueOwnershipKind RHSKind = ValueOwnershipKind::Any;
+   ValueOwnershipKind LHSKind = ValueOwnershipKind::None;
+   ValueOwnershipKind RHSKind = ValueOwnershipKind::None;
    SourceLoc Loc;
 
    if (parseTypedValueRef(Val, Loc, B) ||
@@ -3215,7 +3212,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    CanGenericSignature canSig = nullptr;
+    CanGenericSignature canSig = CanGenericSignature();
     if (patternEnv && patternEnv->getGenericSignature()) {
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
     }
@@ -5330,7 +5327,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
-        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any;
+        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::None;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,
@@ -5497,13 +5494,14 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
           // Resolve types and convert requirements.
           FunctionState.convertRequirements(FunctionState.F,
                                             Attr.requirements, requirements);
-          GenericSignature *genericSig = evaluateOrDefault(
+          auto *fenv = FunctionState.F->getGenericEnvironment();
+          auto genericSig = evaluateOrDefault(
               P.Context.evaluator,
               AbstractGenericSignatureRequest{
-                FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+                fenv->getGenericSignature().getPointer(),
                 /*addedGenericParams=*/{ },
                 std::move(requirements)},
-                nullptr);
+                GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
               Attr.kind));

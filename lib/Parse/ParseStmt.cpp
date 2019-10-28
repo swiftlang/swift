@@ -252,7 +252,7 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
   SyntaxParsingContext Discarding(SyntaxContext);
-  Discarding.setDiscard();
+  Discarding.disable();
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();

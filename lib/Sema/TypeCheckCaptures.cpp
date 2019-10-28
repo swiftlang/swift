@@ -42,39 +42,33 @@ class FindCapturedVars : public ASTWalker {
   OpaqueValueExpr *OpaqueValue = nullptr;
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
-  bool NoEscape, ObjC;
+  bool NoEscape, ObjC, IsGenericFunction;
 
 public:
   FindCapturedVars(ASTContext &Context,
                    SourceLoc CaptureLoc,
                    DeclContext *CurDC,
                    bool NoEscape,
-                   bool ObjC)
+                   bool ObjC,
+                   bool IsGenericFunction)
       : Context(Context), CaptureLoc(CaptureLoc), CurDC(CurDC),
-        NoEscape(NoEscape), ObjC(ObjC) {}
+        NoEscape(NoEscape), ObjC(ObjC), IsGenericFunction(IsGenericFunction) {}
 
   CaptureInfo getCaptureInfo() const {
-    CaptureInfo result;
-
-    // Anything can capture an opaque value placeholder.
-    if (OpaqueValue)
-      result.setOpaqueValue(OpaqueValue);
+    DynamicSelfType *dynamicSelfToRecord = nullptr;
+    bool hasGenericParamCaptures = IsGenericFunction;
 
     // Only local functions capture dynamic 'Self'.
     if (CurDC->getParent()->isLocalContext()) {
       if (GenericParamCaptureLoc.isValid())
-        result.setGenericParamCaptures(true);
+        hasGenericParamCaptures = true;
 
       if (DynamicSelfCaptureLoc.isValid())
-        result.setDynamicSelfType(DynamicSelf);
+        dynamicSelfToRecord = DynamicSelf;
     }
 
-    if (Captures.empty())
-      result.setCaptures(None);
-    else
-      result.setCaptures(Context.AllocateCopy(Captures));
-
-    return result;
+    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
+                       hasGenericParamCaptures);
   }
 
   SourceLoc getGenericParamCaptureLoc() const {
@@ -325,8 +319,7 @@ public:
     return { false, DRE };
   }
 
-  void propagateCaptures(const CaptureInfo &captureInfo,
-                         SourceLoc loc) {
+  void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl()->getDeclContext() == CurDC)
@@ -370,6 +363,11 @@ public:
       propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
       return false;
     }
+
+    // Don't walk into local types; we'll walk their initializers when we check
+    // the local type itself.
+    if (isa<NominalTypeDecl>(D))
+      return false;
 
     return true;
   }
@@ -590,28 +588,26 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
 
   PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
 
+  // A generic function always captures outer generic parameters.
+  bool isGeneric = false;
+  auto *AFD = AFR.getAbstractFunctionDecl();
+  if (AFD)
+    isGeneric = (AFD->getGenericParams() != nullptr);
+
   auto &Context = AFR.getAsDeclContext()->getASTContext();
   FindCapturedVars finder(Context,
                           AFR.getLoc(),
                           AFR.getAsDeclContext(),
                           AFR.isKnownNoEscape(),
-                          AFR.isObjC());
+                          AFR.isObjC(),
+                          isGeneric);
   AFR.getBody()->walk(finder);
 
   if (AFR.hasType() && !AFR.isObjC()) {
     finder.checkType(AFR.getType(), AFR.getLoc());
   }
 
-  // A generic function always captures outer generic parameters.
-  bool isGeneric = false;
-  auto *AFD = AFR.getAbstractFunctionDecl();
-  if (AFD)
-    isGeneric = AFD->isGeneric();
-
-  auto captures = finder.getCaptureInfo();
-  if (isGeneric)
-    captures.setGenericParamCaptures(true);
-  AFR.setCaptureInfo(captures);
+  AFR.setCaptureInfo(finder.getCaptureInfo());
 
   // Compute captures for default argument expressions.
   if (auto *AFD = AFR.getAbstractFunctionDecl()) {
@@ -621,7 +617,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
                                 E->getLoc(),
                                 AFD,
                                 /*isNoEscape=*/false,
-                                /*isObjC=*/false);
+                                /*isObjC=*/false,
+                                /*IsGeneric*/isGeneric);
         E->walk(finder);
 
         if (!AFD->getDeclContext()->isLocalContext() &&
@@ -630,10 +627,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
                                  diag::dynamic_self_default_arg);
         }
 
-        auto captures = finder.getCaptureInfo();
-        if (isGeneric)
-          captures.setGenericParamCaptures(true);
-        P->setDefaultArgumentCaptureInfo(captures);
+        P->setDefaultArgumentCaptureInfo(finder.getCaptureInfo());
       }
     }
   }
@@ -678,7 +672,7 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
     if (!PBD) continue;
     // Walk the initializers for all properties declared in the type with
     // an initializer.
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+    for (unsigned i : range(PBD->getNumPatternEntries())) {
       if (PBD->isInitializerSubsumed(i))
         continue;
 
@@ -690,7 +684,8 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
                               init->getLoc(),
                               PBD->getInitContext(i),
                               /*NoEscape=*/false,
-                              /*ObjC=*/false);
+                              /*ObjC=*/false,
+                              /*IsGenericFunction*/false);
       init->walk(finder);
 
       if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {

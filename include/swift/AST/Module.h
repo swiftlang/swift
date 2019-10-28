@@ -354,8 +354,7 @@ public:
 
   /// Look up an opaque return type by the mangled name of the declaration
   /// that defines it.
-  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
-                                         LazyResolver *resolver);
+  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName);
   
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///

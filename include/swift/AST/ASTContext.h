@@ -109,6 +109,7 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
+  class IndexSubset;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -460,6 +461,8 @@ public:
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
   StructDecl *getObjCBoolDecl() const;
 
+  /// Retrieve the declaration of Foundation.NSCopying.
+  ProtocolDecl *getNSCopyingDecl() const;
   /// Retrieve the declaration of Foundation.NSError.
   ClassDecl *getNSErrorDecl() const;
   /// Retrieve the declaration of Foundation.NSNumber.
@@ -603,7 +606,6 @@ public:
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
   const CanType TheNativeObjectType;      /// Builtin.NativeObject
   const CanType TheBridgeObjectType;      /// Builtin.BridgeObject
-  const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
   const CanType TheSILTokenType;          /// Builtin.SILToken
@@ -856,7 +858,7 @@ private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already
   /// have one.
-  void registerGenericSignatureBuilder(GenericSignature *sig,
+  void registerGenericSignatureBuilder(GenericSignature sig,
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
 
@@ -875,8 +877,8 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
-                                                const ValueDecl *derived);
+  GenericSignature getOverrideGenericSignature(const ValueDecl *base,
+                                               const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisifed by derived method

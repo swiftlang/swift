@@ -1284,7 +1284,7 @@ computeUsesAndLiveness(SILValue Base) {
 
     // If node is not a leaf, add its children to the worklist and continue.
     if (!Node->ChildProjections.empty()) {
-      for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
+      for (unsigned ChildIdx : llvm::reverse(Node->ChildProjections)) {
         Worklist.push_back(getNode(ChildIdx));
       }
       continue;
@@ -1337,7 +1337,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
 
       // Create projections for each one of them and the child node and
       // projection to the worklist for processing.
-      for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
+      for (unsigned ChildIdx : llvm::reverse(Node->ChildProjections)) {
         const ProjectionTreeNode *ChildNode = getNode(ChildIdx);
         auto I = ChildNode->createProjection(B, Loc, V).get();
         LLVM_DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": "
@@ -1512,5 +1512,13 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
     // this iteration.
     std::copy(NewNodes.begin(), NewNodes.end(), std::back_inserter(Worklist));
     NewNodes.clear();
+  }
+}
+
+void ProjectionTree::getUsers(SmallPtrSetImpl<SILInstruction *> &users) const {
+  for (auto *node : ProjectionTreeNodes) {
+    for (auto *op : node->getNonProjUsers()) {
+      users.insert(op->getUser());
+    }
   }
 }

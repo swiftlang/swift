@@ -537,7 +537,7 @@ struct ReferenceStorageTypeRValues {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ReferenceStorageTypeRValues):
 // CHECK-NEXT:   debug_value [[ARG]] : $ReferenceStorageTypeRValues
 // CHECK-NEXT:   [[UNOWNED_ARG_FIELD:%.*]] = struct_extract [[ARG]] : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
-// CHECK-NEXT:   [[COPIED_VALUE:%.*]] = copy_unowned_value [[UNOWNED_ARG_FIELD]]
+// CHECK-NEXT:   [[COPIED_VALUE:%.*]] = strong_copy_unowned_value [[UNOWNED_ARG_FIELD]]
 // CHECK-NEXT:   return [[COPIED_VALUE]] : $Ref
 
   init() {

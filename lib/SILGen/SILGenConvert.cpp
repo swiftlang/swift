@@ -498,7 +498,7 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
   auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
 
-  auto *genericSig = converter->getGenericSignature();
+  auto genericSig = converter->getGenericSignature();
   auto subMap =
     SubstitutionMap::combineSubstitutionMaps(firstSubMap,
                                              secondSubMap,
