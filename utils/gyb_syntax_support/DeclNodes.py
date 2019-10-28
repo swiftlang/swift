@@ -86,7 +86,7 @@ DECL_NODES = [
          ]),
 
     # if-config-clause ->
-    #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
+    #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list | catch-clause-list)
     Node('IfConfigClause', kind='Syntax',
          children=[
              Child('PoundKeyword', kind='Token',
@@ -102,6 +102,7 @@ DECL_NODES = [
                    node_choices=[
                        Child('Statements', kind='CodeBlockItemList'),
                        Child('SwitchCases', kind='SwitchCaseList'),
+                       Child('CatchClauses', kind='CatchClauseList'),
                        Child('Decls', kind='MemberDeclList'),
                    ]),
          ]),

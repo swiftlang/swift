@@ -1148,7 +1148,6 @@ public:
 
   /// Does this statement contain a syntactically exhaustive catch
   /// clause?
-  ///
   /// Note that an exhaustive do/catch statement can still throw
   /// errors out of its catch block(s).
   bool isSyntacticallyExhaustive() const;

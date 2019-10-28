@@ -1888,33 +1888,31 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
     body = makeParserResult(
         body, BraceStmt::create(Context, doLoc, {}, PreviousLoc, true));
 
-  // If the next token is 'catch', this is a 'do'/'catch' statement.
-  if (Tok.is(tok::kw_catch)) {
-    SyntaxParsingContext CatchListCtxt(SyntaxContext,
-                                       SyntaxKind::CatchClauseList);
+  {
+    // Try to parse a series of 'catch' clauses if this is a 'do-catch'
+    BacktrackingScope backtrackScope(*this);
     // Parse 'catch' clauses
     SmallVector<ASTNode, 4> allClauses;
-    do {
-      ParserResult<CaseStmt> clause = parseStmtCatch();
-      status |= clause;
-      if (status.hasCodeCompletion() && clause.isNull())
-        return makeParserResult<Stmt>(status, nullptr);
+    bool sawCatchKeyword = false;
+    ParserStatus catchStatus =
+        parseStmtCatches(allClauses, true, sawCatchKeyword);
 
-      // parseStmtCatch promises to return non-null unless we are
-      // completing inside the catch's pattern.
-      allClauses.push_back(clause.get());
-    } while (Tok.is(tok::kw_catch) && !status.hasCodeCompletion());
+    if (sawCatchKeyword || catchStatus.hasCodeCompletion()) {
+      backtrackScope.cancelBacktrack();
+      status |= catchStatus;
 
-    // Recover from all of the clauses failing to parse by returning a
-    // normal do-statement.
-    if (allClauses.empty()) {
-      assert(status.isError());
+      // Recover from all of the clauses failing to parse by returning a
+      // normal do-statement.
+      if (allClauses.empty()) {
+        assert(status.isError());
+        return makeParserResult(
+            status, new (Context) DoStmt(labelInfo, doLoc, body.get()));
+      }
+
       return makeParserResult(status,
-                        new (Context) DoStmt(labelInfo, doLoc, body.get()));
+                              DoCatchStmt::create(Context, labelInfo, doLoc,
+                                                  body.get(), allClauses));
     }
-
-    return makeParserResult(status,
-      DoCatchStmt::create(Context, labelInfo, doLoc, body.get(), allClauses));
   }
 
   // If we dont see a 'while' or see a 'while' that starts
@@ -1951,6 +1949,60 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
                                 body.get()));
 }
 
+ParserStatus Parser::parseStmtCatches(SmallVectorImpl<ASTNode> &catches,
+                                      bool IsActive, bool &sawCatchKeyword) {
+  SyntaxParsingContext CatchListCtxt(SyntaxContext,
+                                     SyntaxKind::CatchClauseList);
+  ParserStatus Status;
+  do {
+    if (Tok.is(tok::kw_catch)) {
+      sawCatchKeyword = true;
+      ParserResult<CaseStmt> Case = parseStmtCatch(IsActive);
+      Status |= Case;
+      if (Case.isNonNull())
+        catches.emplace_back(Case.get());
+    } else if (Tok.is(tok::pound_if)) {
+      BacktrackingScope backtrackingScope(*this);
+      // '#if' in 'catch' position can enclose zero or more 'catch' clauses
+      auto IfConfigResult =
+          parseIfConfig([&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
+            Status |= parseStmtCatches(Elements, IsActive, sawCatchKeyword);
+          });
+      Status |= IfConfigResult;
+      // If we fail to parse a catch clause inside the #if block, we need to
+      // fall back to assuming the #if encloses statements after the do-catch.
+      // Return and backtrack.
+      if (Status.isError())
+        return Status;
+      // If we succeeded in parsing a catch clause inside the #if block, cancel
+      // backtracking.
+      backtrackingScope.cancelBacktrack();
+      if (auto ICD = IfConfigResult.getPtrOrNull()) {
+        for (auto &Entry : ICD->getActiveClauseElements()) {
+          if (Entry.is<Decl *>() && (isa<IfConfigDecl>(Entry.get<Decl *>())))
+            // Don't hoist nested '#if'.
+            continue;
+
+          assert((Entry.is<Stmt *>() && isa<CaseStmt>(Entry.get<Stmt *>())) ||
+                 (Entry.is<Decl *>() &&
+                  isa<PoundDiagnosticDecl>(Entry.get<Decl *>())));
+          catches.push_back(Entry);
+        }
+        // The IfConfigDecl must come after the CaseStmts it encloses to ensure
+        // proper nesting of source ranges.
+        catches.emplace_back(ICD);
+      }
+    } else if (!Tok.isAny(tok::pound_elseif, tok::pound_endif,
+                          tok::pound_else)) {
+      // Unless this is an empty IfConfigDecl in the middle of a series of
+      // catches, we failed to parse a sequence of catch clauses.
+      return makeParserError();
+    }
+  } while ((Tok.is(tok::kw_catch) || Tok.is(tok::pound_if)) &&
+           !Status.hasCodeCompletion());
+  return Status;
+}
+
 ///  stmt-catch:
 ///    'catch' pattern ('where' expr)? stmt-brace
 ///
@@ -1959,10 +2011,10 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 ///
 /// This routine promises to return a non-null result unless there was
 /// a code-completion token in the pattern.
-ParserResult<CaseStmt> Parser::parseStmtCatch() {
+ParserResult<CaseStmt> Parser::parseStmtCatch(bool IsActive) {
   SyntaxParsingContext CatchClauseCtxt(SyntaxContext, SyntaxKind::CatchClause);
   // A catch block has its own scope for variables bound out of the pattern.
-  Scope S(this, ScopeKind::CatchVars);
+  Scope S(this, ScopeKind::CatchVars, !IsActive);
 
   SourceLoc catchLoc = consumeToken(tok::kw_catch);
 

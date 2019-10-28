@@ -115,7 +115,8 @@ STMT_NODES = [
 
     # catch-clause-list -> catch-clause catch-clause-list?
     Node('CatchClauseList', kind='SyntaxCollection',
-         element='CatchClause'),
+         element='Syntax', element_name='CatchClause',
+         element_choices=['CatchClause', 'IfConfigDecl']),
 
     # do-stmt -> identifier? ':'? 'do' code-block catch-clause-list ';'?
     Node('DoStmt', kind='Stmt',
