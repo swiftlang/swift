@@ -166,3 +166,52 @@ extension Result where Failure == Swift.Error {
 extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable { }
+
+extension Result {
+    /// Returns a new result, replacing any failure value to a successful value.
+    ///
+    /// Use this method when you need to transform the failure value of a `Result`
+    /// instance to a replacement success. The following example transforms
+    /// the integer failure value of a result into a replacement int:
+    ///
+    ///     func getNextInteger() -> Result<Int, Error> { /* ... */ }
+    ///     let replacementInt = 42
+    ///
+    ///     let integerResult = getNextInteger()
+    ///     // integerResult == .failure(/* some Error */)
+    ///     let nonFailingIntResult = integerResult.replaceFailure(with: replacementInt)
+    ///     // stringResult == .success(42)
+    ///     let safeInt = nonFailingIntResult.get()
+    ///     // safeInt == 42
+    ///
+    /// - Parameter transform: A closure that takes the failure value of this
+    ///   instance.
+    /// - Returns: A `Result` instance with the result of evaluating `transform`
+    ///   as the new success value if this instance represents a failure.
+    func replaceFailure(with replacement: Success) -> Result<Success, Never> {
+        switch self {
+        case let .success(success):
+            return .success(success)
+        case .failure:
+            return .success(replacement)
+        }
+    }
+}
+
+extension Result where Failure == Never {
+    /// Returns the success value of a never failing result.
+    ///
+    /// Use this method to retrieve the value of this result.
+    ///
+    ///     let integerResult: Result<Int, Never> = .success(5)
+    ///     let value = integerResult.get()
+    ///     // value == 5
+    ///
+    /// - Returns: The success value.
+    func get() -> Success {
+        switch self {
+        case let .success(success):
+            return success
+        }
+    }
+}
