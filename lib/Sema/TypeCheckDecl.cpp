@@ -4134,9 +4134,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   TypeChecker::checkForForbiddenPrefix(Context, D->getBaseName());
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumDeclsValidated++;
-
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
