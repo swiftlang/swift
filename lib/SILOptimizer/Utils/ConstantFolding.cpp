@@ -1501,7 +1501,6 @@ bool ConstantFolder::constantFoldStringConcatenation(ApplyInst *AI) {
       assert(DeadI);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);
-      WorkList.remove(DeadI);
     }
   }
   // Schedule users of the new instruction for constant folding.
