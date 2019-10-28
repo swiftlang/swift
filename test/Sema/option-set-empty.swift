@@ -9,7 +9,7 @@ struct SomeOptions: OptionSet {
     
     let someVal = MyOptions(rawValue: 6)
     let option = MyOptions(float: Float.infinity)
-    let none = MyOptions(rawValue: 0)
+    let none = SomeOptions(rawValue: 0) // expected-error {{value type 'SomeOptions' cannot have a stored property that recursively contains it}}
 }
 
 struct MyOptions: OptionSet {
