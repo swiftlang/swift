@@ -47,6 +47,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -1941,7 +1942,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ImportedModules:
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
-      case file_types::TY_OptRecord:
+      case file_types::TY_YAMLOptRecord:
+      case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
       case file_types::TY_PrivateSwiftModuleInterfaceFile:
       case file_types::TY_SwiftCrossImportDir:
@@ -2766,6 +2768,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                   Output.get());
 
   if (C.getArgs().hasArg(options::OPT_save_optimization_record,
+                         options::OPT_save_optimization_record_EQ,
                          options::OPT_save_optimization_record_path))
     chooseOptimizationRecordPath(C, workingDirectory, Buf, Output.get());
 
@@ -3202,12 +3205,18 @@ void Driver::chooseOptimizationRecordPath(Compilation &C,
                                           CommandOutput *Output) const {
   const OutputInfo &OI = C.getOutputInfo();
   if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    llvm::Expected<file_types::ID> FileType =
+        C.getToolChain().remarkFileTypeFromArgs(C.getArgs());
+    if (!FileType) {
+      Diags.diagnose({}, diag::error_creating_remark_serializer,
+                     llvm::toString(FileType.takeError()));
+      return;
+    }
     auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
-        OI, C.getArgs(), options::OPT_save_optimization_record_path,
-        file_types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true,
-        workingDirectory, Buf);
+        OI, C.getArgs(), options::OPT_save_optimization_record_path, *FileType,
+        /*TreatAsTopLevelOutput=*/true, workingDirectory, Buf);
 
-    Output->setAdditionalOutputForType(file_types::TY_OptRecord, filename);
+    Output->setAdditionalOutputForType(*FileType, filename);
   } else
     // FIXME: We should use the OutputMap in this case.
     Diags.diagnose({}, diag::warn_opt_remark_disabled);

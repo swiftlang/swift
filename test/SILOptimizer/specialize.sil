@@ -23,17 +23,17 @@ import Swift
 // YAML-NEXT: Pass:            sil-generic-specializer
 // YAML-NEXT: Name:            sil.Specialized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/specialize.sil
-// YAML-NEXT:   Line:            132
-// YAML-NEXT:   Column:          8
+// YAML:        File:            {{.*}}/specialize.sil
+// YAML:        Line:            132
+// YAML:        Column:          8
 // YAML-NEXT: Function:        exp1
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Specialized function '
 // YAML-NEXT:   - Function:        '"XXX_init"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/specialize.sil
-// YAML-NEXT:       Line:            73
-// YAML-NEXT:       Column:          17
+// YAML:            File:            {{.*}}/specialize.sil
+// YAML:            Line:            73
+// YAML:            Column:          17
 // YAML-NEXT:   - String:          ' with type '
 // YAML-NEXT:   - FuncType:        '(Int32, @thin XXX<Int32>.Type) -> XXX<Int32>'
 // YAML-NEXT: ...
@@ -41,17 +41,17 @@ import Swift
 // YAML-NEXT: Pass:            sil-generic-specializer
 // YAML-NEXT: Name:            sil.Specialized
 // YAML-NEXT: DebugLoc:
-// YAML-NEXT:   File:            {{.*}}/specialize.sil
-// YAML-NEXT:   Line:            142
-// YAML-NEXT:   Column:          9
+// YAML:        File:            {{.*}}/specialize.sil
+// YAML:        Line:            142
+// YAML:        Column:          9
 // YAML-NEXT: Function:        exp1
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Specialized function '
 // YAML-NEXT:   - Function:        '"XXX_foo"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/specialize.sil
-// YAML-NEXT:       Line:            90
-// YAML-NEXT:       Column:          17
+// YAML:            File:            {{.*}}/specialize.sil
+// YAML:            Line:            90
+// YAML:            Column:          17
 // YAML-NEXT:   - String:          ' with type '
 // YAML-NEXT:   - FuncType:        '(Int32, @inout XXX<Int32>) -> Int32'
 // YAML-NEXT: ...
@@ -283,15 +283,15 @@ bb0(%0 : $Base):
 // CHECK:  return %0 : $Base
 
 // YAML:      Line:            277
-// YAML-NEXT:   Column:          8
+// YAML:      Column:          8
 // YAML-NEXT: Function:        specialize_generic_upcast
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Specialized function '
 // YAML-NEXT:   - Function:        '"generic_upcast"'
 // YAML-NEXT:     DebugLoc:
-// YAML-NEXT:       File:            {{.*}}/specialize.sil
-// YAML-NEXT:       Line:            268
-// YAML-NEXT:       Column:          6
+// YAML:            File:            {{.*}}/specialize.sil
+// YAML:            Line:            268
+// YAML:            Column:          6
 // YAML-NEXT:   - String:          ' with type '
 // YAML-NEXT:   - FuncType:        '(@owned Base) -> @owned Base'
 // YAML-NEXT: ...

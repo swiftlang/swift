@@ -20,8 +20,8 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/SILRemarkStreamer.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -105,9 +105,8 @@ static void emitRemark(SILModule &module, const Remark<RemarkT> &remark,
                        Diag<ArgTypes...> id, bool diagEnabled) {
   if (remark.getLocation().isInvalid())
     return;
-  if (auto *out = module.getOptRecordStream())
-    // YAMLTraits takes a non-const reference even when outputting.
-    *out << const_cast<Remark<RemarkT> &>(remark);
+  if (auto *remarkStreamer = module.getSILRemarkStreamer())
+    remarkStreamer->emit(remark);
   if (diagEnabled)
     module.getASTContext().Diags.diagnose(remark.getLocation(), id,
                                           remark.getMsg());
@@ -130,66 +129,3 @@ void Emitter::emitDebug(const RemarkPassed &remark) {
 void Emitter::emitDebug(const RemarkMissed &remark) {
   llvm::dbgs() << remark.getDebugMsg();
 }
-
-namespace llvm {
-namespace yaml {
-
-template <typename KindT> struct MappingTraits<Remark<KindT>> {
-  static void mapping(llvm::yaml::IO &io, Remark<KindT> &remark) {
-    assert(io.outputting() && "input not implemented");
-
-    if (io.mapTag("!Passed", std::is_same<KindT, RemarkPassed>::value))
-      ;
-    else if (io.mapTag("!Missed", std::is_same<KindT, RemarkMissed>::value))
-      ;
-    else
-      llvm_unreachable("Unknown remark type");
-
-    // The attributes are read-only for now since we're only support outputting
-    // them.
-    StringRef passName = remark.getPassName();
-    io.mapRequired("Pass", passName);
-    std::string id = (Twine("sil.") + remark.getIdentifier()).str();
-    io.mapRequired("Name", id);
-
-    SourceLoc loc = remark.getLocation();
-    if (!io.outputting() || loc.isValid())
-      io.mapOptional("DebugLoc", loc);
-
-    std::string fn = Demangle::demangleSymbolAsString(
-        remark.getFunction()->getName(),
-        Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-    io.mapRequired("Function", fn);
-    io.mapOptional("Args", remark.getArgs());
-  }
-};
-
-template <> struct MappingTraits<SourceLoc> {
-  static void mapping(IO &io, SourceLoc &loc) {
-    assert(io.outputting() && "input not yet implemented");
-
-    SourceManager *srcMgr = static_cast<SourceManager *>(io.getContext());
-    StringRef file = srcMgr->getDisplayNameForLoc(loc);
-    unsigned line, col;
-    std::tie(line, col) = srcMgr->getLineAndColumn(loc);
-
-    io.mapRequired("File", file);
-    io.mapRequired("Line", line);
-    io.mapRequired("Column", col);
-  }
-};
-
-// Implement this as a mapping for now to get proper quotation for the value.
-template <> struct MappingTraits<OptRemark::Argument> {
-  static void mapping(IO &io, OptRemark::Argument &a) {
-    assert(io.outputting() && "input not yet implemented");
-    io.mapRequired(a.key.data(), a.val);
-    if (a.loc.isValid())
-      io.mapOptional("DebugLoc", a.loc);
-  }
-};
-
-} // end namespace yaml
-} // end namespace llvm
-
-LLVM_YAML_IS_SEQUENCE_VECTOR(OptRemark::Argument)

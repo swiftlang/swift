@@ -20,6 +20,7 @@
 #define SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -75,9 +76,9 @@ template <typename DerivedT> class Remark {
   StringRef passName;
 
   /// Textual identifier for the remark (single-word, camel-case). Can be used
-  /// by external tools reading the YAML output file for optimization remarks to
+  /// by external tools reading the output file for optimization remarks to
   /// identify the remark.
-  StringRef identifier;
+  SmallString<32> identifier;
 
   /// Source location for the diagnostics.
   SourceLoc location;
@@ -85,13 +86,20 @@ template <typename DerivedT> class Remark {
   /// The function for the diagnostics.
   SILFunction *function;
 
+  /// The demangled name of \p Function.
+  SmallString<64> demangledFunctionName;
+
   /// Indentation used if this remarks is printed as a debug message.
   unsigned indentDebugWidth = 0;
 
 protected:
   Remark(StringRef identifier, SILInstruction &i)
-      : identifier(identifier), location(i.getLoc().getSourceLoc()),
-        function(i.getParent()->getParent()) {}
+      : identifier((Twine("sil.") + identifier).str()),
+        location(i.getLoc().getSourceLoc()),
+        function(i.getParent()->getParent()),
+        demangledFunctionName(Demangle::demangleSymbolAsString(
+            function->getName(),
+            Demangle::DemangleOptions::SimplifiedUIDemangleOptions())) {}
 
 public:
   DerivedT &operator<<(StringRef s) {
@@ -112,11 +120,13 @@ public:
   StringRef getPassName() const { return passName; }
   StringRef getIdentifier() const { return identifier; }
   SILFunction *getFunction() const { return function; }
+  StringRef getDemangledFunctionName() const { return demangledFunctionName; }
   SourceLoc getLocation() const { return location; }
   std::string getMsg() const;
   std::string getDebugMsg() const;
   Remark<DerivedT> &getRemark() { return *this; }
   SmallVector<Argument, 4> &getArgs() { return args; }
+  ArrayRef<Argument> getArgs() const { return args; }
 
   void setPassName(StringRef name) { passName = name; }
 };
@@ -156,7 +166,7 @@ public:
   void emit(T remarkBuilder, decltype(remarkBuilder()) * = nullptr) {
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    if (isEnabled<RemarkT>() || module.getOptRecordStream()) {
+    if (isEnabled<RemarkT>() || module.getSILRemarkStreamer()) {
       auto rb = remarkBuilder();
       rb.setPassName(passName);
       emit(rb);
@@ -171,7 +181,7 @@ public:
     using RemarkT = decltype(remarkBuilder());
     // Avoid building the remark unless remarks are enabled.
     bool emitRemark = emitter && (emitter->isEnabled<RemarkT>() ||
-                                  emitter->module.getOptRecordStream());
+                                  emitter->module.getSILRemarkStreamer());
     // Same for DEBUG.
     bool shouldEmitDebug = false;
 #ifndef NDEBUG

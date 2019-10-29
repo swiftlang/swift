@@ -72,7 +72,8 @@ TYPE("tbd",                 TBD,                       "tbd",             "")
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
 
 TYPE("index-data",          IndexData,                 "",                "")
-TYPE("opt-record",          OptRecord,                 "opt.yaml",        "")
+TYPE("yaml-opt-record",     YAMLOptRecord,             "opt.yaml",        "")
+TYPE("bitstream-opt-record",BitstreamOptRecord,        "opt.bitstream",   "")
 
 // Overlay files declare wrapper modules, called "separately-imported overlays",
 // that should be automatically imported when a particular module is imported.
