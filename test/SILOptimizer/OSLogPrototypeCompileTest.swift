@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -swift-version 5 -emit-sil -primary-file %s |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
 // Tests for the OSLogOptimization pass that performs compile-time analysis
