@@ -922,16 +922,12 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   auto &ctx = decl->getASTContext();
   SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
-  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       if (!ctor->isInvalid()) {
         auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
         declaredInitializers.push_back({ctor, type});
       }
-
-      if (auto overridden = ctor->getOverriddenDecl())
-        overriddenInits.insert(overridden);
     }
   }
 
@@ -955,28 +951,18 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   if (!defaultInitable && !foundDesignatedInit)
     return;
 
-  auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
-  assert(superclassDecl && "Superclass of class is not a class?");
-  if (!superclassDecl->addedImplicitInitializers())
-    ctx.getLazyResolver()->resolveImplicitConstructors(superclassDecl);
-
-  auto ctors = TypeChecker::lookupConstructors(
-      decl, superclassTy,
-      NameLookupFlags::IgnoreAccessControl);
-
-  bool canInheritInitializers = defaultInitable && !foundDesignatedInit;
-
-  SmallVector<ConstructorDecl *, 4> requiredConvenienceInitializers;
   SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
   collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
 
+  bool inheritDesignatedInits = canInheritDesignatedInits(ctx.evaluator, decl);
   for (auto *superclassCtor : nonOverridenSuperclassCtors) {
     // We only care about required or designated initializers.
     if (!superclassCtor->isDesignatedInit()) {
       if (superclassCtor->isRequired()) {
         assert(superclassCtor->isInheritable() &&
                "factory initializers cannot be 'required'");
-        requiredConvenienceInitializers.push_back(superclassCtor);
+        if (!decl->inheritsSuperclassInitializers())
+          diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
       }
       continue;
     }
@@ -991,7 +977,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       continue;
 
     // Diagnose a missing override of a required initializer.
-    if (superclassCtor->isRequired() && !canInheritInitializers) {
+    if (superclassCtor->isRequired() && !inheritDesignatedInits) {
       diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
       continue;
     }
@@ -1002,8 +988,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
     for (const auto &ctorAndType : declaredInitializers) {
       auto *ctor = ctorAndType.first;
       auto type = ctorAndType.second;
-      auto parentType = getMemberTypeForComparison(
-          ctx, superclassCtor, ctor);
+      auto parentType = getMemberTypeForComparison(ctx, superclassCtor, ctor);
 
       if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
         alreadyDeclared = true;
@@ -1018,19 +1003,14 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
     // If we're inheriting initializers, create an override delegating
     // to 'super.init'. Otherwise, create a stub which traps at runtime.
-    auto kind = canInheritInitializers
-                  ? DesignatedInitKind::Chaining
-                  : DesignatedInitKind::Stub;
+    auto kind = inheritDesignatedInits ? DesignatedInitKind::Chaining
+                                       : DesignatedInitKind::Stub;
 
     if (auto ctor = createDesignatedInitOverride(
                       decl, superclassCtor, kind, ctx)) {
       decl->addMember(ctor);
     }
   }
-
-  if (!decl->inheritsSuperclassInitializers())
-    for (ConstructorDecl *requiredCtor : requiredConvenienceInitializers)
-      diagnoseMissingRequiredInitializer(decl, requiredCtor, ctx);
 }
 
 llvm::Expected<bool>
