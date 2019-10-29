@@ -970,9 +970,9 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
         = TypeChecker::conformsToProtocol(
                           baseTy, assocType->getProtocol(), dc,
                           ConformanceCheckFlags::SkipConditionalRequirements);
-      if (!localConformance || localConformance->isAbstract() ||
-          (localConformance->getConcrete()->getRootConformance()
-             != conformance)) {
+      if (localConformance.isInvalid() || localConformance.isAbstract() ||
+          (localConformance.getConcrete()->getRootConformance() !=
+           conformance)) {
         return nullptr;
       }
 

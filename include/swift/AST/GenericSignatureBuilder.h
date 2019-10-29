@@ -519,10 +519,9 @@ public:
     explicit LookUpConformanceInBuilder(GenericSignatureBuilder *builder)
       : builder(builder) {}
 
-    Optional<ProtocolConformanceRef>
-    operator()(CanType dependentType,
-               Type conformingReplacementType,
-               ProtocolDecl *conformedProtocol) const {
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const {
       return builder->lookupConformance(dependentType,
                                         conformingReplacementType,
                                         conformedProtocol);
@@ -534,10 +533,9 @@ public:
   LookUpConformanceInBuilder getLookupConformanceFn();
 
   /// Lookup a protocol conformance in a module-agnostic manner.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType dependentType, Type conformingReplacementType,
-                    ProtocolDecl *conformedProtocol);
-
+  ProtocolConformanceRef lookupConformance(CanType dependentType,
+                                           Type conformingReplacementType,
+                                           ProtocolDecl *conformedProtocol);
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;

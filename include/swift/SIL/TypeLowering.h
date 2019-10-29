@@ -72,16 +72,16 @@ inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
 CanSILFunctionType
 adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
                    ParameterConvention calleeConv,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance);
+                   ProtocolConformanceRef witnessMethodConformance);
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   ProtocolConformanceRef witnessMethodConformance) {
   return adjustFunctionType(type, extInfo, type->getCalleeConvention(),
                             witnessMethodConformance);
 }
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   ProtocolConformanceRef witnessMethodConformance) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
   auto contextConvention = DefaultThickCalleeConvention;

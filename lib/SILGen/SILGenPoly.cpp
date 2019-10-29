@@ -177,7 +177,8 @@ collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) 
   for (auto proto : protocols) {
     auto conformance =
       M->lookupConformance(fromType, proto->getDecl());
-    conformances.push_back(*conformance);
+    assert(!conformance.isInvalid());
+    conformances.push_back(conformance);
   }
   
   return M->getASTContext().AllocateCopy(conformances);
@@ -596,9 +597,8 @@ ManagedValue Transform::transform(ManagedValue v,
     auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
         inputSubstType, protocol);
     auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
-    auto result = SGF.emitAnyHashableErasure(Loc, addr,
-                                             inputSubstType, *conformance,
-                                             ctxt);
+    auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,
+                                             conformance, ctxt);
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);
@@ -3764,7 +3764,7 @@ getSelfTypeAndConformanceForWitness(SILDeclRef witness, SubstitutionMap subs) {
   auto protocol = cast<ProtocolDecl>(witness.getDecl()->getDeclContext());
   auto selfParam = protocol->getProtocolSelfType()->getCanonicalType();
   auto type = subs.getReplacementTypes()[0];
-  auto conf = *subs.lookupConformance(selfParam, protocol);
+  auto conf = subs.lookupConformance(selfParam, protocol);
   return {type->getCanonicalType(), conf};
 }
 

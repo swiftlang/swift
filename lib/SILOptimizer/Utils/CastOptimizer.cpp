@@ -74,7 +74,7 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
                                                       CanType target) {
   auto bridgedProto =
       mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  auto conf = *mod.getSwiftModule()->lookupConformance(target, bridgedProto);
+  auto conf = mod.getSwiftModule()->lookupConformance(target, bridgedProto);
   return SubstitutionMap::getProtocolSubstitutions(conf.getRequirement(),
                                                    target, conf);
 }
@@ -483,7 +483,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
       mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
   auto conf = mod.getSwiftModule()->lookupConformance(sourceType, bridgedProto);
-  assert(conf && "_ObjectiveCBridgeable conformance should exist");
+  assert(!conf.isInvalid() && "_ObjectiveCBridgeable conformance should exist");
   (void)conf;
 
   // Generate code to invoke _bridgeToObjectiveC
@@ -1522,12 +1522,12 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
     auto Conformance = SM->conformsToProtocol(SourceType, Proto);
-    if (!Conformance)
+    if (Conformance.isInvalid())
       return false;
 
     SILBuilderWithScope B(Inst);
     SmallVector<ProtocolConformanceRef, 1> NewConformances;
-    NewConformances.push_back(Conformance.getValue());
+    NewConformances.push_back(Conformance);
     ArrayRef<ProtocolConformanceRef> Conformances =
         Ctx.AllocateCopy(NewConformances);
 

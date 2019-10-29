@@ -96,7 +96,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   // If conformsToProtocol returns a valid conformance, then all requirements
   // were proven by the type checker.
-  if (M->conformsToProtocol(source, TargetProtocol))
+  if (!M->conformsToProtocol(source, TargetProtocol).isInvalid())
     return DynamicCastFeasibility::WillSucceed;
 
   auto *SourceNominalTy = source.getAnyNominal();
@@ -134,8 +134,9 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   // the conformsToProtocol interface needs to be reformulated as a query, and
   // the implementation, including checkGenericArguments, needs to be taught to
   // recognize that types with archetypes may potentially succeed.
-  if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
-    assert(!conformance->getConditionalRequirements().empty());
+  auto conformance = M->lookupConformance(source, TargetProtocol);
+  if (!conformance.isInvalid()) {
+    assert(!conformance.getConditionalRequirements().empty());
     return DynamicCastFeasibility::MaySucceed;
   }
 
@@ -217,8 +218,7 @@ bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
-    auto conformance = M->lookupConformance(Ty, bridgedProto);
-    return conformance.hasValue();
+    return !M->lookupConformance(Ty, bridgedProto).isInvalid();
   }
   return false;
 }
@@ -232,8 +232,7 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
   if (errorTypeProto) {
     // Find the conformance of the value type to Error.
     // Check whether the type conforms to Error.
-    auto conformance = M->lookupConformance(Ty, errorTypeProto);
-    return conformance.hasValue();
+    return !M->lookupConformance(Ty, errorTypeProto).isInvalid();
   }
   return false;
 }

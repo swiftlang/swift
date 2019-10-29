@@ -55,10 +55,8 @@ SubstitutionMap SILGenModule::mapSubstitutionsForWitnessOverride(
   Type origProtoSelfType = origProto->getSelfInterfaceType();
   auto baseProto = cast<ProtocolDecl>(overridden->getDeclContext());
   return SubstitutionMap::getProtocolSubstitutions(
-           baseProto,
-           origProtoSelfType.subst(subs),
-           *subs.lookupConformance(origProtoSelfType->getCanonicalType(),
-                                   baseProto));
+      baseProto, origProtoSelfType.subst(subs),
+      subs.lookupConformance(origProtoSelfType->getCanonicalType(), baseProto));
 }
 
 /// Return the abstraction pattern to use when calling a function value.
@@ -648,7 +646,7 @@ public:
       auto proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
       auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
       auto lookupType = selfType.subst(Substitutions)->getCanonicalType();
-      auto conformance = *Substitutions.lookupConformance(selfType, proto);
+      auto conformance = Substitutions.lookupConformance(selfType, proto);
 
       ArgumentScope S(SGF, Loc);
 

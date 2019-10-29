@@ -77,8 +77,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  auto optConf = SGM.SwiftModule->lookupConformance(type, errorProtocol);
-  return optConf.hasValue();
+  return !SGM.SwiftModule->lookupConformance(type, errorProtocol).isInvalid();
 }
 
 /// Bridge the given Swift value to its corresponding Objective-C
@@ -1133,7 +1132,8 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
     auto conformance = SGM.getNSErrorConformanceToError();
-    if (!conformance) return emitUndef(nativeErrorTy);
+    if (!conformance)
+      return emitUndef(nativeErrorTy);
     ProtocolConformanceRef conformanceArray[] = {
       ProtocolConformanceRef(conformance)
     };

@@ -358,8 +358,9 @@ ASTContext &GenericSignatureImpl::getASTContext() const {
   return GenericSignature::getASTContext(getGenericParams(), getRequirements());
 }
 
-Optional<ProtocolConformanceRef>
-GenericSignatureImpl::lookupConformance(CanType type, ProtocolDecl *proto) const {
+ProtocolConformanceRef
+GenericSignatureImpl::lookupConformance(CanType type,
+                                        ProtocolDecl *proto) const {
   // FIXME: Actually implement this properly.
   auto *M = proto->getParentModule();
 
@@ -535,8 +536,9 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
     if (canFirstType->isTypeParameter())
       return conformsToProtocol(canFirstType, protocol);
     else
-      return (bool)GSB->lookupConformance(/*dependentType=*/CanType(),
-                                          canFirstType, protocol);
+      return !GSB->lookupConformance(/*dependentType=*/CanType(), canFirstType,
+                                     protocol)
+                  .isInvalid();
   }
 
   case RequirementKind::SameType: {

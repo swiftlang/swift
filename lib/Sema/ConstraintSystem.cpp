@@ -2288,11 +2288,11 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
-        if (!conformance)
+        if (conformance.isInvalid())
           return DependentMemberType::get(lookupBaseType, assocType);
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
-          proto, lookupBaseType, *conformance);
+            proto, lookupBaseType, conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
         if (!result->hasError())
           return result;
@@ -3079,8 +3079,9 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
-    return bool(TypeChecker::conformsToProtocol(
-        type, proto, cs.DC, ConformanceCheckFlags::InExpression));
+    return !TypeChecker::conformsToProtocol(type, proto, cs.DC,
+                                            ConformanceCheckFlags::InExpression)
+                .isInvalid();
   return false;
 }
 
@@ -3097,10 +3098,10 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
 
   auto conformance = TypeChecker::conformsToProtocol(
       type, rawReprType, DC, ConformanceCheckFlags::InExpression);
-  if (!conformance)
+  if (conformance.isInvalid())
     return Type();
 
-  return conformance->getTypeWitnessByName(type, TC.Context.Id_RawValue);
+  return conformance.getTypeWitnessByName(type, TC.Context.Id_RawValue);
 }
 
 Type constraints::isRawRepresentable(

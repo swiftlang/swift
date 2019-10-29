@@ -1487,10 +1487,9 @@ public:
   ///
   /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
   /// an empty optional.
-  static Optional<ProtocolConformanceRef> containsProtocol(
-                                             Type T, ProtocolDecl *Proto,
-                                             DeclContext *DC,
-                                             ConformanceCheckOptions options);
+  static ProtocolConformanceRef
+  containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                   ConformanceCheckOptions options);
 
   /// Determine whether the given type conforms to the given protocol.
   ///
@@ -1509,12 +1508,10 @@ public:
   ///
   /// \returns The protocol conformance, if \c T conforms to the
   /// protocol \c Proto, or \c None.
-  static Optional<ProtocolConformanceRef> conformsToProtocol(
-                                           Type T,
-                                           ProtocolDecl *Proto,
-                                           DeclContext *DC,
-                                           ConformanceCheckOptions options,
-                                           SourceLoc ComplainLoc = SourceLoc());
+  static ProtocolConformanceRef
+  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                     ConformanceCheckOptions options,
+                     SourceLoc ComplainLoc = SourceLoc());
 
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
@@ -1525,10 +1522,9 @@ public:
   public:
     explicit LookUpConformance(DeclContext *dc) : dc(dc) { }
 
-    Optional<ProtocolConformanceRef>
-    operator()(CanType dependentType,
-               Type conformingReplacementType,
-               ProtocolDecl *conformedProtocol) const;
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Completely check the given conformance.
@@ -1539,7 +1535,7 @@ public:
                                   IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  Optional<ProtocolConformanceRef> checkConformanceToNSCopying(VarDecl *var);
+  ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.

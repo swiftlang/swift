@@ -931,7 +931,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   if (S->getConvertElementExpr()) {
     optTy = S->getConvertElementExpr()->getType()->getCanonicalType();
   } else {
-    optTy = OptionalType::get(S->getSequenceConformance()->getTypeWitnessByName(
+    optTy = OptionalType::get(S->getSequenceConformance().getTypeWitnessByName(
                                   S->getSequence()->getType(),
                                   SGF.getASTContext().Id_Element))
                 ->getCanonicalType();

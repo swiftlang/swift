@@ -307,11 +307,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         case RequirementKind::Conformance: {
           auto *M = DC->getParentModule();
           auto *Proto = Second->castTo<ProtocolType>()->getDecl();
-          if (!First->isTypeParameter() &&
-              !First->is<ArchetypeType>() &&
-              !M->conformsToProtocol(First, Proto))
+          if (!First->isTypeParameter() && !First->is<ArchetypeType>() &&
+              M->conformsToProtocol(First, Proto).isInvalid())
             return true;
-          if (!M->conformsToProtocol(First, Proto))
+          if (M->conformsToProtocol(First, Proto).isInvalid())
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
         }
@@ -620,7 +619,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
     // Collecting protocols conformed by this expressions that are in the list.
     for (auto Proto: InterestedProtocols) {
-      if (Module.conformsToProtocol(E->getType(), Proto.first)) {
+      if (!Module.conformsToProtocol(E->getType(), Proto.first).isInvalid()) {
         Conformances.push_back(Proto.second);
       }
     }

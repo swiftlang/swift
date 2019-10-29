@@ -323,7 +323,7 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
 
 void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   CanType selfTy = fnType->getSelfInstanceType(IGM.getSILModule());
-  auto conformance = fnType->getWitnessMethodConformance();
+  auto conformance = fnType->getWitnessMethodConformanceOrNone();
 
   // First, bind type metadata for Self.
   Sources.emplace_back(MetadataSource::Kind::SelfMetadata,
@@ -564,7 +564,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       assert(selfTable && "no Self witness table for witness method");
 
       // Mark this as the cached witness table for Self.
-      auto conformance = FnType->getWitnessMethodConformance();
+      auto conformance = FnType->getWitnessMethodConformanceOrNone();
       auto selfProto = conformance.getRequirement();
 
       auto selfTy = FnType->getSelfInstanceType(IGM.getSILModule());
@@ -956,9 +956,10 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
       rootConformance, [&](unsigned, CanType type, ProtocolDecl *proto) {
         auto substType = type.subst(subMap)->getCanonicalType();
         auto reqConformance = subMap.lookupConformance(type, proto);
-        assert(reqConformance && "conditional conformance must exist");
+        assert(!reqConformance.isInvalid() &&
+               "conditional conformance must be valid");
 
-        tables.push_back(emitWitnessTableRef(IGF, substType, *reqConformance));
+        tables.push_back(emitWitnessTableRef(IGF, substType, reqConformance));
         return /*finished?*/ false;
       });
 
@@ -2417,8 +2418,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     // conformance kind.
     } else {
       assert(requirement.Protocol && "index mismatch!");
-      auto conformance = *subs.lookupConformance(requirement.TypeParameter,
-                                                 requirement.Protocol);
+      auto conformance = subs.lookupConformance(requirement.TypeParameter,
+                                                requirement.Protocol);
       assert(conformance.getRequirement() == requirement.Protocol);
       sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
@@ -2924,8 +2925,8 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
     CanType type = requirement.TypeParameter.subst(subs)->getCanonicalType();
 
     if (requirement.Protocol) {
-      auto conf = *subs.lookupConformance(requirement.TypeParameter,
-                                          requirement.Protocol);
+      auto conf = subs.lookupConformance(requirement.TypeParameter,
+                                         requirement.Protocol);
       bindings.addProtocolConformance(type, conf);
     } else {
       bindings.addTypeMetadata(type);
@@ -2999,11 +3000,11 @@ GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
     auto &reqt = getRequirements()[reqtIndex];
     CanType type = reqt.TypeParameter.subst(subs)->getCanonicalType();
     if (reqt.Protocol) {
-      auto conformance = *subs.lookupConformance(reqt.TypeParameter,
-                                                 reqt.Protocol);
+      auto conformance =
+          subs.lookupConformance(reqt.TypeParameter, reqt.Protocol);
       callback(reqtIndex, type, conformance);
     } else {
-      callback(reqtIndex, type, None);
+      callback(reqtIndex, type, ProtocolConformanceRef::forInvalid());
     }
   }
 }
@@ -3063,7 +3064,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
   }
 
   auto proto = requirement.Protocol;
-  auto conformance = *subs.lookupConformance(depTy, proto);
+  auto conformance = subs.lookupConformance(depTy, proto);
   assert(conformance.getRequirement() == proto);
   llvm::Value *metadata = nullptr;
   auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);

@@ -803,12 +803,10 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         // FIXME: Poor location information. How much better can we do here?
         // FIXME: This call should support listener to be able to properly
         //        diagnose problems with conformances.
-        auto result =
-            conformsToProtocol(firstType, proto->getDecl(), dc,
-                               conformanceOptions, loc);
+        auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
+                                              conformanceOptions, loc);
 
-        if (result) {
-          auto conformance = *result;
+        if (!conformance.isInvalid()) {
           // Report the conformance.
           if (listener && valid && current.Parents.empty()) {
             listener->satisfiedConformance(rawFirstType, firstType,

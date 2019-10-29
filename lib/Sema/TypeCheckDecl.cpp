@@ -1541,12 +1541,13 @@ computeAutomaticEnumValueKind(EnumDecl *ED) {
   
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
-  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
+  auto conformsToProtocol = [&](KnownProtocolKind protoKind) -> bool {
     ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return TypeChecker::conformsToProtocol(rawTy, proto,
-                                           ED->getDeclContext(), None);
+    return !TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext(),
+                                            None)
+                .isInvalid();
   };
-  
+
   static auto otherLiteralProtocolKinds = {
     KnownProtocolKind::ExpressibleByFloatLiteral,
     KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
@@ -4408,15 +4409,18 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   TypeChecker::addImplicitConstructors(CD);
 
   auto forceConformance = [&](ProtocolDecl *protocol) {
-    if (auto ref = TypeChecker::conformsToProtocol(
-          CD->getDeclaredInterfaceType(), protocol, CD,
-          ConformanceCheckFlags::SkipConditionalRequirements,
-          SourceLoc())) {
-      auto conformance = ref->getConcrete();
-      if (conformance->getDeclContext() == CD &&
-          conformance->getState() == ProtocolConformanceState::Incomplete) {
-        TC.checkConformance(conformance->getRootNormalConformance());
-      }
+    auto ref = TypeChecker::conformsToProtocol(
+        CD->getDeclaredInterfaceType(), protocol, CD,
+        ConformanceCheckFlags::SkipConditionalRequirements, SourceLoc());
+
+    if (ref.isInvalid()) {
+      return;
+    }
+
+    auto conformance = ref.getConcrete();
+    if (conformance->getDeclContext() == CD &&
+        conformance->getState() == ProtocolConformanceState::Incomplete) {
+      TC.checkConformance(conformance->getRootNormalConformance());
     }
   };
 
@@ -4589,12 +4593,13 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     auto type = pattern->getType();
 
     // For literal-convertible types, form the corresponding literal.
-#define CHECK_LITERAL_PROTOCOL(Kind, String) \
-    if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) { \
-      if (tc.conformsToProtocol(type, proto, dc, \
-                                ConformanceCheckFlags::InExpression)) \
-        return std::string(String); \
-    }
+#define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
+  if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) {     \
+    auto conf = tc.conformsToProtocol(type, proto, dc,                         \
+                                      ConformanceCheckFlags::InExpression);    \
+    if (!conf.isInvalid())                                                     \
+      return std::string(String);                                              \
+  }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "[:]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "\"\"")
@@ -4675,10 +4680,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     ASTContext &C = tc.Context;
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    if (auto ref = TypeChecker::conformsToProtocol(superclassType, decodableProto,
-                                                   superclassDecl,
-                                                   ConformanceCheckOptions(),
-                                                   SourceLoc())) {
+    auto ref = TypeChecker::conformsToProtocol(
+        superclassType, decodableProto, superclassDecl,
+        ConformanceCheckOptions(), SourceLoc());
+    if (!ref.isInvalid()) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
       //
@@ -4702,10 +4707,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      if ((ref = tc.conformsToProtocol(superclassType, encodableProto,
-                                       superclassDecl,
-                                       ConformanceCheckOptions(),
-                                       SourceLoc()))) {
+      auto ref =
+          tc.conformsToProtocol(superclassType, encodableProto, superclassDecl,
+                                ConformanceCheckOptions(), SourceLoc());
+      if (!ref.isInvalid()) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
         // The direct lookup here won't see an encode(to:) if it is inherited

@@ -208,10 +208,11 @@ Lowering::adjustFunctionType(CanAnyFunctionType t,
 }
 
 /// Adjust a function type to have a slightly different type.
-CanSILFunctionType Lowering::adjustFunctionType(
-    CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
-    ParameterConvention callee,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+CanSILFunctionType
+Lowering::adjustFunctionType(CanSILFunctionType type,
+                             SILFunctionType::ExtInfo extInfo,
+                             ParameterConvention callee,
+                             ProtocolConformanceRef witnessMethodConformance) {
   if (type->getExtInfo() == extInfo && type->getCalleeConvention() == callee &&
       type->getWitnessMethodConformanceOrNone() == witnessMethodConformance)
     return type;
@@ -969,7 +970,7 @@ static CanSILFunctionType getSILFunctionType(
     const Conventions &conventions, const ForeignInfo &foreignInfo,
     Optional<SILDeclRef> origConstant, Optional<SILDeclRef> constant,
     Optional<SubstitutionMap> reqtSubs,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+    ProtocolConformanceRef witnessMethodConformance) {
   // Per above, only fully honor opaqueness in the abstraction pattern
   // for thick or polymorphic functions.  We don't need to worry about
   // non-opaque patterns because the type-checker forbids non-thick
@@ -1284,10 +1285,9 @@ getSILFunctionTypeForAbstractCFunction(TypeConverter &TC,
 static CanSILFunctionType getNativeSILFunctionType(
     TypeConverter &TC, AbstractionPattern origType,
     CanAnyFunctionType substInterfaceType, AnyFunctionType::ExtInfo extInfo,
-    Optional<SILDeclRef> origConstant,
-    Optional<SILDeclRef> constant,
+    Optional<SILDeclRef> origConstant, Optional<SILDeclRef> constant,
     Optional<SubstitutionMap> reqtSubs,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+    ProtocolConformanceRef witnessMethodConformance) {
   assert(bool(origConstant) == bool(constant));
   switch (extInfo.getSILRepresentation()) {
   case SILFunctionType::Representation::Block:
@@ -1349,11 +1349,10 @@ static CanSILFunctionType getNativeSILFunctionType(
 }
 
 CanSILFunctionType swift::getNativeSILFunctionType(
-    TypeConverter &TC, AbstractionPattern origType, CanAnyFunctionType substType,
-    Optional<SILDeclRef> origConstant,
-    Optional<SILDeclRef> substConstant,
-    Optional<SubstitutionMap> reqtSubs,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+    TypeConverter &TC, AbstractionPattern origType,
+    CanAnyFunctionType substType, Optional<SILDeclRef> origConstant,
+    Optional<SILDeclRef> substConstant, Optional<SubstitutionMap> reqtSubs,
+    ProtocolConformanceRef witnessMethodConformance) {
   AnyFunctionType::ExtInfo extInfo;
 
   // Preserve type information from the original type if possible.
@@ -1715,7 +1714,7 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
     return getSILFunctionType(TC, origPattern, substInterfaceType, extInfo,
                               ObjCMethodConventions(method), foreignInfo,
                               constant, constant, None,
-                              /*witnessMethodConformance=*/None);
+                              ProtocolConformanceRef::forInvalid());
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
@@ -1724,8 +1723,7 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, origPattern, substInterfaceType, extInfo,
                               conventions, foreignInfo, constant, constant,
-                              None,
-                              /*witnessMethodConformance=*/None);
+                              None, ProtocolConformanceRef::forInvalid());
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -1736,9 +1734,9 @@ getSILFunctionTypeForClangDecl(TypeConverter &TC, const clang::Decl *clangDecl,
                                                    foreignInfo.Self)
         : AbstractionPattern(origType, clangType);
     return getSILFunctionType(TC, origPattern, substInterfaceType, extInfo,
-                              CFunctionConventions(func), foreignInfo,
-                              constant, constant, None,
-                              /*witnessMethodConformance=*/None);
+                              CFunctionConventions(func), foreignInfo, constant,
+                              constant, None,
+                              ProtocolConformanceRef::forInvalid());
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -1768,15 +1766,15 @@ getSILFunctionTypeForAbstractCFunction(TypeConverter &TC,
       return getSILFunctionType(TC, origType, substType, extInfo,
                                 CFunctionTypeConventions(fnType), ForeignInfo(),
                                 constant, constant, None,
-                                /*witnessMethodConformance=*/None);
+                                ProtocolConformanceRef::forInvalid());
     }
   }
 
   // TODO: Ought to support captures in block funcs.
   return getSILFunctionType(TC, origType, substType, extInfo,
-                            DefaultBlockConventions(), ForeignInfo(),
-                            constant, constant, None,
-                            /*witnessMethodConformance=*/None);
+                            DefaultBlockConventions(), ForeignInfo(), constant,
+                            constant, None,
+                            ProtocolConformanceRef::forInvalid());
 }
 
 /// Try to find a clang method declaration for the given function.
@@ -1940,11 +1938,10 @@ getSILFunctionTypeForObjCSelectorFamily(TypeConverter &TC, ObjCSelectorFamily fa
                                         AnyFunctionType::ExtInfo extInfo,
                                         const ForeignInfo &foreignInfo,
                                         Optional<SILDeclRef> constant) {
-  return getSILFunctionType(TC, AbstractionPattern(origType), substInterfaceType,
-                            extInfo, ObjCSelectorFamilyConventions(family),
-                            foreignInfo, constant, constant,
-                            /*requirement subs*/None,
-                            /*witnessMethodConformance=*/None);
+  return getSILFunctionType(
+      TC, AbstractionPattern(origType), substInterfaceType, extInfo,
+      ObjCSelectorFamilyConventions(family), foreignInfo, constant, constant,
+      /*requirement subs*/ None, ProtocolConformanceRef::forInvalid());
 }
 
 static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
@@ -1977,7 +1974,7 @@ getUncachedSILFunctionTypeForConstant(TypeConverter &TC,
   auto extInfo = origLoweredInterfaceType->getExtInfo();
 
   if (!constant.isForeign) {
-    Optional<ProtocolConformanceRef> witnessMethodConformance;
+    auto witnessMethodConformance = ProtocolConformanceRef::forInvalid();
 
     if (extInfo.getSILRepresentation() ==
         SILFunctionTypeRepresentation::WitnessMethod) {
@@ -2332,7 +2329,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   // Build the SILFunctionType for the vtable thunk.
   CanSILFunctionType fnTy = getNativeSILFunctionType(
       *this, basePattern, overrideLoweredInterfaceTy, base, derived,
-      /*reqt subs*/None, /*witnessMethodConformance=*/None);
+      /*reqt subs*/ None, ProtocolConformanceRef::forInvalid());
 
   // Build the SILConstantInfo and cache it.
   auto resultBuf = Context.Allocate(sizeof(SILConstantInfo),
@@ -2426,8 +2423,9 @@ public:
       substYields.push_back(substInterface(origYield));
     }
 
-    Optional<ProtocolConformanceRef> witnessMethodConformance;
-    if (auto conformance = origType->getWitnessMethodConformanceOrNone()) {
+    auto witnessMethodConformance = ProtocolConformanceRef::forInvalid();
+    auto conformance = origType->getWitnessMethodConformanceOrNone();
+    if (!conformance.isInvalid()) {
       assert(origType->getExtInfo().hasSelfParam());
       auto selfType = origType->getSelfParameter().getInterfaceType();
       // The Self type can be nested in a few layers of metatypes (etc.).
@@ -2438,9 +2436,9 @@ public:
         selfType = next;
       }
       witnessMethodConformance =
-          conformance->subst(selfType, Subst, Conformances);
+          conformance.subst(selfType, Subst, Conformances);
     }
-    
+
     // The substituted type is no longer generic, so it'd never be
     // pseudogeneric.
     auto extInfo = origType->getExtInfo().withIsPseudogeneric(false);

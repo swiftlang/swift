@@ -427,9 +427,10 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     };
 
     auto lookupConformanceFn =
-      [&](CanType depTy, Type substTy, ProtocolDecl *proto)
-        -> Optional<ProtocolConformanceRef> {
-      if (auto conf = subMap.lookupConformance(depTy, proto))
+        [&](CanType depTy, Type substTy,
+            ProtocolDecl *proto) -> ProtocolConformanceRef {
+      auto conf = subMap.lookupConformance(depTy, proto);
+      if (!conf.isInvalid())
         return conf;
 
       return ProtocolConformanceRef(proto);
@@ -1075,20 +1076,22 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    if (auto ref = conformsToProtocol(
-                        targetType, protocol, target,
-                        ConformanceCheckFlags::SkipConditionalRequirements)) {
-      if (auto *conformance = dyn_cast<NormalProtocolConformance>(
-            ref->getConcrete()->getRootConformance())) {
-        if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-          checkConformance(conformance);
-        }
-      }
+    auto ref =
+        conformsToProtocol(targetType, protocol, target,
+                           ConformanceCheckFlags::SkipConditionalRequirements);
 
-      return true;
+    if (ref.isInvalid()) {
+      return false;
     }
 
-    return false;
+    if (auto *conformance = dyn_cast<NormalProtocolConformance>(
+            ref.getConcrete()->getRootConformance())) {
+      if (conformance->getState() == ProtocolConformanceState::Incomplete) {
+        checkConformance(conformance);
+      }
+    }
+
+    return true;
   };
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
