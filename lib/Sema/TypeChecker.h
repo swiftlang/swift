@@ -988,7 +988,7 @@ public:
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
-  Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
+  static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
