@@ -526,12 +526,21 @@ public:
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, TransposeFunction, hasOwnership()));
   }
-  
+
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
       SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+  }
+
+  /// Create a `differentiable_function_extract` instruction with the given
+  /// type. To be used only by LoweredByAddress.
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
+      SILValue TheFunction, SILType Type) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction, Type));
   }
 
   LinearFunctionExtractInst *createLinearFunctionExtract(

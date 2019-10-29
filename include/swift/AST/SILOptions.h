@@ -143,10 +143,7 @@ public:
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
   /// Enable large loadable types IRGen pass.
-  // bool EnableLargeLoadableTypes = true;
-  // FIXME(TF-11, SR-9849): Disabled because LoadableByAddress cannot handle
-  // some functions that return closures that take/return large loadable types.
-  bool EnableLargeLoadableTypes = false;
+  bool EnableLargeLoadableTypes = true;
 
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.

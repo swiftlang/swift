@@ -7984,6 +7984,13 @@ public:
       NormalDifferentiableFunctionTypeComponent extractee,
       SILValue theFunction);
 
+  /// Create a `differentiable_function_extract` instruction with the given
+  /// type. To be used only by LoweredByAddress.
+  explicit DifferentiableFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      NormalDifferentiableFunctionTypeComponent extractee,
+      SILValue theFunction, SILType type);
+
   NormalDifferentiableFunctionTypeComponent getExtractee() const {
       return extractee;
   }

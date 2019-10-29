@@ -690,6 +690,14 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
 
+
+DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    NormalDifferentiableFunctionTypeComponent extractee, SILValue theFunction,
+    SILType type)
+    : InstructionBase(debugLoc, type), extractee(extractee),
+      operands(this, theFunction) {}
+
 SILType LinearFunctionExtractInst::
 getExtracteeType(
     SILValue function, LinearDifferentiableFunctionTypeComponent extractee,
