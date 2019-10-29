@@ -15,7 +15,6 @@ import platform
 
 from . import product
 from .. import shell
-from .. import targets
 
 
 class SKStressTester(product.Product):
@@ -34,17 +33,13 @@ class SKStressTester(product.Product):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
-        toolchain_path = targets.toolchain_path(self.args.install_destdir,
-                                                self.args.install_prefix)
-
-        configuration = 'debug' if self.args.build_variant == 'Debug' else \
-            'release'
+        configuration = 'release' if self.is_release() else 'debug'
 
         helper_cmd = [
             script_path,
             action,
             '--package-dir', self.package_name(),
-            '--toolchain', toolchain_path,
+            '--toolchain', self.install_toolchain_path(),
             '--config', configuration,
             '--build-dir', self.build_dir,
         ]
