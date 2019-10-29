@@ -4537,39 +4537,40 @@ namespace {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
-      auto isMatch = [&](const T *singleResult, bool baseNameMatches) -> bool {
+      auto isMatch = [&](const T *singleResult, bool baseNameMatches,
+                         bool allowObjCMismatch) -> bool {
         const DeclAttributes &attrs = singleResult->getAttrs();
 
         // Skip versioned variants.
         if (attrs.isUnavailableInSwiftVersion(languageVersion))
           return false;
 
-        // Skip if type not exposed to Objective-C.
-        // If the base name doesn't match, then a matching
-        // custom name in an @objc attribute is required.
-        if (baseNameMatches && !singleResult->isObjC())
-          return false;
-
-        // If Clang decl has a custom Swift name, then we know that
-        // `name` is the base name we're looking for.
-        if (hasKnownSwiftName)
-          return baseNameMatches;
+        // If Clang decl has a custom Swift name, then we know that the name we
+        // did direct lookup for is correct.
+        // 'allowObjCMismatch' shouldn't exist, but we need it for source
+        // compatibility where a previous version of the compiler didn't check
+        // @objc-ness at all.
+        if (hasKnownSwiftName || allowObjCMismatch) {
+          assert(baseNameMatches);
+          return allowObjCMismatch || singleResult->isObjC();
+        }
 
         // Skip if a different name is used for Objective-C.
         if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
           if (auto objcName = objcAttr->getName())
             return objcName->getSimpleName() == name;
 
-        return baseNameMatches;
+        return baseNameMatches && singleResult->isObjC();
       };
 
       // First look at Swift types with the same name.
-      SmallVector<ValueDecl *, 4> results;
-      overlay->lookupValue(name, NLKind::QualifiedLookup, results);
+      SmallVector<ValueDecl *, 4> swiftDeclsByName;
+      overlay->lookupValue(name, NLKind::QualifiedLookup, swiftDeclsByName);
       T *found = nullptr;
-      for (auto result : results) {
+      for (auto result : swiftDeclsByName) {
         if (auto singleResult = dyn_cast<T>(result)) {
-          if (isMatch(singleResult, /*baseNameMatches=*/true)) {
+          if (isMatch(singleResult, /*baseNameMatches=*/true,
+                      /*allowObjCMismatch=*/false)) {
             if (found)
               return nullptr;
             found = singleResult;
@@ -4577,14 +4578,36 @@ namespace {
         }
       }
 
-      if (!found && !hasKnownSwiftName) {
+      if (!found && hasKnownSwiftName)
+        return nullptr;
+
+      if (!found) {
         // Try harder to find a match looking at just custom Objective-C names.
-        SmallVector<Decl *, 64> results;
-        overlay->getTopLevelDecls(results);
-        for (auto result : results) {
+        SmallVector<Decl *, 64> allTopLevelDecls;
+        overlay->getTopLevelDecls(allTopLevelDecls);
+        for (auto result : allTopLevelDecls) {
           if (auto singleResult = dyn_cast<T>(result)) {
             // The base name _could_ match but it's irrelevant here.
-            if (isMatch(singleResult, /*baseNameMatches=*/false)) {
+            if (isMatch(singleResult, /*baseNameMatches=*/false,
+                        /*allowObjCMismatch=*/false)) {
+              if (found)
+                return nullptr;
+              found = singleResult;
+            }
+          }
+        }
+      }
+
+      if (!found) {
+        // Go back to the first list and find classes with matching Swift names
+        // *even if the ObjC name doesn't match.*
+        // This shouldn't be allowed but we need it for source compatibility;
+        // people used `@class SwiftNameOfClass` as a workaround for not
+        // having the previous loop, and it "worked".
+        for (auto result : swiftDeclsByName) {
+          if (auto singleResult = dyn_cast<T>(result)) {
+            if (isMatch(singleResult, /*baseNameMatches=*/true,
+                        /*allowObjCMismatch=*/true)) {
               if (found)
                 return nullptr;
               found = singleResult;
