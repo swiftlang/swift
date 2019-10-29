@@ -125,30 +125,29 @@ Anything *not* listed in this document should be assumed unsafe.
 Top-Level Functions
 ~~~~~~~~~~~~~~~~~~~
 
-A versioned top-level function is fairly restricted in how it can be changed.
+An ABI-public top-level function is fairly restricted in how it can be changed.
 The following changes are permitted:
 
-- Changing the body of the function.
+- Changing the body of the function (as long as it is not ``@inlinable``; see
+  below).
 - Changing *internal* parameter names (i.e. the names used within the function
   body, not the labels that are part of the function's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default argument expression to a parameter.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
-  be added to a function without any additional versioning information.
+- Adding or removing the ``@discardableResult`` and ``@warn_unqualified_access``
+  attributes.
 
 No other changes are permitted; the following are particularly of note:
 
-- A versioned function may not change its parameters or return type.
-- A versioned function may not change its generic requirements.
-- A versioned function may not change its external parameter names (labels).
-- A versioned function may not add, remove, or reorder parameters, whether or
+- An ABI-public function may not change its parameters or return type.
+- An ABI-public function may not change its generic requirements.
+- An ABI-public function may not change its external parameter names (labels).
+- An ABI-public function may not add, remove, or reorder parameters, whether or
   not they have default arguments.
-- A versioned function that throws may not become non-throwing or vice versa.
+- An ABI-public function that throws may not become non-throwing or vice versa.
 - The ``@escaping`` attribute may not be added to or removed from a parameter.
-  It is not a `versioned attribute` and so there is no way to guarantee that it
-  is safe when a client deploys against older versions of the library.
 
 
 Inlinable Functions
@@ -173,12 +172,9 @@ are a few common reasons for this:
 - The function is generic and its performance may be greatly increased by
   specialization in the client.
 
-A versioned function marked with the ``@inlinable`` attribute makes its body
-available to clients as part of the module's public interface. ``@inlinable``
-is a `versioned attribute`; clients may not assume that the body of the
-function is suitable when deploying against older versions of the library.
-
-Clients are not required to inline a function marked ``@inlinable``.
+An ABI-public function marked with the ``@inlinable`` attribute makes its body
+available to clients as part of the module's public interface. Clients are not
+required to inline a function marked ``@inlinable``.
 
 .. note::
 
@@ -190,17 +186,15 @@ Clients are not required to inline a function marked ``@inlinable``.
 Any local functions or closures within an inlinable function are treated as
 ``@_alwaysEmitIntoClient`` (see below). A client that inlines the containing
 function must emit its own copy of the local functions or closures. This is
-important in case it is necessary to change the inlinable function later;
-existing clients should not be depending on internal details of the previous
-implementation.
+important in case it is necessary to change the inlinable function later.
 
 Removing the ``@inlinable`` attribute completely---say, to reference private
-implementation details that should not be `versioned <versioned entity>`---is a
-safe change. However, existing clients will of course not be affected by this
-change, and any future use of the function must take this into account.
+implementation details that should not be ABI-public---is a safe change.
+However, existing clients will of course not be affected by this change, and
+any future use of the function must take this into account.
 
 Although they are not a supported feature for arbitrary libraries at this time,
-`transparent`_ functions are implicitly marked ``@inlinable``.
+public `transparent`_ functions are implicitly marked ``@inlinable``.
 
 .. _transparent: https://github.com/apple/swift/blob/master/docs/TransparentAttr.rst
 
@@ -236,19 +230,15 @@ polar representation::
     }
 
 and the ``x`` and ``y`` properties have now disappeared. To avoid this, the
-bodies of inlinable functions have the following restrictions:
+bodies of inlinable functions have the following restrictions (enforced by the
+compiler):
 
 - They may not define any local types.
 
 - They must not reference any ``private`` or ``fileprivate`` entities.
 
 - They must not reference any ``internal`` entities except for those that have
-  been ``versioned <versioned entity>` and those declared ``@inlinable``. See
-  below for a discussion of versioning internal API.
-
-- They must not reference any entities from the current module introduced
-  after the function was made inlinable, except under appropriate availability
-  guards.
+  been declared ``@usableFromInline`` or ``@inlinable``.
 
 
 Always Emit Into Client
@@ -270,91 +260,55 @@ is a binary-compatible source-breaking change.
 Default Argument Expressions
 ----------------------------
 
-Default argument expressions for functions that are public, versioned, or
-inlinable are implicitly ``@_alwaysEmitIntoClient``. They are subject to
-similar restrictions:
-
-- They may not define any local types.
-
-- They must not reference any non-``public`` entities.
-
-- They must not reference any entities from the current module introduced
-  after the default argument was added, except under appropriate availability
-  guards.
-
-A default argument implicitly has the same availability as the function it is
-attached to. Because default argument expressions can be added and removed, a
-client that uses one must always emit its own copy of the implementation.
+Default argument expressions for functions that are ABI-public are implicitly
+``@_alwaysEmitIntoClient``. They are subject to the same restrictions as
+inlinable functions except that they also must not reference any non-``public``
+entities, even if they are ``@usableFromInline`` or ``@inlinable``. This is to
+make sure a default argument expression can always be written explicitly by a
+caller.
 
 
 Top-Level Variables and Constants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Given a versioned module-scope variable declared with ``var``, the following
+Given an ABI-public module-scope variable declared with ``var``, the following
 changes are permitted:
 
 - Adding (but not removing) a public setter to a computed variable.
-- Adding or removing a non-public, non-versioned setter.
+- Adding or removing a non-ABI-public setter.
 - Changing from a stored variable to a computed variable, or vice versa, as
-  long as a previously versioned setter is not removed.
+  long as a previously ABI-public setter is not removed.
 - As a special case of the above, adding or removing ``lazy`` from a stored
   property.
-- Changing the body of an accessor.
+- Changing the body of an accessor, if the property is not marked ``@inlinable``
+  (see below).
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
   setter.
 - Changing the initial value of a stored variable.
-- Adding or removing ``weak`` from a variable with ``Optional`` type.
-- Adding or removing ``unowned`` from a variable.
+- Adding or removing ``weak`` to/from a variable with ``Optional`` type.
+- Adding or removing ``unowned`` to/from a variable.
 - Adding or removing ``@NSCopying`` to/from a variable.
+- If the variable is get-only, or if it has a non-ABI-public setter, it may be
+  replaced by a ``let`` constant.
 
-If a public setter is added after the property is first exposed (whether the
-property is stored or computed), it must be versioned independently of the
-property itself.
-
-.. admonition:: TODO
-
-    This needs syntax.
-
-Additionally, for a module-scope constant declared with ``let``, the following
+For an ABI-public module-scope constant declared with ``let``, the following
 changes are permitted:
 
 - Changing the value of the constant.
-
-It is *not* safe to change a ``let`` constant into a variable or vice versa.
-Top-level constants are assumed not to change for the entire lifetime of the
-program once they have been initialized.
-
-.. admonition:: TODO
-
-    We could make it safe to turn a read-only ``var`` into a ``let``, but do we
-    want to? We would have to come up with syntax for declaring when it
-    changed, at least.
+- Replacing the constant with a variable.
 
 
 Giving Up Flexibility
 ---------------------
 
-Both top-level constants and variables can be marked ``@inlinableAccess`` to
-allow clients to access them more efficiently. This restricts changes a fair
-amount:
+Top-level computed variables can be marked ``@inlinable`` just like functions.
+This restricts changes a fair amount:
 
-- Adding a versioned setter to a computed variable is still permitted.
-- Adding or removing a non-public, non-versioned setter is still permitted.
-- Changing from stored to computed or vice versa is forbidden, because it would
-  break existing clients.
-- Similarly, adding or removing ``lazy`` is forbidden.
+- Adding an ABI-public setter to a computed variable is still permitted.
+- Adding or removing a non-ABI-public setter is still permitted.
 - Changing the body of an accessor is a `binary-compatible source-breaking
   change`.
-- Adding/removing observing accessors is likewise a `binary-compatible
-  source-breaking change`.
-- Changing the initial value of a stored variable is still permitted.
-- Changing the value of a constant is a `binary-compatible source-breaking
-  change`.
-- Adding or removing ``weak`` is forbidden.
-- Adding or removing ``unowned`` is forbidden.
-- Adding or removing ``@NSCopying`` to/from a variable is `binary-compatible
-  source-breaking change`.
 
 .. admonition:: TODO
 
@@ -365,23 +319,6 @@ amount:
 Any inlinable accessors must follow the rules for `inlinable functions`_, as
 described above.
 
-Note that if a constant's initial value expression has any observable side
-effects, including the allocation of class instances, it must not be treated
-as inlinable. A constant must always behave as if it is initialized exactly
-once.
-
-.. admonition:: TODO
-
-    Is this a condition we can detect at compile-time? Do we have to be
-    restricted to things that can be lowered to compile-time constants?
-
-.. admonition:: TODO
-
-    ``@inlinableAccess`` isn't implemented yet, but for computed properties we
-    already allow putting ``@inlinable`` on the accessors individually. That
-    doesn't support all the use cases, like promising that a stored property
-    will remain stored, but it also provides flexibility in only making *one*
-    accessor inlinable. Is that important?
 
 Structs
 ~~~~~~~
@@ -389,26 +326,39 @@ Structs
 Swift structs are a little more flexible than their C counterparts. By default,
 the following changes are permitted:
 
-- Reordering any existing members, including stored properties.
+- Reordering any existing members, including stored properties (unless the
+  struct is marked ``@frozen``; see below).
 - Adding any new members, including stored properties.
-- Changing existing properties from stored to computed or vice versa.
+- Changing existing properties from stored to computed or vice versa (unless the
+  struct is marked ``@frozen``; see below).
 - As a special case of the above, adding or removing ``lazy`` from a stored
   property.
 - Changing the body of any methods, initializers, or accessors.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
-  an existing property. This is effectively the same as modifying the body of a
-  setter.
-- Removing any non-public, non-versioned members, including stored properties.
-- Adding a new protocol conformance (with proper availability annotations).
-- Removing conformances to non-public protocols.
+  an existing property (unless the struct is marked ``@frozen``; see below).
+  This is effectively the same as modifying the body of a setter.
+- Removing any non-ABI-public members, including stored properties.
+- Adding a conformance to an ABI-public protocol *that was introduced in the
+  same release* (see below).
+- Adding or removing a conformance to a non-ABI-public protocol.
 
 The important most aspect of a Swift struct is its value semantics, not its
 layout.
 
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
-or accessor within a struct. These modifiers are not `versioned attributes
-<versioned attribute>` and as such there is no safety guarantee for a client
-deploying against an earlier version of the library.
+or accessor within a struct.
+
+If a conformance is added to a type in version 1.1 of a library, it's important
+that it isn't accessed in version 1.0. This means that it is only safe to add
+new conformances to ABI-public protocols when the protocol is introduced, and
+not after. If the protocol comes from a separate module, there is no safe way
+to conform to it.
+
+.. admonition:: TODO
+
+    Coming up with a way to do this, either with availability annotations for
+    protocol conformances or a way to emit a fallback copy of the conformance
+    for clients on older library versions to use, is highly desired.
 
 
 Methods and Initializers
@@ -416,28 +366,21 @@ Methods and Initializers
 
 For the most part struct methods and initializers are treated exactly like
 top-level functions. They permit all of the same modifications and can also be
-marked ``@inlinable``, with the same restrictions. Inlinable initializers must
-always delegate to another initializer or assign an entire value to ``self``,
-since new properties may be added between new releases. For the same reason,
-initializers declared outside of the struct's module must always delegate to
-another initializer or assign to ``self``.
+marked ``@inlinable``, with the same restrictions.
+
+Inlinable initializers must always delegate to another initializer or assign an
+entire value to ``self``, since new properties may be added between new
+releases. For the same reason, initializers declared outside of the struct's
+module must always delegate to another initializer or assign to ``self``. This
+is enforced by the compiler.
 
 
 Properties
 ----------
 
-Struct properties behave largely the same as top-level bindings. They permit
-all of the same modifications, and also allow adding or removing an initial
-value entirely.
-
-Struct properties can also be marked ``@inlinableAccess``, with the same
-restrictions as for top-level bindings. An inlinable stored property may not
-become computed, but the offset of its storage within the struct is not
-necessarily fixed.
-
-Like top-level constants, it is *not* safe to change a ``let`` property into a
-variable or vice versa. Properties declared with ``let`` are assumed not to
-change for the entire lifetime of the program once they have been initialized.
+Struct properties behave largely the same as top-level variables and constants.
+They permit all of the same modifications, and also allow adding or removing an
+initial value entirely.
 
 
 Subscripts
@@ -447,7 +390,7 @@ Subscripts behave largely the same as properties, except that there are no
 stored subscripts. This means that the following changes are permitted:
 
 - Adding (but not removing) a public setter.
-- Adding or removing a non-public, non-versioned setter.
+- Adding or removing a non-ABI-public setter.
 - Changing the body of an accessor.
 - Changing index parameter internal names (i.e. the names used within the
   accessor bodies, not the labels that are part of the subscript's full name).
@@ -456,64 +399,19 @@ stored subscripts. This means that the following changes are permitted:
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
 
-Like properties, subscripts can be marked ``@inlinableAccess``, which makes
+Like properties, subscripts can be marked ``@inlinable``, which makes
 changing the body of an accessor a `binary-compatible source-breaking change`.
 Any inlinable accessors must follow the rules for `inlinable functions`_, as
 described above.
 
 
-New Conformances
-----------------
-
-If a conformance is added to a type in version 1.1 of a library, it's important
-that it isn't accessed in version 1.0. This is implied if the protocol itself
-was introduced in version 1.1, but needs special handling if both the protocol
-and the type were available earlier. In this case, the conformance *itself*
-needs to be labeled as being introduced in version 1.1, so that the compiler
-can enforce its safe use.
-
-.. note::
-
-    This may feel like a regression from Objective-C, where `duck typing` would
-    allow a ``Wand`` to be passed as an ``id <MagicType>`` without ill effects.
-    However, ``Wand`` would still fail a ``-conformsToProtocol:`` check in
-    version 1.0 of the library, and so whether or not the client code will work
-    is dependent on what should be implementation details of the library.
-
-We've considered two possible syntaxes for this::
-
-    @available(1.1)
-    extension Wand : MagicType {/*...*/}
-
-and
-
-::
-
-    extension Wand : @available(1.1) MagicType {/*...*/}
-
-The former requires fewer changes to the language grammar, but the latter could
-also be used on the declaration of the type itself (i.e. the ``struct``
-declaration).
-
-If we went with the former syntax, applying ``@available`` to an extension
-would override the default availability of entities declared within the
-extension; unlike access control, entities within the extension may freely
-declare themselves to be either more or less available than what the extension
-provides.
-
-We could also implement a ``@_alwaysEmitIntoClient``  attribute for conformances.
-This introduces its own challenges with runtime uniquing of witness tables now
-necessary for conformances.
-
-
 Frozen Structs
 --------------
 
-To opt out of this flexibility, a struct may be marked ``@frozen``.
-This promises that no stored properties will be added to or removed from the
-struct, even non-public ones. Additionally, all versioned instance stored
-properties in a ``@frozen`` struct are implicitly declared
-``@inlinable`` (as described above for top-level variables). In effect:
+To opt out of this flexibility, a struct may be marked ``@frozen``. This
+promises that no stored properties will be added to or removed from the struct,
+even non-ABI-public ones, and allows the compiler to optimize as such. These
+stored properties also must not have any observing accessors. In effect:
 
 - Reordering stored instance properties (public or non-public) is not permitted.
   Reordering all other members is still permitted.
@@ -523,22 +421,19 @@ properties in a ``@frozen`` struct are implicitly declared
   vice versa is not permitted.
 - Similarly, adding or removing ``lazy`` from a stored property is not
   permitted.
-- Changing the body of any *existing* methods, initializers, computed property
-  accessors, or non-instance stored property accessors is permitted. Changing
-  the body of a stored instance property observing accessor is permitted if the
-  property is not `versioned <versioned entity>`, and considered a
-  `binary-compatible source-breaking change` if it is.
-- Adding or removing observing accessors from any
-  `versioned <versioned entity>` stored instance properties (public or
-  non-public) is not permitted.
+- Changing the body of any *existing* methods, initializers, or computed
+  property accessors is still permitted.
+- Adding observing accessors to any stored instance properties (public or
+  non-public) is not permitted (and is checked by the compiler).
 - Removing stored instance properties is not permitted. Removing any other
-  non-public, non-versioned members is still permitted.
-- Adding a new protocol conformance is still permitted.
-- Removing conformances to non-public protocols is still permitted.
+  non-ABI-public members is still permitted.
+- Adding a new protocol conformance is still permitted, per the usual
+  restrictions.
+- Removing conformances to non-ABI-public protocols is still permitted.
 
 Additionally, if the type of any stored instance property includes a struct or
-enum, that struct or enum must be `versioned <versioned entity>`. This includes
-generic parameters and members of tuples.
+enum, that struct or enum must be ABI-public. This includes generic parameters
+and members of tuples.
 
 .. note::
 
@@ -549,18 +444,16 @@ generic parameters and members of tuples.
 While adding or removing stored properties is forbidden, existing properties may
 still be modified in limited ways:
 
-- An existing non-public, non-versioned property may change its access level to
-  any other non-public access level.
-- A non-versioned ``internal`` property may be versioned (see `Versioning
-  Internal Declarations`_).
-- A versioned ``internal`` property may be made ``public`` (without changing
-  its version).
+- An existing non-ABI-public property may change its access level to any other
+  non-public access level.
+- ``@usableFromInline`` may be added to an ``internal`` property (with the
+  current availability version, if necessary).
+- A ``@usableFromInline`` property may be made ``public``.
+
+Adding or removing ``@frozen`` from an existing struct is forbidden.
 
 An initializer of a frozen struct may be declared ``@inlinable`` even
-if it does not delegate to another initializer, as long as the ``@inlinable``
-attribute, or the initializer itself, is not introduced earlier than the
-``@frozen`` attribute and the struct has no non-versioned stored
-properties.
+if it does not delegate to another initializer.
 
 A ``@frozen`` struct is *not* guaranteed to use the same layout as a C
 struct with a similar "shape". If such a struct is necessary, it should be
@@ -568,33 +461,13 @@ defined in a C header and imported into Swift.
 
 .. note::
 
-    We can add a *different* feature to control layout some day, or something
+    We may add a *different* feature to control layout some day, or something
     equivalent, but this feature should not restrict Swift from doing useful
-    things like minimizing member padding. At the very least, Swift structs
-    don't guarantee the same tail padding that C structs do.
-
-.. note::
-
-    Hypothetically, we could use a different model where a ``@frozen``
-    struct only guarantees the "shape" of the struct, so to speak, while
-    leaving all property accesses to go through function calls. This would
-    allow stored properties to change their accessors, or (with the Behaviors
-    proposal) to change a behavior's implementation, or change from one
-    behavior to another. However, the *most common case* here is probably just
-    a simple C-like struct that groups together simple values, with only public
-    stored properties and no observing accessors, and having to opt into direct
-    access to those properties seems unnecessarily burdensome. The struct is
-    being declared ``@frozen`` for a reason, after all: it's been
-    discovered that its use is causing performance issues.
-
-    Consequently, as a first pass we may just require all stored properties in
-    a ``@frozen`` struct, public or non-public, to have trivial
-    accessors, i.e. no observing accessors and no behaviors.
-
-``@frozen`` is a `versioned attribute`. This is so that clients can
-deploy against older versions of the library, which may have a different layout
-for the struct. (In this case the client must manipulate the struct as if the
-``@frozen`` attribute were absent.)
+    things like minimizing member padding. While the layout of ``@frozen``
+    structs is part of the stable ABI on Apple platforms now, it's not
+    something that can't be revised in the future (with appropriate
+    compatibility considerations). At the very least, Swift structs don't
+    guarantee the same tail padding that C structs do.
 
 
 Enums
@@ -605,16 +478,16 @@ without breaking binary compatibility. As with structs, this results in a fair
 amount of indirection when dealing with enum values, in order to potentially
 accommodate new values. More specifically, the following changes are permitted:
 
-- Adding a new case.
-- Reordering existing cases is a `binary-compatible source-breaking change`. In
-  particular, if an enum is RawRepresentable, changing the raw representations
-  of cases may break existing clients who use them for serialization.
+- Adding a new case (unless the enum is marked ``@frozen``; see below).
+- Reordering existing cases is a `binary-compatible source-breaking change`
+  (unless the struct is marked ``@frozen``; see below). In particular, both
+  CaseIterable and RawRepresentable default implementations may affect client
+  behavior.
 - Adding a raw type to an enum that does not have one.
-- Removing a non-public, non-versioned case.
 - Adding any other members.
-- Removing any non-public, non-versioned members.
-- Adding a new protocol conformance (with proper availability annotations).
-- Removing conformances to non-public protocols.
+- Removing any non-ABI-public members.
+- Adding a new protocol conformance, with the same restrictions as for structs.
+- Removing conformances to non-ABI-public protocols.
 
 .. note::
 
@@ -622,12 +495,6 @@ accommodate new values. More specifically, the following changes are permitted:
     known cases, the compiler is of course free to use a more efficient
     representation for the value, just as it may discard fields of structs that
     are provably never accessed.
-
-.. note::
-
-    Non-public cases in public enums don't exist at the moment, but they *can*
-    be useful, and they require essentially the same implementation work as
-    cases added in future versions of a library.
 
 Adding or removing the ``@objc`` attribute from an enum is not permitted; this
 affects the enum's memory representation and is not backwards-compatible.
@@ -651,19 +518,18 @@ members.
 Frozen Enums
 ------------
 
-A library owner may opt out of this flexibility by marking a versioned enum as
-``@frozen``. A "frozen" enum may not have any cases with less access than the
-enum itself, and may not add new cases in the future. This guarantees to
-clients that the enum cases are exhaustive. In particular:
+A library owner may opt out of this flexibility by marking an ABI-public enum
+as ``@frozen``. A "frozen" enum may not add new cases in the future,
+guaranteeing to clients that the current set of enum cases is exhaustive. In
+particular:
 
 - Adding new cases is not permitted.
 - Reordering existing cases is not permitted.
-- Removing a non-public case is not applicable.
 - Adding a raw type is still permitted.
 - Adding any other members is still permitted.
-- Removing any non-public, non-versioned members is still permitted.
+- Removing any non-ABI-public members is still permitted.
 - Adding a new protocol conformance is still permitted.
-- Removing conformances to non-public protocols is still permitted.
+- Removing conformances to non-ABI-public protocols is still permitted.
 
 .. note::
 
@@ -671,23 +537,11 @@ clients that the enum cases are exhaustive. In particular:
     the library would still have to treat the enum as opaque and would still
     have to be able to handle unknown cases in their ``switch`` statements.
 
-``@frozen`` is a `versioned attribute`. This is so that clients can deploy
-against older versions of the library, which may have non-public cases in the
-enum. (In this case the client must manipulate the enum as if the ``@frozen``
-attribute were absent.) All cases that are not versioned become implicitly
-versioned with this number.
+Adding or removing ``@frozen`` from an existing enum is forbidden.
 
 Even for default "non-frozen" enums, adding new cases should not be done
 lightly. Any clients attempting to do an exhaustive switch over all enum cases
 will likely not handle new cases well.
-
-.. note::
-
-    One possibility would be a way to map new cases to older ones on older
-    clients. This would only be useful for certain kinds of enums, though, and
-    adds a lot of additional complexity, all of which would be tied up in
-    versions. Our generalized switch patterns probably make it hard to nail
-    down the behavior here.
 
 
 Protocols
@@ -703,19 +557,12 @@ There are very few safe changes to make to protocols and their members:
 - Reordering generic requirements is permitted (but not the generic parameters
   themselves).
 - The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
-  be added to a function requirement without any additional versioning
-  information.
-
-New requirements can be added to a protocol. However, restrictions around
-existential types mean that adding new associated types or non-type requirements
-involving ``Self`` can break source compatibility. For this reason, the following
-are `binary-compatible source-breaking changes <binary-compatible source-breaking change>`:
-
-- A new non-type requirement may be added to a protocol, as long as it has an
-  unconstrained default implementation in a protocol extension of the
-  protocol itself or some other protocol it refines.
-- A new associated type requirement may be added as long as it has a
-  default.
+  be added to or removed from a function requirement.
+- A new non-type requirement may be added (with the appropriate availability),
+  as long as it has an unconstrained default implementation. If the requirement
+  uses ``Self`` and the protocol has no other requirements using ``Self`` and
+  no associated types, this is a `binary-compatible source-breaking change` due
+  to restrictions on protocol value types.
 
 All other changes to the protocol itself are forbidden, including:
 
@@ -744,19 +591,22 @@ support all of the following changes:
 - Changing existing properties from stored to computed or vice versa.
 - As a special case of the above, adding or removing ``lazy`` from a stored
   property.
-- Changing the body of any methods, initializers, or accessors.
+- Changing the body of any methods, initializers, accessors, or deinitializers.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
   setter.
-- Removing any non-public, non-versioned members, including stored properties.
-- Adding a new protocol conformance (with proper availability annotations).
-- Removing conformances to non-public protocols.
+- Removing any non-ABI-public members, including stored properties.
+- Adding a new protocol conformance (subject to the same restrictions as for
+  structs).
+- Removing conformances to non-ABI-public protocols.
 
 Omitted from this list is the free addition of new members. Here classes are a
 little more restrictive than structs; they only allow the following changes:
 
 - Adding a new convenience initializer.
-- Adding a new designated initializer, if the class is not ``open``.
+- Adding a new designated initializer, if the class is not ``open`` and any
+  ``open`` subclasses that previously inherited convenience initializers
+  continue to do so.
 - Adding a deinitializer.
 - Adding new, non-overriding method, subscript, or property.
 - Adding a new overriding member, though if the class is ``open`` the type of
@@ -765,8 +615,6 @@ little more restrictive than structs; they only allow the following changes:
 
 Finally, classes allow the following changes that do not apply to structs:
 
-- A public class may be made ``open`` if it is not already marked ``final``.
-- A non-``open`` public class may be marked ``final``.
 - Removing an explicit deinitializer. (A class with no declared deinitializer
   effectively has an implicit deinitializer.)
 - "Moving" a method, subscript, or property up to its superclass. The
@@ -777,55 +625,35 @@ Finally, classes allow the following changes that do not apply to structs:
   removed as long as the generic parameters, formal parameters, and return type
   *exactly* match the overridden declaration. Any existing callers should
   automatically use the superclass implementation.
-- Within an ``open`` class, any public method, subscript, or property may be
-  marked ``open`` if it is not already marked ``final``.
-- Any method, subscript, or property may be marked ``final`` if it is not
-  already marked ``open``.
+- ``final`` can be added to or removed from any non-ABI-public class, or any
+  non-ABI-public member of a class.
 - ``@IBOutlet``, ``@IBAction``, ``@IBInspectable``, and ``@GKInspectable`` may
-  be added to a member without providing any extra version information.
+  be added to a member that is already exposed to Objective-C (either explicitly
+  with ``@objc`` or implicitly through overriding or protocol requirements).
   Removing any of these is a `binary-compatible source-breaking change` if the
   member remains ``@objc``, and disallowed if not.
-- Likewise, ``@IBDesignable`` may be added to a class without providing any
-  extra version information. Removing it is considered a `binary-compatible
-  source-breaking change`.
+- ``@IBDesignable`` may be added to a class; removing it is considered a
+  `binary-compatible source-breaking change`.
 - Changing a class's superclass ``A`` to another class ``B``, *if* class ``B``
   is a subclass of ``A`` *and* class ``B``, along with any superclasses between
   it and class ``A``, were introduced in the latest version of the library.
 
-.. admonition:: TODO
-
-    This last is very tricky to get right. We've seen it happen a few times in
-    Apple's SDKs, but at least one of them, `NSCollectionViewItem`_ becoming a
-    subclass of NSViewController instead of the root class NSObject, doesn't
-    strictly follow the rules. While NSViewController was introduced in the
-    same version of the OS, its superclass, NSResponder, was already present.
-    If a client app was deploying to an earlier version of the OS, would
-    NSCollectionViewItem be a subclass of NSResponder or not? How would the
-    compiler be able to enforce this?
-
-.. admonition:: TODO
-
-    Both ``final`` and ``open`` may be applied to a declaration after it has
-    been made public. However, these need to be treated as
-    `versioned attributes <versioned attribute>`. It's not clear what syntax
-    should be used for this.
-
-.. _NSCollectionViewItem: https://developer.apple.com/library/mac/documentation/Cocoa/Reference/NSCollectionViewItem_Class/index.html
-
 Other than those detailed above, no other changes to a class or its members
 are permitted. In particular:
 
-- An ``open`` class or member cannot become non-``open``.
-- ``final`` may not be removed from a class or its members. (The presence of
-  ``final`` enables optimization.)
-- ``dynamic`` may not be added to *or* removed from any members. Existing
-  clients would not know to invoke the member dynamically.
+- ``open`` cannot be added to or removed from an ABI-public class or member.
+- ``final`` may not be added to or removed from an ABI-public class or its
+  ABI-public members. (The presence of ``final`` enables optimization.)
+- ``dynamic`` may not be added to *or* removed from any ABI-public members.
+  Existing clients would not know to invoke the member dynamically.
 - A ``final`` override of a member may *not* be removed, even if the type
   matches exactly; existing clients may be performing a direct call to the
   implementation instead of using dynamic dispatch.
 - ``@objc`` and ``@nonobjc`` may not be added to or removed from the class or
-  any existing members.
-- ``@NSManaged`` may not be added to or removed from any existing members.
+  any existing members, except if the member already was or was not exposed to
+  Objective-C.
+- ``@NSManaged`` may not be added to or removed from any existing
+  ABI-public members.
 
 .. admonition:: TODO
 
@@ -845,12 +673,6 @@ into a designated initializer or vice versa.
 A new ``required`` initializer may be added to a class only if it is a
 convenience initializer; that initializer may only call existing ``required``
 initializers. An existing initializer may not be marked ``required``.
-
-.. admonition:: TODO
-
-    This implies a different rule for inheriting ``required`` convenience
-    initializers than non-required convenience initializers, which is not
-    currently implemented.
 
 All of the modifications permitted for top-level functions are also permitted
 for class initializers. Convenience initializers may be marked ``@inlinable``,
@@ -872,19 +694,12 @@ little. They allow the following changes:
 - Adding a default argument expression to a parameter.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
-  be added to a method without any additional versioning information.
+- Adding or removing the ``@discardableResult`` and ``@warn_unqualified_access``
+  attributes.
 
 Class and instance methods may be marked ``@inlinable``, with the same
 restrictions as struct methods. Additionally, only non-overriding ``final``
 methods may be marked ``@inlinable``.
-
-.. note::
-
-    A previous draft of this document allowed non-``final`` methods to be
-    marked ``@inlinable``, permitting inlining based on speculative
-    devirtualization. This was removed because of the added complexity for
-    users.
 
 
 Properties
@@ -895,9 +710,9 @@ struct properties, but the potential for overrides complicates things a little.
 Variable properties (those declared with ``var``) allow the following changes:
 
 - Adding (but not removing) a computed setter to a non-``open`` property.
-- Adding or removing a non-public, non-versioned setter.
+- Adding or removing a non-ABI-public setter.
 - Changing from a stored property to a computed property, or vice versa, as
-  long as a previously versioned setter is not removed.
+  long as a previously ABI-public setter is not removed.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
@@ -905,7 +720,7 @@ Variable properties (those declared with ``var``) allow the following changes:
 - Adding, removing, or changing the initial value of a stored variable.
 - Adding or removing ``weak`` from a variable with ``Optional`` type.
 - Adding or removing ``unowned`` from a variable.
-- Adding or removing ``@NSCopying`` to/from a variable.
+- Adding or removing ``@NSCopying`` from a variable.
 
 Adding a public setter to an ``open`` property is a
 `binary-compatible source-breaking change`; any existing overrides will not
@@ -914,9 +729,8 @@ know what to do with the setter and will likely not behave correctly.
 Constant properties (those declared with ``let``) still permit changing their
 value, as well as adding or removing an initial value entirely.
 
-Non-overriding ``final`` variable and constant properties (on both instances
-and classes) may be marked ``@inlinableAccess``. This behaves as described for
-struct properties.
+Non-overriding ``final`` computed properties (on both instances and classes)
+may be marked ``@inlinable``. This behaves as described for struct properties.
 
 
 Subscripts
@@ -927,7 +741,7 @@ counterparts with a few small changes:
 
 - Adding (but not removing) a public setter to a non-``open`` subscript is
   permitted.
-- Adding or removing a non-public, non-versioned setter is permitted.
+- Adding or removing a non-ABI-public setter is permitted.
 - Changing the body of an accessor is permitted.
 - Changing index parameter internal names is permitted.
 - Reordering generic requirements (but not the generic parameters themselves)
@@ -940,21 +754,8 @@ Adding a public setter to an ``open`` subscript is a
 `binary-compatible source-breaking change`; any existing overrides will not
 know what to do with the setter and will likely not behave correctly.
 
-Non-overriding ``final`` class subscripts may be marked ``@inlinableAccess``,
+Non-overriding ``final`` class subscripts may be marked ``@inlinable``,
 which behaves as described for struct subscripts.
-
-
-Possible Restrictions on Classes
---------------------------------
-
-In addition to ``final``, it may be useful to restrict the stored properties of
-a class instance, like `Frozen Structs`_. However, there are open
-questions about how this would actually work, and the compiler still wouldn't
-be able to make much use of the information, because classes from other
-libraries must almost always be allocated on the heap.
-
-The design of this annotation is not covered by this document. As a purely
-additive feature, it can be added to the model at any time.
 
 
 Extensions
@@ -969,18 +770,19 @@ The following changes are permitted:
   as both extensions have the exact same constraints.
 - Adding any new member.
 - Reordering members.
-- Removing any non-public, non-versioned member.
+- Removing any non-ABI-public member.
 - Changing the body of any methods, initializers, or accessors.
 
 Additionally, non-protocol extensions allow a few additional changes:
 
 - Moving a member from an unconstrained extension to the declaration of the
   base type, provided that the declaration is in the same module. The reverse
-  is permitted for all members except stored properties, although note that
-  moving all initializers out of a type declaration may cause a new one to be
-  implicitly synthesized.
-- Adding a new protocol conformance (with proper availability annotations).
-- Removing conformances to non-public protocols.
+  is permitted for all members that would be valid to declare in an extension,
+  although note that moving all initializers out of a type declaration may
+  cause a new one to be implicitly synthesized.
+- Adding a new protocol conformance (subject to the same restrictions discussed
+  for structs).
+- Removing conformances to non-ABI-public protocols.
 
 .. note::
 
@@ -1000,8 +802,6 @@ existing operators are not changed at all except for the following:
 - Making a non-associative precedence group left- or right-associative.
 
 Any other change counts as a `binary-compatible source-breaking change`.
-
-Operator and precedence group declarations are not versioned.
 
 
 Typealiases
@@ -1096,6 +896,11 @@ Glossary
     including things like symbol names, calling conventions, and type layout
     information. Stands for "Application Binary Interface".
 
+  ABI-public
+    Describes entities that are part of a library's `ABI`. Marked ``public``,
+    ``open``, ``@usableFromInline``, or ``@inlinable`` in Swift. See
+    `SE-0193 <SE0193>`_ for more information.
+
   API
     An `entity` in a library that a `client` may use, or the collection of all
     such entities in a library. (If contrasting with `SPI`, only those entities
@@ -1146,9 +951,6 @@ Glossary
     An API that is designed to handle future clients, perhaps allowing certain
     changes to be made without changing the ABI.
 
-  fragility attribute
-    See `A Unifying Theme`_.
-
   module
     The primary unit of code sharing in Swift. Code in a module is always built
     together, though it may be spread across several source files.
@@ -1169,9 +971,3 @@ Glossary
     In this document, a collection of code in a single Swift module that is
     built together; a "compilation unit". Roughly equivalent to a target in
     Xcode.
-
-  versioned entity
-    See `Publishing Versioned API`_.
-
-  versioned attribute
-    See `Publishing Versioned API`_.
