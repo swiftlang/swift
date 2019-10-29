@@ -1036,21 +1036,27 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   }
 }
 
+static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
+  // Don't add implicit constructors in module interfaces.
+  if (auto *SF = decl->getParentSourceFile())
+    if (SF->Kind == SourceFileKind::Interface)
+      return false;
+
+  // Don't attempt if we know the decl is invalid.
+  if (decl->isInvalid())
+    return false;
+
+  return true;
+}
+
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
   
-  // Don't add implicit constructors for an invalid declaration
-  if (decl->isInvalid())
+  if (!shouldAttemptInitializerSynthesis(decl)) {
+    decl->setAddedImplicitInitializers();
     return;
-
-  // Don't add implicit constructors in module interfaces.
-  if (auto *SF = decl->getParentSourceFile()) {
-    if (SF->Kind == SourceFileKind::Interface) {
-      decl->setAddedImplicitInitializers();
-      return;
-    }
   }
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl))
@@ -1157,6 +1163,9 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
 llvm::Expected<bool>
 HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                    StructDecl *decl) const {
+  if (!shouldAttemptInitializerSynthesis(decl))
+    return false;
+
   // Don't synthesize a memberwise init for imported decls.
   if (decl->hasClangNode())
     return false;
@@ -1195,6 +1204,9 @@ llvm::Expected<bool>
 HasDefaultInitRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *decl) const {
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
+
+  if (!shouldAttemptInitializerSynthesis(decl))
+    return false;
 
   // Don't synthesize a default for imported decls.
   if (decl->hasClangNode())
