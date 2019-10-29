@@ -51,6 +51,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
+    single-source/ChaCha
     single-source/ChainedFilterMap
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
