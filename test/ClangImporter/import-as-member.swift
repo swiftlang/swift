@@ -1,3 +1,4 @@
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks -I %S/Inputs/custom-modules %s 2>&1 | %FileCheck %S/Inputs/custom-modules/ImportAsMember.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -F %S/Inputs/frameworks -I %S/Inputs/custom-modules %s -verify
 
 import ImportAsMember

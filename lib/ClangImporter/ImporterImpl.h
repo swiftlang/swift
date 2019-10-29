@@ -1380,15 +1380,18 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
+  ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
+                           ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail, bool inferIAM)
       : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        availability(avail), inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
+        inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;
