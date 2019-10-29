@@ -69,6 +69,7 @@ BOOL TestSwiftNativeNSBase_UnwantedCdtors()
       @"__SwiftNativeNSDictionaryBase",
       @"__SwiftNativeNSSetBase",
       @"__SwiftNativeNSStringBase",
+      @"__SwiftNativeNSMutableStringBase",
       @"__SwiftNativeNSEnumeratorBase",
       nil];
 

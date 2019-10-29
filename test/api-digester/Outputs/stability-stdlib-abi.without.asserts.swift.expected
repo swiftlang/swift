@@ -1,2 +1,4 @@
 Class _SwiftNSMutableArray is a new API without @available attribute
+Class _SwiftNSMutableString is a new API without @available attribute
 Class _SwiftNativeNSMutableArray is a new API without @available attribute
+Class _SwiftNativeNSMutableString is a new API without @available attribute

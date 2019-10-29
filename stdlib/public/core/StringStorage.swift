@@ -20,8 +20,12 @@ internal protocol _AbstractStringStorage: _NSCopying {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
-  var start: UnsafePointer<UInt8> { get }
+  var start: UnsafePointer<UInt8>? { get }
   var UTF16Length: Int { get }
+  
+  func withFastUTF8<R>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R
 }
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
@@ -38,7 +42,11 @@ internal protocol _AbstractStringStorage {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
-  var start: UnsafePointer<UInt8> { get }
+  var start: UnsafePointer<UInt8>? { get }
+  
+  func withFastUTF8<R>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R
 }
 
 #endif
@@ -75,9 +83,11 @@ extension _AbstractStringStorage {
     case (_cocoaASCIIEncoding, true),
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
-      outputPtr.initialize(from: start, count: count)
-      outputPtr[count] = 0
-      return 1
+      return withFastUTF8 {
+        outputPtr.initialize(from: $0.baseAddress!, count: $0.count)
+        outputPtr[count] = 0
+        return 1
+      }
     default:
       return  _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
     }
@@ -102,8 +112,14 @@ extension _AbstractStringStorage {
     if count != nativeOther.count {
       return 0
     }
-    return (start == nativeOther.start ||
-      (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
+    return withFastUTF8 { (buffer) in
+      let ourStart = buffer.baseAddress!
+      return nativeOther.withFastUTF8 { (otherBuffer) in
+        let otherStart = otherBuffer.baseAddress!
+        return (ourStart == otherStart ||
+          (memcmp(ourStart, otherStart, count) == 0)) ? 1 : 0
+      }
+    }
   }
 
   @inline(__always)
@@ -127,6 +143,9 @@ extension _AbstractStringStorage {
     case .shared:
       return _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
+    case .mutable:
+      return _nativeIsEqual(
+        _unsafeUncheckedDowncast(other, to: _SwiftNSMutableString.self))
 #if !(arch(i386) || arch(arm))
     case .tagged:
       fallthrough
@@ -151,8 +170,10 @@ extension _AbstractStringStorage {
         if count != otherUTF16Length {
           return 0
         }
-        return (start == otherStart ||
-          (memcmp(start, otherStart, count) == 0)) ? 1 : 0
+        return withFastUTF8 {
+          return ($0.baseAddress! == otherStart ||
+            (memcmp($0.baseAddress!, otherStart, count) == 0)) ? 1 : 0
+        }
       }
 
       if UTF16Length != otherUTF16Length {
@@ -239,7 +260,9 @@ final internal class __StringStorage
   final internal var hash: UInt {
     @_effects(readonly) get {
       if isASCII {
-        return _cocoaHashASCIIBytes(start, length: count)
+        return withFastUTF8 {
+          return _cocoaHashASCIIBytes($0.baseAddress!, length: $0.count)
+        }
       }
       return _cocoaHashString(self)
     }
@@ -266,7 +289,7 @@ final internal class __StringStorage
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
     if isASCII {
-      return start._asCChar
+      return start!._asCChar
     }
     return nil
   }
@@ -314,6 +337,21 @@ final internal class __StringStorage
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
     return self
+  }
+  
+  @objc(copy)
+  final internal func copy() -> AnyObject {
+    return self
+  }
+  
+  @objc(mutableCopyWithZone:)
+  final internal func mutableCopy(with zone: _SwiftNSZone?) -> AnyObject {
+    return _SwiftNSMutableString(self.asString)
+  }
+  
+  @objc(mutableCopy)
+  final internal func mutableCopy() -> AnyObject {
+    return _SwiftNSMutableString(self.asString)
   }
 
 #endif // _runtime(_ObjC)
@@ -465,13 +503,21 @@ extension __StringStorage {
   }
 
   @inline(__always)
-  internal var start: UnsafePointer<UInt8> {
+  internal var start: UnsafePointer<UInt8>? {
      return UnsafePointer(mutableStart)
   }
 
   @inline(__always)
   private final var end: UnsafePointer<UInt8> {
     return UnsafePointer(mutableEnd)
+  }
+  
+  @inline(__always)
+  final func withFastUTF8<R>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try f(UnsafeBufferPointer(start: start, count: count))
   }
 
   // Point to the nul-terminator.
@@ -488,7 +534,7 @@ extension __StringStorage {
   // @opaque
   internal var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
     let raw = Builtin.getTailAddr_Word(
-      start._rawValue,
+      start._unsafelyUnwrappedUnchecked._rawValue,
       _realCapacity._builtinWordValue,
       UInt8.self,
       Optional<_StringBreadcrumbs>.self)
@@ -691,7 +737,7 @@ extension __StringStorage {
 final internal class __SharedStringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
   internal var _owner: AnyObject?
-  internal var start: UnsafePointer<UInt8>
+  internal var start: UnsafePointer<UInt8>?
 
 #if arch(i386) || arch(arm)
   internal var _count: Int
@@ -724,6 +770,14 @@ final internal class __SharedStringStorage
     super.init()
     self._invariantCheck()
   }
+  
+  @inline(__always)
+  final func withFastUTF8<R>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try f(UnsafeBufferPointer(start: start, count: count))
+  }
 
   @inline(__always)
   final internal var isASCII: Bool { return _countAndFlags.isASCII }
@@ -747,7 +801,12 @@ final internal class __SharedStringStorage
   final internal var hash: UInt {
     @_effects(readonly) get {
       if isASCII {
-        return _cocoaHashASCIIBytes(start, length: count)
+        return withFastUTF8 {
+          return _cocoaHashASCIIBytes(
+            $0.baseAddress._unsafelyUnwrappedUnchecked,
+            length: $0.count
+          )
+        }
       }
       return _cocoaHashString(self)
     }
@@ -784,7 +843,7 @@ final internal class __SharedStringStorage
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
     if isASCII {
-      return start._asCChar
+      return start?._asCChar
     }
     return nil
   }
@@ -822,6 +881,21 @@ final internal class __SharedStringStorage
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
     return self
+  }
+  
+  @objc(copy)
+  final internal func copy() -> AnyObject {
+    return self
+  }
+  
+  @objc(mutableCopyWithZone:)
+  final internal func mutableCopy(with zone: _SwiftNSZone?) -> AnyObject {
+    return _SwiftNSMutableString(self.asString)
+  }
+  
+  @objc(mutableCopy)
+  final internal func mutableCopy() -> AnyObject {
+    return _SwiftNSMutableString(self.asString)
   }
 
 #endif // _runtime(_ObjC)

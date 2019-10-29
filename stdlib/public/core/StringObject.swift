@@ -805,7 +805,7 @@ extension _StringObject {
     }
 #endif
 
-    return sharedStorage.start
+    return sharedStorage.start._unsafelyUnwrappedUnchecked
   }
 
   @usableFromInline
