@@ -124,6 +124,9 @@ void consumeObjCForwardNativeTypeHasDifferentCustomNameClass(ObjCForwardNativeTy
 @class ForwardNativeTypeIsNonObjCClass;
 void consumeForwardNativeTypeIsNonObjCClass(ForwardNativeTypeIsNonObjCClass *_Nonnull obj);
 
+@class ForwardNativeTypeIsUnambiguouslyNonObjCClass;
+void consumeForwardNativeTypeIsUnambiguouslyNonObjCClass(ForwardNativeTypeIsUnambiguouslyNonObjCClass *_Nonnull obj);
+
 SWIFT_CLASS("BOGUS")
 @interface BogusClass
 @end
