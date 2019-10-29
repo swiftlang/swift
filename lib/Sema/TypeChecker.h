@@ -1014,8 +1014,8 @@ public:
   void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
-  void checkDeclAttributes(Decl *D);
-  void checkParameterAttributes(ParameterList *params);
+  static void checkDeclAttributes(Decl *D);
+  static void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
@@ -1537,7 +1537,7 @@ public:
                                   IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
+  static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
