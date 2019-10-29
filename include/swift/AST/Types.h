@@ -4104,7 +4104,7 @@ public:
   /// If this is a @convention(witness_method) function, return the conformance
   /// for which the method is a witness. If it isn't that convention, return
   /// an invalid conformance.
-  ProtocolConformanceRef getWitnessMethodConformanceOrNone() const {
+  ProtocolConformanceRef getWitnessMethodConformanceOrInvalid() const {
     return WitnessMethodConformance;
   }
 
@@ -4199,11 +4199,9 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getSubstGenericSignature(), getExtInfo(), getCoroutineKind(),
-            getCalleeConvention(), getParameters(), getYields(),
-            getResults(), getOptionalErrorResult(),
-            getWitnessMethodConformanceOrNone(),
-            isGenericSignatureImplied(),
-            getSubstitutions());
+            getCalleeConvention(), getParameters(), getYields(), getResults(),
+            getOptionalErrorResult(), getWitnessMethodConformanceOrInvalid(),
+            isGenericSignatureImplied(), getSubstitutions());
   }
   static void
   Profile(llvm::FoldingSetNodeID &ID, GenericSignature genericSig, ExtInfo info,

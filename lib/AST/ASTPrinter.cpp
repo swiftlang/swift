@@ -4000,7 +4000,7 @@ public:
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
     printFunctionExtInfo(T->getExtInfo(),
-                         T->getWitnessMethodConformanceOrNone());
+                         T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
     if (auto sig = T->getSubstGenericSignature()) {
       printGenericSignature(sig,

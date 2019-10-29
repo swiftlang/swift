@@ -323,7 +323,7 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
 
 void PolymorphicConvention::considerWitnessSelf(CanSILFunctionType fnType) {
   CanType selfTy = fnType->getSelfInstanceType(IGM.getSILModule());
-  auto conformance = fnType->getWitnessMethodConformanceOrNone();
+  auto conformance = fnType->getWitnessMethodConformanceOrInvalid();
 
   // First, bind type metadata for Self.
   Sources.emplace_back(MetadataSource::Kind::SelfMetadata,
@@ -564,7 +564,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       assert(selfTable && "no Self witness table for witness method");
 
       // Mark this as the cached witness table for Self.
-      auto conformance = FnType->getWitnessMethodConformanceOrNone();
+      auto conformance = FnType->getWitnessMethodConformanceOrInvalid();
       auto selfProto = conformance.getRequirement();
 
       auto selfTy = FnType->getSelfInstanceType(IGM.getSILModule());

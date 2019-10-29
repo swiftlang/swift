@@ -427,10 +427,9 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      SubstitutionMap(), false,
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), SubstitutionMap(), false,
+      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");

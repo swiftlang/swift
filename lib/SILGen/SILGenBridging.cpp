@@ -927,7 +927,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   auto loweredFuncTyWithoutNoEscape = adjustFunctionType(
       loweredFuncTy, loweredFuncTy->getExtInfo().withNoEscape(false),
-      loweredFuncTy->getWitnessMethodConformanceOrNone());
+      loweredFuncTy->getWitnessMethodConformanceOrInvalid());
 
   CanType dynamicSelfType;
   auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncTyWithoutNoEscape,

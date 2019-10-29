@@ -2123,7 +2123,8 @@ emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
   // This use of getSelfInstanceType() assumes that the instance type is
   // always a meaningful formal type.
   auto substSelfType = substCalleeType->getSelfInstanceType(IGF.IGM.getSILModule());
-  auto substConformance = substCalleeType->getWitnessMethodConformanceOrNone();
+  auto substConformance =
+      substCalleeType->getWitnessMethodConformanceOrInvalid();
 
   llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
   llvm::Value *wtable =

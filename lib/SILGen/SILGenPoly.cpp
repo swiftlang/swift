@@ -3385,7 +3385,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
                                      : expectedFnType->isNoEscape());
   auto newFnType =
       adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
-                         fnType->getWitnessMethodConformanceOrNone());
+                         fnType->getWitnessMethodConformanceOrInvalid());
 
   // Apply any ABI-compatible conversions before doing thin-to-thick or
   // escaping->noescape conversion.

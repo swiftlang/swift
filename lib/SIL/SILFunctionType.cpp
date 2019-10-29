@@ -214,7 +214,7 @@ Lowering::adjustFunctionType(CanSILFunctionType type,
                              ParameterConvention callee,
                              ProtocolConformanceRef witnessMethodConformance) {
   if (type->getExtInfo() == extInfo && type->getCalleeConvention() == callee &&
-      type->getWitnessMethodConformanceOrNone() == witnessMethodConformance)
+      type->getWitnessMethodConformanceOrInvalid() == witnessMethodConformance)
     return type;
 
   return SILFunctionType::get(type->getSubstGenericSignature(),
@@ -246,11 +246,10 @@ CanSILFunctionType SILFunctionType::getWithExtInfo(ExtInfo newExt) {
        : ParameterConvention::Direct_Unowned);
 
   return get(getSubstGenericSignature(), newExt, getCoroutineKind(),
-             calleeConvention, getParameters(), getYields(),
-             getResults(), getOptionalErrorResult(),
-             getSubstitutions(), isGenericSignatureImplied(),
-             getASTContext(),
-             getWitnessMethodConformanceOrNone());
+             calleeConvention, getParameters(), getYields(), getResults(),
+             getOptionalErrorResult(), getSubstitutions(),
+             isGenericSignatureImplied(), getASTContext(),
+             getWitnessMethodConformanceOrInvalid());
 }
 
 namespace {
@@ -2424,7 +2423,7 @@ public:
     }
 
     auto witnessMethodConformance = ProtocolConformanceRef::forInvalid();
-    auto conformance = origType->getWitnessMethodConformanceOrNone();
+    auto conformance = origType->getWitnessMethodConformanceOrInvalid();
     if (!conformance.isInvalid()) {
       assert(origType->getExtInfo().hasSelfParam());
       auto selfType = origType->getSelfParameter().getInterfaceType();

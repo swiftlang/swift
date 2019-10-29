@@ -1133,7 +1133,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     if (calleeFnType->getRepresentation() ==
         SILFunctionType::Representation::WitnessMethod) {
       auto protocol =
-          calleeFnType->getWitnessMethodConformanceOrNone().getRequirement();
+          calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
       auto protoSelfToConcreteType =
