@@ -1043,7 +1043,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee);
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
     break;
   }
   case SILInstructionKind::LinearFunctionExtractInst: {

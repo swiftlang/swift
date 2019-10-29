@@ -7969,9 +7969,11 @@ class DifferentiableFunctionExtractInst
           SingleValueInstruction> {
 private:
   /// The extractee.
-  NormalDifferentiableFunctionTypeComponent extractee;
+  NormalDifferentiableFunctionTypeComponent Extractee;
   /// The list containing the `@differentiable` function operand.
-  FixedOperandList<1> operands;
+  FixedOperandList<1> Operands;
+  /// True if the instruction has an explicit extractee type.
+  bool HasExplicitExtracteeType;
 
   static SILType
   getExtracteeType(
@@ -7979,24 +7981,26 @@ private:
       SILModule &module);
 
 public:
+  /// Note: explicit extractee type may be specified only in lowered SIL.
   explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
       NormalDifferentiableFunctionTypeComponent extractee,
-      SILValue theFunction);
+      SILValue theFunction, Optional<SILType> extracteeType = None);
 
   NormalDifferentiableFunctionTypeComponent getExtractee() const {
-      return extractee;
+    return Extractee;
   }
 
   AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
-    auto kind = extractee.getAsDerivativeFunctionKind();
+    auto kind = Extractee.getAsDerivativeFunctionKind();
     assert(kind);
     return *kind;
   }
 
-  SILValue getFunctionOperand() const { return operands[0].get(); }
-  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
+  SILValue getFunctionOperand() const { return Operands[0].get(); }
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
 };
 
 /// `linear_function_extract` - given an `@differentiable(linear)` function

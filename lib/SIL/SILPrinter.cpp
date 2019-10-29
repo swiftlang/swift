@@ -1251,6 +1251,10 @@ public:
     }
     *this << "] ";
     *this << getIDAndType(dfei->getFunctionOperand());
+    if (dfei->hasExplicitExtracteeType()) {
+      *this << " as ";
+      *this << dfei->getType();
+    }
   }
 
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
