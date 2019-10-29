@@ -4610,13 +4610,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // protocol compositions.
     if (anchor && isa<AssignExpr>(anchor)) {
       auto *assignment = cast<AssignExpr>(anchor);
-      auto srcType = getType(assignment->getSrc())->getWithoutSpecifierType();
-      // If the source type is something that can't possibly conform
-      // to a protocol e.g. a function type, let's record this is a
-      // type mismatch, otherwise this is a specific missing conformance.
-      auto dstType = srcType->is<FunctionType>()
-                         ? getType(assignment->getDest())
-                         : protocolTy;
+
+      // If the locator's last element points to the function result,
+      // let's check whether there is a problem with function argument
+      // as well, and if so, avoid producing a fix here, because
+      // contextual mismatch mentions the source/destination
+      // types of the assignment.
+      if (auto last = locator.last()) {
+        if (last->is<LocatorPathElt::FunctionResult>() &&
+            hasFixFor(getConstraintLocator(anchor,
+                                           LocatorPathElt::FunctionArgument())))
+          return SolutionKind::Solved;
+      }
+
+      auto srcType = getType(assignment->getSrc());
+      auto dstType = getType(assignment->getDest());
 
       auto *fix = IgnoreAssignmentDestinationType::create(
           *this, srcType, dstType, getConstraintLocator(locator));

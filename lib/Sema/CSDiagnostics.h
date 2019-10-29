@@ -1979,7 +1979,11 @@ public:
                                 Type dstType, ConstraintLocator *locator)
       : ContextualFailure(expr, cs, context, srcType, dstType, locator) {}
 
+  bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+
+private:
+  bool diagnoseMissingConformance() const;
 };
 
 } // end namespace constraints

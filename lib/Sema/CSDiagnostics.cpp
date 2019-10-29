@@ -5832,6 +5832,52 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AssignmentTypeMismatchFailure::diagnoseMissingConformance() const {
+  auto srcType = getFromType();
+  auto dstType = getToType()->lookThroughAllOptionalTypes();
+
+  llvm::SmallPtrSet<ProtocolDecl *, 4> srcMembers;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> dstMembers;
+
+  auto retrieveProtocols = [](Type type,
+                              llvm::SmallPtrSetImpl<ProtocolDecl *> &members) {
+    if (auto *protocol = type->getAs<ProtocolType>())
+      members.insert(protocol->getDecl());
+
+    if (auto *composition = type->getAs<ProtocolCompositionType>()) {
+      for (auto member : composition->getMembers()) {
+        if (auto *protocol = member->getAs<ProtocolType>())
+          members.insert(protocol->getDecl());
+      }
+    }
+  };
+
+  retrieveProtocols(srcType, srcMembers);
+  retrieveProtocols(dstType, dstMembers);
+
+  if (srcMembers.empty() || dstMembers.empty())
+    return false;
+
+  // Let's check whether there is an overlap between source and destination.
+  for (auto *member : srcMembers)
+    dstMembers.erase(member);
+
+  if (dstMembers.size() == 1)
+    dstType = (*dstMembers.begin())->getDeclaredType();
+
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_convert_assign_protocol,
+                 srcType, dstType);
+  return true;
+}
+
+bool AssignmentTypeMismatchFailure::diagnoseAsError() {
+  if (diagnoseMissingConformance())
+    return true;
+
+  return ContextualFailure::diagnoseAsError();
+}
+
 bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   auto *anchor = getAnchor();
   auto &cs = getConstraintSystem();
