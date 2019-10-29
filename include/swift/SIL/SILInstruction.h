@@ -61,6 +61,9 @@ class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
 class SILDebugScope;
+// SWIFT_ENABLE_TENSORFLOW
+class SILDifferentiabilityWitness;
+// SWIFT_ENABLE_TENSORFLOW_END
 class SILFunction;
 class SILGlobalVariable;
 class SILInstructionResultArray;
@@ -8038,43 +8041,31 @@ class DifferentiabilityWitnessFunctionInst
           SingleValueInstruction> {
 private:
   friend SILBuilder;
-  /// The original function.
-  SILFunction *originalFunction;
   /// The differentiability witness function kind.
   DifferentiabilityWitnessFunctionKind witnessKind;
-  /// The autodiff config: parameter indices, result indices, and witness
-  /// derivative signature.
-  AutoDiffConfig config;
+  /// The referenced SIL differentiability witness.
+  SILDifferentiabilityWitness *witness;
 
   static SILType getDifferentiabilityWitnessType(
-      SILModule &module, SILFunction *originalFunction,
+      SILModule &module,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature witnessGenericSignature);
+      SILDifferentiabilityWitness *witness);
 
 public:
   DifferentiabilityWitnessFunctionInst(
-      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      SILModule &module, SILDebugLocation loc,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature witnessGenericSignature);
+      SILDifferentiabilityWitness *witness);
 
   static DifferentiabilityWitnessFunctionInst *create(
-      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      SILModule &module, SILDebugLocation loc,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature witnessGenericSignature);
+      SILDifferentiabilityWitness *witness);
 
   DifferentiabilityWitnessFunctionKind getWitnessKind() const {
     return witnessKind;
   }
-  SILFunction *getOriginalFunction() const { return originalFunction; }
-  AutoDiffConfig const &getConfig() const { return config; }
-  IndexSubset *getParameterIndices() const { return config.parameterIndices; }
-  IndexSubset *getResultIndices() const { return config.resultIndices; }
-  GenericSignature getWitnessGenericSignature() const {
-    return config.derivativeGenericSignature;
-  }
+  SILDifferentiabilityWitness *getWitness() const { return witness; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

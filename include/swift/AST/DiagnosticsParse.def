@@ -691,6 +691,8 @@ ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
 ERROR(sil_diff_witness_serialized_declaration,none,
       "differentiability witness declaration should not be serialized", ())
+ERROR(sil_diff_witness_undefined,PointsToFirstBadToken,
+      "reference to undefined differentiability witness", ())
 
 // SIL Coverage Map
 ERROR(sil_coverage_func_not_found, none,
