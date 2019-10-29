@@ -590,8 +590,7 @@ CanSILFunctionType getNativeSILFunctionType(
     CanAnyFunctionType substType, Optional<SILDeclRef> origConstant = None,
     Optional<SILDeclRef> constant = None,
     Optional<SubstitutionMap> reqtSubs = None,
-    ProtocolConformanceRef witnessMethodConformance =
-        ProtocolConformanceRef::forInvalid());
+    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

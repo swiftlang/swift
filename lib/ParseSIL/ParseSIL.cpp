@@ -5969,17 +5969,17 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
   SourceLoc Loc, KeywordLoc;
   proto = parseProtocolDecl(P, SP);
   if (!proto)
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
 
   if (P.parseIdentifier(ModuleKeyword, KeywordLoc,
                         diag::expected_tok_in_sil_instr, "module") ||
       SP.parseSILIdentifier(ModuleName, Loc,
                             diag::expected_sil_value_name))
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
 
   if (ModuleKeyword.str() != "module") {
     P.diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "module");
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
   }
 
   // Calling lookupConformance on a BoundGenericType will return a specialized
@@ -5990,7 +5990,7 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
   auto lookup = P.SF.getParentModule()->lookupConformance(lookupTy, proto);
   if (lookup.isInvalid()) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
   }
 
   // Use a concrete self-conformance if we're parsing this for a witness table.
@@ -6043,7 +6043,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
   // Parse AST type.
   ParserResult<TypeRepr> TyR = P.parseType();
   if (TyR.isNull())
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
   TypeLoc Ty = TyR.get();
   if (defaultForProto) {
     bindProtocolSelfInTypeRepr(Ty, defaultForProto);
@@ -6051,11 +6051,11 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
 
   if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv,
                              defaultForProto))
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
   auto ConformingTy = Ty.getType();
 
   if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))
-    return ProtocolConformanceRef::forInvalid();
+    return ProtocolConformanceRef();
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "specialize") {
     P.consumeToken();
@@ -6063,10 +6063,10 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     // Parse substitutions for specialized conformance.
     SmallVector<ParsedSubstitution, 4> parsedSubs;
     if (parseSubstitutions(parsedSubs, witnessEnv, defaultForProto))
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
     ProtocolDecl *dummy;
     GenericEnvironment *specializedEnv;
     auto genericConform =
@@ -6074,14 +6074,14 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
                                  ConformanceContext::Ordinary,
                                  defaultForProto);
     if (genericConform.isInvalid() || !genericConform.isConcrete())
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
 
     SubstitutionMap subMap =
       getApplySubstitutionsFromParsed(*this, specializedEnv, parsedSubs);
     if (!subMap)
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
 
     auto result = P.Context.getSpecializedConformance(
         ConformingTy, genericConform.getConcrete(), subMap);
@@ -6092,13 +6092,13 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
     P.consumeToken();
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
     auto baseConform = parseProtocolConformance(defaultForProto,
                                                 ConformanceContext::Ordinary);
     if (baseConform.isInvalid() || !baseConform.isConcrete())
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
-      return ProtocolConformanceRef::forInvalid();
+      return ProtocolConformanceRef();
 
     auto result = P.Context.getInheritedConformance(ConformingTy,
                                                     baseConform.getConcrete());

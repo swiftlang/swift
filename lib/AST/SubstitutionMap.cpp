@@ -368,7 +368,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     genericSig->getConformanceAccessPath(type, proto);
 
   // Fall through because we cannot yet evaluate an access path.
-  auto conformance = ProtocolConformanceRef::forInvalid();
+  ProtocolConformanceRef conformance;
   for (const auto &step : accessPath) {
     // For the first step, grab the initial conformance.
     if (conformance.isInvalid()) {

@@ -2711,7 +2711,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
-  auto witnessMethodConformance = ProtocolConformanceRef::forInvalid();
+  ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
     auto resolved = resolveType(witnessMethodProtocol, options);
     if (resolved->hasError())

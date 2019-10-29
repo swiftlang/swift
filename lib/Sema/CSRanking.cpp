@@ -206,8 +206,7 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
   // If both declarations are operators, even through they
   // might have Self such types are unrelated.
   if (decl1->isOperator() && decl2->isOperator())
-    return {SelfTypeRelationship::Unrelated,
-            ProtocolConformanceRef::forInvalid()};
+    return {SelfTypeRelationship::Unrelated, ProtocolConformanceRef()};
 
   auto *dc1 = decl1->getDeclContext();
   auto *dc2 = decl2->getDeclContext();
@@ -215,38 +214,32 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
   // If at least one of the contexts is a non-type context, the two are
   // unrelated.
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
-    return {SelfTypeRelationship::Unrelated,
-            ProtocolConformanceRef::forInvalid()};
+    return {SelfTypeRelationship::Unrelated, ProtocolConformanceRef()};
 
   Type type1 = dc1->getDeclaredInterfaceType();
   Type type2 = dc2->getDeclaredInterfaceType();
 
   // If the types are equal, the answer is simple.
   if (type1->isEqual(type2))
-    return {SelfTypeRelationship::Equivalent,
-            ProtocolConformanceRef::forInvalid()};
+    return {SelfTypeRelationship::Equivalent, ProtocolConformanceRef()};
 
   // If both types can have superclasses, which whether one is a superclass
   // of the other. The subclass is the common base type.
   if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
     if (isNominallySuperclassOf(type1, type2))
-      return {SelfTypeRelationship::Superclass,
-              ProtocolConformanceRef::forInvalid()};
+      return {SelfTypeRelationship::Superclass, ProtocolConformanceRef()};
 
     if (isNominallySuperclassOf(type2, type1))
-      return {SelfTypeRelationship::Subclass,
-              ProtocolConformanceRef::forInvalid()};
+      return {SelfTypeRelationship::Subclass, ProtocolConformanceRef()};
 
-    return {SelfTypeRelationship::Unrelated,
-            ProtocolConformanceRef::forInvalid()};
+    return {SelfTypeRelationship::Unrelated, ProtocolConformanceRef()};
   }
 
   // If neither or both are protocol types, consider the bases unrelated.
   bool isProtocol1 = isa<ProtocolDecl>(dc1);
   bool isProtocol2 = isa<ProtocolDecl>(dc2);
   if (isProtocol1 == isProtocol2)
-    return {SelfTypeRelationship::Unrelated,
-            ProtocolConformanceRef::forInvalid()};
+    return {SelfTypeRelationship::Unrelated, ProtocolConformanceRef()};
 
   // Just one of the two is a protocol. Check whether the other conforms to
   // that protocol.

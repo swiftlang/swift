@@ -3903,7 +3903,7 @@ public:
       SubstitutionMap substitutions, bool genericSigIsImplied,
       const ASTContext &ctx,
       ProtocolConformanceRef witnessMethodConformance =
-          ProtocolConformanceRef::forInvalid());
+          ProtocolConformanceRef());
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.

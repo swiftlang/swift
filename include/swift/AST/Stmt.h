@@ -805,8 +805,7 @@ class ForEachStmt : public LabeledStmt {
   BraceStmt *Body;
 
   // Set by Sema:
-  ProtocolConformanceRef sequenceConformance =
-      ProtocolConformanceRef::forInvalid();
+  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
   ConcreteDeclRef makeIterator;
   ConcreteDeclRef iteratorNext;
   VarDecl *iteratorVar = nullptr;
