@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(1024),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(2048),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
@@ -792,6 +792,12 @@ static void getWitnessMethodName(WitnessMethodInst *witnessMethodInst,
   }
 }
 
+/// A helper function to pretty print function names in diagnostics.
+static std::string demangleSymbolNameForDiagnostics(StringRef name) {
+  return Demangle::demangleSymbolAsString(
+      name, Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+}
+
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is. Specifically, point to interesting
 /// source locations and function calls in the call stack.
@@ -910,11 +916,27 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   case UnknownReason::CalleeImplementationUnknown: {
     SILFunction *callee = unknownReason.getCalleeWithoutImplmentation();
     std::string demangledCalleeName =
-        Demangle::demangleSymbolAsString(callee->getName());
+        demangleSymbolNameForDiagnostics(callee->getName());
     diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
              StringRef(demangledCalleeName));
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
+               triggerLocSkipsInternalLocs);
+    return;
+  }
+  case UnknownReason::CallArgumentUnknown: {
+    unsigned argNumber = unknownReason.getArgumentIndex() + 1;
+    ApplyInst *call = dyn_cast<ApplyInst>(unknownNode);
+    assert(call);
+    SILFunction *callee = call->getCalleeFunction();
+    assert(callee);
+    std::string demangledCalleeName =
+        demangleSymbolNameForDiagnostics(callee->getName());
+    diagnose(ctx, diagLoc, diag::constexpr_found_call_with_unknown_arg,
+             demangledCalleeName,
+             (Twine(argNumber) + llvm::getOrdinalSuffix(argNumber)).str());
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, triggerLoc, diag::constexpr_call_with_unknown_arg,
                triggerLocSkipsInternalLocs);
     return;
   }
