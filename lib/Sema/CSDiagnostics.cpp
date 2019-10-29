@@ -2033,6 +2033,60 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
+  case ConstraintLocator::RValueAdjustment: {
+    auto &cs = getConstraintSystem();
+
+    auto overload = getChoiceFor(
+        cs.getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
+    if (!(overload && overload->choice.isDecl()))
+      return false;
+
+    auto *choice = overload->choice.getDecl();
+    auto fnType = FromType->getAs<FunctionType>();
+    if (!fnType) {
+      emitDiagnostic(anchor->getLoc(),
+                     diag::expected_result_in_contextual_member,
+                     choice->getFullName(), FromType, ToType);
+      return true;
+    }
+
+    // If member type is a function and contextual type matches
+    // its result type, most likely problem is related to a
+    // missing call e.g.:
+    //
+    // struct S {
+    //   static func foo() -> S {}
+    // }
+    //
+    // let _: S = .foo
+
+    auto params = fnType->getParams();
+
+    ParameterListInfo info(params, choice,
+                           hasAppliedSelf(cs, overload->choice));
+    auto numMissingArgs = llvm::count_if(
+        indices(params), [&info](const unsigned paramIdx) -> bool {
+          return !info.hasDefaultArgument(paramIdx);
+        });
+
+    if (numMissingArgs == 0 || numMissingArgs > 1) {
+      auto diagnostic = emitDiagnostic(
+          anchor->getLoc(), diag::expected_parens_in_contextual_member,
+          choice->getFullName());
+
+      // If there are no parameters we can suggest a fix-it
+      // to form an explicit call.
+      if (numMissingArgs == 0)
+        diagnostic.fixItInsertAfter(anchor->getEndLoc(), "()");
+    } else {
+      emitDiagnostic(anchor->getLoc(),
+                     diag::expected_argument_in_contextual_member,
+                     choice->getFullName(), params.front().getPlainType());
+    }
+
+    return true;
+  }
+
   default:
     return false;
   }
@@ -2231,6 +2285,9 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
   auto &TC = getTypeChecker();
+
+  if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
+    return false;
 
   auto *srcFT = FromType->getAs<FunctionType>();
   if (!srcFT || !srcFT->getParams().empty())

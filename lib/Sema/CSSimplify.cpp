@@ -3361,6 +3361,26 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  // Unresolved member type mismatches are handled when
+  // r-value adjustment constraint fails.
+  case ConstraintLocator::UnresolvedMember:
+    return true;
+
+  case ConstraintLocator::RValueAdjustment: {
+    if (!(anchor && isa<UnresolvedMemberExpr>(anchor)))
+      break;
+
+    // r-value adjustment is used to connect base type of
+    // unresolved member to its output type, if there is
+    // a type mismatch here it's contextual e.g.
+    // `let x: E = .foo(42)`, where `.foo` is a member of `E`
+    // but produces an incorrect type.
+    auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
+                                             getConstraintLocator(locator));
+    conversionsOrFixes.push_back(fix);
+    break;
+  }
+
   default:
     break;
   }
