@@ -29,6 +29,9 @@ class TSanLibDispatch(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
+    def should_build(self, host_target):
+        return True
+
     def build(self, host_target):
         """Build TSan runtime (compiler-rt)."""
         rt_source_dir = join_path(self.source_dir, os.pardir, 'compiler-rt')
@@ -59,6 +62,9 @@ class TSanLibDispatch(product.Product):
             shell.call(config_cmd)
             shell.call(build_cmd)
 
+    def should_test(self, host_target):
+        return True
+
     def test(self, host_target):
         """Run check-tsan target with a LIT filter for libdispatch."""
         cmd = ['ninja', 'check-tsan']
@@ -66,6 +72,9 @@ class TSanLibDispatch(product.Product):
 
         with shell.pushd(self.build_dir):
             shell.call(cmd, env=env)
+
+    def should_install(self, host_target):
+        return False
 
     def install(self, host_target):
         pass

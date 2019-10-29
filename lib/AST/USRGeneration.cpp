@@ -342,8 +342,6 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
 }
 
 bool ide::printDeclUSR(const Decl *D, raw_ostream &OS) {
-  if (D->isImplicit())
-    return true;
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (ide::printValueDeclUSR(VD, OS)) {
       return true;

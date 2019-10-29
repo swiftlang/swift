@@ -782,7 +782,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   } else if (Tok.is(tok::kw_rethrows)) {
     throwsLoc = consumeToken();
     rethrows = true;
-  } else if (Tok.is(tok::kw_throw)) {
+  } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
     throwsLoc = consumeToken();
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
@@ -900,7 +900,8 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             /*isExprBasic=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
-                                            trailingClosure);
+                                            trailingClosure,
+                                            SyntaxKind::Unknown);
         if (status.isSuccess()) {
           backtrack.cancelBacktrack();
           
@@ -1174,17 +1175,18 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
-  DeferringContextRAII Deferring(*SyntaxContext);
   ParserResult<Expr> subExpr =
     parseExprImpl(diag::expected_pattern, isExprBasic);
   ParserStatus status = subExpr;
   if (subExpr.isNull())
     return status;
 
-  if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
-    PatternCtx.addSyntax(UPES->getDeferredPattern());
-  } else {
-    PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+  if (SyntaxContext->isEnabled()) {
+    if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getDeferredPattern());
+    } else {
+      PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+    }
   }
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate

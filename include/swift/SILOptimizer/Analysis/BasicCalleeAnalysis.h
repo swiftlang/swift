@@ -54,6 +54,11 @@ public:
       : CalleeFunctions(llvm::makeArrayRef(List.begin(), List.end())),
         IsIncomplete(IsIncomplete) {}
 
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+
+  void print(llvm::raw_ostream &os) const;
+
   /// Return an iterator for the beginning of the list.
   ArrayRef<SILFunction *>::iterator begin() const {
     return CalleeFunctions.begin();
@@ -67,7 +72,7 @@ public:
   bool isIncomplete() const { return IsIncomplete; }
 
   /// Returns true if all callees are known and not external.
-  bool allCalleesVisible();
+  bool allCalleesVisible() const;
 };
 
 /// CalleeCache is a helper class that builds lists of potential
@@ -106,16 +111,16 @@ public:
   /// given instruction. E.g. it could be destructors.
   CalleeList getCalleeList(SILInstruction *I) const;
 
+  CalleeList getCalleeList(SILDeclRef Decl) const;
+
 private:
   void enumerateFunctionsInModule();
   void sortAndUniqueCallees();
   CalleesAndCanCallUnknown &getOrCreateCalleesForMethod(SILDeclRef Decl);
-  void computeClassMethodCalleesForClass(ClassDecl *CD);
-  void computeClassMethodCallees(ClassDecl *CD, SILDeclRef Method);
+  void computeClassMethodCallees();
   void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WT);
   void computeMethodCallees();
   SILFunction *getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const;
-  CalleeList getCalleeList(SILDeclRef Decl) const;
   CalleeList getCalleeList(WitnessMethodInst *WMI) const;
   CalleeList getCalleeList(ClassMethodInst *CMI) const;
   CalleeList getCalleeListForCalleeKind(SILValue Callee) const;
@@ -162,17 +167,23 @@ public:
     Cache.reset();
   }
 
-  CalleeList getCalleeList(FullApplySite FAS) {
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+
+  void print(llvm::raw_ostream &os) const;
+
+  void updateCache() {
     if (!Cache)
       Cache = llvm::make_unique<CalleeCache>(M);
+  }
 
+  CalleeList getCalleeList(FullApplySite FAS) {
+    updateCache();
     return Cache->getCalleeList(FAS);
   }
 
   CalleeList getCalleeList(SILInstruction *I) {
-    if (!Cache)
-      Cache = llvm::make_unique<CalleeCache>(M);
-
+    updateCache();
     return Cache->getCalleeList(I);
   }
 };

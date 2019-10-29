@@ -792,7 +792,6 @@ public:
           /*IsStatic*/ false, VarDecl::Introducer::Var,
           /*IsCaptureList*/ false, S->getInLoc(),
           TC.Context.getIdentifier(name), DC);
-      iterator->setType(iteratorTy);
       iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
       iterator->setImplicit();
       S->setIteratorVar(iterator);
@@ -1065,7 +1064,10 @@ public:
 
       // If that failed, mark any variables binding pieces of the pattern
       // as invalid to silence follow-on errors.
-      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+      pattern->forEachVariable([&](VarDecl *VD) {
+        VD->setInterfaceType(ErrorType::get(TC.Context));
+        VD->setInvalid();
+      });
     }
     labelItem.setPattern(pattern);
 
@@ -1136,13 +1138,16 @@ public:
         }
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        if (vd->hasType() && initialCaseVarDecl->hasType() &&
+        if (vd->getInterfaceType() && initialCaseVarDecl->getType() &&
             !initialCaseVarDecl->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
-          vd->markInvalid();
-          initialCaseVarDecl->markInvalid();
+          vd->setInterfaceType(ErrorType::get(TC.Context));
+          vd->setInvalid();
+
+          initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
+          initialCaseVarDecl->setInvalid();
         }
 
         if (initialCaseVarDecl->isLet() == vd->isLet()) {
@@ -1162,8 +1167,11 @@ public:
         if (foundVP)
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-        vd->markInvalid();
-        initialCaseVarDecl->markInvalid();
+        vd->setInterfaceType(ErrorType::get(TC.Context));
+        vd->setInvalid();
+
+        initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
+        initialCaseVarDecl->setInvalid();
       }
     });
 
@@ -1230,8 +1238,11 @@ public:
           TC.diagnose(previous->getLoc(),
                       diag::type_mismatch_fallthrough_pattern_list,
                       previous->getType(), expected->getType());
-          previous->markInvalid();
-          expected->markInvalid();
+          previous->setInterfaceType(ErrorType::get(TC.Context));
+          previous->setInvalid();
+
+          expected->setInterfaceType(ErrorType::get(TC.Context));
+          expected->setInvalid();
         }
 
         // Ok, we found our match. Make the previous fallthrough statement var
@@ -1322,8 +1333,6 @@ public:
           if (!prev->hasName() || expected->getName() != prev->getName()) {
             continue;
           }
-          if (prev->hasType())
-            expected->setType(prev->getType());
           if (prev->hasInterfaceType())
             expected->setInterfaceType(prev->getInterfaceType());
           break;
@@ -1468,7 +1477,8 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
       });
     }
 

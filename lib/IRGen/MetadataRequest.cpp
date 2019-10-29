@@ -518,9 +518,10 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   if (type->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    return underlyingTy;
   }
 
   return type;
@@ -533,8 +534,10 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   if (type.getASTType()->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    type = type.subst(getSILModule(), replacer, replacer, genericSig,
-                      /*substitute opaque*/ true);
+    auto underlyingTy =
+        type.subst(getSILModule(), replacer, replacer, genericSig,
+                   /*substitute opaque*/ true);
+    return underlyingTy;
   }
 
   return type;
@@ -548,11 +551,12 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   if (type->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    conformance = conformance.subst(type, replacer, replacer,
-                                    SubstFlags::SubstituteOpaqueArchetypes);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    auto substConformance = conformance.subst(
+        type, replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    return std::make_pair(underlyingTy, substConformance);
   }
 
   return std::make_pair(type, conformance);

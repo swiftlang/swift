@@ -12,16 +12,6 @@
 // BOTH: current-version: 2.0.3
 // BOTH: compatibility-version: 1.7
 // CURRENT: current-version: 2
-
-// Compatibility version defaults to 1 if not present in TBD file, and
-// tapi does not write field if compatibility version is 1
-
-// CURRENT-NOT: compatibility-version: 1
-
 // COMPAT: compatibility-version: 2
-
-// Same as above -- current version defaults to 1 and is not present in
-// emitted TBD file if it's 1.
-// COMPAT-NOT: current-version: 1
 
 // BOGUS: version component contains non-numeric characters

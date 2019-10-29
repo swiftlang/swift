@@ -75,6 +75,9 @@ getRecordedNode(ParsedRawSyntaxNode node, ParsedRawSyntaxRecorder &rec) {
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
                                          MutableArrayRef<ParsedRawSyntaxNode> elements) {
+#ifndef NDEBUG
+  ParsedRawSyntaxRecorder::verifyElementRanges(elements);
+#endif
   CharSourceRange range;
   SmallVector<OpaqueSyntaxNode, 16> subnodes;
   if (!elements.empty()) {

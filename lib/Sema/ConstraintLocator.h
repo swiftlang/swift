@@ -89,6 +89,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case Condition:
       return 0;
 
     case ContextualType:
@@ -123,54 +124,6 @@ public:
     /// FunctionArgument or FunctionResult node?
     IsFunctionConversion = 0x1,
   };
-
-  static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
-    switch (kind) {
-    case ApplyArgument:
-    case ApplyFunction:
-    case ApplyArgToParam:
-    case SequenceElementType:
-    case ClosureResult:
-    case ConstructorMember:
-    case InstanceType:
-    case AutoclosureResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case ParentType:
-    case ExistentialSuperclassType:
-    case LValueConversion:
-    case RValueAdjustment:
-    case SubscriptMember:
-    case OpenedGeneric:
-    case GenericParameter:
-    case GenericArgument:
-    case NamedTupleElement:
-    case TupleElement:
-    case ProtocolRequirement:
-    case Witness:
-    case KeyPathComponent:
-    case ConditionalRequirement:
-    case TypeParameterRequirement:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
-    case ContextualType:
-    case SynthesizedArgument:
-    case KeyPathDynamicMember:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
-      return 0;
-
-    case FunctionArgument:
-    case FunctionResult:
-      return IsFunctionConversion;
-    }
-
-    llvm_unreachable("Unhandled PathElementKind in switch.");
-  }
 
   /// One element in the path of a locator, which can include both
   /// a kind (PathElementKind) and a value used to describe specific
@@ -329,9 +282,7 @@ public:
     bool is() const { return isa<T>(this); }
 
     /// Return the summary flags for this particular element.
-    unsigned getNewSummaryFlags() const {
-      return getSummaryFlagsForPathElement(getKind());
-    }
+    unsigned getNewSummaryFlags() const;
 
     bool isConditionalRequirement() const {
       return getKind() == PathElementKind::ConditionalRequirement;

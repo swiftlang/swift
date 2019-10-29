@@ -292,9 +292,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
-  Opts.DisableTsanInoutInstrumentation |=
-      Args.hasArg(OPT_disable_tsan_inout_instrumentation);
-
   if (FrontendOpts.InputKind == InputFileKind::SIL)
     Opts.DisableAvailabilityChecking = true;
   
@@ -449,10 +446,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
-  Opts.FunctionBuilderOneWayConstraints =
-    Args.hasFlag(OPT_enable_function_builder_one_way_constraints,
-                 OPT_disable_function_builder_one_way_constraints,
-                 /*Default=*/true);
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -684,6 +677,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
+  Opts.EnableDescriptiveDiagnostics |=
+      Args.hasArg(OPT_enable_descriptive_diagnostics);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
@@ -1214,11 +1209,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
     }
   }
-                             
-  // Autolink runtime compatibility libraries, if asked to.
-  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+
+  auto getRuntimeCompatVersion = [&] () -> Optional<llvm::VersionTuple> {
     Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
-    
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
@@ -1234,15 +1227,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       runtimeCompatibilityVersion =
                            getSwiftRuntimeCompatibilityVersionForTarget(Triple);
     }
-      
-    Opts.AutolinkRuntimeCompatibilityLibraryVersion =
-                                                    runtimeCompatibilityVersion;
+    return runtimeCompatibilityVersion;
+  };
+
+  // Autolink runtime compatibility libraries, if asked to.
+  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+    Opts.AutolinkRuntimeCompatibilityLibraryVersion = getRuntimeCompatVersion();
   }
 
   if (!Args.hasArg(options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
-        getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+        getRuntimeCompatVersion();
   }
   return false;
 }

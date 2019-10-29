@@ -72,10 +72,26 @@ public class A_Sub: Base {
   public override func typeChangeMethod() -> Any { return self }
   public override func disappearingMethodWithOverload() {}
   public override var disappearingProperty: Int { return 0 }
+  public override var disappearingPropertySetter: Int {
+    get { return 0 }
+    set {}
+  }
 }
 
 public class A_Sub2: A_Sub {
   public override func disappearingMethod() {}
+}
+
+public final class A_Sub3Final: Base {
+  public override func disappearingMethod() {}
+  public override func nullabilityChangeMethod() -> Any? { return nil }
+  public override func typeChangeMethod() -> Any { return self }
+  public override func disappearingMethodWithOverload() {}
+  public override var disappearingProperty: Int { return 0 }
+  public override var disappearingPropertySetter: Int {
+    get { return 0 }
+    set {}
+  }
 }
 
 
@@ -85,11 +101,22 @@ public class A_Sub2: A_Sub {
 // CHECK-NEXT: func typeChangeMethod() -> Any
 // CHECK-NEXT: func disappearingMethodWithOverload()
 // CHECK-NEXT: var disappearingProperty: Int { get }
+// CHECK-NEXT: var disappearingPropertySetter: Int{{$}}
 // CHECK-NEXT: init()
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-LABEL: class A_Sub2 : A_Sub {
 // CHECK-NEXT: func disappearingMethod()
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: final class A_Sub3Final : Base {
+// CHECK-NEXT: func disappearingMethod()
+// CHECK-NEXT: func nullabilityChangeMethod() -> Any?
+// CHECK-NEXT: func typeChangeMethod() -> Any
+// CHECK-NEXT: func disappearingMethodWithOverload()
+// CHECK-NEXT: var disappearingProperty: Int { get }
+// CHECK-NEXT: var disappearingPropertySetter: Int{{$}}
 // CHECK-NEXT: init()
 // CHECK-NEXT: {{^}$}}
 
@@ -99,11 +126,22 @@ public class A_Sub2: A_Sub {
 // CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
 // CHECK-RECOVERY-NEXT: func disappearingMethodWithOverload()
 // CHECK-RECOVERY-NEXT: /* placeholder for disappearingProperty */
+// CHECK-RECOVERY-NEXT: var disappearingPropertySetter: Int{{$}}
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class A_Sub2 : A_Sub {
 // CHECK-RECOVERY-NEXT: func disappearingMethod()
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class A_Sub3Final : Base {
+// CHECK-RECOVERY-NEXT: func disappearingMethod()
+// CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Any?
+// CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
+// CHECK-RECOVERY-NEXT: func disappearingMethodWithOverload()
+// CHECK-RECOVERY-NEXT: /* placeholder for disappearingProperty */
+// CHECK-RECOVERY-NEXT: var disappearingPropertySetter: Int{{$}}
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 

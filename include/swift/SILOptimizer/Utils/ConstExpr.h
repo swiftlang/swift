@@ -207,6 +207,9 @@ public:
   const SmallPtrSetImpl<SILFunction *> &getFuncsCalledDuringEvaluation() {
     return evaluator.getFuncsCalledDuringEvaluation();
   }
+
+  /// Dump the internal state to standard error for debugging.
+  void dumpState();
 };
 
 bool isKnownConstantEvaluableFunction(SILFunction *fun);

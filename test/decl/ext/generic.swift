@@ -131,7 +131,7 @@ func intArray(_ x: [Int]) {
 
 class GenericClass<T> { }
 
-extension GenericClass where T : Equatable {
+extension GenericClass where T : Equatable { // expected-note {{where 'T' = 'T'}}
   func foo(_ x: T, y: T) -> Bool { return x == y }
 }
 
@@ -140,7 +140,7 @@ func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
 }
 
 func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y) // expected-error{{argument type 'T' does not conform to expected type 'Equatable'}}
+  gc.foo(x, y: y) // expected-error{{referencing instance method 'foo(_:y:)' on 'GenericClass' requires that 'T' conform to 'Equatable'}}
 }
 
 

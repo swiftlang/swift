@@ -291,6 +291,29 @@ bb3:
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil @handle_unreachable : $@convention(thin) (@inout Builtin.Int32) -> () {
+// CHECK: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: cond_br
+// CHECK: return
+sil @handle_unreachable : $@convention(thin) (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  store %1 to %0 : $*Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  br bb3
+
+bb3:
+  store %1 to %0 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil @post_dominating_dead_store_partial : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0(
 // CHECK-NOT: {{ store}}
@@ -442,6 +465,24 @@ bb2:
 
 bb3:
   store %0 to %6 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @unknown : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @inout_is_not_aliasing : $@convention(thin) (@inout Builtin.Int32) -> () {
+// CHECK: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: function_ref
+// CHECK: return
+sil @inout_is_not_aliasing : $@convention(thin) (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  store %1 to %0 : $*Builtin.Int32
+  %f = function_ref @unknown : $@convention(thin) () -> ()
+  %3 = apply %f() : $@convention(thin) () -> ()
+  store %1 to %0 : $*Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }

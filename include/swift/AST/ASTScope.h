@@ -1270,8 +1270,7 @@ public:
   PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
                                DeclVisibilityKind vis)
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
-        initAsWrittenWhenCreated(
-            pbDecl->getPatternList()[entryIndex].getOriginalInit()) {}
+        initAsWrittenWhenCreated(pbDecl->getOriginalInit(entryIndex)) {}
   virtual ~PatternEntryInitializerScope() {}
 
 protected:

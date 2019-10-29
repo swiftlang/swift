@@ -956,16 +956,15 @@ public:
         isInTypeDecl ? DeclVisibilityKind::MemberOfCurrentNominal
                      : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
-    for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
+    for (auto i : range(patternBinding->getNumPatternEntries())) {
       // TODO: Won't need to do so much work to avoid creating one without
       // a SourceRange once parser is fixed to not create two
       // PatternBindingDecls with same locaiton and getSourceRangeOfThisASTNode
       // for PatternEntryDeclScope is simplified to use the PatternEntry's
       // source range.
-      auto &patternEntry = patternBinding->getPatternList()[i];
-      if (!patternEntry.getOriginalInit()) {
+      if (!patternBinding->getOriginalInit(i)) {
         bool found = false;
-        patternEntry.getPattern()->forEachVariable([&](VarDecl *vd) {
+        patternBinding->getPattern(i)->forEachVariable([&](VarDecl *vd) {
           if (!vd->isImplicit())
             found = true;
           else
@@ -1419,8 +1418,8 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   }
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
-  // erroneous code in bodies. But don't let compiler synthesize one.
-  if (decl->getBodySourceRange().isValid() && decl->getBody(false)) {
+  // erroneous code in bodies.
+  if (decl->getBodySourceRange().isValid()) {
     if (AbstractFunctionBodyScope::isAMethod(decl))
       scopeCreator.constructExpandAndInsertUncheckable<MethodBodyScope>(leaf,
                                                                         decl);
@@ -1970,6 +1969,7 @@ void AbstractFunctionBodyScope::beCurrent() {
   bodyWhenLastExpanded = decl->getBody(false);
 }
 bool AbstractFunctionBodyScope::isCurrentIfWasExpanded() const {
+  // Pass in false to keep the compiler from synthesizing one.
   return bodyWhenLastExpanded == decl->getBody(false);
 }
 
@@ -1981,27 +1981,22 @@ bool TopLevelCodeScope::isCurrentIfWasExpanded() const {
 // Try to avoid the work of counting
 static const bool assumeVarsDoNotGetAdded = true;
 
-static unsigned countVars(const PatternBindingEntry &entry) {
-  unsigned varCount = 0;
-  entry.getPattern()->forEachVariable([&](VarDecl *) { ++varCount; });
-  return varCount;
-}
-
 void PatternEntryDeclScope::beCurrent() {
   initWhenLastExpanded = getPatternEntry().getOriginalInit();
   if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded)
     return;
-  varCountWhenLastExpanded = countVars(getPatternEntry());
+  varCountWhenLastExpanded = getPatternEntry().getNumBoundVariables();
 }
 bool PatternEntryDeclScope::isCurrentIfWasExpanded() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
     return false;
   if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
-    ASTScopeAssert(varCountWhenLastExpanded == countVars(getPatternEntry()),
+    ASTScopeAssert(varCountWhenLastExpanded ==
+                       getPatternEntry().getNumBoundVariables(),
                    "Vars were not supposed to be added to a pattern entry.");
     return true;
   }
-  return countVars(getPatternEntry()) == varCountWhenLastExpanded;
+  return getPatternEntry().getNumBoundVariables() == varCountWhenLastExpanded;
 }
 
 void WholeClosureScope::beCurrent() {
@@ -2128,8 +2123,8 @@ private:
   }
 
   void recordInitializers(PatternBindingDecl *pbd) {
-    for (auto entry : pbd->getPatternList())
-      record(entry.getInitContext());
+    for (auto idx : range(pbd->getNumPatternEntries()))
+      record(pbd->getInitContext(idx));
   }
 
   void catchForDebugging(Decl *D, const char *file, const unsigned line) {

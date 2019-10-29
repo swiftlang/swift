@@ -55,7 +55,10 @@ enum class WellKnownFunction {
   // String.percentEscapedString.getter
   StringEscapePercent,
   // _assertionFailure(_: StaticString, _: StaticString, file: StaticString,...)
-  AssertionFailure
+  AssertionFailure,
+  // A function taking one argument that prints the symbolic value of the
+  // argument during constant evaluation. This must only be used for debugging.
+  DebugPrint
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
@@ -80,6 +83,12 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringEscapePercent;
   if (fn->hasSemanticsAttrThatStartsWith("programtermination_point"))
     return WellKnownFunction::AssertionFailure;
+  // A call to a function with the following semantics annotation will be
+  // considered as a DebugPrint operation. The evaluator will print the value
+  // of the single argument passed to this function call to the standard error.
+  // This functionality must be used only for debugging the evaluator.
+  if (fn->hasSemanticsAttrThatStartsWith("constant_evaluator_debug_print"))
+    return WellKnownFunction::DebugPrint;
   return None;
 }
 
@@ -221,6 +230,13 @@ public:
 
   llvm::Optional<SymbolicValue>
   computeWellKnownCallResult(ApplyInst *apply, WellKnownFunction callee);
+
+  /// Evaluate a closure creation instruction which is either a partial_apply
+  /// instruction or a thin_to_think_function instruction. On success, this
+  /// function will bind the \c closureInst parameter to its symbolic value.
+  /// On failure, it returns the unknown symbolic value that captures the error.
+  llvm::Optional<SymbolicValue>
+  evaluateClosureCreation(SingleValueInstruction *closureInst);
 
   SymbolicValue getSingleWriterAddressValue(SILValue addr);
   SymbolicValue getConstAddrAndLoadResult(SILValue addr);
@@ -883,36 +899,19 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumIndirectSILResults() == 0 &&
            "unexpected Array.append(_:) signature");
     // Get the element to be appended which is passed indirectly (@in).
-    SymbolicValue elementAddress = getConstantValue(apply->getOperand(1));
-    if (!elementAddress.isConstant())
-      return elementAddress;
+    SymbolicValue element = getConstAddrAndLoadResult(apply->getOperand(1));
+    if (!element.isConstant())
+      return element;
 
-    auto invalidOperand = [&]() {
+    // Get the array value. The array is passed @inout and could be a property
+    // of a struct.
+    SILValue arrayAddress = apply->getOperand(2);
+    SymbolicValue arrayValue = getConstAddrAndLoadResult(arrayAddress);
+    if (!arrayValue.isConstant())
+      return arrayValue;
+    if (arrayValue.getKind() != SymbolicValue::Array) {
       return getUnknown(evaluator, (SILInstruction *)apply,
                         UnknownReason::InvalidOperandValue);
-    };
-    if (elementAddress.getKind() != SymbolicValue::Address) {
-      // TODO: store the operand number in the error message here.
-      return invalidOperand();
-    }
-
-    SmallVector<unsigned, 4> elementAP;
-    SymbolicValue element =
-        elementAddress.getAddressValue(elementAP)->getValue();
-
-    // Get the array value. The array is passed @inout.
-    SymbolicValue arrayAddress = getConstantValue(apply->getOperand(2));
-    if (!arrayAddress.isConstant())
-      return arrayAddress;
-    if (arrayAddress.getKind() != SymbolicValue::Address)
-      return invalidOperand();
-
-    SmallVector<unsigned, 4> arrayAP;
-    SymbolicValueMemoryObject *arrayMemoryObject =
-        arrayAddress.getAddressValue(arrayAP);
-    SymbolicValue arrayValue = arrayMemoryObject->getValue();
-    if (arrayValue.getKind() != SymbolicValue::Array) {
-      return invalidOperand();
     }
 
     // Create a new array storage by appending the \c element to the existing
@@ -930,7 +929,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
         newElements, elementType, allocator);
     SymbolicValue newArray = SymbolicValue::getArray(arrayValue.getArrayType(),
                                                      newStorage, allocator);
-    arrayMemoryObject->setIndexedElement(arrayAP, newArray, allocator);
+    computeFSStore(newArray, arrayAddress);
     return None;
   }
   case WellKnownFunction::StringInitEmpty: { // String.init()
@@ -1056,6 +1055,21 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     setValue(apply, resultVal);
     return None;
   }
+  case WellKnownFunction::DebugPrint: {
+    assert(apply->getNumArguments() == 1 &&
+           "debug_print function must take exactly one argument");
+    SILValue argument = apply->getArgument(0);
+    SymbolicValue argValue = getConstantValue(argument);
+    llvm::errs() << "Debug print output ";
+    argValue.print(llvm::errs());
+    if (argValue.getKind() != SymbolicValue::Address)
+      return None;
+
+    llvm::errs() << "\n  Addressed Memory Object: ";
+    SymbolicValueMemoryObject *memObj = argValue.getAddressValueMemoryObject();
+    memObj->getValue().print(llvm::errs());
+    return None;
+  }
   }
   llvm_unreachable("unhandled WellKnownFunction");
 }
@@ -1092,10 +1106,11 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   }
 
   // If we reached an external function that hasn't been deserialized yet, make
-  // sure to pull it in so we can see its body.  If that fails, then we can't
-  // analyze the function.
+  // sure to pull it in so we can see its body. If that fails, then we can't
+  // analyze the function. Note: pull in everything referenced from another
+  // module in case some referenced functions have non-public linkage.
   if (callee->isExternalDeclaration()) {
-    callee->getModule().loadFunction(callee);
+    apply->getModule().linkFunction(callee, SILModule::LinkingMode::LinkAll);
     if (callee->isExternalDeclaration())
       return computeOpaqueCallResult(apply, callee);
   }
@@ -1547,6 +1562,43 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   return None;
 }
 
+llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
+    SingleValueInstruction *closureInst) {
+  assert(isa<PartialApplyInst>(closureInst) ||
+         isa<ThinToThickFunctionInst>(closureInst));
+  SILValue calleeOperand = closureInst->getOperand(0);
+  SymbolicValue calleeValue = getConstantValue(calleeOperand);
+  if (!calleeValue.isConstant())
+    return calleeValue;
+  if (calleeValue.getKind() != SymbolicValue::Function) {
+    return getUnknown(evaluator, (SILInstruction *)closureInst,
+                      UnknownReason::InvalidOperandValue);
+  }
+
+  SILFunction *target = calleeValue.getFunctionValue();
+  assert(target != nullptr);
+
+  SmallVector<SymbolicClosureArgument, 4> captures;
+
+  // If this is a partial-apply instruction, arguments to this partial-apply
+  // instruction are the captures of the closure.
+  if (PartialApplyInst *papply = dyn_cast<PartialApplyInst>(closureInst)) {
+    for (SILValue capturedSILValue : papply->getArguments()) {
+      SymbolicValue capturedSymbolicValue = getConstantValue(capturedSILValue);
+      if (!capturedSymbolicValue.isConstant()) {
+        captures.push_back({capturedSILValue, None});
+        continue;
+      }
+      captures.push_back({capturedSILValue, capturedSymbolicValue});
+    }
+  }
+
+  auto closureVal =
+      SymbolicValue::makeClosure(target, captures, evaluator.getAllocator());
+  setValue(closureInst, closureVal);
+  return None;
+}
+
 /// Evaluate the specified instruction in a flow sensitive way, for use by
 /// the constexpr function evaluator.  This does not handle control flow
 /// statements.  This returns None on success, and an Unknown SymbolicValue with
@@ -1628,6 +1680,10 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   if (auto *injectEnumInst = dyn_cast<InjectEnumAddrInst>(inst)) {
     return computeFSStore(SymbolicValue::getEnum(injectEnumInst->getElement()),
                           injectEnumInst->getOperand());
+  }
+
+  if (isa<PartialApplyInst>(inst) || isa<ThinToThickFunctionInst>(inst)) {
+    return evaluateClosureCreation(cast<SingleValueInstruction>(inst));
   }
 
   // If the instruction produces a result, try computing it, and fail if the
@@ -1934,6 +1990,8 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
            constKind == SymbolicValue::Aggregate ||
            constKind == SymbolicValue::Enum ||
            constKind == SymbolicValue::EnumWithPayload ||
+           constKind == SymbolicValue::Array ||
+           constKind == SymbolicValue::Closure ||
            constKind == SymbolicValue::UninitMemory);
 
     if (constKind != SymbolicValue::Address) {
@@ -2040,6 +2098,8 @@ ConstExprStepEvaluator::lookupConstValue(SILValue value) {
   }
   return res;
 }
+
+void ConstExprStepEvaluator::dumpState() { internalState->dump(); }
 
 bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
   return classifyFunction(fun).hasValue();

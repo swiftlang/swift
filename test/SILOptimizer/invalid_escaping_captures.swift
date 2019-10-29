@@ -53,7 +53,7 @@ func badLocalFunctionCaptureInOut1(x: inout Int) { // expected-note {{parameter 
     x += 1 // expected-note {{captured here}}
   }
 
-  takesEscaping(local) // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+  takesEscaping(local) // expected-error {{escaping local function captures 'inout' parameter 'x'}}
 }
 
 func badLocalFunctionCaptureInOut2(x: inout Int) { // expected-note {{parameter 'x' is declared 'inout'}}
@@ -75,7 +75,7 @@ func badLocalFunctionCaptureInOut3(x: inout Int) { // expected-note {{parameter 
     local1() // expected-note {{captured indirectly by this call}}
   }
 
-  takesEscaping(local2) // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+  takesEscaping(local2) // expected-error {{escaping local function captures 'inout' parameter 'x'}}
 }
 
 func badLocalFunctionCaptureNoEscape1(y: () -> ()) { // expected-note {{parameter 'y' is implicitly non-escaping}}
@@ -83,7 +83,7 @@ func badLocalFunctionCaptureNoEscape1(y: () -> ()) { // expected-note {{paramete
     y() // expected-note {{captured here}}
   }
 
-  takesEscaping(local) // expected-error {{escaping closure captures non-escaping parameter 'y'}}
+  takesEscaping(local) // expected-error {{escaping local function captures non-escaping parameter 'y'}}
 }
 
 func badLocalFunctionCaptureNoEscape2(y: () -> ()) { // expected-note {{parameter 'y' is implicitly non-escaping}}
@@ -105,7 +105,7 @@ func badLocalFunctionCaptureNoEscape3(y: () -> ()) { // expected-note {{paramete
     local1() // expected-note {{captured indirectly by this call}}
   }
 
-  takesEscaping(local2) // expected-error {{escaping closure captures non-escaping parameter 'y'}}
+  takesEscaping(local2) // expected-error {{escaping local function captures non-escaping parameter 'y'}}
 }
 
 func badLocalFunctionCaptureNoEscape4(y: () -> ()) { // expected-note {{parameter 'y' is implicitly non-escaping}}
@@ -117,7 +117,7 @@ func badLocalFunctionCaptureNoEscape4(y: () -> ()) { // expected-note {{paramete
     local1() // expected-note {{captured indirectly by this call}}
   }
 
-  takesEscaping(local2) // expected-error {{escaping closure captures non-escaping parameter 'y'}}
+  takesEscaping(local2) // expected-error {{escaping local function captures non-escaping parameter 'y'}}
 }
 
 // Capturing 'self' produces a different diagnostic.
@@ -151,7 +151,7 @@ func testGenericLocalFunctionReabstraction(x: inout Int) { // expected-note {{pa
     x += 1 // expected-note {{captured here}}
     return 0
   }
-  takesEscapingGeneric(local) // expected-error {{escaping closure captures 'inout' parameter 'x'}}
+  takesEscapingGeneric(local) // expected-error {{escaping local function captures 'inout' parameter 'x'}}
 }
 
 // Make sure that withoutActuallyEscaping counts as a safe use.

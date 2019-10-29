@@ -52,7 +52,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 523; // differentiable_function and differentiable_function_extract instructions
+const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // differentiable_function and differentiable_function_extract instructions
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-24-a
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1224,6 +1225,7 @@ namespace decls_block {
     BCFixed<1>,   // IUO result?
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
+    BCFixed<1>,   // whether the overridden decl affects ABI
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     AccessLevelField, // access level
@@ -1265,6 +1267,7 @@ namespace decls_block {
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?
     DeclIDField,  // overridden function
+    BCFixed<1>,   // whether the overridden decl affects ABI
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
     AccessLevelField, // access level

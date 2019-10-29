@@ -591,12 +591,12 @@ class StringWriter {
   llvm::SmallString<1024> Buffer;
 public:
   uint32_t getTextOffset(StringRef Text) {
-    if (IndexMap.find(Text) == IndexMap.end()) {
-      IndexMap.insert({Text, Buffer.size()});
+    auto IterAndIsNew = IndexMap.insert({Text, Buffer.size()});
+    if (IterAndIsNew.second) {
       Buffer.append(Text);
       Buffer.push_back('\0');
     }
-    return IndexMap[Text];
+    return IterAndIsNew.first->getValue();
   }
 
   void emitSourceFilesRecord(llvm::BitstreamWriter &Out) {

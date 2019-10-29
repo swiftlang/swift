@@ -202,9 +202,9 @@ public:
   SourceManager &getSourceMgr() {
     return SourceMgr;
   }
-  DiagnosticEngine &getDiags() {
-    return Diags;
-  }
+  // Find a DiagnosticEngine to use when emitting diagnostics at the given Loc.
+  DiagnosticEngine &getDiags(SourceLoc Loc = SourceLoc());
+  void addDiagConsumer(DiagnosticConsumer &Consumer);
   void setCommonVersion(uint8_t Ver) {
     assert(!CommonVersion.hasValue());
     CommonVersion = Ver;
@@ -337,6 +337,7 @@ struct PlatformIntroVersion {
 class SDKNodeDecl: public SDKNode {
   DeclKind DKind;
   StringRef Usr;
+  SourceLoc Loc;
   StringRef Location;
   StringRef ModuleName;
   std::vector<DeclAttrKind> DeclAttributes;
@@ -393,20 +394,21 @@ public:
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
   StringRef getObjCName() const { return ObjCName; }
+  SourceLoc getLoc() const { return Loc; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 
   // The first argument of the diag is always screening info.
   template<typename ...ArgTypes>
-  void emitDiag(Diag<StringRef, ArgTypes...> ID,
+  void emitDiag(SourceLoc Loc,
+                Diag<StringRef, ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... Args) const {
     // Don't emit objc decls if we care about swift exclusively
     if (Ctx.getOpts().SwiftOnly) {
       if (isObjc())
         return;
     }
-    Ctx.getDiags().diagnose(SourceLoc(), ID, getScreenInfo(),
-                            std::move(Args)...);
+    Ctx.getDiags(Loc).diagnose(Loc, ID, getScreenInfo(), std::move(Args)...);
   }
 };
 

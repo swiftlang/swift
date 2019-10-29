@@ -571,23 +571,23 @@ enum SR_10084_E_8 {
 }
 
 enum SR_10084_E_9 {
-  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static let A: SR_10084_E_9 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{'A' previously declared here}}
+  static let A: SR_10084_E_9 = .A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_10 {
-  static let A: SR_10084_E_10 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
-  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+  static let A: SR_10084_E_10 = .A // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_11 {
-  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
-  static var A: SR_10084_E_11 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{'A' previously declared here}}
+  static var A: SR_10084_E_11 = .A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_12 {
-  static var A: SR_10084_E_12 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
-  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+  static var A: SR_10084_E_12 = .A // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum SR_10084_E_13 {

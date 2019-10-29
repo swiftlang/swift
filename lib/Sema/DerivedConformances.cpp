@@ -524,7 +524,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
-  getterDecl->computeType();
+  (void)getterDecl->getInterfaceType();
 
   getterDecl->copyFormalAccessFrom(property);
 

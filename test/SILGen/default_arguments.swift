@@ -383,3 +383,9 @@ func stupidGames(x: Int = 3) -> Int {
   return x
 }
 stupidGames(x:)()
+
+func genericMagic<T : ExpressibleByStringLiteral>(x: T = #file) -> T {
+  return x
+}
+
+let _: String = genericMagic()

@@ -1380,7 +1380,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
 
   // If we've made it to here, this is some header other than the bridging
   // header, which means we can no longer rely on one file's modification time
-  // to invalid code completion caches. :-(
+  // to invalidate code completion caches. :-(
   Impl.setSinglePCHImport(None);
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
@@ -3728,8 +3728,16 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
       (nominal->getAttrs().hasAttribute<ObjCAttr>() ||
        (!nominal->getParentSourceFile() && nominal->isObjC()))) {
     // Map the name. If we can't represent the Swift name in Clang.
-    // FIXME: We should be using the Objective-C name here!
-    auto clangName = exportName(nominal->getName());
+    Identifier name = nominal->getName();
+    if (auto objcAttr = nominal->getAttrs().getAttribute<ObjCAttr>()) {
+      if (auto objcName = objcAttr->getName()) {
+        if (objcName->getNumArgs() == 0) {
+          // This is an error if not 0, but it should be caught later.
+          name = objcName->getSimpleName();
+        }
+      }
+    }
+    auto clangName = exportName(name);
     if (!clangName)
       return EffectiveClangContext();
 

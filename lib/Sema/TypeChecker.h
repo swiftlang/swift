@@ -221,6 +221,8 @@ enum ContextualTypePurpose {
                              ///< result type.
   CTP_Condition,        ///< Condition expression of various statements e.g.
                         ///< `if`, `for`, `while` etc.
+  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
+                        ///< is expected to conform to 'Sequence' protocol.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
@@ -795,14 +797,8 @@ public:
   void checkUnsupportedProtocolType(GenericParamList *genericParams);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
-                                             DeclContext *DC);
-
-  void validateDecl(ValueDecl *D);
-
-  /// Validate the given extension declaration, ensuring that it
-  /// properly extends the nominal type it names.
-  void validateExtension(ExtensionDecl *ext);
+  static GenericEnvironment *
+  handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
@@ -1024,12 +1020,8 @@ public:
   // TODO(TF-789): Figure out the proper way to typecheck these.
   void checkDeclDifferentiableAttributes(Decl *D);
 
-  Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
-                                   ReferenceOwnershipAttr *attr);
-
-  virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD);
-  }
+  static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
+                                          ReferenceOwnershipAttr *attr);
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
@@ -1126,7 +1118,7 @@ public:
   ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
-  void addImplicitConstructors(NominalTypeDecl *typeDecl);
+  static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
   /// Synthesize the member with the given name on the target if applicable,
   /// i.e. if the member is synthesizable and has not yet been added to the
@@ -1786,7 +1778,7 @@ public:
   ///
   /// This is "Swift", if that module is imported, or the current module if
   /// we're parsing the standard library.
-  ModuleDecl *getStdlibModule(const DeclContext *dc);
+  static ModuleDecl *getStdlibModule(const DeclContext *dc);
 
   /// \name Lazy resolution.
   ///
@@ -1957,24 +1949,17 @@ public:
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
-  /// has a name with that prefix, an llvm fatal_error is triggered.
+  /// name starts with that prefix, an llvm fatal_error is triggered.
   /// This is for testing purposes.
-  void checkForForbiddenPrefix(const Decl *D);
-  void checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E);
-  void checkForForbiddenPrefix(Identifier Ident);
-  void checkForForbiddenPrefix(StringRef Name);
-
-  bool hasEnabledForbiddenTypecheckPrefix() const {
-    return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
-  }
+  static void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
   /// Check error handling in the given type-checked top-level code.
-  void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
-  void checkFunctionErrorHandling(AbstractFunctionDecl *D);
-  void checkInitializerErrorHandling(Initializer *I, Expr *E);
-  void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
-  void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
-                                          Expr *expr);
+  static void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
+  static void checkFunctionErrorHandling(AbstractFunctionDecl *D);
+  static void checkInitializerErrorHandling(Initializer *I, Expr *E);
+  static void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
+  static void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
+                                                Expr *expr);
 
   // SWIFT_ENABLE_TENSORFLOW
   void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
@@ -2097,13 +2082,12 @@ public:
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
-                                  TypeChecker &TC, bool hasKeywordArguments);
+                                  bool hasKeywordArguments);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
-                                         TypeChecker &TC,
                                          bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -2112,7 +2096,6 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
-                                      TypeChecker &TC,
                                       bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -2120,7 +2103,7 @@ bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
 /// @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC,
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
                                        bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached

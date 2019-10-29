@@ -584,7 +584,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedEncodingContainerDecl(),
-                                             codingKeysType,
+                                             codingKeysEnum->getDeclaredInterfaceType(),
                                              VarDecl::Introducer::Var);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -750,7 +750,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
+  (void)encodeDecl->getInterfaceType();
 
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -806,7 +806,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedDecodingContainerDecl(),
-                                             codingKeysType,
+                                             codingKeysEnum->getDeclaredInterfaceType(),
                                              VarDecl::Introducer::Let);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -1030,7 +1030,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
+  (void)initDecl->getInterfaceType();
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);

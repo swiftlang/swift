@@ -90,10 +90,15 @@ void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 /// \p base...but only if we're highly confident that we know what the user
 /// should have written.
 ///
+/// The \p diag closure allows the caller to control the diagnostic that is
+/// emitted. It is passed true if the diagnostic will be emitted with fixits
+/// attached, and false otherwise. If None is returned, no diagnostics are
+/// emitted.  Else the fixits are attached to the returned diagnostic.
+///
 /// \returns true iff any fix-its were attached to \p diag.
-bool fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
-                                   ValueDecl *decl,
-                                   const ValueDecl *base);
+bool computeFixitsForOverridenDeclaration(
+    ValueDecl *decl, const ValueDecl *base,
+    llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
 
 /// Emit fix-its to enclose trailing closure in argument parens.
 void fixItEncloseTrailingClosure(TypeChecker &TC,

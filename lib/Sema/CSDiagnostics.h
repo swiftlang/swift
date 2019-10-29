@@ -92,15 +92,18 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  Type getType(Expr *expr) const;
-  Type getType(const TypeLoc &loc) const;
+  Type getType(Expr *expr, bool wantRValue = true) const;
+  Type getType(const TypeLoc &loc, bool wantRValue = true) const;
 
   /// Resolve type variables present in the raw type, if any.
-  Type resolveType(Type rawType, bool reconstituteSugar = false) const {
+  Type resolveType(Type rawType, bool reconstituteSugar = false,
+                   bool wantRValue = true) const {
     auto resolvedType = CS.simplifyType(rawType);
-    return reconstituteSugar
-               ? resolvedType->reconstituteSugar(/*recursive*/ true)
-               : resolvedType;
+
+    if (reconstituteSugar)
+      resolvedType = resolvedType->reconstituteSugar(/*recursive*/ true);
+
+    return wantRValue ? resolvedType->getRValueType() : resolvedType;
   }
 
   /// Resolve type variables present in the raw type, using generic parameter
@@ -320,8 +323,8 @@ protected:
   Type LHS, RHS;
 
 public:
-  RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
-                     Type lhs, Type rhs, ConstraintLocator *locator)
+  RequirementFailure(ConstraintSystem &cs, Expr *expr, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator),
         Conformance(getConformanceForConditionalReq(locator)),
         Signature(getSignature(locator)), AffectedDecl(getDeclRef()),
@@ -333,9 +336,6 @@ public:
            "Couldn't find where the requirement came from?");
     assert(getGenericContext() &&
            "Affected decl not within a generic context?");
-
-    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
-    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -418,8 +418,12 @@ public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, Type> conformance)
-      : RequirementFailure(cs, expr, RequirementKind::Conformance,
-                           conformance.first, conformance.second, locator) {}
+      : RequirementFailure(cs, expr, conformance.first, conformance.second,
+                           locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::Conformance ||
+           reqElt.getRequirementKind() == RequirementKind::Layout);
+  }
 
   bool diagnoseAsError() override;
 
@@ -433,11 +437,15 @@ protected:
   bool diagnoseAsAmbiguousOperatorRef();
 
   DiagOnDecl getDiagnosticOnDecl() const override {
-    return diag::type_does_not_conform_decl_owner;
+    return (getRequirement().getKind() == RequirementKind::Layout ?
+            diag::type_does_not_conform_anyobject_decl_owner :
+            diag::type_does_not_conform_decl_owner);
   }
 
   DiagInReference getDiagnosticInRereference() const override {
-    return diag::type_does_not_conform_in_decl_ref;
+    return (getRequirement().getKind() == RequirementKind::Layout ?
+            diag::type_does_not_conform_anyobject_in_decl_ref :
+            diag::type_does_not_conform_in_decl_ref);
   }
 
   DiagAsNote getDiagnosticAsNote() const override {
@@ -468,8 +476,10 @@ class SameTypeRequirementFailure final : public RequirementFailure {
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::SameType, lhs, rhs,
-                           locator) {}
+      : RequirementFailure(cs, expr, lhs, rhs, locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::SameType);
+  }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -502,8 +512,10 @@ class SuperclassRequirementFailure final : public RequirementFailure {
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::Superclass, lhs, rhs,
-                           locator) {}
+      : RequirementFailure(cs, expr, lhs, rhs, locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::Superclass);
+  }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -557,15 +569,6 @@ private:
   /// passing such parameter as an @escaping argument, or trying to
   /// assign it to a variable which expects @escaping function.
   bool diagnoseParameterUse() const;
-};
-
-class MissingForcedDowncastFailure final : public FailureDiagnostic {
-public:
-  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
-
-  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to attempting member access on optional base
@@ -695,8 +698,7 @@ public:
                     ContextualTypePurpose purpose, Type lhs, Type rhs,
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), CTP(purpose),
-        FromType(resolve(lhs)->getRValueType()),
-        ToType(resolve(rhs)->getRValueType()) {}
+        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
 
   Type getFromType() const { return FromType; }
 
@@ -1338,6 +1340,36 @@ public:
                                          ConstraintLocator *locator);
 };
 
+class ExtraneousArgumentsFailure final : public FailureDiagnostic {
+  FunctionType *ContextualType;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArgs;
+
+public:
+  ExtraneousArgumentsFailure(
+      Expr *root, ConstraintSystem &cs, FunctionType *contextualType,
+      ArrayRef<std::pair<unsigned, AnyFunctionType::Param>> extraArgs,
+      ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        ContextualType(resolveType(contextualType)->castTo<FunctionType>()),
+        ExtraArgs(extraArgs.begin(), extraArgs.end()) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  bool diagnoseSingleExtraArgument() const;
+
+  unsigned getTotalNumArguments() const {
+    return ContextualType->getNumParams() + ExtraArgs.size();
+  }
+
+  bool isContextualMismatch() const {
+    auto *locator = getLocator();
+    return locator->isLastElement<LocatorPathElt::ContextualType>() ||
+           locator->isLastElement<LocatorPathElt::ApplyArgToParam>();
+  }
+};
+
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
   using ParamBinding = SmallVector<unsigned, 1>;
 
@@ -1868,6 +1900,16 @@ protected:
   bool diagnoseMisplacedMissingArgument() const;
 
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class MissingForcedDowncastFailure final : public ContextualFailure {
+public:
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs, Type fromType,
+                               Type toType, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints
