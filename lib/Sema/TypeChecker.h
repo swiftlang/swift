@@ -1038,7 +1038,7 @@ public:
 
   /// All generic parameters of a generic function must be referenced in the
   /// declaration's type, otherwise we have no way to infer them.
-  void checkReferencedGenericParams(GenericContext *dc);
+  static void checkReferencedGenericParams(GenericContext *dc);
 
   /// Construct a new generic environment for the given declaration context.
   ///

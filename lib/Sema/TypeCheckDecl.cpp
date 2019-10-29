@@ -2578,7 +2578,7 @@ public:
     (void) SD->getGenericSignature();
 
     if (!SD->isInvalid()) {
-      TC.checkReferencedGenericParams(SD);
+      TypeChecker::checkReferencedGenericParams(SD);
       checkGenericParams(SD->getGenericParams(), SD);
       TypeChecker::checkProtocolSelfRequirements(SD);
     }
@@ -3187,7 +3187,7 @@ public:
 
     if (!FD->isInvalid()) {
       checkGenericParams(FD->getGenericParams(), FD);
-      TC.checkReferencedGenericParams(FD);
+      TypeChecker::checkReferencedGenericParams(FD);
       TypeChecker::checkProtocolSelfRequirements(FD);
     }
 
@@ -3428,7 +3428,7 @@ public:
 
     if (!CD->isInvalid()) {
       checkGenericParams(CD->getGenericParams(), CD);
-      TC.checkReferencedGenericParams(CD);
+      TypeChecker::checkReferencedGenericParams(CD);
       TypeChecker::checkProtocolSelfRequirements(CD);
     }
 
