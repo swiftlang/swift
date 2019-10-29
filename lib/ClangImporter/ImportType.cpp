@@ -2202,6 +2202,12 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       SwiftContext.Diags.diagnose(methodLoc, diag::invalid_swift_name_method,
                                   swiftParams.size() < argNames.size(),
                                   swiftParams.size(), argNames.size());
+      ModuleDecl *parentModule = dc->getParentModule();
+      if (parentModule != ImportedHeaderUnit->getParentModule()) {
+        SwiftContext.Diags.diagnose(
+            methodLoc, diag::unresolvable_clang_decl_is_a_framework_bug,
+            parentModule->getName().str());
+      }
     }
     return {Type(), false};
   }
