@@ -3381,6 +3381,24 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice: {
+    // If this is an attempt to use readonly IUO as a destination
+    // of an assignment e.g.
+    //
+    // let x: Int! = 0
+    // x = 42 <- `x` can be either `Int?` or `Int` but it can't be an l-value.
+    if (lhs->is<LValueType>() && !rhs->is<LValueType>()) {
+      auto result = matchTypes(lhs->getWithoutSpecifierType(), rhs, matchKind,
+                               TMF_ApplyingFix, locator);
+
+      if (result.isSuccess()) {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+      }
+    }
+    break;
+  }
+
   default:
     break;
   }
