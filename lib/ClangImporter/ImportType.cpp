@@ -1762,13 +1762,12 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
-    DeclBaseName baseName, unsigned numParams, StringRef argumentLabel,
-    bool isFirstParameter, bool isLastParameter, NameImporter &nameImporter) {
+    DeclBaseName baseName, StringRef argumentLabel, bool isFirstParameter,
+    bool isLastParameter, NameImporter &nameImporter) {
   auto baseNameStr = baseName.userFacingName();
 
-  // Don't introduce a default argument for setters with only a single
-  // parameter.
-  if (numParams == 1 && camel_case::getFirstWord(baseNameStr) == "set")
+  // Don't introduce a default argument for the first parameter of setters.
+  if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
   // Some nullable parameters default to 'nil'.
@@ -1788,10 +1787,6 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       }
     }
   }
-
-  // Don't introduce an empty options default arguments for setters.
-  if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
-    return DefaultArgumentKind::None;
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>()) {
@@ -2175,8 +2170,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam,
-          importedName.getDeclName().getBaseName(), numEffectiveParams,
-          name.empty() ? StringRef() : name.str(), paramIndex == 0,
+          importedName.getDeclName().getBaseName(), name.str(), paramIndex == 0,
           isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
