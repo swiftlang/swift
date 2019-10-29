@@ -3409,8 +3409,8 @@ public:
       theClass->setImplicit();
     theClass->setIsObjC(isObjC);
     theClass->setSuperclass(MF.getType(superclassID));
-    if (inheritsSuperclassInitializers)
-      theClass->setInheritsSuperclassInitializers();
+    ctx.evaluator.cacheOutput(InheritsSuperclassInitializersRequest{theClass},
+                              std::move(inheritsSuperclassInitializers));
 
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));

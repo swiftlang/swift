@@ -864,6 +864,48 @@ static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                            false);
 }
 
+static bool canInheritDesignatedInits(Evaluator &eval, ClassDecl *decl) {
+  // We can only inherit designated initializers if the user hasn't defined
+  // a designated init of their own, and all the stored properties have initial
+  // values.
+  return !hasUserDefinedDesignatedInit(eval, decl) &&
+         areAllStoredPropertiesDefaultInitializable(eval, decl);
+}
+
+static void collectNonOveriddenSuperclassInits(
+    ClassDecl *subclass, SmallVectorImpl<ConstructorDecl *> &results) {
+  auto superclassTy = subclass->getSuperclass();
+  assert(superclassTy);
+
+  // Record all of the initializers the subclass has overriden, excluding stub
+  // overrides, which we don't want to consider as viable delegates for
+  // convenience inits.
+  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
+  for (auto member : subclass->getMembers())
+    if (auto ctor = dyn_cast<ConstructorDecl>(member))
+      if (!ctor->hasStubImplementation())
+        if (auto overridden = ctor->getOverriddenDecl())
+          overriddenInits.insert(overridden);
+
+  auto superclassCtors = TypeChecker::lookupConstructors(
+      subclass, superclassTy, NameLookupFlags::IgnoreAccessControl);
+
+  for (auto memberResult : superclassCtors) {
+    auto superclassCtor = cast<ConstructorDecl>(memberResult.getValueDecl());
+
+    // Skip invalid superclass initializers.
+    if (superclassCtor->isInvalid())
+      continue;
+
+    // Skip unavailable superclass initializers.
+    if (AvailableAttr::isUnavailable(superclassCtor))
+      continue;
+
+    if (!overriddenInits.count(superclassCtor))
+      results.push_back(superclassCtor);
+  }
+}
+
 /// For a class with a superclass, automatically define overrides
 /// for all of the superclass's designated initializers.
 static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
@@ -944,25 +986,11 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   bool canInheritInitializers = defaultInitable && !foundDesignatedInit;
 
-  bool canInheritConvenienceInitalizers =
-      !superclassDecl->hasMissingDesignatedInitializers();
   SmallVector<ConstructorDecl *, 4> requiredConvenienceInitializers;
-  for (auto memberResult : ctors) {
-    auto member = memberResult.getValueDecl();
+  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
 
-    // Skip unavailable superclass initializers.
-    if (AvailableAttr::isUnavailable(member))
-      continue;
-
-    // Skip invalid superclass initializers.
-    auto superclassCtor = dyn_cast<ConstructorDecl>(member);
-    if (superclassCtor->isInvalid())
-      continue;
-
-    // If we have an override for this constructor, it's okay.
-    if (overriddenInits.count(superclassCtor) > 0)
-      continue;
-
+  for (auto *superclassCtor : nonOverridenSuperclassCtors) {
     // We only care about required or designated initializers.
     if (!superclassCtor->isDesignatedInit()) {
       if (superclassCtor->isRequired()) {
@@ -972,10 +1000,6 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       }
       continue;
     }
-
-    // Otherwise, it may no longer be safe to inherit convenience
-    // initializers.
-    canInheritConvenienceInitalizers &= canInheritInitializers;
 
     // Everything after this is only relevant for Swift classes being defined.
     if (decl->hasClangNode())
@@ -1028,12 +1052,38 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
     }
   }
 
-  if (canInheritConvenienceInitalizers) {
-    decl->setInheritsSuperclassInitializers();
-  } else {
+  if (!decl->inheritsSuperclassInitializers())
     for (ConstructorDecl *requiredCtor : requiredConvenienceInitializers)
       diagnoseMissingRequiredInitializer(decl, requiredCtor, ctx);
-  }
+}
+
+llvm::Expected<bool>
+InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
+                                                ClassDecl *decl) const {
+  auto superclass = decl->getSuperclass();
+  assert(superclass);
+
+  // If the superclass has known-missing designated initializers, inheriting
+  // is unsafe.
+  auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+  if (superclassDecl->hasMissingDesignatedInitializers())
+    return false;
+
+  // If we're allowed to inherit designated initializers, then we can inherit
+  // convenience inits too.
+  if (canInheritDesignatedInits(eval, decl))
+    return true;
+
+  // Otherwise we need to check whether the user has overriden all of the
+  // superclass' designed inits.
+  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
+
+  auto allDesignatedInitsOverriden =
+      llvm::none_of(nonOverridenSuperclassCtors, [](ConstructorDecl *ctor) {
+        return ctor->isDesignatedInit();
+      });
+  return allDesignatedInitsOverriden;
 }
 
 static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
