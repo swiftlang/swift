@@ -91,8 +91,8 @@ library, as used by the `Swift Package Manager`_). Because a client always uses
 a particular version of such a library, there is no need to worry about
 backwards- or forwards-compatibility at the binary level. Just as developers
 with a single app target are not forced to think about access control, anyone
-writing a bundled library should not be required to use any of the annotations
-described below in order to achieve full performance.
+writing a bundled library should (ideally) not be required to use any of the
+annotations described below in order to achieve full performance.
 
 .. _Swift Package Manager: https://swift.org/package-manager/
 
@@ -110,164 +110,6 @@ example, a client's use of a C struct is "fragile" in that if the library
 changes the fields in the struct, the client's use will "break". In Swift,
 changing the fields in a struct will not automatically cause problems for
 existing clients, so we say the struct is "resilient".
-
-
-Using Versioned API
-===================
-
-References to a versioned API must always be guarded with the appropriate
-availability checks. This means that any client entities that rely on certain
-APIs from a library must themselves be restricted to contexts in which those
-APIs are available. This is accomplished using the ``@available`` attribute, by
-specifying the name of the client library along with the required version::
-
-    // Client code
-    @available(Magician 1.5)
-    class CrystalBallView : MagicView { /*...*/ }
-
-Library versions can also be checked dynamically using ``#available``, allowing
-for fallback behavior when the requested library version is not present::
-
-    func scareMySiblings() {
-      if #available(Magician 1.2) {
-        summonDemons()
-      } else {
-        print("BOO!!")
-      }
-    }
-
-.. note::
-
-    Possible implementations include generating a hidden symbol into a library,
-    or putting the version number in some kind of metadata, like the Info.plist
-    in a framework bundle on Darwin platforms.
-
-This is essentially the same model as the availability checking released in
-Swift 2.0, but generalized for checking library versions instead of just OS
-versions.
-
-
-Declaring Library Version Dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Swift's current availability model includes the notion of a *minimum deployment
-target,* the version of an OS that must be present for the program being
-compiled to run at all. For example, a program compiled with a minimum
-deployment target of iOS 9.2 will not launch on iOS 9.0.
-
-The generalized model above suggests being able to make similar guarantees for
-individual libraries. For example, a client program may depend on version 1.1
-of the "Magician" library; trying to run using version 1.0 will result in
-errors. By declaring this at compile-time, the client code can omit
-``@available`` and ``#available`` checks that are satisfied by the minimum
-library version.
-
-Both the syntax and enforcement of this feature are not covered by this
-document.
-
-
-Publishing Versioned API
-========================
-
-A library's API is already marked with the ``public`` modifier, but if a
-client wants to work with multiple releases of the library, the API needs
-versioning information as well. A *versioned entity* represents anything with a
-run-time presence that a client may rely on; its version records when the entity
-was first exposed publicly in its library. Put another way, it is the oldest
-version of the library where the entity may be used.
-
-- Classes, structs, enums, and protocols may all be versioned entities.
-- Methods, properties, subscripts, and initializers may be versioned entities.
-- Top-level functions, variables, and constants may be versioned entities.
-- Protocol conformances may be versioned entities, despite not explicitly having
-  a declaration in Swift, because a client may depend on them.
-  See `New Conformances`_, below.
-- Typealiases are treated as versioned entities for the purpose of verifying
-  availability, even though they have no run-time presence.
-
-In a versioned library, any top-level public entity from the list above may not
-be made ``public`` (or ``open``) without an appropriate version. A public
-entity declared within a versioned type (or an extension of a versioned type)
-will default to having the same version as the type.
-
-In this document, the term "public" includes classes and members marked
-``open``.
-
-Code within a library may generally use all other entities declared within the
-library (barring their own availability checks), since the entire library is
-shipped as a unit. That is, even if a particular API was introduced in v1.0,
-its (non-public) implementation may refer to APIs introduced in later versions.
-
-Certain uses of ``internal`` entities require them to be part of a library's
-binary interface, which means they need to be versioned as well. See
-`Versioning Internal Declarations`_ below.
-
-In addition to versioned entities, there are also attributes that are safe to
-add to declarations when releasing a new version of a library. In most cases,
-clients can only take advantage of the attributes when using the new release of
-the library, and therefore the attributes also need to record the version in
-which they were introduced; these are called *versioned attributes.* If the
-version is omitted, it is assumed to be the version of the declaration to which
-the attribute is attached.
-
-The syntax for marking an entity as versioned has not yet been decided, but the
-rest of this document will use syntax #1 described below.
-
-
-Syntax #1: Attributes
-~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    @available(1.2)
-    public func summonDemons()
-
-    @available(1.0) @inlinable(1.2)
-    public func summonElves()
-
-Using the same attribute for both publishing and using versioned APIs helps tie
-the feature together and enforces a consistent set of rules. However, there are
-several other annotations described later in this document that also need
-versioning information, and it may not be obvious what the version number means
-outside the context of ``available``.
-
-
-Syntax #2: Version Blocks
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    #version(1.2)
-    public func summonDemons()
-
-    #version(1.0) {}
-    #version(1.2) { @inlinable }
-    public func summonElves()
-
-Since there are potentially many annotations on a declaration that need
-versioning information, it may make sense to group them together in some way.
-Only certain annotations would support being versioned in this way.
-
-
-Syntax #3: The ``public`` modifier
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    public(1.2) func summonDemons()
-
-    /* @inlinable ?? */
-    public(1.0) func summonElves()
-
-Putting the version on the public modifier is the most concise option. However,
-there's no obvious syntax here for adding versions to other annotations that
-may apply to a declaration.
-
-(Also, at one point there was a proposal to tag API only intended for certain
-clients using a similar syntax: ``public("Foundation")``, for example, for APIs
-only meant to be used by Foundation. These could then be stripped out of the
-public interface for a framework before being widely distributed. But that
-could easily use an alternate syntax.)
 
 
 Supported Evolution
@@ -1173,115 +1015,37 @@ clients, they cannot recompile their code and get correct behavior.
 
 Top-level typealiases only exist at compile-time, so changing the underlying
 type of one is a `binary-compatible source-breaking change`. However, if the
-typealias is *used* in the type of any `versioned entity` in a library, it
+typealias is *used* in the type of any ABI-public declaration in a library, it
 may be an actual breaking change and would not be permitted.
 
 It is always permitted to change the *use* of a public typealias to its
 underlying type, and vice versa, at any location in the program.
 
-Typealiases are `versioned <versioned entity>` despite being compile-time
+Typealiases require availability annotations despite being compile-time
 constructs in order to verify the availability of their underlying types.
 
 
-A Unifying Theme
-~~~~~~~~~~~~~~~~
+``@usableFromInline``
+=====================
 
-So far this document has talked about ways to give up flexibility for several
-different kinds of declarations: namely ``@inlinable`` for functions, and
-``@frozen`` for enums and structs. Each of these has a different set of
-constraints it enforces on the library author and promises it makes to clients.
-However, they follow a common theme of giving up the flexibility of future
-changes in exchange for improved performance and perhaps some semantic
-guarantees. Therefore, these attributes are informally referred to as
-"fragility attributes".
-
-
-Versioning Internal Declarations
-================================
-
-The initial discussion on versioning focused on public APIs, making sure
-that a client knows what features they can use when a specific version of a
-library is present. Inlinable functions have much the same constraints, except
-the inlinable function is the client and the entities being used may not be
-public.
-
-Adding a versioning annotation to an ``internal`` entity promises that the
-entity will be available at link time in the containing module's binary. This
-makes it safe to refer to such an entity from an inlinable function. If the
-entity is ever made ``public`` or ``open``, its availability should not be
-changed; not only is it safe for new clients to rely on it, but *existing*
-clients require its presence as well.
+Adding ``@usableFromInline`` to an ``internal`` entity promises that the entity
+will be available at link time in the containing module's binary. This makes it
+safe to refer to such an entity from an inlinable function or in the stored
+properties of a frozen struct. ``@usableFromInline`` declarations shipped as
+part of an OS should have availability just like ``public`` declarations; if
+the entity is ever made ``public`` or ``open``, its availability should not be
+changed.
 
 .. note::
 
-    Why isn't this a special form of ``public``? Because we don't want it to
-    imply everything that ``public`` does, such as requiring overrides to be
-    ``public``.
+    Why isn't ``@usableFromInline`` a special form of ``public``? Because we
+    don't want it to imply everything that ``public`` does, such as requiring
+    overrides to be ``public``.
 
-In libraries without binary compatibility concerns, the equivalent annotation
-is ``@usableFromInline``, since inlinable functions are the only way that a
-non-public entity can be referenced from outside of a module.
-
-Because a versioned class member may eventually be made ``open``, it must be
-assumed that new overrides may eventually appear from outside the module if the
-class is marked ``open`` unless the member is marked ``final``.
-
-Non-public conformances are never considered versioned, even if both the
-conforming type and the protocol are versioned. A conformance is considered
-public if and only if both the conforming type and protocol are public.
-
-Entities declared ``private`` or ``fileprivate`` may not be versioned; the
-mangled name of such an entity includes an identifier based on the containing
-file, which means moving the declaration to another file changes the entity's
-mangled name. This implies that a client would not be able to find the entity
-at run time if the source code is reorganized, which is unacceptable.
-
-.. note::
-
-    There are ways around this limitation, the most simple being that versioned
-    ``private`` entities are subject to the same cross-file redeclaration rules
-    as ``internal`` entities. However, this is a purely additive feature, so to
-    keep things simple we'll stick with the basics.
-
-We could do away with the entire feature if we restricted inlinable functions
-and frozen structs to only refer to public entities. However, this
-removes one of the primary reasons to make something inlinable: to allow
-efficient access to a type while still protecting its invariants.
-
-
-"Backdating"
-============
-
-*Backdating* refers to releasing a new version of a library that contains
-changes, but pretending those changes were made in a previous version of the
-library. For example, you might want to release version 1.2 of the "Magician"
-library, but pretend that the "SpellIncantation" struct was frozen
-since its introduction in version 1.0.
-
-**This is not safe.**
-
-Backdating the availability a versioned entity that was previously non-public
-is clearly not safe: older versions of the library will not expose the entity
-as part of their ABI. What may be less obvious is that the fragility attributes
-likewise are not safe to backdate, even if you know the attributes could have
-been added in the past. To give one example, the presence of ``@frozen`` may
-affect the layout and calling conventions for an enum or struct.
-
-.. note::
-
-    If we add an "SPI" feature, such that the use of specific public entities
-    is limited to certain clients, it *will* be safe to change the set of
-    clients, or remove the restriction altogether. In fact, in such cases the
-    library author is *required* to *not* change the availability info that was
-    originally presented for the limited set of clients, since as mentioned
-    above this may affect how those existing clients use the entities declared
-    in the library.
-
-The one exception is ``@inlinable``, which does not change how a function is
-called or otherwise used at the ABI level. If the implementation being provided
-is compatible with a previous version of a library, and the function was
-present and public (or `versioned <versioned entity>`) there, then the library
-author may choose to backdate the ``@inlinable`` annotation.
+Because a ``@usableFromInline`` class member may eventually be made ``open``,
+the compiler must assume that new overrides may eventually appear from outside
+the module if the class is marked ``open`` unless the member is marked
+``final``.
 
 
 Optimization
@@ -1299,324 +1063,16 @@ several ways. For example:
 - A struct may have additional members in the future, so client code must not
   assume it fits in any fixed-sized allocation.
 
-In order to make sure client code doesn't make unsafe assumptions, queries
-about properties that may change between library versions must be parameterized
-with the `availability context` that is using the entity. An availability
-context is a set of minimum platform and library versions that can be assumed
-present for code executing within the context. (See `Declaring Library Version
-Dependencies`_.) This allows the compiler to answer the question, "Given what I
-know about where this code will be executed, what can I assume about a
-particular entity being used?".
-
 If the entity is declared within the same module as the code that's using it,
 then the code is permitted to know all the details of how the entity is
 declared. After all, if the entity is changed, the code that's using it will be
-recompiled.
-
-However, if the entity is declared in another module, then the code using it
-must be more conservative, and will therefore receive more conservative answers
-to its queries. For example, a stored property may report itself as computed.
-
-The presence of versioned fragility attributes makes the situation more
-complicated. Within a client function that requires version 1.5 of a particular
-library, the compiler should be able to take advantage of any fragility
-information (and performance assertions) introduced prior to version 1.5.
-
-
-Inlinable Code
-~~~~~~~~~~~~~~
-
-By default, the availability context for a library always includes the latest
-version of the library itself, since that code is always distributed as a unit.
-However, this is not true for functions that have been marked inlinable (see
-`Inlinable Functions`_ above). Inlinable code must be treated as if it is
-outside the current module, since once it's inlined it will be.
-
-For inlinable code, the availability context is exactly the same as the
-equivalent non-inlinable code except that the assumed version of the
-containing library is the version attached to the ``@inlinable`` attribute, or
-the version of the library in which the entity was introduced, and any `library
-version dependencies <#declaring-library-version-dependencies>`_ or minimum
-deployment target must be specified explicitly using ``@available``. Code
-within this context must be treated as if the containing library were just a
-normal dependency.
-
-A versioned inlinable function still has an exported symbol in the library
-binary, which may be used when the function is referenced from a client rather
-than called. This version of the function is not subject to the same
-restrictions as the version that may be inlined, and so it may be desirable to
-compile a function twice: once for inlining, once for maximum performance.
-
-If the body of an inlinable function is used in any way by a client module
-(say, to determine that it does not read any global variables), that module
-must take care to emit and use its own copy of the function. This is because
-analysis of the function body may not apply to the version of the function
-currently in the library.
-
-
-Local Availability Contexts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Swift availability contexts aren't just at the declaration level; they also
-cover specific regions of code inside function bodies as well. These "local"
-constructs are formed using the ``#available`` construct, which performs a
-dynamic check.
-
-In theory, it would be legal to allow code dominated by a ``#available`` check
-to take advantage of additional fragility information introduced by the more
-restrictive dependencies that were checked for. However, this is an additional
-optimization that may be complicated to implement (and even to represent
-properly in SIL), and so it is not a first priority.
-
-
-Other Promises About Types
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Advanced users may want to promise more specific things about various types.
-These are similar to the internal ``effects`` attribute we have for functions,
-except that they can be enforced by the compiler.
-
-- ``trivial``: Promises that assignment just requires a fixed-size bit-for-bit
-  copy without any indirection or reference-counting operations.
-
-- ``maximumFootprint(sizeInBits: N, alignmentInBits: A)``: Promises that the
-  type's size and required alignment are at most N bits and A bits,
-  respectively. (Both may be smaller.)
-
-- ``fixedSize``: Promises that the type has *some* size known at compile-time,
-  allowing optimizations like promoting allocations to the stack. Only applies
-  to fixed-contents structs and closed enums, which can already infer this
-  information; the explicit annotation allows it to be enforced.
-
-Collectively these features are known as "performance assertions", to
-underscore the fact that they do not affect how a type is used at the source
-level, but do allow for additional optimizations. We may also expose some of
-these qualities to static or dynamic queries for performance-sensitive code.
-
-.. note:: Previous revisions of this document contained a ``noPayload``
-    assertion for enums. However, this doesn't actually offer any additional
-    optimization opportunities over combining ``trivial`` with
-    ``maximumFootprint``, and the latter is more flexible.
-
-.. note:: None of these names / spellings are final. The name "trivial" comes
-    from C++, though Swift's trivial is closer to C++'s "`trivially
-    copyable`__".
-
-All of these features need to be versioned, just like the more semantic
-fragility attributes above. The exact spelling is not proposed by this document.
-
-__ http://en.cppreference.com/w/cpp/types/is_trivially_copyable
-
-
-Resilience Domains
-==================
-
-As described in the `Introduction`_, the features and considerations discussed
-in this document do not apply to libraries distributed in a bundle with their
-clients. In this case, a client can rely on all the current implementation
-details of its libraries when compiling, since the same version of the library
-is guaranteed to be present at run time. This allows more optimization than
-would otherwise be possible.
-
-In some cases, a collection of libraries may be built and delivered together,
-even though their clients may be packaged separately. (For example, the ICU
-project is usually built into several library binaries, but these libraries are
-always distributed together.) While the *clients* cannot rely on a particular
-version of any library being present, the various libraries in the collection
-should be able to take advantage of the implementations of their dependencies
-also in the collection---that is, it should treat all entities as if marked
-with the appropriate fragility attributes. Modules in this sort of collection
-are said to be in the same *resilience domain.*
-
-Exactly how resilience domains are specified is not covered by this document,
-and indeed they are an additive feature. One possibility is that a library's
-resilience domain defaults to the name of the module, but can be overridden. If
-a client has the same resilience domain name as a library it is using, it may
-assume that version of the library will be present at run time.
-
-
-Deployments
-~~~~~~~~~~~
-
-Related to the concept of a resilience domain is a *deployment.* While a
-resilience domain allows related libraries to be compiled more efficiently,
-a deployment groups related libraries together to present semantic version
-information to clients. The simplest example of this might be an OS release:
-OS X 10.10.0 contains Foundation version 1151.16 and AppKit version 1343. A
-deployment thus acts as a "virtual dependency": clients that depend on
-OS X 10.10 can rely on the presence of both of the library versions above.
-
-The use of deployments allows clients to only have to think about aggregate
-dependencies, instead of listing every library they might depend on. It also
-allows library authors to build `many versions of a library`__ within a larger
-release cycle, as well as allowing a vendor to bundle together many libraries
-with uncoordinated release schedules and release them as a logical unit.
-
-__ https://developer.apple.com/library/ios/documentation/Cocoa/Reference/Foundation/Miscellaneous/Foundation_Constants/index.html#//apple_ref/doc/constant_group/Foundation_Framework_Version_Numbers
-
-There are lots of details to figure out here, including how to distribute this
-information. In particular, just like libraries publish the history of their
-own APIs, a deployment must publish the history of their included library
-versions, i.e. not just that OS X 10.10 contains Foundation 1151.16 and AppKit
-1343, but also that OS X 10.9 contains Foundation 1056 and AppKit 1265, and that
-OS X 10.8 contains Foundation 945.0 and AppKit 1187, and so on, back to the
-earliest version of the deployment that is supported.
-
-
-
-Checking Binary Compatibility
-=============================
-
-With this many manual controls, it's important that library owners be able to
-check their work. Therefore, we intend to build a tool that can compare two
-versions of a library's public interface, and present any suspect differences
-for verification. Important cases include but are not limited to:
-
-- Removal of versioned entities.
-
-- Incompatible modifications to versioned entities, such as added protocol
-  conformances lacking versioning information.
-
-- Unsafe `backdating <#backdating>`_.
-
-- Unsafe modifications to entities marked with fragility attributes, such as
-  adding a stored property to a ``@frozen`` struct.
-
-Wherever possible, this tool should also check for `binary-compatible
-source-breaking changes <binary-compatible source-breaking change>`, such as
-changing a default argument from ``false`` to ``true``.
-
-
-Automatic Versioning
-~~~~~~~~~~~~~~~~~~~~
-
-A possible extension of this "checker" would be a tool that *automatically*
-generates versioning information for entities in a library, given the previous
-public interface of the library. This would remove the need for versions on any
-of the fragility attributes, and declaring versioned API would be as simple as
-marking an entity ``public``. Obviously this would also remove the possibility
-of human error in managing library versions.
-
-However, making this tool has a number of additional difficulties beyond the
-simple checker tool:
-
-- The tool must be able to read past library interface formats. This is true
-  for a validation tool as well, but the cost of failure is much higher.
-  Similarly, the past version of a library *must* be available to correctly
-  compile a new version.
-
-- Because the information goes into a library's public interface, the
-  versioning tool must either be part of the compilation process, modify the
-  interface generated by compilation, or produce a sidecar file that can be
-  loaded when compiling the client. In any case, it must *produce* information
-  in addition to *consuming* it.
-
-- Occasionally a library owner may want to override the inferred versions. This
-  can be accomplished by providing explicit versioning information, as
-  described above.
-
-- Bugs in the tool manifest as bugs in client programs.
-
-Because this tool would require a fair amount of additional work, it is not
-part of this initial model. It is something we may decide to add in the future.
-
-
-Open Issues
-===========
-
-There are still a number of known issues with the model described in this
-document. We should endeavor to account for each of them, and if we can't come
-up with a satisfactory implementation we should at least make sure that they
-will not turn into pitfalls for library or client developers.
-
-
-Subclass and base both conform to protocol
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    // Library, version 1
-    class Elf {}
-    protocol Summonable {}
-
-::
-
-    // Client, version 1
-    class ShoemakingElf : Elf, Summonable {}
-
-::
-
-    // Library, version 2
-    @available(2.0)
-    extension Elf : Summonable {}
-
-Now ``ShoemakingElf`` conforms to ``Summonable`` in two different ways, which
-may be incompatible (especially if ``Summonable`` had associated types or
-requirements involving ``Self``).
-
-Additionally, the client can't even remove ``ShoemakingElf``'s conformance to
-``Summonable``, because it may itself be a library with other code depending on
-it. We could fix that with an annotation to explicitly inherent the conformance
-of ``Summonable`` from the base class, but even that may not be possible if
-there are incompatible associated types involved (because changing a member
-typealias is not a safe change).
-
-One solution is to disallow adding a conformance for an existing protocol to an
-``open`` class.
-
-
-Recompiling changes a protocol's implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    // Library, version 1
-    protocol MagicType {}
-    protocol Wearable {}
-    func use<T: MagicType>(_ item: T) {}
-
-::
-
-    // Client, version 1
-    struct Amulet : MagicType, Wearable {}
-    use(Amulet())
-
-::
-
-    // Library, version 2
-    protocol MagicType {
-      @available(2.0)
-      func equip() { print("Equipped.") }
-    }
-
-    extension Wearable where Self: MagicType {
-      @available(2.0)
-      func equip() { print("You put it on.") }
-    }
-
-    func use<T: MagicType>(_ item: T) { item.equip() }
-
-Before the client is recompiled, the implementation of ``equip()`` used for
-``Amulet`` instances can only be the default implementation, i.e. the one that
-prints "Equipped". However, recompiling the client will result in the
-constrained implementation being considered a "better" match for the protocol
-requirement, thus changing the behavior of the program.
-
-This should never change the *meaning* of a program, since the default
-implementation for a newly-added requirement should always be *correct.*
-However, it may have significantly different performance characteristics or
-side effects that would make the difference in behavior a surprise.
-
-This is similar to adding a new overload to an existing set of functions, which
-can also change the meaning of client code just by recompiling. However, the
-difference here is that the before-recompilation behavior was never requested
-or acknowledged by the client; it's just the best the library can do.
-
-A possible solution here is to require the client to acknowledge the added
-requirement in some way when it is recompiled.
-
-(We do not want to perform overload resolution at run time to find the best
-possible default implementation for a given type.)
+recompiled. However, if the entity is declared in another module, then the code
+using it must be more conservative, and will therefore receive more
+conservative answers to its queries. (For example, a stored property may be
+treated as computed.)
+
+As a special case, inlinable code must be treated as if it is outside the
+current module, since once it's inlined it will be.
 
 
 Summary
@@ -1628,34 +1084,6 @@ semantics and performance of client code, and so library owners also have tools
 to waive the ability to make certain future changes. The language guarantees
 that client code will never accidentally introduce implicit dependencies on
 specific versions of libraries.
-
-
-Related Proposals
-=================
-
-The following proposals (some currently in the process, some planned) will
-affect the model described in this document, or concern the parts of this
-document that affect language semantics:
-
-- Non-exhaustive enums (`SE-0192 <SE0192>`_)
-- Inlineable functions (`SE-0193 <SE0193>`_)
-- Frozen structs and enums (`SE-0260 <SE0260>`_)
-- (draft) `Overridable methods in extensions`_
-- (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
-- (planned) `Generalized existentials (values of protocol type) <Generics>`_
-- (planned) Removing the "constant" guarantee for 'let' across module boundaries
-- (future) Performance annotations for types
-- (future) Attributes for stored property accessors
-- (future) Stored properties in extensions
-
-.. _Overridable methods in extensions: https://github.com/jrose-apple/swift-evolution/blob/overridable-members-in-extensions/proposals/nnnn-overridable-members-in-extensions.md
-.. _Generics: https://github.com/apple/swift/blob/master/docs/GenericsManifesto.md#generalized-existentials
-.. _SE0192: https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md
-.. _SE0193: https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md
-.. _SE0260: https://github.com/apple/swift-evolution/blob/master/proposals/0260-library-evolution.md
-
-This does not mean all of these proposals need to be accepted, only that their
-acceptance or rejection will affect this document.
 
 
 Glossary
