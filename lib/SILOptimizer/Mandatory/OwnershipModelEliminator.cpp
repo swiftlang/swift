@@ -318,7 +318,7 @@ static bool stripOwnership(SILFunction &F) {
   OwnershipModelEliminatorVisitor Visitor(B);
 
   for (auto &BB : F) {
-    // Change all arguments to have ValueOwnershipKind::Any.
+    // Change all arguments to have ValueOwnershipKind::None.
     for (auto *Arg : BB.getArguments()) {
       Arg->setOwnershipKind(ValueOwnershipKind::None);
     }
