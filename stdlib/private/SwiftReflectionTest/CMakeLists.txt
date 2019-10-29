@@ -9,17 +9,15 @@ if (SWIFT_INCLUDE_TESTS)
     SWIFT_MODULE_DEPENDS_TVOS Darwin
     SWIFT_MODULE_DEPENDS_WATCHOS Darwin
     SWIFT_MODULE_DEPENDS_LINUX Glibc
+    SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
     INSTALL_IN_COMPONENT stdlib-experimental
     DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}")
 
   foreach(SDK ${SWIFT_SDKS})
-    if("${SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
-      foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-        set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-        add_dependencies(
-          "swiftSwiftReflectionTest${VARIANT_SUFFIX}"
-          "swift-reflection-test${VARIANT_SUFFIX}")
-      endforeach()
-    endif()
+    foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+      add_dependencies("swiftSwiftReflectionTest${VARIANT_SUFFIX}"
+        "swift-reflection-test${VARIANT_SUFFIX}")
+    endforeach()
   endforeach()
 endif()
