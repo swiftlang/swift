@@ -2237,7 +2237,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     // Check whether original function generic signature and parsed witness
     // generic have the same generic parameters.
     auto areGenericParametersConsistent = [&]() {
-      llvm::DenseSet<GenericParamKey> genericParamKeys;
+      llvm::SmallDenseSet<GenericParamKey, 4> genericParamKeys;
       for (auto *origGP : origGenSig->getGenericParams())
         genericParamKeys.insert(GenericParamKey(origGP));
       for (auto *witnessGP : witnessGenSig->getGenericParams())
@@ -2270,7 +2270,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
   auto *resultIndexSet = IndexSubset::get(
       P.Context, origFnType->getNumResults(), resultIndices);
   AutoDiffConfig config(parameterIndexSet, resultIndexSet, witnessGenSig);
-  return {{config, originalFunction}};
+  return std::make_pair(config, originalFunction);
 }
 // SWIFT_ENABLE_TENSORFLOW_END
 
