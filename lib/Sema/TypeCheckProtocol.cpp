@@ -3043,7 +3043,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
       auto conformance =
           TypeChecker::conformsToProtocol(Adoptee, derivableProto, DC, None);
-      if (!conformance.isInvalid() && conformance.isConcrete()) {
+      if (conformance.isConcrete()) {
         (void)conformance.getConcrete()->getWitnessDecl(derivable);
       }
     }

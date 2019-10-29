@@ -898,7 +898,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
         (ConformanceCheckFlags::InExpression |
          ConformanceCheckFlags::SuppressDependencyTracking |
          ConformanceCheckFlags::SkipConditionalRequirements));
-    if (!conformanceRef.isInvalid() && conformanceRef.isConcrete())
+    if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
 

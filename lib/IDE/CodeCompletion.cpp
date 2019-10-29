@@ -2107,7 +2107,7 @@ public:
         auto *Module = NTD->getParentModule();
         auto Conformance = Module->lookupConformance(
             BaseTy, ATD->getProtocol());
-        if (!Conformance.isInvalid() && Conformance.isConcrete()) {
+        if (Conformance.isConcrete()) {
           return Conformance.getConcrete()->getTypeWitness(
               const_cast<AssociatedTypeDecl *>(ATD));
         }

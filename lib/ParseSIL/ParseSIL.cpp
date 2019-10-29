@@ -6322,7 +6322,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 
   // FIXME: should we really allow a specialized or inherited conformance here?
   RootProtocolConformance *theConformance = nullptr;
-  if (!conf.isInvalid() && conf.isConcrete())
+  if (conf.isConcrete())
     theConformance = conf.getConcrete()->getRootConformance();
 
   SILWitnessTable *wt = nullptr;

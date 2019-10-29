@@ -436,7 +436,7 @@ namespace {
               TypeChecker::conformsToProtocol(
                         baseTy, proto, cs.DC,
                         ConformanceCheckFlags::InExpression);
-            if (!conformance.isInvalid() && conformance.isConcrete()) {
+            if (conformance.isConcrete()) {
               if (auto witness =
                       conformance.getConcrete()->getWitnessDecl(decl)) {
                 // Hack up an AST that we can type-check (independently) to get
