@@ -2580,7 +2580,7 @@ public:
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
       checkGenericParams(SD->getGenericParams(), SD);
-      TC.checkProtocolSelfRequirements(SD);
+      TypeChecker::checkProtocolSelfRequirements(SD);
     }
 
     TypeChecker::checkDeclAttributes(SD);
@@ -3188,7 +3188,7 @@ public:
     if (!FD->isInvalid()) {
       checkGenericParams(FD->getGenericParams(), FD);
       TC.checkReferencedGenericParams(FD);
-      TC.checkProtocolSelfRequirements(FD);
+      TypeChecker::checkProtocolSelfRequirements(FD);
     }
 
     checkAccessControl(TC, FD);
@@ -3429,7 +3429,7 @@ public:
     if (!CD->isInvalid()) {
       checkGenericParams(CD->getGenericParams(), CD);
       TC.checkReferencedGenericParams(CD);
-      TC.checkProtocolSelfRequirements(CD);
+      TypeChecker::checkProtocolSelfRequirements(CD);
     }
 
     TypeChecker::checkDeclAttributes(CD);

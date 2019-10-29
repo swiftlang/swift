@@ -246,6 +246,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
   // For a generic requirement in a protocol, make sure that the requirement
   // set didn't add any requirements to Self or its associated types.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+    auto &ctx = proto->getASTContext();
     auto protoSelf = proto->getSelfInterfaceType();
     auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
     for (auto req : sig->getRequirements()) {
@@ -261,12 +262,12 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      diagnose(decl,
-               diag::requirement_restricts_self,
-               decl->getDescriptiveKind(), decl->getFullName(),
-               req.getFirstType().getString(),
-               static_cast<unsigned>(req.getKind()),
-               req.getSecondType().getString());
+      ctx.Diags.diagnose(decl,
+                         diag::requirement_restricts_self,
+                         decl->getDescriptiveKind(), decl->getFullName(),
+                         req.getFirstType().getString(),
+                         static_cast<unsigned>(req.getKind()),
+                         req.getSecondType().getString());
     }
   }
 }

@@ -1034,7 +1034,7 @@ public:
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
-  void checkProtocolSelfRequirements(ValueDecl *decl);
+  static void checkProtocolSelfRequirements(ValueDecl *decl);
 
   /// All generic parameters of a generic function must be referenced in the
   /// declaration's type, otherwise we have no way to infer them.
