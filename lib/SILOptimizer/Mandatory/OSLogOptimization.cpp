@@ -76,6 +76,8 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -86,14 +88,14 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/MapVector.h"
-#include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/CFG.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
+#include "llvm/ADT/MapVector.h"
 
 using namespace swift;
 
@@ -177,10 +179,7 @@ public:
   /// Instruction from where folding must begin.
   SILInstruction *beginInstruction;
 
-  /// Instructions that mark the end points of folding. No folded SIL value must
-  /// be usable beyond these instructions (in the control-flow order). These
-  /// instructions are also used to emit destory instructions for non-trivial,
-  /// SIL values emitted during folding.
+  /// Instructions that mark the end points of constant evaluation.
   SmallSetVector<SILInstruction *, 2> endInstructions;
 
 private:
@@ -292,8 +291,14 @@ static bool isSILValueFoldable(SILValue value) {
   ASTContext &astContext = definingInst->getFunction()->getASTContext();
   SILType silType = value->getType();
 
+  // Fold only SIL values of integer or string type that are not one of the
+  // following: addresses, literals, instructions marking ownership access and
+  // scope, copy_value (as its operand will be folded), struct creations, or
+  // call to string literal initializer.
   return (!silType.isAddress() && !isa<LiteralInst>(definingInst) &&
-          !isa<StructInst>(definingInst) &&
+          !isa<LoadBorrowInst>(definingInst) &&
+          !isa<BeginBorrowInst>(definingInst) &&
+          !isa<CopyValueInst>(definingInst) && !isa<StructInst>(definingInst) &&
           !getStringMakeUTF8Init(definingInst) &&
           isIntegerOrStringType(silType, astContext));
 }
@@ -428,93 +433,155 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
 }
 
-/// Collect the end-of-lifetime instructions of the given SILValue. These are
-/// either release_value or destroy_value instructions.
-/// \param value SIL value whose end-of-lifetime instructions must be collected.
-/// \param lifetimeEndInsts buffer for storing the found end-of-lifetime
-/// instructions of 'value'.
-static void getLifetimeEndInstructionsOfSILValue(
-    SILValue value, SmallVectorImpl<SILInstruction *> &lifetimeEndInsts) {
+/// Collect the end points of the instructions that are data dependent on \c
+/// value. A instruction is data dependent on \c value if its result may
+/// transitively depends on \c value. Note that data dependencies through
+/// addresses are not tracked by this function.
+///
+/// \param value SILValue that is not an address.
+/// \param fun SILFunction that defines \c value.
+/// \param endUsers buffer for storing the found end points of the data
+/// dependence chain.
+static void
+getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
+                                 SmallVectorImpl<SILInstruction *> &endUsers) {
+  assert(!value->getType().isAddress());
 
-  bool continueLifetimeEndInstructionSearch = true;
-  SILValue currValue = value;
+  // Collect the instructions that are data dependent on the value using a
+  // fix point iteration.
+  SmallPtrSet<SILInstruction *, 16> visitedUsers;
+  SmallVector<SILValue, 16> worklist;
+  worklist.push_back(value);
 
-  while (continueLifetimeEndInstructionSearch) {
-    continueLifetimeEndInstructionSearch = false;
-
-    for (Operand *use : currValue->getUses()) {
+  while (!worklist.empty()) {
+    SILValue currVal = worklist.pop_back_val();
+    for (Operand *use : currVal->getUses()) {
       SILInstruction *user = use->getUser();
-
-      if (isa<ReleaseValueInst>(user) || isa<DestroyValueInst>(user)) {
-        lifetimeEndInsts.push_back(user);
+      if (visitedUsers.count(user))
         continue;
-      }
-
-      if (isa<CopyValueInst>(user)) {
-        auto *copyValueInst = cast<CopyValueInst>(user);
-        // Continue looking for the end-of-lifetime instruction for the
-        // result of copy_value.
-        currValue = copyValueInst;
-        continueLifetimeEndInstructionSearch = true;
-      }
+      visitedUsers.insert(user);
+      llvm::copy(user->getResults(), std::back_inserter(worklist));
     }
+  }
+
+  // At this point, visitedUsers have all the transitive, data-dependent uses.
+  // Compute the lifetime frontier of all the uses which are the instructions
+  // following the last uses. Every exit from the last uses will have a
+  // lifetime frontier.
+  SILInstruction *valueDefinition = value->getDefiningInstruction();
+  SILInstruction *def =
+      valueDefinition ? valueDefinition : &(value->getParentBlock()->front());
+  ValueLifetimeAnalysis lifetimeAnalysis =
+      ValueLifetimeAnalysis(def, SmallVector<SILInstruction *, 16>(
+                                     visitedUsers.begin(), visitedUsers.end()));
+  ValueLifetimeAnalysis::Frontier frontier;
+  bool hasCriticlEdges = lifetimeAnalysis.computeFrontier(
+      frontier, ValueLifetimeAnalysis::DontModifyCFG);
+  endUsers.append(frontier.begin(), frontier.end());
+  if (!hasCriticlEdges)
+    return;
+  // If there are some lifetime frontiers on the critical edges, take the
+  // first instruction of the target of the critical edge as the frontier. This
+  // will suffice as every exit from the visitedUsers must go through one of
+  // them.
+  for (auto edgeIndexPair : lifetimeAnalysis.getCriticalEdges()) {
+    SILBasicBlock *targetBB =
+        edgeIndexPair.first->getSuccessors()[edgeIndexPair.second];
+    endUsers.push_back(&targetBB->front());
   }
 }
 
-/// Emit instructions to destroy the folded value at the end of its use, if
-/// required. Since this pass folds only integers or strings and since the
-/// former is a trivial type, we only have to destroy strings that are folded.
-/// For strings, a release_value (or a destory_value instruction in ownership
-/// SIL) has to be emitted if it is not already present.
+/// Given an instruction \p inst, invoke the given clean-up function \p cleanup
+/// on its lifetime frontier, which are instructions that follow the last use of
+/// the results of \c inst. E.g. the clean-up function could destory/release
+/// the function result.
 static void
-destroyFoldedValueAtEndOfUse(SILValue foldedVal, SILValue originalVal,
-                             ArrayRef<SILInstruction *> endOfUseInsts,
-                             SILFunction *fun) {
-  // Folded value should have either trivial or owned ownership as it is an
-  // integer or string constant.
-  assert(foldedVal.getOwnershipKind() == ValueOwnershipKind::None ||
-         foldedVal.getOwnershipKind() == ValueOwnershipKind::Owned);
+cleanupAtEndOfLifetime(SILInstruction *inst,
+                       llvm::function_ref<void(SILInstruction *)> cleanup) {
+  ValueLifetimeAnalysis lifetimeAnalysis = ValueLifetimeAnalysis(inst);
+  ValueLifetimeAnalysis::Frontier frontier;
+  (void)lifetimeAnalysis.computeFrontier(
+      frontier, ValueLifetimeAnalysis::AllowToModifyCFG);
+  for (SILInstruction *lifetimeEndInst : frontier) {
+    cleanup(lifetimeEndInst);
+  }
+}
 
-  // If the ownership kinds of folded and original values are both either
-  // owned or trivial, there is nothing to do.
-  if (foldedVal.getOwnershipKind() == originalVal.getOwnershipKind()) {
+/// Replace all uses of \c originalVal by \c foldedVal and adjust lifetimes of
+/// original and folded values by emitting required destory/release instructions
+/// at the right places. Note that this function does not remove any
+/// instruction.
+///
+/// \param originalVal the SIL value that is replaced.
+/// \param foldedVal the SIL value that replaces the \c originalVal.
+/// \param fun the SIL function containing the \c foldedVal and \c originalVal
+static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
+                                          SILValue originalVal,
+                                          SILFunction *fun) {
+  SILInstruction *originalInst = originalVal->getDefiningInstruction();
+  SILInstruction *foldedInst = foldedVal->getDefiningInstruction();
+  assert(originalInst &&
+         "cannot constant fold function or basic block parameter");
+  assert(!isa<TermInst>(originalInst) &&
+         "cannot constant fold a terminator instruction");
+  assert(foldedInst && "constant value does not have a defining instruction");
+
+  // First, replace all uses of originalVal by foldedVal, and then adjust their
+  // lifetimes if necessary.
+  originalVal->replaceAllUsesWith(foldedVal);
+
+  if (originalVal->getType().isTrivial(*fun)) {
+    assert(foldedVal->getType().isTrivial(*fun));
     return;
   }
-  assert(originalVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+  assert(!foldedVal->getType().isTrivial(*fun));
 
-  // Here, the original value may be at +0 and hence may not be released.
-  // However, the folded value should always be released.
-  SmallVector<SILInstruction *, 2> lifeTimeEndInstsOfOriginal;
-  getLifetimeEndInstructionsOfSILValue(originalVal, lifeTimeEndInstsOfOriginal);
-
-  if (!lifeTimeEndInstsOfOriginal.empty()) {
-    // Here, the original value is released, and so would be the folded value.
+  if (!fun->hasOwnership()) {
+    // In non-ownership SIL, handle only folding of struct_extract instruction,
+    // which is the only important instruction that should be folded by this
+    // pass. Note that folding an arbitrary instruction in non-ownership SIL
+    // makes updating reference counts of the original value much harder and
+    // error prone.
+    // TODO: this code can be safely removed once ownership SIL becomes the
+    // default SIL this pass works on.
+    assert(isa<StructExtractInst>(originalInst));
+    cleanupAtEndOfLifetime(foldedInst, [&](SILInstruction *lifetimeEndInst) {
+      SILBuilderWithScope builder(lifetimeEndInst);
+      builder.emitReleaseValue(lifetimeEndInst->getLoc(), foldedVal);
+    });
     return;
   }
 
-  // Here, the original value is not released. Release the folded value at the
-  // 'endOfUse' instructions passed as parameter.
-  bool hasOwnership = fun->hasOwnership();
-  for (SILInstruction *endInst : endOfUseInsts) {
-    SILBuilderWithScope builder(endInst);
-    if (hasOwnership) {
-      builder.createDestroyValue(endInst->getLoc(), foldedVal);
-    } else {
-      builder.createReleaseValue(endInst->getLoc(), foldedVal,
-                                 builder.getDefaultAtomicity());
-    }
+  assert(foldedVal.getOwnershipKind() == ValueOwnershipKind::Owned &&
+         "constant value must have owned ownership kind");
+
+  if (originalVal.getOwnershipKind() == ValueOwnershipKind::Owned) {
+    // Destroy originalVal, which is now unused, immediately after its
+    // definition. Note that originalVal's destorys are now transferred to
+    // foldedVal.
+    SILInstruction *insertionPoint = &(*std::next(originalInst->getIterator()));
+    SILBuilderWithScope builder(insertionPoint);
+    SILLocation loc = insertionPoint->getLoc();
+    builder.emitDestroyValueOperation(loc, originalVal);
+    return;
   }
+
+  // Here, originalVal is not owned. Hence, destroy foldedVal at the end of its
+  // lifetime.
+  cleanupAtEndOfLifetime(foldedInst, [&](SILInstruction *lifetimeEndInst) {
+    SILBuilderWithScope builder(lifetimeEndInst);
+    builder.emitDestroyValueOperation(lifetimeEndInst->getLoc(), foldedVal);
+  });
+  return;
 }
 
 /// Given a fold state with constant-valued instructions, substitute the
 /// instructions with the constant values. The constant values could be strings
 /// or Stdlib integer-struct values or builtin integers.
 static void substituteConstants(FoldState &foldState) {
-
   ConstExprStepEvaluator &evaluator = foldState.constantEvaluator;
-  SmallVector<SILInstruction *, 4> deletedInsts;
-  auto endOfUseInsts = ArrayRef<SILInstruction *>(
-      foldState.endInstructions.begin(), foldState.endInstructions.end());
+  // Instructions that are possibly dead since their results are folded.
+  SmallVector<SILInstruction *, 4> possiblyDeadInsts;
 
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
@@ -522,6 +589,12 @@ static void substituteConstants(FoldState &foldState) {
 
     SILInstruction *definingInst = constantSILValue->getDefiningInstruction();
     assert(definingInst);
+    SILFunction *fun = definingInst->getFunction();
+
+    // Do not attempt to fold anything but struct_extract in non-OSSA.
+    // TODO: this condition should be removed once migration OSSA is complete.
+    if (!fun->hasOwnership() && !isa<StructExtractInst>(definingInst))
+      continue;
 
     SILBuilderWithScope builder(definingInst);
     SILLocation loc = definingInst->getLoc();
@@ -529,19 +602,12 @@ static void substituteConstants(FoldState &foldState) {
     SILValue foldedSILVal = emitCodeForSymbolicValue(
         constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
 
-    // Add an instruction to end the lifetime of the foldedSILVal, if necessary.
-    destroyFoldedValueAtEndOfUse(foldedSILVal, constantSILValue, endOfUseInsts,
-                                 definingInst->getFunction());
-
-    constantSILValue->replaceAllUsesWith(foldedSILVal);
-
-    if (isa<SingleValueInstruction>(definingInst)) {
-      deletedInsts.push_back(definingInst);
-    } // Otherwise, be conservative and do not delete the instruction as other
-    // results of the instruction could be used.
+    // Replace constantSILValue with foldedSILVal and adjust the lifetime and
+    // ownership of the values appropriately.
+    replaceAllUsesAndFixLifetimes(foldedSILVal, constantSILValue, fun);
+    possiblyDeadInsts.push_back(definingInst);
   }
-
-  recursivelyDeleteTriviallyDeadInstructions(deletedInsts, true,
+  recursivelyDeleteTriviallyDeadInstructions(possiblyDeadInsts, /*force*/ false,
                                              [&](SILInstruction *DeadI) {});
 }
 
@@ -581,8 +647,10 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
     return true;
   }
 
+  // The first (and only) property of OSLogMessage is the OSLogInterpolation
+  // instance.
   SymbolicValue osLogInterpolationValue =
-      osLogMessageValueOpt->lookThroughSingleElementAggregates();
+      osLogMessageValueOpt->getAggregateValue()[0];
   if (!osLogInterpolationValue.isConstant()) {
     diagnose(astContext, sourceLoc, diag::oslog_non_constant_interpolation);
     return true;
@@ -633,12 +701,14 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
 static void constantFold(SILInstruction *start,
                          SingleValueInstruction *oslogMessage,
                          unsigned assertConfig) {
+  SILFunction *fun = start->getFunction();
 
   // Initialize fold state.
-  SmallVector<SILInstruction *, 2> lifetimeEndInsts;
-  getLifetimeEndInstructionsOfSILValue(oslogMessage, lifetimeEndInsts);
+  SmallVector<SILInstruction *, 2> endUsersOfOSLogMessage;
+  getEndPointsOfDataDependentChain(oslogMessage, fun, endUsersOfOSLogMessage);
+  assert(!endUsersOfOSLogMessage.empty());
 
-  FoldState state(start->getFunction(), assertConfig, start, lifetimeEndInsts);
+  FoldState state(fun, assertConfig, start, endUsersOfOSLogMessage);
 
   auto errorInfo = collectConstants(state);
 

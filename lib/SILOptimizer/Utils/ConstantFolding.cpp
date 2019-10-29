@@ -1527,10 +1527,9 @@ constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
                                             bool enableDiagnostics) {
   // Look through string initializer to extract the string_literal instruction.
   //
-  // We allow for a single borrow to be stripped here if we are here in
-  // [ossa]. The begin borrow occurs b/c SILGen treats builtins as having
-  // arguments with a +0 convention (implying a borrow).
-  SILValue builtinOperand = stripBorrow(bi->getOperand(0));
+  // We can look through ownership instructions to get to the string value that
+  // is passed to this builtin.
+  SILValue builtinOperand = stripOwnershipInsts(bi->getOperand(0));
   SILFunction *caller = bi->getFunction();
 
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);
