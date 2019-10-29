@@ -105,20 +105,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 
 namespace {
 
-/// If the given instruction is a call to the compiler-intrinsic initializer
-/// of String that accepts string literals, return the called function.
-/// Otherwise, return nullptr.
-static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
-  auto *apply = dyn_cast<ApplyInst>(inst);
-  if (!apply)
-    return nullptr;
-
-  SILFunction *callee = apply->getCalleeFunction();
-  if (!callee || !callee->hasSemanticsAttr("string.makeUTF8"))
-    return nullptr;
-  return callee;
-}
-
 // A cache of string-related, SIL information that is needed to create and
 // initalize strings from raw string literals. This information is
 // extracted from instructions while they are constant evaluated. Though the
@@ -140,7 +126,7 @@ public:
     if (stringInitIntrinsic)
       return;
 
-    SILFunction *callee = getStringMakeUTF8Init(inst);
+    SILFunction *callee = StringLiteralInfo::getStringMakeUTF8Init(inst);
     if (!callee)
       return;
 
@@ -294,7 +280,7 @@ static bool isSILValueFoldable(SILValue value) {
 
   return (!silType.isAddress() && !isa<LiteralInst>(definingInst) &&
           !isa<StructInst>(definingInst) &&
-          !getStringMakeUTF8Init(definingInst) &&
+          !StringLiteralInfo::getStringMakeUTF8Init(definingInst) &&
           isIntegerOrStringType(silType, astContext));
 }
 

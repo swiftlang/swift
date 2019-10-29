@@ -27,6 +27,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
@@ -39,6 +41,81 @@ class SymbolicValue;
 class SymbolicValueAllocator;
 class ConstExprFunctionState;
 class UnknownReason;
+
+class StringLiteralInfo {
+  StringLiteralInfo() = default;
+
+public:
+  bool isAscii;
+  StringRef value;
+
+  static Optional<StringLiteralInfo> create(SILValue v) {
+    if (auto *inst = dyn_cast<ApplyInst>(v))
+      return create(inst);
+    return {};
+  }
+
+  static Optional<StringLiteralInfo> create(SILInstruction *inst) {
+    ApplyInst *makeStr = getStringMakeUTF8Apply(inst);
+    if (!makeStr)
+      return {};
+
+    auto strVal = getUTF8String(makeStr);
+    if (!makeStr)
+      return {};
+
+    StringLiteralInfo info;
+    info.value = strVal.getValue();
+    info.isAscii = getIsAscii(makeStr);
+    return info;
+  }
+
+  /// If the given instruction is a call to the compiler-intrinsic initializer
+  /// of String that accepts string literals, return the called function.
+  /// Otherwise, return nullptr.
+  static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
+    auto *apply = dyn_cast<ApplyInst>(inst);
+    if (!apply)
+      return nullptr;
+
+    SILFunction *callee = apply->getCalleeFunction();
+    if (!callee || !callee->hasSemanticsAttr("string.makeUTF8"))
+      return nullptr;
+    return callee;
+  }
+
+  /// Similar to getStringMakeUTF8Init but, gets the apply instruction instead.
+  static ApplyInst *getStringMakeUTF8Apply(SILInstruction *inst) {
+    auto *apply = dyn_cast<ApplyInst>(inst);
+    if (!apply)
+      return nullptr;
+
+    SILFunction *callee = apply->getCalleeFunction();
+    if (!callee || !callee->hasSemanticsAttr("string.makeUTF8"))
+      return nullptr;
+    return apply;
+  }
+
+  /// Gets an optional StringRef from a string init function.
+  static Optional<StringRef> getUTF8String(ApplyInst *makeStr) {
+    if (makeStr->getNumArguments() < 1)
+      return {};
+
+    if (auto *SL = dyn_cast<StringLiteralInst>(makeStr->getOperand(1)))
+      return SL->getValue();
+    return {};
+  }
+
+  /// Gets is string ascii from string init function.
+  static bool getIsAscii(ApplyInst *makeStr) {
+    if (makeStr->getNumArguments() < 3)
+      return false;
+
+    if (auto *isAscii = dyn_cast<IntegerLiteralInst>(makeStr->getOperand(3)))
+      return isAscii->getValue().getBoolValue();
+    return false;
+  }
+};
 
 /// This class is the main entrypoint for evaluating constant expressions.  It
 /// also handles caching of previously computed constexpr results.
