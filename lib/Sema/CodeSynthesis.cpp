@@ -911,12 +911,10 @@ static void collectNonOveriddenSuperclassInits(
 static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   // Bail out if we're validating one of our constructors already;
   // we'll revisit the issue later.
-  if (!decl->hasClangNode()) {
-    for (auto member : decl->getMembers()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (ctor->isRecursiveValidation())
-          return;
-      }
+  for (auto member : decl->getMembers()) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (ctor->isRecursiveValidation())
+        return;
     }
   }
 
@@ -925,33 +923,15 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   auto &ctx = decl->getASTContext();
   SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
-  if (decl->hasClangNode()) {
-    // Objective-C classes may have interesting initializers in extensions.
-    for (auto member : decl->lookupDirect(DeclBaseName::createConstructor())) {
-      auto ctor = dyn_cast<ConstructorDecl>(member);
-      if (!ctor)
-        continue;
-
-      // Swift initializers added in extensions of Objective-C classes can never
-      // be overrides.
-      if (!ctor->hasClangNode())
-        continue;
+  for (auto member : decl->getMembers()) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (!ctor->isInvalid()) {
+        auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
+        declaredInitializers.push_back({ctor, type});
+      }
 
       if (auto overridden = ctor->getOverriddenDecl())
         overriddenInits.insert(overridden);
-    }
-
-  } else {
-    for (auto member : decl->getMembers()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->isInvalid()) {
-          auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
-          declaredInitializers.push_back({ctor, type});
-        }
-
-        if (auto overridden = ctor->getOverriddenDecl())
-          overriddenInits.insert(overridden);
-      }
     }
   }
 
@@ -972,7 +952,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   // We can't define these overrides if we have any uninitialized
   // stored properties.
-  if (!defaultInitable && !foundDesignatedInit && !decl->hasClangNode())
+  if (!defaultInitable && !foundDesignatedInit)
     return;
 
   auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
@@ -1000,10 +980,6 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       }
       continue;
     }
-
-    // Everything after this is only relevant for Swift classes being defined.
-    if (decl->hasClangNode())
-      continue;
 
     // If the superclass initializer is not accessible from the derived
     // class, don't synthesize an override, since we cannot reference the
@@ -1087,6 +1063,10 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
 }
 
 static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
+  // Don't synthesize initializers for imported decls.
+  if (decl->hasClangNode())
+    return false;
+
   // Don't add implicit constructors in module interfaces.
   if (auto *SF = decl->getParentSourceFile())
     if (SF->Kind == SourceFileKind::Interface)
@@ -1216,10 +1196,6 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
   if (!shouldAttemptInitializerSynthesis(decl))
     return false;
 
-  // Don't synthesize a memberwise init for imported decls.
-  if (decl->hasClangNode())
-    return false;
-
   // If the user has already defined a designated initializer, then don't
   // synthesize a memberwise init.
   if (hasUserDefinedDesignatedInit(evaluator, decl))
@@ -1256,10 +1232,6 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
 
   if (!shouldAttemptInitializerSynthesis(decl))
-    return false;
-
-  // Don't synthesize a default for imported decls.
-  if (decl->hasClangNode())
     return false;
 
   if (auto *sd = dyn_cast<StructDecl>(decl)) {
