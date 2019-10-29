@@ -158,36 +158,6 @@ bool mergeBasicBlockWithSuccessor(SILBasicBlock *bb, DominanceInfo *domInfo,
 /// quadratic.
 bool mergeBasicBlocks(SILFunction *f);
 
-/// Given a list of \p UserBlocks and a list of \p DefBlocks, find a set of
-/// blocks that together with \p UserBlocks joint-postdominate \p
-/// DefBlocks. This is in a sense finding a set of blocks that "complete" \p
-/// UserBlocks with respect to \p DefBlocks. As an example, for the following
-/// CFG:
-///
-///       +-----+
-///       | Def |
-///       +-----+
-///       |     |
-///       v     v
-/// +-----+     +-----+
-/// |     |     | Use |
-/// +-----+     +-----+
-///
-/// the completion of the joint post-dominance set would be the empty
-/// block. This has two main uses:
-///
-/// 1. This can tell you the places where if you were to sink the Def one would
-/// need to insert "compensating code".
-///
-/// 2. It can be used to prove ownership correctness of @owned values by
-/// asserting that the set of UserBlocks has an empty completion, implying they
-/// jointly-post dominate the def.
-///
-/// *NOTE* This completion may not be unique.
-void completeJointPostDominanceSet(
-    ArrayRef<SILBasicBlock *> userBlocks, ArrayRef<SILBasicBlock *> defBlocks,
-    llvm::SmallVectorImpl<SILBasicBlock *> &completion);
-
 /// Return true if we conservatively find all bb's that are non-failure exit
 /// basic blocks and place them in \p bbs. If we find something we don't
 /// understand, bail.
