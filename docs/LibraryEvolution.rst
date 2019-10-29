@@ -148,6 +148,8 @@ No other changes are permitted; the following are particularly of note:
   not they have default arguments.
 - An ABI-public function that throws may not become non-throwing or vice versa.
 - The ``@escaping`` attribute may not be added to or removed from a parameter.
+- Adding or removing a function builder from a parameter is a
+  `binary-compatible source-breaking change`.
 
 
 Inlinable Functions
@@ -291,6 +293,11 @@ changes are permitted:
 - Adding or removing ``@NSCopying`` to/from a variable.
 - If the variable is get-only, or if it has a non-ABI-public setter, it may be
   replaced by a ``let`` constant.
+- Adding a property wrapper to a variable, or changing from one property
+  wrapper to another, as long as an ABI-public setter or projected value
+  (``$foo``) is not removed
+- Removing a property wrapper from a variable, as long as the property wrapper
+  didn't have a projected value (``$foo``).
 
 For an ABI-public module-scope constant declared with ``let``, the following
 changes are permitted:
@@ -341,6 +348,7 @@ the following changes are permitted:
 - Adding a conformance to an ABI-public protocol *that was introduced in the
   same release* (see below).
 - Adding or removing a conformance to a non-ABI-public protocol.
+- Adding ``@dynamicCallable`` to the struct.
 
 The important most aspect of a Swift struct is its value semantics, not its
 layout.
@@ -430,10 +438,11 @@ stored properties also must not have any observing accessors. In effect:
 - Adding a new protocol conformance is still permitted, per the usual
   restrictions.
 - Removing conformances to non-ABI-public protocols is still permitted.
+- Adding, changing, or removing property wrappers is not permitted.
 
 Additionally, if the type of any stored instance property includes a struct or
-enum, that struct or enum must be ABI-public. This includes generic parameters
-and members of tuples.
+enum, that struct or enum must be ABI-public. This includes generic parameters,
+members of tuples, and property wrappers for stored instance properties.
 
 .. note::
 
@@ -488,6 +497,7 @@ accommodate new values. More specifically, the following changes are permitted:
 - Removing any non-ABI-public members.
 - Adding a new protocol conformance, with the same restrictions as for structs.
 - Removing conformances to non-ABI-public protocols.
+- Adding ``@dynamicCallable`` to the enum.
 
 .. note::
 
@@ -599,6 +609,7 @@ support all of the following changes:
 - Adding a new protocol conformance (subject to the same restrictions as for
   structs).
 - Removing conformances to non-ABI-public protocols.
+- Adding ``@dynamicCallable`` to the class.
 
 Omitted from this list is the free addition of new members. Here classes are a
 little more restrictive than structs; they only allow the following changes:
@@ -721,6 +732,14 @@ Variable properties (those declared with ``var``) allow the following changes:
 - Adding or removing ``weak`` from a variable with ``Optional`` type.
 - Adding or removing ``unowned`` from a variable.
 - Adding or removing ``@NSCopying`` from a variable.
+- Adding a property wrapper to a non-``open`` variable, or changing from one
+  property wrapper to another, as long as an ABI-public setter or projected
+  value (``$foo``) is not removed.
+- Adding a property wrapper to an ``open`` variable, or changing from one
+  property wrapper to another, as long as an ABI-public setter or projected
+  value (``$foo``) is not added or removed.
+- Removing a property wrapper from a variable, as long as the property wrapper
+  didn't have a projected value (``$foo``).
 
 Adding a public setter to an ``open`` property is a
 `binary-compatible source-breaking change`; any existing overrides will not
