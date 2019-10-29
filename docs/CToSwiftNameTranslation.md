@@ -228,7 +228,7 @@ Objective-C methods are classified into one of five categories:
 
 5. Other methods are imported as plain methods.
 
-If a method overrides a superclass or adopted protocol method, the Swift name of the overridden method will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
+If a method overrides a superclass or matches a method in an adopted protocol, the Swift name of the "overridden" method will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
 
 
 ### Normal Initializers
@@ -454,7 +454,7 @@ Certain method parameters are automatically considered to have default argument 
 
 Property names are transformed according to the "omit needless words" process described in [CToSwiftNameTranslation-OmitNeedlessWords.md][]. This process attempts to omit superfluous type names and other words that make a name fit the Cocoa Naming Guidelines for Objective-C but not the Swift API Design Guidelines. The transformation is based on the property's type and the type of the enclosing context.
 
-If the getter of a property overrides a superclass or adopted protocol method that is also a property accessor, the Swift name of the overridden accessor's property will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
+If the getter of a property overrides a superclass method or matches a method in an adopted protocol that is also a property accessor, the Swift name of the "overridden" accessor's property will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
 
 Properties with the type `BOOL` or `Boolean` use the name of the getter as the name of the Swift property by default, rather than the name of the property in Objective-C. This accounts for a difference in Swift and Objective-C naming conventions for boolean properties that use "is".
 
@@ -479,7 +479,7 @@ _Objective-C code has historically not been consistent about whether the NSAcces
 
 ## `swift_private`
 
-The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override; in that case the name needs to match the overridden declaration.
+The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override or matches a protocol requirement; in that case the name needs to match the "overridden" declaration.
 
 ```objc
 @interface Example : NSObject
