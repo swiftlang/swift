@@ -10,6 +10,11 @@ class C {
   init(i: Builtin.Int64)
 }
 
+private class C2 {
+  var i: Builtin.Int64 { get set }
+  init(i: Builtin.Int64)
+}
+
 class Klass {}
 
 sil [transparent] [ossa] @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64 {
@@ -501,3 +506,81 @@ bb3:
   return %19 : $()
 }
 
+sil [ossa] [transparent] @devirt_callee : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64 {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $Builtin.Int64
+  %1a = integer_literal $Builtin.Int64, 0
+  store %1a to [trivial] %1 : $*Builtin.Int64
+  yield %1 : $*Builtin.Int64, resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %1 : $*Builtin.Int64
+  %6 = tuple ()
+  return %6 : $()
+
+bb2:
+  dealloc_stack %1 : $*Builtin.Int64
+  unwind
+}
+
+// Just make sure we actually inlined the begin_apply. We just want to make sure
+// we are not breaking ownership invariants by not properly borrowing %0.
+// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error Error {
+// CHECK-NOT: begin_apply
+// CHECK: } // end sil function 'begin_apply_devirt_caller'
+sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error Error {
+bb0(%0 : @owned $C2):
+  %1 = class_method %0 : $C2, #C2.i!modify.1 : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  br bb1
+
+bb1:
+  end_apply %tok
+  destroy_value %0 : $C2
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error Error {
+// CHECK-NOT: begin_apply
+// CHECK: } // end sil function 'begin_apply_devirt_caller_2'
+sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error Error {
+bb0(%0 : @owned $C2):
+  %1 = class_method %0 : $C2, #C2.i!modify.1 : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  br bb1
+
+bb1:
+  abort_apply %tok
+  destroy_value %0 : $C2
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error Error {
+// CHECK-NOT: begin_apply
+// CHECK: } // end sil function 'begin_apply_devirt_caller_3'
+sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error Error {
+bb0(%0 : @owned $C2):
+  %1 = class_method %0 : $C2, #C2.i!modify.1 : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_apply %tok
+  br bb3
+
+bb2:
+  abort_apply %tok
+  br bb3
+
+bb3:
+  destroy_value %0 : $C2
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+sil_vtable C2 {
+  #C2.i!modify.1: (C2) -> () -> () : @devirt_callee
+}
