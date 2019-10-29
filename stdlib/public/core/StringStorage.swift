@@ -332,10 +332,15 @@ final internal class __StringStorage
 // utilize malloc's small buckets while accounting for the trailing
 // _StringBreadCrumbs.
 //
+// If we don't need breadcrumbs (ASCII), we drop the "not a multiple of 16"
+// criterion.
+//
 // NOTE: We may still under-utilize the spare bytes from the actual allocation
 // for Strings ~1KB or larger, though at this point we're well into our growth
 // curve.
-private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
+private func determineCodeUnitCapacity(
+  _ desiredCapacity: Int,
+  mayNeedBreadcrumbs: Bool = true) -> Int {
 #if arch(i386) || arch(arm)
   // FIXME: Adapt to actual 32-bit allocator. For now, let's arrange things so
   // that the instance size will be a multiple of 4.
@@ -351,10 +356,18 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   let minCap = 1 + Swift.max(desiredCapacity, _SmallString.capacity)
   _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
 
-  // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
-  let capacity = ((minCap + 7) & -16) + 8
-  _internalInvariant(
-    capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
+  let capacity:Int
+  if mayNeedBreadcrumbs {
+    // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
+    capacity = ((minCap + 7) & -16) + 8
+    _internalInvariant(
+      capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
+  } else {
+    // Round up to the nearest
+    capacity = ((minCap + 7) & -8)
+    _internalInvariant(
+      capacity > desiredCapacity && capacity % 8 == 0)
+  }
   return capacity
 #endif
 }
@@ -389,11 +402,16 @@ extension __StringStorage {
 
   @_effects(releasenone)
   private static func create(
-    capacity: Int, countAndFlags: CountAndFlags
+    capacity: Int,
+    countAndFlags: CountAndFlags,
+    mayNeedBreadcrumbs: Bool = true
   ) -> __StringStorage {
     _internalInvariant(capacity >= countAndFlags.count)
 
-    let realCapacity = determineCodeUnitCapacity(capacity)
+    let realCapacity = determineCodeUnitCapacity(
+      capacity,
+      mayNeedBreadcrumbs: mayNeedBreadcrumbs
+    )
     _internalInvariant(realCapacity > capacity)
     return __StringStorage.create(
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
@@ -437,7 +455,10 @@ extension __StringStorage {
       mortalCount: bufPtr.count, isASCII: isASCII)
     _internalInvariant(capacity >= bufPtr.count)
     let storage = __StringStorage.create(
-      capacity: capacity, countAndFlags: countAndFlags)
+      capacity: capacity,
+      countAndFlags: countAndFlags,
+      mayNeedBreadcrumbs: !isASCII
+    )
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
     storage.mutableStart.initialize(from: addr, count: bufPtr.count)
     storage._invariantCheck()
