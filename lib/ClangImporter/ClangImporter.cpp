@@ -1844,6 +1844,7 @@ ClangImporter::Implementation::Implementation(
     ASTContext &ctx, const ClangImporterOptions &opts,
     DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx),
+      BuffersForDiagnostics(ctx.SourceMgr),
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),

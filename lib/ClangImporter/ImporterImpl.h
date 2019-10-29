@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "ClangAdapter.h"
+#include "ClangSourceBufferImporter.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -345,6 +346,13 @@ private:
   /// (through the Swift name lookup module file extension).
   LookupTableMap LookupTables;
 
+  /// A helper class used to bring Clang buffers into Swift's SourceManager
+  /// for the purpose of emitting diagnostics.
+  ///
+  /// Listed early so that it gets torn down after the underlying Clang
+  /// instances that also use these buffers.
+  importer::ClangSourceBufferImporter BuffersForDiagnostics;
+
   /// The fake buffer used to import modules.
   ///
   /// \see getNextIncludeLoc
@@ -649,6 +657,10 @@ public:
   
   clang::CodeGenOptions &getClangCodeGenOpts() const {
     return Instance->getCodeGenOpts();
+  }
+
+  importer::ClangSourceBufferImporter &getBufferImporterForDiagnostics() {
+    return BuffersForDiagnostics;
   }
 
   /// Imports the given header contents into the Clang context.
