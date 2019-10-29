@@ -5116,8 +5116,20 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       return;
   }
 
-  if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
-    return;
+  if (!ParsedTypeLoc.isNull() && !typecheckParsedType()) {
+    // If we think we parsed a type but it doesn't type check as a type, see if
+    // it's a qualifying module name and recover if so.
+    if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
+      SmallVector<ImportDecl::AccessPathElement, 4> AccessPath;
+      for (auto Component : ITR->getComponentRange())
+        AccessPath.push_back({ Component->getIdentifier(),
+                               Component->getIdLoc() });
+      if (auto Module = Context.getLoadedModule(AccessPath))
+        ParsedTypeLoc.setType(ModuleType::get(Module));
+    }
+    if (ParsedTypeLoc.isNull())
+      return;
+  }
 
   CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
                           CurDeclContext, &CompletionContext);

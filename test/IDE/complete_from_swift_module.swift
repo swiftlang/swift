@@ -21,6 +21,12 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | %FileCheck %s -check-prefix=ERROR_COMMON
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=STDLIB_TYPE_QUALIFIED > %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=STDLIB_TYPE_QUALIFIED < %t.compl.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_TYPE_QUALIFIED > %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_TYPE_QUALIFIED < %t.compl.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=POSTFIX_OPERATOR_1 < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=NEGATIVE_POSTFIX_OPERATOR_1 < %t.compl.txt
@@ -99,3 +105,20 @@ func testPostfixOperator1(x: Int) {
 // TOP_LEVEL_1-DAG: Decl[GlobalVar]/Local:     hiddenImport[#Int#]{{; name=.+$}}
 // TOP_LEVEL_1-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]:     globalVar[#Int#]{{; name=.+$}}
 // TOP_LEVEL_1: End completions
+
+struct Foo: Swift.Array.#^STDLIB_TYPE_QUALIFIED^# {}
+// STDLIB_TYPE_QUALIFIED: Begin completions
+// STDLIB_TYPE_QUALIFIED: Decl[TypeAlias]/CurrNominal: Index[#Int#]; name=Index
+// STDLIB_TYPE_QUALIFIED: Decl[TypeAlias]/CurrNominal: Element[#Element#]; name=Element
+// STDLIB_TYPE_QUALIFIED: Keyword/None: Type[#Array.Type#]; name=Type
+// STDLIB_TYPE_QUALIFIED: End completions
+
+func foo() -> foo_swift_module.#^MODULE_TYPE_QUALIFIED^# {}
+// MODULE_TYPE_QUALIFIED: Begin completions
+// MODULE_TYPE_QUALIFIED: Decl[Protocol]/OtherModule[foo_swift_module]: BarProtocol[#BarProtocol#]; name=BarProtocol
+// MODULE_TYPE_QUALIFIED: Decl[Enum]/OtherModule[foo_swift_module]: MyQuickLookObject[#MyQuickLookObject#]; name=MyQuickLookObject
+// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct1[#BarGenericSwiftStruct1#]; name=BarGenericSwiftStruct1
+// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: FooSwiftStruct[#FooSwiftStruct#]; name=FooSwiftStruct
+// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct2[#BarGenericSwiftStruct2#]; name=BarGenericSwiftStruct2
+// MODULE_TYPE_QUALIFIED: Keyword/None: Type[#module<foo_swift_module>.Type#]; name=Type
+// MODULE_TYPE_QUALIFIED: End completions
