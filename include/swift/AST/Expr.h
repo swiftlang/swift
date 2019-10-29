@@ -454,7 +454,7 @@ public:
   /// Enumerate each immediate child expression of this node, invoking the
   /// specific functor on it.  This ignores statements and other non-expression
   /// children.
-  void forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
+  void forEachImmediateChildExpr(llvm::function_ref<void(Expr *)> callback);
 
   /// Enumerate each expr node within this expression subtree, invoking the
   /// specific functor on it.  This ignores statements and other non-expression

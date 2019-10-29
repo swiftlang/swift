@@ -4328,19 +4328,18 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
   // independently invalid.
   bool errorInSubExpr = false;
   
-  E->forEachImmediateChildExpr([&](Expr *Child) -> Expr* {
+  E->forEachImmediateChildExpr([&](Expr *Child) {
     // If we already found an error, stop checking.
-    if (errorInSubExpr) return Child;
+    if (errorInSubExpr) return;
 
     // Otherwise just type check the subexpression independently.  If that
     // succeeds, then we stitch the result back into our expression.
     if (typeCheckChildIndependently(Child, TCC_AllowLValue))
-      return Child;
+      return;
 
     // Otherwise, it failed, which emitted a diagnostic.  Keep track of this
     // so that we don't emit multiple diagnostics.
     errorInSubExpr = true;
-    return Child;
   });
   
   // If any of the children were errors, we're done.

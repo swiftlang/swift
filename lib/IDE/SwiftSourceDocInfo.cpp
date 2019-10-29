@@ -805,7 +805,6 @@ static Expr* getSingleNonImplicitChild(Expr *Parent) {
   llvm::SmallVector<Expr*, 4> Children;
   Parent->forEachImmediateChildExpr([&](Expr *E) {
     Children.push_back(E);
-    return E;
   });
 
   // If more than one children are found, we are not sure the non-implicit node.

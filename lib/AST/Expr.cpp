@@ -383,12 +383,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
 void Expr::
-forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
+forEachImmediateChildExpr(llvm::function_ref<void(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    llvm::function_ref<Expr *(Expr *)> callback;
+    llvm::function_ref<void(Expr *)> callback;
     Expr *ThisNode;
     
-    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
+    ChildWalker(llvm::function_ref<void(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -398,7 +398,8 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
         return { true, E };
 
       // Otherwise we must be a child of our expression, enumerate it!
-      return { false, callback(E) };
+      callback(E);
+      return { false, E };
     }
     
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
