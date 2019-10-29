@@ -783,18 +783,20 @@ public:
                            TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
-  void checkUnsupportedProtocolType(Decl *decl);
+  static void checkUnsupportedProtocolType(Decl *decl);
 
   /// Check for unsupported protocol types in the given statement.
-  void checkUnsupportedProtocolType(Stmt *stmt);
+  static void checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           TrailingWhereClause *whereClause);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           GenericParamList *genericParams);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   static GenericEnvironment *

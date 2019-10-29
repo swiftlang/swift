@@ -2241,7 +2241,7 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
-    TC.checkUnsupportedProtocolType(decl);
+    TypeChecker::checkUnsupportedProtocolType(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = TC.Context;
