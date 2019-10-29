@@ -1,11 +1,17 @@
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// Round-trip parsing/printing test.
+
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck --check-prefix=ROUNDTRIP %s
+
+// Round-trip serialization-deserialization test.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name main
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name main
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name main | %FileCheck %s
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name main | %FileCheck --check-prefix=ROUNDTRIP %s
 
-// Round-trip parsing/printing and serialization/deserialization test.
+// IRGen test.
+
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
 
 sil_stage raw
 
@@ -38,11 +44,16 @@ sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thi
   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 }
 
-// CHECK-LABEL: // differentiability witness for foo
-// CHECK: sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
-// CHECK:   jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK: }
+// ROUNDTRIP-LABEL: // differentiability witness for foo
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// IRGEN-LABEL: @AD__foo_PSRS = protected global { i8*, i8* } {
+// IRGEN-SAME: @AD__foo__jvp_src_0_wrt_0
+// IRGEN-SAME: @AD__foo__vjp_src_0_wrt_0
+// IRGEN-SAME: }
 
 // Test internal generic function.
 // SIL differentiability witness:
@@ -71,11 +82,16 @@ sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where 
   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
 }
 
-// CHECK-LABEL: // differentiability witness for generic
-// CHECK: sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
-// CHECK:   jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
-// CHECK:   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
-// CHECK: }
+// ROUNDTRIP-LABEL: // differentiability witness for generic
+// ROUNDTRIP: sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+// ROUNDTRIP:   jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+// ROUNDTRIP:   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+// ROUNDTRIP: }
+
+// IRGEN-LABEL: @AD__generic_PSSRSs15_DifferentiableRzl = hidden global { i8*, i8* } {
+// IRGEN-SAME: @AD__generic__jvp_src_0_wrt_0_1
+// IRGEN-SAME: @AD__generic__vjp_src_0_wrt_0_1
+// IRGEN-SAME: }
 
 // Test SIL differentiability witness for bodiless original function, with defined jvp/vjp.
 
@@ -96,11 +112,16 @@ sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@conven
   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 }
 
-// CHECK-LABEL: // differentiability witness for externalFn1
-// CHECK: sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
-// CHECK:   jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK: }
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn1
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// IRGEN-LABEL: @AD__externalFn1_PSRS = protected global { i8*, i8* } {
+// IRGEN-SAME: @AD__externalFn1__jvp_src_0_wrt_0
+// IRGEN-SAME: @AD__externalFn1__vjp_src_0_wrt_0
+// IRGEN-SAME: }
 
 // Test SIL differentiability witness for bodiless original function, with bodiless jvp/vjp.
 
@@ -115,11 +136,24 @@ sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@conven
   vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 }
 
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn2
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// IRGEN-LABEL: @AD__externalFn2_PSRS = protected global { i8*, i8* } {
+// IRGEN-SAME: @AD__externalFn2__jvp_src_0_wrt_0
+// IRGEN-SAME: @AD__externalFn2__vjp_src_0_wrt_0
+// IRGEN-SAME: }
+
 // Test SIL differentiability witness declaration.
 
 sil @externalFn3 : $@convention(thin) (Float) -> Float
 
 sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float
 
-// CHECK-LABEL: // differentiability witness for externalFn3
-// CHECK: sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float{{[^{]*$}}
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn3
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float{{[^{]*$}}
+
+// IRGEN-NOT: @AD__externalFn3{{.*}}={{.*}}{ i8*, i8* }
