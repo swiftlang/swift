@@ -563,14 +563,14 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case SelfTypeRelationship::ConformsTo:
-        assert(!conformance.isInvalid());
+        assert(conformance);
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
                          cast<ProtocolDecl>(outerDC2)->getDeclaredType(),
                          locator);
         break;
 
       case SelfTypeRelationship::ConformedToBy:
-        assert(!conformance.isInvalid());
+        assert(conformance);
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
                          cast<ProtocolDecl>(outerDC1)->getDeclaredType(),
                          locator);

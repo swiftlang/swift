@@ -3982,7 +3982,7 @@ static void diagnoseConformanceFailure(Type T,
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
-      !TypeChecker::containsProtocol(T, Proto, DC, None).isInvalid()) {
+      TypeChecker::containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
@@ -4091,7 +4091,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
     if (auto superclass = layout.getSuperclass()) {
       auto result =
           TypeChecker::conformsToProtocol(superclass, Proto, DC, options);
-      if (!result.isInvalid()) {
+      if (result) {
         return result;
       }
     }

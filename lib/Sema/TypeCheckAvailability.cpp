@@ -2644,12 +2644,10 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
     Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
-  return !TypeChecker::conformsToProtocol(ty, integerType, DC,
-                                          ConformanceCheckFlags::InExpression)
-              .isInvalid() ||
-         !TypeChecker::conformsToProtocol(ty, floatingType, DC,
-                                          ConformanceCheckFlags::InExpression)
-              .isInvalid();
+  return TypeChecker::conformsToProtocol(ty, integerType, DC,
+                                         ConformanceCheckFlags::InExpression) ||
+         TypeChecker::conformsToProtocol(ty, floatingType, DC,
+                                         ConformanceCheckFlags::InExpression);
 }
 
 

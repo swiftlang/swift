@@ -1082,9 +1082,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return !TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
-                                            ConformanceCheckOptions())
-                .isInvalid();
+    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
+                                                 ConformanceCheckOptions());
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1098,9 +1097,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return !TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
-                                          ConformanceCheckOptions())
-              .isInvalid();
+  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
+                                               ConformanceCheckOptions());
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1194,9 +1192,8 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
 
   // If this is `subscript(dynamicMember: String*)`
-  return !TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
-                                          ConformanceCheckOptions())
-              .isInvalid();
+  return (bool)TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
+                                               ConformanceCheckOptions());
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1628,9 +1625,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      TypeChecker::conformsToProtocol(CD->getDeclaredType(),
-                                      ApplicationDelegateProto, CD, None)
-          .isInvalid()) {
+      !TypeChecker::conformsToProtocol(CD->getDeclaredType(),
+                                       ApplicationDelegateProto, CD, None)) {
     TC.diagnose(attr->getLocation(),
                 diag::attr_ApplicationMain_not_ApplicationDelegate,
                 applicationMainKind);

@@ -2294,7 +2294,7 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
     auto conformance = TypeChecker::conformsToProtocol(
         errorCodeType, errorCodeProtocol, getDC(),
         ConformanceCheckFlags::InExpression);
-    if (!conformance.isInvalid()) {
+    if (conformance) {
       Type errorType =
           conformance
               .getTypeWitnessByName(errorCodeType, getASTContext().Id_ErrorType)

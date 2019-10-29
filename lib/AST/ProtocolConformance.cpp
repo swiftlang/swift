@@ -131,7 +131,7 @@ ProtocolConformanceRef::subst(Type origType,
     auto optConformance =
         proto->getModuleContext()->lookupExistentialConformance(substType,
                                                                 proto);
-    if (!optConformance.isInvalid())
+    if (optConformance)
       return optConformance;
 
     return ProtocolConformanceRef::forInvalid();

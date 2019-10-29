@@ -643,7 +643,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // then just erase the NSError.
     auto storedNSErrorConformance =
         SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
-    if (!storedNSErrorConformance.isInvalid()) {
+    if (storedNSErrorConformance) {
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(existentialTL.getLoweredType());
 

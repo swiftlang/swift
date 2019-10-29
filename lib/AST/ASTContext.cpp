@@ -3168,8 +3168,8 @@ void SILFunctionType::Profile(
   if (errorResult) errorResult->profile(id);
   id.AddBoolean(isGenericSignatureImplied);
   substitutions.profile(id);
-  id.AddBoolean(!conformance.isInvalid());
-  if (!conformance.isInvalid())
+  id.AddBoolean((bool)conformance);
+  if (conformance)
     id.AddPointer(conformance.getRequirement());
 }
 
@@ -4167,7 +4167,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
             = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
         auto conformance = dc->getParentModule()->lookupConformance(
             nominal->getDeclaredType(), objcBridgeable);
-        if (!conformance.isInvalid()) {
+        if (conformance) {
           result =
               ForeignRepresentationInfo::forBridged(conformance.getConcrete());
         }
@@ -4320,8 +4320,8 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   };
 
   // Do we conform to _ObjectiveCBridgeable?
-  auto conformance = findConformance(KnownProtocolKind::ObjectiveCBridgeable);
-  if (!conformance.isInvalid()) {
+  if (auto conformance =
+          findConformance(KnownProtocolKind::ObjectiveCBridgeable)) {
     // The corresponding value type is... the type.
     if (bridgedValueType)
       *bridgedValueType = type;
@@ -4331,7 +4331,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   }
 
   // Do we conform to Error?
-  if (!findConformance(KnownProtocolKind::Error).isInvalid()) {
+  if (findConformance(KnownProtocolKind::Error)) {
     // The corresponding value type is Error.
     if (bridgedValueType)
       *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
@@ -4465,8 +4465,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   auto lookupConformanceFn =
       [&](CanType depTy, Type substTy,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
-    auto conf = subMap.lookupConformance(depTy, proto);
-    if (!conf.isInvalid())
+    if (auto conf = subMap.lookupConformance(depTy, proto))
       return conf;
 
     return ProtocolConformanceRef(proto);

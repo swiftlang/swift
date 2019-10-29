@@ -2423,8 +2423,7 @@ public:
     }
 
     auto witnessMethodConformance = ProtocolConformanceRef::forInvalid();
-    auto conformance = origType->getWitnessMethodConformanceOrInvalid();
-    if (!conformance.isInvalid()) {
+    if (auto conformance = origType->getWitnessMethodConformanceOrInvalid()) {
       assert(origType->getExtInfo().hasSelfParam());
       auto selfType = origType->getSelfParameter().getInterfaceType();
       // The Self type can be nested in a few layers of metatypes (etc.).

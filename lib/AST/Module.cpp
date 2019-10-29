@@ -748,8 +748,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // If the existential is class-constrained, the class might conform
   // concretely.
   if (auto superclass = layout.explicitSuperclass) {
-    auto result = lookupConformance(superclass, protocol);
-    if (!result.isInvalid())
+    if (auto result = lookupConformance(superclass, protocol))
       return result;
   }
 
@@ -765,8 +764,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     // If the protocol has a superclass constraint, we might conform
     // concretely.
     if (auto superclass = protoDecl->getSuperclass()) {
-      auto result = lookupConformance(superclass, protocol);
-      if (!result.isInvalid())
+      if (auto result = lookupConformance(superclass, protocol))
         return result;
     }
 
@@ -800,8 +798,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      auto inheritedConformance = lookupConformance(super, protocol);
-      if (!inheritedConformance.isInvalid()) {
+      if (auto inheritedConformance = lookupConformance(super, protocol)) {
         return ProtocolConformanceRef(ctx.getInheritedConformance(
             type, inheritedConformance.getConcrete()));
       }
@@ -860,7 +857,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol);
-    assert(!inheritedConformance.isInvalid() &&
+    assert(inheritedConformance &&
            "We already found the inherited conformance");
 
     // Create the inherited conformance entry.

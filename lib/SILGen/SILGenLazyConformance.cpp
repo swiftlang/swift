@@ -109,16 +109,14 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
       return;
 
     if (objectiveCBridgeable) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, objectiveCBridgeable);
-      if (!subConformance.isInvalid())
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, objectiveCBridgeable))
         useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, bridgedStoredNSError);
-      if (!subConformance.isInvalid())
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, bridgedStoredNSError))
         useConformance(subConformance);
     }
   });

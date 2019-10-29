@@ -506,7 +506,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);
-      if (conformance.isInvalid()) {
+      if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
       }

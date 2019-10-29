@@ -1738,7 +1738,7 @@ namespace {
 
       FuncDecl *fn = nullptr;
 
-      if (!bridgedToObjectiveCConformance.isInvalid()) {
+      if (bridgedToObjectiveCConformance) {
         assert(bridgedToObjectiveCConformance.getConditionalRequirements()
                    .empty() &&
                "cannot conditionally conform to _BridgedToObjectiveC");
@@ -1773,7 +1773,7 @@ namespace {
           },
           [&](CanType origType, Type replacementType,
               ProtocolDecl *protoType) -> ProtocolConformanceRef {
-            assert(!bridgedToObjectiveCConformance.isInvalid());
+            assert(bridgedToObjectiveCConformance);
             return bridgedToObjectiveCConformance;
           });
 
@@ -2004,9 +2004,8 @@ namespace {
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (TypeChecker::conformsToProtocol(type, protocol, cs.DC,
-                                          ConformanceCheckFlags::InExpression)
-              .isInvalid()) {
+      if (!TypeChecker::conformsToProtocol(
+              type, protocol, cs.DC, ConformanceCheckFlags::InExpression)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = tc.getProtocol(
@@ -2015,9 +2014,8 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (TypeChecker::conformsToProtocol(type, protocol, cs.DC,
-                                          ConformanceCheckFlags::InExpression)
-              .isInvalid()) {
+      if (!TypeChecker::conformsToProtocol(
+              type, protocol, cs.DC, ConformanceCheckFlags::InExpression)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = tc.getProtocol(
             expr->getLoc(),
@@ -2136,8 +2134,7 @@ namespace {
         auto conformance =
           TypeChecker::conformsToProtocol(type, proto, cs.DC,
                                           ConformanceCheckFlags::InExpression);
-        assert(!conformance.isInvalid() &&
-               "string interpolation type conforms to protocol");
+        assert(conformance && "string interpolation type conforms to protocol");
 
         DeclName constrName(tc.Context, DeclBaseName::createConstructor(), argLabels);
 
@@ -2243,8 +2240,7 @@ namespace {
       auto conformance =
         TypeChecker::conformsToProtocol(conformingType, proto, cs.DC,
                                         ConformanceCheckFlags::InExpression);
-      assert(!conformance.isInvalid() &&
-             "object literal type conforms to protocol");
+      assert(conformance && "object literal type conforms to protocol");
 
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
 
@@ -2904,7 +2900,7 @@ namespace {
       auto conformance =
         TypeChecker::conformsToProtocol(arrayTy, arrayProto, cs.DC,
                                         ConformanceCheckFlags::InExpression);
-      assert(!conformance.isInvalid() && "Type does not conform to protocol?");
+      assert(conformance && "Type does not conform to protocol?");
 
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
@@ -4655,7 +4651,7 @@ namespace {
         auto hashableConformance =
           TypeChecker::conformsToProtocol(indexType, hashable, cs.DC,
                                           ConformanceCheckFlags::InExpression);
-        assert(!hashableConformance.isInvalid());
+        assert(hashableConformance);
 
         conformances.push_back(hashableConformance);
       }
@@ -6119,7 +6115,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         TypeChecker::conformsToProtocol(
                         cs.getType(expr), hashable, cs.DC,
                         ConformanceCheckFlags::InExpression);
-      assert(!conformance.isInvalid() && "must conform to Hashable");
+      assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
           new (tc.Context) AnyHashableErasureExpr(expr, toType, conformance));
@@ -6605,7 +6601,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   if (builtinProtocol) {
     auto builtinConformance = TypeChecker::conformsToProtocol(
         type, builtinProtocol, cs.DC, ConformanceCheckFlags::InExpression);
-    if (!builtinConformance.isInvalid()) {
+    if (builtinConformance) {
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
       auto witness = builtinConformance.getWitnessByName(
@@ -6638,7 +6634,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   assert(protocol && "requirements should have stopped recursion");
   auto conformance = TypeChecker::conformsToProtocol(type, protocol, cs.DC,
                                            ConformanceCheckFlags::InExpression);
-  assert(!conformance.isInvalid() && "must conform to literal protocol");
+  assert(conformance && "must conform to literal protocol");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
   if (!literalType.empty()) {

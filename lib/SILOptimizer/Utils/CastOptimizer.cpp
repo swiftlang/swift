@@ -483,7 +483,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
       mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
   auto conf = mod.getSwiftModule()->lookupConformance(sourceType, bridgedProto);
-  assert(!conf.isInvalid() && "_ObjectiveCBridgeable conformance should exist");
+  assert(conf && "_ObjectiveCBridgeable conformance should exist");
   (void)conf;
 
   // Generate code to invoke _bridgeToObjectiveC

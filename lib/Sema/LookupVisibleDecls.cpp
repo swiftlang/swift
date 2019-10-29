@@ -405,8 +405,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // couldn't be computed, so assume they conform in such cases.
     if (!BaseTy->hasUnboundGenericType()) {
       if (auto res = Conformance->getConditionalRequirementsIfAvailable()) {
-        if (!res->empty() &&
-            Module->conformsToProtocol(BaseTy, Proto).isInvalid())
+        if (!res->empty() && !Module->conformsToProtocol(BaseTy, Proto))
           continue;
       }
     }
@@ -697,8 +696,7 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy) {
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
     if (BaseTy->getClassOrBoundGenericClass()) {
-      auto Conformance = M->lookupConformance(BaseTy, Proto);
-      if (!Conformance.isInvalid()) {
+      if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
         auto *Superclass = Conformance.getConcrete()
                                ->getRootConformance()
                                ->getType()

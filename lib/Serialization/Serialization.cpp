@@ -3981,8 +3981,7 @@ public:
         fnTy->getNumYields(), fnTy->getNumResults(),
         S.addGenericSignatureRef(sig), variableData);
 
-    auto conformance = fnTy->getWitnessMethodConformanceOrInvalid();
-    if (!conformance.isInvalid())
+    if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);
   }
 

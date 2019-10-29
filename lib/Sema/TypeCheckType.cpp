@@ -2732,7 +2732,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     witnessMethodConformance = TypeChecker::conformsToProtocol(
         selfType, protocolType->getDecl(), DC, ConformanceCheckOptions());
-    assert(!witnessMethodConformance.isInvalid() &&
+    assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }
 

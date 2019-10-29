@@ -558,7 +558,7 @@ public:
           auto conformance =
               Conformance->getGenericSignature()->lookupConformance(type,
                                                                     protocol);
-          assert(!conformance.isInvalid() &&
+          assert(conformance &&
                  "unable to find conformance that should be known");
 
           ConditionalConformances.push_back(

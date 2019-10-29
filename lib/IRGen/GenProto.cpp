@@ -956,8 +956,7 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
       rootConformance, [&](unsigned, CanType type, ProtocolDecl *proto) {
         auto substType = type.subst(subMap)->getCanonicalType();
         auto reqConformance = subMap.lookupConformance(type, proto);
-        assert(!reqConformance.isInvalid() &&
-               "conditional conformance must be valid");
+        assert(reqConformance && "conditional conformance must be valid");
 
         tables.push_back(emitWitnessTableRef(IGF, substType, reqConformance));
         return /*finished?*/ false;

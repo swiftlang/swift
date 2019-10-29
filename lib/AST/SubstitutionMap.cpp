@@ -355,8 +355,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // Check whether the superclass conforms.
   if (auto superclass = genericSig->getSuperclassBound(type)) {
     LookUpConformanceInSignature lookup(getGenericSignature().getPointer());
-    auto conformance = lookup(type->getCanonicalType(), superclass, proto);
-    if (!conformance.isInvalid())
+    if (auto conformance = lookup(type->getCanonicalType(), superclass, proto))
       return conformance;
   }
 

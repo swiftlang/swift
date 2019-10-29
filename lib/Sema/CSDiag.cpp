@@ -798,7 +798,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     auto conformance = TypeChecker::conformsToProtocol(
         fromType, PT->getDecl(), CS.DC, ConformanceCheckFlags::InExpression,
         expr->getLoc());
-    if (!conformance.isInvalid()) {
+    if (conformance) {
       if (conformance.isAbstract() || !conformance.getConcrete()->isInvalid())
         return false;
     }
@@ -3670,7 +3670,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   // Check to see if the contextual type conforms.
   auto Conformance = TypeChecker::conformsToProtocol(
       contextualType, ALC, CS.DC, ConformanceCheckFlags::InExpression);
-  if (!Conformance.isInvalid()) {
+  if (Conformance) {
     Type contextualElementType =
         Conformance
             .getTypeWitnessByName(contextualType,

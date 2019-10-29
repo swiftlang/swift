@@ -4416,8 +4416,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         auto conformance =
             getLookupConformanceFn()(dependentType, subjectType, proto->getDecl());
 
-        // FIXME: diagnose if there's an invalid conformance.
-        if (!conformance.isInvalid()) {
+        // FIXME: diagnose if there's no conformance.
+        if (conformance) {
           if (addConditionalRequirements(conformance, inferForModule,
                                          source.getLoc()))
             return ConstraintResult::Conflicting;

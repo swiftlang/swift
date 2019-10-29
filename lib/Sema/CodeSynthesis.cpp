@@ -429,8 +429,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     auto lookupConformanceFn =
         [&](CanType depTy, Type substTy,
             ProtocolDecl *proto) -> ProtocolConformanceRef {
-      auto conf = subMap.lookupConformance(depTy, proto);
-      if (!conf.isInvalid())
+      if (auto conf = subMap.lookupConformance(depTy, proto))
         return conf;
 
       return ProtocolConformanceRef(proto);

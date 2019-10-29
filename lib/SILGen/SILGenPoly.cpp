@@ -177,7 +177,7 @@ collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) 
   for (auto proto : protocols) {
     auto conformance =
       M->lookupConformance(fromType, proto->getDecl());
-    assert(!conformance.isInvalid());
+    assert(conformance);
     conformances.push_back(conformance);
   }
   

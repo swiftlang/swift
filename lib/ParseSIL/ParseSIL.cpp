@@ -1766,14 +1766,11 @@ static bool getConformancesForSubstitution(Parser &P,
   for (auto protoTy : protocols) {
     auto conformance = M->lookupConformance(subReplacement,
                                             protoTy->getDecl());
-    if (!conformance.isInvalid()) {
-      conformances.push_back(conformance);
-      continue;
+    if (conformance.isInvalid()) {
+      P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement, protoTy);
+      return true;
     }
-
-    P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
-               protoTy);
-    return true;
+    conformances.push_back(conformance);
   }
 
   return false;
@@ -1821,8 +1818,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
       [&](CanType dependentType, Type replacementType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
         auto M = SP.P.SF.getParentModule();
-        auto conformance = M->lookupConformance(replacementType, proto);
-        if (!conformance.isInvalid())
+        if (auto conformance = M->lookupConformance(replacementType, proto))
           return conformance;
 
         SP.P.diagnose(loc, diag::sil_substitution_mismatch, replacementType,

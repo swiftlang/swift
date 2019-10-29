@@ -4349,7 +4349,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         type, protocol, DC,
         (ConformanceCheckFlags::InExpression |
          ConformanceCheckFlags::SkipConditionalRequirements));
-    if (!conformance.isInvalid()) {
+    if (conformance) {
       return recordConformance(conformance);
     }
   } break;
@@ -4360,7 +4360,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         type, protocol, DC,
         (ConformanceCheckFlags::InExpression |
          ConformanceCheckFlags::SkipConditionalRequirements));
-    if (!conformance.isInvalid()) {
+    if (conformance) {
       return recordConformance(conformance);
     }
   } break;

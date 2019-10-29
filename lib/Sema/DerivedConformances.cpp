@@ -170,7 +170,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto conformance = TypeChecker::conformsToProtocol(
         nominal->getDeclaredInterfaceType(), proto, nominal,
         ConformanceCheckFlags::SkipConditionalRequirements);
-    if (!conformance.isInvalid()) {
+    if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
       if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))

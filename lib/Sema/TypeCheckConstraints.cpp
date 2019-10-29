@@ -4325,9 +4325,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&
-              conformsToProtocol(toType, protocolDecl, dc,
-                                 ConformanceCheckFlags::InExpression)
-                  .isInvalid()) {
+              !conformsToProtocol(toType, protocolDecl, dc,
+                                  ConformanceCheckFlags::InExpression)) {
             return failed();
           }
         }

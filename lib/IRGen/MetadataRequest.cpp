@@ -473,7 +473,7 @@ namespace {
       requirements.enumerateFulfillments(
           IGF.IGM, subs,
           [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
-            if (!conf.isInvalid()) {
+            if (conf) {
               Values.push_back(emitWitnessTableRef(IGF, type, conf));
             } else {
               Values.push_back(IGF.emitAbstractTypeMetadataRef(type));

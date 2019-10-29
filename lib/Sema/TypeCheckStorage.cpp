@@ -884,8 +884,7 @@ checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var, Type type) {
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    auto result = TypeChecker::conformsToProtocol(type, proto, dc, None);
-    if (!result.isInvalid())
+    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc, None))
       return result;
   }
 
@@ -923,7 +922,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // The element type must conform to NSCopying.  If not, emit an error and just
   // recovery by synthesizing without the copy call.
   auto conformance = checkConformanceToNSCopying(Ctx, VD, underlyingType);
-  if (conformance.isInvalid())
+  if (!conformance)
     return Val;
 
   //- (id)copyWithZone:(NSZone *)zone;

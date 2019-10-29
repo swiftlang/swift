@@ -806,7 +806,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
                                               conformanceOptions, loc);
 
-        if (!conformance.isInvalid()) {
+        if (conformance) {
           // Report the conformance.
           if (listener && valid && current.Parents.empty()) {
             listener->satisfiedConformance(rawFirstType, firstType,

@@ -2288,7 +2288,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
-        if (conformance.isInvalid())
+        if (!conformance)
           return DependentMemberType::get(lookupBaseType, assocType);
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
@@ -3079,9 +3079,8 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
-    return !TypeChecker::conformsToProtocol(type, proto, cs.DC,
-                                            ConformanceCheckFlags::InExpression)
-                .isInvalid();
+    return (bool)TypeChecker::conformsToProtocol(
+        type, proto, cs.DC, ConformanceCheckFlags::InExpression);
   return false;
 }
 

@@ -536,9 +536,8 @@ bool GenericSignatureImpl::isRequirementSatisfied(Requirement requirement) {
     if (canFirstType->isTypeParameter())
       return conformsToProtocol(canFirstType, protocol);
     else
-      return !GSB->lookupConformance(/*dependentType=*/CanType(), canFirstType,
-                                     protocol)
-                  .isInvalid();
+      return (bool)GSB->lookupConformance(/*dependentType=*/CanType(),
+                                          canFirstType, protocol);
   }
 
   case RequirementKind::SameType: {

@@ -1541,11 +1541,10 @@ computeAutomaticEnumValueKind(EnumDecl *ED) {
   
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
-  auto conformsToProtocol = [&](KnownProtocolKind protoKind) -> bool {
+  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
     ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return !TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext(),
-                                            None)
-                .isInvalid();
+    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext(),
+                                           None);
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -4595,9 +4594,8 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     // For literal-convertible types, form the corresponding literal.
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
   if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) {     \
-    auto conf = tc.conformsToProtocol(type, proto, dc,                         \
-                                      ConformanceCheckFlags::InExpression);    \
-    if (!conf.isInvalid())                                                     \
+    if (tc.conformsToProtocol(type, proto, dc,                                 \
+                              ConformanceCheckFlags::InExpression))            \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
@@ -4683,7 +4681,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     auto ref = TypeChecker::conformsToProtocol(
         superclassType, decodableProto, superclassDecl,
         ConformanceCheckOptions(), SourceLoc());
-    if (!ref.isInvalid()) {
+    if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
       //
@@ -4710,7 +4708,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       auto ref =
           tc.conformsToProtocol(superclassType, encodableProto, superclassDecl,
                                 ConformanceCheckOptions(), SourceLoc());
-      if (!ref.isInvalid()) {
+      if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
         // The direct lookup here won't see an encode(to:) if it is inherited

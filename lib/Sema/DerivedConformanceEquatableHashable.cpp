@@ -92,9 +92,8 @@ storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                        DC, None)
-            .isInvalid()) {
+    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
+                                         DC, None)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
