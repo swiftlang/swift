@@ -315,11 +315,11 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
     NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
     // This is only used for diagnostics, so always use KnownPrivate.
     LookupOptions |= NameLookupFlags::KnownPrivate;
-    auto startLookup = TC.lookupUnqualified(DC, startName, UDRE->getLoc(),
-                                       LookupOptions);
+    auto startLookup = TypeChecker::lookupUnqualified(
+        DC, startName, UDRE->getLoc(), LookupOptions);
     if (!startLookup) continue;
-    auto endLookup = TC.lookupUnqualified(DC, endName, UDRE->getLoc(),
-                                          LookupOptions);
+    auto endLookup = TypeChecker::lookupUnqualified(DC, endName, UDRE->getLoc(),
+                                                    LookupOptions);
     if (!endLookup) continue;
 
     // If the overall operator is a binary one, then we're looking at
@@ -1404,10 +1404,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
       // See if the type has a member type with this name.
-      auto Result = TC.lookupMemberType(DC,
-                                        TD->getDeclaredInterfaceType(),
-                                        Name,
-                                        lookupOptions);
+      auto Result = TypeChecker::lookupMemberType(
+          DC, TD->getDeclaredInterfaceType(), Name, lookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1462,10 +1460,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
       // See if there is a member type with this name.
-      auto Result = TC.lookupMemberType(DC,
-                                        BaseTy,
-                                        Name,
-                                        lookupOptions);
+      auto Result =
+          TypeChecker::lookupMemberType(DC, BaseTy, Name, lookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1963,7 +1959,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!literal)
     return nullptr;
 
-  auto *protocol = TC.getLiteralProtocol(literal);
+  auto *protocol = TypeChecker::getLiteralProtocol(TC.Context, literal);
   if (!protocol)
     return nullptr;
 
@@ -2914,8 +2910,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *sequenceProto
-        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
+      ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+          cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
         return true;
       }

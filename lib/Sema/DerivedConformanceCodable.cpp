@@ -93,17 +93,13 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
 /// Returns whether the given variable conforms to the given {En,De}codable
 /// protocol.
 ///
-/// \param tc The typechecker to use in validating {En,De}codable conformance.
-///
-/// \param context The \c DeclContext in which to check conformance.
+/// \param DC The \c DeclContext in which to check conformance.
 ///
 /// \param varDecl The \c VarDecl to validate.
 ///
 /// \param proto The \c ProtocolDecl to check conformance to.
-static CodableConformanceType varConformsToCodable(TypeChecker &tc,
-                                                   DeclContext *context,
-                                                   VarDecl *varDecl,
-                                                   ProtocolDecl *proto) {
+static CodableConformanceType
+varConformsToCodable(DeclContext *DC, VarDecl *varDecl, ProtocolDecl *proto) {
   // If the decl doesn't yet have a type, we may be seeing it before the type
   // checker has gotten around to evaluating its type. For example:
   //
@@ -117,8 +113,8 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   //              //    hasn't yet been evaluated
   // }
   bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
-  return typeConformsToCodable(context, varDecl->getValueInterfaceType(),
-                               isIUO, proto);
+  return typeConformsToCodable(DC, varDecl->getValueInterfaceType(), isIUO,
+                               proto);
 }
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
@@ -135,7 +131,6 @@ static Identifier getVarNameForCoding(VarDecl *var) {
 /// \param codingKeysDecl The \c CodingKeys enum decl to validate.
 static bool validateCodingKeysEnum(DerivedConformance &derived,
                                    EnumDecl *codingKeysDecl) {
-  auto &tc = derived.TC;
   auto conformanceDC = derived.getConformanceContext();
 
   // Look through all var decls in the given type.
@@ -161,8 +156,8 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
   for (auto elt : codingKeysDecl->getAllElements()) {
     auto it = properties.find(elt->getName());
     if (it == properties.end()) {
-      tc.diagnose(elt->getLoc(), diag::codable_extraneous_codingkey_case_here,
-                  elt->getName());
+      elt->diagnose(diag::codable_extraneous_codingkey_case_here,
+                    elt->getName());
       // TODO: Investigate typo-correction here; perhaps the case name was
       //       misspelled and we can provide a fix-it.
       propertiesAreValid = false;
@@ -171,7 +166,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
 
     // We have a property to map to. Ensure it's {En,De}codable.
     auto conformance =
-        varConformsToCodable(tc, conformanceDC, it->second, derived.Protocol);
+        varConformsToCodable(conformanceDC, it->second, derived.Protocol);
     switch (conformance) {
       case Conforms:
         // The property was valid. Remove it from the list.
@@ -179,9 +174,8 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
         break;
 
       case DoesNotConform:
-        tc.diagnose(it->second->getLoc(),
-                    diag::codable_non_conforming_property_here,
-                    derived.getProtocolType(), it->second->getType());
+        it->second->diagnose(diag::codable_non_conforming_property_here,
+                             derived.getProtocolType(), it->second->getType());
         LLVM_FALLTHROUGH;
 
       case TypeNotValidated:
@@ -215,8 +209,8 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
       // The var was not default initializable, and did not have an explicit
       // initial value.
       propertiesAreValid = false;
-      tc.diagnose(it->second->getLoc(), diag::codable_non_decoded_property_here,
-                  derived.getProtocolType(), it->first);
+      it->second->diagnose(diag::codable_non_decoded_property_here,
+                           derived.getProtocolType(), it->first);
     }
   }
 
@@ -241,8 +235,7 @@ struct CodingKeysValidity {
 ///
 /// \returns A \c CodingKeysValidity value representing the result of the check.
 static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
-  auto &tc = derived.TC;
-  auto &C = tc.Context;
+  auto &C = derived.Context;
   auto codingKeysDecls =
       derived.Nominal->lookupDirect(DeclName(C.Id_CodingKeys));
   if (codingKeysDecls.empty())
@@ -255,9 +248,8 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
 
   auto *codingKeysTypeDecl = dyn_cast<TypeDecl>(result);
   if (!codingKeysTypeDecl) {
-    tc.diagnose(result->getLoc(),
-                diag::codable_codingkeys_type_is_not_an_enum_here,
-                derived.getProtocolType());
+    result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
+                     derived.getProtocolType());
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
 
@@ -279,8 +271,8 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
                     codingKeysTypeDecl->getLoc() :
                     cast<TypeDecl>(result)->getLoc();
 
-    tc.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
-                derived.getProtocolType());
+    C.Diags.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
+                     derived.getProtocolType());
 
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
@@ -288,9 +280,9 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   // CodingKeys must be an enum for synthesized conformance.
   auto *codingKeysEnum = dyn_cast<EnumDecl>(codingKeysTypeDecl);
   if (!codingKeysEnum) {
-    tc.diagnose(codingKeysTypeDecl->getLoc(),
-                diag::codable_codingkeys_type_is_not_an_enum_here,
-                derived.getProtocolType());
+    codingKeysTypeDecl->diagnose(
+        diag::codable_codingkeys_type_is_not_an_enum_here,
+        derived.getProtocolType());
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
 
@@ -303,8 +295,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
 ///
 /// If able to synthesize the enum, adds it directly to \c derived.Nominal.
 static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
-  auto &tc = derived.TC;
-  auto &C = tc.Context;
+  auto &C = derived.Context;
   // Create CodingKeys in the parent type always, because both
   // Encodable and Decodable might want to use it, and they may have
   // different conditional bounds. CodingKeys is simple and can't
@@ -348,7 +339,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     // concurrently checking the variables for the current protocol
     // conformance being synthesized, for which we use the conformance
     // context, not the type.
-    auto conformance = varConformsToCodable(tc, derived.getConformanceContext(),
+    auto conformance = varConformsToCodable(derived.getConformanceContext(),
                                             varDecl, derived.Protocol);
     switch (conformance) {
       case Conforms:
@@ -363,9 +354,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
       }
 
       case DoesNotConform:
-        tc.diagnose(varDecl->getLoc(),
-                    diag::codable_non_conforming_property_here,
-                    derived.getProtocolType(), varDecl->getType());
+        varDecl->diagnose(diag::codable_non_conforming_property_here,
+                          derived.getProtocolType(), varDecl->getType());
         LLVM_FALLTHROUGH;
 
       case TypeNotValidated:
@@ -380,7 +370,10 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     return nullptr;
 
   // Forcibly derive conformance to CodingKey.
-  tc.checkConformancesInContext(enumDecl, enumDecl);
+  //
+  // FIXME: Drop the dependency on the type checker.
+  auto *tc = static_cast<TypeChecker *>(C.getLazyResolver());
+  tc->checkConformancesInContext(enumDecl, enumDecl);
 
   // Add to the type.
   target->addMember(enumDecl);
@@ -706,7 +699,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
 ///
 /// Adds the function declaration to the given type before returning it.
 static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto conformanceDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (Encoder) throws -> ()
@@ -985,7 +978,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 ///
 /// Adds the function declaration to the given type before returning it.
 static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
   auto conformanceDC = derived.getConformanceContext();
@@ -1056,8 +1049,6 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
   //
   // If the required initializer is not available, we shouldn't attempt to
   // synthesize CodingKeys.
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
   auto proto = derived.Protocol;
   auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
   if (proto->isSpecificProtocol(KnownProtocolKind::Decodable) && classDecl) {
@@ -1072,11 +1063,13 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
         // super.init() must be accessible.
         // Passing an empty params array constructs a compound name with no
         // arguments (as opposed to a simple name when omitted).
-        memberName = DeclName(C, DeclBaseName::createConstructor(),
-                              ArrayRef<Identifier>());
+        memberName =
+            DeclName(derived.Context, DeclBaseName::createConstructor(),
+                     ArrayRef<Identifier>());
       }
 
-      auto result = tc.lookupMember(superclassDecl, superType, memberName);
+      auto result =
+          TypeChecker::lookupMember(superclassDecl, superType, memberName);
 
       if (result.empty()) {
         // No super initializer for us to call.
@@ -1138,9 +1131,9 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() != TC.Context.Id_encode) {
+  if (requirement->getBaseName() != Context.Id_encode) {
     // Unknown requirement.
-    TC.diagnose(requirement->getLoc(), diag::broken_encodable_requirement);
+    requirement->diagnose(diag::broken_encodable_requirement);
     return nullptr;
   }
 
@@ -1162,12 +1155,12 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   // diagnostics, then potentially collect notes. If we succeed in
   // synthesizing Encodable, we can cancel the transaction and get rid of the
   // fake failures.
-  DiagnosticTransaction diagnosticTransaction(TC.Context.Diags);
-  TC.diagnose(ConformanceDecl, diag::type_does_not_conform,
-              Nominal->getDeclaredType(), getProtocolType());
-  TC.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
-              requirement->getFullName(), getProtocolType(),
-              /*AddFixIt=*/false);
+  DiagnosticTransaction diagnosticTransaction(Context.Diags);
+  ConformanceDecl->diagnose(diag::type_does_not_conform,
+                            Nominal->getDeclaredType(), getProtocolType());
+  requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
+                        requirement->getFullName(), getProtocolType(),
+                        /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
@@ -1186,7 +1179,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
 
   if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
     // Unknown requirement.
-    TC.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
+    requirement->diagnose(diag::broken_decodable_requirement);
     return nullptr;
   }
 
@@ -1198,12 +1191,12 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   // diagnostics produced by canSynthesize and deriveDecodable_init to produce
   // them in the right order -- see the comment in deriveEncodable for
   // background on this transaction.
-  DiagnosticTransaction diagnosticTransaction(TC.Context.Diags);
-  TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
-              Nominal->getDeclaredType(), getProtocolType());
-  TC.diagnose(requirement, diag::no_witnesses,
-              diag::RequirementKind::Constructor, requirement->getFullName(),
-              getProtocolType(), /*AddFixIt=*/false);
+  DiagnosticTransaction diagnosticTransaction(Context.Diags);
+  ConformanceDecl->diagnose(diag::type_does_not_conform,
+                            Nominal->getDeclaredType(), getProtocolType());
+  requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
+                        requirement->getFullName(), getProtocolType(),
+                        /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
