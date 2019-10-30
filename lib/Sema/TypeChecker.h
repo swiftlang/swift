@@ -2024,13 +2024,13 @@ OverrideRequiresKeyword overrideRequiresKeyword(ValueDecl *overridden);
 
 /// Compute the type of a member that will be used for comparison when
 /// performing override checking.
-Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
-                                ValueDecl *derivedDecl = nullptr);
+Type getMemberTypeForComparison(const ValueDecl *member,
+                                const ValueDecl *derivedDecl = nullptr);
 
 /// Determine whether the given declaration is an override by comparing type
 /// information.
-bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
-                           ValueDecl *parentDecl, Type parentDeclTy);
+bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
+                           const ValueDecl *parentDecl, Type parentDeclTy);
 
 /// Determine whether the given declaration is an operator defined in a
 /// protocol. If \p type is not null, check specifically whether \p decl
