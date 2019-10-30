@@ -133,13 +133,9 @@ namespace {
 }
 
 AssociatedTypeInference::AssociatedTypeInference(
-                                       TypeChecker &tc,
-                                       NormalProtocolConformance *conformance)
-  : tc(tc), conformance(conformance), proto(conformance->getProtocol()),
-    dc(conformance->getDeclContext()),
-    adoptee(conformance->getType())
-{
-}
+    ASTContext &ctx, NormalProtocolConformance *conformance)
+    : ctx(ctx), conformance(conformance), proto(conformance->getProtocol()),
+      dc(conformance->getDeclContext()), adoptee(conformance->getType()) {}
 
 static bool associatedTypesAreSameEquivalenceClass(AssociatedTypeDecl *a,
                                                    AssociatedTypeDecl *b) {
@@ -212,13 +208,14 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
     auto selfTy = extension->getSelfInterfaceType();
+    auto *tc = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
     for (const Requirement &reqt : extensionSig->getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
         // FIXME: This is the wrong check
-        if (selfTy->isEqual(reqt.getFirstType())
-            && !tc.isSubtypeOf(conformance->getType(),reqt.getSecondType(), dc))
+        if (selfTy->isEqual(reqt.getFirstType()) &&
+            !tc->isSubtypeOf(conformance->getType(), reqt.getSecondType(), dc))
           return false;
         break;
 
@@ -489,8 +486,7 @@ static Type mapErrorTypeToOriginal(Type type) {
 }
 
 /// Produce the type when matching a witness.
-static Type getWitnessTypeForMatching(TypeChecker &tc,
-                                      NormalProtocolConformance *conformance,
+static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
   if (witness->isRecursiveValidation())
     return Type();
@@ -554,7 +550,6 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   return resultType.transform(mapErrorTypeToOriginal);
 }
 
-
 /// Remove the 'self' type from the given type, if it's a method type.
 static Type removeSelfParam(ValueDecl *value, Type type) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -570,8 +565,6 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
                    ConformanceChecker &checker,
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType) {
-  auto &tc = checker.TC;
-
   // Form the default name _Default_Foo.
   Identifier defaultName;
   {
@@ -603,7 +596,7 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
       continue;
 
     // Determine the witness type.
-    Type witnessType = getWitnessTypeForMatching(tc, conformance, typeDecl);
+    Type witnessType = getWitnessTypeForMatching(conformance, typeDecl);
     if (!witnessType) continue;
 
     if (auto witnessMetaType = witnessType->getAs<AnyMetatypeType>())
@@ -651,7 +644,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   inferred.Witness = witness;
 
   // Compute the requirement and witness types we'll use for matching.
-  Type fullWitnessType = getWitnessTypeForMatching(tc, conformance, witness);
+  Type fullWitnessType = getWitnessTypeForMatching(conformance, witness);
   if (!fullWitnessType) {
     return inferred;
   }
@@ -764,7 +757,6 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 }
 
 AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
-                                             TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
   if (assocType->hasDefaultDefinitionType())
@@ -774,7 +766,7 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
   SmallPtrSet<CanType, 4> canonicalTypes;
   SmallVector<AssociatedTypeDecl *, 2> results;
   for (auto overridden : assocType->getOverriddenDecls()) {
-    auto overriddenDefault = findDefaultedAssociatedType(tc, overridden);
+    auto overriddenDefault = findDefaultedAssociatedType(overridden);
     if (!overriddenDefault) continue;
 
     Type overriddenType =
@@ -824,7 +816,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
 Type AssociatedTypeInference::computeDefaultTypeWitness(
                                               AssociatedTypeDecl *assocType) {
   // Go find a default definition.
-  auto defaultedAssocType = findDefaultedAssociatedType(tc, assocType);
+  auto defaultedAssocType = findDefaultedAssociatedType(assocType);
   if (!defaultedAssocType) return Type();
 
   // If we don't have a default definition, we're done.
@@ -1984,7 +1976,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
 
 void ConformanceChecker::resolveTypeWitnesses() {
   // Attempt to infer associated type witnesses.
-  AssociatedTypeInference inference(TC, Conformance);
+  AssociatedTypeInference inference(getASTContext(), Conformance);
   if (auto inferred = inference.solve(*this)) {
     for (const auto &inferredWitness : *inferred) {
       recordTypeWitness(inferredWitness.first, inferredWitness.second,

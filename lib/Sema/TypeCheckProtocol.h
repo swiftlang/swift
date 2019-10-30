@@ -474,13 +474,13 @@ public:
       llvm::DenseMap<RequirementEnvironmentCacheKey, RequirementEnvironment>;
 
 protected:
-  TypeChecker &TC;
+  ASTContext &Context;
   ProtocolDecl *Proto;
   Type Adoptee;
   // The conforming context, either a nominal type or extension.
   DeclContext *DC;
 
-  ASTContext &getASTContext() const { return TC.Context; }
+  ASTContext &getASTContext() const { return Context; }
 
   // An auxiliary lookup table to be used for witnesses remapped via
   // @_implements(Protocol, DeclName)
@@ -490,8 +490,8 @@ protected:
 
   Optional<std::pair<AccessScope, bool>> RequiredAccessScopeAndUsableFromInline;
 
-  WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
-                 Type adoptee, DeclContext *dc);
+  WitnessChecker(ASTContext &ctx, ProtocolDecl *proto, Type adoptee,
+                 DeclContext *dc);
 
   bool isMemberOperator(FuncDecl *decl, Type type);
 
@@ -676,8 +676,8 @@ public:
   /// Emit any diagnostics that have been delayed.
   void emitDelayedDiags();
 
-  ConformanceChecker(TypeChecker &tc, NormalProtocolConformance *conformance,
-                     llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses,
+  ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
+                     llvm::SetVector<ValueDecl *> &GlobalMissingWitnesses,
                      bool suppressDiagnostics = true);
 
   /// Resolve all of the type witnesses.
@@ -712,7 +712,7 @@ public:
 /// Captures the state needed to infer associated types.
 class AssociatedTypeInference {
   /// The type checker we'll need to validate declarations etc.
-  TypeChecker &tc;
+  ASTContext &ctx;
 
   /// The conformance for which we are inferring associated types.
   NormalProtocolConformance *conformance;
@@ -752,12 +752,12 @@ class AssociatedTypeInference {
   unsigned numTypeWitnessesBeforeConflict = 0;
 
 public:
-  AssociatedTypeInference(TypeChecker &tc,
+  AssociatedTypeInference(ASTContext &ctx,
                           NormalProtocolConformance *conformance);
 
 private:
   /// Retrieve the AST context.
-  ASTContext &getASTContext() const { return tc.Context; }
+  ASTContext &getASTContext() const { return ctx; }
 
   /// Infer associated type witnesses for the given tentative
   /// requirement/witness match.
@@ -883,7 +883,6 @@ public:
 
   /// Find an associated type declaration that provides a default definition.
   static AssociatedTypeDecl *findDefaultedAssociatedType(
-                                                 TypeChecker &tc,
                                                  AssociatedTypeDecl *assocType);
 };
 

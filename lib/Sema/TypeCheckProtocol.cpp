@@ -896,9 +896,9 @@ static bool isBetterMatch(DeclContext *dc, ValueDecl *requirement,
   return false;
 }
 
-WitnessChecker::WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
+WitnessChecker::WitnessChecker(ASTContext &ctx, ProtocolDecl *proto,
                                Type adoptee, DeclContext *dc)
-    : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) {}
+    : Context(ctx), Proto(proto), Adoptee(adoptee), DC(dc) {}
 
 void
 WitnessChecker::lookupValueWitnessesViaImplementsAttr(
@@ -981,6 +981,8 @@ bool WitnessChecker::findBestWitness(
   bool anyFromUnconstrainedExtension;
   numViable = 0;
 
+  // FIXME: Remove dependnecy on the lazy resolver.
+  auto *TC = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
     SmallVector<ValueDecl *, 4> witnesses;
@@ -1028,8 +1030,8 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      auto match = matchWitness(TC, ReqEnvironmentCache, Proto, conformance, DC,
-                                requirement, witness);
+      auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, conformance,
+                                DC, requirement, witness);
       if (match.isViable()) {
         ++numViable;
         bestIdx = matches.size();
@@ -1053,7 +1055,7 @@ bool WitnessChecker::findBestWitness(
     if (conformance && !conformance->isInvalid()) {
       if (auto *SF = DC->getParentSourceFile()) {
         if (SF->Kind == SourceFileKind::Interface) {
-          auto match = matchWitness(TC, ReqEnvironmentCache, Proto,
+          auto match = matchWitness(*TC, ReqEnvironmentCache, Proto,
                                     conformance, DC, requirement, requirement);
           assert(match.isViable());
           numViable = 1;
@@ -1509,8 +1511,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
         // conformance is invalid for other reasons, so emit diagnosis now.
         if (revivedMissingWitnesses.empty()) {
           // Emit any delayed diagnostics.
-          ConformanceChecker(TC, conformance, MissingWitnesses, false).
-            emitDelayedDiags();
+          ConformanceChecker(getASTContext(), conformance, MissingWitnesses,
+                             false)
+              .emitDelayedDiags();
         }
       }
 
@@ -1712,7 +1715,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     return conformance;
 
   // The conformance checker we're using.
-  AllUsedCheckers.emplace_back(TC, conformance, MissingWitnesses);
+  AllUsedCheckers.emplace_back(getASTContext(), conformance, MissingWitnesses);
   MissingWitnesses.insert(revivedMissingWitnesses.begin(),
                           revivedMissingWitnesses.end());
 
@@ -2201,16 +2204,15 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 }
 
 ConformanceChecker::ConformanceChecker(
-                   TypeChecker &tc, NormalProtocolConformance *conformance,
-                   llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses,
-                   bool suppressDiagnostics)
-    : WitnessChecker(tc, conformance->getProtocol(),
-                     conformance->getType(),
+    ASTContext &ctx, NormalProtocolConformance *conformance,
+    llvm::SetVector<ValueDecl *> &GlobalMissingWitnesses,
+    bool suppressDiagnostics)
+    : WitnessChecker(ctx, conformance->getProtocol(), conformance->getType(),
                      conformance->getDeclContext()),
       Conformance(conformance), Loc(conformance->getLoc()),
       GlobalMissingWitnesses(GlobalMissingWitnesses),
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
-      SuppressDiagnostics(suppressDiagnostics) { }
+      SuppressDiagnostics(suppressDiagnostics) {}
 
 ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
@@ -2562,8 +2564,9 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     auto overriddenRootConformance =
         overriddenConformance.getConcrete()->getRootNormalConformance();
-    ConformanceChecker(TC, overriddenRootConformance, GlobalMissingWitnesses)
-      .recordTypeWitness(overridden, type, typeDecl);
+    ConformanceChecker(getASTContext(), overriddenRootConformance,
+                       GlobalMissingWitnesses)
+        .recordTypeWitness(overridden, type, typeDecl);
   }
 }
 
@@ -3368,7 +3371,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto match = matchWitness(TC, ReqEnvironmentCache, Proto, Conformance, DC,
+  auto *TC = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
+  auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, Conformance, DC,
                             requirement, derived);
   if (match.isViable()) {
     recordWitness(requirement, match);
@@ -5231,9 +5235,8 @@ void TypeChecker::resolveTypeWitness(
        AssociatedTypeDecl *assocType) {
   llvm::SetVector<ValueDecl*> MissingWitnesses;
   ConformanceChecker checker(
-                       *this, 
-                       const_cast<NormalProtocolConformance*>(conformance),
-                       MissingWitnesses);
+      Context, const_cast<NormalProtocolConformance *>(conformance),
+      MissingWitnesses);
   checker.resolveSingleTypeWitness(assocType);
   checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
@@ -5242,9 +5245,8 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
                                  ValueDecl *requirement) {
   llvm::SetVector<ValueDecl*> MissingWitnesses;
   ConformanceChecker checker(
-                       *this, 
-                       const_cast<NormalProtocolConformance*>(conformance),
-                       MissingWitnesses);
+      Context, const_cast<NormalProtocolConformance *>(conformance),
+      MissingWitnesses);
   checker.resolveSingleWitness(requirement);
   checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
@@ -5326,9 +5328,8 @@ namespace {
   class DefaultWitnessChecker : public WitnessChecker {
     
   public:
-    DefaultWitnessChecker(TypeChecker &tc,
-                          ProtocolDecl *proto)
-      : WitnessChecker(tc, proto, proto->getDeclaredType(), proto) { }
+    DefaultWitnessChecker(ASTContext &ctx, ProtocolDecl *proto)
+        : WitnessChecker(ctx, proto, proto->getDeclaredType(), proto) {}
 
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
     void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -5374,16 +5375,16 @@ void DefaultWitnessChecker::recordWitness(
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
-  DefaultWitnessChecker checker(*this, proto);
+  DefaultWitnessChecker checker(Context, proto);
 
   // Find the default for the given associated type.
   auto findAssociatedTypeDefault =
       [&](AssociatedTypeDecl *assocType,
-      AssociatedTypeDecl **defaultedAssocTypeOut = nullptr) -> Type {
+          AssociatedTypeDecl **defaultedAssocTypeOut = nullptr) -> Type {
     auto defaultedAssocType =
-      AssociatedTypeInference::findDefaultedAssociatedType(*this, assocType);
+        AssociatedTypeInference::findDefaultedAssociatedType(assocType);
     if (!defaultedAssocType)
-      return nullptr;;
+      return nullptr;
 
     Type defaultType = defaultedAssocType->getDefaultDefinitionType();
     if (!defaultType)
