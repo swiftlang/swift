@@ -523,7 +523,8 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   if (isa<ModuleDecl>(this))
     return SourceLoc();
   // When the decl is context-free, we should get loc from source buffer.
-  if (!getDeclContext())
+  if (!getDeclContext() ||
+      !isa<FileUnit>(getDeclContext()->getModuleScopeContext()))
     return getLocFromSource();
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   switch(File->getKind()) {
