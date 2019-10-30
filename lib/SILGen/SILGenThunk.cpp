@@ -133,7 +133,7 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
       auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);
-      auto result = SGF.B.createWitnessMethod(loc, substSelfType, *conformance,
+      auto result = SGF.B.createWitnessMethod(loc, substSelfType, conformance,
                                               next, constantInfo.getSILType());
       return {ManagedValue::forUnmanaged(result), next};
     }

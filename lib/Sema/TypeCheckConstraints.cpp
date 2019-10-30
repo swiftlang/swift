@@ -734,7 +734,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
             ConformanceCheckFlags::InExpression |
                 ConformanceCheckFlags::SkipConditionalRequirements);
 
-        if (!conformance || conformance->getConditionalRequirements().empty()) {
+        if (conformance.isInvalid() ||
+            conformance.getConditionalRequirements().empty()) {
           AllConditionalConformances = false;
         }
       }
@@ -4416,8 +4417,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (conformsToProtocol(toType, errorTypeProto, dc,
-                             ConformanceCheckFlags::InExpression)) {
+      if (!conformsToProtocol(toType, errorTypeProto, dc,
+                              ConformanceCheckFlags::InExpression)
+               .isInvalid()) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
           Type NSErrorTy = nsError->getDeclaredInterfaceType();

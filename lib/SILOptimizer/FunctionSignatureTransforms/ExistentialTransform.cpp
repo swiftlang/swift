@@ -362,7 +362,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   /// Finally the ExtInfo.
   auto ExtInfo = FTy->getExtInfo();
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrNone();
+  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrInvalid();
 
   /// Return the new signature.
   return SILFunctionType::get(

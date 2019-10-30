@@ -86,9 +86,8 @@ static CodableConformanceType typeConformsToCodable(DeclContext *context,
     return typeConformsToCodable(context, target->getOptionalObjectType(),
                                  false, proto);
 
-  return (TypeChecker::conformsToProtocol(target, proto, context, None)
-          ? Conforms
-          : DoesNotConform);
+  auto conf = TypeChecker::conformsToProtocol(target, proto, context, None);
+  return conf.isInvalid() ? DoesNotConform : Conforms;
 }
 
 /// Returns whether the given variable conforms to the given {En,De}codable
@@ -271,8 +270,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
-                                       derived.getConformanceContext(),
-                                       None)) {
+                                       derived.getConformanceContext(), None)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to

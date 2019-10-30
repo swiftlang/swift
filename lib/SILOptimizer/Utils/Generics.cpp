@@ -772,12 +772,10 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
-      CanSpecializedGenericSig, FnTy->getExtInfo(),
-      FnTy->getCoroutineKind(), FnTy->getCalleeConvention(),
-      FnTy->getParameters(), FnTy->getYields(),
-      FnTy->getResults(), FnTy->getOptionalErrorResult(),
-      SubstitutionMap(), false,
-      M.getASTContext(), FnTy->getWitnessMethodConformanceOrNone());
+      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCoroutineKind(),
+      FnTy->getCalleeConvention(), FnTy->getParameters(), FnTy->getYields(),
+      FnTy->getResults(), FnTy->getOptionalErrorResult(), SubstitutionMap(),
+      false, M.getASTContext(), FnTy->getWitnessMethodConformanceOrInvalid());
 
   // This is an interface type. It should not have any archetypes.
   assert(!NewFnTy->hasArchetype());
@@ -846,13 +844,11 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     SpecializedYields.push_back(YI);
   }
   return SILFunctionType::get(
-      SubstFTy->getInvocationGenericSignature(),
-      SubstFTy->getExtInfo(), SubstFTy->getCoroutineKind(),
-      SubstFTy->getCalleeConvention(),
+      SubstFTy->getInvocationGenericSignature(), SubstFTy->getExtInfo(),
+      SubstFTy->getCoroutineKind(), SubstFTy->getCalleeConvention(),
       SpecializedParams, SpecializedYields, SpecializedResults,
-      SubstFTy->getOptionalErrorResult(),
-      SubstitutionMap(), false, M.getASTContext(),
-      SubstFTy->getWitnessMethodConformanceOrNone());
+      SubstFTy->getOptionalErrorResult(), SubstitutionMap(), false,
+      M.getASTContext(), SubstFTy->getWitnessMethodConformanceOrInvalid());
 }
 
 /// Create a new generic signature from an existing one by adding

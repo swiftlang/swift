@@ -378,10 +378,10 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
 
   // Don't use a method representation if we modified self.
   auto ExtInfo = FTy->getExtInfo();
-  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrNone();
+  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrInvalid();
   if (shouldModifySelfArgument) {
     ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-    witnessMethodConformance = None;
+    witnessMethodConformance = ProtocolConformanceRef::forInvalid();
   }
 
   Optional<SILResultInfo> InterfaceErrorResult;
