@@ -984,3 +984,13 @@ AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
   return new (cs.getAllocator())
       AllowArgumentMismatch(cs, argType, paramType, locator);
 }
+
+bool RemoveInvalidCall::diagnose(Expr *root, bool asNote) const {
+  ExtraneousCallFailure failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveInvalidCall(cs, locator);
+}

@@ -1912,6 +1912,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class ExtraneousCallFailure final : public FailureDiagnostic {
+public:
+  ExtraneousCallFailure(Expr *expr, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

@@ -169,7 +169,7 @@ func rdar20142523() {
 func rdar21080030() {
   var s = "Hello"
   // SR-7599: This should be `cannot_call_non_function_value`
-  if s.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
+  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}} {{13-15=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -530,8 +530,8 @@ let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in c
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .svar() // expected-error {{static property 'svar' is not a function}}
-someColor = .svar(1) // expected-error {{static property 'svar' is not a function}}
+someColor = .svar() // expected-error {{cannot call value of non-function type 'Color'}}
+someColor = .svar(1) // expected-error {{cannot call value of non-function type 'Color'}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int

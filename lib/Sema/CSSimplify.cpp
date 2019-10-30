@@ -7097,8 +7097,37 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // Handle applications of @dynamicCallable types.
-  return simplifyDynamicCallableApplicableFnConstraint(type1, origType2,
-                                                       subflags, locator);
+  auto result = simplifyDynamicCallableApplicableFnConstraint(
+      type1, origType2, subflags, locator);
+
+  if (shouldAttemptFixes() && result == SolutionKind::Error) {
+    // Skip this fix if the type is not yet resolved or
+    // it's a function type/metatype which points to argument mismatches.
+    if (desugar2->is<TypeVariableType>() || desugar2->is<FunctionType>() ||
+        desugar2->is<AnyMetatypeType>())
+      return SolutionKind::Error;
+
+    if (auto objectTy = desugar2->lookThroughAllOptionalTypes()) {
+      if (objectTy->isAny() || objectTy->isAnyObject())
+        return SolutionKind::Error;
+    }
+
+    // If there are any type variables associated with arguments/result
+    // they have to be marked as "holes".
+    type1.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordHole(typeVar);
+    });
+
+    auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
+    // Let's make this fix as high impact so if there is a function or member
+    // overload with e.g. argument-to-parameter type mismatches it would take
+    // a higher priority.
+    return recordFix(fix, /*impact=*/10) ? SolutionKind::Error
+                                         : SolutionKind::Solved;
+  }
+
+  return result;
 }
 
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
@@ -8012,6 +8041,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
   case FixKind::RelabelArguments:
+  case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowMemberRefOnExistential:
