@@ -5319,7 +5319,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
     BB = getBBForDefinition(BBName, NameLoc);
     // For now, since we always assume that PhiArguments have
-    // ValueOwnershipKind::Any, do not parse or do anything special. Eventually
+    // ValueOwnershipKind::None, do not parse or do anything special. Eventually
     // we will parse the convention.
     bool IsEntry = BB->isEntry();
 
