@@ -520,7 +520,7 @@ GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
       // can't return outright without checking the nested scopes.
       NullablePtr<DeclContext> nestedCapturedSelfDC =
           checkNestedScopesForSelfCapture(history, i);
-      return nestedCapturedSelfDC ?: *maybeSelfDC;
+      return nestedCapturedSelfDC ? nestedCapturedSelfDC : *maybeSelfDC;
     }
   }
   return nullptr;
