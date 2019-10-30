@@ -201,7 +201,10 @@ static id _getClassDescription(Class cls) {
   // runs on older OSes in certain testing scenarios, so that doesn't matter.
   // Only perform the check on newer OSes where the value should definitely
   // match.
-  if (!_swift_isBackDeploying()) {
+#  if SWIFT_BUILD_HAS_BACK_DEPLOYMENT
+  if (!_swift_isBackDeploying())
+#  endif
+  {
     assert(&objc_debug_isa_class_mask);
     assert(objc_debug_isa_class_mask == SWIFT_ISA_MASK);
   }
