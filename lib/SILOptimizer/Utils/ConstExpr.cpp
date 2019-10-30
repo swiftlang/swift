@@ -1100,8 +1100,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // call.
     auto op = apply->getOperand(i + 1);
     SymbolicValue argValue = getConstantValue(op);
-    if (!argValue.isConstant())
-      return argValue;
+    if (!argValue.isConstant()) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::createCallArgumentUnknown(i));
+    }
     paramConstants.push_back(argValue);
   }
 
@@ -2048,7 +2050,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
   return {None, None};
 }
 
-bool ConstExprStepEvaluator::isFailStopError(SymbolicValue errorVal) {
+bool swift::isFailStopError(SymbolicValue errorVal) {
   assert(errorVal.isUnknown());
 
   switch (errorVal.getUnknownReason().getKind()) {
@@ -2104,4 +2106,9 @@ void ConstExprStepEvaluator::dumpState() { internalState->dump(); }
 
 bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
   return classifyFunction(fun).hasValue();
+}
+
+bool swift::isConstantEvaluable(SILFunction *fun) {
+  assert(fun && "fun should not be nullptr");
+  return fun->hasSemanticsAttr("constant_evaluable");
 }
