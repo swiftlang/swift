@@ -6827,7 +6827,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     = [&](ApplyExpr *apply,
           ConcreteDeclRef declRef,
           Type openedType) -> Expr* {
-      switch (cs.TC.getDeclTypeCheckingSemantics(declRef.getDecl())) {
+      switch (TypeChecker::getDeclTypeCheckingSemantics(declRef.getDecl())) {
       case DeclTypeCheckingSemantics::TypeOf: {
         // Resolve into a DynamicTypeExpr.
         auto arg = apply->getArg();

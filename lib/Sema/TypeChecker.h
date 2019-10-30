@@ -1949,7 +1949,8 @@ public:
 
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
-  DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  static DeclTypeCheckingSemantics
+  getDeclTypeCheckingSemantics(ValueDecl *decl);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

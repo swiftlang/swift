@@ -570,7 +570,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Referencing type(of:) and other decls with special type-checking
       // behavior as functions is not implemented. Maybe we could wrap up the
       // special-case behavior in a closure someday...
-      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+      if (TypeChecker::getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
                     DRE->getDecl()->getBaseName().getIdentifier());

@@ -1603,7 +1603,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      Type &openedFullType) {
   assert(choice.getKind() == OverloadChoiceKind::Decl);
 
-  switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
+  switch (TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
     
