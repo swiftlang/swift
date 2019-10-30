@@ -1150,7 +1150,7 @@ namespace {
       if (expr->getType())
         return expr->getType();
 
-      auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
+      auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
       if (!protocol)
         return nullptr;
 
@@ -1167,9 +1167,9 @@ namespace {
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       // Dig out the ExpressibleByStringInterpolation protocol.
       auto &tc = CS.getTypeChecker();
-      auto interpolationProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation);
+      auto interpolationProto = TypeChecker::getProtocol(
+          CS.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringInterpolation);
       if (!interpolationProto) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
@@ -1240,7 +1240,7 @@ namespace {
         return expr->getType();
 
       auto &tc = CS.getTypeChecker();
-      auto protocol = tc.getLiteralProtocol(expr);
+      auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
       if (!protocol) {
         tc.diagnose(expr->getLoc(), diag::use_unknown_object_literal_protocol,
                     expr->getLiteralKindPlainName());
@@ -1763,9 +1763,9 @@ namespace {
       // An array expression can be of a type T that conforms to the
       // ExpressibleByArrayLiteral protocol.
       auto &tc = CS.getTypeChecker();
-      ProtocolDecl *arrayProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByArrayLiteral);
+      ProtocolDecl *arrayProto = TypeChecker::getProtocol(
+          CS.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByArrayLiteral);
       if (!arrayProto) {
         return Type();
       }
@@ -1846,9 +1846,8 @@ namespace {
       // ExpressibleByDictionaryLiteral protocol.
       // FIXME: This isn't actually used for anything at the moment.
       auto &tc = CS.getTypeChecker();
-      ProtocolDecl *dictionaryProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      ProtocolDecl *dictionaryProto = TypeChecker::getProtocol(
+          C, expr->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
       if (!dictionaryProto) {
         return Type();
       }

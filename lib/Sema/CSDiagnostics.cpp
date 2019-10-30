@@ -2613,8 +2613,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
   for (auto protocol : layout.getProtocols()) {
-    if (getTypeChecker()
-            .conformsToProtocol(FromType, protocol->getDecl(), getDC(),
+    if (TypeChecker::conformsToProtocol(FromType, protocol->getDecl(), getDC(),
                                 ConformanceCheckFlags::InExpression)
             .isInvalid()) {
       missingProtoTypeStrings.push_back(protocol->getString());

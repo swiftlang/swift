@@ -182,7 +182,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (!anchor)
         continue;
 
-      literalProtocol = TC.getLiteralProtocol(anchor);
+      literalProtocol =
+          TypeChecker::getLiteralProtocol(getASTContext(), anchor);
       if (literalProtocol)
         break;
     }
@@ -1781,8 +1782,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // components.
   auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
                                           ConstraintLocator *locator) {
-    if (auto *hashable = TC.getProtocol(choice.getDecl()->getLoc(),
-                                        KnownProtocolKind::Hashable)) {
+    if (auto *hashable = TypeChecker::getProtocol(
+            argType->getASTContext(), choice.getDecl()->getLoc(),
+            KnownProtocolKind::Hashable)) {
       addConstraint(ConstraintKind::ConformsTo, argType,
                     hashable->getDeclaredType(),
                     getConstraintLocator(
@@ -1966,11 +1968,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
              "subscript always has one arg");
       auto argType = refFnType->getParams()[0].getPlainType();
 
-      auto &TC = getTypeChecker();
-
-      auto stringLiteral =
-          TC.getProtocol(choice.getDecl()->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral);
+      auto stringLiteral = TypeChecker::getProtocol(
+          getASTContext(), choice.getDecl()->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
       if (!stringLiteral)
         break;
 
@@ -3078,7 +3078,8 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
 
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
-  if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
+  if (auto *proto =
+          TypeChecker::getProtocol(cs.getASTContext(), SourceLoc(), protocol))
     return (bool)TypeChecker::conformsToProtocol(
         type, proto, cs.DC, ConformanceCheckFlags::InExpression);
   return false;
@@ -3090,8 +3091,8 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   auto &TC = cs.TC;
   auto *DC = cs.DC;
 
-  auto rawReprType =
-      TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  auto rawReprType = TypeChecker::getProtocol(
+      cs.getASTContext(), SourceLoc(), KnownProtocolKind::RawRepresentable);
   if (!rawReprType)
     return Type();
 

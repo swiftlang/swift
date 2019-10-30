@@ -4594,9 +4594,10 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
     // For literal-convertible types, form the corresponding literal.
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
-  if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) {     \
-    if (tc.conformsToProtocol(type, proto, dc,                                 \
-                              ConformanceCheckFlags::InExpression))            \
+  if (auto proto = TypeChecker::getProtocol(                                   \
+          type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
+    if (TypeChecker::conformsToProtocol(type, proto, dc,                       \
+                                        ConformanceCheckFlags::InExpression))  \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")

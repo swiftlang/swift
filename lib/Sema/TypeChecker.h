@@ -1682,13 +1682,14 @@ public:
   ///
   /// \returns null if the protocol is not available. This represents a
   /// problem with the Standard Library.
-  ProtocolDecl *getProtocol(SourceLoc loc, KnownProtocolKind kind);
+  static ProtocolDecl *getProtocol(ASTContext &ctx, SourceLoc loc,
+                                   KnownProtocolKind kind);
 
   /// Retrieve the literal protocol for the given expression.
   ///
   /// \returns the literal protocol, if known and available, or null if the
   /// expression does not have an associated literal protocol.
-  ProtocolDecl *getLiteralProtocol(Expr *expr);
+  static ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
   DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
 

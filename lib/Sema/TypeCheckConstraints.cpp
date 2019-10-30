@@ -1963,7 +1963,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!literal)
     return nullptr;
 
-  auto *protocol = TC.getLiteralProtocol(literal);
+  auto *protocol = TypeChecker::getLiteralProtocol(TC.Context, literal);
   if (!protocol)
     return nullptr;
 
@@ -2914,8 +2914,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *sequenceProto
-        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
+      ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+          cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
         return true;
       }

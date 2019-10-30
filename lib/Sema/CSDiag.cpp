@@ -3663,7 +3663,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
   // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
   // figure out what the contextual element type is in place.
-  auto ALC = CS.TC.getProtocol(E->getLoc(),
+  auto ALC =
+      TypeChecker::getProtocol(CS.getASTContext(), E->getLoc(),
                                KnownProtocolKind::ExpressibleByArrayLiteral);
   if (!ALC)
     return visitExpr(E);
@@ -3713,8 +3714,9 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     // surely initializing whatever is inside.
     contextualType = contextualType->lookThroughAllOptionalTypes();
 
-    auto DLC = CS.TC.getProtocol(
-        E->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    auto DLC = TypeChecker::getProtocol(
+        CS.getASTContext(), E->getLoc(),
+        KnownProtocolKind::ExpressibleByDictionaryLiteral);
     if (!DLC) return visitExpr(E);
 
     // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
@@ -3774,7 +3776,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   auto &TC = CS.getTypeChecker();
 
   // Type check the argument first.
-  auto protocol = TC.getLiteralProtocol(E);
+  auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), E);
   if (!protocol)
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
