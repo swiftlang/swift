@@ -634,13 +634,8 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
-  // FIXME: Computes isInvalid() below.
-  (void) current->getInterfaceType();
-
   // Ignore invalid and anonymous declarations.
-  if (current->isInvalid() ||
-      !current->hasInterfaceType() ||
-      !current->hasName())
+  if (current->isInvalid() || !current->hasName())
     return;
 
   // If this declaration isn't from a source file, don't check it.
@@ -679,7 +674,9 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
-    if (current == other || other->isInvalid())
+    //
+    // FIXME: Breaking a cycle here with hasInterfaceType() is bogus.
+    if (current == other || (other->hasInterfaceType() && other->isInvalid()))
       continue;
 
     // Skip declarations in other modules.
@@ -704,9 +701,6 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // FIXME: Computes isInvalid() below.
-    (void) other->getInterfaceType();
-
     // Skip invalid declarations.
     if (other->isInvalid())
       continue;
@@ -719,19 +713,13 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (!other->isAccessibleFrom(currentDC))
       continue;
 
-    const auto markInvalid = [&current]() {
-      current->setInvalid();
-      if (current->hasInterfaceType())
-        current->setInterfaceType(ErrorType::get(current->getInterfaceType()));
-    };
-
     // Thwart attempts to override the same declaration more than once.
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
       current->diagnose(diag::multiple_override, current->getFullName());
       other->diagnose(diag::multiple_override_prev, other->getFullName());
-      markInvalid();
+      current->setInvalid();
       break;
     }
 
@@ -878,7 +866,7 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
             other->diagnose(diag::invalid_redecl_prev, other->getFullName());
           });
         }
-        markInvalid();
+        current->setInvalid();
       }
 
       // Make sure we don't do this checking again for the same decl. We also
@@ -1593,9 +1581,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   
   Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
-    // FIXME: Computes isInvalid() below.
-    (void) elt->getInterfaceType();
-
     // If the element has been diagnosed up to now, skip it.
     if (elt->isInvalid())
       continue;
@@ -2472,7 +2457,6 @@ public:
         auto markVarAndPBDInvalid = [PBD, var] {
           PBD->setInvalid();
           var->setInvalid();
-          var->setInterfaceType(ErrorType::get(var->getASTContext()));
         };
         
         // Properties with an opaque return type need an initializer to
@@ -4375,7 +4359,8 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     //
     // Once that's through, this will only fire during circular validation.
     if (!namingPattern) {
-      if (!VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+      if (VD->hasInterfaceType() &&
+          !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
         VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
       }
 

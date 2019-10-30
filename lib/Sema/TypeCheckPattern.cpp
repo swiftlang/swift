@@ -787,7 +787,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
-        var->setInterfaceType(ErrorType::get(Context));
         var->setInvalid();
       }
     }
@@ -977,7 +976,7 @@ recur:
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
-    if (var->isInvalid())
+    if (var->hasInterfaceType() && var->isInvalid())
       type = ErrorType::get(Context);
 
     // In SIL mode, VarDecls are written as having reference storage types.

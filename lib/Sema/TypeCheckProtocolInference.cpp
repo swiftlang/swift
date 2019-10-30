@@ -447,7 +447,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     }
 
     // Validate the requirement.
-    if (!req->getInterfaceType() || req->isInvalid())
+    if (req->isInvalid())
       continue;
 
     // Check whether any of the associated types we care about are
@@ -494,9 +494,6 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       ValueDecl *witness) {
   if (witness->isRecursiveValidation())
     return Type();
-
-  // FIXME: This is here to trigger the isInvalid() computation.
-  (void) witness->getInterfaceType();
 
   if (witness->isInvalid())
     return Type();
@@ -2038,7 +2035,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
-  if (!requirement->getInterfaceType() || requirement->isInvalid()) {
+  if (requirement->isInvalid()) {
     Conformance->setInvalid();
     return;
   }
