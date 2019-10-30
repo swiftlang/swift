@@ -214,13 +214,13 @@ public:
     // For example:
     // case ...:
     //     case body is implicitly wrapped in a brace statement
-    if (Parent.isCaseContext())
+    if (Parent.isSwitchCaseContext())
       return true;
 
     return false;
   }
 
-  bool isCaseContext() {
+  bool isSwitchCaseContext() {
     if (Cursor == Stack.rend())
       return false;
     auto caseStmt = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt());
@@ -417,9 +417,9 @@ public:
         // } <-- No indent here, close brace should be at same level as do.
         // catch {
         // }
-        if (auto caseStmt = dyn_cast<CaseStmt>(AtStmtEnd))
-          if (caseStmt->getParentKind() == CaseParentKind::DoCatch)
-            return false;
+        auto caseStmt = dyn_cast_or_null<CaseStmt>(AtStmtEnd);
+        if (caseStmt && caseStmt->getParentKind() == CaseParentKind::DoCatch)
+          return false;
       }
     }
 
