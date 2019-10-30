@@ -3768,7 +3768,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Function: {
       auto func1 = cast<FunctionType>(desugar1);
       auto func2 = cast<FunctionType>(desugar2);
-      return matchFunctionTypes(func1, func2, kind, flags, locator);
+
+      auto result = matchFunctionTypes(func1, func2, kind, flags, locator);
+
+      // If this is a type mismatch in assignment, we don't really care
+      // (yet) was it argument or result type mismatch, let's produce a
+      // diagnostic which means both function types.
+      if (shouldAttemptFixes() && result.isFailure()) {
+        auto *anchor = locator.getAnchor();
+        if (anchor && isa<AssignExpr>(anchor))
+          break;
+      }
+
+      return result;
     }
 
     case TypeKind::GenericFunction:
