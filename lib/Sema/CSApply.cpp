@@ -5758,7 +5758,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
 
   // A single-expression body contains a single return statement
   // prior to this transformation.
-  auto member = closureExpr->getBody()->getElement(0);
+  auto member = closureExpr->getBody()->getFirstElement();
  
   if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
@@ -5810,7 +5810,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
 
   // A single-expression body contains a single return statement
   // prior to this transformation.
-  auto member = closureExpr->getBody()->getElement(0);
+  auto member = closureExpr->getBody()->getFirstElement();
 
   if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());

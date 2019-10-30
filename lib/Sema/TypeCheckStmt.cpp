@@ -1770,9 +1770,9 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   // BraceStmt does not start a TopLevelDecl).
   if (IsBraceStmtFromTopLevelDecl) {
     IsBraceStmtFromTopLevelDecl = false;
-  } else if (BS->getNumElements() > 0) {
+  } else if (!BS->empty()) {
     if (auto stmt =
-            BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt *>()) {
+            BS->getLastElement().dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
         TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
             .fixItReplace(deferStmt->getStartLoc(), "do");
@@ -2096,12 +2096,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
       if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
         // The function returns void.  We don't need an explicit return, no matter
         // what the type of the expression is.  Take the inserted return back out.
-        body->setElement(0, expr);
+        body->setFirstElement(expr);
       }
     }
   } else if (isa<ConstructorDecl>(AFD) &&
-             (body->getNumElements() == 0 ||
-                !isKnownEndOfConstructor(body->getElements().back()))) {
+             (body->empty() ||
+                !isKnownEndOfConstructor(body->getLastElement()))) {
     // For constructors, we make sure that the body ends with a "return" stmt,
     // which we either implicitly synthesize, or the user can write.  This
     // simplifies SILGen.
@@ -2123,12 +2123,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   // that we have eagerly converted something like `{ fatalError() }`
   // into `{ return fatalError() }` that has to be corrected here.
   if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
-    if (auto *stmt = body->getElement(0).dyn_cast<Stmt *>()) {
+    if (auto *stmt = body->getFirstElement().dyn_cast<Stmt *>()) {
       if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
         if (retStmt->isImplicit() && retStmt->hasResult()) {
           auto returnType = retStmt->getResult()->getType();
           if (returnType && returnType->isUninhabited())
-            body->setElement(0, retStmt->getResult());
+            body->setFirstElement(retStmt->getResult());
         }
       }
     }
