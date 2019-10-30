@@ -318,6 +318,10 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
         getUsedLocationsOfAddr(bits, LBI->getOperand());
       }
       break;
+    case SILInstructionKind::EndApplyInst:
+      // Operands passed to begin_apply are alive throughout the end_apply.
+      I = cast<EndApplyInst>(I)->getBeginApply();
+      LLVM_FALLTHROUGH;
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::CopyAddrInst:
