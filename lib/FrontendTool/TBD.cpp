@@ -102,7 +102,9 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
       if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
         if (!symbols.erase(name))
-          irNotTBD.push_back(name);
+          // Note: Add the unmangled name to the irNotTBD list, which is owned
+          //       by the IRModule, instead of the mangled name.
+          irNotTBD.push_back(unmangledName);
       }
     } else {
       assert(symbols.find(name) == symbols.end() &&
