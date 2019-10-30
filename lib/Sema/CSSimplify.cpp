@@ -8259,7 +8259,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
-  case FixKind::TreatRValueAsLValue:
   case FixKind::AddMissingArguments:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
@@ -8269,6 +8268,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::CoerceToCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::TreatRValueAsLValue: {
+    unsigned impact = 1;
+    // If this is an attempt to use result of a function/subscript call as
+    // an l-value, it has to have an increased impact because it's either
+    // a function - which is completely incorrect, or it's a get-only
+    // subscript, which requires changes to declaration to become mutable.
+    if (auto last = locator.last()) {
+      impact += (last->is<LocatorPathElt::FunctionResult>() ||
+                 last->is<LocatorPathElt::SubscriptMember>())
+                    ? 1
+                    : 0;
+    }
+
+    return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::AddConformance:
