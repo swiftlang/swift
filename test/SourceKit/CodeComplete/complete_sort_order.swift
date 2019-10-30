@@ -33,6 +33,8 @@ func test() {
 // CONTEXT: key.kind: source.lang.swift.decl
 // CONTEXT-NEXT: key.name: "x"
 // CONTEXT-NOT: key.name:
+// CONTEXT: key.name: "complete_sort_order",
+// CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "foo(a:)"
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "foo(a:)"
