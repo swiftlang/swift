@@ -273,6 +273,16 @@ MathTests.test("gradient_${T}") {
   expectEqualWithTolerance(5.0, fmaGrad.0, ulps: 16)
   expectEqualWithTolerance(4.0, fmaGrad.1, ulps: 16)
   expectEqualWithTolerance(1.0, fmaGrad.2, ulps: 16)
+  let remainderGrad = gradient(at: 4.0 as ${T}, 5.0 as ${T}, in: { x, y in remainder(x, y) })
+  expectEqualWithTolerance(1.0, remainderGrad.0, ulps: 16)
+  expectEqualWithTolerance(1.0, remainderGrad.1, ulps: 16)
+  let fmodGrad = gradient(at: 4.0 as ${T}, 5.0 as ${T}, in: { x, y in fmod(x, y) })
+  expectEqualWithTolerance(1.0, fmodGrad.0, ulps: 16)
+  expectEqualWithTolerance(1.0, fmodGrad.1, ulps: 16)
+  expectEqualWithTolerance(0.0, gradient(at: 2.0 as ${T}, in: { ceil($0) }), ulps: 16)
+  expectEqualWithTolerance(0.0, gradient(at: 2.0 as ${T}, in: { floor($0) }), ulps: 16)
+  expectEqualWithTolerance(0.0, gradient(at: 2.0 as ${T}, in: { round($0) }), ulps: 16)
+  expectEqualWithTolerance(0.0, gradient(at: 2.0 as ${T}, in: { trunc($0) }), ulps: 16)
 }
 %end
 
