@@ -284,8 +284,10 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
 
   // Find the conformance to _ObjectiveCBridgeable.
   auto result = SwiftModule->lookupConformance(type, proto);
-  if (result) return result->getConcrete();
-  return nullptr;
+  if (result.isInvalid())
+    return nullptr;
+
+  return result.getConcrete();
 }
 
 ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
@@ -319,10 +321,11 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   return found;
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return None;
+  if (!proto)
+    return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
   return SwiftModule->lookupConformance(type, proto);
@@ -349,8 +352,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
                                    cast<ProtocolDecl>(error));
 
-  if (conformance && conformance->isConcrete())
-    NSErrorConformanceToError = conformance->getConcrete();
+  if (conformance.isConcrete())
+    NSErrorConformanceToError = conformance.getConcrete();
   else
     NSErrorConformanceToError = nullptr;
   return *NSErrorConformanceToError;
@@ -427,6 +430,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
+                                         SubstitutionMap(), false,
                                          getASTContext());
 
   auto env = sig->getGenericEnvironment();
@@ -487,6 +491,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
+                                   SubstitutionMap(), false,
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -816,13 +821,13 @@ void SILGenModule::emitDifferentiabilityWitness(
   // type-checking no longer generates implicit `@differentiable` attributes.
   // See TF-835 for replacement code.
   if (jvp) {
-    auto jvpCanGenSig = jvp->getLoweredFunctionType()->getGenericSignature();
+    auto jvpCanGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
     if (!derivativeCanGenSig && jvpCanGenSig)
       derivativeCanGenSig = jvpCanGenSig;
     assert(derivativeCanGenSig == jvpCanGenSig);
   }
   if (vjp) {
-    auto vjpCanGenSig = vjp->getLoweredFunctionType()->getGenericSignature();
+    auto vjpCanGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
     if (!derivativeCanGenSig && vjpCanGenSig)
       derivativeCanGenSig = vjpCanGenSig;
     assert(derivativeCanGenSig == vjpCanGenSig);

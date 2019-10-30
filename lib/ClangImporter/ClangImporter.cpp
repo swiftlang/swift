@@ -1014,6 +1014,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
       std::make_shared<SwiftNameLookupExtension>(
           importer->Impl.BridgingHeaderLookupTable,
           importer->Impl.LookupTables, importer->Impl.SwiftContext,
+          importer->Impl.getBufferImporterForDiagnostics(),
           importer->Impl.platformAvailability,
           importer->Impl.InferImportAsMember));
 
@@ -1356,7 +1357,8 @@ bool ClangImporter::Implementation::importHeader(
   }
 
   // Finalize the lookup table, which may fail.
-  finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter());
+  finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter(),
+                      getBufferImporterForDiagnostics());
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -1878,6 +1880,7 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
+      BuffersForDiagnostics(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DWARFImporter(dwarfImporterDelegate) {}
 
@@ -3746,6 +3749,28 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     clang::LookupResult lookupResult(sema, clangName,
                                      clang::SourceLocation(),
                                      clang::Sema::LookupOrdinaryName);
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+      // FIXME: Filter based on access path? C++ access control?
+      for (auto clangDecl : lookupResult) {
+        if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+          return EffectiveClangContext(objcClass);
+
+        /// FIXME: Other type declarations should also be okay?
+      }
+    }
+
+    // For source compatibility reasons, fall back to the Swift name.
+    //
+    // This is how people worked around not being able to import-as-member onto
+    // Swift types by their ObjC name before the above code to handle ObjCAttr
+    // was added.
+    if (name != nominal->getName())
+      clangName = exportName(nominal->getName());
+
+    lookupResult.clear();
+    lookupResult.setLookupName(clangName);
+    // FIXME: This loop is duplicated from above, but doesn't obviously factor
+    // out in a nice way.
     if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
       // FIXME: Filter based on access path? C++ access control?
       for (auto clangDecl : lookupResult) {

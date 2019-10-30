@@ -2293,13 +2293,14 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   if (auto errorCodeProtocol =
           TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            errorCodeType, errorCodeProtocol, getDC(),
-            ConformanceCheckFlags::InExpression)) {
-      Type errorType = conformance
-                           ->getTypeWitnessByName(errorCodeType,
-                                                  getASTContext().Id_ErrorType)
-                           ->getCanonicalType();
+    auto conformance = TypeChecker::conformsToProtocol(
+        errorCodeType, errorCodeProtocol, getDC(),
+        ConformanceCheckFlags::InExpression);
+    if (conformance) {
+      Type errorType =
+          conformance
+              .getTypeWitnessByName(errorCodeType, getASTContext().Id_ErrorType)
+              ->getCanonicalType();
       if (errorType) {
         auto diagnostic =
             emitDiagnostic(anchor->getLoc(), diag::cannot_throw_error_code,
@@ -2614,9 +2615,10 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
   for (auto protocol : layout.getProtocols()) {
-    if (!getTypeChecker().conformsToProtocol(
-            FromType, protocol->getDecl(), getDC(),
-            ConformanceCheckFlags::InExpression)) {
+    if (getTypeChecker()
+            .conformsToProtocol(FromType, protocol->getDecl(), getDC(),
+                                ConformanceCheckFlags::InExpression)
+            .isInvalid()) {
       missingProtoTypeStrings.push_back(protocol->getString());
     }
   }

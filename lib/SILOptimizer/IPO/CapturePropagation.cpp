@@ -256,7 +256,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   NewFTy = NewFTy->getWithRepresentation(SILFunctionType::Representation::Thin);
 
   GenericEnvironment *GenericEnv = nullptr;
-  if (NewFTy->getGenericSignature())
+  if (NewFTy->getInvocationGenericSignature())
     GenericEnv = OrigF->getGenericEnvironment();
   SILOptFunctionBuilder FuncBuilder(*this);
   SILFunction *NewF = FuncBuilder.createFunction(

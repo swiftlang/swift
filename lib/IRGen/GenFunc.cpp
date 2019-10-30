@@ -589,14 +589,17 @@ IRGenModule::getForeignFunctionInfo(CanSILFunctionType type) {
 }
 
 static void emitApplyArgument(IRGenFunction &IGF,
+                              CanSILFunctionType origFnTy,
                               SILParameterInfo origParam,
+                              CanSILFunctionType substFnTy,
                               SILParameterInfo substParam,
                               Explosion &in,
                               Explosion &out) {
   auto silConv = IGF.IGM.silConv;
 
   bool isSubstituted =
-      (silConv.getSILType(substParam) != silConv.getSILType(origParam));
+      (silConv.getSILType(substParam, substFnTy)
+         != silConv.getSILType(origParam, origFnTy));
 
   // For indirect arguments, we just need to pass a pointer.
   if (silConv.isSILIndirect(origParam)) {
@@ -606,7 +609,7 @@ static void emitApplyArgument(IRGenFunction &IGF,
     // If a substitution is in play, just bitcast the address.
     if (isSubstituted) {
       auto origType =
-          IGF.IGM.getStoragePointerType(silConv.getSILType(origParam));
+          IGF.IGM.getStoragePointerType(silConv.getSILType(origParam, origFnTy));
       addr = IGF.Builder.CreateBitCast(addr, origType);
     }
     
@@ -621,14 +624,14 @@ static void emitApplyArgument(IRGenFunction &IGF,
 
   // Handle the last unsubstituted case.
   if (!isSubstituted) {
-    auto &substArgTI =
-        cast<LoadableTypeInfo>(IGF.getTypeInfo(silConv.getSILType(substParam)));
+    auto &substArgTI = cast<LoadableTypeInfo>(
+      IGF.getTypeInfo(silConv.getSILType(substParam, substFnTy)));
     substArgTI.reexplode(IGF, in, out);
     return;
   }
 
-  reemitAsUnsubstituted(IGF, silConv.getSILType(origParam),
-                        silConv.getSILType(substParam), in, out);
+  reemitAsUnsubstituted(IGF, silConv.getSILType(origParam, origFnTy),
+                        silConv.getSILType(substParam, substFnTy), in, out);
 }
 
 static CanType getArgumentLoweringType(CanType type,
@@ -659,7 +662,7 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
   if (param.isFormalIndirect())
     return false;
 
-  SILType argType = IGM.silConv.getSILType(param);
+  SILType argType = IGM.silConv.getSILType(param, substType);
   auto &ti = IGF.getTypeInfoForLowered(argType.getASTType());
   // Empty values don't matter.
   return ti.getSchema().empty();
@@ -749,7 +752,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   {
     // Lower the forwarded arguments in the original function's generic context.
-    GenericContextScope scope(IGM, origType->getGenericSignature());
+    GenericContextScope scope(IGM, origType->getInvocationGenericSignature());
 
     SILFunctionConventions origConv(origType, IGM.getSILModule());
     auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
@@ -790,10 +793,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
           (isWitnessMethodCallee && i + 1 == origType->getParameters().size());
 
       auto origParamInfo = origType->getParameters()[i];
-      auto &ti = IGM.getTypeInfoForLowered(origParamInfo.getType());
+      auto &ti = IGM.getTypeInfoForLowered(
+                   origParamInfo.getArgumentType(IGM.getSILModule(), origType));
       auto schema = ti.getSchema();
       
-      auto origParamSILType = IGM.silConv.getSILType(origParamInfo);
+      auto origParamSILType = IGM.silConv.getSILType(origParamInfo, origType);
       // Forward the address of indirect value params.
       auto &nativeSchemaOrigParam = ti.nativeParameterValueSchema(IGM);
       bool isIndirectParam = origConv.isSILIndirect(origParamInfo);
@@ -811,15 +815,19 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // Indirect parameters need no mapping through the native calling
       // convention.
       if (isIndirectParam) {
-        emitApplyArgument(
-            subIGF, origParamInfo, outTypeParamInfo, origParams,
+        emitApplyArgument(subIGF,
+                          origType,
+                          origParamInfo,
+                          outType,
+                          outTypeParamInfo,
+                          origParams,
             // SWIFT_ENABLE_TENSORFLOW
             (isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args));
         continue;
       }
 
       // Map from the native calling convention into the explosion schema.
-      auto outTypeParamSILType = IGM.silConv.getSILType(origParamInfo);
+      auto outTypeParamSILType = IGM.silConv.getSILType(origParamInfo, origType);
       auto &nativeSchemaOutTypeParam =
           IGM.getTypeInfo(outTypeParamSILType).nativeParameterValueSchema(IGM);
       Explosion nativeParam;
@@ -833,7 +841,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
       // Emit unsubstituted argument for call.
       Explosion nonNativeApplyArg;
-      emitApplyArgument(subIGF, origParamInfo, outTypeParamInfo, nonNativeParam,
+      emitApplyArgument(subIGF,
+                        origType, origParamInfo,
+                        outType, outTypeParamInfo,
+                        nonNativeParam,
                         nonNativeApplyArg);
       assert(nonNativeParam.empty());
       // Map back from the explosion scheme to the native calling convention for
@@ -876,7 +887,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   }
 
   // Lower the captured arguments in the original function's generic context.
-  GenericContextScope scope(IGM, origType->getGenericSignature());
+  GenericContextScope scope(IGM, origType->getInvocationGenericSignature());
 
   // This is where the context parameter appears.
   llvm::Value *rawData = nullptr;
@@ -932,7 +943,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
           findSinglePartiallyAppliedParameterIndexIgnoringEmptyTypes(
               subIGF, substType, outType);
       auto paramInfo = substType->getParameters()[paramI];
-      auto &ti = IGM.getTypeInfoForLowered(paramInfo.getType());
+      auto &ti = IGM.getTypeInfoForLowered(
+                     paramInfo.getArgumentType(IGM.getSILModule(), substType));
       Explosion param;
       auto ref = rawData;
       // We can get a '{ swift.refcounted* }' type for AnyObject on linux.
@@ -1111,13 +1123,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         if (hasPolymorphicParams)
           bindPolymorphicParameter(subIGF, origType, substType, param,
                                    origParamI);
-        emitApplyArgument(subIGF, origParamInfo,
-                          substType->getParameters()[origParamI],
+        emitApplyArgument(subIGF,
+                          origType, origParamInfo,
+                          substType, substType->getParameters()[origParamI],
                           param, origParam);
         bool isWitnessMethodCalleeSelf = (isWitnessMethodCallee &&
             origParamI + 1 == origType->getParameters().size());
         needsAllocas |= addNativeArgument(
-            subIGF, origParam, origParamInfo,
+            subIGF, origParam, origType, origParamInfo,
             isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args, false);
         ++origParamI;
       } else {
@@ -1312,7 +1325,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // Collect the type infos for the context parameters.
   for (auto param : params) {
-    SILType argType = IGF.IGM.silConv.getSILType(param);
+    SILType argType = IGF.IGM.silConv.getSILType(param, origType);
 
     auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
 

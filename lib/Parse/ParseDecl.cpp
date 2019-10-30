@@ -5609,12 +5609,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
-static void flagInvalidAccessor(AccessorDecl *func) {
-  if (func) {
-    func->setInvalid();
-  }
-}
-
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
@@ -5625,7 +5619,7 @@ static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
   P.diagnose(first->getLoc(), diag::previous_accessor,
              getAccessorNameForDiagnostic(first, /*article*/ false),
              /*already*/ false);
-  flagInvalidAccessor(second);
+  second->setInvalid();
 }
 
 template <class... DiagArgs>
@@ -5635,11 +5629,11 @@ static void diagnoseAndIgnoreObservers(Parser &P,
                         typename std::enable_if<true, DiagArgs>::type... args) {
   if (auto &accessor = accessors.WillSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*willSet*/ 0, args...);
-    flagInvalidAccessor(accessor);
+    accessor->setInvalid();
   }
   if (auto &accessor = accessors.DidSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*didSet*/ 1, args...);
-    flagInvalidAccessor(accessor);
+    accessor->setInvalid();
   }
 }
 
@@ -5651,7 +5645,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // was invalid.
   if (invalid) {
     for (auto accessor : Accessors) {
-      flagInvalidAccessor(accessor);
+      accessor->setInvalid();
     }
   }
 

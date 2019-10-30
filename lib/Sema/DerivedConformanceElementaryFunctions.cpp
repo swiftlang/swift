@@ -182,8 +182,8 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberOpDecl = operatorReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberOpDecl = confRef->getConcrete()->getWitnessDecl(
+    if (confRef.isConcrete())
+      memberOpDecl = confRef.getConcrete()->getWitnessDecl(
           operatorReq);
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =

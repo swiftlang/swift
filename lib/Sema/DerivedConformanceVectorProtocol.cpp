@@ -65,7 +65,7 @@ static Type getVectorProtocolVectorSpaceScalarAssocType(
   auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
   if (!conf)
     return nullptr;
-  return conf->getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
+  return conf.getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
 }
 
 // Return the `VectorSpaceScalar` associated type for the given nominal type in
@@ -160,9 +160,9 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberMethodDecl = methodReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete()) {
+    if (confRef.isConcrete()) {
       if (auto *concreteMemberMethodDecl =
-              confRef->getConcrete()->getWitnessDecl(methodReq))
+              confRef.getConcrete()->getWitnessDecl(methodReq))
         memberMethodDecl = concreteMemberMethodDecl;
       assert(memberMethodDecl);
     }

@@ -216,6 +216,7 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
+        args.test_swiftsyntax = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
@@ -585,6 +586,15 @@ def create_argument_parser():
            help='build IndexStoreDB')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
+           help='install SwiftSyntax')
+    option('--skip-install-swiftsyntax-module',
+           toggle_true('skip_install_swiftsyntax_module'),
+           help='skip installing the SwiftSyntax modules')
+    option('--swiftsyntax-verify-generated-files',
+           toggle_true('swiftsyntax_verify_generated_files'),
+           help='set to verify that the generated files in the source tree '
+                'match the ones that would be generated from current master')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
@@ -978,6 +988,8 @@ def create_argument_parser():
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
 
+    option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
+           help='skip testing SwiftSyntax')
     option('--skip-test-indexstore-db', toggle_false('test_indexstoredb'),
            help='skip testing indexstore-db')
     option('--skip-test-sourcekit-lsp', toggle_false('test_sourcekitlsp'),

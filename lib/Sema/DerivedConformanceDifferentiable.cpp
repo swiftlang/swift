@@ -93,7 +93,7 @@ static Type getTangentVectorType(VarDecl *decl, DeclContext *DC) {
                                               None);
   if (!conf)
     return nullptr;
-  Type tangentType = conf->getTypeWitnessByName(varType, C.Id_TangentVector);
+  Type tangentType = conf.getTypeWitnessByName(varType, C.Id_TangentVector);
   return tangentType;
 }
 
@@ -108,7 +108,7 @@ static StructDecl *getTangentVectorStructDecl(DeclContext *DC) {
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
                                               diffableProto, DC, None);
   assert(conf && "Nominal must conform to `Differentiable`");
-  auto assocType = conf->getTypeWitnessByName(
+  auto assocType = conf.getTypeWitnessByName(
       DC->getSelfTypeInContext(), C.Id_TangentVector);
   assert(assocType && "`Differentiable.TangentVector` type not found");
   auto *structDecl = dyn_cast<StructDecl>(assocType->getAnyNominal());
@@ -252,8 +252,8 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberMethodDecl = methodReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
+    if (confRef.isConcrete())
+      memberMethodDecl = confRef.getConcrete()->getWitnessDecl(
           methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE =
@@ -432,8 +432,8 @@ static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
       assert(confRef &&
              "Member missing conformance to `EuclideanDifferentiable`");
       ConcreteDeclRef memberDeclRef = vectorViewReq;
-      if (confRef->isConcrete())
-        memberDeclRef = confRef->getConcrete()->getWitnessDecl(vectorViewReq);
+      if (confRef.isConcrete())
+        memberDeclRef = confRef.getConcrete()->getWitnessDecl(vectorViewReq);
       argLabels.push_back(member->getName());
       memberRefs.push_back(new (C) MemberRefExpr(
           memberExpr, SourceLoc(), memberDeclRef, DeclNameLoc(),
@@ -534,7 +534,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
         if (!conf)
           return false;
         auto scalarType =
-            conf->getTypeWitnessByName(tanType, C.Id_VectorSpaceScalar);
+            conf.getTypeWitnessByName(tanType, C.Id_VectorSpaceScalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
@@ -545,8 +545,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // `TangentVector` struct should derive `KeyPathIterable` if the parent struct
   // conforms to `KeyPathIterable`.
   bool shouldDeriveKeyPathIterable =
-      TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
-                            kpIterableProto, parentDC, None).hasValue();
+      !TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
+                            kpIterableProto, parentDC, None).isInvalid();
 
   // If all members conform to `PointwiseMultiplicative`, make the
   // `TangentVector` struct conform to `PointwiseMultiplicative`.
@@ -709,7 +709,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
       continue;
     // Check whether to diagnose stored property.
     bool conformsToDifferentiable =
-        TC.conformsToProtocol(varType, diffableProto, nominal, None).hasValue();
+        !TC.conformsToProtocol(varType, diffableProto, nominal, None).isInvalid();
     // If stored property should not be diagnosed, continue.
     if (conformsToDifferentiable && !vd->isLet())
       continue;

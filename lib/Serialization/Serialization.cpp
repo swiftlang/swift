@@ -4052,7 +4052,7 @@ public:
 
     SmallVector<TypeID, 8> variableData;
     for (auto param : fnTy->getParameters()) {
-      variableData.push_back(S.addTypeRef(param.getType()));
+      variableData.push_back(S.addTypeRef(param.getInterfaceType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
       // SWIFT_ENABLE_TENSORFLOW
@@ -4061,23 +4061,23 @@ public:
             getRawSILParameterDifferentiability(param.getDifferentiability())));
     }
     for (auto yield : fnTy->getYields()) {
-      variableData.push_back(S.addTypeRef(yield.getType()));
+      variableData.push_back(S.addTypeRef(yield.getInterfaceType()));
       unsigned conv = getRawStableParameterConvention(yield.getConvention());
       variableData.push_back(TypeID(conv));
     }
     for (auto result : fnTy->getResults()) {
-      variableData.push_back(S.addTypeRef(result.getType()));
+      variableData.push_back(S.addTypeRef(result.getInterfaceType()));
       unsigned conv = getRawStableResultConvention(result.getConvention());
       variableData.push_back(TypeID(conv));
     }
     if (fnTy->hasErrorResult()) {
       auto abResult = fnTy->getErrorResult();
-      variableData.push_back(S.addTypeRef(abResult.getType()));
+      variableData.push_back(S.addTypeRef(abResult.getInterfaceType()));
       unsigned conv = getRawStableResultConvention(abResult.getConvention());
       variableData.push_back(TypeID(conv));
     }
 
-    auto sig = fnTy->getGenericSignature();
+    auto sig = fnTy->getSubstGenericSignature();
 
     auto stableCoroutineKind =
       getRawStableSILCoroutineKind(fnTy->getCoroutineKind());
@@ -4095,8 +4095,8 @@ public:
         fnTy->getParameters().size(), fnTy->getNumYields(),
         fnTy->getNumResults(), S.addGenericSignatureRef(sig), variableData);
 
-    if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
-      S.writeConformance(*conformance, S.DeclTypeAbbrCodes);
+    if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
+      S.writeConformance(conformance, S.DeclTypeAbbrCodes);
   }
 
   void visitArraySliceType(const ArraySliceType *sliceTy) {

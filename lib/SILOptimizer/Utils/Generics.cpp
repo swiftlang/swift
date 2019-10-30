@@ -123,7 +123,8 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
     for (auto Param : Params) {
       unsigned TypeWidth;
       unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getType());
+      std::tie(TypeDepth, TypeWidth) =
+        getTypeDepthAndWidth(Param.getInterfaceType());
       if (TypeDepth > MaxTypeDepth)
         MaxTypeDepth = TypeDepth;
       Width += TypeWidth;
@@ -133,7 +134,8 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
     for (auto Result : Results) {
       unsigned TypeWidth;
       unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Result.getType());
+      std::tie(TypeDepth, TypeWidth) =
+        getTypeDepthAndWidth(Result.getInterfaceType());
       if (TypeDepth > MaxTypeDepth)
         MaxTypeDepth = TypeDepth;
       Width += TypeWidth;
@@ -143,7 +145,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
       unsigned TypeWidth;
       unsigned TypeDepth;
       std::tie(TypeDepth, TypeWidth) =
-          getTypeDepthAndWidth(FnTy->getErrorResult().getType());
+          getTypeDepthAndWidth(FnTy->getErrorResult().getInterfaceType());
       if (TypeDepth > MaxTypeDepth)
         MaxTypeDepth = TypeDepth;
       Width += TypeWidth;
@@ -401,7 +403,8 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   SpecializedGenericEnv = nullptr;
   SpecializedGenericSig = nullptr;
-  auto CalleeGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto CalleeGenericSig = Callee->getLoweredFunctionType()
+                                ->getInvocationGenericSignature();
   auto CalleeGenericEnv = Callee->getGenericEnvironment();
 
   this->Callee = Callee;
@@ -697,7 +700,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       auto &TL = M.Types.getTypeLowering(ResultTy,
                                          getResilienceExpansion());
 
-      if (TL.isLoadable() && !RI.getType()->isVoid() &&
+      if (TL.isLoadable() && !RI.getReturnValueType(M, SubstitutedType)->isVoid() &&
           shouldExpand(M, ResultTy)) {
         Conversions.set(IdxForResult);
         break;
@@ -779,11 +782,10 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
-      CanSpecializedGenericSig, FnTy->getExtInfo(),
-      FnTy->getCoroutineKind(), FnTy->getCalleeConvention(),
-      FnTy->getParameters(), FnTy->getYields(),
-      FnTy->getResults(), FnTy->getOptionalErrorResult(),
-      M.getASTContext(), FnTy->getWitnessMethodConformanceOrNone());
+      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCoroutineKind(),
+      FnTy->getCalleeConvention(), FnTy->getParameters(), FnTy->getYields(),
+      FnTy->getResults(), FnTy->getOptionalErrorResult(), SubstitutionMap(),
+      false, M.getASTContext(), FnTy->getWitnessMethodConformanceOrInvalid());
 
   // This is an interface type. It should not have any archetypes.
   assert(!NewFnTy->hasArchetype());
@@ -803,7 +805,8 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     if (RI.isFormalIndirect()) {
       if (isFormalResultConverted(IndirectResultIdx++)) {
         // Convert the indirect result to a direct result.
-        SILType SILResTy = SILType::getPrimitiveObjectType(RI.getType());
+        SILType SILResTy =
+          SILType::getPrimitiveObjectType(RI.getReturnValueType(M, SubstFTy));
         auto &TL = M.Types.getTypeLowering(SILResTy,
                                            getResilienceExpansion());
 
@@ -812,7 +815,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         auto C = (TL.isTrivial()
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
-        SpecializedResults.push_back(SILResultInfo(RI.getType(), C));
+        SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
         continue;
       }
     }
@@ -828,7 +831,8 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     }
 
     // Convert the indirect parameter to a direct parameter.
-    SILType SILParamTy = SILType::getPrimitiveObjectType(PI.getType());
+    SILType SILParamTy =
+      SILType::getPrimitiveObjectType(PI.getArgumentType(M, SubstFTy));
     auto &TL = M.Types.getTypeLowering(SILParamTy,
                                        getResilienceExpansion());
 
@@ -843,19 +847,18 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         C = ParameterConvention::Direct_Owned;
       }
     }
-    SpecializedParams.push_back(SILParameterInfo(PI.getType(), C));
+    SpecializedParams.push_back(SILParameterInfo(PI.getArgumentType(M, SubstFTy), C));
   }
   for (SILYieldInfo YI : SubstFTy->getYields()) {
     // For now, always just use the original, substituted parameter info.
     SpecializedYields.push_back(YI);
   }
   return SILFunctionType::get(
-      SubstFTy->getGenericSignature(),
-      SubstFTy->getExtInfo(), SubstFTy->getCoroutineKind(),
-      SubstFTy->getCalleeConvention(),
+      SubstFTy->getInvocationGenericSignature(), SubstFTy->getExtInfo(),
+      SubstFTy->getCoroutineKind(), SubstFTy->getCalleeConvention(),
       SpecializedParams, SpecializedYields, SpecializedResults,
-      SubstFTy->getOptionalErrorResult(), M.getASTContext(),
-      SubstFTy->getWitnessMethodConformanceOrNone());
+      SubstFTy->getOptionalErrorResult(), SubstitutionMap(), false,
+      M.getASTContext(), SubstFTy->getWitnessMethodConformanceOrInvalid());
 }
 
 /// Create a new generic signature from an existing one by adding
@@ -1691,13 +1694,14 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
   CanGenericSignature CallerGenericSig;
   GenericEnvironment *CallerGenericEnv = nullptr;
   if (Caller) {
-    CallerGenericSig = Caller->getLoweredFunctionType()->getGenericSignature();
+    CallerGenericSig = Caller->getLoweredFunctionType()
+                             ->getInvocationGenericSignature();
     CallerGenericEnv = Caller->getGenericEnvironment();
   }
 
   // Callee is the generic function being called by the apply instruction.
   auto CalleeFnTy = Callee->getLoweredFunctionType();
-  auto CalleeGenericSig = CalleeFnTy->getGenericSignature();
+  auto CalleeGenericSig = CalleeFnTy->getInvocationGenericSignature();
   auto CalleeGenericEnv = Callee->getGenericEnvironment();
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nTrying partial specialization for: "
@@ -1771,7 +1775,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
   SILModule &M = Callee->getModule();
 
   auto CalleeGenericSig =
-      Callee->getLoweredFunctionType()->getGenericSignature();
+      Callee->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *CalleeGenericEnv = Callee->getGenericEnvironment();
 
   FunctionSignaturePartialSpecializer FSPS(M,
@@ -1989,7 +1993,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                                       A->isNonThrowing());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
-      if (!CalleeSILSubstFnTy.isNoReturnFunction()) {
+      if (!CalleeSILSubstFnTy.isNoReturnFunction(Builder.getModule())) {
         // Store the direct result to the original result address.
         fixUsedVoidType(A, Loc, Builder);
         Builder.createStore(Loc, NewAI, StoreResultTo,
@@ -2092,7 +2096,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   // Set proper generic context scope for the type lowering.
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   Lowering::GenericContextScope GenericScope(M.Types,
-                                             SpecType->getGenericSignature());
+                                     SpecType->getInvocationGenericSignature());
 
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
@@ -2129,7 +2133,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Builder.createStore(Loc, ReturnValue, ReturnValueAddr,
                         StoreOwnershipQualifier::Unqualified);
     SILType VoidTy =
-        OrigPAI->getSubstCalleeType()->getDirectFormalResultsType();
+        OrigPAI->getSubstCalleeType()
+               ->getDirectFormalResultsType(M);
     assert(VoidTy.isVoid());
     ReturnValue = Builder.createTuple(Loc, VoidTy, {});
   }

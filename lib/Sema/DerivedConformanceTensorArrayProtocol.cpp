@@ -146,8 +146,8 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
     ValueDecl *memberMethodDecl = methodReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberMethodDecl = confRef->getConcrete()->
+    if (confRef.isConcrete())
+      memberMethodDecl = confRef.getConcrete()->
       getWitnessDecl(methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE = new (C) DeclRefExpr(
@@ -511,8 +511,8 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
     ValueDecl *memberInitDecl = initReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
-    if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(initReq);
+    if (confRef.isConcrete())
+      memberInitDecl = confRef.getConcrete()->getWitnessDecl(initReq);
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
         memberInitDecl, DeclNameLoc(), /*implicit*/ true);

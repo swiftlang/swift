@@ -96,7 +96,7 @@ SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
   if (!thunk->empty())
     return thunk;
 
-  if (auto genSig = derivativeFnTy->getGenericSignature())
+  if (auto genSig = derivativeFnTy->getSubstGenericSignature())
     thunk->setGenericEnvironment(genSig->getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
@@ -136,7 +136,7 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   if (!thunk->empty())
     return thunk;
 
-  if (auto genSig = constantTy->getGenericSignature())
+  if (auto genSig = constantTy->getSubstGenericSignature())
     thunk->setGenericEnvironment(genSig->getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
@@ -227,7 +227,7 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
       auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);
-      auto result = SGF.B.createWitnessMethod(loc, substSelfType, *conformance,
+      auto result = SGF.B.createWitnessMethod(loc, substSelfType, conformance,
                                               next, constantInfo.getSILType());
       return {ManagedValue::forUnmanaged(result), next};
     }
@@ -279,7 +279,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   if (resultTy != toClosure.getType()) {
     CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
     CanSILFunctionType closureFnTy = toClosure.getType().castTo<SILFunctionType>();
-    if (resultFnTy->isABICompatibleWith(closureFnTy).isCompatible()) {
+    if (resultFnTy->isABICompatibleWith(closureFnTy, F).isCompatible()) {
       toClosure = B.createConvertFunction(loc, toClosure, resultTy);
     } else {
       // Compute the partially-applied abstraction pattern for the callee:

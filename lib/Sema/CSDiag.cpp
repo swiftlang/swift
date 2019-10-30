@@ -798,11 +798,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     }
 
     // Emit a conformance error through conformsToProtocol.
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            fromType, PT->getDecl(), CS.DC, ConformanceCheckFlags::InExpression,
-            expr->getLoc())) {
-      if (conformance->isAbstract() ||
-          !conformance->getConcrete()->isInvalid())
+    auto conformance = TypeChecker::conformsToProtocol(
+        fromType, PT->getDecl(), CS.DC, ConformanceCheckFlags::InExpression,
+        expr->getLoc());
+    if (conformance) {
+      if (conformance.isAbstract() || !conformance.getConcrete()->isInvalid())
         return false;
     }
 
@@ -3671,12 +3671,13 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     return visitExpr(E);
 
   // Check to see if the contextual type conforms.
-  if (auto Conformance
-        = TypeChecker::conformsToProtocol(contextualType, ALC, CS.DC,
-                                          ConformanceCheckFlags::InExpression)) {
+  auto Conformance = TypeChecker::conformsToProtocol(
+      contextualType, ALC, CS.DC, ConformanceCheckFlags::InExpression);
+  if (Conformance) {
     Type contextualElementType =
-        Conformance->getTypeWitnessByName(
-          contextualType, CS.getASTContext().Id_ArrayLiteralElement)
+        Conformance
+            .getTypeWitnessByName(contextualType,
+                                  CS.getASTContext().Id_ArrayLiteralElement)
             ->getDesugaredType();
 
     // Type check each of the subexpressions in place, passing down the contextual
@@ -3722,20 +3723,20 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     // and figure out what the contextual Key/Value types are in place.
     auto Conformance = TypeChecker::conformsToProtocol(
         contextualType, DLC, CS.DC, ConformanceCheckFlags::InExpression);
-    if (!Conformance) {
+    if (Conformance.isInvalid()) {
       diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
         .highlight(E->getSourceRange());
       return true;
     }
 
     contextualKeyType =
-        Conformance->getTypeWitnessByName(
-          contextualType, CS.getASTContext().Id_Key)
+        Conformance
+            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Key)
             ->getDesugaredType();
 
     contextualValueType =
-        Conformance->getTypeWitnessByName(
-          contextualType, CS.getASTContext().Id_Value)
+        Conformance
+            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Value)
             ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&

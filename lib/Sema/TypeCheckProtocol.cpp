@@ -1748,7 +1748,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                         T, InheritedProto, DC,
                         ConformanceCheckFlags::SkipConditionalRequirements,
                         ComplainLoc);
-    if (!InheritedConformance || !InheritedConformance->isConcrete()) {
+    if (InheritedConformance.isInvalid() ||
+        !InheritedConformance.isConcrete()) {
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
       if (ComplainLoc.isValid()) {
@@ -2636,12 +2637,12 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     auto overriddenConformance =
       DC->getParentModule()->lookupConformance(Adoptee,
                                                overridden->getProtocol());
-    if (!overriddenConformance ||
-        !overriddenConformance->isConcrete())
+    if (overriddenConformance.isInvalid() ||
+        !overriddenConformance.isConcrete())
       continue;
 
     auto overriddenRootConformance =
-      overriddenConformance->getConcrete()->getRootNormalConformance();
+        overriddenConformance.getConcrete()->getRootNormalConformance();
     ConformanceChecker(TC, overriddenRootConformance, GlobalMissingWitnesses)
       .recordTypeWitness(overridden, type, typeDecl);
   }
@@ -2708,6 +2709,15 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.FunctionDefinitions = true;
     Options.PrintAccessorBodiesInProtocols = true;
 
+    bool AdopterIsClass = Adopter->getSelfClassDecl() != nullptr;
+    // Skip 'mutating' only inside classes: mutating methods usually
+    // don't have a sensible non-mutating implementation.
+    if (AdopterIsClass)
+      Options.ExcludeAttrList.push_back(DAK_Mutating);
+    // 'nonmutating' is only meaningful on value type member accessors.
+    if (AdopterIsClass || !isa<AbstractStorageDecl>(Requirement))
+      Options.ExcludeAttrList.push_back(DAK_NonMutating);
+
     // FIXME: Once we support move-only types, remove this if the
     //        conforming type is move-only. Until then, don't suggest printing
     //        __consuming on a protocol requirement.
@@ -2722,10 +2732,19 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
-    if (!isa<ExtensionDecl>(Adopter)) {
+    if (isa<NominalTypeDecl>(Adopter)) {
       // Create a variable declaration instead of a computed property in
-      // nominal types
+      // nominal types...
       Options.PrintPropertyAccessors = false;
+
+      // ...but a non-mutating setter requirement will force us into a
+      // computed property in non-class adopters; don't leave the user
+      // wondering why a conformance fails.
+      if (!AdopterIsClass)
+        if (const auto VD = dyn_cast<VarDecl>(Requirement))
+          if (const auto Set = VD->getAccessor(AccessorKind::Set))
+            if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
+              Options.PrintPropertyAccessors = true;
     }
     Requirement->print(Printer, Options);
     Printer << "\n";
@@ -3103,11 +3122,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // Otherwise, go satisfy the derivable requirement, which can introduce
       // a member that could in turn satisfy *this* requirement.
       auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
-      if (auto conformance =
-            TypeChecker::conformsToProtocol(Adoptee, derivableProto,
-                                            DC, None)) {
-        if (conformance->isConcrete())
-          (void)conformance->getConcrete()->getWitnessDecl(derivable);
+      auto conformance =
+          TypeChecker::conformsToProtocol(Adoptee, derivableProto, DC, None);
+      if (conformance.isConcrete()) {
+        (void)conformance.getConcrete()->getWitnessDecl(derivable);
       }
     }
   }
@@ -3490,9 +3508,10 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Check protocol conformances.
   for (auto reqProto : genericSig->getConformsTo(depTy)) {
-    if (!TypeChecker::conformsToProtocol(
-                          contextType, reqProto, dc,
-                          ConformanceCheckFlags::SkipConditionalRequirements))
+    if (TypeChecker::conformsToProtocol(
+            contextType, reqProto, dc,
+            ConformanceCheckFlags::SkipConditionalRequirements)
+            .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredType());
 
     // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
@@ -4085,8 +4104,9 @@ static void diagnoseConformanceFailure(Type T,
       if (!equatableProto)
         return;
 
-      if (!TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl,
-                                           None)) {
+      if (TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl,
+                                          None)
+              .isInvalid()) {
         SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
@@ -4139,10 +4159,9 @@ void ConformanceChecker::emitDelayedDiags() {
   }
 }
 
-Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
-                                               Type T, ProtocolDecl *Proto,
-                                               DeclContext *DC,
-                                               ConformanceCheckOptions options) {
+ProtocolConformanceRef
+TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                              ConformanceCheckOptions options) {
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
   if (T->isExistentialType()) {
@@ -4151,7 +4170,9 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
     // First, if we have a superclass constraint, the class may conform
     // concretely.
     if (auto superclass = layout.getSuperclass()) {
-      if (auto result = conformsToProtocol(superclass, Proto, DC, options)) {
+      auto result =
+          TypeChecker::conformsToProtocol(superclass, Proto, DC, options);
+      if (result) {
         return result;
       }
     }
@@ -4170,18 +4191,17 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
         return ProtocolConformanceRef(Proto);
     }
 
-    return None;
+    return ProtocolConformanceRef::forInvalid();
   }
 
   // For non-existential types, this is equivalent to checking conformance.
-  return conformsToProtocol(T, Proto, DC, options);
+  return TypeChecker::conformsToProtocol(T, Proto, DC, options);
 }
 
-Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
-                                   Type T, ProtocolDecl *Proto,
-                                   DeclContext *DC,
-                                   ConformanceCheckOptions options,
-                                   SourceLoc ComplainLoc) {
+ProtocolConformanceRef
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                                ConformanceCheckOptions options,
+                                SourceLoc ComplainLoc) {
   bool InExpression = options.contains(ConformanceCheckFlags::InExpression);
 
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
@@ -4193,18 +4213,18 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   // Look up conformance in the module.
   ModuleDecl *M = DC->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto);
-  if (!lookupResult) {
+  if (lookupResult.isInvalid()) {
     if (ComplainLoc.isValid())
       diagnoseConformanceFailure(T, Proto, DC, ComplainLoc);
     else
       recordDependency();
 
-    return None;
+    return ProtocolConformanceRef::forInvalid();
   }
 
   // Store the conformance and record the dependency.
-  if (lookupResult->isConcrete()) {
-    recordDependency(lookupResult->getConcrete());
+  if (lookupResult.isConcrete()) {
+    recordDependency(lookupResult.getConcrete());
   } else {
     recordDependency();
   }
@@ -4212,7 +4232,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   if (options.contains(ConformanceCheckFlags::SkipConditionalRequirements))
     return lookupResult;
 
-  auto condReqs = lookupResult->getConditionalRequirementsIfAvailable();
+  auto condReqs = lookupResult.getConditionalRequirementsIfAvailable();
   assert(condReqs &&
          "unhandled recursion: missing conditional requirements when they're "
          "required");
@@ -4221,7 +4241,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   // we need to check, do so now.
   if (!condReqs->empty()) {
     // Figure out the location of the conditional conformance.
-    auto conformanceDC = lookupResult->getConcrete()->getDeclContext();
+    auto conformanceDC = lookupResult.getConcrete()->getDeclContext();
     SourceLoc noteLoc;
     if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC))
       noteLoc = ext->getLoc();
@@ -4230,8 +4250,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
     auto conditionalCheckResult = checkGenericArguments(
         DC, ComplainLoc, noteLoc, T,
-        {lookupResult->getRequirement()->getSelfInterfaceType()},
-        *condReqs,
+        {lookupResult.getRequirement()->getSelfInterfaceType()}, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); },
         LookUpConformance(DC), options);
     switch (conditionalCheckResult) {
@@ -4240,7 +4259,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
     case RequirementCheckResult::Failure:
     case RequirementCheckResult::SubstitutionFailure:
-      return None;
+      return ProtocolConformanceRef::forInvalid();
     }
   }
 
@@ -4261,7 +4280,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 // is only valid during type checking, will never be invoked.
 //
 // - mapTypeIntoContext will be a nop.
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
 
   auto flags = ConformanceCheckFlags::SuppressDependencyTracking;
@@ -4269,11 +4288,9 @@ ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
   return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, flags);
 }
 
-Optional<ProtocolConformanceRef>
-TypeChecker::LookUpConformance::operator()(
-                                       CanType dependentType,
-                                       Type conformingReplacementType,
-                                       ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef TypeChecker::LookUpConformance::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
 
@@ -5582,7 +5599,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       req.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto conformance = conformsToProtocol(defaultAssocTypeInContext,
                                           requirementProto, proto, None);
-    if (!conformance) {
+    if (conformance.isInvalid()) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.
       diagnose(proto, diag::assoc_type_default_conformance_failed,
@@ -5598,6 +5615,6 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     // Record the default associated conformance.
     proto->setDefaultAssociatedConformanceWitness(
-        req.getFirstType()->getCanonicalType(), requirementProto, *conformance);
+        req.getFirstType()->getCanonicalType(), requirementProto, conformance);
   }
 }

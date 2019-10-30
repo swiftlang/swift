@@ -674,7 +674,7 @@ class SuperSub : SuperBase {
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         [[UNOWNED_SELF:%.*]] = load_borrow [[PB]]
 // -- strong +2, unowned +1
-// CHECK:         [[SELF:%.*]] = copy_unowned_value [[UNOWNED_SELF]]
+// CHECK:         [[SELF:%.*]] = strong_copy_unowned_value [[UNOWNED_SELF]]
 // CHECK:         end_borrow [[UNOWNED_SELF]]
 // CHECK:         [[UNOWNED_SELF2:%.*]] = ref_to_unowned [[SELF]]
 // -- strong +2, unowned +2
@@ -714,7 +714,7 @@ class SuperSub : SuperBase {
 // CHECK: sil private [ossa] @[[INNER_CLOSURE_FUN:\$s8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycyXEfU_ACycfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned UnownedSelfNestedCapture {
 // CHECK: bb0([[CAPTURED_SELF:%.*]] : @guaranteed $@sil_unowned UnownedSelfNestedCapture):
 // -- strong +1, unowned +1
-// CHECK:         [[SELF:%.*]] = copy_unowned_value [[CAPTURED_SELF:%.*]] :
+// CHECK:         [[SELF:%.*]] = strong_copy_unowned_value [[CAPTURED_SELF:%.*]] :
 // -- strong +1, unowned +0 (claimed by return)
 // CHECK:         return [[SELF]]
 // CHECK: } // end sil function '[[INNER_CLOSURE_FUN]]'

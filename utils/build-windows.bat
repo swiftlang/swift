@@ -65,7 +65,7 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 call :test_swift %exitOnError%
 
 goto :end
@@ -279,7 +279,7 @@ cmake "%source_root%\lldb"^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
     -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
-    -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=YES^
+    -DLLDB_USE_STATIC_BINDINGS:BOOL=YES^
     -DPYTHON_HOME:PATH=%PYTHON_HOME%^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^

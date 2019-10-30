@@ -3488,6 +3488,21 @@ public:
     });
   }
 
+  /// Whether this declaration has a synthesized memberwise initializer.
+  bool hasMemberwiseInitializer() const;
+
+  /// Retrieves the synthesized memberwise initializer for this declaration,
+  /// or \c nullptr if it does not have one.
+  ConstructorDecl *getMemberwiseInitializer() const;
+
+  /// Whether this declaration has a synthesized zero parameter default
+  /// initializer.
+  bool hasDefaultInitializer() const;
+
+  /// Retrieves the synthesized zero parameter default initializer for this
+  /// declaration, or \c nullptr if it doesn't have one.
+  ConstructorDecl *getDefaultInitializer() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -4389,9 +4404,9 @@ public:
 
   /// Returns the default associated conformance witness for an associated
   /// type, or \c None if there is no default.
-  Optional<ProtocolConformanceRef> getDefaultAssociatedConformanceWitness(
-                                              CanType association,
-                                              ProtocolDecl *requirement) const;
+  ProtocolConformanceRef
+  getDefaultAssociatedConformanceWitness(CanType association,
+                                         ProtocolDecl *requirement) const;
 
   /// Set the default associated conformance witness for the given
   /// associated conformance.

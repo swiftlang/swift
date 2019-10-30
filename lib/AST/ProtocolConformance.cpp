@@ -128,21 +128,17 @@ ProtocolConformanceRef::subst(Type origType,
 
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
-    if (auto optConformance =
-          proto->getModuleContext()->lookupExistentialConformance(
-            substType, proto))
-      return *optConformance;
+    auto optConformance =
+        proto->getModuleContext()->lookupExistentialConformance(substType,
+                                                                proto);
+    if (optConformance)
+      return optConformance;
 
     return ProtocolConformanceRef::forInvalid();
   }
 
   // Check the conformance map.
-  if (auto result = conformances(origType->getCanonicalType(),
-                                 substType, proto)) {
-    return *result;
-  }
-
-  return ProtocolConformanceRef::forInvalid();
+  return conformances(origType->getCanonicalType(), substType, proto);
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
@@ -841,8 +837,8 @@ recursivelySubstituteBaseType(ModuleDecl *module,
 
   // If we have an inherited protocol just look up the conformance.
   if (reqProto != conformance->getProtocol()) {
-    reqConformance = module->lookupConformance(
-        conformance->getType(), reqProto)->getConcrete();
+    reqConformance = module->lookupConformance(conformance->getType(), reqProto)
+                         .getConcrete();
   }
 
   return reqConformance->getTypeWitness(depMemTy->getAssocType());
@@ -894,12 +890,8 @@ void NormalProtocolConformance::finishSignatureConformances() {
     if (substTy->hasTypeParameter())
       substTy = getDeclContext()->mapTypeIntoContext(substTy);
 
-    auto reqConformance = module->lookupConformance(substTy, reqProto);
-    if (!reqConformance)
-      reqConformance = ProtocolConformanceRef::forInvalid();
-
-    reqConformance = reqConformance->mapConformanceOutOfContext();
-    reqConformances.push_back(*reqConformance);
+    reqConformances.push_back(module->lookupConformance(substTy, reqProto)
+                                  .mapConformanceOutOfContext());
   }
   setSignatureConformances(reqConformances);
 }

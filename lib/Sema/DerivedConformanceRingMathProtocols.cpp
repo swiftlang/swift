@@ -175,9 +175,9 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
     ValueDecl *memberOpDecl = operatorReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
+    if (confRef.isConcrete())
       if (auto *concreteMemberMethodDecl =
-              confRef->getConcrete()->getWitnessDecl(operatorReq))
+              confRef.getConcrete()->getWitnessDecl(operatorReq))
         memberOpDecl = concreteMemberMethodDecl;
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
@@ -303,12 +303,12 @@ deriveBodyRingPropertyGetter(AbstractFunctionDecl *funcDecl,
     // If conformance reference is not concrete, then concrete witness
     // declaration for ring property cannot be resolved. Return reference to
     // protocol requirement: this will be dynamically dispatched.
-    if (!confRef->isConcrete()) {
+    if (!confRef.isConcrete()) {
       return new (C) MemberRefExpr(memberExpr, SourceLoc(), reqDecl,
                                    DeclNameLoc(), /*Implicit*/ true);
     }
     // Otherwise, return reference to concrete witness declaration.
-    auto conf = confRef->getConcrete();
+    auto conf = confRef.getConcrete();
     auto witnessDecl = conf->getWitnessDecl(reqDecl);
     return new (C) MemberRefExpr(memberExpr, SourceLoc(), witnessDecl,
                                  DeclNameLoc(), /*Implicit*/ true);

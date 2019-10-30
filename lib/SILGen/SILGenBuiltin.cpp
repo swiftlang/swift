@@ -1061,7 +1061,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     if (currentLevel->getNumResults() != 1)
       break;
     currentLevel =
-        currentLevel->getSingleResult().getType()->getAs<SILFunctionType>();
+        currentLevel->getSingleResult().getInterfaceType()->getAs<SILFunctionType>();
   }
   assert(numParameters == origFnArgVals.size());
 
@@ -1102,7 +1102,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   // Apply the last curry level, in the case where it has indirect results.
   if (curryLevels.back()->hasIndirectFormalResults()) {
     auto indResBuffer = SGF.getBufferForExprResult(
-        loc, curryLevels.back()->getAllResultsType(), C);
+        loc, curryLevels.back()->getAllResultsInterfaceType(), C);
     SmallVector<SILValue, 3> applyArgs;
     applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(

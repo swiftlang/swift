@@ -269,8 +269,8 @@ public:
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
   /// parameters which have conformance constraints on them.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType depTy, ProtocolDecl *proto) const;
+  ProtocolConformanceRef lookupConformance(CanType depTy,
+                                           ProtocolDecl *proto) const;
 
   /// Iterate over all generic parameters, passing a flag to the callback
   /// indicating if the generic parameter is canonical or not.

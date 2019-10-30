@@ -212,9 +212,249 @@ Additionally, typedefs for `void *` or `const void *` that are themselves annota
 If a typedef's underlying type is itself a "CF pointer" typedef, the "alias" typedef will be imported as a regular typealias, with the suffix "Ref" still dropped from its name (if present) unless doing so would conflict with another declaration in the same module as the typedef.
 
 
+## Objective-C Methods
+
+Objective-C methods are classified into one of five categories:
+
+1. Instance methods that are part of the `init` method family whose selector's first word is "init" are considered "normal" initializers.
+
+2. Class methods that return the type of the containing class or `instancetype` are considered "factory initializers" if a "leading type match" succeeds against the selector, using the containing type (see [CToSwiftNameTranslation-OmitNeedlessWords.md][]).
+
+    _As an exception, no-argument factory methods cannot have any additional text *after* the matching portion._
+
+3. Accessor methods are associated with a property declaration (`@property`).
+
+4. Subscript methods have one of Objective-C's special subscript selectors (`objectAtIndexedSubscript:`, `objectForKeyedSubscript:`, `setObject:atIndexedSubscript:`, or `setObject:forKeyedSubscript:`).
+
+5. Other methods are imported as plain methods.
+
+If a method overrides a superclass or matches a method in an adopted protocol, the Swift name of the "overridden" method will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
+
+
+### Normal Initializers
+
+The base name of an initializer is always the special name "init". Any leading "init" is dropped from the original selector. If the next word in the first selector piece is "With":
+
+1. Drop "With".
+2. If the remaining text is longer than one letter, the first letter is an ASCII uppercase character, and the second letter is *not* an ASCII uppercase character, downcase the first letter.
+3. If the result is a Swift keyword, undo the previous downcasing and insert "with" in front instead.
+4. Set this as the first argument name.
+
+Whether or not the initializer will throw is determined according to the "error handling" logic described below. If the initializer is considered throwing, an NSError out-parameter may be removed from the argument list.
+
+At this point, the method name goes through the "omit needless words" process described in [CToSwiftNameTranslation-OmitNeedlessWords.md][]. This process attempts to omit superfluous type names and other words that make a name fit the Cocoa Naming Guidelines for Objective-C but not the Swift API Design Guidelines. For initializers, this is based on
+
+- the argument types, if any, and whether they'll have default values
+- the first argument name that was just computed and the remaining selector pieces, if any
+
+If the resulting name has a first argument name but there are no arguments in the original method, a dummy parameter with type `Void` is added.
+
+A normal initializer in a class is considered designated (non-convenience) if it is marked with the `objc_designated_initializer` attribute, *or* if the class has *no* initializers marked with the `objc_designated_initializer` attribute. Otherwise, it is considered convenience.
+
+```objc
+@interface CorporateEmployee : NSObject
+- (instancetype)initWithName:(NSString *)name manager:(nullable CorporateEmployee *)manager __attribute__((objc_designated_initializer));
+- (instancetype)initCEOWithName:(NSString *)name;
+- (instancetype)initTimCookHimself;
+@end
+
+// Usually seen as NS_DESIGNATED_INITIALIZER.
+```
+
+```swift
+class CorporateEmployee {
+  init(name: String, manager: CorporateEmployee?)
+  convenience init(ceoWithName: String)
+  convenience init(timCookHimself: ())
+}
+```
+
+If an initializer in a class matches a requirement in a protocol adopted by the class, it is imported as `required`.
+
+
+### Factory initializers
+
+The base name of a factory initializer is always the special name "init". The "leading type match" portion of the first selector piece is dropped. If the next word in the first selector piece is "With":
+
+1. Drop "With".
+2. If the remaining text is longer than one letter, the first letter is an ASCII uppercase character, and the second letter is *not* an ASCII uppercase character, downcase the first letter.
+3. If the result is a Swift keyword, undo the previous downcasing and insert "with" in front instead.
+4. Set this as the first argument name.
+
+Whether or not the initializer will throw is determined according to the "error handling" logic described below. If the initializer is considered throwing, an NSError out-parameter may be removed from the argument list.
+
+At this point, the method name goes through the "omit needless words" process described in [CToSwiftNameTranslation-OmitNeedlessWords.md][]. This process attempts to omit superfluous type names and other words that make a name fit the Cocoa Naming Guidelines for Objective-C but not the Swift API Design Guidelines. For factory initializers, this is based on
+
+- the argument types, if any, and whether they'll have default values
+- the first argument name that was just computed and the remaining selector pieces, if any
+
+Factory initializers are considered convenience initializers if they have a return type of `instancetype`, and a special "non-inherited factory initializer" otherwise.
+
+```objc
+@interface SpellBook : NSObject
++ (instancetype)spellBookWithAuthor:(NSString *)authorName;
++ (nullable SpellBook *)spellBookByTranslatingAncientText:(AncientText *)text error:(NSError **)error;
+@end
+```
+
+```swift
+class SpellBook: NSObject {
+  convenience init(author authorName: String)
+  /* non-inherited */ init(byTranslating text: AncientText) throws
+}
+```
+
+If a factory initializer turns out to have the same imported name as an available designated initializer, or a non-inherited factory initializer has the same imported name as an available convenience initializer, the factory initializer is marked unavailable to resolve ambiguities. If a convenience factory initializer has the same imported name as an available convenience initializer, the initializer with more restrictive availability is marked unavailable. In the case of a tie, the convenience factory initializer is the one marked unavailable.
+
+
+### Property accessors
+
+A method that has an associated property declaration is imported with a type that matches the property's type and made into a property accessor. See the section on Objective-C properties below.
+
+
+### Subscript accessors
+
+Methods named `objectAtIndexedSubscript:`, `objectForKeyedSubscript:`, `setObject:atIndexedSubscript:`, or `setObject:forKeyedSubscript:` are considered subscript accessors. If a getter method exists on a type, it will be imported as a subscript; a setter method must be paired with a getter method in the same class/protocol, or in a superclass.
+
+If a subscript getter and setter disagree about the optionality of the element type, the subscript's element type will be imported as implicitly-unwrapped optional. If the getter and setter element types differ in any other way, the subscript will not be imported. If the getter and setter *index* types differ in any way, the subscript will be imported as read-only.
+
+_These two fallbacks should have been the same, but aren't._
+
+As a special case, NSDictionary's subscript is imported with a key type of `NSCopying` rather than `Any` so that it has an index type compatible with NSMutableDictionary's subscript setter.
+
+
+### Normal methods
+
+All other Objective-C methods are imported as...methods. Whether or not the method will throw is determined according to the "error handling" logic described below. If the method is considered throwing, an NSError out-parameter may be removed from the argument list.
+
+If the first selector piece of the method is empty, the method is not imported into Swift.
+
+After any error handling transformations, the method name goes through the "omit needless words" process described in [CToSwiftNameTranslation-OmitNeedlessWords.md][]. This process attempts to omit superfluous type names and other words that make a name fit the Cocoa Naming Guidelines for Objective-C but not the Swift API Design Guidelines. For methods, this is based on
+
+- the method base name
+- the method return type
+- the argument types, if any, and whether they'll have default values
+- the first argument name that was just computed and the remaining selector pieces, if any
+- the *local* parameter name for the first parameter
+- the containing class or protocol
+- the set of properties and property-like methods present on the containing class and categories in the same module as the class, including those inherited from superclasses and their categories. (A property-like method is a no-argument method with a non-`void`, non-`instancetype` return type.)
+
+```objc
+@interface UIColor : NSObject
+- (UIColor *)colorWithAlphaComponent:(CGFloat)alpha;
+- (UIColor *)resolvedColorWithTraitCollection:(UITraitCollection *)traitCollection;
+@end
+```
+
+```swift
+class UIColor {
+  func withAlphaComponent(_ alpha: CGFloat) -> UIColor
+  func resolvedColor(with traitCollection: UITraitCollection) -> UIColor
+}
+```
+
+```objc
+@interface UIView : UIResponder
+- (CGPoint)convertPoint:(CGPoint)point toView:(nullable UIView *)view;
+
+@property (readonly) NSArray<NSLayoutConstraint *> *constraints;
+- (void)addConstraint:(NSLayoutConstraint *)constraint;
+@end
+```
+
+```swift
+class UIView {
+  func convert(_ point: CGPoint, to view: UIView?) -> CGPoint
+
+  var constraints: [NSLayoutConstraint] { get }
+  func addConstraint(_ constraint: NSLayoutConstraint) // rather than add(_:)
+}
+```
+
+
+### Error handling
+
+Certain methods with NSError out-parameters are imported as throwing methods in Swift. The conditions for this are as follows:
+
+- The method has a parameter with the type `NSError * __autoreleasing *` or `NSError * __unsafe_unretained *`, called the _NSError out-parameter._ Note that `__autoreleasing` is the default for indirect pointers under Objective-C ARC.
+
+- The NSError out-parameter is the last parameter in the method other than parameters with block type.
+
+- The method provides a way to indicate failure:
+
+    - an explicit `swift_error` attribute with a value other than `none`, or
+    - a return type of `BOOL` or `Boolean`, or
+    - a return type that will be imported as Optional
+
+    Note that the built-in `bool` (`_Bool`) type is *not* considered a boolean type for the purposes of inferring "throws".
+
+- The method does not have a `swift_error` attribute with a value of `none`.
+
+If the method in question is not going to be imported as an initializer, and the NSError out-parameter is the first parameter, and the first selector piece ends with "AndReturnError" or "WithError", the matching suffix is dropped from the base name unless the resulting base name would be a Swift keyword. If the NSError out-parameter is *not* the first parameter, the corresponding selector piece is dropped entirely. The modified selector is then compared against other methods in the class. If there are no other methods in the class matching the new selector, the name change is accepted; otherwise, the original selector is used.
+
+```objc
+- (BOOL)performDelicateActivity:(NSOperation *)operation error:(NSError **)error;
+- (BOOL)performDelicateActivityAndReturnError:(NSError **)error activityBody:(BOOL(^)(void))activityBody;
+- (BOOL)performTheUsualActivityWithError:(NSError **)error;
+- (BOOL)performYetAnotherActivity:(NSError **)error;
+```
+
+```swift
+func performDelicateActivity(_ operation: NSOperation) throws
+func performDelicateActivity(_ activityBody: () -> Bool) throws
+func performTheUsualActivity() throws
+func performYetAnotherActivity() throws
+```
+
+If the original selector was used and no "AndReturnError" or "WithError" suffix-stripping was attempted, the imported method will have a dummy parameter with type `Void` in place of the NSError out-parameter. In all other cases (a modified selector or a selector with a suffix that could have been stripped), the NSError out-parameter is removed from the method.
+
+```objc
+- (nullable NSString *)fetchDisplayNameOfResource:(NSURL *)resource;
+- (nullable NSString *)fetchDisplayNameOfResource:(NSURL *)resource error:(NSError **)error;
+- (nullable NSString *)fetchDisplayNameOfMyFavoriteSong;
+- (nullable NSString *)fetchDisplayNameOfMyFavoriteSongAndReturnError:(NSError **)error;
+```
+
+```swift
+func fetchDisplayName(ofResource: URL) -> String?
+func fetchDisplayName(ofResource: URL, error: ()) throws -> String
+func fetchDisplayNameOfMyFavoriteSong() -> String?
+func fetchDisplayNameOfMyFavoriteSongAndReturnError() throws -> String
+```
+
+The return type will be transformed according to the kind of failure indication:
+
+- `swift_error(nonnull_error)`: no transformation
+- `swift_error(null_result)` (default for Optional return types): return type becomes non-optional
+- `swift_error(zero_result)` (default for `BOOL` and `Boolean`): `BOOL` and `Boolean` become `Void`; other return types are unchanged
+- `swift_error(nonzero_result)`: return type becomes `Void`
+
+
+### Default argument values
+
+Certain method parameters are automatically considered to have default argument values when imported into Swift. This inference uses the following algorithm:
+
+1. If the first word of the method base name is "set", the first parameter of that method never has a default value.
+
+2. A final argument that is a nullable function or block pointer defaults to `nil`.
+
+3. A nullable argument of type `NSZone *` defaults to `nil`.
+
+4. An argument whose type is an option set enum (see above) where the C name of the enum contains the word "options" defaults to `[]`.
+
+    _This mistakenly does not check the names of typedefs that wrap anonymous enums, which are supposed to be treated as the name of the enum._
+
+5. An argument whose Objective-C type is an NSDictionary defaults to `nil` if the NSDictionary is nullable and `[:]` if the NSDictionary is non-nullable, under the following conditions:
+
+    - the argument label contains the word "options" or "attributes", or the two words "user info" one after another
+    - the argument label is empty and the method base name ends with the word "options" or "attributes", or the two words "user info" one after another
+
+
 ## Objective-C Properties
 
-By default, most property names are not transformed at all. However, if the getter of a property overrides a superclass or adopted protocol method that is also a property accessor, the Swift name of the overridden accessor's property will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
+Property names are transformed according to the "omit needless words" process described in [CToSwiftNameTranslation-OmitNeedlessWords.md][]. This process attempts to omit superfluous type names and other words that make a name fit the Cocoa Naming Guidelines for Objective-C but not the Swift API Design Guidelines. The transformation is based on the property's type and the type of the enclosing context.
+
+If the getter of a property overrides a superclass method or matches a method in an adopted protocol that is also a property accessor, the Swift name of the "overridden" accessor's property will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
 
 Properties with the type `BOOL` or `Boolean` use the name of the getter as the name of the Swift property by default, rather than the name of the property in Objective-C. This accounts for a difference in Swift and Objective-C naming conventions for boolean properties that use "is".
 
@@ -234,10 +474,12 @@ A property declaration with the `SwiftImportPropertyAsAccessors` API note will n
 
 _Objective-C code has historically not been consistent about whether the NSAccessibility declarations should be considered properties and therefore the Swift compiler chooses to import them as methods, as a sort of lowest common denominator._
 
+  [CToSwiftNameTranslation-OmitNeedlessWords.md]: ./CToSwiftNameTranslation-OmitNeedlessWords.md
+
 
 ## `swift_private`
 
-The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override; in that case the name needs to match the overridden declaration.
+The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override or matches a protocol requirement; in that case the name needs to match the "overridden" declaration.
 
 ```objc
 @interface Example : NSObject
@@ -533,6 +775,3 @@ init(default: ())
 A custom name on an instance method with one of Objective-C's subscript selectors (`objectAtIndexedSubscript:`, `objectForKeyedSubscript:`, `setObject:atIndexedSubscript:`, or `setObject:forKeyedSubscript:`) prevents that method from being imported as a subscript or used as the accessor for another subscript.
 
 _Currently, this only works if *both* methods in a read/write subscript are given custom names; if just one is, a read/write subscript will still be formed. A read-only subscript only has one method to rename._
-
-
-## More to come...

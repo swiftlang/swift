@@ -598,12 +598,5 @@ swift::swift_errorRelease(SwiftError *error) {
   return objc_release((id)error);
 }
 
-/// Breakpoint hook for debuggers.
-SWIFT_CC(swift) void
-swift::swift_willThrow(SWIFT_CONTEXT void *unused,
-                       SWIFT_ERROR_RESULT SwiftError **error) {
-  // empty
-}
-
 #endif
 

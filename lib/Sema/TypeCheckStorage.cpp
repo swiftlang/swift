@@ -878,19 +878,19 @@ createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                ctx);
 }
 
-static Optional<ProtocolConformanceRef>
-checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var, Type type) {
+static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
+                                                          Type type) {
   auto dc = var->getDeclContext();
+  auto &ctx = dc->getASTContext();
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    auto result = TypeChecker::conformsToProtocol(type, proto, dc, None);
-    if (result)
+    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc, None))
       return result;
   }
 
   ctx.Diags.diagnose(var->getLoc(), diag::nscopying_doesnt_conform);
-  return None;
+  return ProtocolConformanceRef::forInvalid();
 }
 
 static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
@@ -903,10 +903,9 @@ static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
   }
 }
 
-Optional<ProtocolConformanceRef>
-TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
+ProtocolConformanceRef TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
   Type type = getUnderlyingTypeOfVariable(var).first;
-  return ::checkConformanceToNSCopying(Context, var, type);
+  return ::checkConformanceToNSCopying(var, type);
 }
 
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
@@ -923,14 +922,14 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // The element type must conform to NSCopying.  If not, emit an error and just
   // recovery by synthesizing without the copy call.
-  auto conformance = checkConformanceToNSCopying(Ctx, VD, underlyingType);
+  auto conformance = checkConformanceToNSCopying(VD, underlyingType);
   if (!conformance)
     return Val;
 
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance->getRequirement()->getMembers()) {
+  for (auto member : conformance.getRequirement()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getFullName() == copyWithZoneName) {
         copyMethod = func;
@@ -948,9 +947,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   }
 
   SubstitutionMap subs =
-    SubstitutionMap::get(copyMethod->getGenericSignature(),
-                         {underlyingType},
-                         ArrayRef<ProtocolConformanceRef>(*conformance));
+      SubstitutionMap::get(copyMethod->getGenericSignature(), {underlyingType},
+                           ArrayRef<ProtocolConformanceRef>(conformance));
   ConcreteDeclRef copyMethodRef(copyMethod, subs);
   auto copyMethodType = copyMethod->getInterfaceType()
                            ->castTo<GenericFunctionType>()

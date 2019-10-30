@@ -783,18 +783,20 @@ public:
                            TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
-  void checkUnsupportedProtocolType(Decl *decl);
+  static void checkUnsupportedProtocolType(Decl *decl);
 
   /// Check for unsupported protocol types in the given statement.
-  void checkUnsupportedProtocolType(Stmt *stmt);
+  static void checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           TrailingWhereClause *whereClause);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           GenericParamList *genericParams);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   static GenericEnvironment *
@@ -986,15 +988,15 @@ public:
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
-  Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
+  static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                               BraceStmt *body,
-                                               Type builderType);
+  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                                      BraceStmt *body,
+                                                      Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1012,8 +1014,8 @@ public:
   void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
-  void checkDeclAttributes(Decl *D);
-  void checkParameterAttributes(ParameterList *params);
+  static void checkDeclAttributes(Decl *D);
+  static void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -1036,11 +1038,11 @@ public:
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
-  void checkProtocolSelfRequirements(ValueDecl *decl);
+  static void checkProtocolSelfRequirements(ValueDecl *decl);
 
   /// All generic parameters of a generic function must be referenced in the
   /// declaration's type, otherwise we have no way to infer them.
-  void checkReferencedGenericParams(GenericContext *dc);
+  static void checkReferencedGenericParams(GenericContext *dc);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1153,9 +1155,6 @@ private:
   Optional<Type> boolType;
 
 public:
-  /// Define the default constructor for the given struct or class.
-  static void defineDefaultConstructor(NominalTypeDecl *decl);
-
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
@@ -1564,10 +1563,9 @@ public:
   ///
   /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
   /// an empty optional.
-  static Optional<ProtocolConformanceRef> containsProtocol(
-                                             Type T, ProtocolDecl *Proto,
-                                             DeclContext *DC,
-                                             ConformanceCheckOptions options);
+  static ProtocolConformanceRef
+  containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                   ConformanceCheckOptions options);
 
   /// Determine whether the given type conforms to the given protocol.
   ///
@@ -1586,12 +1584,10 @@ public:
   ///
   /// \returns The protocol conformance, if \c T conforms to the
   /// protocol \c Proto, or \c None.
-  static Optional<ProtocolConformanceRef> conformsToProtocol(
-                                           Type T,
-                                           ProtocolDecl *Proto,
-                                           DeclContext *DC,
-                                           ConformanceCheckOptions options,
-                                           SourceLoc ComplainLoc = SourceLoc());
+  static ProtocolConformanceRef
+  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                     ConformanceCheckOptions options,
+                     SourceLoc ComplainLoc = SourceLoc());
 
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
@@ -1602,10 +1598,9 @@ public:
   public:
     explicit LookUpConformance(DeclContext *dc) : dc(dc) { }
 
-    Optional<ProtocolConformanceRef>
-    operator()(CanType dependentType,
-               Type conformingReplacementType,
-               ProtocolDecl *conformedProtocol) const;
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Completely check the given conformance.
@@ -1616,7 +1611,7 @@ public:
                                   IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  Optional<ProtocolConformanceRef> checkConformanceToNSCopying(VarDecl *var);
+  static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.

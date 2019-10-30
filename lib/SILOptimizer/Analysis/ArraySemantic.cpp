@@ -744,7 +744,8 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
       ReserveFnRef->getType().castTo<SILFunctionType>();
     assert(ReserveFnTy->getNumParameters() == 2);
     StructType *IntType =
-      ReserveFnTy->getParameters()[0].getType()->castTo<StructType>();
+      ReserveFnTy->getParameters()[0].getArgumentType(F->getModule(), ReserveFnTy)
+                 ->castTo<StructType>();
     StructDecl *IntDecl = IntType->getDecl();
     VarDecl *field = IntDecl->getStoredProperties()[0];
     SILType BuiltinIntTy =SILType::getPrimitiveObjectType(
