@@ -1111,7 +1111,7 @@ public:
       SubstOptions options = None);
 
   /// Diagnose if the class has no designated initializers.
-  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 
   ///
   /// Add any implicitly-defined constructors required for the given

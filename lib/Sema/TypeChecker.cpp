@@ -301,7 +301,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
         // Finally, we can check classes for missing initializers.
         if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
-          TC.maybeDiagnoseClassWithoutInitializers(classDecl);
+          TypeChecker::maybeDiagnoseClassWithoutInitializers(classDecl);
       }
     }
     TC.ConformanceContexts.clear();
