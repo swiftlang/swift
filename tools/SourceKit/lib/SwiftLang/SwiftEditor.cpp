@@ -75,13 +75,10 @@ void EditorDiagConsumer::getAllDiagnostics(
   }
 }
 
-void EditorDiagConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
+                                          const DiagnosticInfo &Info) {
 
-  if (Kind == DiagnosticKind::Error) {
+  if (Info.Kind == DiagnosticKind::Error) {
     HadAnyError = true;
   }
 
@@ -90,13 +87,13 @@ void EditorDiagConsumer::handleDiagnostic(
       Info.ID == diag::error_doing_code_completion.ID)
     return;
 
-  bool IsNote = (Kind == DiagnosticKind::Note);
+  bool IsNote = (Info.Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
     // Is this possible?
     return;
 
-  if (Kind == DiagnosticKind::Remark) {
+  if (Info.Kind == DiagnosticKind::Remark) {
     // FIXME: we may want to handle optimization remarks in sourcekitd.
     LOG_WARN_FUNC("unhandled optimization remark");
     return;
@@ -108,13 +105,14 @@ void EditorDiagConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
   SKInfo.Description = Text.str();
 
   Optional<unsigned> BufferIDOpt;
-  if (Loc.isValid()) {
-    BufferIDOpt =  SM.findBufferContainingLoc(Loc);
+  if (Info.Loc.isValid()) {
+    BufferIDOpt = SM.findBufferContainingLoc(Info.Loc);
   }
 
   if (BufferIDOpt && !isInputBufferID(*BufferIDOpt)) {
@@ -147,9 +145,10 @@ void EditorDiagConsumer::handleDiagnostic(
   if (BufferIDOpt.hasValue()) {
     unsigned BufferID = *BufferIDOpt;
 
-    SKInfo.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
-    std::tie(SKInfo.Line, SKInfo.Column) = SM.getLineAndColumn(Loc, BufferID);
-    SKInfo.Filename = SM.getDisplayNameForLoc(Loc);
+    SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
+    std::tie(SKInfo.Line, SKInfo.Column) =
+        SM.getLineAndColumn(Info.Loc, BufferID);
+    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc);
 
     for (auto R : Info.Ranges) {
       if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
@@ -177,16 +176,16 @@ void EditorDiagConsumer::handleDiagnostic(
     return;
   }
 
-  switch (Kind) {
-    case DiagnosticKind::Error:
-      SKInfo.Severity = DiagnosticSeverityKind::Error;
-      break;
-    case DiagnosticKind::Warning:
-      SKInfo.Severity = DiagnosticSeverityKind::Warning;
-      break;
-    case DiagnosticKind::Note:
-    case DiagnosticKind::Remark:
-      llvm_unreachable("already covered");
+  switch (Info.Kind) {
+  case DiagnosticKind::Error:
+    SKInfo.Severity = DiagnosticSeverityKind::Error;
+    break;
+  case DiagnosticKind::Warning:
+    SKInfo.Severity = DiagnosticSeverityKind::Warning;
+    break;
+  case DiagnosticKind::Note:
+  case DiagnosticKind::Remark:
+    llvm_unreachable("already covered");
   }
 
   if (!BufferIDOpt) {

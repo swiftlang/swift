@@ -39,11 +39,7 @@ public:
   ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
                             llvm::raw_ostream &OS = llvm::errs());
   ~ModuleDifferDiagsConsumer();
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 };
 }
 }

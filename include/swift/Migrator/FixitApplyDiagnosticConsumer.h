@@ -62,11 +62,7 @@ public:
   /// output stream.
   void printResult(llvm::raw_ostream &OS) const;
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
   unsigned getNumFixitsApplied() const {
     return NumFixitsApplied;
