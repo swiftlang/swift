@@ -562,6 +562,12 @@ struct ImmutableAddressUseVerifier {
         if (isConsumingOrMutatingYieldUse(use))
           return true;
         break;
+      case SILInstructionKind::BeginAccessInst:
+        if (cast<BeginAccessInst>(inst)->getAccessKind() != SILAccessKind::Read)
+          return true;
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))
           return true;
