@@ -174,6 +174,9 @@ bool MissingConformance::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
 
+  llvm::errs() << "MissingConformanceFailure: " << this << "\n";
+  NonConformingType->dump();
+  ProtocolType->dump();
   MissingConformanceFailure failure(
       root, cs, locator, std::make_pair(NonConformingType, ProtocolType));
   return failure.diagnose(asNote);
@@ -185,14 +188,26 @@ MissingConformance::forContextual(ConstraintSystem &cs, Type type,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator()) MissingConformance(
       cs, /*isContextual=*/true, type, protocolType, locator);
+#if 0
+  auto *fix = new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/true, type, protocolType, locator);
+  llvm::errs() << "MissingConformance::forContextual: " << fix << "\n";
+  return fix;
+#endif
 }
 
 MissingConformance *
 MissingConformance::forRequirement(ConstraintSystem &cs, Type type,
                                    Type protocolType,
                                    ConstraintLocator *locator) {
+#if 0
   return new (cs.getAllocator()) MissingConformance(
       cs, /*isContextual=*/false, type, protocolType, locator);
+#endif
+  auto *fix = new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/false, type, protocolType, locator);
+  // llvm::errs() << "MissingConformance::forRequirement: " << fix << "\n";
+  return fix;
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {

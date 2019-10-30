@@ -2042,7 +2042,6 @@ extension Array.DifferentiableView : AdditiveArithmetic
     return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
   }
 
-  @inlinable
   public subscript(_ index: Int) -> Element {
     if index < base.count {
       return base[index]

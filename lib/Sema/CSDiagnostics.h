@@ -437,6 +437,7 @@ protected:
   }
 
   DiagInReference getDiagnosticInRereference() const override {
+    llvm::errs() << "HELLO!\n";
     return diag::type_does_not_conform_in_decl_ref;
   }
 
