@@ -41,9 +41,7 @@ bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
@@ -339,7 +337,6 @@ static ValueDecl *deriveTensorGroup_constructor(
   initDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({initDecl});

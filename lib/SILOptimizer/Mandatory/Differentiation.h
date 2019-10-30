@@ -89,7 +89,7 @@ public:
 };
 
 /// Creates arguments in the entry block based on the function type.
-void createEntryArguments(SILFunction *f) {
+inline void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
   auto conv = f->getConventions();
   auto &ctx = f->getASTContext();
@@ -103,7 +103,7 @@ void createEntryArguments(SILFunction *f) {
     auto *decl = new (ctx) ParamDecl(loc, loc, Identifier(), loc,
                                      Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
-    decl->setType(type.getASTType());
+//    decl->setType(type.getASTType());
     entry->createFunctionArgument(type, decl);
   };
   for (auto indResTy : conv.getIndirectSILResultTypes())

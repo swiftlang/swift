@@ -59,9 +59,7 @@ static Type getVectorProtocolVectorSpaceScalarAssocType(
     VarDecl *varDecl, DeclContext *DC) {
   auto &C = varDecl->getASTContext();
   auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
-  if (!varDecl->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(varDecl);
-  if (!varDecl->hasInterfaceType())
+  if (varDecl->getInterfaceType()->hasError())
     return nullptr;
   auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
@@ -83,9 +81,7 @@ static Type deriveVectorProtocol_VectorSpaceScalar(NominalTypeDecl *nominal,
   // associated type. Otherwise, the `VectorSpaceScalar` type cannot be derived.
   Type sameScalarType;
   for (auto member : nominal->getStoredProperties()) {
-    if (!member->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(member);
-    if (!member->hasInterfaceType())
+    if (member->getInterfaceType()->hasError())
       return nullptr;
     auto scalarType = getVectorProtocolVectorSpaceScalarAssocType(member, DC);
     // If stored property does not conform to `VectorProtocol`, return nullptr.
@@ -230,7 +226,6 @@ static ValueDecl *deriveVectorProtocol_method(
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});

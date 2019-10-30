@@ -129,9 +129,7 @@ bool DerivedConformance::canDeriveElementaryFunctions(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, mathProto, DC, None);
@@ -302,7 +300,6 @@ ElementaryFunction op) {
 #undef ELEMENTARY_FUNCTION
   }
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  operatorDecl->computeType();
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({operatorDecl});

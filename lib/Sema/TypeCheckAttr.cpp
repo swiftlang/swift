@@ -2892,7 +2892,6 @@ static IndexSubset *computeDifferentiationParameters(
     StringRef attrName, SourceLoc attrLoc
 ) {
   // Get function type and parameters.
-  TC.resolveDeclSignature(function);
   auto *functionType = function->getInterfaceType()->castTo<AnyFunctionType>();
   auto &params = *function->getParameters();
   auto numParams = function->getParameters()->size();
@@ -3015,7 +3014,6 @@ static IndexSubset *computeTransposingParameters(
     GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc
 ) {
   // Get function type and parameters.
-  TC.resolveDeclSignature(transposeFunc);
   auto *functionType = transposeFunc->getInterfaceType()
                            ->castTo<AnyFunctionType>();
   
@@ -3272,7 +3270,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  TC.resolveDeclSignature(original);
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
@@ -3479,7 +3476,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
             whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
-      TC.validateDecl(jvpCandidate);
       return checkFunctionSignature(
           cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
           jvpCandidate->getInterfaceType()->getCanonicalType());
@@ -3505,7 +3501,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
             whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
-      TC.validateDecl(vjpCandidate);
       return checkFunctionSignature(
           cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),
           vjpCandidate->getInterfaceType()->getCanonicalType());
@@ -3649,7 +3644,6 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   };
 
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
-    TC.validateDecl(originalCandidate);
     return checkFunctionSignature(
         cast<AnyFunctionType>(originalFnType->getCanonicalType()),
         originalCandidate->getInterfaceType()->getCanonicalType(),
@@ -3913,7 +3907,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto original = attr->getOriginal();
-  TC.resolveDeclSignature(transpose);
   auto *transposeInterfaceType = transpose->getInterfaceType()
                                      ->castTo<AnyFunctionType>();
   
@@ -4001,7 +3994,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     };
   
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
-    TC.validateDecl(originalCandidate);
     return checkFunctionSignature(
         cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
         originalCandidate->getInterfaceType()->getCanonicalType(),

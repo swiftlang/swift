@@ -1231,9 +1231,8 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   if (!P.canParseTypeQualifierForDeclName())
     return false;
 
-  SourceLoc loc = P.Tok.getLoc();
   auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
-  if (!result.isSuccess())
+  if (result.isNull())
     return true;
 
   // Consume the period.
@@ -1242,9 +1241,7 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   else if (P.startsWithSymbol(P.Tok, '.'))
     P.consumeStartingCharacterOfCurrentToken(tok::period);
 
-  P.SyntaxContext->addSyntax(result.get());
-  auto node = P.SyntaxContext->topNode<TypeSyntax>();
-  baseType = P.Generator.generate(node, loc);
+  baseType = result.getPtrOrNull();
   return false;
 }
 
@@ -2609,57 +2606,47 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
   StringRef witnessMethodProtocol;
 
   // SWIFT_ENABLE_TENSORFLOW
+  bool linear = false;
   if (attr == TAK_differentiable) {
     // Check if there is a 'linear' argument.
     // If next tokens are not `'(' identifier`, break early.
     if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier)) {
-
       Parser::BacktrackingScope backtrack(*this);
-      SourceLoc lParenLoc = Tok.getLoc();
-      auto lParen = consumeTokenSyntax(tok::l_paren);
+      consumeToken(tok::l_paren);
 
       // Determine if we have '@differentiable(linear) (T) -> U'
       // or '@differentiable (linear) -> U'.
-      if (Tok.getText() == "linear") {
-        auto linearIdentifier = consumeTokenSyntax(tok::identifier);
-        if (Tok.is(tok::r_paren) &&
-            peekToken().isAny(tok::l_paren, tok::at_sign, tok::identifier)) {
+      if (Tok.getText() == "linear" && consumeIf(tok::identifier)) {
+        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
+          linear = true;
           backtrack.cancelBacktrack();
-          builder.useLeftParen(std::move(lParen));
-          builder.useArgument(std::move(linearIdentifier));
-          SourceLoc rParenLoc;
-          auto rParen = parseMatchingTokenSyntax(
-              tok::r_paren, diag::differentiable_attribute_expected_rparen, lParenLoc);
-          if (rParen.isError())
-            return true;
-          builder.useRightParen(rParen.get());
+          consumeToken(tok::r_paren);
         } else if (Tok.is(tok::l_paren)) {
           // Handle invalid '@differentiable(linear (T) -> U'
-          diagnose(Tok, diag::differentiable_attribute_expected_rparen);
+          if (!justChecking)
+            diagnose(Tok,
+                     diag::differentiable_attribute_expected_rparen);
           backtrack.cancelBacktrack();
-          builder.useLeftParen(std::move(lParen));
-          builder.useArgument(std::move(linearIdentifier));
-          return true;
+          return false;
         }
       } else if (Tok.is(tok::identifier)) {
         // No 'linear' arg or param type, but now checking if the token is being
         // passed in as an invalid argument to '@differentiable'.
         auto possibleArg = Tok.getText();
         auto t = Tok; // get ref to the argument for clearer diagnostics.
-        auto argIdentifier = consumeTokenSyntax(tok::identifier);
+        consumeToken(tok::identifier);
         // Check if there is an invalid argument getting passed into
         // '@differentiable'.
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // Handling '@differentiable(wrong) (...'.
-          diagnose(t, diag::unexpected_argument_differentiable, possibleArg);
-          auto rParen = consumeTokenSyntax(tok::r_paren);
+          if (!justChecking)
+            diagnose(t, diag::unexpected_argument_differentiable,
+                     possibleArg);
+          consumeToken(tok::r_paren);
           backtrack.cancelBacktrack();
-          builder.useLeftParen(std::move(lParen));
-          builder.useArgument(std::move(argIdentifier));
-          builder.useRightParen(std::move(rParen));
-          return true;
+          return false;
         }
       }
     }
@@ -2849,7 +2836,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
     Attributes.setOpaqueReturnTypeOf(mangling, index);
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW
+  // @differentiable(...) attribute.
+  case TAK_differentiable:
+    Attributes.linear = linear;
+    break;
   }
+
 
   Attributes.setAttr(attr, AtLoc);
   return false;

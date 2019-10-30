@@ -4230,7 +4230,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     // SWIFT_ENABLE_TENSORFLOW
     // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(VD);
+    // checkDeclDifferentiableAttributes(VD);
     // SWIFT_ENABLE_TENSORFLOW END
 
     // In SIL mode, VarDecls are written as having reference storage types.
@@ -4297,7 +4297,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     // SWIFT_ENABLE_TENSORFLOW
     // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(AFD);
+    // checkDeclDifferentiableAttributes(AFD);
     // SWIFT_ENABLE_TENSORFLOW END
 
     return funcTy;
@@ -4319,7 +4319,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     // SWIFT_ENABLE_TENSORFLOW
     // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    checkDeclDifferentiableAttributes(SD);
+    // checkDeclDifferentiableAttributes(SD);
     // SWIFT_ENABLE_TENSORFLOW END
 
     return funcTy;

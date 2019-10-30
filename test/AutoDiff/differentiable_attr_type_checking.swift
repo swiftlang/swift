@@ -43,9 +43,9 @@ func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
 struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
   var value: T
 
-  @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
+  @differentiable // expected-note {{other attribute declared here}}
   var computed1: T {
-    @differentiable // expected-note {{other attribute declared here}}
+    @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
     get { value }
     set { value = newValue }
   }

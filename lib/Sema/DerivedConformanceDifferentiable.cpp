@@ -59,9 +59,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
       continue;
     if (vd->isLet())
       continue;
-    if (!vd->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(vd);
-    if (!vd->hasInterfaceType())
+    if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal,
@@ -90,8 +88,6 @@ static StructDecl *convertToStructDecl(ValueDecl *v) {
 static Type getTangentVectorType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  if (!decl->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(decl);
   auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC,
                                               None);
@@ -126,7 +122,6 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
     return false;
   auto &C = nominal->getASTContext();
-  auto *lazyResolver = C.getLazyResolver();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
 
@@ -186,9 +181,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC,
@@ -204,7 +197,6 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
   if (!canDeriveDifferentiable(nominal, DC))
     return false;
   auto &C = nominal->getASTContext();
-  auto *lazyResolver = C.getLazyResolver();
   auto *eucDiffProto =
       C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
   // Return true if all differentiation stored properties conform to
@@ -212,9 +204,7 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *member) {
-    if (!member->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(member);
-    if (!member->hasInterfaceType())
+    if (member->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(member->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(
@@ -344,7 +334,6 @@ static ValueDecl *deriveDifferentiable_method(
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
@@ -600,7 +589,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberAssocContextualType =
         parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-    newMember->setType(memberAssocContextualType);
+//    newMember->setType(memberAssocContextualType);
     Pattern *memberPattern =
         new (C) NamedPattern(newMember, /*implicit*/ true);
     memberPattern->setType(memberAssocContextualType);
@@ -624,9 +613,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
-      if (!member->getSynthesizedAccessor(AccessorKind::Get)
-               ->hasInterfaceType())
-        TC.resolveDeclSignature(member->getAccessor(AccessorKind::Get));
+      (void)member->getAccessor(AccessorKind::Get)->getInterfaceType();
       // If member or its getter already has a `@differentiable` attribute,
       // continue.
       if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
@@ -699,7 +686,6 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  TC.validateDecl(aliasDecl);
   C.addSynthesizedDecl(aliasDecl);
 };
 
@@ -716,9 +702,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
   bool nominalCanDeriveAdditiveArithmetic =
       DerivedConformance::canDeriveAdditiveArithmetic(nominal, DC);
   for (auto *vd : nominal->getStoredProperties()) {
-    if (!vd->hasInterfaceType())
-      TC.resolveDeclSignature(vd);
-    if (!vd->hasInterfaceType())
+    if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
@@ -773,7 +757,6 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
   // Add `TangentVector` typealias for `TangentVector` struct.
   addAssociatedTypeAliasDecl(C.Id_TangentVector,
                              tangentStruct, tangentStruct, TC);
-  TC.validateDecl(tangentStruct);
 
   // Sanity checks for synthesized struct.
   assert(DerivedConformance::canDeriveAdditiveArithmetic(tangentStruct,
@@ -844,7 +827,6 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
     aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-    TC.validateDecl(aliasDecl);
     derived.addMembersToConformanceContext({aliasDecl});
     C.addSynthesizedDecl(aliasDecl);
     return selfType;

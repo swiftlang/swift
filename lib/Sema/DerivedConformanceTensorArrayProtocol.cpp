@@ -41,9 +41,7 @@ bool DerivedConformance::canDeriveTensorArrayProtocol(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
@@ -244,7 +242,6 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
@@ -645,7 +642,6 @@ static ValueDecl
   initDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_init, nullptr);
 
   initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({initDecl});

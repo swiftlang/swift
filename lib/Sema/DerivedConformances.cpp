@@ -570,7 +570,6 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
 
   // Compute the interface type of the setter.
   setterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  setterDecl->computeType();
   setterDecl->copyFormalAccessFrom(property);
 
   C.addSynthesizedDecl(setterDecl);

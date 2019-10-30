@@ -113,9 +113,7 @@ static bool canDeriveRingProtocol(KnownProtocolKind knownProtoKind,
   auto &C = nominal->getASTContext();
   auto *proto = C.getProtocol(knownProtoKind);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, proto, DC, None);
@@ -255,7 +253,6 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   };
   operatorDecl->setBodySynthesizer(bodySynthesizer, (void *) op);
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  operatorDecl->computeType();
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({operatorDecl});

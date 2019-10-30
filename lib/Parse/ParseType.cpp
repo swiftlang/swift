@@ -624,7 +624,7 @@ bool Parser::canParseTypeQualifierForDeclName() {
 // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
 ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   if (isParsingQualifiedDeclName && !canParseTypeQualifierForDeclName())
-    return makeParsedError<TypeRepr>();
+    return makeParserError();
 
   // SWIFT_ENABLE_TENSORFLOW: Condition body intentionally not indented, to
   // reduce merge conflicts.

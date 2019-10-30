@@ -53,7 +53,6 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // differentiable_function and differentiable_function_extract instructions
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-10-24-a
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///

@@ -144,9 +144,9 @@ private:
   SourceLoc Loc;
   Kind Kind;
   union Value {
-    struct { Identifier Name; }; // Named
-    struct { unsigned Index; }; // Ordered
-    struct {};                  // Self
+    Identifier Name; // Named
+    unsigned Index; // Ordered
+                      // Self
     Value(Identifier name) : Name(name) {}
     Value(unsigned index) : Index(index) {}
     Value() {}

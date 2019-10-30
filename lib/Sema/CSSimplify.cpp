@@ -7119,7 +7119,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // Record the call method overload set.
       SmallVector<OverloadChoice, 4> choices;
       for (auto candidate : callMethods) {
-        TC.validateDecl(candidate);
+        (void)candidate->getInterfaceType();
         if (candidate->isInvalid()) continue;
         choices.push_back(
             OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
