@@ -209,8 +209,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
 
 /// Check that the Objective-C method(s) provided by the witness have
 /// the same selectors as those required by the requirement.
-static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
-                                     ValueDecl *witness) {
+static bool checkObjCWitnessSelector(ValueDecl *req, ValueDecl *witness) {
   // Simple case: for methods and initializers, check that the selectors match.
   if (auto reqFunc = dyn_cast<AbstractFunctionDecl>(req)) {
     auto witnessFunc = cast<AbstractFunctionDecl>(witness);
@@ -218,10 +217,9 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
       return false;
 
     auto diagInfo = getObjCMethodDiagInfo(witnessFunc);
-    auto diag = tc.diagnose(witness, diag::objc_witness_selector_mismatch,
-                            diagInfo.first, diagInfo.second,
-                            witnessFunc->getObjCSelector(),
-                            reqFunc->getObjCSelector());
+    auto diag = witness->diagnose(
+        diag::objc_witness_selector_mismatch, diagInfo.first, diagInfo.second,
+        witnessFunc->getObjCSelector(), reqFunc->getObjCSelector());
     fixDeclarationObjCName(diag, witnessFunc,
                            witnessFunc->getObjCSelector(),
                            reqFunc->getObjCSelector());
@@ -239,7 +237,7 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   if (auto reqGetter = reqStorage->getParsedAccessor(AccessorKind::Get)) {
     auto *witnessGetter =
       witnessStorage->getSynthesizedAccessor(AccessorKind::Get);
-    if (checkObjCWitnessSelector(tc, reqGetter, witnessGetter))
+    if (checkObjCWitnessSelector(reqGetter, witnessGetter))
       return true;
   }
 
@@ -247,7 +245,7 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   if (auto reqSetter = reqStorage->getParsedAccessor(AccessorKind::Set)) {
     auto *witnessSetter =
       witnessStorage->getSynthesizedAccessor(AccessorKind::Set);
-    if (checkObjCWitnessSelector(tc, reqSetter, witnessSetter))
+    if (checkObjCWitnessSelector(reqSetter, witnessSetter))
       return true;
   }
 
@@ -932,10 +930,9 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     auto lookupOptions = defaultUnqualifiedLookupOptions;
     if (!DC->isCascadingContextForLookup(false))
       lookupOptions |= NameLookupFlags::KnownPrivate;
-    auto lookup = TC.lookupUnqualified(DC->getModuleScopeContext(),
-                                       req->getBaseName(),
-                                       SourceLoc(),
-                                       lookupOptions);
+    auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
+                                                 req->getBaseName(),
+                                                 SourceLoc(), lookupOptions);
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
       if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
@@ -1007,8 +1004,8 @@ bool WitnessChecker::findBestWitness(
 
       auto lookupOptions = defaultUnqualifiedLookupOptions;
       lookupOptions |= NameLookupFlags::KnownPrivate;
-      auto lookup = TC.lookupUnqualified(overlay, requirement->getBaseName(),
-                                         SourceLoc(), lookupOptions);
+      auto lookup = TypeChecker::lookupUnqualified(
+          overlay, requirement->getBaseName(), SourceLoc(), lookupOptions);
       for (auto candidate : lookup)
         witnesses.push_back(candidate.getValueDecl());
       break;
@@ -3492,8 +3489,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   }
 
   // Look for a member type with the same name as the associated type.
-  auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
-                                        NameLookupFlags::ProtocolMembers);
+  auto candidates = TypeChecker::lookupMemberType(
+      DC, Adoptee, assocType->getName(), NameLookupFlags::ProtocolMembers);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
@@ -3838,7 +3835,7 @@ void ConformanceChecker::resolveValueWitnesses() {
         }
 
         // The selectors must coincide.
-        if (checkObjCWitnessSelector(TC, requirement, witness)) {
+        if (checkObjCWitnessSelector(requirement, witness)) {
           Conformance->setInvalid();
           return;
         }

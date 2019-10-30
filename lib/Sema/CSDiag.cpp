@@ -1741,7 +1741,8 @@ static void emitFixItForExplicitlyQualifiedReference(
 
 void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
     UnresolvedDotExpr *UDE, ValueDecl *choice) {
-  auto result = TC.lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
+  auto result =
+      TypeChecker::lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
   assert(result && "names can't just disappear");
   // These should all come from the same place.
   auto exampleInner = result.front();
@@ -1940,7 +1941,8 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   // For each of the parent contexts, let's try to find any candidates
   // which have the same name and the same number of arguments as callee.
   while (context->getParent()) {
-    auto result = TC.lookupUnqualified(context, UDE->getName(), UDE->getLoc());
+    auto result =
+        TypeChecker::lookupUnqualified(context, UDE->getName(), UDE->getLoc());
     context = context->getParent();
 
     if (!result || result.empty())

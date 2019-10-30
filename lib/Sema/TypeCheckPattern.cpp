@@ -117,7 +117,8 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
                                    Identifier name, SourceLoc UseLoc) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
+  auto lookup =
+      TypeChecker::lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
   return filterForEnumElement(TC, DC, UseLoc,
                               /*unqualifiedLookup=*/true, lookup);
 }
