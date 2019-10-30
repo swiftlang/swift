@@ -178,4 +178,4 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
-              bool(ClassDecl *), Cached, NoLocationInfo)
+              bool(ClassDecl *), SeparatelyCached, NoLocationInfo)

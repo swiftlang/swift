@@ -1631,7 +1631,7 @@ public:
 /// convenience initializers.
 class InheritsSuperclassInitializersRequest
     : public SimpleRequest<InheritsSuperclassInitializersRequest,
-                           bool(ClassDecl *), CacheKind::Cached> {
+                           bool(ClassDecl *), CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1642,8 +1642,10 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
 
 public:
-  // Caching.
+  // Separate caching.
   bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
