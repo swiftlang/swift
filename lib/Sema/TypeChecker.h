@@ -1774,7 +1774,7 @@ public:
   /// is sufficient to safely conform to the requirement in the context
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
-  bool
+  static bool
   isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
                                    ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);

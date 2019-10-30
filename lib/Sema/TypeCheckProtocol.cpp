@@ -1197,8 +1197,8 @@ checkWitnessAvailability(ValueDecl *requirement,
                          ValueDecl *witness,
                          AvailabilityContext *requiredAvailability) {
   return (!TC.Context.LangOpts.DisableAvailabilityChecking &&
-          !TC.isAvailabilitySafeForConformance(Proto, requirement, witness,
-                                               DC, *requiredAvailability));
+          !TypeChecker::isAvailabilitySafeForConformance(
+              Proto, requirement, witness, DC, *requiredAvailability));
 }
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,

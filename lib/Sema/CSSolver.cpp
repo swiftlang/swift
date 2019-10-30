@@ -1098,9 +1098,9 @@ bool ConstraintSystem::solve(Expr *&expr,
                              ExprTypeCheckListener *listener,
                              SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
-  llvm::SaveAndRestore<bool>
-    debugForExpr(getASTContext().LangOpts.DebugConstraintSolver,
-                 debugConstraintSolverForExpr(TC.Context, expr));
+  llvm::SaveAndRestore<bool> debugForExpr(
+      getASTContext().LangOpts.DebugConstraintSolver,
+      debugConstraintSolverForExpr(TC.Context, expr));
 
   // Attempt to solve the constraint system.
   auto solution = solveImpl(expr,

@@ -1708,8 +1708,7 @@ namespace {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
                          CS.getConstraintLocator(expr));
-      }
-      else {
+      } else {
         CS.addConstraint(ConstraintKind::OptionalObject,
                          optTy, CS.getType(expr->getSubExpr()),
                          CS.getConstraintLocator(expr));
