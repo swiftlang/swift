@@ -1557,9 +1557,8 @@ public:
   /// Derive an implicit type witness for the given associated type in
   /// the conformance of the given nominal type to some known
   /// protocol.
-  Type deriveTypeWitness(DeclContext *DC,
-                         NominalTypeDecl *nominal,
-                         AssociatedTypeDecl *assocType);
+  static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
+                                AssociatedTypeDecl *assocType);
 
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
@@ -1920,10 +1919,10 @@ public:
           [](const GenericTypeParamDecl *) { return Type(); });
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+  static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<Identifier> omitNeedlessWords(VarDecl *var);
+  static Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
   /// Calculate edit distance between declaration names.
   static unsigned getCallEditDistance(DeclName writtenName,
