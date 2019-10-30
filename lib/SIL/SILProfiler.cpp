@@ -114,6 +114,15 @@ DeclContext *getProfilerContextForDecl(ASTNode N, SILDeclRef forDecl) {
   return forDecl.getDecl()->getDeclContext();
 }
 
+static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
+  switch (caseStmt->getParentKind()) {
+  case CaseParentKind::Switch:
+    return caseStmt;
+  case CaseParentKind::DoCatch:
+    return caseStmt->getBody();
+  }
+}
+
 /// Check that the input AST has at least been type-checked.
 LLVM_ATTRIBUTE_UNUSED
 static bool hasASTBeenTypeChecked(ASTNode N, SILDeclRef forDecl) {
@@ -239,14 +248,7 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      switch (CS->getParentKind()) {
-      case CaseParentKind::Switch:
-        mapRegion(CS);
-        break;
-      case CaseParentKind::DoCatch:
-        mapRegion(CS->getBody());
-        break;
-      }
+      mapRegion(getProfilerStmtForCase(CS));
     }
     return {true, S};
   }
@@ -602,21 +604,10 @@ struct PGOMapping : public ASTWalker {
       auto ssCount = loadExecutionCount(SS);
       LoadedCounterMap[SS] = ssCount;
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      switch (CS->getParentKind()) {
-      case CaseParentKind::Switch: {
-        CounterMap[CS] = NextCounter++;
-        auto csCount = loadExecutionCount(CS);
-        LoadedCounterMap[CS] = csCount;
-        break;
-      }
-      case CaseParentKind::DoCatch: {
-        auto csBody = CS->getBody();
-        CounterMap[csBody] = NextCounter++;
-        auto csBodyCount = loadExecutionCount(csBody);
-        LoadedCounterMap[csBody] = csBodyCount;
-        break;
-      }
-      }
+      auto stmt = getProfilerStmtForCase(CS);
+      CounterMap[stmt] = NextCounter++;
+      auto csCount = loadExecutionCount(stmt);
+      LoadedCounterMap[stmt] = csCount;
     }
     return {true, S};
   }
@@ -770,9 +761,9 @@ private:
     if (ParentStmt) {
       if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt))
         return;
-      if (auto catchClause = dyn_cast<CaseStmt>(ParentStmt))
-        if (catchClause->getParentKind() == CaseParentKind::DoCatch)
-          return;
+      auto caseStmt = dyn_cast_or_null<CaseStmt>(ParentStmt);
+      if (caseStmt && caseStmt->getParentKind() == CaseParentKind::DoCatch)
+        return;
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
         JumpsToLabel = &getCounter(LS);
     }
