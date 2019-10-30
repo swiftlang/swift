@@ -4511,10 +4511,10 @@ void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
   /// SWIFT_ENABLE_TENSORFLOW
   switch (getDifferentiability()) {
-    case SILParameterDifferentiability::NotDifferentiable:
+  case SILParameterDifferentiability::NotDifferentiable:
     Printer << "@nondiff ";
     break;
-    default:
+  default:
     break;
   }
   Printer << getStringForParameterConvention(getConvention());

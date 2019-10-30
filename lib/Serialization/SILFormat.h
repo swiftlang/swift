@@ -455,7 +455,8 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
-    BCFixed<2> // extractee
+    BCFixed<2>, // extractee
+    BCFixed<1>  // has explicit extractee type?
   >;
 
   using SILInstLinearFunctionExtractLayout = BCRecordLayout<

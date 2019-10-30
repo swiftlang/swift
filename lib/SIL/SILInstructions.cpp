@@ -685,10 +685,21 @@ getExtracteeType(
 
 DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
-    NormalDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
+    NormalDifferentiableFunctionTypeComponent extractee, SILValue theFunction,
+    Optional<SILType> extracteeType)
     : InstructionBase(debugLoc,
-                      getExtracteeType(theFunction, extractee, module)),
-      extractee(extractee), operands(this, theFunction) {}
+                      extracteeType
+                          ? *extracteeType
+                          : getExtracteeType(theFunction, extractee, module)),
+      Extractee(extractee), Operands(this, theFunction),
+      HasExplicitExtracteeType(extracteeType.hasValue()) {
+#ifndef NDEBUG
+  if (extracteeType.hasValue()) {
+    assert(module.getStage() == SILStage::Lowered &&
+           "Explicit type is valid only in lowered SIL");
+  }
+#endif
+}
 
 SILType LinearFunctionExtractInst::
 getExtracteeType(

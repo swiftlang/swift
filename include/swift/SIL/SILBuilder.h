@@ -526,12 +526,14 @@ public:
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, TransposeFunction, hasOwnership()));
   }
-  
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction) {
+      SILValue TheFunction, Optional<SILType> ExtracteeType = None) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction,
+        ExtracteeType));
   }
 
   LinearFunctionExtractInst *createLinearFunctionExtract(

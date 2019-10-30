@@ -3152,7 +3152,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     // Parse the rest of the instruction: an extractee, a differentiable
-    // function operand, and a debug location.
+    // function operand, an optional explicit extractee type, and a debug
+    // location.
     NormalDifferentiableFunctionTypeComponent extractee;
     StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
     SILValue functionOperand;
@@ -3164,11 +3165,19 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
                      "extractee kind"))
       return true;
-    if (parseTypedValueRef(functionOperand, B) ||
-        parseSILDebugLocation(InstLoc, B))
+    if (parseTypedValueRef(functionOperand, B))
+      return true;
+    // Parse an optional explicit extractee type.
+    Optional<SILType> extracteeType = None;
+    if (P.consumeIf(tok::kw_as)) {
+      extracteeType = SILType();
+      if (parseSILType(*extracteeType))
+        return true;
+    }
+    if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDifferentiableFunctionExtract(
-        InstLoc, extractee, functionOperand);
+        InstLoc, extractee, functionOperand, extracteeType);
     break;
   }
 

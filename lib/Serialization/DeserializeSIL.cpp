@@ -1167,7 +1167,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
     SILInstDifferentiableFunctionExtractLayout::readRecord(
-        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr,
+        /*hasExplicitExtracteeType*/ Attr2);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
     break;
   case SIL_INST_LINEAR_FUNCTION_EXTRACT:
@@ -1622,8 +1623,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
     NormalDifferentiableFunctionTypeComponent extractee(Attr);
+    Optional<SILType> explicitExtracteeType = None;
+    if (Attr2)
+      explicitExtracteeType = silTy;
     ResultVal =
-        Builder.createDifferentiableFunctionExtract(Loc, extractee, val);
+        Builder.createDifferentiableFunctionExtract(Loc, extractee, val,
+                                                    explicitExtracteeType);
     break;
   }
   case SILInstructionKind::LinearFunctionExtractInst: {
