@@ -1394,10 +1394,10 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
   }
 }
 
-void ConstraintGraphNode::dump() {
+void ConstraintGraphNode::dump() const {
   llvm::SaveAndRestore<bool>
     debug(TypeVar->getASTContext().LangOpts.DebugConstraintSolver, true);
-  print(llvm::dbgs(), 0);
+  const_cast<ConstraintGraphNode*>(this)->print(llvm::dbgs(), 0);
 }
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,

@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -317,7 +318,7 @@ public:
   
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;

@@ -3617,12 +3617,12 @@ void Solution::dump(raw_ostream &out) const {
   }
 }
 
-void ConstraintSystem::dump() {
-  print(llvm::errs());
+void ConstraintSystem::dump() const {
+  const_cast<ConstraintSystem*>(this)->print(llvm::errs());
 }
 
-void ConstraintSystem::dump(Expr *E) {
-  print(llvm::errs(), E);
+void ConstraintSystem::dump(Expr *E) const {
+  const_cast<ConstraintSystem*>(this)->print(llvm::errs(), E);
 }
 
 void ConstraintSystem::print(raw_ostream &out, Expr *E) {

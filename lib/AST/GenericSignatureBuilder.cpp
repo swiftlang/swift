@@ -33,6 +33,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/GraphTraits.h"
@@ -198,8 +199,7 @@ public:
   /// Print this path.
   void print(llvm::raw_ostream &out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     print(llvm::errs());
   }
 
@@ -401,8 +401,7 @@ public:
     return enumerateRulesRec(fn, temporarilyDisableVisitedRule, lhs);
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump the tree.
   void dump(llvm::raw_ostream &out, bool lastChild = true) const;
@@ -6160,8 +6159,7 @@ namespace {
       return lhs.constraint < rhs.constraint;
     }
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                              "only for use in the debugger");
+    SWIFT_DEBUG_DUMP;
   };
 }
 

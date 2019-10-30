@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 #define SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "clang/AST/Decl.h"
@@ -516,7 +517,9 @@ public:
   void deserializeAll();
 
   /// Dump the internal representation of this lookup table.
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
+
+  void dump(llvm::raw_ostream &os) const;
 };
 
 namespace importer {

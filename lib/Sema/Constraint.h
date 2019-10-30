@@ -23,6 +23,7 @@
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
@@ -642,13 +643,9 @@ public:
 
   void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint));

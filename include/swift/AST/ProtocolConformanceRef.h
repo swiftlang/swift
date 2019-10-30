@@ -16,6 +16,7 @@
 #ifndef SWIFT_AST_PROTOCOLCONFORMANCEREF_H
 #define SWIFT_AST_PROTOCOLCONFORMANCEREF_H
 
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Requirement.h"
@@ -124,7 +125,7 @@ public:
   getAssociatedConformance(Type origType, Type dependentType,
                            ProtocolDecl *requirement) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
   bool operator==(ProtocolConformanceRef other) const {

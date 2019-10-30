@@ -31,6 +31,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -740,9 +741,7 @@ public:
     return None;
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
   void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
@@ -2456,7 +2455,7 @@ public:
 
   /// Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
-  Type getFixedType(TypeVariableType *typeVar) {
+  Type getFixedType(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getFixedType(getSavedBindings());
   }
 
@@ -3803,8 +3802,7 @@ public:
       return LiteralProtocols;
     }
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                              "only for use within the debugger");
+    SWIFT_DEBUG_DUMP;
   };
 
   bool haveTypeInformationForAllArguments(FunctionType *fnType);
@@ -3835,11 +3833,8 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(Expr *) LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(dump(Expr *));
 
   void print(raw_ostream &out);
   void print(raw_ostream &out, Expr *);

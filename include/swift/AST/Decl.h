@@ -35,6 +35,7 @@
 #include "swift/AST/Witness.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
@@ -776,12 +777,8 @@ public:
 
   SourceLoc TrailingSemiLoc;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(const char *filename) const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(dump(const char *filename));
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
 
   /// Pretty-print the given declaration.
@@ -1202,9 +1199,7 @@ public:
     return repr->SecondType.getTypeRepr();
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void print(raw_ostream &OS) const;
   void print(ASTPrinter &Printer) const;
 };
@@ -1374,7 +1369,7 @@ public:
   GenericParamList *clone(DeclContext *dc) const;
 
   void print(raw_ostream &OS) const;
-  void dump();
+  SWIFT_DEBUG_DUMP;
 };
   
 /// A trailing where clause.
@@ -2714,7 +2709,7 @@ public:
   void dumpRef(raw_ostream &os) const;
 
   /// Dump a reference to the given declaration.
-  void dumpRef() const;
+  SWIFT_DEBUG_DUMPER(dumpRef());
 
   /// Returns true if the declaration is a static member of a type.
   ///

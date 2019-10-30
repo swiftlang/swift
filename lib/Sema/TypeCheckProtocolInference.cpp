@@ -86,10 +86,10 @@ void InferredTypeWitnessesSolution::dump() const {
     auto &valueWitness = ValueWitnesses[i];
     llvm::errs() << i << ":  " << (Decl*)valueWitness.first
     << ' ' << valueWitness.first->getBaseName() << '\n';
-    valueWitness.first->getDeclContext()->dumpContext();
+    valueWitness.first->getDeclContext()->printContext(llvm::errs());
     llvm::errs() << "    for " << (Decl*)valueWitness.second
     << ' ' << valueWitness.second->getBaseName() << '\n';
-    valueWitness.second->getDeclContext()->dumpContext();
+    valueWitness.second->getDeclContext()->printContext(llvm::errs());
   }
 }
 

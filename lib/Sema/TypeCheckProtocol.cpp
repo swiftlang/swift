@@ -4865,8 +4865,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Now that they're filled out, print out information about the conformances
     // here, when requested.
     for (auto conformance : conformances) {
-      dc->dumpContext();
-      conformance->dump();
+      dc->printContext(llvm::errs());
+      conformance->dump(llvm::errs());
     }
   }
 

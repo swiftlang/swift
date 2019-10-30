@@ -28,6 +28,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -1088,10 +1089,10 @@ public:
   /// Error.
   bool isExistentialWithError();
 
-  void dump() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  void dumpPrint() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMPER(dumpPrint());
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
@@ -3493,7 +3494,7 @@ public:
     id.AddInteger((unsigned)getConvention());
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out,
              const PrintOptions &options = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
@@ -3612,7 +3613,7 @@ public:
     id.AddPointer(TypeAndConvention.getOpaqueValue());
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out,
              const PrintOptions &options = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;

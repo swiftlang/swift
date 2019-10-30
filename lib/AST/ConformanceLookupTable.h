@@ -22,6 +22,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/MapVector.h"
@@ -289,9 +290,7 @@ class ConformanceLookupTable {
     void *operator new(size_t Bytes, ASTContext &C,
                        unsigned Alignment = alignof(ConformanceEntry));
 
-    LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-        "only for use within the debugger");
+    SWIFT_DEBUG_DUMP;
     void dump(raw_ostream &os, unsigned indent = 0) const;
   };
 
@@ -478,9 +477,7 @@ public:
     return Mem;
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
   /// Compare two protocol conformances to place them in some canonical order.

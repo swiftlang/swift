@@ -18,6 +18,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Allocator.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/Malloc.h"
 #include <utility>
 
@@ -361,10 +362,9 @@ public:
   /// Visit each entry in the map without regard to order. Meant to be used with
   /// in the debugger in coordination with other dumpers that can dump whatever
   /// is stored in the map. No-op when asserts are disabled.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void debugVisit(std::function<void(const DebugVisitValueTy &)> &&func)
-          const LLVM_ATTRIBUTE_USED,
-      "Only for use in the debugger");
+  SWIFT_DEBUG_HELPER(
+    void debugVisit(std::function<void(const DebugVisitValueTy &)> &&func) const
+  );
 
   /// This inserts the specified key/value at the specified
   /// (possibly not the current) scope.  While it is ok to insert into a scope

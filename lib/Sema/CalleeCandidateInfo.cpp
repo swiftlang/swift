@@ -90,30 +90,36 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
   }
 }
 
-void OverloadCandidate::dump() const {
+void OverloadCandidate::dump(llvm::raw_ostream &os) const {
   if (auto decl = getDecl())
-    decl->dumpRef(llvm::errs());
+    decl->dumpRef(os);
   else
-    llvm::errs() << "<<EXPR>>";
-  llvm::errs() << " - ignore curried self = " << (skipCurriedSelf ? "yes"
-                                                                  : "no");
+    os << "<<EXPR>>";
+  os << " - ignore curried self = " << (skipCurriedSelf ? "yes" : "no");
 
   if (auto FT = getFunctionType())
-    llvm::errs() << " - type: " << Type(FT) << "\n";
+    os << " - type: " << Type(FT) << "\n";
   else
-    llvm::errs() << " - type <<NONFUNCTION>>: " << entityType << "\n";
+    os << " - type <<NONFUNCTION>>: " << entityType << "\n";
 }
 
-void CalleeCandidateInfo::dump() const {
-  llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
+void CalleeCandidateInfo::dump(llvm::raw_ostream &os) const {
+  os << "CalleeCandidateInfo for '" << declName << "': closeness="
   << unsigned(closeness) << "\n";
-  llvm::errs() << candidates.size() << " candidates:\n";
+  os << candidates.size() << " candidates:\n";
   for (auto c : candidates) {
-    llvm::errs() << "  ";
-    c.dump();
+    os << "  ";
+    c.dump(os);
   }
 }
 
+void OverloadCandidate::dump() const {
+  dump(llvm::errs());
+}
+
+void CalleeCandidateInfo::dump() const {
+  dump(llvm::errs());
+}
 
 /// Given a candidate list, this computes the narrowest closeness to the match
 /// we're looking for and filters out any worse matches.  The predicate

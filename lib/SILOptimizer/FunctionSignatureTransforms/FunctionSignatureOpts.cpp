@@ -366,12 +366,12 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
                               << F->getName() << "\n";
                  llvm::dbgs() << "Interface params:\n";
                  for (auto Param : InterfaceParams) {
-                   Param.getInterfaceType().dump();
+                   Param.getInterfaceType().dump(llvm::dbgs());
                  }
 
                  llvm::dbgs() << "Interface results:\n";
                  for (auto Result : InterfaceResults) {
-                   Result.getInterfaceType().dump();
+                   Result.getInterfaceType().dump(llvm::dbgs());
                  });
     }
   }

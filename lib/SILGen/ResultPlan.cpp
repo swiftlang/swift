@@ -71,7 +71,7 @@ public:
   void dump(SILGenFunction &SGF) const override {
     llvm::errs() << "IndirectOpenedSelfCleanup\n";
     if (box)
-      box->dump();
+      box->print(llvm::errs());
   }
 };
 

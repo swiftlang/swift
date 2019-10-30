@@ -89,7 +89,7 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
 
   if (Loc.isValid()) {
     os << " loc=";
-    Loc.dump(getProtocol()->getASTContext().SourceMgr);
+    Loc.print(os, getProtocol()->getASTContext().SourceMgr);
   }
 
   switch (getKind()) {

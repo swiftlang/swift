@@ -94,9 +94,9 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     name.print(llvm::errs());
     llvm::errs() << "' ";
     llvm::errs() << "loc: ";
-    loc.dump(sourceFile->getASTContext().SourceMgr);
+    loc.print(llvm::errs(), sourceFile->getASTContext().SourceMgr);
     llvm::errs() << "\nstarting context:\n ";
-    startingContext->dumpContext();
+    startingContext->printContext(llvm::errs());
     //    llvm::errs() << "\ninnermost: ";
     //    innermost->dump();
     //    llvm::errs() << "in: \n";

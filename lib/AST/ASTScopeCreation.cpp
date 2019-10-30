@@ -29,6 +29,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -670,7 +671,7 @@ public:
 
     auto printDecl = [&](const Decl *d) {
       llvm::errs() << "\ngetAsDecl() -> " << d << " ";
-      d->getSourceRange().dump(ctx.SourceMgr);
+      d->getSourceRange().print(llvm::errs(), ctx.SourceMgr);
       llvm::errs() << " : ";
       d->dump(llvm::errs());
       llvm::errs() << "\n";
@@ -710,7 +711,7 @@ private:
   findLocalizableDeclContextsInAST() const;
 
 public:
-  void dump() const { print(llvm::errs()); }
+  SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
   void print(raw_ostream &out) const {
     out << "(swift::ASTSourceFileScope*) " << sourceFileScope << "\n";

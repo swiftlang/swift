@@ -23,6 +23,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -134,9 +135,7 @@ public:
   Stmt *walk(ASTWalker &walker);
   Stmt *walk(ASTWalker &&walker) { return walk(walker); }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext

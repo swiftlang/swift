@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
@@ -851,8 +852,7 @@ public:
     os << "\n";
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     dump(llvm::errs());
   }
 

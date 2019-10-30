@@ -353,7 +353,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
     LLVM_DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
                << (PromotableIndices.count(ArgIndex)?"yes":"no")
-               << " Param: "; param.dump());
+               << " Param: "; param.print(llvm::dbgs()));
 
     if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
