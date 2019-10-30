@@ -1,10 +1,14 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build swift on Windows.
+Visual Studio 2017 or newer is needed to build swift on Windows.  The following must take place in the developer command prompt (provided by Visual Studio).  This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
 
 ## Install dependencies
 - Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
-- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation.
+- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation.  The following components are required:
+
+1. Microsoft.VisualStudio.Component.Windows10SDK
+1. Microsoft.VisualStudio.Component.Windows10SDK.17763
+1. Microsoft.VisualStudio.Component.VC.Tools.x86.x64 
 
 ## Clone the repositories
 1. Clone `apple/llvm-project` into a directory for the toolchain
@@ -49,22 +53,6 @@ git clone https://github.com/compnerd/windows-swift windows-swift
       ┕ usr/...
 ```
 
-## Get ready
-- From within a **NATIVE developer** command prompt (not PowerShell nor cmd, but the [Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC (The Native Developer command prompt is situated at "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Visual Studio 2019\Visual Studio Tools\VC\x64 Native Tools Command Prompt for VS 2019.lnk").
-
-Run this as administrator the first time, for setting up the symlinks below. 
-
-If instead you're compiling for a 32-bit Windows target, adapt the `arch` argument to `x86` and run
-
-```cmd
-VsDevCmd -arch=x86
-```
-
-- Decide whether you want to build a release or debug version of Swift on Windows and 
-  replace the `CMAKE_BUILD_TYPE` parameter in the build steps below with the correct value 
-  (`Debug`, `RelWithDebInfoAssert` or `Release`) to avoid conflicts between the debug and 
-  non-debug version of the MSCRT library.
-
 ## One-time Setup (re-run on Visual Studio upgrades)
 - Set up the `ucrt`, `visualc`, and `WinSDK` modules by copying  `ucrt.modulemap` located at
   `swift/stdlib/public/Platform/ucrt.modulemap` into
@@ -80,23 +68,14 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
 ## Build the toolchain
-- This must be done from within a developer command prompt. Make sure that the build type for LLVM/Clang is compatible with the build type for Swift. That is, either build everything `Debug` or some variant of `Release` (e.g. `Release`, `RelWithDebInfo`).
 
 ```cmd
 md "S:\b\toolchain"
-cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm -C S:\windows-swift\cmake\caches\Windows-x86_64.cmake -C S:\windows-swift\cmake\caches\org.compnerd.dt.cmake -DLLVM_ENABLE_ASSERTIONS=YES -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" -DLLVM_EXTERNAL_PROJECTS="cmark;swift" -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\llvm-project\swift-corelibs-libdispatch -DLLVM_ENABLE_PDB=YES -DLLDB_DISABLE_PYTHON=YES -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" -DPYTHON_EXECUTABLE=C:\Python27\python.exe -DSWIFT_BUILD_DYNAMIC_STDLIB=YES -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES
+cmake -B "S:\b\toolchain" -G Ninja -S S:\toolchain\llvm -C S:\windows-swift\cmake\caches\Windows-x86_64.cmake -C S:\windows-swift\cmake\caches\org.compnerd.dt.cmake -DLLVM_ENABLE_ASSERTIONS=YES -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;cmark;swift;lldb;lld" -DLLVM_EXTERNAL_PROJECTS="cmark;swift" -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\toolchain\swift-corelibs-libdispatch -DLLVM_ENABLE_PDB=YES -DLLDB_DISABLE_PYTHON=YES -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/Library/icu-64/usr/include" -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/Library/icu-64/usr/lib/icuuc64.lib" -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/Library/icu-64/usr/include" -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/Library/icu-64/usr/lib/icuin64.lib" -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr" -DPYTHON_EXECUTABLE=C:\Python27\python.exe -DSWIFT_BUILD_DYNAMIC_STDLIB=YES -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=YES
 ninja -C S:\b\toolchain
 ```
 
-- Update your path to include the toolchain.
-
-```cmd
-path S:\b\toolchain\bin;%PATH%
-```
-
-## Running tests on Windows
-
-Running the testsuite on Windows has additional external dependencies.
+## Running Swift tests on Windows
 
 ```cmd
 path S:\Library\icu-64\usr\bin;S:\b\toolchain\bin;S:\b\toolchain\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
@@ -106,13 +85,8 @@ ninja -C S:\b\toolchain check-swift
 ## Build swift-corelibs-libdispatch
 
 ```cmd
-cmake -B S:\b\libdispatch -G Ninja -S S:\toolchain\swift-corelibs-libdispatch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_Swift_COMPILER=S:\b\toolchain\bin\swiftc.exe -DENABLE_SWIFT=YES
+cmake -B S:\b\libdispatch -G Ninja -S S:\toolchain\swift-corelibs-libdispatch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DENABLE_SWIFT=YES
 ninja -C S:\b\libdispatch
-```
-
-- Add libdispatch to your path:
-```cmd
-path S:\b\libdispatch;S:\b\libdispatch\src;%PATH%
 ```
 
 ## Test swift-corelibs-libdispatch
@@ -237,12 +211,12 @@ cd S:\b\spm
 C:\Python27\python.exe S:\swift-package-manager\Utilities\bootstrap --foundation S:\b\foundation --libdispatch-build-dir S:\b\libdispatch --libdispatch-source-dir S:\swift-corelibs-libdispatch --llbuild-build-dir S:\b\llbuild --llbuild-source-dir S:\llbuild --sqlite-build-dir S:\b\sqlite --sqlite-source-dir S:\sqlite-amalgamation-3270200
 ```
 
-## Install Swift on Windows
+## Install the Swift toolchain on Windows
 
 - Run ninja install:
 
 ```cmd 
-ninja -C S:\b\swift install
+ninja -C S:\b\toolchain install
 ```
 
 - Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
