@@ -86,6 +86,10 @@ WARNING(unresolvable_clang_decl,none,
         "imported declaration '%0' could not be mapped to '%1'",
         (StringRef, StringRef))
 
+NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
+     "please report this issue to the owners of '%0'",
+     (StringRef))
+
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
         "is deprecated and will be removed in a later version of Swift",
