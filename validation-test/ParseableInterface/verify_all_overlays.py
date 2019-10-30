@@ -49,6 +49,8 @@ for filename in os.listdir(sdk_overlay_dir):
     else:
         continue
 
+    # SWIFT_ENABLE_TENSORFLOW
+    # TODO(TF-939): Enable this on DifferentiationUnittest and Python.
     if module_name in ["Swift", "SwiftLang", "DifferentiationUnittest", "Python"]:
         continue
 
