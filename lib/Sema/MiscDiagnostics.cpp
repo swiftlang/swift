@@ -2918,11 +2918,11 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 }
 
 // Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
+static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    TC.checkUnsupportedProtocolType(cs);
+    TypeChecker::checkUnsupportedProtocolType(ctx, cs);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
@@ -2949,25 +2949,25 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
       if (prevLoc.isInvalid() || thisLoc.isInvalid())
         continue;
       
-      auto &SM = TC.Context.SourceMgr;
+      auto &SM = ctx.SourceMgr;
       auto prevLineCol = SM.getLineAndColumn(prevLoc);
       if (SM.getLineNumber(thisLoc) != prevLineCol.first)
         continue;
-      
-      TC.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+
+      ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
         .highlight(items[i].getPattern()->getSourceRange())
         .highlight(where->getSourceRange());
       
       // Whitespace it out to the same column as the previous item.
       std::string whitespace(prevLineCol.second-1, ' ');
-      TC.diagnose(thisLoc, diag::add_where_newline)
+      ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
         .fixItInsert(thisLoc, "\n"+whitespace);
 
       auto whereRange = SourceRange(items[i].getWhereLoc(),
                                     where->getEndLoc());
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
       auto whereText = SM.extractText(charRange);
-      TC.diagnose(prevLoc, diag::duplicate_where)
+      ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
         .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
         .highlight(items[i-1].getSourceRange());
     }
@@ -3999,10 +3999,10 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
-  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
+  TypeChecker::checkUnsupportedProtocolType(TC.Context, const_cast<Stmt *>(S));
     
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(TC, switchStmt);
+    checkSwitch(TC.Context, switchStmt);
 
   checkStmtConditionTrailingClosure(TC, S);
   

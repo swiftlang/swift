@@ -783,18 +783,20 @@ public:
                            TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
-  void checkUnsupportedProtocolType(Decl *decl);
+  static void checkUnsupportedProtocolType(Decl *decl);
 
   /// Check for unsupported protocol types in the given statement.
-  void checkUnsupportedProtocolType(Stmt *stmt);
+  static void checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           TrailingWhereClause *whereClause);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           GenericParamList *genericParams);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   static GenericEnvironment *
@@ -986,15 +988,15 @@ public:
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
-  Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
+  static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                               BraceStmt *body,
-                                               Type builderType);
+  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                                      BraceStmt *body,
+                                                      Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1012,8 +1014,8 @@ public:
   void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
-  void checkDeclAttributes(Decl *D);
-  void checkParameterAttributes(ParameterList *params);
+  static void checkDeclAttributes(Decl *D);
+  static void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
@@ -1032,11 +1034,11 @@ public:
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
-  void checkProtocolSelfRequirements(ValueDecl *decl);
+  static void checkProtocolSelfRequirements(ValueDecl *decl);
 
   /// All generic parameters of a generic function must be referenced in the
   /// declaration's type, otherwise we have no way to infer them.
-  void checkReferencedGenericParams(GenericContext *dc);
+  static void checkReferencedGenericParams(GenericContext *dc);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1535,7 +1537,7 @@ public:
                                   IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
+  static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
