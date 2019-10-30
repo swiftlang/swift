@@ -2788,7 +2788,7 @@ static FuncDecl *resolveAutoDiffDerivativeFunction(
   auto lookupOptions = defaultMemberLookupOptions
       | NameLookupFlags::IgnoreAccessControl;
 
-  auto candidate = TC.lookupFuncDecl(
+  auto candidate = TypeChecker::lookupFuncDecl(
       specifier.Name, nameLoc, /*baseType*/ Type(), originalTypeCtx, isValid,
       overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
@@ -3605,9 +3605,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto valueResultType = valueResultElt.getType();
   if (valueResultType->hasTypeParameter())
     valueResultType = derivative->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TC.conformsToProtocol(valueResultType, diffableProto,
-                                               derivative->getDeclContext(),
-                                               None);
+  auto valueResultConf = TypeChecker::conformsToProtocol(
+      valueResultType, diffableProto, derivative->getDeclContext(), None);
   if (!valueResultConf) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_result_value_not_differentiable,
@@ -3631,13 +3630,13 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
           if (!source)
             return false;
           // Check if target's requirements are satisfied by source.
-          return TC.checkGenericArguments(
-                     derivative, original.Loc.getBaseNameLoc(),
-                     original.Loc.getBaseNameLoc(), Type(),
-                     source->getGenericParams(), target->getRequirements(),
-                     [](SubstitutableType *dependentType) {
-                       return Type(dependentType);
-                     }, lookupConformance, None) == RequirementCheckResult::Success;
+          return TypeChecker::checkGenericArguments(
+              derivative, original.Loc.getBaseNameLoc(),
+              original.Loc.getBaseNameLoc(), Type(),
+              source->getGenericParams(), target->getRequirements(),
+              [](SubstitutableType *dependentType) {
+                return Type(dependentType);
+              }, lookupConformance, None) == RequirementCheckResult::Success;
   };
 
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
@@ -3692,7 +3691,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   assert(derivativeTypeCtx);
 
   // Look up original function.
-  auto *originalFn = TC.lookupFuncDecl(
+  auto *originalFn = TypeChecker::lookupFuncDecl(
       original.Name, original.Loc.getBaseNameLoc(), /*baseType*/ Type(),
       derivativeTypeCtx, isValidOriginal, overloadDiagnostic,
       ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
@@ -3743,18 +3742,18 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
       map<SmallVector<TupleTypeElt, 4>>(wrtParamTypes, [&](Type paramType) {
         if (paramType->hasTypeParameter())
           paramType = derivative->mapTypeIntoContext(paramType);
-        auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
-                                          None);
+        auto conf = TypeChecker::conformsToProtocol(
+            paramType, diffableProto, derivative, None);
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
-        auto paramAssocType = conf->getTypeWitnessByName(
+        auto paramAssocType = conf.getTypeWitnessByName(
             paramType, ctx.Id_TangentVector);
         return TupleTypeElt(paramAssocType);
       });
 
   // Check differential/pullback type.
   // Get vector type: the associated type of the value result type.
-  auto vectorTy = valueResultConf->getTypeWitnessByName(
+  auto vectorTy = valueResultConf.getTypeWitnessByName(
       valueResultType, ctx.Id_TangentVector);
 
   // Compute expected differential/pullback type.
@@ -3957,8 +3956,9 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     expectedOriginalResultType = transpose->mapTypeIntoContext(
         expectedOriginalResultType);
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultConf = TC.conformsToProtocol(expectedOriginalResultType,
-      diffableProto, transpose->getDeclContext(), None);
+  auto valueResultConf = TypeChecker::conformsToProtocol(
+      expectedOriginalResultType, diffableProto, transpose->getDeclContext(),
+      None);
 
   if (!valueResultConf) {
     TC.diagnose(attr->getLocation(),
@@ -3981,14 +3981,14 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
           if (!source)
             return false;
           // Check if target's requirements are satisfied by source.
-          return TC.checkGenericArguments(
-                     transpose, original.Loc.getBaseNameLoc(),
-                     original.Loc.getBaseNameLoc(), Type(),
-                     source->getGenericParams(), target->getRequirements(),
-                     [](SubstitutableType *dependentType) {
-                       return Type(dependentType);
-                     },
-                     lookupConformance, None) == RequirementCheckResult::Success;
+          return TypeChecker::checkGenericArguments(
+              transpose, original.Loc.getBaseNameLoc(),
+              original.Loc.getBaseNameLoc(), Type(),
+              source->getGenericParams(), target->getRequirements(),
+              [](SubstitutableType *dependentType) {
+                return Type(dependentType);
+              },
+              lookupConformance, None) == RequirementCheckResult::Success;
     };
   
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
@@ -4041,7 +4041,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto funcLoc = original.Loc.getBaseNameLoc();
   if (attr->getBaseType())
     funcLoc = attr->getBaseType()->getLoc();
-  auto *originalFn = TC.lookupFuncDecl(
+  auto *originalFn = TypeChecker::lookupFuncDecl(
       original.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
       overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);

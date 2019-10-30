@@ -1020,7 +1020,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   // TODO(TF-789): Figure out the proper way to typecheck these.
-  void checkDeclDifferentiableAttributes(Decl *D);
+  static void checkDeclDifferentiableAttributes(Decl *D);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
@@ -2032,7 +2032,7 @@ public:
   // Returns the function declaration corresponding to the given function name
   // and lookup context. If the function declaration cannot be resolved, emits a
   // diagnostic and returns nullptr.
-  FuncDecl *lookupFuncDecl(
+  static FuncDecl *lookupFuncDecl(
       DeclName funcName, SourceLoc funcNameLoc, Type baseType,
       DeclContext *lookupContext,
       const std::function<bool(FuncDecl *)> &isValidFuncDecl,
