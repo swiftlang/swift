@@ -482,8 +482,6 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
     if (elt->hasAssociatedValues())
       return false;
 
-    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-    (void)elt->getInterfaceType();
     if (elt->isInvalid()) {
       return false;
     }

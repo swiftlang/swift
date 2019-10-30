@@ -825,11 +825,6 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
           return getType(param);
 
         if (!var->hasInterfaceType()) {
-          if (!var->isInvalid()) {
-            TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
-                        var->getDescriptiveKind(), var->getName());
-            var->setInterfaceType(ErrorType::get(getASTContext()));
-          }
           return ErrorType::get(TC.Context);
         }
 

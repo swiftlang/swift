@@ -2103,7 +2103,7 @@ public:
     
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
-    if (!VD->getInterfaceType() || VD->isInvalid()) {
+    if (VD->isInvalid()) {
       sawError = true;
       return false;
     }
@@ -3792,8 +3792,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       ValueDecl * fnDecl = appendMethod.getDecl();
 
       // If things aren't set up right, just hope for the best.
-      if (!fnDecl || !fnDecl->getInterfaceType() ||
-           fnDecl->getInterfaceType()->hasError())
+      if (!fnDecl || fnDecl->isInvalid())
         return false;
 
       // If the decl expects an optional, that's fine.
@@ -4205,7 +4204,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->getInterfaceType() || afd->isInvalid() || isa<DestructorDecl>(afd))
+  if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -4285,7 +4284,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->getInterfaceType() || var->isInvalid())
+  if (var->isInvalid())
     return None;
 
   if (var->getName().empty())

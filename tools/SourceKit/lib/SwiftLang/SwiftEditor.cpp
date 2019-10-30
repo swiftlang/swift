@@ -1264,12 +1264,12 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D || D->isInvalid())
+    if (!D)
       return StringRef();
     if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
       return StringRef();
     auto *VD = cast<ValueDecl>(D);
-    if (!VD->hasName())
+    if (!VD->hasName() || (VD->hasInterfaceType() && VD->isInvalid()))
       return StringRef();
     auto ident = VD->getBaseName().getIdentifier().str();
     if (ident.empty() || Mangle::isDigit(ident.front()))
