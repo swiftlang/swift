@@ -478,9 +478,8 @@ namespace {
     }    
     
     if (lti.haveFloatLiteral) {
-      if (auto floatProto =
-            CS.TC.Context.getProtocol(
-                                  KnownProtocolKind::ExpressibleByFloatLiteral)) {
+      if (auto floatProto = CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -491,9 +490,8 @@ namespace {
     }
     
     if (lti.haveIntLiteral) {
-      if (auto intProto =
-            CS.TC.Context.getProtocol(
-                                KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+      if (auto intProto = CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -504,9 +502,8 @@ namespace {
     }
     
     if (lti.haveStringLiteral) {
-      if (auto stringProto =
-          CS.TC.Context.getProtocol(
-                                KnownProtocolKind::ExpressibleByStringLiteral)) {
+      if (auto stringProto = CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByStringLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -1387,7 +1384,8 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       bool hadError = TypeChecker::validateType(
-          CS.TC.Context, loc, TypeResolution::forContextual(CS.DC), options);
+          CS.getASTContext(), loc, TypeResolution::forContextual(CS.DC),
+          options);
       return hadError ? Type() : loc.getType();
     }
 
@@ -1706,7 +1704,7 @@ namespace {
 
       // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
       // even if the sub-expression was already optional.
-      if (CS.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+      if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
                          CS.getConstraintLocator(expr));
@@ -2286,7 +2284,7 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (TypeChecker::validateType(CS.TC.Context,
+            if (TypeChecker::validateType(CS.getASTContext(),
                                           isp->getCastTypeLoc(),
                                           TypeResolution::forContextual(CS.DC),
                                           TypeResolverContext::InExpression)) {
@@ -3734,7 +3732,7 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
     return;
   
   SmallVector<Expr *, 16> linkedExprs;

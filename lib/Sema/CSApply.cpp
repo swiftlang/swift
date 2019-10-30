@@ -272,7 +272,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
 static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
                                                DeclContext *dc,
                                                ConstraintSystem &cs) {
-  auto &ctx = cs.TC.Context;
+  auto &ctx = cs.getASTContext();
 
   auto *stringDecl = ctx.getStringDecl();
   auto stringType = stringDecl->getDeclaredType();
@@ -4584,7 +4584,7 @@ namespace {
       auto dc = subscript->getInnermostDeclContext();
 
       auto indexType = AnyFunctionType::composeInput(
-          cs.TC.Context,
+          cs.getASTContext(),
           subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
           /*canonicalVararg=*/false);
 

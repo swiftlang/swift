@@ -812,7 +812,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   if (toType->isBool() &&
       fromType->mayHaveMembers()) {
     auto LookupResult = TypeChecker::lookupMember(
-        CS.DC, fromType, DeclName(CS.TC.Context.getIdentifier("boolValue")));
+        CS.DC, fromType,
+        DeclName(CS.getASTContext().getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
       if (isa<VarDecl>(LookupResult.begin()->getValueDecl())) {
         if (anchor->canAppendPostfixExpression())
@@ -4151,7 +4152,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
   // Since the lookup was allowing inaccessible members, let's check
   // if it found anything of that sort, which is easy to diagnose.
-  bool allUnavailable = !CS.TC.getLangOpts().DisableAvailabilityChecking;
+  bool allUnavailable =
+      !CS.getASTContext().LangOpts.DisableAvailabilityChecking;
   bool allInaccessible = true;
   for (auto &member : viableCandidatesToReport) {
     if (!member.isDecl()) {

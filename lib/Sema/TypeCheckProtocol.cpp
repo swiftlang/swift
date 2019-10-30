@@ -1196,7 +1196,7 @@ bool WitnessChecker::
 checkWitnessAvailability(ValueDecl *requirement,
                          ValueDecl *witness,
                          AvailabilityContext *requiredAvailability) {
-  return (!TC.getLangOpts().DisableAvailabilityChecking &&
+  return (!TC.Context.LangOpts.DisableAvailabilityChecking &&
           !TC.isAvailabilitySafeForConformance(Proto, requirement, witness,
                                                DC, *requiredAvailability));
 }
@@ -1635,12 +1635,12 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     bool hasDiagnosed = false;
     auto *protoFile = Proto->getModuleScopeContext();
     if (auto *serialized = dyn_cast<SerializedASTFile>(protoFile)) {
-      if (serialized->getLanguageVersionBuiltWith() !=
-          TC.getLangOpts().EffectiveLanguageVersion) {
+      const auto effectiveVers = TC.Context.LangOpts.EffectiveLanguageVersion;
+      if (serialized->getLanguageVersionBuiltWith() != effectiveVers) {
         TC.diagnose(ComplainLoc,
                     diag::protocol_has_missing_requirements_versioned, T,
                     ProtoType, serialized->getLanguageVersionBuiltWith(),
-                    TC.getLangOpts().EffectiveLanguageVersion);
+                    effectiveVers);
         hasDiagnosed = true;
       }
     }
@@ -2697,7 +2697,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   if (LocalMissing.empty())
     return;
   SourceLoc ComplainLoc = Loc;
-  bool EditorMode = TC.getLangOpts().DiagnosticsEditorMode;
+  bool EditorMode = TC.Context.LangOpts.DiagnosticsEditorMode;
   llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
                                                GlobalMissingWitnesses.end());
   auto InsertFixitCallback = [ComplainLoc, EditorMode, MissingWitnesses]
