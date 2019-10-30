@@ -4676,8 +4676,8 @@ namespace {
 
     const AppliedBuilderTransform *getAppliedBuilderTransform(
        ClosureExpr *closure) {
-      auto known = solution.builderTransformedClosures.find(closure);
-      return known != solution.builderTransformedClosures.end()
+      auto known = solution.builderTransformedFunctions.find(closure);
+      return known != solution.builderTransformedFunctions.end()
           ? &known->second
           : nullptr;
     }
@@ -7597,8 +7597,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
 #if false
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
-        auto result = solution.builderTransformedClosures.find(closure);
-        if (result != solution.builderTransformedClosures.end()) {
+        auto result = solution.builderTransformedFunctions.find(closure);
+        if (result != solution.builderTransformedFunctions.end()) {
           auto *transformedExpr = result->second.singleExpr;
           // Since this closure has been transformed into something
           // else let's look inside transformed expression instead.

@@ -687,9 +687,9 @@ public:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
-  /// The set of closures that have been transformed by a function builder.
-  llvm::MapVector<ClosureExpr *, AppliedBuilderTransform>
-      builderTransformedClosures;
+  /// The set of functions that have been transformed by a function builder.
+  llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
+      builderTransformedFunctions;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1188,9 +1188,9 @@ private:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
 
-  /// The set of closures that have been transformed by a function builder.
-  std::vector<std::pair<ClosureExpr *, AppliedBuilderTransform>>
-      builderTransformedClosures;
+  /// The set of functions that have been transformed by a function builder.
+  std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
+      builderTransformedFunctions;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1710,7 +1710,7 @@ public:
 
     unsigned numFavoredConstraints;
 
-    unsigned numBuilderTransformedClosures;
+    unsigned numBuilderTransformedFunctions;
 
     /// The previous score.
     Score PreviousScore;
@@ -3280,10 +3280,10 @@ public:
   /// Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
 
-  /// Apply the given function builder to the closure expression.
-  /// FIXME: This is really about generating constraints for the function
-  /// builder now.
-  TypeMatchResult applyFunctionBuilder(ClosureExpr *closure, Type builderType,
+  /// Apply the given function builder to the function, generating the
+  /// appropriate set of constraints.
+  TypeMatchResult matchFunctionBuilder(AnyFunctionRef fn, Type builderType,
+                                       Type bodyResultType,
                                        ConstraintLocator *calleeLocator,
                                        ConstraintLocatorBuilder locator);
 

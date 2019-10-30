@@ -528,14 +528,15 @@ enum class CheckedCastContextKind {
   EnumElementPattern,
 };
 
-enum class FunctionBuilderClosurePreCheck : uint8_t {
-  /// There were no problems pre-checking the closure.
+enum class FunctionBuilderBodyPrecheck : uint8_t {
+  /// There were no problems pre-checking the body for use with a function
+  /// builder.
   Okay,
 
-  /// There was an error pre-checking the closure.
+  /// There was an error pre-checking the body.
   Error,
 
-  /// The closure has a return statement.
+  /// The body has a return statement.
   HasReturnStmt,
 };
 
@@ -620,10 +621,10 @@ private:
   /// function bodies.
   bool SkipNonInlinableFunctionBodies = false;
 
-  /// Closure expressions whose bodies have already been prechecked as
+  /// Functions whose bodies have already been prechecked as
   /// part of trying to apply a function builder.
-  llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
-    precheckedFunctionBuilderClosures;
+  llvm::DenseMap<AnyFunctionRef, FunctionBuilderBodyPrecheck>
+    precheckedFunctionBuilderBodies;
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
@@ -990,9 +991,7 @@ public:
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                               BraceStmt *body,
-                                               Type builderType);
+  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD, Type builderType);
 
   bool typeCheckClosureBody(ClosureExpr *closure);
 
@@ -1124,15 +1123,14 @@ public:
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
 
-  /// Pre-check the body of the given closure, which we are about to
+  /// Pre-check the body of the given function, which we are about to
   /// generate constraints for.
   ///
-  /// This mutates the body of the closure, but only in ways that should be
+  /// This mutates the body, but only in ways that should be
   /// valid even if we end up not actually applying the function-builder
-  /// transform: it just does a normal pre-check of all the expressions in
-  /// the closure.
-  FunctionBuilderClosurePreCheck
-  preCheckFunctionBuilderClosureBody(ClosureExpr *closure);
+  /// transform: it just does a normal pre-check of all the expressions.
+  FunctionBuilderBodyPrecheck
+  preCheckFunctionBuilderBody(AnyFunctionRef fn);
 
   /// \name Name lookup
   ///

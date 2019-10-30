@@ -2084,11 +2084,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (!body || AFD->isBodyTypeChecked())
     return false;
 
+  bool alreadyTypeCheckedBody = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      body = tc.applyFunctionBuilderBodyTransform(func, body, builderType);
+      body = tc.applyFunctionBuilderBodyTransform(func, builderType);
       if (!body)
         return true;
+      alreadyTypeCheckedBody = true;
     } else if (func->hasSingleExpressionBody()) {
       auto resultTypeLoc = func->getBodyResultTypeLoc();
       auto expr = func->getSingleExpressionBody();
@@ -2114,9 +2116,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                              body->getRBraceLoc(), body->isImplicit());
   }
 
-  StmtChecker SC(tc, AFD);
-  SC.EndTypeCheckLoc = endTypeCheckLoc;
-  bool hadError = SC.typeCheckBody(body);
+  bool hadError = false;
+  if (!alreadyTypeCheckedBody) {
+    StmtChecker SC(tc, AFD);
+    SC.EndTypeCheckLoc = endTypeCheckLoc;
+    hadError = SC.typeCheckBody(body);
+  }
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means

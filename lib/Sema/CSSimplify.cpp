@@ -1078,9 +1078,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
               = paramInfo.getFunctionBuilderType(paramIdx)) {
         Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
         if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
+          Type bodyResultType =
+              cs.getType(closure)->castTo<FunctionType>()->getResult();
           auto result =
-              cs.applyFunctionBuilder(closure, functionBuilderType,
-                                      calleeLocator, loc);
+              cs.matchFunctionBuilder(closure, functionBuilderType,
+                                      bodyResultType, calleeLocator, loc);
           if (result.isFailure())
             return result;
         }
