@@ -855,8 +855,7 @@ witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
 }
 
 /// Determine whether one requirement match is better than the other.
-static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
-                          ValueDecl *requirement,
+static bool isBetterMatch(DeclContext *dc, ValueDecl *requirement,
                           const RequirementMatch &match1,
                           const RequirementMatch &match2) {
 
@@ -875,7 +874,9 @@ static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
   }
 
   // Check whether one declaration is better than the other.
-  switch (tc.compareDeclarations(dc, match1.Witness, match2.Witness)) {
+  const auto comparisonResult =
+      TypeChecker::compareDeclarations(dc, match1.Witness, match2.Witness);
+  switch (comparisonResult) {
   case Comparison::Better:
     return true;
 
@@ -1085,7 +1086,7 @@ bool WitnessChecker::findBestWitness(
     // Find the best match.
     bestIdx = 0;
     for (unsigned i = 1, n = matches.size(); i != n; ++i) {
-      if (isBetterMatch(TC, DC, requirement, matches[i], matches[bestIdx]))
+      if (isBetterMatch(DC, requirement, matches[i], matches[bestIdx]))
         bestIdx = i;
     }
 
@@ -1094,7 +1095,7 @@ bool WitnessChecker::findBestWitness(
       if (i == bestIdx)
         continue;
 
-      if (!isBetterMatch(TC, DC, requirement, matches[bestIdx], matches[i])) {
+      if (!isBetterMatch(DC, requirement, matches[bestIdx], matches[i])) {
         isReallyBest = false;
         break;
       }

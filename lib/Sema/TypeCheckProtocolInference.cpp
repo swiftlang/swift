@@ -1406,10 +1406,9 @@ void AssociatedTypeInference::findSolutionsRec(
   }
 }
 
-static Comparison
-compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
-                         ValueDecl *decl1, ValueDecl *decl2) {
-  // TC.compareDeclarations assumes that it's comparing two decls that
+static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
+                                           ValueDecl *decl2) {
+  // TypeChecker::compareDeclarations assumes that it's comparing two decls that
   // apply equally well to a call site. We haven't yet inferred the
   // associated types for a type, so the ranking algorithm used by
   // compareDeclarations to score protocol extensions is inappropriate,
@@ -1439,7 +1438,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   auto dc2 = decl2->getDeclContext();
 
   if (dc1 == dc2)
-    return TC.compareDeclarations(DC, decl1, decl2);
+    return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
   auto isProtocolExt1 = (bool)dc1->getExtendedProtocolDecl();
   auto isProtocolExt2 = (bool)dc2->getExtendedProtocolDecl();
@@ -1454,7 +1453,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   // Associated type inference shouldn't impact the result.
   // FIXME: It could, if someone constrained to ConcreteType.AssocType...
   if (!isProtocolExt1)
-    return TC.compareDeclarations(DC, decl1, decl2);
+    return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
   // Compare protocol extensions by which protocols they require Self to
   // conform to. If one extension requires a superset of the other's
@@ -1465,9 +1464,9 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   // FIXME: Extensions sometimes have null generic signatures while
   // checking the standard library...
   if (!sig1 || !sig2)
-    return TC.compareDeclarations(DC, decl1, decl2);
+    return TypeChecker::compareDeclarations(DC, decl1, decl2);
 
-  auto selfParam = GenericTypeParamType::get(0, 0, TC.Context);
+  auto selfParam = GenericTypeParamType::get(0, 0, decl1->getASTContext());
 
   // Collect the protocols required by extension 1.
   Type class1;
@@ -1559,7 +1558,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
 
   // If they require the same set of protocols, or non-overlapping
   // sets, judge them normally.
-  return TC.compareDeclarations(DC, decl1, decl2);
+  return TypeChecker::compareDeclarations(DC, decl1, decl2);
 }
 
 bool AssociatedTypeInference::isBetterSolution(
@@ -1575,7 +1574,7 @@ bool AssociatedTypeInference::isBetterSolution(
     if (firstWitness == secondWitness)
       continue;
 
-    switch (compareDeclsForInference(tc, dc, firstWitness, secondWitness)) {
+    switch (compareDeclsForInference(dc, firstWitness, secondWitness)) {
     case Comparison::Better:
       if (secondBetter)
         return false;
