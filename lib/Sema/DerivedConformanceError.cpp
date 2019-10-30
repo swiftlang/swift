@@ -90,15 +90,13 @@ deriveBridgedNSError_enum_nsErrorDomain(
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
-
-  auto stringTy = C.getStringDecl()->getDeclaredType();
+  auto stringTy = derived.Context.getStringDecl()->getDeclaredType();
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
+      derived.Context.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
       /*isFinal=*/true);
 
   // Define the getter.
@@ -115,7 +113,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
   if (!isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == TC.Context.Id_nsErrorDomain) {
+  if (requirement->getBaseName() == Context.Id_nsErrorDomain) {
     auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
 
     auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
@@ -127,6 +125,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
     return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
   }
 
-  TC.diagnose(requirement->getLoc(), diag::broken_errortype_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_errortype_requirement);
   return nullptr;
 }

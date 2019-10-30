@@ -701,7 +701,7 @@ deriveEquatable_eq(
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
@@ -761,8 +761,7 @@ deriveEquatable_eq(
   }
 
   if (!C.getEqualIntDecl()) {
-    derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
-                        diag::no_equal_overload_for_int);
+    derived.ConformanceDecl->diagnose(diag::no_equal_overload_for_int);
     return nullptr;
   }
 
@@ -808,7 +807,7 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
     else
       llvm_unreachable("todo");
   }
-  TC.diagnose(requirement->getLoc(), diag::broken_equatable_requirement);
+  requirement->diagnose(diag::broken_equatable_requirement);
   return nullptr;
 }
 
@@ -850,7 +849,7 @@ deriveHashable_hashInto(
                                                     void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (into: inout Hasher) -> ()
@@ -863,8 +862,7 @@ deriveHashable_hashInto(
   auto hasherDecl = C.getHasherDecl();
   if (!hasherDecl) {
     auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-    derived.TC.diagnose(hashableProto->getLoc(),
-                        diag::broken_hashable_no_hasher);
+    hashableProto->diagnose(diag::broken_hashable_no_hasher);
     return nullptr;
   }
   Type hasherType = hasherDecl->getDeclaredType();
@@ -1198,8 +1196,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // @derived var hashValue: Int {
   //   return _hashValue(for: self)
   // }
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type intType = C.getIntDecl()->getDeclaredType();

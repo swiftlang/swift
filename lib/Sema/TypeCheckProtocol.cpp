@@ -5269,7 +5269,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   if (Decl->isInvalid())
     return nullptr;
 
-  DerivedConformance derived(*this, Decl, TypeDecl, protocol);
+  DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
+                             protocol);
 
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
@@ -5313,7 +5314,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
 
-  DerivedConformance derived(*this, Decl, TypeDecl, protocol);
+  DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
+                             protocol);
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
     return derived.deriveRawRepresentable(AssocType);
