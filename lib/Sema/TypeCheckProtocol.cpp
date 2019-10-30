@@ -3358,7 +3358,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   }
 
   // Attempt to derive the witness.
-  auto derived = TC.deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
+  auto derived =
+      TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
   if (!derived)
     return ResolveWitnessResult::ExplicitFailed;
 
