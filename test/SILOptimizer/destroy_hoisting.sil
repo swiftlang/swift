@@ -230,3 +230,21 @@ bb1:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_abort_apply
+// CHECK:        abort_apply
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK:        return
+sil [ossa] @test_abort_apply : $@convention(thin) (@in S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  %f = function_ref @coro : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+  (%i, %t) = begin_apply %f(%0) : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+  abort_apply %t
+  br bb1
+bb1:
+  destroy_addr %0 : $*S
+  %r = tuple ()
+  return %r : $()
+}
