@@ -14,16 +14,10 @@ bb0(%0 : $*Int64, %1 : $Int64):
 }
 
 //CHECK-LABEL: sil @licm_readonly_apply
-//CHECK:   [[V1:%[0-9]+]] = load
-//CHECK:   %{{[0-9]+}} = apply
-//CHECK:   br bb1([[V1]] : $Int64)
-//CHECK: bb1({{.*}} : $Int64):
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: bb1:
 //CHECK-NOT: {{ apply}}
-//CHECK-NOT: load
-//CHECK-NOT: store
-//CHECK: bb2:
-//CHECK:   store
-//CHECK:   return
+//CHECK: return
 sil @licm_readonly_apply : $@convention(thin) (Int64, @inout Int64) -> () {
 bb0(%0 : $Int64, %1 : $*Int64):
   %2 = alloc_stack $Int64
