@@ -160,6 +160,7 @@
 # else
 #  define SWIFT_CLASS_IS_SWIFT_MASK _swift_classIsSwiftMask
 #  define SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE 1
+#  define SWIFT_BUILD_HAS_BACK_DEPLOYMENT 1
 #  include "BackDeployment.h"
 
 # endif
