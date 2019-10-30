@@ -297,6 +297,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::CopyAddrInst:
       case SILInstructionKind::YieldInst:
