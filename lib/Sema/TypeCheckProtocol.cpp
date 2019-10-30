@@ -3693,7 +3693,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     }
   } listener(Conformance, fileForCheckingExportability);
 
-  auto result = TC.checkGenericArguments(
+  auto result = TypeChecker::checkGenericArguments(
       DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
