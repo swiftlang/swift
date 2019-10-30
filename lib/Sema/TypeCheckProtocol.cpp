@@ -907,8 +907,8 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   auto lookupOptions = defaultMemberTypeLookupOptions;
   lookupOptions -= NameLookupFlags::PerformConformanceCheck;
   lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
-  auto candidates = TC.lookupMember(DC, Adoptee, req->getFullName(),
-                                    lookupOptions);
+  auto candidates =
+      TypeChecker::lookupMember(DC, Adoptee, req->getFullName(), lookupOptions);
   for (auto candidate : candidates) {
     if (witnessHasImplementsAttrForExactRequirement(candidate.getValueDecl(), req)) {
       witnesses.push_back(candidate.getValueDecl());
@@ -947,14 +947,14 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     auto lookupOptions = defaultMemberTypeLookupOptions;
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    auto candidates = TC.lookupMember(DC, Adoptee, req->getFullName(),
-                                      lookupOptions);
+    auto candidates = TypeChecker::lookupMember(DC, Adoptee, req->getFullName(),
+                                                lookupOptions);
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TC.lookupMember(DC, Adoptee, req->getBaseName(),
-                                   lookupOptions);
+      candidates = TypeChecker::lookupMember(DC, Adoptee, req->getBaseName(),
+                                             lookupOptions);
       *ignoringNames = true;
     }
 
@@ -4732,9 +4732,9 @@ diagnoseMissingAppendInterpolationMethod(TypeChecker &tc,
       auto baseName = DeclName(tc.Context.Id_appendInterpolation);
       auto lookupOptions = defaultMemberTypeLookupOptions;
       lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-      
-      for (auto resultEntry : tc.lookupMember(typeDecl, type, baseName,
-                                              lookupOptions)) {
+
+      for (auto resultEntry :
+           TypeChecker::lookupMember(typeDecl, type, baseName, lookupOptions)) {
         auto method = dyn_cast<FuncDecl>(resultEntry.getValueDecl()); 
         if (!method) continue;
         
@@ -4756,7 +4756,7 @@ diagnoseMissingAppendInterpolationMethod(TypeChecker &tc,
         
         return true;
       }
-      
+
       return false;
     }
   };

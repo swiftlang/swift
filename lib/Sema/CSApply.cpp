@@ -2494,10 +2494,9 @@ namespace {
           auto baseTyNominalDecl = baseTyUnwrapped
                                    ->getNominalOrBoundGenericNominal();
           auto &tc = cs.getTypeChecker();
-          auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
-                                         baseTyUnwrapped,
-                                         memberName,
-                                         defaultMemberLookupOptions);
+          auto results = TypeChecker::lookupMember(
+              baseTyNominalDecl->getModuleContext(), baseTyUnwrapped,
+              memberName, defaultMemberLookupOptions);
 
           // Filter out any functions, instance members, enum cases with
           // associated values or variables whose type does not match the

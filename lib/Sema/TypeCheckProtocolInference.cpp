@@ -590,8 +590,8 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   InferredAssociatedTypesByWitnesses result;
   auto lookupOptions = defaultMemberTypeLookupOptions;
   lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-  for (auto candidate : tc.lookupMember(dc, adoptee, defaultName,
-                                        lookupOptions)) {
+  for (auto candidate :
+       TypeChecker::lookupMember(dc, adoptee, defaultName, lookupOptions)) {
     // We want type declarations.
     auto typeDecl = dyn_cast<TypeDecl>(candidate.getValueDecl());
     if (!typeDecl || isa<AssociatedTypeDecl>(typeDecl))

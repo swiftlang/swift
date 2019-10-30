@@ -5378,9 +5378,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     lookupOptions |= NameLookupFlags::IgnoreAccessControl;
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
-    
-    auto lookup = TC.lookupMember(DC, instanceTy,
-                                  memberName, lookupOptions);
+
+    auto lookup =
+        TypeChecker::lookupMember(DC, instanceTy, memberName, lookupOptions);
     for (auto entry : lookup) {
       auto *cand = entry.getValueDecl();
 

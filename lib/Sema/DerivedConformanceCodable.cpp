@@ -1076,7 +1076,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
                               ArrayRef<Identifier>());
       }
 
-      auto result = tc.lookupMember(superclassDecl, superType, memberName);
+      auto result =
+          TypeChecker::lookupMember(superclassDecl, superType, memberName);
 
       if (result.empty()) {
         // No super initializer for us to call.

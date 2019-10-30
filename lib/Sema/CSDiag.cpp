@@ -811,7 +811,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // tries to add a specific diagnosis/fixit to explicitly invoke 'boolValue'.
   if (toType->isBool() &&
       fromType->mayHaveMembers()) {
-    auto LookupResult = CS.TC.lookupMember(
+    auto LookupResult = TypeChecker::lookupMember(
         CS.DC, fromType, DeclName(CS.TC.Context.getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
       if (isa<VarDecl>(LookupResult.begin()->getValueDecl())) {
