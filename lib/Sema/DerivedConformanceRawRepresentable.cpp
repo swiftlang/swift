@@ -404,8 +404,8 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
                                        KnownProtocolKind::Equatable);
   assert(equatableProto);
-  assert(TypeChecker::conformsToProtocol(rawType, equatableProto,
-                                         enumDecl, None));
+  assert(
+      TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
   (void)rawType;
 
@@ -466,8 +466,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   if (!equatableProto)
     return false;
 
-  if (!TypeChecker::conformsToProtocol(rawType, equatableProto,
-                                       enumDecl, None))
+  if (TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None)
+          .isInvalid())
     return false;
   
   // There must be enum elements.

@@ -641,8 +641,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is known to conform to _BridgedStoredNSError,
     // call the _nsError witness getter to extract the NSError directly,
     // then just erase the NSError.
-    if (auto storedNSErrorConformance =
-          SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType)) {
+    auto storedNSErrorConformance =
+        SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
+    if (storedNSErrorConformance) {
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(existentialTL.getLoweredType());
 
@@ -650,9 +651,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
-      if (storedNSErrorConformance->isConcrete()) {
+      if (storedNSErrorConformance.isConcrete()) {
         if (auto normal = dyn_cast<NormalProtocolConformance>(
-                                    storedNSErrorConformance->getConcrete())) {
+                storedNSErrorConformance.getConcrete())) {
           if (auto witnessVar = normal->getWitness(nsErrorVar)) {
             nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
             nsErrorVarSubstitutions = witnessVar.getSubstitutions();

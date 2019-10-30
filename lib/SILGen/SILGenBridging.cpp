@@ -77,8 +77,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  auto optConf = SGM.SwiftModule->lookupConformance(type, errorProtocol);
-  return optConf.hasValue();
+  return (bool)SGM.SwiftModule->lookupConformance(type, errorProtocol);
 }
 
 /// Bridge the given Swift value to its corresponding Objective-C
@@ -928,7 +927,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   auto loweredFuncTyWithoutNoEscape = adjustFunctionType(
       loweredFuncTy, loweredFuncTy->getExtInfo().withNoEscape(false),
-      loweredFuncTy->getWitnessMethodConformanceOrNone());
+      loweredFuncTy->getWitnessMethodConformanceOrInvalid());
 
   CanType dynamicSelfType;
   auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncTyWithoutNoEscape,
@@ -1133,7 +1132,8 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
     auto conformance = SGM.getNSErrorConformanceToError();
-    if (!conformance) return emitUndef(nativeErrorTy);
+    if (!conformance)
+      return emitUndef(nativeErrorTy);
     ProtocolConformanceRef conformanceArray[] = {
       ProtocolConformanceRef(conformance)
     };

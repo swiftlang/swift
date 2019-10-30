@@ -3981,8 +3981,8 @@ public:
         fnTy->getNumYields(), fnTy->getNumResults(),
         S.addGenericSignatureRef(sig), variableData);
 
-    if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
-      S.writeConformance(*conformance, S.DeclTypeAbbrCodes);
+    if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
+      S.writeConformance(conformance, S.DeclTypeAbbrCodes);
   }
 
   void visitArraySliceType(const ArraySliceType *sliceTy) {

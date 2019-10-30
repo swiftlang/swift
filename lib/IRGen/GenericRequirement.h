@@ -137,10 +137,8 @@ public:
 
   bool empty() const { return Requirements.empty(); }
 
-  using FulfillmentCallback =
-    llvm::function_ref<void(unsigned requirementIndex,
-                            CanType type,
-                            Optional<ProtocolConformanceRef> conf)>;
+  using FulfillmentCallback = llvm::function_ref<void(
+      unsigned requirementIndex, CanType type, ProtocolConformanceRef conf)>;
   void enumerateFulfillments(IRGenModule &IGM, SubstitutionMap subs,
                              FulfillmentCallback callback);
 

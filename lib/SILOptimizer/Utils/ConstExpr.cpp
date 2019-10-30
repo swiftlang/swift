@@ -380,12 +380,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
-    auto confResult = substitutionMap.lookupConformance(
+    auto conf = substitutionMap.lookupConformance(
         wmi->getLookupType(), wmi->getConformance().getRequirement());
-    if (!confResult)
+    if (conf.isInvalid())
       return getUnknown(evaluator, value,
                         UnknownReason::UnknownWitnessMethodConformance);
-    auto conf = confResult.getValue();
     auto &module = wmi->getModule();
     SILFunction *fn =
         module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
@@ -1136,7 +1135,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     if (calleeFnType->getRepresentation() ==
         SILFunctionType::Representation::WitnessMethod) {
       auto protocol =
-          calleeFnType->getWitnessMethodConformance().getRequirement();
+          calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
       auto protoSelfToConcreteType =
@@ -1145,12 +1144,12 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       // Self type of the requirement.
       auto conf = protoSelfToConcreteType.lookupConformance(
           protocol->getSelfInterfaceType()->getCanonicalType(), protocol);
-      if (!conf.hasValue())
+      if (conf.isInvalid())
         return getUnknown(evaluator, (SILInstruction *)apply,
                           UnknownReason::UnknownWitnessMethodConformance);
 
       callSubMap = getWitnessMethodSubstitutions(
-          apply->getModule(), ApplySite(apply), callee, conf.getValue());
+          apply->getModule(), ApplySite(apply), callee, conf);
 
       /// Remark: If we ever start to care about evaluating classes,
       /// getSubstitutionsForCallee() is the analogous mapping function we

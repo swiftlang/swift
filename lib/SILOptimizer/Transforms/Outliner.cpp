@@ -138,10 +138,10 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
     return SILDeclRef();
   auto ConformanceRef =
       SwiftModule->lookupConformance(NativeType, Proto);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return SILDeclRef();
 
-  auto Conformance = ConformanceRef->getConcrete();
+  auto Conformance = ConformanceRef.getConcrete();
   // bridgeToObjectiveC
   DeclName Name(Ctx, Ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
   auto *Requirement = dyn_cast_or_null<FuncDecl>(
@@ -162,9 +162,9 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
     return SILDeclRef();
   auto ConformanceRef =
       SwiftModule->lookupConformance(NativeType, Proto);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return SILDeclRef();
-  auto Conformance = ConformanceRef->getConcrete();
+  auto Conformance = ConformanceRef.getConcrete();
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));

@@ -286,7 +286,7 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
       fnType->getSubstitutions(),
       fnType->isGenericSignatureImplied(),
       fnType->getASTContext(),
-      fnType->getWitnessMethodConformanceOrNone());
+      fnType->getWitnessMethodConformanceOrInvalid());
   return newFnType;
 }
 
@@ -2317,7 +2317,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
         newSILResultInfo, loweredTy->getOptionalErrorResult(),
         loweredTy->getSubstitutions(), loweredTy->isGenericSignatureImplied(),
         F->getModule().getASTContext(),
-        loweredTy->getWitnessMethodConformanceOrNone());
+        loweredTy->getWitnessMethodConformanceOrInvalid());
     F->rewriteLoweredTypeUnsafe(NewTy);
     return true;
   }

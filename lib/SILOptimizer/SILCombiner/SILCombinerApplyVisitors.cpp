@@ -1258,7 +1258,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
           return type;
         },
         [&](CanType origTy, Type substTy,
-            ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+            ProtocolDecl *proto) -> ProtocolConformanceRef {
           if (origTy->isEqual(OAI.OpenedArchetype)) {
             assert(substTy->isEqual(CEI.ConcreteType));
             // Do a conformance lookup on this witness requirement using the
@@ -1376,7 +1376,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // Get the conformance of the init_existential type, which is passed as the
   // self argument, on the witness' protocol.
   ProtocolConformanceRef SelfConformance =
-      *SelfCEI.lookupExistentialConformance(WMI->getLookupProtocol());
+      SelfCEI.lookupExistentialConformance(WMI->getLookupProtocol());
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction. It's ok to rewrite the witness method in terms

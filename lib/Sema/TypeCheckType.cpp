@@ -892,15 +892,15 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
-  if (protocol)
-    if (auto conformanceRef = TypeChecker::conformsToProtocol(
-            parentTy, protocol, dc,
-            (ConformanceCheckFlags::InExpression |
-             ConformanceCheckFlags::SuppressDependencyTracking |
-             ConformanceCheckFlags::SkipConditionalRequirements))) {
-      if (conformanceRef->isConcrete())
-        conformance = conformanceRef->getConcrete();
-    }
+  if (protocol) {
+    auto conformanceRef = TypeChecker::conformsToProtocol(
+        parentTy, protocol, dc,
+        (ConformanceCheckFlags::InExpression |
+         ConformanceCheckFlags::SuppressDependencyTracking |
+         ConformanceCheckFlags::SkipConditionalRequirements));
+    if (conformanceRef.isConcrete())
+      conformance = conformanceRef.getConcrete();
+  }
 
   // If any errors have occurred, don't bother diagnosing this cross-file
   // issue.
@@ -2587,13 +2587,12 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
         auto result = TypeChecker::conformsToProtocol(
                                             replacement, proto, DC,
                                             ConformanceCheckOptions());
-        // TODO: getSubstitutions callback ought to return Optional.
-        if (!result) {
+        if (result.isInvalid()) {
           ok = false;
           return ProtocolConformanceRef(proto);
         }
-        
-        return *result;
+
+        return result;
       });
 
     if (!ok)
@@ -2712,7 +2711,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
-  Optional<ProtocolConformanceRef> witnessMethodConformance;
+  ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
     auto resolved = resolveType(witnessMethodProtocol, options);
     if (resolved->hasError())

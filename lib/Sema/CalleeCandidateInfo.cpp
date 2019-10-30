@@ -49,8 +49,7 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
   }
 
   for (auto proto : archetype->getConformsTo()) {
-    if (!dc->getParentModule()->lookupConformance(
-          type, proto))
+    if (dc->getParentModule()->lookupConformance(type, proto).isInvalid())
       return false;
   }
 

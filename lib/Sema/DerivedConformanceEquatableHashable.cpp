@@ -53,8 +53,9 @@ associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC, None)) {
+      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                          protocol, DC, None)
+              .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -1205,17 +1206,17 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (!TypeChecker::conformsToProtocol(intType,
-                                       C.getProtocol(KnownProtocolKind::Hashable),
-                                       parentDC, None)) {
+  if (TypeChecker::conformsToProtocol(
+          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC, None)
+          .isInvalid()) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!TypeChecker::conformsToProtocol(intType, intLiteralProto,
-                                       parentDC, None)) {
+  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC, None)
+          .isInvalid()) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
