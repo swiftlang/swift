@@ -94,8 +94,7 @@ public:
 /// associated type.
 ///
 /// \returns an empty result on success, or a description of the error.
-CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
-                                        ProtocolDecl *proto,
+CheckTypeWitnessResult checkTypeWitness(DeclContext *dc, ProtocolDecl *proto,
                                         AssociatedTypeDecl *assocType,
                                         Type type);
 
@@ -481,6 +480,8 @@ protected:
   // The conforming context, either a nominal type or extension.
   DeclContext *DC;
 
+  ASTContext &getASTContext() const { return TC.Context; }
+
   // An auxiliary lookup table to be used for witnesses remapped via
   // @_implements(Protocol, DeclName)
   llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
@@ -755,6 +756,9 @@ public:
                           NormalProtocolConformance *conformance);
 
 private:
+  /// Retrieve the AST context.
+  ASTContext &getASTContext() const { return tc.Context; }
+
   /// Infer associated type witnesses for the given tentative
   /// requirement/witness match.
   InferredAssociatedTypesByWitness inferTypeWitnessesViaValueWitness(

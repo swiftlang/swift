@@ -743,15 +743,15 @@ public:
 
 
     // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *sequenceProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
+    ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+        TC.Context, S->getForLoc(), KnownProtocolKind::Sequence);
     if (!sequenceProto) {
       return nullptr;
     }
 
     // Retrieve the 'Iterator' protocol.
-    ProtocolDecl *iteratorProto =
-        TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
+    ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
+        TC.Context, S->getForLoc(), KnownProtocolKind::IteratorProtocol);
     if (!iteratorProto) {
       return nullptr;
     }

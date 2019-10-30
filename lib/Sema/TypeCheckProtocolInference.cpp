@@ -378,8 +378,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       if (!canInferFromOtherAssociatedType) {
         // Check that the type witness meets the
         // requirements on the associated type.
-        if (auto failed = checkTypeWitness(tc, dc, proto, result.first,
-                                           result.second)) {
+        if (auto failed =
+                checkTypeWitness(dc, proto, result.first, result.second)) {
           witnessResult.NonViable.push_back(
                           std::make_tuple(result.first,result.second,failed));
           LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
@@ -582,7 +582,7 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
       out << assocType->getName().str();
     }
 
-    defaultName = tc.Context.getIdentifier(defaultNameStr);
+    defaultName = getASTContext().getIdentifier(defaultNameStr);
   }
 
   // Look for types with the given default name that have appropriate
@@ -590,8 +590,8 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   InferredAssociatedTypesByWitnesses result;
   auto lookupOptions = defaultMemberTypeLookupOptions;
   lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-  for (auto candidate : tc.lookupMember(dc, adoptee, defaultName,
-                                        lookupOptions)) {
+  for (auto candidate :
+       TypeChecker::lookupMember(dc, adoptee, defaultName, lookupOptions)) {
     // We want type declarations.
     auto typeDecl = dyn_cast<TypeDecl>(candidate.getValueDecl());
     if (!typeDecl || isa<AssociatedTypeDecl>(typeDecl))
@@ -868,7 +868,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return Type();
 
-  if (auto failed = checkTypeWitness(tc, dc, proto, assocType, defaultType)) {
+  if (auto failed = checkTypeWitness(dc, proto, assocType, defaultType)) {
     // Record the failure, if we haven't seen one already.
     if (!failedDefaultedAssocType && !failed.isError()) {
       failedDefaultedAssocType = defaultedAssocType;
@@ -894,12 +894,13 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
     return Type();
 
   // Try to derive the type witness.
-  Type derivedType = tc.deriveTypeWitness(dc, derivingTypeDecl, assocType);
+  Type derivedType =
+      TypeChecker::deriveTypeWitness(dc, derivingTypeDecl, assocType);
   if (!derivedType)
     return Type();
 
   // Make sure that the derived type is sane.
-  if (checkTypeWitness(tc, dc, proto, assocType, derivedType)) {
+  if (checkTypeWitness(dc, proto, assocType, derivedType)) {
     /// FIXME: Diagnose based on this.
     failedDerivedAssocType = assocType;
     failedDerivedWitness = derivedType;
@@ -1102,13 +1103,13 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   sanitizeProtocolRequirements(proto, proto->getRequirementSignature(),
                                sanitizedRequirements);
   auto result =
-    tc.checkGenericArguments(dc, SourceLoc(), SourceLoc(),
-                             typeInContext,
-                             { proto->getSelfInterfaceType() },
-                             sanitizedRequirements,
-                             QuerySubstitutionMap{substitutions},
-                             TypeChecker::LookUpConformance(dc),
-                             None, nullptr, options);
+    TypeChecker::checkGenericArguments(dc, SourceLoc(), SourceLoc(),
+                                       typeInContext,
+                                       { proto->getSelfInterfaceType() },
+                                       sanitizedRequirements,
+                                       QuerySubstitutionMap{substitutions},
+                                       TypeChecker::LookUpConformance(dc),
+                                       None, nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
     ++NumSolutionStatesFailedCheck;
@@ -1150,7 +1151,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   auto subs = typeInContext->getContextSubstitutions(ext);
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
-  switch (tc.checkGenericArguments(
+  switch (TypeChecker::checkGenericArguments(
                        dc, SourceLoc(), SourceLoc(), adoptee,
                        ext->getGenericSignature()->getGenericParams(),
                        ext->getGenericSignature()->getRequirements(),
@@ -2004,7 +2005,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (Conformance->hasTypeWitness(assocType))
       continue;
 
-    recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr);
+    recordTypeWitness(assocType, ErrorType::get(getASTContext()), nullptr);
   }
 }
 

@@ -117,7 +117,8 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
                                    Identifier name, SourceLoc UseLoc) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
+  auto lookup =
+      TypeChecker::lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
   return filterForEnumElement(TC, DC, UseLoc,
                               /*unqualifiedLookup=*/true, lookup);
 }
@@ -132,7 +133,8 @@ lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-  LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
+  LookupResult foundElements =
+      TypeChecker::lookupMember(DC, ty, name, lookupOptions);
   return filterForEnumElement(TC, DC, UseLoc,
                               /*unqualifiedLookup=*/false, foundElements);
 }

@@ -478,9 +478,8 @@ namespace {
     }    
     
     if (lti.haveFloatLiteral) {
-      if (auto floatProto =
-            CS.TC.Context.getProtocol(
-                                  KnownProtocolKind::ExpressibleByFloatLiteral)) {
+      if (auto floatProto = CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -491,9 +490,8 @@ namespace {
     }
     
     if (lti.haveIntLiteral) {
-      if (auto intProto =
-            CS.TC.Context.getProtocol(
-                                KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+      if (auto intProto = CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByIntegerLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(intProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -504,9 +502,8 @@ namespace {
     }
     
     if (lti.haveStringLiteral) {
-      if (auto stringProto =
-          CS.TC.Context.getProtocol(
-                                KnownProtocolKind::ExpressibleByStringLiteral)) {
+      if (auto stringProto = CS.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByStringLiteral)) {
         if (auto defaultType = CS.TC.getDefaultType(stringProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
@@ -1153,7 +1150,7 @@ namespace {
       if (expr->getType())
         return expr->getType();
 
-      auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
+      auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
       if (!protocol)
         return nullptr;
 
@@ -1170,9 +1167,9 @@ namespace {
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       // Dig out the ExpressibleByStringInterpolation protocol.
       auto &tc = CS.getTypeChecker();
-      auto interpolationProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation);
+      auto interpolationProto = TypeChecker::getProtocol(
+          CS.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringInterpolation);
       if (!interpolationProto) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
@@ -1243,7 +1240,7 @@ namespace {
         return expr->getType();
 
       auto &tc = CS.getTypeChecker();
-      auto protocol = tc.getLiteralProtocol(expr);
+      auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
       if (!protocol) {
         tc.diagnose(expr->getLoc(), diag::use_unknown_object_literal_protocol,
                     expr->getLiteralKindPlainName());
@@ -1387,7 +1384,8 @@ namespace {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
       bool hadError = TypeChecker::validateType(
-          CS.TC.Context, loc, TypeResolution::forContextual(CS.DC), options);
+          CS.getASTContext(), loc, TypeResolution::forContextual(CS.DC),
+          options);
       return hadError ? Type() : loc.getType();
     }
 
@@ -1706,12 +1704,11 @@ namespace {
 
       // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
       // even if the sub-expression was already optional.
-      if (CS.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+      if (CS.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
         CS.addConstraint(ConstraintKind::Conversion,
                          CS.getType(expr->getSubExpr()), optTy,
                          CS.getConstraintLocator(expr));
-      }
-      else {
+      } else {
         CS.addConstraint(ConstraintKind::OptionalObject,
                          optTy, CS.getType(expr->getSubExpr()),
                          CS.getConstraintLocator(expr));
@@ -1766,9 +1763,9 @@ namespace {
       // An array expression can be of a type T that conforms to the
       // ExpressibleByArrayLiteral protocol.
       auto &tc = CS.getTypeChecker();
-      ProtocolDecl *arrayProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByArrayLiteral);
+      ProtocolDecl *arrayProto = TypeChecker::getProtocol(
+          CS.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByArrayLiteral);
       if (!arrayProto) {
         return Type();
       }
@@ -1849,9 +1846,8 @@ namespace {
       // ExpressibleByDictionaryLiteral protocol.
       // FIXME: This isn't actually used for anything at the moment.
       auto &tc = CS.getTypeChecker();
-      ProtocolDecl *dictionaryProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      ProtocolDecl *dictionaryProto = TypeChecker::getProtocol(
+          C, expr->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
       if (!dictionaryProto) {
         return Type();
       }
@@ -2286,7 +2282,7 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (TypeChecker::validateType(CS.TC.Context,
+            if (TypeChecker::validateType(CS.getASTContext(),
                                           isp->getCastTypeLoc(),
                                           TypeResolution::forContextual(CS.DC),
                                           TypeResolverContext::InExpression)) {
@@ -3734,7 +3730,7 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
     return;
   
   SmallVector<Expr *, 16> linkedExprs;

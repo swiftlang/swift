@@ -34,7 +34,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
   CurrentScore.Data[index] += value;
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
       log.indent(solverState->depth * 2);
@@ -90,7 +90,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
-  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   if (retainAllSolutions())
@@ -100,7 +100,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
       CurrentScore <= *solverState->BestScore)
     return false;
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
       << "(solution is worse than the best solution)\n";
@@ -201,7 +201,7 @@ static bool isNominallySuperclassOf(Type type1, Type type2) {
 /// Determine the relationship between the self types of the given declaration
 /// contexts..
 static std::pair<SelfTypeRelationship, ProtocolConformanceRef>
-computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
+computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
                             ValueDecl *decl2) {
   // If both declarations are operators, even through they
   // might have Self such types are unrelated.
@@ -533,8 +533,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // Determine the relationship between the 'self' types and add the
       // appropriate constraints. The constraints themselves never fail, but
       // they help deduce type variables that were opened.
-      auto selfTypeRelationship =
-          computeSelfTypeRelationship(tc, dc, decl1, decl2);
+      auto selfTypeRelationship = computeSelfTypeRelationship(dc, decl1, decl2);
       auto relationshipKind = selfTypeRelationship.first;
       auto conformance = selfTypeRelationship.second;
       (void)conformance;
@@ -720,7 +719,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2,
     llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights) {
-  if (cs.TC.getLangOpts().DebugConstraintSolver) {
+  if (cs.getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
@@ -1126,14 +1125,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (!(score1 || score2)) {
       if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
         if ((nominalType2->getName() ==
-             cs.TC.Context.Id_OptionalNilComparisonType)) {
+             cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score2;
         }
       }
 
       if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
         if ((nominalType1->getName() ==
-             cs.TC.Context.Id_OptionalNilComparisonType)) {
+             cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score1;
         }
       }
@@ -1190,7 +1189,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   if (viable.size() == 1)
     return 0;
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
         << "Comparing " << viable.size() << " viable solutions\n";

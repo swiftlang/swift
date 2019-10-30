@@ -46,8 +46,8 @@ struct REPLContext {
 
     {
       Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
-      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id, SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
+                                                   SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -55,8 +55,8 @@ struct REPLContext {
     }
     {
       Identifier Id(Context.getIdentifier("_replDebugPrintln"));
-      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id, SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
+                                                   SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)

@@ -3571,6 +3571,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   if (!dc->getParentSourceFile())
     return true;
 
+  auto &Context = proto->getASTContext();
   NominalTypeDecl *conformingDecl = dc->getSelfNominalTypeDecl();
   assert(conformingDecl && "Must have conforming declaration");
 
@@ -4573,8 +4574,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
-static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
-                                                           DeclContext *dc,
+static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
                                                            Pattern *pattern) {
   switch (pattern->getKind()) {
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
@@ -4593,9 +4593,10 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
     // For literal-convertible types, form the corresponding literal.
 #define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
-  if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) {     \
-    if (tc.conformsToProtocol(type, proto, dc,                                 \
-                              ConformanceCheckFlags::InExpression))            \
+  if (auto proto = TypeChecker::getProtocol(                                   \
+          type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
+    if (TypeChecker::conformsToProtocol(type, proto, dc,                       \
+                                        ConformanceCheckFlags::InExpression))  \
       return std::string(String);                                              \
   }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
@@ -4616,7 +4617,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
   case PatternKind::Paren: {
     if (auto sub = buildDefaultInitializerString(
-                     tc, dc, cast<ParenPattern>(pattern)->getSubPattern())) {
+            dc, cast<ParenPattern>(pattern)->getSubPattern())) {
       return "(" + *sub + ")";
     }
 
@@ -4627,7 +4628,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     std::string result = "(";
     bool first = true;
     for (auto elt : cast<TuplePattern>(pattern)->getElements()) {
-      if (auto sub = buildDefaultInitializerString(tc, dc, elt.getPattern())) {
+      if (auto sub = buildDefaultInitializerString(dc, elt.getPattern())) {
         if (first) {
           first = false;
         } else {
@@ -4645,21 +4646,21 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
   case PatternKind::Typed:
     return buildDefaultInitializerString(
-             tc, dc, cast<TypedPattern>(pattern)->getSubPattern());
+        dc, cast<TypedPattern>(pattern)->getSubPattern());
 
   case PatternKind::Var:
     return buildDefaultInitializerString(
-             tc, dc, cast<VarPattern>(pattern)->getSubPattern());
+        dc, cast<VarPattern>(pattern)->getSubPattern());
   }
 
   llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Diagnose a class that does not have any initializers.
-static void diagnoseClassWithoutInitializers(TypeChecker &tc,
-                                             ClassDecl *classDecl) {
-  tc.diagnose(classDecl, diag::class_without_init,
-              classDecl->getDeclaredType());
+static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+  ASTContext &C = classDecl->getASTContext();
+  C.Diags.diagnose(classDecl, diag::class_without_init,
+                   classDecl->getDeclaredType());
 
   // HACK: We've got a special case to look out for and diagnose specifically to
   // improve the experience of seeing this, and mitigate some confusion.
@@ -4675,7 +4676,6 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   // listing the members that prevented initializer synthesis.
   // TODO: Add a fixit along with this suggestion.
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
-    ASTContext &C = tc.Context;
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
     auto ref = TypeChecker::conformsToProtocol(
@@ -4689,9 +4689,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       // and isn't implicit; otherwise, on the subclass itself.
       ValueDecl *diagDest = classDecl;
       auto initFrom = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
-      auto result = tc.lookupMember(superclassDecl, superclassType, initFrom,
+      auto result =
+          TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     NameLookupFlags::ProtocolMembers |
-                                    NameLookupFlags::IgnoreAccessControl);
+                                        NameLookupFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();
@@ -4705,9 +4706,9 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      auto ref =
-          tc.conformsToProtocol(superclassType, encodableProto, superclassDecl,
-                                ConformanceCheckOptions(), SourceLoc());
+      auto ref = TypeChecker::conformsToProtocol(
+          superclassType, encodableProto, superclassDecl,
+          ConformanceCheckOptions(), SourceLoc());
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -4718,7 +4719,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
           diagName = diag::codable_suggest_overriding_init_here;
       }
 
-      tc.diagnose(diagDest, diagName);
+      C.Diags.diagnose(diagDest, diagName);
     }
   }
 
@@ -4776,27 +4777,27 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       Optional<InFlightDiagnostic> diag;
       switch (vars.size()) {
       case 1:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_1,
-                                 vars[0]->getName()));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_1,
+                                      vars[0]->getName()));
         break;
       case 2:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_2,
-                                 vars[0]->getName(), vars[1]->getName()));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_2,
+                                      vars[0]->getName(), vars[1]->getName()));
         break;
       case 3:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
-                                 vars[2]->getName(), false));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_3plus,
+                                      vars[0]->getName(), vars[1]->getName(),
+                                      vars[2]->getName(), false));
         break;
       default:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
-                                 vars[2]->getName(), true));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_3plus,
+                                      vars[0]->getName(), vars[1]->getName(),
+                                      vars[2]->getName(), true));
         break;
       }
 
-      if (auto defaultValueSuggestion
-             = buildDefaultInitializerString(tc, classDecl, pattern))
+      if (auto defaultValueSuggestion =
+              buildDefaultInitializerString(classDecl, pattern))
         diag->fixItInsertAfter(pattern->getEndLoc(),
                                " = " + *defaultValueSuggestion);
     }
@@ -4834,5 +4835,5 @@ void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
   }
 
-  diagnoseClassWithoutInitializers(*this, classDecl);
+  diagnoseClassWithoutInitializers(classDecl);
 }
