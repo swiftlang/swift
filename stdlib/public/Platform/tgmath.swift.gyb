@@ -20,22 +20,11 @@ public func fabs<T: FloatingPoint>(_ x: T) -> T {
 }
 
 @_transparent
-// SWIFT_ENABLE_TENSORFLOW
-@differentiable(
-  vjp: _vjpSqrt
-  where T : Differentiable & FloatingPoint, T == T.TangentVector
-)
 public func sqrt<T: FloatingPoint>(_ x: T) -> T {
   return x.squareRoot()
 }
 
 @_transparent
-// SWIFT_ENABLE_TENSORFLOW
-@differentiable(
-  wrt: (x, y, z),
-  vjp: _vjpFma
-  where T : Differentiable & FloatingPoint, T == T.TangentVector
-)
 public func fma<T: FloatingPoint>(_ x: T, _ y: T, _ z: T) -> T {
   return z.addingProduct(x, y)
 }
@@ -95,21 +84,74 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
 
 // SWIFT_ENABLE_TENSORFLOW
 @usableFromInline
+@differentiating(sqrt)
 func _vjpSqrt<T: FloatingPoint & Differentiable> (
   _ x: T
-) -> (T, (T) -> T) where T == T.TangentVector {
+) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
   let value = x.squareRoot()
   return (value, { v in v / (2 * value) })
 }
 
 @usableFromInline
+@differentiating(fma)
 func _vjpFma<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T,
   _ z: T
-) -> (T, (T) -> (T, T, T)) where T == T.TangentVector {
+) -> (value: T, pullback: (T) -> (T, T, T)) where T == T.TangentVector {
   return (fma(x, y, z), { v in (v * y, v * x, v) })
 }
+
+@usableFromInline
+@differentiating(remainder)
+func _vjpRemainder<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T
+) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
+  return (remainder(x, y), { v in (v, v) })
+}
+
+@usableFromInline
+@differentiating(fmod)
+func _vjpFmod<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T
+) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
+  return (fmod(x, y), { v in (v, v) })
+}
+
+@usableFromInline
+@differentiating(ceil)
+func _vjpCeil<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+  return (ceil(x), { v in 0 })
+}
+
+@usableFromInline
+@differentiating(floor)
+func _vjpFloor<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+  return (floor(x), { v in 0 })
+}
+
+@usableFromInline
+@differentiating(round)
+func _vjpRound<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+  return (round(x), { v in 0 })
+}
+
+@usableFromInline
+@differentiating(trunc)
+func _vjpTrunc<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+  return (trunc(x), { v in 0 })
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 %for T in ['Float','Double']:
 @available(swift, deprecated: 4.2, renamed: "scalbn")
@@ -233,6 +275,7 @@ func _vjpErf(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
 func _vjpErfc(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
   return (erfc(x), { v in v * -${T}(M_2_SQRTPI) * exp(-x * x) })
 }
+// SWIFT_ENABLE_TENSORFLOW END
 %   if T == 'Float80':
 #endif
 %   end
