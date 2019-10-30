@@ -27,6 +27,46 @@ CHANGELOG
 Swift 5.3
 ----------
 
+* [SR-11700][]:
+
+  Exclusivity violations within code that computes the `default`
+  argument during Dictionary access are now diagnosed.
+
+  ```swift
+  struct Container {
+     static let defaultKey = 0
+
+     var dictionary = [defaultKey:0]
+
+     mutating func incrementValue(at key: Int) {
+       dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+     }
+  }
+  // error: overlapping accesses to 'self.dictionary', but modification requires exclusive access; consider copying to a local variable
+  //     dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+  //     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // note: conflicting access is here
+  //     dictionary[key, default: dictionary[Container.defaultKey]!] += 1
+  //                              ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+  ```
+
+  The exclusivity violation can be avoided by precomputing the `default`
+  argument using a local variable.
+
+  ```swift
+  struct Container {
+    static let defaultKey = 0
+
+    var dictionary = [defaultKey:0]
+
+    mutating func incrementValue(at key: Int) {
+      let defaultValue = dictionary[Container.defaultKey]!
+      dictionary[key, default: defaultValue] += 1
+    }
+  }
+  // No error.
+  ```
+
 * [SR-7083][]:
 
   Property observers such as `willSet` and `didSet` are now supported on `lazy` properties:
@@ -8068,4 +8108,5 @@ Swift 1.0
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
+[SR-11700]: <https://bugs.swift.org/browse/SR-11700>
 [SR-11841]: <https://bugs.swift.org/browse/SR-11841>
