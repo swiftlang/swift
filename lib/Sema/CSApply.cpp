@@ -7045,7 +7045,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     apply->setIsSuper(isSuper);
 
     cs.setExprTypes(apply);
-    Expr *result = tc.substituteInputSugarTypeForResult(apply);
+    Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
 
     // If we have a covariant result type, perform the conversion now.

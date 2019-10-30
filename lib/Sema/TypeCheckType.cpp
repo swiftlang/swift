@@ -3384,13 +3384,13 @@ namespace {
 class UnsupportedProtocolVisitor
   : public TypeReprVisitor<UnsupportedProtocolVisitor>, public ASTWalker
 {
-  TypeChecker &TC;
+  ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
     
 public:
-  UnsupportedProtocolVisitor(TypeChecker &tc, bool checkStatements)
-    : TC(tc), checkStatements(checkStatements), hitTopStmt(false) { }
+  UnsupportedProtocolVisitor(ASTContext &ctx, bool checkStatements)
+    : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
     if (T->isInvalid())
@@ -3429,8 +3429,8 @@ public:
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported()) {
-        TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                    proto->getName());
+        Ctx.Diags.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+                           proto->getName());
         T->setInvalid();
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
@@ -3446,8 +3446,9 @@ public:
             if (protoDecl->existentialTypeSupported())
               continue;
             
-            TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                        protoDecl->getName());
+            Ctx.Diags.diagnose(comp->getIdLoc(),
+                               diag::unsupported_existential_type,
+                               protoDecl->getName());
             T->setInvalid();
           }
         }
@@ -3474,49 +3475,52 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
+  auto &ctx = decl->getASTContext();
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl))
-    checkUnsupportedProtocolType(protocolDecl->getTrailingWhereClause());
+    checkUnsupportedProtocolType(ctx, protocolDecl->getTrailingWhereClause());
   else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl))
-    checkUnsupportedProtocolType(genericDecl->getGenericParams());
+    checkUnsupportedProtocolType(ctx, genericDecl->getGenericParams());
   else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl))
-    checkUnsupportedProtocolType(assocType->getTrailingWhereClause());
+    checkUnsupportedProtocolType(ctx, assocType->getTrailingWhereClause());
   else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
-    checkUnsupportedProtocolType(extDecl->getTrailingWhereClause());
+    checkUnsupportedProtocolType(ctx, extDecl->getTrailingWhereClause());
   else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl))
-    checkUnsupportedProtocolType(subscriptDecl->getGenericParams());
+    checkUnsupportedProtocolType(ctx, subscriptDecl->getGenericParams());
   else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (!isa<AccessorDecl>(funcDecl))
-      checkUnsupportedProtocolType(funcDecl->getGenericParams());
+      checkUnsupportedProtocolType(ctx, funcDecl->getGenericParams());
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
   decl->walk(visitor);
 }
 
-void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
+void TypeChecker::checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt) {
   if (!stmt)
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/true);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/true);
   stmt->walk(visitor);
 }
 
-void TypeChecker::checkUnsupportedProtocolType(TrailingWhereClause *whereClause) {
+void TypeChecker::checkUnsupportedProtocolType(
+    ASTContext &ctx, TrailingWhereClause *whereClause) {
   if (whereClause == nullptr)
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
   visitor.visitRequirements(whereClause->getRequirements());
 }
 
-void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) {
+void TypeChecker::checkUnsupportedProtocolType(
+    ASTContext &ctx, GenericParamList *genericParams) {
   if (genericParams  == nullptr)
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
   visitor.visitRequirements(genericParams->getRequirements());
 }
 

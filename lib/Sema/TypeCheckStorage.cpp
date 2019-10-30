@@ -878,9 +878,10 @@ createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                ctx);
 }
 
-static ProtocolConformanceRef
-checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var, Type type) {
+static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
+                                                          Type type) {
   auto dc = var->getDeclContext();
+  auto &ctx = dc->getASTContext();
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
@@ -904,7 +905,7 @@ static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
 
 ProtocolConformanceRef TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
   Type type = getUnderlyingTypeOfVariable(var).first;
-  return ::checkConformanceToNSCopying(Context, var, type);
+  return ::checkConformanceToNSCopying(var, type);
 }
 
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
@@ -921,7 +922,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // The element type must conform to NSCopying.  If not, emit an error and just
   // recovery by synthesizing without the copy call.
-  auto conformance = checkConformanceToNSCopying(Ctx, VD, underlyingType);
+  auto conformance = checkConformanceToNSCopying(VD, underlyingType);
   if (!conformance)
     return Val;
 

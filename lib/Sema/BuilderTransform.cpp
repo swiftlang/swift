@@ -484,7 +484,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                BraceStmt *body,
                                                Type builderType) {
   // Try to build a single result expression.
-  BuilderClosureVisitor visitor(Context, nullptr,
+  auto &ctx = FD->getASTContext();
+  BuilderClosureVisitor visitor(ctx, nullptr,
                                 /*wantExpr=*/true, builderType);
   Expr *returnExpr = visitor.visit(body);
   if (!returnExpr)
@@ -496,9 +497,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
     return nullptr;
 
   auto loc = returnExpr->getStartLoc();
-  auto returnStmt =
-    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
-  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
+  auto returnStmt = new (ctx) ReturnStmt(loc, returnExpr, /*implicit*/ true);
+  return BraceStmt::create(ctx, body->getLBraceLoc(), { returnStmt },
                            body->getRBraceLoc());
 }
 

@@ -487,12 +487,12 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC, TypeChecker &tc) {
+                               DeclContext *owningDC) {
   if (!genericParams)
     return;
 
   for (auto gp : *genericParams) {
-    tc.checkDeclAttributes(gp);
+    TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
 
@@ -2241,7 +2241,7 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
-    TC.checkUnsupportedProtocolType(decl);
+    TypeChecker::checkUnsupportedProtocolType(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = TC.Context;
@@ -2289,11 +2289,11 @@ public:
   }
   
   void visitImportDecl(ImportDecl *ID) {
-    TC.checkDeclAttributes(ID);
+    TypeChecker::checkDeclAttributes(ID);
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
-    TC.checkDeclAttributes(OD);
+    TypeChecker::checkDeclAttributes(OD);
     auto &Ctx = OD->getASTContext();
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
@@ -2311,7 +2311,7 @@ public:
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
-    TC.checkDeclAttributes(PGD);
+    TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
     checkAccessControl(TC, PGD);
   }
@@ -2377,7 +2377,7 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(VD);
+    TypeChecker::checkDeclAttributes(VD);
 
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
@@ -2431,7 +2431,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     DeclContext *DC = PBD->getDeclContext();
 
-    TC.checkDeclAttributes(PBD);
+    TypeChecker::checkDeclAttributes(PBD);
 
     bool isInSILMode = false;
     if (auto sourceFile = DC->getParentSourceFile())
@@ -2529,7 +2529,7 @@ public:
       });
     }
 
-    TC.checkDeclAttributes(PBD);
+    TypeChecker::checkDeclAttributes(PBD);
 
     checkAccessControl(TC, PBD);
 
@@ -2578,12 +2578,12 @@ public:
     (void) SD->getGenericSignature();
 
     if (!SD->isInvalid()) {
-      TC.checkReferencedGenericParams(SD);
-      checkGenericParams(SD->getGenericParams(), SD, TC);
-      TC.checkProtocolSelfRequirements(SD);
+      TypeChecker::checkReferencedGenericParams(SD);
+      checkGenericParams(SD->getGenericParams(), SD);
+      TypeChecker::checkProtocolSelfRequirements(SD);
     }
 
-    TC.checkDeclAttributes(SD);
+    TypeChecker::checkDeclAttributes(SD);
 
     checkAccessControl(TC, SD);
 
@@ -2604,7 +2604,7 @@ public:
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
 
-    TC.checkParameterAttributes(SD->getIndices());
+    TypeChecker::checkParameterAttributes(SD->getIndices());
     checkDefaultArguments(TC, SD->getIndices());
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
@@ -2627,7 +2627,7 @@ public:
     (void) TAD->getGenericSignature();
     (void) TAD->getUnderlyingType();
 
-    TC.checkDeclAttributes(TAD);
+    TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TC, TAD);
 
   }
@@ -2636,12 +2636,12 @@ public:
     // Force requests that can emit diagnostics.
     (void) OTD->getGenericSignature();
 
-    TC.checkDeclAttributes(OTD);
+    TypeChecker::checkDeclAttributes(OTD);
     checkAccessControl(TC, OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    TC.checkDeclAttributes(AT);
+    TypeChecker::checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
     auto *proto = AT->getProtocol();
@@ -2732,7 +2732,7 @@ public:
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
-    checkGenericParams(ED->getGenericParams(), ED, TC);
+    checkGenericParams(ED->getGenericParams(), ED);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2745,7 +2745,7 @@ public:
     for (Decl *member : ED->getMembers())
       visit(member);
 
-    TC.checkDeclAttributes(ED);
+    TypeChecker::checkDeclAttributes(ED);
 
     checkInheritanceClause(ED);
 
@@ -2778,7 +2778,7 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    checkGenericParams(SD->getGenericParams(), SD, TC);
+    checkGenericParams(SD->getGenericParams(), SD);
 
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
@@ -2790,7 +2790,7 @@ public:
 
     TC.checkPatternBindingCaptures(SD);
 
-    TC.checkDeclAttributes(SD);
+    TypeChecker::checkDeclAttributes(SD);
 
     checkInheritanceClause(SD);
 
@@ -2901,7 +2901,7 @@ public:
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();
 
-    checkGenericParams(CD->getGenericParams(), CD, TC);
+    checkGenericParams(CD->getGenericParams(), CD);
 
     {
       // Check for circular inheritance.
@@ -3038,7 +3038,7 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(CD);
+    TypeChecker::checkDeclAttributes(CD);
 
     checkInheritanceClause(CD);
 
@@ -3075,7 +3075,7 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    TC.checkDeclAttributes(PD);
+    TypeChecker::checkDeclAttributes(PD);
 
     checkAccessControl(TC, PD);
 
@@ -3186,15 +3186,15 @@ public:
     (void) FD->getOperatorDecl();
 
     if (!FD->isInvalid()) {
-      checkGenericParams(FD->getGenericParams(), FD, TC);
-      TC.checkReferencedGenericParams(FD);
-      TC.checkProtocolSelfRequirements(FD);
+      checkGenericParams(FD->getGenericParams(), FD);
+      TypeChecker::checkReferencedGenericParams(FD);
+      TypeChecker::checkProtocolSelfRequirements(FD);
     }
 
     checkAccessControl(TC, FD);
 
-    TC.checkParameterAttributes(FD->getParameters());
-    TC.checkDeclAttributes(FD);
+    TypeChecker::checkParameterAttributes(FD->getParameters());
+    TypeChecker::checkDeclAttributes(FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3280,10 +3280,10 @@ public:
     (void) EED->getInterfaceType();
     auto *ED = EED->getParentEnum();
 
-    TC.checkDeclAttributes(EED);
+    TypeChecker::checkDeclAttributes(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      TC.checkParameterAttributes(PL);
+      TypeChecker::checkParameterAttributes(PL);
       checkDefaultArguments(TC, PL);
     }
 
@@ -3387,14 +3387,14 @@ public:
       }
     }
 
-    checkGenericParams(ED->getGenericParams(), ED, TC);
+    checkGenericParams(ED->getGenericParams(), ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
     TC.ConformanceContexts.push_back(ED);
 
-    TC.checkDeclAttributes(ED);
+    TypeChecker::checkDeclAttributes(ED);
     checkAccessControl(TC, ED);
 
     checkExplicitAvailability(ED);
@@ -3408,7 +3408,7 @@ public:
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
-    TC.checkDeclAttributes(ICD);
+    TypeChecker::checkDeclAttributes(ICD);
   }
 
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
@@ -3427,13 +3427,13 @@ public:
     (void) CD->getInitKind();
 
     if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams(), CD, TC);
-      TC.checkReferencedGenericParams(CD);
-      TC.checkProtocolSelfRequirements(CD);
+      checkGenericParams(CD->getGenericParams(), CD);
+      TypeChecker::checkReferencedGenericParams(CD);
+      TypeChecker::checkProtocolSelfRequirements(CD);
     }
 
-    TC.checkDeclAttributes(CD);
-    TC.checkParameterAttributes(CD->getParameters());
+    TypeChecker::checkDeclAttributes(CD);
+    TypeChecker::checkParameterAttributes(CD->getParameters());
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
@@ -3548,7 +3548,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    TC.checkDeclAttributes(DD);
+    TypeChecker::checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
