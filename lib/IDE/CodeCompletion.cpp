@@ -3318,23 +3318,19 @@ public:
   }
 
   template <typename T>
-  void collectOperatorsFromMap(SourceFile::OperatorMap<T> &map,
-                               bool includePrivate,
+  void collectOperatorsFromMap(llvm::DenseMap<Identifier, T> &map,
                                std::vector<OperatorDecl *> &results) {
     for (auto &pair : map) {
-      if (pair.second.getPointer() &&
-          (pair.second.getInt() || includePrivate)) {
-        results.push_back(pair.second.getPointer());
-      }
+      if (auto *op = pair.second)
+        results.push_back(op);
     }
   }
 
   void collectOperatorsFrom(SourceFile *SF,
                             std::vector<OperatorDecl *> &results) {
-    bool includePrivate = CurrDeclContext->getParentSourceFile() == SF;
-    collectOperatorsFromMap(SF->PrefixOperators, includePrivate, results);
-    collectOperatorsFromMap(SF->PostfixOperators, includePrivate, results);
-    collectOperatorsFromMap(SF->InfixOperators, includePrivate, results);
+    collectOperatorsFromMap(SF->PrefixOperators, results);
+    collectOperatorsFromMap(SF->PostfixOperators, results);
+    collectOperatorsFromMap(SF->InfixOperators, results);
   }
 
   void collectOperatorsFrom(LoadedFile *F,

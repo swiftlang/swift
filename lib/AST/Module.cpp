@@ -656,9 +656,7 @@ void ModuleDecl::getPrecedenceGroups(
 void SourceFile::getPrecedenceGroups(
        SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
   for (auto pair : PrecedenceGroups) {
-    if (pair.second.getPointer() && pair.second.getInt()) {
-      Results.push_back(pair.second.getPointer());
-    }
+    Results.push_back(pair.second);
   }
 }
 
@@ -892,9 +890,6 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 
 namespace {
   template <typename T>
-  using OperatorMap = SourceFile::OperatorMap<T>;
-
-  template <typename T>
   struct OperatorLookup {
     // Don't fold this into the static_assert: this would trigger an MSVC bug
     // that causes the assertion to fail.
@@ -968,10 +963,10 @@ void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
   SyntaxInfo->SyntaxRoot.emplace(Root);
 }
 
-template<typename OP_DECL>
-static Optional<OP_DECL *>
-lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
-                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP);
+template <typename OP_DECL>
+static Optional<OP_DECL *> lookupOperatorDeclForName(
+    ModuleDecl *M, SourceLoc Loc, Identifier Name,
+    llvm::DenseMap<Identifier, OP_DECL *> SourceFile::*OP_MAP);
 
 template<typename OP_DECL>
 using ImportedOperatorsMap = llvm::SmallDenseMap<OP_DECL*, bool, 16>;
@@ -1019,12 +1014,10 @@ checkOperatorConflicts(const SourceFile &SF, SourceLoc loc,
 
 // Returns None on error, Optional(nullptr) if no operator decl found, or
 // Optional(decl) if decl was found.
-template<typename OP_DECL>
-static Optional<OP_DECL *>
-lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
-                          bool includePrivate,
-                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
-{
+template <typename OP_DECL>
+static Optional<OP_DECL *> lookupOperatorDeclForName(
+    FileUnit &File, SourceLoc Loc, Identifier Name, bool includePrivate,
+    llvm::DenseMap<Identifier, OP_DECL *> SourceFile::*OP_MAP) {
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
     // The Builtin module declares no operators.
@@ -1042,8 +1035,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
 
   // Look for an operator declaration in the current module.
   auto found = (SF.*OP_MAP).find(Name);
-  if (found != (SF.*OP_MAP).end() && (includePrivate || found->second.getInt()))
-    return found->second.getPointer();
+  if (found != (SF.*OP_MAP).end())
+    return found->second;
 
   // Look for imported operator decls.
   // Record whether they come from re-exported modules.
@@ -1070,13 +1063,12 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
       importedOperators[op] |= isExported;
   }
 
-  typename OperatorMap<OP_DECL *>::mapped_type result = { nullptr, true };
-  
+  OP_DECL *result = nullptr;
   if (!importedOperators.empty()) {
     auto start = checkOperatorConflicts(SF, Loc, importedOperators);
     if (start == importedOperators.end())
       return None;
-    result = { start->first, start->second };
+    result = start->first;
   }
 
   if (includePrivate) {
@@ -1084,22 +1076,20 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
     // It's not safe to cache the non-private results because we didn't search
     // private imports there, but in most non-private cases the result will
     // be cached in the final lookup.
-    auto &mutableOpMap = const_cast<OperatorMap<OP_DECL *> &>(SF.*OP_MAP);
-    mutableOpMap[Name] = result;
+    (SF.*OP_MAP)[Name] = result;
   }
 
-  if (includePrivate || result.getInt())
-    return result.getPointer();
+  if (includePrivate)
+    return result;
   return nullptr;
 }
 
-template<typename OP_DECL>
-static Optional<OP_DECL *>
-lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
-                          OperatorMap<OP_DECL *> SourceFile::*OP_MAP)
-{
+template <typename OP_DECL>
+static Optional<OP_DECL *> lookupOperatorDeclForName(
+    ModuleDecl *M, SourceLoc Loc, Identifier Name,
+    llvm::DenseMap<Identifier, OP_DECL *> SourceFile::*OP_MAP) {
   OP_DECL *result = nullptr;
-  for (const FileUnit *File : M->getFiles()) {
+  for (FileUnit *File : M->getFiles()) {
     auto next = lookupOperatorDeclForName(*File, Loc, Name, false, OP_MAP);
     if (!next.hasValue())
       return next;
@@ -1113,31 +1103,31 @@ lookupOperatorDeclForName(ModuleDecl *M, SourceLoc Loc, Identifier Name,
   return result;
 }
 
-#define LOOKUP_OPERATOR(Kind) \
-Kind##Decl * \
-ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) { \
-  auto result = lookupOperatorDeclForName(this, loc, name, \
-                                          &SourceFile::Kind##s); \
-  return result ? *result : nullptr; \
-} \
-Kind##Decl * \
-SourceFile::lookup##Kind(Identifier name, bool isCascading, SourceLoc loc) { \
-  auto result = lookupOperatorDeclForName(*this, loc, name, true, \
-                                          &SourceFile::Kind##s); \
-  if (!result.hasValue()) \
-    return nullptr; \
-  if (ReferencedNames) {\
-    if (!result.getValue() || \
-        result.getValue()->getDeclContext()->getModuleScopeContext() != this) {\
-      ReferencedNames->addTopLevelName(name, isCascading); \
-    } \
-  } \
-  if (!result.getValue()) { \
-    result = lookupOperatorDeclForName(getParentModule(), loc, name, \
-                                       &SourceFile::Kind##s); \
-  } \
-  return result.hasValue() ? result.getValue() : nullptr; \
-}
+#define LOOKUP_OPERATOR(Kind)                                                  \
+  Kind##Decl *ModuleDecl::lookup##Kind(Identifier name, SourceLoc loc) {       \
+    auto result =                                                              \
+        lookupOperatorDeclForName(this, loc, name, &SourceFile::Kind##s);      \
+    return result ? *result : nullptr;                                         \
+  }                                                                            \
+  Kind##Decl *SourceFile::lookup##Kind(Identifier name, bool isCascading,      \
+                                       SourceLoc loc) {                        \
+    auto result = lookupOperatorDeclForName(*this, loc, name, true,            \
+                                            &SourceFile::Kind##s);             \
+    if (!result.hasValue())                                                    \
+      return nullptr;                                                          \
+    if (ReferencedNames) {                                                     \
+      if (!result.getValue() ||                                                \
+          result.getValue()->getDeclContext()->getModuleScopeContext() !=      \
+              this) {                                                          \
+        ReferencedNames->addTopLevelName(name, isCascading);                   \
+      }                                                                        \
+    }                                                                          \
+    if (!result.getValue()) {                                                  \
+      result = lookupOperatorDeclForName(getParentModule(), loc, name,         \
+                                         &SourceFile::Kind##s);                \
+    }                                                                          \
+    return result.hasValue() ? result.getValue() : nullptr;                    \
+  }
 
 LOOKUP_OPERATOR(PrefixOperator)
 LOOKUP_OPERATOR(InfixOperator)
