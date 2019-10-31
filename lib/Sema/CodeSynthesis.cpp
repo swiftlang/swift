@@ -864,17 +864,57 @@ static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                            false);
 }
 
+static bool canInheritDesignatedInits(Evaluator &eval, ClassDecl *decl) {
+  // We can only inherit designated initializers if the user hasn't defined
+  // a designated init of their own, and all the stored properties have initial
+  // values.
+  return !hasUserDefinedDesignatedInit(eval, decl) &&
+         areAllStoredPropertiesDefaultInitializable(eval, decl);
+}
+
+static void collectNonOveriddenSuperclassInits(
+    ClassDecl *subclass, SmallVectorImpl<ConstructorDecl *> &results) {
+  auto superclassTy = subclass->getSuperclass();
+  assert(superclassTy);
+
+  // Record all of the initializers the subclass has overriden, excluding stub
+  // overrides, which we don't want to consider as viable delegates for
+  // convenience inits.
+  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
+  for (auto member : subclass->getMembers())
+    if (auto ctor = dyn_cast<ConstructorDecl>(member))
+      if (!ctor->hasStubImplementation())
+        if (auto overridden = ctor->getOverriddenDecl())
+          overriddenInits.insert(overridden);
+
+  auto superclassCtors = TypeChecker::lookupConstructors(
+      subclass, superclassTy, NameLookupFlags::IgnoreAccessControl);
+
+  for (auto memberResult : superclassCtors) {
+    auto superclassCtor = cast<ConstructorDecl>(memberResult.getValueDecl());
+
+    // Skip invalid superclass initializers.
+    if (superclassCtor->isInvalid())
+      continue;
+
+    // Skip unavailable superclass initializers.
+    if (AvailableAttr::isUnavailable(superclassCtor))
+      continue;
+
+    if (!overriddenInits.count(superclassCtor))
+      results.push_back(superclassCtor);
+  }
+}
+
 /// For a class with a superclass, automatically define overrides
 /// for all of the superclass's designated initializers.
 static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   // Bail out if we're validating one of our constructors already;
   // we'll revisit the issue later.
-  if (!decl->hasClangNode()) {
-    for (auto member : decl->getMembers()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (ctor->isRecursiveValidation())
-          return;
-      }
+  for (auto member : decl->getMembers()) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (ctor->isRecursiveValidation())
+        return;
     }
   }
 
@@ -882,33 +922,11 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   auto &ctx = decl->getASTContext();
   SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
-  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
-  if (decl->hasClangNode()) {
-    // Objective-C classes may have interesting initializers in extensions.
-    for (auto member : decl->lookupDirect(DeclBaseName::createConstructor())) {
-      auto ctor = dyn_cast<ConstructorDecl>(member);
-      if (!ctor)
-        continue;
-
-      // Swift initializers added in extensions of Objective-C classes can never
-      // be overrides.
-      if (!ctor->hasClangNode())
-        continue;
-
-      if (auto overridden = ctor->getOverriddenDecl())
-        overriddenInits.insert(overridden);
-    }
-
-  } else {
-    for (auto member : decl->getMembers()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->isInvalid()) {
-          auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
-          declaredInitializers.push_back({ctor, type});
-        }
-
-        if (auto overridden = ctor->getOverriddenDecl())
-          overriddenInits.insert(overridden);
+  for (auto member : decl->getMembers()) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (!ctor->isInvalid()) {
+        auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
+        declaredInitializers.push_back({ctor, type});
       }
     }
   }
@@ -930,56 +948,24 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   // We can't define these overrides if we have any uninitialized
   // stored properties.
-  if (!defaultInitable && !foundDesignatedInit && !decl->hasClangNode())
+  if (!defaultInitable && !foundDesignatedInit)
     return;
 
-  auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
-  assert(superclassDecl && "Superclass of class is not a class?");
-  if (!superclassDecl->addedImplicitInitializers())
-    ctx.getLazyResolver()->resolveImplicitConstructors(superclassDecl);
+  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
 
-  auto ctors = TypeChecker::lookupConstructors(
-      decl, superclassTy,
-      NameLookupFlags::IgnoreAccessControl);
-
-  bool canInheritInitializers = defaultInitable && !foundDesignatedInit;
-
-  bool canInheritConvenienceInitalizers =
-      !superclassDecl->hasMissingDesignatedInitializers();
-  SmallVector<ConstructorDecl *, 4> requiredConvenienceInitializers;
-  for (auto memberResult : ctors) {
-    auto member = memberResult.getValueDecl();
-
-    // Skip unavailable superclass initializers.
-    if (AvailableAttr::isUnavailable(member))
-      continue;
-
-    // Skip invalid superclass initializers.
-    auto superclassCtor = dyn_cast<ConstructorDecl>(member);
-    if (superclassCtor->isInvalid())
-      continue;
-
-    // If we have an override for this constructor, it's okay.
-    if (overriddenInits.count(superclassCtor) > 0)
-      continue;
-
+  bool inheritDesignatedInits = canInheritDesignatedInits(ctx.evaluator, decl);
+  for (auto *superclassCtor : nonOverridenSuperclassCtors) {
     // We only care about required or designated initializers.
     if (!superclassCtor->isDesignatedInit()) {
       if (superclassCtor->isRequired()) {
         assert(superclassCtor->isInheritable() &&
                "factory initializers cannot be 'required'");
-        requiredConvenienceInitializers.push_back(superclassCtor);
+        if (!decl->inheritsSuperclassInitializers())
+          diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
       }
       continue;
     }
-
-    // Otherwise, it may no longer be safe to inherit convenience
-    // initializers.
-    canInheritConvenienceInitalizers &= canInheritInitializers;
-
-    // Everything after this is only relevant for Swift classes being defined.
-    if (decl->hasClangNode())
-      continue;
 
     // If the superclass initializer is not accessible from the derived
     // class, don't synthesize an override, since we cannot reference the
@@ -991,7 +977,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       continue;
 
     // Diagnose a missing override of a required initializer.
-    if (superclassCtor->isRequired() && !canInheritInitializers) {
+    if (superclassCtor->isRequired() && !inheritDesignatedInits) {
       diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
       continue;
     }
@@ -1002,8 +988,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
     for (const auto &ctorAndType : declaredInitializers) {
       auto *ctor = ctorAndType.first;
       auto type = ctorAndType.second;
-      auto parentType = getMemberTypeForComparison(
-          ctx, superclassCtor, ctor);
+      auto parentType = getMemberTypeForComparison(ctx, superclassCtor, ctor);
 
       if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
         alreadyDeclared = true;
@@ -1018,22 +1003,60 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
     // If we're inheriting initializers, create an override delegating
     // to 'super.init'. Otherwise, create a stub which traps at runtime.
-    auto kind = canInheritInitializers
-                  ? DesignatedInitKind::Chaining
-                  : DesignatedInitKind::Stub;
+    auto kind = inheritDesignatedInits ? DesignatedInitKind::Chaining
+                                       : DesignatedInitKind::Stub;
 
     if (auto ctor = createDesignatedInitOverride(
                       decl, superclassCtor, kind, ctx)) {
       decl->addMember(ctor);
     }
   }
+}
 
-  if (canInheritConvenienceInitalizers) {
-    decl->setInheritsSuperclassInitializers();
-  } else {
-    for (ConstructorDecl *requiredCtor : requiredConvenienceInitializers)
-      diagnoseMissingRequiredInitializer(decl, requiredCtor, ctx);
-  }
+llvm::Expected<bool>
+InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
+                                                ClassDecl *decl) const {
+  auto superclass = decl->getSuperclass();
+  assert(superclass);
+
+  // If the superclass has known-missing designated initializers, inheriting
+  // is unsafe.
+  auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+  if (superclassDecl->hasMissingDesignatedInitializers())
+    return false;
+
+  // If we're allowed to inherit designated initializers, then we can inherit
+  // convenience inits too.
+  if (canInheritDesignatedInits(eval, decl))
+    return true;
+
+  // Otherwise we need to check whether the user has overriden all of the
+  // superclass' designed inits.
+  SmallVector<ConstructorDecl *, 4> nonOverridenSuperclassCtors;
+  collectNonOveriddenSuperclassInits(decl, nonOverridenSuperclassCtors);
+
+  auto allDesignatedInitsOverriden =
+      llvm::none_of(nonOverridenSuperclassCtors, [](ConstructorDecl *ctor) {
+        return ctor->isDesignatedInit();
+      });
+  return allDesignatedInitsOverriden;
+}
+
+static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
+  // Don't synthesize initializers for imported decls.
+  if (decl->hasClangNode())
+    return false;
+
+  // Don't add implicit constructors in module interfaces.
+  if (auto *SF = decl->getParentSourceFile())
+    if (SF->Kind == SourceFileKind::Interface)
+      return false;
+
+  // Don't attempt if we know the decl is invalid.
+  if (decl->isInvalid())
+    return false;
+
+  return true;
 }
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
@@ -1041,16 +1064,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (decl->addedImplicitInitializers())
     return;
   
-  // Don't add implicit constructors for an invalid declaration
-  if (decl->isInvalid())
+  if (!shouldAttemptInitializerSynthesis(decl)) {
+    decl->setAddedImplicitInitializers();
     return;
-
-  // Don't add implicit constructors in module interfaces.
-  if (auto *SF = decl->getParentSourceFile()) {
-    if (SF->Kind == SourceFileKind::Interface) {
-      decl->setAddedImplicitInitializers();
-      return;
-    }
   }
 
   if (auto *classDecl = dyn_cast<ClassDecl>(decl))
@@ -1159,8 +1175,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
 llvm::Expected<bool>
 HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                    StructDecl *decl) const {
-  // Don't synthesize a memberwise init for imported decls.
-  if (decl->hasClangNode())
+  if (!shouldAttemptInitializerSynthesis(decl))
     return false;
 
   // If the user has already defined a designated initializer, then don't
@@ -1198,8 +1213,7 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *decl) const {
   assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
 
-  // Don't synthesize a default for imported decls.
-  if (decl->hasClangNode())
+  if (!shouldAttemptInitializerSynthesis(decl))
     return false;
 
   if (auto *sd = dyn_cast<StructDecl>(decl)) {

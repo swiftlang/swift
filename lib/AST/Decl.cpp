@@ -3957,6 +3957,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.ClassDecl.InheritsSuperclassInits = 0;
+  Bits.ClassDecl.ComputedInheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 0;
@@ -4072,30 +4073,15 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
 }
 
 bool ClassDecl::inheritsSuperclassInitializers() {
-  // Check whether we already have a cached answer.
-  if (addedImplicitInitializers())
-    return Bits.ClassDecl.InheritsSuperclassInits;
-
   // If there's no superclass, there's nothing to inherit.
-  ClassDecl *superclassDecl;
-  if (!(superclassDecl = getSuperclassDecl())) {
-    setAddedImplicitInitializers();
-    return false;
-  }
-
-  // If the superclass has known-missing designated initializers, inheriting
-  // is unsafe.
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (!getSuperclass())
     return false;
 
-  // Otherwise, do all the work of resolving constructors, which will also
-  // calculate the right answer.
-  if (auto *resolver = getASTContext().getLazyResolver())
-    resolver->resolveImplicitConstructors(this);
-
-  return Bits.ClassDecl.InheritsSuperclassInits;
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, InheritsSuperclassInitializersRequest{mutableThis}, false);
 }
-
 
 AncestryOptions ClassDecl::checkAncestry() const {
   return AncestryOptions(evaluateOrDefault(getASTContext().evaluator,

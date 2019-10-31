@@ -1647,6 +1647,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether this declaration inherits its superclass' designated and
+/// convenience initializers.
+class InheritsSuperclassInitializersRequest
+    : public SimpleRequest<InheritsSuperclassInitializersRequest,
+                           bool(ClassDecl *), CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
