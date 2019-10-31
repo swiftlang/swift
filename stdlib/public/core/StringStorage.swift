@@ -296,7 +296,7 @@ final internal class __StringStorage
 
   @objc(UTF8String)
   @_effects(readonly)
-  final internal func _utf8String() -> UnsafePointer<UInt8>? {
+  final internal func _utf8String() -> UnsafePointer<UInt8> {
     return start
   }
 
@@ -850,7 +850,7 @@ final internal class __SharedStringStorage
 
   @objc(UTF8String)
   @_effects(readonly)
-  final internal func _utf8String() -> UnsafePointer<UInt8>? {
+  final internal func _utf8String() -> UnsafePointer<UInt8> {
     return start
   }
 

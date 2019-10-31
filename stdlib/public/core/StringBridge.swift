@@ -62,6 +62,9 @@ internal typealias _CocoaString = AnyObject
   @objc(newTaggedNSStringWithASCIIBytes_:length_:)
   func createTaggedString(bytes: UnsafePointer<UInt8>, 
                           count: Int) -> AnyObject?
+  
+  @objc(UTF8String)
+  func _utf8String() -> UnsafePointer<UInt8>
 }
 
 /*
@@ -187,6 +190,20 @@ internal func _cocoaStringCopyUTF8(
   return _NSStringCopyUTF8(_objc(target), into: bufPtr)
 }
 
+@_effects(releasenone)
+private func _NSStringGetUTF8Pointer(
+  _ o: _StringSelectorHolder,
+) -> UnsafePointer<UInt8> {
+  return o._utf8String()
+}
+
+@_effects(releasenone)
+internal func _cocoaStringGetUTF8Pointer(
+  _ target: _CocoaString,
+) -> UnsafePointer<UInt8> {
+  return _NSStringGetUTF8Pointer(_objc(target))
+}
+
 @_effects(readonly)
 private func _NSStringUTF8Count(
   _ o: _StringSelectorHolder,
@@ -290,6 +307,12 @@ internal enum _KnownCocoaString {
   case tagged
 #endif
 
+  private static let stringClasses = (
+    storage: unsafeBitCast(__StringStorage.self, to: UInt.self),
+    shared: unsafeBitCast(__SharedStringStorage.self, to: UInt.self)
+    mutable: unsafeBitCast(_SwiftNSMutableString.self, to: UInt.self)
+  )
+  
   @inline(__always)
   init(_ str: _CocoaString) {
 
@@ -299,13 +322,15 @@ internal enum _KnownCocoaString {
       return
     }
 #endif
+    
+    let classes = _KnownCocoaString.stringClasses
 
     switch unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self) {
-    case unsafeBitCast(__StringStorage.self, to: UInt.self):
+    case classes.storage:
       self = .storage
-    case unsafeBitCast(__SharedStringStorage.self, to: UInt.self):
+    case classes.shared:
       self = .shared
-    case unsafeBitCast(_SwiftNSMutableString.self, to: UInt.self):
+    case classes.mutable:
       self = .mutable
     default:
       self = .cocoa
@@ -729,12 +754,17 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
 
   @objc(UTF8String)
   @_effects(readonly)
-  final internal func _utf8String() -> UnsafePointer<UInt8>? {
+  final internal func _utf8String() -> UnsafePointer<UInt8> {
     let guts = _contents._guts
     if !guts.isSmall && guts.isFastUTF8 {
       return guts._object.fastUTF8.baseAddress!
     }
-    return nil
+    // This is Cocoa's trick for returning an "autoreleased char *", but using
+    // our CoW to make it a bit faster
+    let anchor = _contents._bridgeToObjectiveCImpl()
+    let unmanagedAnchor = Unmanaged.passRetained(anchor)
+    unmanagedAnchor.autorelease()
+    return _cocoaStringGetUTF8Pointer(anchor)
   }
 
   @objc(cStringUsingEncoding:)
