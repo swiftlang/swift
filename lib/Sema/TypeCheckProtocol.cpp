@@ -567,8 +567,9 @@ swift::matchWitness(
       if (!reqDiffAttrMatch) {
         auto implicitDiffAttr = false;
         if (reqDiffAttrSupersetMatch) {
+          auto *witnessAFD = cast<AbstractFunctionDecl>(witness);
           auto *newAttr = DifferentiableAttr::create(
-              ctx, /*implicit*/ true, reqDiffAttr->AtLoc,
+              witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
               reqDiffAttr->getParameterIndices(), /*jvp*/ None,
               /*vjp*/ None, reqDiffAttr->getDerivativeGenericSignature());

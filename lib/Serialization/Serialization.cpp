@@ -2310,6 +2310,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto *attr = cast<DifferentiableAttr>(DA);
 
+      assert(attr->getOriginalFunction() &&
+             "@differentiable attribute must have original function resolved");
+      DeclID originalRef = S.addDeclRef(attr->getOriginalFunction());
+
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
       if (auto jvp = attr->getJVP())
@@ -2331,7 +2335,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         indices.push_back(paramIndices->contains(i));
 
       DifferentiableDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), originalRef,
           attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
           indices);

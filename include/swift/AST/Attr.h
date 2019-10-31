@@ -1541,6 +1541,8 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
+  /// The declaration on which the `@differentiable` attribute is declared.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
   /// Whether this function is linear.
   bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
@@ -1573,7 +1575,7 @@ class DifferentiableAttr final
                               Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
 
-  explicit DifferentiableAttr(ASTContext &context, bool implicit,
+  explicit DifferentiableAttr(AbstractFunctionDecl *original, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
                               bool linear, IndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
@@ -1589,12 +1591,18 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
-  static DifferentiableAttr *create(ASTContext &context, bool implicit,
-                                    SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear, IndexSubset *indices,
+  static DifferentiableAttr *create(AbstractFunctionDecl *original,
+                                    bool implicit, SourceLoc atLoc,
+                                    SourceRange baseRange, bool linear,
+                                    IndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
+
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
