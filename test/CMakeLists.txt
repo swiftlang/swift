@@ -87,7 +87,7 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps ${deps_binaries})
   else()
     foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}")
+      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}${CMAKE_EXECUTABLE_SUFFIX}")
     endforeach()
   endif()
 
