@@ -2617,7 +2617,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
       // Determine if we have '@differentiable(linear) (T) -> U'
       // or '@differentiable (linear) -> U'.
       if (Tok.getText() == "linear" && consumeIf(tok::identifier)) {
-        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
+        if (Tok.is(tok::r_paren) &&
+            peekToken().isAny(tok::l_paren, tok::at_sign, tok::identifier)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
           linear = true;
@@ -2626,8 +2627,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
         } else if (Tok.is(tok::l_paren)) {
           // Handle invalid '@differentiable(linear (T) -> U'
           if (!justChecking)
-            diagnose(Tok,
-                     diag::differentiable_attribute_expected_rparen);
+            diagnose(Tok, diag::differentiable_attribute_expected_rparen);
           backtrack.cancelBacktrack();
           return false;
         }
