@@ -136,7 +136,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   assert(done && "Parser returned early?");
   (void)done;
 
-  performNameBinding(*importFile);
+  resolveImportsAndOperators(*importFile);
   importMod->setHasResolvedImports();
   return importMod;
 }

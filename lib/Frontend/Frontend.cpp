@@ -900,7 +900,7 @@ void CompilerInstance::parseLibraryFile(
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
-  performNameBinding(*NextInput);
+  resolveImportsAndOperators(*NextInput);
 }
 
 OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
@@ -982,7 +982,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
       case SourceFile::Parsed:
         llvm_unreachable("invalid limit stage");
       case SourceFile::NameBound:
-        performNameBinding(MainFile, CurTUElem);
+        resolveImportsAndOperators(MainFile, CurTUElem);
         break;
       case SourceFile::TypeChecked:
         const auto &options = Invocation.getFrontendOptions();
@@ -1007,7 +1007,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
   }
 
   if (!mainIsPrimary) {
-    performNameBinding(MainFile);
+    resolveImportsAndOperators(MainFile);
   }
 }
 

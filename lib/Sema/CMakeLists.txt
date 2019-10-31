@@ -32,10 +32,10 @@ add_swift_host_library(swiftSema STATIC
   InstrumenterSupport.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
-  NameBinding.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
   ResilienceDiagnostics.cpp
+  ResolveImports.cpp
   SourceLoader.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp

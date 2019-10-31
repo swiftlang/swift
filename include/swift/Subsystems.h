@@ -152,7 +152,7 @@ namespace swift {
   ///
   /// \param StartElem Where to start for incremental name binding in the main
   ///                  source file.
-  void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
+  void resolveImportsAndOperators(SourceFile &SF, unsigned StartElem = 0);
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can

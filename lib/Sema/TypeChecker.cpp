@@ -375,10 +375,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);
 
-  // Make sure that name binding has been completed before doing any type
+  // Make sure that import resolution has been completed before doing any type
   // checking.
-  performNameBinding(SF, StartElem);
-                                  
+  resolveImportsAndOperators(SF, StartElem);
+
   // Could build scope maps here because the AST is stable now.
 
   {

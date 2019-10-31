@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements name binding for Swift.
+//  This file implements import resolution and collects operator and precedence
+//  group declarations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,40 +34,37 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <system_error>
-using namespace swift;
 
-//===----------------------------------------------------------------------===//
-// NameBinder
-//===----------------------------------------------------------------------===//
+using namespace swift;
 
 using ImportedModule = ModuleDecl::ImportedModule;
 using ImportOptions = SourceFile::ImportOptions;
 
-namespace {  
-  class NameBinder {    
-  public:
-    SourceFile &SF;
-    ASTContext &Context;
+namespace {
+class ImportResolver {
+public:
+  SourceFile &SF;
+  ASTContext &Context;
 
-    NameBinder(SourceFile &SF) : SF(SF), Context(SF.getASTContext()) {}
+  ImportResolver(SourceFile &SF) : SF(SF), Context(SF.getASTContext()) {}
 
-    template<typename ...ArgTypes>
-    InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-      return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
-    }
+  template <typename... ArgTypes>
+  InFlightDiagnostic diagnose(ArgTypes &&... Args) {
+    return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
+  }
 
-    void addImport(SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports,
-                   ImportDecl *ID);
+  void addImport(SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports,
+                 ImportDecl *ID);
 
-    /// Load a module referenced by an import statement.
-    ///
-    /// Returns null if no module can be loaded.
-    ModuleDecl *getModule(ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
-  };
+  /// Load a module referenced by an import statement.
+  ///
+  /// Returns null if no module can be loaded.
+  ModuleDecl *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModuleID);
+};
 } // end anonymous namespace
 
-ModuleDecl *
-NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
+ModuleDecl *ImportResolver::getModule(
+    ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
   
@@ -168,7 +166,7 @@ static bool shouldImportSelfImportClang(const ImportDecl *ID,
   return false;
 }
 
-void NameBinder::addImport(
+void ImportResolver::addImport(
     SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports, ImportDecl *ID) {
   if (ID->getModulePath().front().first == SF.getParentModule()->getName() &&
       ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
@@ -354,51 +352,35 @@ void NameBinder::addImport(
   }
 }
 
-//===----------------------------------------------------------------------===//
-// performNameBinding
-//===----------------------------------------------------------------------===//
-
-template<typename OP_DECL>
-static void insertOperatorDecl(NameBinder &Binder,
-                               SourceFile::OperatorMap<OP_DECL*> &Operators,
+template <typename OP_DECL>
+static void insertOperatorDecl(ImportResolver &resolver,
+                               llvm::DenseMap<Identifier, OP_DECL *> &Operators,
                                OP_DECL *OpDecl) {
   auto previousDecl = Operators.find(OpDecl->getName());
   if (previousDecl != Operators.end()) {
-    Binder.diagnose(OpDecl->getLoc(), diag::operator_redeclared);
-    Binder.diagnose(previousDecl->second.getPointer(),
-                    diag::previous_operator_decl);
+    resolver.diagnose(OpDecl->getLoc(), diag::operator_redeclared);
+    resolver.diagnose(previousDecl->second, diag::previous_operator_decl);
     return;
   }
 
-  // FIXME: The second argument indicates whether the given operator is visible
-  // outside the current file.
-  Operators[OpDecl->getName()] = { OpDecl, true };
+  Operators[OpDecl->getName()] = OpDecl;
 }
 
-static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
+static void insertPrecedenceGroupDecl(ImportResolver &resolver, SourceFile &SF,
                                       PrecedenceGroupDecl *group) {
   auto previousDecl = SF.PrecedenceGroups.find(group->getName());
   if (previousDecl != SF.PrecedenceGroups.end()) {
-    binder.diagnose(group->getLoc(), diag::precedence_group_redeclared);
-    binder.diagnose(previousDecl->second.getPointer(),
-                    diag::previous_precedence_group_decl);
+    resolver.diagnose(group->getLoc(), diag::precedence_group_redeclared);
+    resolver.diagnose(previousDecl->second,
+                      diag::previous_precedence_group_decl);
     return;
   }
 
-  // FIXME: The second argument indicates whether the given precedence
-  // group is visible outside the current file.
-  SF.PrecedenceGroups[group->getName()] = { group, true };  
+  SF.PrecedenceGroups[group->getName()] = group;
 }
 
-/// performNameBinding - Once parsing is complete, this walks the AST to
-/// resolve names and do other top-level validation.
-///
-/// At this point parsing has been performed, but we still have
-/// UnresolvedDeclRefExpr nodes for unresolved value names, and we may have
-/// unresolved type names as well. This handles import directives and forward
-/// references.
-void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
-  SharedTimer timer("Name binding");
+void swift::resolveImportsAndOperators(SourceFile &SF, unsigned StartElem) {
+  SharedTimer timer("Import resolution");
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
   if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {
@@ -410,7 +392,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // FIXME: This is inefficient.
   SF.clearLookupCache();
 
-  NameBinder Binder(SF);
+  ImportResolver Resolver(SF);
 
   SmallVector<SourceFile::ImportedModuleDesc, 8> ImportedModules;
 
@@ -418,15 +400,15 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // and map operator decls.
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     if (auto *ID = dyn_cast<ImportDecl>(D)) {
-      Binder.addImport(ImportedModules, ID);
+      Resolver.addImport(ImportedModules, ID);
     } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(D)) {
-      insertOperatorDecl(Binder, SF.PrefixOperators, OD);
+      insertOperatorDecl(Resolver, SF.PrefixOperators, OD);
     } else if (auto *OD = dyn_cast<PostfixOperatorDecl>(D)) {
-      insertOperatorDecl(Binder, SF.PostfixOperators, OD);
+      insertOperatorDecl(Resolver, SF.PostfixOperators, OD);
     } else if (auto *OD = dyn_cast<InfixOperatorDecl>(D)) {
-      insertOperatorDecl(Binder, SF.InfixOperators, OD);
+      insertOperatorDecl(Resolver, SF.InfixOperators, OD);
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
-      insertPrecedenceGroupDecl(Binder, SF, PGD);
+      insertPrecedenceGroupDecl(Resolver, SF, PGD);
     }
   }
 
@@ -435,4 +417,3 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);
 }
-
