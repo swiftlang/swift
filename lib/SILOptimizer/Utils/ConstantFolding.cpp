@@ -1939,51 +1939,8 @@ ConstantFolder::processWorkList() {
           // Ok, we have succeeded. Add user to the FoldedUsers list and perform
           // the necessary cleanups, RAUWs, etc.
           FoldedUsers.insert(User);
-          ++NumInstFolded;
-
           InvalidateInstructions = true;
-
-          // If the constant produced a tuple, be smarter than RAUW: explicitly
-          // nuke any tuple_extract instructions using the apply.  This is a
-          // common case for functions returning multiple values.
-          if (auto *TI = dyn_cast<TupleInst>(C)) {
-            for (SILValue Result : User->getResults()) {
-              for (auto UI = Result->use_begin(), UE = Result->use_end();
-                   UI != UE;) {
-                Operand *O = *UI++;
-
-                // If the user is a tuple_extract, just substitute the right
-                // value in.
-                if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
-                  SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-                  TEI->replaceAllUsesWith(NewVal);
-                  TEI->dropAllReferences();
-                  FoldedUsers.insert(TEI);
-                  if (auto *Inst = NewVal->getDefiningInstruction())
-                    WorkList.insert(Inst);
-                  continue;
-                }
-
-                if (auto *DTI = dyn_cast<DestructureTupleInst>(O->getUser())) {
-                  SILValue NewVal = TI->getOperand(O->getOperandNumber());
-                  auto OwnershipKind = NewVal.getOwnershipKind();
-                  if (OwnershipKind.isCompatibleWith(
-                          ValueOwnershipKind::Guaranteed)) {
-                    SILValue DTIResult = DTI->getResult(O->getOperandNumber());
-                    DTIResult->replaceAllUsesWith(NewVal);
-                    FoldedUsers.insert(DTI);
-                    if (auto *Inst = NewVal->getDefiningInstruction())
-                      WorkList.insert(Inst);
-                    continue;
-                  }
-                }
-              }
-            }
-
-            if (llvm::all_of(User->getResults(),
-                             [](SILValue v) { return v->use_empty(); }))
-              FoldedUsers.insert(TI);
-          }
+          ++NumInstFolded;
 
           // We were able to fold, so all users should use the new folded
           // value. If we don't have any such users, continue.
