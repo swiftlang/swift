@@ -1390,7 +1390,7 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
     "swift/test/TypeCoercion/overload_noncall.swift",
     "swift/test/expr/capture/nested_class.swift",
     "swift/test/expr/capture/order.swift",
-    "swift/test/NameBinding/name-binding.swift"
+    "swift/test/ImportResolution/name-binding.swift"
   };
   StringRef fileName = SF->getFilename();
   return llvm::any_of(testsThatShouldDiffer, [&](const char *testFile) {
