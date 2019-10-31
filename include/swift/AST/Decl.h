@@ -527,12 +527,13 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+1+2+1+7+1+1+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
     /// Whether this class inherits its superclass's convenience initializers.
     InheritsSuperclassInits : 1,
+    ComputedInheritsSuperclassInits : 1,
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
@@ -3810,9 +3811,24 @@ class ClassDecl final : public NominalTypeDecl {
     Bits.ClassDecl.HasForcedEmittedMembers = true;
   }
 
+  Optional<bool> getCachedInheritsSuperclassInitializers() const {
+    if (Bits.ClassDecl.ComputedInheritsSuperclassInits)
+      return Bits.ClassDecl.InheritsSuperclassInits;
+
+    return None;
+  }
+
+  /// Marks that this class inherits convenience initializers from its
+  /// superclass.
+  void setInheritsSuperclassInitializers(bool value) {
+    Bits.ClassDecl.InheritsSuperclassInits = value;
+    Bits.ClassDecl.ComputedInheritsSuperclassInits = true;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class EmittedMembersRequest;
+  friend class InheritsSuperclassInitializersRequest;
   friend class TypeChecker;
 
 public:
@@ -3969,15 +3985,6 @@ public:
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
   bool inheritsSuperclassInitializers();
-
-  /// Marks that this class inherits convenience initializers from its
-  /// superclass.
-  ///
-  /// This is computed as part of adding implicit initializers.
-  void setInheritsSuperclassInitializers() {
-    assert(addedImplicitInitializers());
-    Bits.ClassDecl.InheritsSuperclassInits = true;
-  }
 
   /// Walks the class hierarchy starting from this class, checking various
   /// conditions.

@@ -1057,3 +1057,17 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "precedence group " << desc.ident << " at ";
   desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
 }
+
+//----------------------------------------------------------------------------//
+// InheritsSuperclassInitializersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedInheritsSuperclassInitializers();
+}
+
+void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setInheritsSuperclassInitializers(value);
+}
