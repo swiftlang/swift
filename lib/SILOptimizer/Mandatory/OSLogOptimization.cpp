@@ -505,7 +505,8 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
 
     VarDecl *propertyDecl = structDecl->getStoredProperties().front();
     SILType propertyType =
-        expectedType.getFieldType(propertyDecl, builder.getModule());
+        expectedType.getFieldType(propertyDecl, builder.getModule(),
+                                  TypeExpansionContext(builder.getFunction()));
     SymbolicValue propertyVal = symVal.lookThroughSingleElementAggregates();
     SILValue newPropertySIL = emitCodeForSymbolicValue(
         propertyVal, propertyType, builder, loc, stringInfo);
@@ -734,9 +735,11 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   StructDecl *structDecl = osLogMessageType.getStructOrBoundGenericStruct();
   assert(structDecl);
 
+  auto typeExpansionContext =
+      TypeExpansionContext(*osLogMessage->getFunction());
   VarDecl *interpolationPropDecl = structDecl->getStoredProperties().front();
-  SILType osLogInterpolationType =
-      osLogMessageType.getFieldType(interpolationPropDecl, module);
+  SILType osLogInterpolationType = osLogMessageType.getFieldType(
+      interpolationPropDecl, module, typeExpansionContext);
   StructDecl *interpolationStruct =
       osLogInterpolationType.getStructOrBoundGenericStruct();
   assert(interpolationStruct);

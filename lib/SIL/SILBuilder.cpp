@@ -49,15 +49,14 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   return createTuple(loc, tupleType, elts);
 }
 
-SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
-                                        SILModule &M,
-                                        SubstitutionMap subs,
-                                        ParameterConvention calleeConvention,
-                                        PartialApplyInst::OnStackKind onStack) {
+SILType SILBuilder::getPartialApplyResultType(
+    TypeExpansionContext context, SILType origTy, unsigned argCount,
+    SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
+    PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
-    FTI = FTI->substGenericArgs(M, subs);
-  
+    FTI = FTI->substGenericArgs(M, subs, context);
+
   assert(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");
   auto params = FTI->getParameters();
@@ -104,7 +103,8 @@ ProjectBoxInst *SILBuilder::createProjectBox(SILLocation Loc,
                                              SILValue boxOperand,
                                              unsigned index) {
   auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-  auto fieldTy = getSILBoxFieldType(boxTy, getModule().Types, index);
+  auto fieldTy = getSILBoxFieldType(getTypeExpansionContext(), boxTy,
+                                    getModule().Types, index);
 
   return insert(new (getModule()) ProjectBoxInst(
       getSILDebugLocation(Loc), boxOperand, index, fieldTy));
@@ -511,11 +511,11 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
 ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
                                                    SILType MetatypeTy,
                                                    SILValue Base) {
-  assert(
-      Base->getType().isLoweringOf(
-          getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
-      "value_metatype result must be formal metatype of the lowered operand "
-      "type");
+  assert(Base->getType().isLoweringOf(
+             getTypeExpansionContext(), getModule(),
+             MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
+         "value_metatype result must be formal metatype of the lowered operand "
+         "type");
   return insert(new (getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
                                                       MetatypeTy, Base));
 }
@@ -541,7 +541,8 @@ void SILBuilder::emitDestructureValueOperation(
 
   // In non qualified ownership SIL, drop back to using projection code.
   SmallVector<Projection, 16> projections;
-  Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
   llvm::transform(projections, std::back_inserter(results),
                   [&](const Projection &p) -> SILValue {
                     return p.createObjectProjection(*this, loc, v).get();
@@ -562,7 +563,8 @@ void SILBuilder::emitDestructureAddressOperation(
   }
 
   SmallVector<Projection, 16> projections;
-  Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
   llvm::transform(projections, std::back_inserter(results),
                   [&](const Projection &p) -> SILValue {
                     return p.createAddressProjection(*this, loc, v).get();

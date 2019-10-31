@@ -110,6 +110,9 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id,
                            SILType Type);
 
+    SILType getSILType(Type ty, SILValueCategory category,
+                       SILFunction *inContext);
+
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);

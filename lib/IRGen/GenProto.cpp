@@ -3186,7 +3186,8 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
 }
 
 FunctionPointer
-irgen::emitWitnessMethodValue(IRGenFunction &IGF,
+irgen::emitWitnessMethodValue(TypeExpansionContext expansionContext,
+                              IRGenFunction &IGF,
                               llvm::Value *wtable,
                               SILDeclRef member) {
   auto *fn = cast<AbstractFunctionDecl>(member.getDecl());
@@ -3201,7 +3202,8 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
                                      index.forProtocolWitnessTable());
 
-  auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(member);
+  auto fnType =
+      IGF.IGM.getSILTypes().getConstantFunctionType(expansionContext, member);
   Signature signature = IGF.IGM.getSignature(fnType);
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
                                            signature.getType()->getPointerTo());
@@ -3209,16 +3211,14 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   return FunctionPointer(witnessFnPtr, signature);
 }
 
-FunctionPointer
-irgen::emitWitnessMethodValue(IRGenFunction &IGF,
-                              CanType baseTy,
-                              llvm::Value **baseMetadataCache,
-                              SILDeclRef member,
-                              ProtocolConformanceRef conformance) {
+FunctionPointer irgen::emitWitnessMethodValue(
+    TypeExpansionContext expansionContext, IRGenFunction &IGF, CanType baseTy,
+    llvm::Value **baseMetadataCache, SILDeclRef member,
+    ProtocolConformanceRef conformance) {
   llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
                                             conformance);
 
-  return emitWitnessMethodValue(IGF, wtable, member);
+  return emitWitnessMethodValue(expansionContext, IGF, wtable, member);
 }
 
 llvm::Value *irgen::computeResilientWitnessTableIndex(

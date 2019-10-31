@@ -1045,7 +1045,8 @@ static bool mayContainReference(SILType Ty, const SILFunction &F) {
 
   if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
     for (auto *Field : Str->getStoredProperties()) {
-      if (mayContainReference(Ty.getFieldType(Field, Mod), F))
+      if (mayContainReference(
+              Ty.getFieldType(Field, Mod, TypeExpansionContext(F)), F))
         return true;
     }
     return false;
@@ -1059,8 +1060,9 @@ static bool mayContainReference(SILType Ty, const SILFunction &F) {
   }
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->hasAssociatedValues()
-          && mayContainReference(Ty.getEnumElementType(ElemDecl, Mod), F))
+      if (ElemDecl->hasAssociatedValues() &&
+          mayContainReference(
+              Ty.getEnumElementType(ElemDecl, Mod, TypeExpansionContext(F)), F))
         return true;
     }
     return false;

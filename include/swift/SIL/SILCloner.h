@@ -128,14 +128,15 @@ public:
   /// blocks.
   ///
   /// This is used to clone an entire function and should not mutate the
-  /// original function.
+  /// original function except if \p replaceOriginalFunctionInPlace is true.
   ///
   /// entryArgs must have a SILValue from the cloned function corresponding to
   /// each argument in the original function `F`.
   ///
   /// Cloned instructions are inserted starting at the end of clonedEntryBB.
   void cloneFunctionBody(SILFunction *F, SILBasicBlock *clonedEntryBB,
-                         ArrayRef<SILValue> entryArgs);
+                         ArrayRef<SILValue> entryArgs,
+                         bool replaceOriginalFunctionInPlace = false);
 
   /// MARK: Callback utilities used from CRTP extensions during cloning.
   /// These should only be called from within an instruction cloning visitor.
@@ -354,8 +355,14 @@ protected:
 
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
-  SILType remapType(SILType Ty) { return Ty; }
-  CanType remapASTType(CanType Ty) { return Ty; }
+  SILType remapType(SILType Ty) {
+      return Ty;
+  }
+
+  CanType remapASTType(CanType Ty) {
+    return Ty;
+  }
+
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
     return C;
   }
@@ -612,9 +619,11 @@ void SILCloner<ImplClass>::cloneReachableBlocks(
 template <typename ImplClass>
 void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
                                              SILBasicBlock *clonedEntryBB,
-                                             ArrayRef<SILValue> entryArgs) {
+                                             ArrayRef<SILValue> entryArgs,
+                                             bool replaceOriginalFunctionInPlace) {
 
-  assert(F != clonedEntryBB->getParent() && "Must clone into a new function.");
+  assert((replaceOriginalFunctionInPlace || F != clonedEntryBB->getParent()) &&
+         "Must clone into a new function.");
   assert(BBMap.empty() && "This API does not allow clients to map blocks.");
   assert(ValueMap.empty() && "Stale ValueMap.");
 
@@ -972,9 +981,9 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
                                     getOpLocation(Inst->getLoc()), OpFunction));
 }
 
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) {
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDynamicFunctionRefInst(
+    DynamicFunctionRefInst *Inst) {
   SILFunction *OpFunction =
       getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2049,8 +2058,11 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
     if (Ty != newLookupType) {
-      assert(Ty->isExactSuperclassOf(newLookupType) &&
-             "Should only create upcasts for sub class.");
+      assert(
+          (Ty->isExactSuperclassOf(newLookupType) ||
+           getBuilder().getModule().Types.getLoweredRValueType(
+               getBuilder().getTypeExpansionContext(), Ty) == newLookupType) &&
+          "Should only create upcasts for sub class.");
 
       // We use the super class as the new look up type.
       newLookupType = Ty;

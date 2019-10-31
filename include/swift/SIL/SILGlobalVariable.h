@@ -105,7 +105,12 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType.castTo<SILFunctionType>();
   }
-    
+  SILType getLoweredTypeInContext(TypeExpansionContext context) const;
+  CanSILFunctionType
+  getLoweredFunctionTypeInContext(TypeExpansionContext context) const {
+    return getLoweredTypeInContext(context).castTo<SILFunctionType>();
+  }
+
   StringRef getName() const { return Name; }
   
   void setDeclaration(bool isD) { IsDeclaration = isD; }

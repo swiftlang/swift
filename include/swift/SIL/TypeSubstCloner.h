@@ -90,7 +90,8 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             // Use the new set of substitutions to compute the new
             // substituted callee type.
             RecursiveSubstCalleeSILType = LoweredFnTy->substGenericArgs(
-                AI.getModule(), RecursiveSubs);
+                AI.getModule(), RecursiveSubs,
+                Builder.getTypeExpansionContext());
           }
 
           // The specialized recursive function may have different calling
@@ -109,7 +110,8 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       assert(Subs.empty() ||
              SubstCalleeSILType ==
-                 Callee->getType().substGenericArgs(AI.getModule(), Subs));
+                 Callee->getType().substGenericArgs(
+                     AI.getModule(), Subs, Builder.getTypeExpansionContext()));
     }
 
     ArrayRef<SILValue> getArguments() const {
@@ -168,17 +170,40 @@ protected:
     SILType &Sty = TypeCache[Ty];
     if (!Sty) {
       Sty = Ty.subst(Original.getModule(), SubsMap);
+      if (!Sty.getASTType()->hasOpaqueArchetype() ||
+          !getBuilder()
+               .getTypeExpansionContext()
+               .shouldLookThroughOpaqueTypeArchetypes())
+        return Sty;
+      // Remap types containing opaque result types in the current context.
+      Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
+          Sty.getCategory());
     }
     return Sty;
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SubsMap)->getCanonicalType();
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    if (!substTy->hasOpaqueArchetype() ||
+        !getBuilder().getTypeExpansionContext()
+            .shouldLookThroughOpaqueTypeArchetypes())
+      return substTy;
+    // Remap types containing opaque result types in the current context.
+    return getBuilder().getModule().Types.getLoweredRValueType(
+        TypeExpansionContext(getBuilder().getFunction()), substTy);
   }
 
-  ProtocolConformanceRef remapConformance(Type type,
+  ProtocolConformanceRef remapConformance(Type ty,
                                           ProtocolConformanceRef conf) {
-    return conf.subst(type, SubsMap);
+    auto conformance = conf.subst(ty, SubsMap);
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    auto context = getBuilder().getTypeExpansionContext();
+    if (substTy->hasOpaqueArchetype() &&
+        context.shouldLookThroughOpaqueTypeArchetypes()) {
+      conformance =
+          substOpaqueTypesWithUnderlyingTypes(conformance, substTy, context);
+    }
+    return conformance;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {

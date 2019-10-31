@@ -376,7 +376,7 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
 
   // FIXME: Expansion
   auto &TL = Module->Types.getTypeLowering(Property->getType(),
-                                           ResilienceExpansion::Minimal);
+                                           TypeExpansionContext::minimal());
   if (!TL.isTrivial()) {
      LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
                              << "' is not of trivial type\n");

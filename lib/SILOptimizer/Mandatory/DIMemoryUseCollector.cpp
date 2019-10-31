@@ -63,7 +63,8 @@ static void gatherDestroysOfContainer(const MarkUninitializedInst *MUI,
 //                     DIMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
-static unsigned getElementCountRec(SILModule &Module, SILType T,
+static unsigned getElementCountRec(TypeExpansionContext context,
+                                   SILModule &Module, SILType T,
                                    bool IsSelfOfNonDelegatingInitializer) {
   // If this is a tuple, it is always recursively flattened.
   if (CanTupleType TT = T.getAs<TupleType>()) {
@@ -71,7 +72,7 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
     unsigned NumElements = 0;
     for (unsigned i = 0, e = TT->getNumElements(); i < e; i++)
       NumElements +=
-          getElementCountRec(Module, T.getTupleElementType(i), false);
+          getElementCountRec(context, Module, T.getTupleElementType(i), false);
     return NumElements;
   }
 
@@ -83,8 +84,8 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
     if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
-        NumElements +=
-            getElementCountRec(Module, T.getFieldType(VD, Module), false);
+        NumElements += getElementCountRec(
+            context, Module, T.getFieldType(VD, Module, context), false);
       return NumElements;
     }
   }
@@ -134,7 +135,8 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
 
   // Otherwise, we break down the initializer.
   NumElements =
-      getElementCountRec(Module, MemorySILType, isNonDelegatingInit());
+      getElementCountRec(TypeExpansionContext(*MI->getFunction()), Module,
+                         MemorySILType, isNonDelegatingInit());
 
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
@@ -152,16 +154,18 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
 }
 
 /// Given a symbolic element number, return the type of the element.
-static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
+static SILType getElementTypeRec(TypeExpansionContext context,
+                                 SILModule &Module, SILType T, unsigned EltNo,
                                  bool IsSelfOfNonDelegatingInitializer) {
   // If this is a tuple type, walk into it.
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
       auto FieldType = T.getTupleElementType(i);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
+      unsigned NumFieldElements =
+          getElementCountRec(context, Module, FieldType, false);
       if (EltNo < NumFieldElements)
-        return getElementTypeRec(Module, FieldType, EltNo, false);
+        return getElementTypeRec(context, Module, FieldType, EltNo, false);
       EltNo -= NumFieldElements;
     }
     // This can only happen if we look at a symbolic element number of an empty
@@ -177,11 +181,11 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
       bool HasStoredProperties = false;
       for (auto *VD : NTD->getStoredProperties()) {
         HasStoredProperties = true;
-        auto FieldType = T.getFieldType(VD, Module);
+        auto FieldType = T.getFieldType(VD, Module, context);
         unsigned NumFieldElements =
-            getElementCountRec(Module, FieldType, false);
+            getElementCountRec(context, Module, FieldType, false);
         if (EltNo < NumFieldElements)
-          return getElementTypeRec(Module, FieldType, EltNo, false);
+          return getElementTypeRec(context, Module, FieldType, EltNo, false);
         EltNo -= NumFieldElements;
       }
 
@@ -202,7 +206,8 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
 /// getElementTypeRec - Return the swift type of the specified element.
 SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
   auto &Module = MemoryInst->getModule();
-  return getElementTypeRec(Module, MemorySILType, EltNo, isNonDelegatingInit());
+  return getElementTypeRec(TypeExpansionContext(*MemoryInst->getFunction()),
+                           Module, MemorySILType, EltNo, isNonDelegatingInit());
 }
 
 /// computeTupleElementAddress - Given a tuple element number (in the flattened
@@ -225,7 +230,8 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
       unsigned FieldNo = 0;
       for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
         auto EltTy = PointeeType.getTupleElementType(i);
-        unsigned NumSubElt = getElementCountRec(Module, EltTy, false);
+        unsigned NumSubElt = getElementCountRec(
+            TypeExpansionContext(B.getFunction()), Module, EltTy, false);
         if (EltNo < NumSubElt) {
           Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
           PointeeType = EltTy;
@@ -255,10 +261,11 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
               EndBorrowList.emplace_back(Borrowed, Original);
             }
           }
-
-          auto FieldType = PointeeType.getFieldType(VD, Module);
+          auto expansionContext = TypeExpansionContext(B.getFunction());
+          auto FieldType =
+              PointeeType.getFieldType(VD, Module, expansionContext);
           unsigned NumFieldElements =
-              getElementCountRec(Module, FieldType, false);
+              getElementCountRec(expansionContext, Module, FieldType, false);
           if (EltNo < NumFieldElements) {
             if (isa<StructDecl>(NTD)) {
               Ptr = B.createStructElementAddr(Loc, Ptr, VD);
@@ -300,7 +307,8 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static void getPathStringToElementRec(SILModule &Module, SILType T,
+static void getPathStringToElementRec(TypeExpansionContext context,
+                                      SILModule &Module, SILType T,
                                       unsigned EltNo, std::string &Result) {
   CanTupleType TT = T.getAs<TupleType>();
   if (!TT) {
@@ -313,7 +321,7 @@ static void getPathStringToElementRec(SILModule &Module, SILType T,
   for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
-    unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
+    unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
 
     if (EltNo < NumFieldElements) {
       Result += '.';
@@ -321,7 +329,7 @@ static void getPathStringToElementRec(SILModule &Module, SILType T,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
+      return getPathStringToElementRec(context, Module, FieldTy, EltNo, Result);
     }
 
     EltNo -= NumFieldElements;
@@ -346,14 +354,16 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
     Result = "<unknown>";
 
   // If this is indexing into a field of 'self', look it up.
+  auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   if (isNonDelegatingInit() && !isDerivedClassSelfOnly()) {
     if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
       bool HasStoredProperty = false;
       for (auto *VD : NTD->getStoredProperties()) {
         HasStoredProperty = true;
-        auto FieldType = MemorySILType.getFieldType(VD, Module);
+        auto FieldType =
+            MemorySILType.getFieldType(VD, Module, expansionContext);
         unsigned NumFieldElements =
-            getElementCountRec(Module, FieldType, false);
+            getElementCountRec(expansionContext, Module, FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
           auto originalProperty = VD->getOriginalWrappedProperty();
@@ -362,7 +372,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
           } else {
             Result += VD->getName().str();
           }
-          getPathStringToElementRec(Module, FieldType, Element, Result);
+          getPathStringToElementRec(expansionContext, Module, FieldType,
+                                    Element, Result);
           return VD;
         }
         Element -= NumFieldElements;
@@ -375,7 +386,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
   }
 
   // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(Module, MemorySILType, Element, Result);
+  getPathStringToElementRec(expansionContext, Module, MemorySILType, Element,
+                            Result);
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
@@ -402,9 +414,11 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
     return false;
   }
 
+  auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   for (auto *VD : NTD->getStoredProperties()) {
-    auto FieldType = MemorySILType.getFieldType(VD, Module);
-    unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
+    auto FieldType = MemorySILType.getFieldType(VD, Module, expansionContext);
+    unsigned NumFieldElements =
+        getElementCountRec(expansionContext, Module, FieldType, false);
     if (Element < NumFieldElements)
       return VD->isLet();
     Element -= NumFieldElements;
@@ -591,7 +605,8 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
   unsigned NumElements = 1;
   if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
     NumElements =
-        getElementCountRec(Module, UseTy, IsSelfOfNonDelegatingInitializer);
+        getElementCountRec(TypeExpansionContext(*User->getFunction()), Module,
+                           UseTy, IsSelfOfNonDelegatingInitializer);
 
   trackUse(DIMemoryUse(User, Kind, BaseEltNo, NumElements));
 }
@@ -617,7 +632,8 @@ void ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
   if (T.is<TupleType>()) {
     for (unsigned i = 0; i != FieldNo; ++i) {
       SILType EltTy = T.getTupleElementType(i);
-      BaseEltNo += getElementCountRec(Module, EltTy, false);
+      BaseEltNo += getElementCountRec(TypeExpansionContext(*TEAI->getFunction()),
+                                      Module, EltTy, false);
     }
   }
 
@@ -644,7 +660,8 @@ void ElementUseCollector::collectDestructureTupleResultUses(
   if (T.is<TupleType>()) {
     for (unsigned i = 0; i != FieldNo; ++i) {
       SILType EltTy = T.getTupleElementType(i);
-      BaseEltNo += getElementCountRec(Module, EltTy, false);
+      BaseEltNo += getElementCountRec(TypeExpansionContext(*DTR->getFunction()),
+                                      Module, EltTy, false);
     }
   }
 
@@ -670,8 +687,9 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     if (SEAI->getField() == VD)
       break;
 
-    auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module);
-    BaseEltNo += getElementCountRec(Module, FieldType, false);
+    auto expansionContext = TypeExpansionContext(*SEAI->getFunction());
+    auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module, expansionContext);
+    BaseEltNo += getElementCountRec(expansionContext, Module, FieldType, false);
   }
 
   collectUses(SEAI, BaseEltNo);
@@ -1119,8 +1137,11 @@ void ElementUseCollector::collectClassSelfUses() {
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
       EltNumbering[VD] = NumElements;
-      NumElements +=
-          getElementCountRec(Module, T.getFieldType(VD, Module), false);
+      auto expansionContext =
+          TypeExpansionContext(*TheMemory.MemoryInst->getFunction());
+      NumElements += getElementCountRec(
+          expansionContext, Module,
+          T.getFieldType(VD, Module, expansionContext), false);
     }
   }
 

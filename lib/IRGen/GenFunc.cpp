@@ -1138,8 +1138,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   FunctionPointer fnPtr = [&]() -> FunctionPointer {
     // If we found a function pointer statically, great.
     if (staticFnPtr) {
-      assert(staticFnPtr->getPointer()->getType() == fnTy &&
-             "static function type mismatch?!");
+      if (staticFnPtr->getPointer()->getType() != fnTy) {
+        auto fnPtr = staticFnPtr->getPointer();
+        fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
+        return FunctionPointer(fnPtr, origSig);
+      }
       return *staticFnPtr;
     }
 

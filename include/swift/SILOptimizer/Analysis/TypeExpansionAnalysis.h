@@ -32,7 +32,8 @@ public:
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
-  const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod);
+  const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod,
+                                             TypeExpansionContext context);
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {

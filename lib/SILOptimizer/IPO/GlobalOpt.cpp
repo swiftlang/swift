@@ -264,7 +264,8 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
     Serialized = IsSerialized;
   }
 
-  auto refType = M.Types.getLoweredRValueType(varDecl->getInterfaceType());
+  auto refType = M.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                              varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType,

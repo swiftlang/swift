@@ -2591,7 +2591,7 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
   auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
-      enumInstr->getElement(), F->getModule());
+      enumInstr->getElement(), F->getModule(), TypeExpansionContext(*F));
   SingleValueInstruction *newInstr = nullptr;
   if (newType.isAddress()) {
     newType = newType.getObjectType();
@@ -2624,7 +2624,7 @@ bool LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst(
   GenericEnvironment *genEnv = F->getGenericEnvironment();
   SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
   auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
-      enumInstr->getElement(), F->getModule());
+      enumInstr->getElement(), F->getModule(), TypeExpansionContext(*F));
   SingleValueInstruction *newInstr = nullptr;
   if (caseTy != origType.getObjectType()) {
     auto *takeEnum = enumBuilder.createUncheckedTakeEnumDataAddr(

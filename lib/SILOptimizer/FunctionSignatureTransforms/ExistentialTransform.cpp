@@ -517,7 +517,8 @@ void ExistentialTransform::populateThunkBody() {
       MakeAbstractConformanceForGenericType());
 
   /// Perform the substitutions.
-  auto SubstCalleeType = GenCalleeType->substGenericArgs(M, SubMap);
+  auto SubstCalleeType = GenCalleeType->substGenericArgs(
+      M, SubMap, Builder.getTypeExpansionContext());
 
   /// Obtain the Result Type.
   SILValue ReturnValue;

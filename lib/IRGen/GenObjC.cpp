@@ -858,8 +858,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     auto &callee = emission.getCallee();
     auto resultType =
     callee.getOrigFunctionType()->getDirectFormalResultsType(IGM.getSILModule());
-    subIGF.emitScalarReturn(resultType, result, true /*isSwiftCCReturn*/,
-                            false);
+    subIGF.emitScalarReturn(resultType, resultType, result,
+                            true /*isSwiftCCReturn*/, false);
   }
   
   return fwd;
@@ -1018,8 +1018,9 @@ static SILDeclRef getObjCMethodRef(AbstractFunctionDecl *method) {
 }
 
 static CanSILFunctionType getObjCMethodType(IRGenModule &IGM,
-                                            AbstractFunctionDecl *method) {  
-  return IGM.getSILTypes().getConstantFunctionType(getObjCMethodRef(method));
+                                            AbstractFunctionDecl *method) {
+  return IGM.getSILTypes().getConstantFunctionType(
+      TypeExpansionContext::minimal(), getObjCMethodRef(method));
 }
 
 static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,

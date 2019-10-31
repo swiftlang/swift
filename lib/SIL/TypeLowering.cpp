@@ -92,7 +92,7 @@ static bool hasSingletonMetatype(CanType instanceType) {
 }
 
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
-                                              ResilienceExpansion expansion) {
+                                              TypeExpansionContext expansion) {
   auto decl = capture.getDecl();
   auto *var = cast<VarDecl>(decl);
   assert(var->hasStorage() &&
@@ -103,7 +103,11 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // by its address (like a var) instead.
   if (!var->supportsMutation() &&
       (Context.LangOpts.EnableSILOpaqueValues ||
-       !getTypeLowering(var->getType(), expansion).isAddressOnly()))
+       !getTypeLowering(
+            var->getType(),
+            TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                expansion.getResilienceExpansion()))
+            .isAddressOnly()))
     return CaptureKind::Constant;
 
   // In-out parameters are captured by address.
@@ -132,7 +136,7 @@ using RecursiveProperties = TypeLowering::RecursiveProperties;
 
 static RecursiveProperties
 classifyType(CanType type, TypeConverter &TC, CanGenericSignature sig,
-             ResilienceExpansion expansion);
+             TypeExpansionContext expansion);
 
 namespace {
   /// A CRTP helper class for doing things that depends on type
@@ -143,9 +147,9 @@ namespace {
   protected:
     TypeConverter &TC;
     CanGenericSignature Sig;
-    ResilienceExpansion Expansion;
+    TypeExpansionContext Expansion;
     TypeClassifierBase(TypeConverter &TC, CanGenericSignature Sig,
-                       ResilienceExpansion Expansion)
+                       TypeExpansionContext Expansion)
       : TC(TC), Sig(Sig), Expansion(Expansion) {}
 
   public:
@@ -326,7 +330,7 @@ namespace {
       auto referentType = type->getReferentType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
-            ->isLoadable(Expansion)) { \
+            ->isLoadable(Expansion.getResilienceExpansion())) { \
         return asImpl().visitLoadable##Name##StorageType(type); \
       } else { \
         return asImpl().visitAddressOnly##Name##StorageType(type); \
@@ -337,6 +341,13 @@ namespace {
       return asImpl().handleTrivial(type); \
     }
 #include "swift/AST/ReferenceStorage.def"
+
+    RetTy visitOpaqueTypeArchetypeType(CanOpaqueTypeArchetypeType ty) {
+      auto replacedTy = substOpaqueTypesWithUnderlyingTypes(ty, Expansion);
+      if (replacedTy == ty)
+        return visitArchetypeType(ty);
+      return this->visit(replacedTy);
+    }
 
     RetTy visitArchetypeType(CanArchetypeType type) {
       if (type->requiresClass()) {
@@ -448,7 +459,7 @@ namespace {
       public TypeClassifierBase<TypeClassifier, RecursiveProperties> {
   public:
     TypeClassifier(TypeConverter &TC, CanGenericSignature Sig,
-                   ResilienceExpansion Expansion)
+                   TypeExpansionContext Expansion)
         : TypeClassifierBase(TC, Sig, Expansion) {}
 
     RecursiveProperties handle(CanType type, RecursiveProperties properties) {
@@ -502,7 +513,7 @@ namespace {
 
 static RecursiveProperties classifyType(CanType type, TypeConverter &tc,
                                         CanGenericSignature sig,
-                                        ResilienceExpansion expansion) {
+                                        TypeExpansionContext expansion) {
   return TypeClassifier(tc, sig, expansion).visit(type);
 }
 
@@ -511,7 +522,7 @@ static RecursiveProperties classifyType(CanType type, TypeConverter &tc,
 /// something of unknown size.
 bool SILType::isAddressOnly(CanType type, TypeConverter &tc,
                             CanGenericSignature sig,
-                            ResilienceExpansion expansion) {
+                            TypeExpansionContext expansion) {
   return classifyType(type, tc, sig, expansion).isAddressOnly();
 }
 
@@ -523,7 +534,7 @@ namespace {
   protected:
     LoadableTypeLowering(SILType type, RecursiveProperties properties,
                          IsReferenceCounted_t isRefCounted,
-                         ResilienceExpansion forExpansion)
+                         TypeExpansionContext forExpansion)
       : TypeLowering(type, properties, isRefCounted, forExpansion) {}
 
   public:
@@ -550,7 +561,7 @@ namespace {
   class TrivialTypeLowering final : public LoadableTypeLowering {
   public:
     TrivialTypeLowering(SILType type, RecursiveProperties properties,
-                        ResilienceExpansion forExpansion)
+                        TypeExpansionContext forExpansion)
       : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
                              forExpansion) {
       assert(properties.isFixedABI());
@@ -620,7 +631,7 @@ namespace {
     NonTrivialLoadableTypeLowering(SILType type,
                                    RecursiveProperties properties,
                                    IsReferenceCounted_t isRefCounted,
-                                   ResilienceExpansion forExpansion)
+                                   TypeExpansionContext forExpansion)
       : LoadableTypeLowering(type, properties, isRefCounted, forExpansion) {
       assert(!properties.isTrivial());
     }
@@ -713,7 +724,7 @@ namespace {
     
   public:
     LoadableAggTypeLowering(CanType type, RecursiveProperties properties,
-                            ResilienceExpansion forExpansion)
+                            TypeExpansionContext forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
                                        properties, IsNotReferenceCounted,
                                        forExpansion) {
@@ -832,7 +843,7 @@ namespace {
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
   public:
     LoadableTupleTypeLowering(CanType type, RecursiveProperties properties,
-                              ResilienceExpansion forExpansion)
+                              TypeExpansionContext forExpansion)
       : LoadableAggTypeLowering(type, properties, forExpansion) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
@@ -857,7 +868,7 @@ namespace {
       unsigned index = 0;
       for (auto elt : tupleTy.getElementTypes()) {
         auto silElt = SILType::getPrimitiveType(elt, silTy.getCategory());
-        auto &eltTL = TC.getTypeLowering(silElt, getResilienceExpansion());
+        auto &eltTL = TC.getTypeLowering(silElt, getExpansionContext());
         children.push_back(Child{index, eltTL});
         ++index;
       }
@@ -869,7 +880,7 @@ namespace {
       : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
   public:
     LoadableStructTypeLowering(CanType type, RecursiveProperties properties,
-                               ResilienceExpansion forExpansion)
+                               TypeExpansionContext forExpansion)
       : LoadableAggTypeLowering(type, properties, forExpansion) {}
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
@@ -892,8 +903,8 @@ namespace {
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
-        SILType propTy = silTy.getFieldType(prop, TC);
-        auto &propTL = TC.getTypeLowering(propTy, getResilienceExpansion());
+        SILType propTy = silTy.getFieldType(prop, TC, getExpansionContext());
+        auto &propTL = TC.getTypeLowering(propTy, getExpansionContext());
         children.push_back(Child{prop, propTL});
       }
     }
@@ -903,7 +914,7 @@ namespace {
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
     LoadableEnumTypeLowering(CanType type, RecursiveProperties properties,
-                             ResilienceExpansion forExpansion)
+                             TypeExpansionContext forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
                                        properties,
                                        IsNotReferenceCounted,
@@ -946,7 +957,7 @@ namespace {
   public:
     LeafLoadableTypeLowering(SILType type, RecursiveProperties properties,
                              IsReferenceCounted_t isRefCounted,
-                             ResilienceExpansion forExpansion)
+                             TypeExpansionContext forExpansion)
       : NonTrivialLoadableTypeLowering(type, properties, isRefCounted,
                                        forExpansion) {}
 
@@ -966,7 +977,7 @@ namespace {
   /// loadable.
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
-    ReferenceTypeLowering(SILType type, ResilienceExpansion forExpansion)
+    ReferenceTypeLowering(SILType type, TypeExpansionContext forExpansion)
       : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(),
                                  IsReferenceCounted, forExpansion) {}
 
@@ -998,7 +1009,7 @@ namespace {
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
   public: \
     Loadable##Name##TypeLowering(SILType type, \
-                                 ResilienceExpansion forExpansion) \
+                                 TypeExpansionContext forExpansion) \
       : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(), \
                                  IsReferenceCounted, \
                                  forExpansion) {} \
@@ -1024,7 +1035,7 @@ namespace {
   class AddressOnlyTypeLowering : public TypeLowering {
   public:
     AddressOnlyTypeLowering(SILType type, RecursiveProperties properties,
-                            ResilienceExpansion forExpansion)
+                            TypeExpansionContext forExpansion)
       : TypeLowering(type, properties, IsNotReferenceCounted,
                      forExpansion) {
       assert(properties.isAddressOnly());
@@ -1096,7 +1107,7 @@ namespace {
   class UnsafeValueBufferTypeLowering : public AddressOnlyTypeLowering {
   public:
     UnsafeValueBufferTypeLowering(SILType type,
-                                  ResilienceExpansion forExpansion)
+                                  TypeExpansionContext forExpansion)
       : AddressOnlyTypeLowering(type,
                                 {IsNotTrivial, IsFixedABI,
                                  IsAddressOnly, IsNotResilient},
@@ -1127,7 +1138,7 @@ namespace {
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
     OpaqueValueTypeLowering(SILType type, RecursiveProperties properties,
-                            ResilienceExpansion forExpansion)
+                            TypeExpansionContext forExpansion)
       : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
                                  forExpansion) {}
 
@@ -1169,7 +1180,7 @@ namespace {
     IsDependent_t Dependent;
   public:
     LowerType(TypeConverter &TC, CanGenericSignature Sig,
-              ResilienceExpansion Expansion, IsDependent_t Dependent)
+              TypeExpansionContext Expansion, IsDependent_t Dependent)
       : TypeClassifierBase(TC, Sig, Expansion), Dependent(Dependent) {}
 
     TypeLowering *handleTrivial(CanType type) {
@@ -1249,7 +1260,8 @@ namespace {
         // Note: if the type is in a different module, the lowering does
         // not depend on the resilience expansion, so we do not need to set
         // the isResilent() flag above.
-        if (!sameModule || Expansion == ResilienceExpansion::Minimal) {
+        if (!sameModule || Expansion.getResilienceExpansion() ==
+                               ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
           return true;
         }
@@ -1362,7 +1374,7 @@ void *TypeLowering::operator new(size_t size, TypeConverter &tc,
   return tc.IndependentBPA.Allocate(size, alignof(TypeLowering&));
 }
 
-const TypeLowering *TypeConverter::find(TypeKey k) {
+const TypeLowering **TypeConverter::find(TypeKey k) {
   if (!k.isCacheable()) return nullptr;
 
   auto ck = k.getCachingKey();
@@ -1380,7 +1392,7 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
     return nullptr;
 
   assert(found->second && "type recursion not caught in Sema");
-  return found->second;
+  return &found->second;
 }
 
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
@@ -1393,13 +1405,13 @@ void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
   } else {
     types = &IndependentTypes;
   }
-
   (*types)[k.getCachingKey()] = tl;
 }
 
 /// Lower each of the elements of the substituted type according to
 /// the abstraction pattern of the given original type.
 static CanTupleType computeLoweredTupleType(TypeConverter &tc,
+                                            TypeExpansionContext context,
                                             AbstractionPattern origType,
                                             CanTupleType substType) {
   assert(origType.matchesTuple(substType));
@@ -1422,7 +1434,7 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
     assert(!Flags.isVariadic());
 
     CanType loweredSubstEltType =
-        tc.getLoweredRValueType(origEltType, substEltType);
+        tc.getLoweredRValueType(context, origEltType, substEltType);
     changed = (changed || substEltType != loweredSubstEltType ||
                !Flags.isNone());
 
@@ -1444,14 +1456,14 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
 }
 
 static CanType computeLoweredOptionalType(TypeConverter &tc,
+                                          TypeExpansionContext context,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           CanType substObjectType) {
   assert(substType.getOptionalObjectType() == substObjectType);
 
-  CanType loweredObjectType =
-      tc.getLoweredRValueType(origType.getOptionalObjectType(),
-                              substObjectType);
+  CanType loweredObjectType = tc.getLoweredRValueType(
+      context, origType.getOptionalObjectType(), substObjectType);
 
   // If the object type didn't change, we don't have to rebuild anything.
   if (loweredObjectType == substObjectType) {
@@ -1464,11 +1476,12 @@ static CanType computeLoweredOptionalType(TypeConverter &tc,
 
 static CanType
 computeLoweredReferenceStorageType(TypeConverter &tc,
+                                   TypeExpansionContext context,
                                    AbstractionPattern origType,
                                    CanReferenceStorageType substType) {
-  CanType loweredReferentType =
-    tc.getLoweredRValueType(origType.getReferenceStorageReferentType(),
-                            substType.getReferentType());
+  CanType loweredReferentType = tc.getLoweredRValueType(
+      context, origType.getReferenceStorageReferentType(),
+      substType.getReferentType());
 
   if (loweredReferentType == substType.getReferentType())
     return substType;
@@ -1478,25 +1491,102 @@ computeLoweredReferenceStorageType(TypeConverter &tc,
 }
 
 CanSILFunctionType
-TypeConverter::getSILFunctionType(AbstractionPattern origType,
+TypeConverter::getSILFunctionType(TypeExpansionContext context,
+                                  AbstractionPattern origType,
                                   CanFunctionType substType) {
   return cast<SILFunctionType>(
-    getLoweredRValueType(origType, substType));
+      getLoweredRValueType(context, origType, substType));
+}
+
+void TypeConverter::verifyLoweringList(const TypeLowering *start) {
+  auto *currLowering = start;
+  llvm::SmallPtrSet<const TypeLowering *, 16> once;
+  while (currLowering) {
+    assert(once.insert(currLowering).second);
+    auto *nextLowering = currLowering->NextExpansion;
+    assert(nextLowering == nullptr || currLowering->getExpansionContext() <
+                                          nextLowering->getExpansionContext());
+    currLowering = nextLowering;
+  }
+}
+
+void TypeConverter::insertSingleLowering(const TypeLowering **start,
+                                         const TypeLowering *insert) {
+  auto *curr = *start;
+
+  // Insert in front.
+  if (insert->getExpansionContext() < curr->getExpansionContext()) {
+    *start = insert;
+    insert->NextExpansion = curr;
+    return;
+  }
+
+  // Drop duplicate front entries.
+  if (insert->getExpansionContext() == curr->getExpansionContext()) {
+    return;
+  }
+
+  auto *prev = curr;
+  while (curr && insert->getExpansionContext() > curr->getExpansionContext()) {
+    prev = curr;
+    curr = curr->NextExpansion;
+  }
+
+  // Drop duplicate entries.
+  if (prev->NextExpansion && prev->NextExpansion->getExpansionContext() ==
+                                 insert->getExpansionContext())
+    return;
+
+  auto *origNext = prev->NextExpansion;
+  prev->NextExpansion = insert;
+  insert->NextExpansion = origNext;
+}
+
+
+void TypeConverter::insertLowerings(const TypeLowering **start,
+                                    const TypeLowering *lowerings) {
+  auto *currLowering = lowerings;
+  while (currLowering) {
+    auto *nextLowering = currLowering->NextExpansion;
+    insertSingleLowering(start, currLowering);
+    currLowering = nextLowering;
+  }
+
+  // DEBUG remove
+  verifyLoweringList(*start);
+}
+
+bool TypeConverter::hasOpaqueArchetypePropertiesOrCases(CanType ty) {
+  if (ty->hasOpaqueArchetype())
+    return true;
+
+  auto it = opaqueArchetypeFields.find(ty);
+  if (it == opaqueArchetypeFields.end()) {
+    bool res = ty->hasOpaqueArchetypePropertiesOrCases();
+    opaqueArchetypeFields[ty] = res;
+    return res;
+  }
+  return it->second;
 }
 
 const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
                                Type origSubstType,
-                               ResilienceExpansion forExpansion) {
+                               TypeExpansionContext forExpansion) {
   CanType substType = origSubstType->getCanonicalType();
+  auto origHadOpaqueTypeArchetype =
+      origSubstType->hasOpaqueArchetype() ||
+      hasOpaqueArchetypePropertiesOrCases(origSubstType->getCanonicalType());
   auto key = getTypeKey(origType, substType);
-  
   assert((!key.isDependent() || getCurGenericContext())
          && "dependent type outside of generic context?!");
   assert(!substType->is<InOutType>());
 
-  auto *prev = find(key);
-  auto *lowering = getTypeLoweringForExpansion(key, forExpansion, prev);
+  auto **prev = find(key);
+  auto *lowering = prev
+                       ? getTypeLoweringForExpansion(key, forExpansion, *prev,
+                                                     origHadOpaqueTypeArchetype)
+                       : nullptr;
   if (lowering != nullptr)
     return *lowering;
 
@@ -1507,7 +1597,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 #endif
 
   // Lower the type.
-  auto loweredSubstType = computeLoweredRValueType(origType, substType);
+  auto loweredSubstType =
+      computeLoweredRValueType(forExpansion, origType, substType);
 
   // If that didn't change the type and the key is cachable, there's no
   // point in re-checking the table, so just construct a type lowering
@@ -1527,21 +1618,23 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
 
     lowering = &getTypeLoweringForLoweredType(loweredKey,
-                                              forExpansion);
+                                              forExpansion,
+                                              origHadOpaqueTypeArchetype);
   }
 
-  if (prev == nullptr)
+  if (prev == nullptr || *prev == nullptr)
     insert(key, lowering);
   else {
-    prev->NextExpansion = lowering;
-    assert(prev->isResilient() == lowering->isResilient());
+    insertLowerings(prev, lowering);
   }
 
   return *lowering;
 }
 
-CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
-                                                CanType substType) {
+CanType
+TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
+                                        AbstractionPattern origType,
+                                        CanType substType) {
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
   //   - types are turned into their unbridged equivalents, depending
@@ -1574,12 +1667,12 @@ CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
       }
     }
 
-    return getNativeSILFunctionType(*this, origType, substFnType);
+    return getNativeSILFunctionType(*this, forExpansion, origType, substFnType);
   }
 
   // Ignore dynamic self types.
   if (auto selfType = dyn_cast<DynamicSelfType>(substType)) {
-    return selfType.getSelfType();
+    return getLoweredRValueType(forExpansion, selfType.getSelfType());
   }
 
   // Static metatypes are unitary and can optimized to a "thin" empty
@@ -1590,7 +1683,7 @@ CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
     // representation.
     if (substMeta->hasRepresentation()) {
       assert(substMeta->isLegalSILType());
-      return substMeta;
+      return substOpaqueTypesWithUnderlyingTypes(substMeta, forExpansion);
     }
 
     MetatypeRepresentation repr;
@@ -1609,8 +1702,9 @@ CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
       else
         repr = MetatypeRepresentation::Thick;
     }
-    
-    CanType instanceType = substMeta.getInstanceType();
+
+    CanType instanceType = substOpaqueTypesWithUnderlyingTypes(
+        substMeta.getInstanceType(), forExpansion);
 
     // Regardless of thinness, metatypes are always trivial.
     return CanMetatypeType::get(instanceType, repr);
@@ -1629,42 +1723,69 @@ CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
 
   // Lower tuple element types.
   if (auto substTupleType = dyn_cast<TupleType>(substType)) {
-    return computeLoweredTupleType(*this, origType, substTupleType);
+    return computeLoweredTupleType(*this, forExpansion, origType,
+                                   substTupleType);
   }
 
   // Lower the referent type of reference storage types.
   if (auto substRefType = dyn_cast<ReferenceStorageType>(substType)) {
-    return computeLoweredReferenceStorageType(*this, origType, substRefType);
+    return computeLoweredReferenceStorageType(*this, forExpansion, origType,
+                                              substRefType);
   }
 
   // Lower the object type of optional types.
   if (auto substObjectType = substType.getOptionalObjectType()) {
-    return computeLoweredOptionalType(*this, origType,
+    return computeLoweredOptionalType(*this, forExpansion, origType,
                                       substType, substObjectType);
   }
 
+  if (auto silFnTy = dyn_cast<SILFunctionType>(substType)) {
+    if (!substType->hasOpaqueArchetype() ||
+        !forExpansion.shouldLookThroughOpaqueTypeArchetypes())
+      return substType;
+    return silFnTy->substituteOpaqueArchetypes(*this, forExpansion);
+  }
+
   // The Swift type directly corresponds to the lowered type.
-  return substType;
+  auto underlyingTy =
+      substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
+                                          /*allowLoweredTypes*/ true);
+  if (underlyingTy != substType)
+    underlyingTy = computeLoweredRValueType(
+        forExpansion, AbstractionPattern(getCurGenericContext(), underlyingTy),
+        underlyingTy);
+
+  return underlyingTy;
 }
 
 const TypeLowering &
-TypeConverter::getTypeLowering(SILType type, ResilienceExpansion forExpansion) {
+TypeConverter::getTypeLowering(SILType type,
+                               TypeExpansionContext forExpansion) {
   auto loweredType = type.getASTType();
   auto key = getTypeKey(AbstractionPattern(getCurGenericContext(), loweredType),
                         loweredType);
 
-  return getTypeLoweringForLoweredType(key, forExpansion);
+  auto origHadOpaqueTypeArchetype =
+      loweredType->hasOpaqueArchetype() ||
+      hasOpaqueArchetypePropertiesOrCases(loweredType);
+
+  return getTypeLoweringForLoweredType(key, forExpansion,
+                                       origHadOpaqueTypeArchetype);
 }
 
 const TypeLowering &
 TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
-                                             ResilienceExpansion forExpansion) {
+                                             TypeExpansionContext forExpansion,
+                                             bool origHadOpaqueTypeArchetype) {
   auto type = key.SubstType;
   assert(type->isLegalSILType() && "type is not lowered!");
   (void)type;
 
-  auto *prev = find(key);
-  auto *lowering = getTypeLoweringForExpansion(key, forExpansion, prev);
+  auto **prev = find(key);
+  auto *lowering = prev
+                       ? getTypeLoweringForExpansion(key, forExpansion, *prev,
+                                                     origHadOpaqueTypeArchetype)
+                       : nullptr;
   if (lowering != nullptr)
     return *lowering;
 
@@ -1674,14 +1795,18 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
     insert(key, nullptr);
 #endif
 
-  lowering = LowerType(*this,
-                       CanGenericSignature(),
-                       forExpansion,
-                       key.isDependent()).visit(key.SubstType);
+  if (forExpansion.shouldLookThroughOpaqueTypeArchetypes() &&
+      type->hasOpaqueArchetype()) {
+    type = computeLoweredRValueType(
+        forExpansion, AbstractionPattern(getCurGenericContext(), type), type);
+  }
 
-  if (prev) {
-    prev->NextExpansion = lowering;
-    assert(prev->isResilient() == lowering->isResilient());
+  lowering =
+      LowerType(*this, CanGenericSignature(), forExpansion, key.isDependent())
+          .visit(type);
+
+  if (prev && *prev) {
+    insertLowerings(prev, lowering);
   } else
     insert(key, lowering);
   return *lowering;
@@ -1693,14 +1818,16 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
 /// go ahead and lower the type with the correct expansion.
 const TypeLowering *TypeConverter::
 getTypeLoweringForExpansion(TypeKey key,
-                            ResilienceExpansion forExpansion,
-                            const TypeLowering *lowering) {
+                            TypeExpansionContext forExpansion,
+                            const TypeLowering *lowering,
+                            bool origHadOpaqueTypeArchetype) {
   if (lowering == nullptr)
     return nullptr;
 
-  if (!lowering->isResilient()) {
+  if (!lowering->isResilient() && !origHadOpaqueTypeArchetype) {
     // Don't try to refine the lowering for other resilience expansions if
-    // we don't expect to get a different lowering anyway.
+    // we don't expect to get a different lowering anyway. Similar if the
+    // original type had opaque type archetypes.
     //
     // See LowerType::handleResilience() for the gory details; we only
     // set this flag if the type is resilient *and* inside our module.
@@ -1709,7 +1836,7 @@ getTypeLoweringForExpansion(TypeKey key,
 
   // Search for a matching lowering in the linked list of lowerings.
   while (lowering) {
-    if (lowering->getResilienceExpansion() == forExpansion)
+    if (lowering->getExpansionContext() == forExpansion)
       return lowering;
 
     // Continue searching.
@@ -2018,7 +2145,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
   return nullptr;
 }
 
-SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
+SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
+                                                 AbstractStorageDecl *value,
                                                  Type lvalueType) {
   // The l-value type is the result of applying substitutions to
   // the type-of-reference.  Essentially, we want to apply those
@@ -2037,7 +2165,7 @@ SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
     substType = substType.getReferenceStorageReferent();
   }
 
-  CanType substLoweredType = getLoweredRValueType(origType, substType);
+  CanType substLoweredType = getLoweredRValueType(context, origType, substType);
 
   // Type substitution preserves structural type structure, and the
   // type-of-reference is only different in the outermost structural
@@ -2603,10 +2731,11 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       env->mapTypeIntoContext(contextBoxTy)
          ->getCanonicalType());
   }
-  assert(contextBoxTy->getLayout()->getFields().size() == 1
-         && getSILBoxFieldType(contextBoxTy, *this, 0).getASTType()
-             == loweredContextType
-         && "box field type doesn't match capture!");
+  assert(contextBoxTy->getLayout()->getFields().size() == 1 &&
+         getSILBoxFieldType(TypeExpansionContext::minimal(), contextBoxTy,
+                            *this, 0)
+                 .getASTType() == loweredContextType &&
+         "box field type doesn't match capture!");
 #endif
   return boxTy;
 }
@@ -2636,8 +2765,8 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
   return boxType;
 }
 
-CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
-                                                      EnumElementDecl *elt) {
+CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
+    TypeExpansionContext context, SILType enumType, EnumElementDecl *elt) {
 
   auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
 
@@ -2650,8 +2779,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 
   if (boxSignature == CanGenericSignature()) {
     auto eltIntfTy = elt->getArgumentInterfaceType();
-
-    auto boxVarTy = getLoweredRValueType(eltIntfTy);
+    auto boxVarTy = getLoweredRValueType(context, eltIntfTy);
     auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true));
     return SILBoxType::get(C, layout, {});
   }
@@ -2663,8 +2791,8 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
   auto eltIntfTy = elt->getArgumentInterfaceType();
   GenericContextScope scope(*this, boxSignature);
 
-  auto boxVarTy = getLoweredRValueType(getAbstractionPattern(elt),
-                                       eltIntfTy);
+  auto boxVarTy = getLoweredRValueType(context,
+                                       getAbstractionPattern(elt), eltIntfTy);
   auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true));
 
   // Instantiate the layout with enum's substitution list.
@@ -2676,13 +2804,15 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 }
 
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
-                                     SILType Ty, ResilienceExpansion expansion) {
+                                     SILType Ty,
+                                     TypeExpansionContext expansion) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
-    assert(!structDecl->isResilient(&TC.M, expansion) &&
-           " FSO should not be trying to explode resilient (ie address-only) "
-           "types at all");
+    assert(
+        !structDecl->isResilient(&TC.M, expansion.getResilienceExpansion()) &&
+        " FSO should not be trying to explode resilient (ie address-only) "
+        "types at all");
     for (auto *prop : structDecl->getStoredProperties()) {
-      SILType propTy = Ty.getFieldType(prop, TC);
+      SILType propTy = Ty.getFieldType(prop, TC, expansion);
       unsigned fieldsCountBefore = fieldsCount;
       countNumberOfInnerFields(fieldsCount, TC, propTy, expansion);
       if (fieldsCount == fieldsCountBefore) {
@@ -2704,7 +2834,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     if (enumDecl->isIndirect()) {
       return;
     }
-    assert(!enumDecl->isResilient(&TC.M, expansion) &&
+    assert(!enumDecl->isResilient(&TC.M, expansion.getResilienceExpansion()) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;
@@ -2721,7 +2851,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
       // (we shouldn't expand enums)
       // Number of fields > 1 as "future proof" for this heuristic:
       // In case it is used by a pass that tries to explode enums.
-      auto payloadTy = Ty.getEnumElementType(elt, TC);
+      auto payloadTy = Ty.getEnumElementType(elt, TC, expansion);
       fieldsCount = 0;
       countNumberOfInnerFields(fieldsCount, TC, payloadTy, expansion);
       if (fieldsCount > maxEnumCount) {
@@ -2734,8 +2864,8 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
 }
 
 unsigned TypeConverter::countNumberOfFields(SILType Ty,
-                                            ResilienceExpansion expansion) {
-  auto key = std::make_pair(Ty, unsigned(expansion));
+                                            TypeExpansionContext expansion) {
+  auto key = std::make_pair(Ty, unsigned(expansion.getResilienceExpansion()));
   auto Iter = TypeFields.find(key);
   if (Iter != TypeFields.end()) {
     return std::max(Iter->second, 1U);
@@ -2753,7 +2883,7 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
     return "false";
   };
   os << "Type Lowering for lowered type: " << LoweredType << ".\n"
-     << "Expansion: " << ResilienceExpansion(ForExpansion) << "\n"
+     << "Expansion: " << getResilienceExpansion() << "\n"
      << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
      << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
      << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"

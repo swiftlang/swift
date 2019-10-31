@@ -342,6 +342,14 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+  CanSILFunctionType
+  getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
+
+  SILType getLoweredTypeInContext(TypeExpansionContext context) const {
+    return SILType::getPrimitiveObjectType(
+        getLoweredFunctionTypeInContext(context));
+  }
+
   SILFunctionConventions getConventions() const {
     return SILFunctionConventions(LoweredType, getModule());
   }

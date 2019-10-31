@@ -1878,7 +1878,8 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
     bool hasNonVoidAssocValue = false;
     bool hasAssocValue = elt->hasAssociatedValues();
     if (hasAssocValue) {
-      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
+      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
+                                               TypeExpansionContext(SGF.F));
       hasNonVoidAssocValue = !eltTy.getASTType()->isVoid();
     }
 
@@ -2060,7 +2061,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
     SILType eltTy;
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
-      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
+      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M,
+                                               TypeExpansionContext(SGF.F));
       hasElt = !eltTy.getASTType()->isVoid();
     }
 

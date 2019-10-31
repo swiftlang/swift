@@ -60,7 +60,8 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   // argument to the refcount instruction.
   SILValue EnumVal = DefOfEnum ? DefOfEnum : I->getOperand(0);
 
-  SILType ArgType = EnumVal->getType().getEnumElementType(EnumDecl, Mod);
+  SILType ArgType = EnumVal->getType().getEnumElementType(
+      EnumDecl, Mod, TypeExpansionContext(Builder.getFunction()));
 
   auto *UEDI =
     Builder.createUncheckedEnumData(I->getLoc(), EnumVal, EnumDecl, ArgType);

@@ -231,7 +231,8 @@ emitInvocation(SILBuilder &Builder,
     if (ReInfo.getSpecializedType()->isPolymorphic()) {
       Subs = ReInfo.getCallerParamSubstitutionMap();
       CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-          Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
+          Builder.getModule(), ReInfo.getCallerParamSubstitutionMap(),
+          Builder.getTypeExpansionContext());
       assert(!CalleeSubstFnTy->isPolymorphic() &&
              "Substituted callee type should not be polymorphic");
       assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -628,7 +629,8 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
   auto CalleeSubstFnTy = CanSILFuncTy;
   if (CanSILFuncTy->isPolymorphic()) {
     CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
+        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap(),
+        Builder.getTypeExpansionContext());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -763,7 +765,9 @@ void EagerSpecializerTransform::run() {
     // TODO: Use a decision-tree to reduce the amount of dynamic checks being
     // performed.
     for (auto *SA : F.getSpecializeAttrs()) {
-      ReInfoVec.emplace_back(&F, SA->getSpecializedSignature());
+      ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
+                             FuncBuilder.getModule().isWholeModule(), &F,
+                             SA->getSpecializedSignature());
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);

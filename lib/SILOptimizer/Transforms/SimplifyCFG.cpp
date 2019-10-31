@@ -313,7 +313,8 @@ public:
         auto EnumVal = SEI->getOperand();
         auto EnumTy = EnumVal->getType();
         auto Loc = SEI->getLoc();
-        auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule());
+        auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule(),
+                                            Builder.getTypeExpansionContext());
         SILValue UED(
             Builder.createUncheckedEnumData(Loc, EnumVal, EnumCase, Ty));
         assert(UED->getType() ==
@@ -358,7 +359,8 @@ static SILValue createEnumElement(SILBuilder &Builder,
   // Do we have a payload.
   auto EnumTy = EnumVal->getType();
   if (EnumElement->hasAssociatedValues()) {
-    auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule());
+    auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule(),
+                                        Builder.getTypeExpansionContext());
     SILValue UED(Builder.createUncheckedEnumData(SEI->getLoc(), EnumVal,
                                                  EnumElement, Ty));
     return Builder.createEnum(SEI->getLoc(), UED, EnumElement, EnumTy);
@@ -1702,7 +1704,8 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 
   auto &Mod = SEI->getModule();
   auto OpndTy = SEI->getOperand()->getType();
-  auto Ty = OpndTy.getEnumElementType(Element, Mod);
+  auto Ty = OpndTy.getEnumElementType(
+      Element, Mod, TypeExpansionContext(*SEI->getFunction()));
   auto *UED = SILBuilderWithScope(SEI)
     .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
 
@@ -2388,15 +2391,17 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
-      TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
-                                                TAI->getSubstitutionMap());
+      TargetFnTy = TargetFnTy->substGenericArgs(
+          TAI->getModule(), TAI->getSubstitutionMap(),
+          Builder.getTypeExpansionContext());
     }
     SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
     auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-                                            TAI->getSubstitutionMap());
+                                            TAI->getSubstitutionMap(),
+                                            Builder.getTypeExpansionContext());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
 
@@ -2857,7 +2862,8 @@ bool ArgumentSplitter::createNewArguments() {
     return false;
 
   // Get the first level projection for the struct or tuple type.
-  Projection::getFirstLevelProjections(Arg->getType(), Mod, Projections);
+  Projection::getFirstLevelProjections(Arg->getType(), Mod,
+                                       TypeExpansionContext(*F), Projections);
 
   // We do not want to split arguments with less than 2 projections.
   if (Projections.size() < 2)
@@ -2866,7 +2872,7 @@ bool ArgumentSplitter::createNewArguments() {
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
   if (count_if(Projections, [&](const Projection &P) {
-        return !P.getType(Ty, Mod).isTrivial(*F);
+        return !P.getType(Ty, Mod, TypeExpansionContext(*F)).isTrivial(*F);
       }) < 2)
     return false;
 
@@ -2878,8 +2884,9 @@ bool ArgumentSplitter::createNewArguments() {
   // old one.
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
-    auto *NewArg = ParentBB->createPhiArgument(P.getType(Ty, Mod),
-                                               ValueOwnershipKind::Owned);
+    auto *NewArg = ParentBB->createPhiArgument(
+        P.getType(Ty, Mod, TypeExpansionContext(*F)),
+        ValueOwnershipKind::Owned);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
     //

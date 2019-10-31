@@ -33,7 +33,8 @@ using namespace swift::Lowering;
 CanType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
   assert(!origType.isTypeParameter());
-  return getLoweredRValueType(origType, origType.getType());
+  return getLoweredRValueType(TypeExpansionContext::minimal(), origType,
+                              origType.getType());
 }
 
 AnyFunctionType::Param

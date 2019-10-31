@@ -228,8 +228,9 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
            "this point.");
     SILModule &M = AI->getModule();
     for (auto *D : SD->getStoredProperties())
-      NewAllocations.push_back(
-          B.createAllocStack(Loc, Type.getFieldType(D, M), {}));
+      NewAllocations.push_back(B.createAllocStack(
+          Loc, Type.getFieldType(D, M, TypeExpansionContext(B.getFunction())),
+          {}));
   }
 }
 

@@ -27,7 +27,7 @@
 
 llvm::cl::opt<bool>
     EnableOpaqueArchetypeSpecializer("enable-opaque-archetype-specializer",
-                                     llvm::cl::init(true));
+                                     llvm::cl::init(false));
 
 using namespace swift;
 
@@ -44,7 +44,8 @@ static Type substOpaqueTypesWithUnderlyingTypes(
     Type ty, SILFunction *context) {
   auto *dc = getDeclContextIfInCurrentModule(*context);
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      dc, context->getResilienceExpansion());
+      dc, context->getResilienceExpansion(),
+      context->getModule().isWholeModule());
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -52,7 +53,8 @@ static SubstitutionMap
 substOpaqueTypesWithUnderlyingTypes(SubstitutionMap map, SILFunction *context) {
   auto *dc = getDeclContextIfInCurrentModule(*context);
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      dc, context->getResilienceExpansion());
+      dc, context->getResilienceExpansion(),
+      context->getModule().isWholeModule());
   return map.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -117,8 +119,9 @@ protected:
     unsigned idx = 0;
     // Adjust field types if neccessary.
     for (VarDecl *field : structDecl->getStoredProperties()) {
-      SILType loweredType = structTy.getFieldType(
-          field, getBuilder().getFunction().getModule());
+      SILType loweredType =
+          structTy.getFieldType(field, getBuilder().getFunction().getModule(),
+                                getBuilder().getTypeExpansionContext());
       if (elements[idx]->getType() != loweredType) {
         elements[idx] = createCast(getOpLocation(Inst->getLoc()), elements[idx],
                                    loweredType);
@@ -153,7 +156,8 @@ protected:
     if (Inst->hasOperand()) {
       opd = getOpValue(Inst->getOperand());
       SILType newCaseTy = newTy.getEnumElementType(
-          Inst->getElement(), getBuilder().getFunction().getModule());
+          Inst->getElement(), getBuilder().getFunction().getModule(),
+          getBuilder().getTypeExpansionContext());
       if (opd->getType() != newCaseTy)
         opd = createCast(getOpLocation(Inst->getLoc()), opd, newCaseTy);
     }
@@ -166,7 +170,8 @@ protected:
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     auto opd = getOpValue(Inst->getOperand());
     auto caseTy = opd->getType().getEnumElementType(
-        Inst->getElement(), getBuilder().getFunction().getModule());
+        Inst->getElement(), getBuilder().getFunction().getModule(),
+        getBuilder().getTypeExpansionContext());
     auto expectedTy = getOpType(Inst->getType());
     if (expectedTy != caseTy)
       expectedTy = caseTy;
@@ -339,7 +344,8 @@ protected:
 
     // Apply the opaque types substitution.
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        dc, Original.getResilienceExpansion());
+        dc, Original.getResilienceExpansion(),
+        Original.getModule().isWholeModule());
     Sty = Ty.subst(Original.getModule(), replacer, replacer,
                    CanGenericSignature(), true);
     return Sty;
@@ -356,7 +362,8 @@ protected:
     auto *dc = getDeclContextIfInCurrentModule(Original);
     // Apply the opaque types substitution.
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        dc, Original.getResilienceExpansion());
+        dc, Original.getResilienceExpansion(),
+        Original.getModule().isWholeModule());
     return conf.subst(type, replacer, replacer,
                       SubstFlags::SubstituteOpaqueArchetypes);
   }
@@ -440,8 +447,9 @@ protected:
 
             if (elt->hasAssociatedValues() &&
                 dest->getArguments().size() == 1) {
-              SILType eltArgTy =
-                  enumTy.getEnumElementType(elt, clonedFunction.getModule());
+              SILType eltArgTy = enumTy.getEnumElementType(
+                  elt, clonedFunction.getModule(),
+                  getBuilder().getTypeExpansionContext());
               SILType bbArgTy = dest->getArguments()[0]->getType();
               if (eltArgTy != bbArgTy)
                 replaceBlockArgumentType(switchEnum->getLoc(), dest, eltArgTy);
@@ -506,10 +514,9 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
         if (auto opaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
           auto opaque = opaqueTy->getDecl();
           OpaqueSubstitutionKind subKind =
-              ReplaceOpaqueTypesWithUnderlyingTypes::
-              shouldPerformSubstitution(opaque,
-                                        context->getModule().getSwiftModule(),
-                                        context->getResilienceExpansion());
+              ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+                  opaque, context->getModule().getSwiftModule(),
+                  context->getResilienceExpansion());
           return subKind != OpaqueSubstitutionKind::DontSubstitute;
         }
         return false;
