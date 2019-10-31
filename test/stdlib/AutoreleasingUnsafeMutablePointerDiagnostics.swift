@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -diagnose-invalid-ephemeralness-as-error
+// RUN: %target-typecheck-verify-swift -enable-invalid-ephemeralness-as-error
 // REQUIRES: objc_interop
 
 func unsafePointerInitEphemeralConversions() {
