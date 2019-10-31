@@ -355,6 +355,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
     Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
 
+  if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
+    Opts.EnableExperimentalDifferentiableProgramming = true;
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
