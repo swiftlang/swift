@@ -2756,7 +2756,19 @@ public:
 
     // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
-      VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
+      auto backingDecl = MF.getDeclChecked(backingPropertyIDs[0]);
+      if (!backingDecl) {
+        if (numBackingProperties > 1 &&
+            backingDecl.errorIsA<XRefNonLoadedModuleError>()) {
+            // A property wrapper defined behind an implementation-only import
+            // is safe to drop when it can't be deserialized.
+            // rdar://problem/56599179
+            consumeError(backingDecl.takeError());
+        } else
+          return backingDecl.takeError();
+      }
+
+      VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
       VarDecl *storageWrapperVar = nullptr;
       if (numBackingProperties > 1) {
         storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
@@ -3904,6 +3916,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
+      bool skipAttr = false;
       switch (recordID) {
       case decls_block::SILGenName_DECL_ATTR: {
         bool isImplicit;
@@ -4104,13 +4117,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
-          MF.fatal(deserialized.takeError());
-          break;
+          if (deserialized.errorIsA<XRefNonLoadedModuleError>()) {
+            // A custom attribute defined behind an implementation-only import
+            // is safe to drop when it can't be deserialized.
+            // rdar://problem/56599179
+            consumeError(deserialized.takeError());
+            skipAttr = true;
+          } else
+            return deserialized.takeError();
+        } else {
+          Attr = CustomAttr::create(ctx, SourceLoc(),
+                                    TypeLoc::withoutLoc(deserialized.get()),
+                                    isImplicit);
         }
-
-        Attr = CustomAttr::create(ctx, SourceLoc(),
-                                  TypeLoc::withoutLoc(deserialized.get()),
-                                  isImplicit);
         break;
       }
 
@@ -4141,10 +4160,12 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         MF.fatal();
       }
 
-      if (!Attr)
-        return llvm::Error::success();
+      if (!skipAttr) {
+        if (!Attr)
+          return llvm::Error::success();
 
-      AddAttribute(Attr);
+        AddAttribute(Attr);
+      }
 
     } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
       IdentifierID discriminatorID;
