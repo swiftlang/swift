@@ -1093,7 +1093,6 @@ static bool parseDeclSILOptional(bool *isTransparent,
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
                                        GenericEnvironment *GenericEnv,
                                        DeclContext *DC) {
-  // Do some type checking / name binding for the parsed type.
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 

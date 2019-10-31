@@ -1333,9 +1333,9 @@ public:
   }
 };
 
-/// A reference to a type in expression context, spelled out as a TypeLoc. Sema
-/// forms this expression as a result of name binding.  This always has
-/// MetaTypetype.
+/// A reference to a type in expression context, spelled out as a TypeLoc.
+///
+/// The type of this expression is always \c MetaTypeType.
 class TypeExpr : public Expr {
   TypeLoc Info;
   TypeExpr(Type Ty);
@@ -4831,7 +4831,7 @@ public:
 };
 
 /// A pattern production that has been parsed but hasn't been resolved
-/// into a complete pattern. Name binding converts these into standalone pattern
+/// into a complete pattern. Pattern checking converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
 /// position.
 class UnresolvedPatternExpr : public Expr {

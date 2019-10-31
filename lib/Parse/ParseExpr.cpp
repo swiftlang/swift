@@ -46,8 +46,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   SyntaxParsingContext ExprParsingContext(SyntaxContext, SyntaxContextKind::Expr);
 
   // If we are parsing a refutable pattern, check to see if this is the start
-  // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
-  // name binding will perform final validation.
+  // of a let/var/is pattern.  If so, parse it as an UnresolvedPatternExpr and
+  // let pattern type checking determine its final form.
   //
   // Only do this if we're parsing a pattern, to improve QoI on malformed
   // expressions followed by (e.g.) let/var decls.

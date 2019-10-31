@@ -623,7 +623,7 @@ public:
   void performParseOnly(bool EvaluateConditionals = false,
                         bool CanDelayBodies = true);
 
-  /// Parses and performs name binding on all input files.
+  /// Parses and performs import resolution on all input files.
   ///
   /// This is similar to a parse-only invocation, but module imports will also
   /// be processed.
