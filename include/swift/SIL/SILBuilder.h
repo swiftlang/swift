@@ -529,12 +529,14 @@ public:
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, TransposeFunction, hasOwnership()));
   }
-  
+
+  /// Note: explicit extractee type may be specified only in lowered SIL.
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
-      SILValue TheFunction) {
+      SILValue TheFunction, Optional<SILType> ExtracteeType = None) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction,
+        ExtracteeType));
   }
 
   LinearFunctionExtractInst *createLinearFunctionExtract(
@@ -554,13 +556,10 @@ public:
 
   DifferentiabilityWitnessFunctionInst *
   createDifferentiabilityWitnessFunction(
-      SILLocation Loc, SILFunction *OriginalFunction,
-      DifferentiabilityWitnessFunctionKind WitnessKind,
-      IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
-      GenericSignature WitnessGenericSignature) {
+      SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
+      SILDifferentiabilityWitness *Witness) {
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
-        getModule(), getSILDebugLocation(Loc), OriginalFunction, WitnessKind,
-        ParameterIndices, ResultIndices, WitnessGenericSignature.getPointer()));
+        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness));
   }
   // SWIFT_ENABLE_TENSORFLOW END
 

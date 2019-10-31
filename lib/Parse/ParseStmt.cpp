@@ -326,6 +326,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::kw_sil_global) &&
          Tok.isNot(tok::kw_sil_witness_table) &&
          Tok.isNot(tok::kw_sil_default_witness_table) &&
+         // SWIFT_ENABLE_TENSORFLOW
+         Tok.isNot(tok::kw_sil_differentiability_witness) &&
+         // SWIFT_ENABLE_TENSORFLOW_END
          Tok.isNot(tok::kw_sil_property) &&
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {

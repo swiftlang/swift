@@ -61,6 +61,9 @@ class SILBasicBlock;
 class SILBuilder;
 class SILDebugLocation;
 class SILDebugScope;
+// SWIFT_ENABLE_TENSORFLOW
+class SILDifferentiabilityWitness;
+// SWIFT_ENABLE_TENSORFLOW_END
 class SILFunction;
 class SILGlobalVariable;
 class SILInstructionResultArray;
@@ -7997,9 +8000,11 @@ class DifferentiableFunctionExtractInst
           SingleValueInstruction> {
 private:
   /// The extractee.
-  NormalDifferentiableFunctionTypeComponent extractee;
+  NormalDifferentiableFunctionTypeComponent Extractee;
   /// The list containing the `@differentiable` function operand.
-  FixedOperandList<1> operands;
+  FixedOperandList<1> Operands;
+  /// True if the instruction has an explicit extractee type.
+  bool HasExplicitExtracteeType;
 
   static SILType
   getExtracteeType(
@@ -8007,24 +8012,26 @@ private:
       SILModule &module);
 
 public:
+  /// Note: explicit extractee type may be specified only in lowered SIL.
   explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
       NormalDifferentiableFunctionTypeComponent extractee,
-      SILValue theFunction);
+      SILValue theFunction, Optional<SILType> extracteeType = None);
 
   NormalDifferentiableFunctionTypeComponent getExtractee() const {
-      return extractee;
+    return Extractee;
   }
 
   AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
-    auto kind = extractee.getAsDerivativeFunctionKind();
+    auto kind = Extractee.getAsDerivativeFunctionKind();
     assert(kind);
     return *kind;
   }
 
-  SILValue getFunctionOperand() const { return operands[0].get(); }
-  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
+  SILValue getFunctionOperand() const { return Operands[0].get(); }
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
 };
 
 /// `linear_function_extract` - given an `@differentiable(linear)` function
@@ -8066,43 +8073,31 @@ class DifferentiabilityWitnessFunctionInst
           SingleValueInstruction> {
 private:
   friend SILBuilder;
-  /// The original function.
-  SILFunction *originalFunction;
   /// The differentiability witness function kind.
   DifferentiabilityWitnessFunctionKind witnessKind;
-  /// The autodiff config: parameter indices, result indices, and witness
-  /// derivative signature.
-  AutoDiffConfig config;
+  /// The referenced SIL differentiability witness.
+  SILDifferentiabilityWitness *witness;
 
   static SILType getDifferentiabilityWitnessType(
-      SILModule &module, SILFunction *originalFunction,
+      SILModule &module,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature witnessGenericSignature);
+      SILDifferentiabilityWitness *witness);
 
 public:
   DifferentiabilityWitnessFunctionInst(
-      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      SILModule &module, SILDebugLocation loc,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature witnessGenericSignature);
+      SILDifferentiabilityWitness *witness);
 
   static DifferentiabilityWitnessFunctionInst *create(
-      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      SILModule &module, SILDebugLocation loc,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature witnessGenericSignature);
+      SILDifferentiabilityWitness *witness);
 
   DifferentiabilityWitnessFunctionKind getWitnessKind() const {
     return witnessKind;
   }
-  SILFunction *getOriginalFunction() const { return originalFunction; }
-  AutoDiffConfig const &getConfig() const { return config; }
-  IndexSubset *getParameterIndices() const { return config.parameterIndices; }
-  IndexSubset *getResultIndices() const { return config.resultIndices; }
-  GenericSignature getWitnessGenericSignature() const {
-    return config.derivativeGenericSignature;
-  }
+  SILDifferentiabilityWitness *getWitness() const { return witness; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

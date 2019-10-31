@@ -932,8 +932,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *transpose = dyn_cast_or_null<AbstractFunctionDecl>(D);
     Printer << attr->getOriginal().Name;
     auto diffParamsString = getTransposingParametersClauseString(
-        transpose, attr->getParameterIndexSubset(),
-        attr->getParsedParameters());
+        transpose, attr->getParameterIndices(), attr->getParsedParameters());
     if (!diffParamsString.empty())
       Printer << ", " << diffParamsString;
     Printer << ')';
@@ -1465,7 +1464,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
       Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
       ParameterIndices(indices) {
-  setDerivativeGenericSignature(context, derivativeGenSig);
+  setDerivativeGenericSignature(derivativeGenSig);
 }
 
 DifferentiableAttr *
@@ -1584,7 +1583,7 @@ TransposingAttr::TransposingAttr(ASTContext &context, bool implicit,
                                  IndexSubset *indices)
     : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
       BaseType(baseType), Original(std::move(original)),
-      ParameterIndexSubset(indices) {}
+      ParameterIndices(indices) {}
 
 TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,

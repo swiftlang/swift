@@ -1502,8 +1502,12 @@ public:
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
             "The original function must not be @differentiable");
-    if (F.getModule().getStage() == SILStage::Canonical ||
-        dfi->hasDerivativeFunctions()) {
+    // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
+    // TODO: Check that derivative function types match excluding
+    // parameter/result conventions in lowered SIL.
+    if (F.getModule().getStage() == SILStage::Lowered)
+      return;
+    if (dfi->hasDerivativeFunctions()) {
       auto jvp = dfi->getJVPFunction();
       auto jvpType = jvp->getType().getAs<SILFunctionType>();
       require(jvpType, "The JVP function must have a function type");
@@ -1537,8 +1541,12 @@ public:
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
             "The original function must not be differentiable");
-    if (F.getModule().getStage() == SILStage::Canonical ||
-        lfi->hasTransposeFunction()) {
+    // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
+    // TODO: Check that transpose function type matches excluding
+    // parameter/result conventions in lowered SIL.
+    if (F.getModule().getStage() == SILStage::Lowered)
+      return;
+    if (lfi->hasTransposeFunction()) {
       auto transpose = lfi->getTransposeFunction();
       auto transposeType = transpose->getType().getAs<SILFunctionType>();
       require(transposeType,

@@ -3413,7 +3413,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
     whereClauseGenEnv = whereClauseGenSig->getGenericEnvironment();
     // Store the resolved derivative generic signature in the attribute.
-    attr->setDerivativeGenericSignature(Ctx, whereClauseGenSig);
+    attr->setDerivativeGenericSignature(whereClauseGenSig);
   }
 
   // Validate the 'wrt:' parameters.
@@ -3917,7 +3917,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
                                      ->castTo<AnyFunctionType>();
   
   // Get checked wrt param indices.
-  auto *wrtParamIndices = attr->getParameterIndexSubset();
+  auto *wrtParamIndices = attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.

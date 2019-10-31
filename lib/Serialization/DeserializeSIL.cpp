@@ -348,6 +348,27 @@ static SILType getSILType(Type Ty, SILValueCategory Category) {
                                    Category);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Helper function to find a SILDifferentiabilityWitness, given its mangled
+/// key.
+SILDifferentiabilityWitness *
+SILDeserializer::getSILDifferentiabilityWitnessForReference(
+    StringRef mangledKey) {
+  // Check to see if we have a witness under this key already.
+  auto *witness = SILMod.lookUpDifferentiabilityWitness(mangledKey);
+  if (witness) {
+    return witness;
+  }
+
+  // Otherwise, look for a witness under this key in the module.
+  auto iter = DifferentiabilityWitnessList->find(mangledKey);
+  if (iter == DifferentiabilityWitnessList->end()) {
+    return nullptr;
+  }
+
+  return readDifferentiabilityWitness(*iter);
+}
+
 /// Helper function to find a SILFunction, given its name and type.
 SILFunction *SILDeserializer::getFuncForReference(StringRef name,
                                                   SILType type) {
@@ -1029,7 +1050,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            // SWIFT_ENABLE_TENSORFLOW
-           Attr = 0, Attr2 = 0, Attr3 = 0, NumSubs = 0, NumConformances = 0,
+           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
            IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
@@ -1146,21 +1167,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
     SILInstDifferentiableFunctionExtractLayout::readRecord(
-        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr,
+        /*hasExplicitExtracteeType*/ Attr2);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
     break;
   case SIL_INST_LINEAR_FUNCTION_EXTRACT:
     SILInstLinearFunctionExtractLayout::readRecord(
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
-    break;
-  case SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION:
-    SILInstDifferentiabilityWitnessFunctionLayout::readRecord(
-        scratch, /*originalFunctionName*/ ValID, /*witnessKind*/ Attr,
-        /*witnessGenSig*/ ValID2, /*numParams*/ Attr2, /*numResults*/ Attr3,
-        ListOfValues);
-    RawOpCode =
-        (unsigned)SILInstructionKind::DifferentiabilityWitnessFunctionInst;
     break;
   // SWIFT_ENABLE_TENSORFLOW END
   case SIL_INST_NO_OPERAND:
@@ -1609,8 +1623,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
     NormalDifferentiableFunctionTypeComponent extractee(Attr);
+    Optional<SILType> explicitExtracteeType = None;
+    if (Attr2)
+      explicitExtracteeType = silTy;
     ResultVal =
-        Builder.createDifferentiableFunctionExtract(Loc, extractee, val);
+        Builder.createDifferentiableFunctionExtract(Loc, extractee, val,
+                                                    explicitExtracteeType);
     break;
   }
   case SILInstructionKind::LinearFunctionExtractInst: {
@@ -1622,29 +1640,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
-    auto originalName = MF->getIdentifierText(ValID);
-    auto *original = getFuncForReference(originalName);
-    assert(original && "Original function must be found");
+    StringRef mangledKey = MF->getIdentifierText(ValID);
+    auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);
+    assert(witness && "SILDifferentiabilityWitness not found");
     DifferentiabilityWitnessFunctionKind witnessKind(Attr);
-    auto numParameterIndices = Attr2;
-    auto numResultIndices = Attr3;
-    SmallVector<unsigned, 8> parameterAndResultIndices(ListOfValues.begin(),
-                                                       ListOfValues.end());
-    assert(parameterAndResultIndices.size() ==
-               numParameterIndices + numResultIndices &&
-           "Parameter/result indices count mismatch");
-    auto *parameterIndices = IndexSubset::get(
-        MF->getContext(), original->getLoweredFunctionType()->getNumParameters(),
-        ArrayRef<unsigned>(parameterAndResultIndices)
-            .take_front(numParameterIndices));
-    auto *resultIndices = IndexSubset::get(
-        MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
-        ArrayRef<unsigned>(parameterAndResultIndices)
-            .take_back(numResultIndices));
-    auto witnessGenSig = MF->getGenericSignature(ValID2);
     ResultVal = Builder.createDifferentiabilityWitnessFunction(
-        Loc, original, witnessKind, parameterIndices, resultIndices,
-        witnessGenSig);
+        Loc, witnessKind, witness);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END
@@ -3460,7 +3461,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
     auto *diffWitness = SILDifferentiabilityWitness::createDeclaration(
         SILMod, *linkage, original, parameterIndices, resultIndices,
         derivativeGenSig);
-    diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ false);
+    diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);
     return diffWitness;
   }
 

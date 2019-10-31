@@ -1632,8 +1632,7 @@ public:
   GenericSignature getDerivativeGenericSignature() const {
     return DerivativeGenericSignature;
   }
-  void setDerivativeGenericSignature(ASTContext &context,
-                                     GenericSignature derivativeGenSig) {
+  void setDerivativeGenericSignature(GenericSignature derivativeGenSig) {
     DerivativeGenericSignature = derivativeGenSig;
   }
 
@@ -1761,7 +1760,7 @@ class TransposingAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  IndexSubset *ParameterIndexSubset = nullptr;
+  IndexSubset *ParameterIndices = nullptr;
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
@@ -1802,11 +1801,11 @@ public:
     return NumParsedParameters;
   }
   
-  IndexSubset *getParameterIndexSubset() const {
-    return ParameterIndexSubset;
+  IndexSubset *getParameterIndices() const {
+    return ParameterIndices;
   }
   void setParameterIndices(IndexSubset *pi) {
-    ParameterIndexSubset = pi;
+    ParameterIndices = pi;
   }
   
   static bool classof(const DeclAttribute *DA) {

@@ -714,10 +714,21 @@ getExtracteeType(
 
 DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc,
-    NormalDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
+    NormalDifferentiableFunctionTypeComponent extractee, SILValue theFunction,
+    Optional<SILType> extracteeType)
     : InstructionBase(debugLoc,
-                      getExtracteeType(theFunction, extractee, module)),
-      extractee(extractee), operands(this, theFunction) {}
+                      extracteeType
+                          ? *extracteeType
+                          : getExtracteeType(theFunction, extractee, module)),
+      Extractee(extractee), Operands(this, theFunction),
+      HasExplicitExtracteeType(extracteeType.hasValue()) {
+#ifndef NDEBUG
+  if (extracteeType.hasValue()) {
+    assert(module.getStage() == SILStage::Lowered &&
+           "Explicit type is valid only in lowered SIL");
+  }
+#endif
+}
 
 SILType LinearFunctionExtractInst::
 getExtracteeType(
@@ -745,21 +756,22 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
       extractee(extractee), operands(this, theFunction) {}
 
 SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
-    SILModule &module, SILFunction *originalFunction,
-    DifferentiabilityWitnessFunctionKind witnessKind,
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature witnessGenSig) {
-  auto fnTy = originalFunction->getLoweredFunctionType();
+    SILModule &module, DifferentiabilityWitnessFunctionKind witnessKind,
+    SILDifferentiabilityWitness *witness) {
+  auto fnTy = witness->getOriginalFunction()->getLoweredFunctionType();
   CanGenericSignature witnessCanGenSig;
-  if (witnessGenSig)
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  auto *parameterIndices = witness->getParameterIndices();
+  auto *resultIndices = witness->getResultIndices();
   if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
        parameterIndices, *resultIndices->begin(), *derivativeKind, module.Types,
        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
-  assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
+  assert(witnessKind ==
+             DifferentiabilityWitnessFunctionKind::Transpose);
   auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
       parameterIndices, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
@@ -767,15 +779,12 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
 }
 
 DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
-    SILModule &module, SILDebugLocation debugLoc, SILFunction *originalFunction,
+    SILModule &module, SILDebugLocation debugLoc,
     DifferentiabilityWitnessFunctionKind witnessKind,
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature witnessGenSig)
+    SILDifferentiabilityWitness *witness)
     : InstructionBase(debugLoc, getDifferentiabilityWitnessType(
-          module, originalFunction, witnessKind, parameterIndices,
-          resultIndices, witnessGenSig)),
-      originalFunction(originalFunction), witnessKind(witnessKind),
-      config({parameterIndices, resultIndices, witnessGenSig.getPointer()}) {}
+          module, witnessKind, witness)),
+      witnessKind(witnessKind), witness(witness) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

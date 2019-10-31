@@ -1251,6 +1251,10 @@ public:
     }
     *this << "] ";
     *this << getIDAndType(dfei->getFunctionOperand());
+    if (dfei->hasExplicitExtracteeType()) {
+      *this << " as ";
+      *this << dfei->getType();
+    }
   }
 
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
@@ -1269,6 +1273,7 @@ public:
 
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto *witness = dwfi->getWitness();
     *this << '[';
     switch (dwfi->getWitnessKind()) {
     case DifferentiabilityWitnessFunctionKind::JVP:
@@ -1282,18 +1287,18 @@ public:
       break;
     }
     *this << "] [parameters";
-    for (auto i : dwfi->getParameterIndices()->getIndices())
+    for (auto i : witness->getParameterIndices()->getIndices())
       *this << ' ' << i;
     *this << "] [results";
-    for (auto i : dwfi->getResultIndices()->getIndices())
+    for (auto i : witness->getResultIndices()->getIndices())
       *this << ' ' << i;
     *this << "] ";
-    if (auto witnessGenSig = dwfi->getWitnessGenericSignature()) {
+    if (auto witnessGenSig = witness->getDerivativeGenericSignature()) {
       auto subPrinter = PrintOptions::printSIL();
       witnessGenSig->print(PrintState.OS, subPrinter);
       *this << " ";
     }
-    printSILFunctionNameAndType(PrintState.OS, dwfi->getOriginalFunction());
+    printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
   }
   // SWIFT_ENABLE_TENSORFLOW END
 
@@ -2938,14 +2943,14 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   }
 
   printSILGlobals(PrintCtx, getSILGlobalList());
-  printSILFunctions(PrintCtx, getFunctionList());
-  printSILVTables(PrintCtx, getVTableList());
-  printSILWitnessTables(PrintCtx, getWitnessTableList());
-  printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   // SWIFT_ENABLE_TENSORFLOW
   printSILDifferentiabilityWitnesses(PrintCtx,
                                      getDifferentiabilityWitnessList());
   // SWIFT_ENABLE_TENSORFLOW END
+  printSILFunctions(PrintCtx, getFunctionList());
+  printSILVTables(PrintCtx, getVTableList());
+  printSILWitnessTables(PrintCtx, getWitnessTableList());
+  printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
@@ -3183,37 +3188,19 @@ void SILDifferentiabilityWitness::print(
              [&](unsigned index) { OS << index; },
              [&] { OS << ' '; });
   OS << "] ";
-  // ([where ...])?
+  // (<...>)?
   if (auto derivativeGenSig = getDerivativeGenericSignature()) {
-    ArrayRef<Requirement> requirements;
-    SmallVector<Requirement, 4> requirementsScratch;
-    auto *origGenEnv = getOriginalFunction()->getGenericEnvironment();
-    if (derivativeGenSig) {
-      if (origGenEnv) {
-        requirementsScratch = derivativeGenSig->requirementsNotSatisfiedBy(
-            origGenEnv->getGenericSignature());
-        requirements = requirementsScratch;
-      } else {
-        requirements = derivativeGenSig->getRequirements();
-      }
-    }
-    if (!requirements.empty()) {
-      OS << "[where ";
-      auto subPrinter = PrintOptions::printSIL();
-      subPrinter.GenericEnv = origGenEnv;
-      interleave(requirements,
-                 [&](Requirement req) {
-                   req.print(OS, subPrinter);
-                 },
-                 [&] { OS << ", "; });
-      OS << "] ";
-    }
+    auto subPrinter = PrintOptions::printSIL();
+    derivativeGenSig->print(OS, subPrinter);
+    OS << " ";
   }
   // @original-function-name : $original-sil-type
   printSILFunctionNameAndType(OS, getOriginalFunction());
 
-  if (isDeclaration())
+  if (isDeclaration()) {
+    OS << "\n\n";
     return;
+  }
 
   // {
   //   jvp: @jvp-function-name : $jvp-sil-type

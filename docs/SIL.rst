@@ -5676,16 +5676,22 @@ differentiable_function_extract
   sil-instruction ::= 'differentiable_function_extract'
                       '[' sil-differentiable-function-extractee ']'
                       sil-value ':' sil-type
+                      ('as' sil-type)?
 
   sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
 
   differentiable_function_extract [original] %0 : $@differentiable (T) -> T
   differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
   differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T \
+    as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
 
 Extracts the original function or a derivative function from the given
 ``@differentiable`` function. It must be provided with an extractee:
 ``[original]``, ``[jvp]`` or ``[vjp]``.
+
+An explicit extractee type may be provided in lowered SIL. This is currently
+used by the LoadableByAddress transformation, which rewrites function types.
 
 
 linear_function_extract

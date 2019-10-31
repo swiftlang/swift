@@ -556,6 +556,22 @@ ControlFlowTests.test("Loops") {
   expectEqual((8, 12), valueWithGradient(at: 2, in: while_loop))
   expectEqual((27, 27), valueWithGradient(at: 3, in: while_loop))
 
+  func while_loop_nonactive_initial_value(_ x: Float) -> Float {
+    var result: Float = 1
+    var i = 0
+    while i < 2 {
+      result = result * x
+      i += 1
+    }
+    return result
+  }
+  // TODO(TF-933): Fix incorrect derivatives when `var result` is not initially
+  // assigned to `x`.
+  // expectEqual((4, 4), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
+  // expectEqual((9, 6), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
+  expectEqual((4, 2), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
+  expectEqual((9, 3), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
+
   func repeat_while_loop(_ x: Float) -> Float {
     var result = x
     var i = 0
@@ -571,6 +587,22 @@ ControlFlowTests.test("Loops") {
   // expectEqual((27, 27), valueWithGradient(at: 3, in: repeat_while_loop))
   expectEqual((8, 18), valueWithGradient(at: 2, in: repeat_while_loop))
   expectEqual((27, 36), valueWithGradient(at: 3, in: repeat_while_loop))
+
+  func repeat_while_loop_nonactive_initial_value(_ x: Float) -> Float {
+    var result: Float = 1
+    var i = 0
+    repeat {
+      result = result * x
+      i += 1
+    } while i < 2
+    return result
+  }
+  // TODO(TF-584, TF-933): Fix incorrect derivatives when `var result` is not
+  // initially assigned to `x`.
+  // expectEqual((4, 4), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
+  // expectEqual((9, 6), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
+  expectEqual((4, 3), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
+  expectEqual((9, 4), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
 
   func loop_continue(_ x: Float) -> Float {
     var result = x
