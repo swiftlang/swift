@@ -3409,7 +3409,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
     whereClauseGenEnv = whereClauseGenSig->getGenericEnvironment();
     // Store the resolved derivative generic signature in the attribute.
-    attr->setDerivativeGenericSignature(ctx, whereClauseGenSig);
+    attr->setDerivativeGenericSignature(whereClauseGenSig);
   }
 
   // Validate the 'wrt:' parameters.
