@@ -124,12 +124,18 @@ protected:
   void appendIdentifier(StringRef ident);
 
   void addSubstitution(const void *ptr) {
-    if (UseSubstitutions)
-      Substitutions[ptr] = Substitutions.size() + StringSubstitutions.size();
+    if (!UseSubstitutions)
+      return;
+
+    auto value = Substitutions.size() + StringSubstitutions.size();
+    Substitutions[ptr] = value;
   }
   void addSubstitution(StringRef Str) {
-    if (UseSubstitutions)
-      StringSubstitutions[Str] = Substitutions.size() + StringSubstitutions.size();
+    if (!UseSubstitutions)
+      return;
+
+    auto value = Substitutions.size() + StringSubstitutions.size();
+    StringSubstitutions[Str] = value;
   }
 
   bool tryMangleSubstitution(const void *ptr);
