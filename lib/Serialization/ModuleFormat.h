@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 525; // @differentiable attribute original declaration
+const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // differentiable_function_extract explicit extractee type
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1759,7 +1759,6 @@ namespace decls_block {
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    DeclIDField, // Original function declaration.
     BCFixed<1>, // Linear flag.
     IdentifierIDField, // JVP name.
     DeclIDField, // JVP function declaration.

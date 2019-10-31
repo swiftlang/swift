@@ -3718,11 +3718,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
         }
       }
 
-      if (D->getAttrs().hasAttribute<DifferentiableAttr>()) {
-        auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
-        if (auto *ASD = dyn_cast<AbstractStorageDecl>(D))
-          AFD = ASD->getAccessor(AccessorKind::Get);
-        assert(AFD && "Must resolve '@differentiable' attribute declaration");
+      // Set original declaration in `@differentiable` attributes.
+      auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D))
+        AFD = ASD->getAccessor(AccessorKind::Get);
+      if (AFD) {
         for (auto *attr : D->getAttrs().getAttributes<DifferentiableAttr>()) {
           auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
           diffAttr->setOriginalFunction(AFD);
