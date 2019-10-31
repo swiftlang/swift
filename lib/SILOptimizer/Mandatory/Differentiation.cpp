@@ -3072,7 +3072,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   return SILFunctionType::get(
       genericSig, extInfo, expectedType->getCoroutineKind(),
       ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
-      interfaceResults, interfaceErrorResult, interfaceSubs, false, module.getASTContext());
+      interfaceResults, interfaceErrorResult, {}, false, module.getASTContext());
 }
 
 /// Get or create a reabstraction thunk from `fromType` to `toType`, to be
