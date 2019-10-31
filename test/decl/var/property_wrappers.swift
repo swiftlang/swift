@@ -244,10 +244,8 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: For some reason this is type-checked twice, second time around solver complains about <<error type>> argument
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
+  var y2 = true // expected-error{{Bool' is not convertible to 'Int}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -1584,9 +1582,7 @@ extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' 
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  // FIXME: We shouldn't diagnose the arg-to-param mismatch (rdar://problem/56345248)
   @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
-  // expected-error @-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
