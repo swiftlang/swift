@@ -1681,15 +1681,6 @@ public:
   /// we're parsing the standard library.
   static ModuleDecl *getStdlibModule(const DeclContext *dc);
 
-  /// \name Lazy resolution.
-  ///
-  /// Routines that perform lazy resolution as required for AST operations.
-  /// @{
-  void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                          AssociatedTypeDecl *assocType) override;
-  void resolveWitness(const NormalProtocolConformance *conformance,
-                      ValueDecl *requirement) override;
-
   /// \name Resilience diagnostics
 
   void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);

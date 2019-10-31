@@ -41,6 +41,8 @@ class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
+class Witness;
+struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
@@ -1695,6 +1697,51 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
+};
+
+class TypeWitnessRequest
+    : public SimpleRequest<TypeWitnessRequest,
+                           TypeWitnessAndDecl(NormalProtocolConformance *,
+                                              AssociatedTypeDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TypeWitnessAndDecl>
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance,
+           AssociatedTypeDecl *ATD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<TypeWitnessAndDecl> getCachedResult() const;
+  void cacheResult(TypeWitnessAndDecl value) const;
+};
+
+class ValueWitnessRequest
+    : public SimpleRequest<ValueWitnessRequest,
+                           Witness(NormalProtocolConformance *, ValueDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Witness> evaluate(Evaluator &evaluator,
+                                   NormalProtocolConformance *conformance,
+                                   ValueDecl *VD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Witness> getCachedResult() const;
+  void cacheResult(Witness value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

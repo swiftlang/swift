@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -1094,3 +1095,36 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+//----------------------------------------------------------------------------//
+// TypeWitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<TypeWitnessAndDecl> TypeWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->TypeWitnesses.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->TypeWitnesses[requirement];
+}
+
+void TypeWitnessRequest::cacheResult(TypeWitnessAndDecl typeWitAndDecl) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// WitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Witness> ValueWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->Mapping.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->Mapping[requirement];
+}
+
+void ValueWitnessRequest::cacheResult(Witness type) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
+}

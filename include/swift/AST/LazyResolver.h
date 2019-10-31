@@ -42,16 +42,6 @@ class VarDecl;
 class LazyResolver {
 public:
   virtual ~LazyResolver();
-
-  /// Resolve the type witnesses for the given associated type within the given
-  /// protocol conformance.
-  virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *assocType) = 0;
-
-  /// Resolve the witness for the given non-type requirement within
-  /// the given protocol conformance.
-  virtual void resolveWitness(const NormalProtocolConformance *conformance,
-                              ValueDecl *requirement) = 0;
 };
 
 class LazyMemberLoader;
