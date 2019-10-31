@@ -5580,7 +5580,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     // may be incomplete and the type mismatch in return statement will just
     // confuse the type checker.
     if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
-      auto Element = BS->getElement(0);
+      auto Element = BS->getFirstElement();
       if (auto *stmt = Element.dyn_cast<Stmt *>()) {
         if (isa<FuncDecl>(AFD)) {
           if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
@@ -5605,7 +5605,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
         }
         if (auto F = dyn_cast<FuncDecl>(AFD)) {
           auto RS = new (Context) ReturnStmt(SourceLoc(), E);
-          BS->setElement(0, RS); 
+          BS->setFirstElement(RS);
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);
         } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
@@ -5613,7 +5613,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
             // If it's a nil literal, just insert return.  This is the only 
             // legal thing to return.
             auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
-            BS->setElement(0, RS); 
+            BS->setFirstElement(RS);
             AFD->setHasSingleExpressionBody();
             AFD->setSingleExpressionBody(E);
           }

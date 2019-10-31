@@ -443,7 +443,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
     if (!TLCD || TLCD->getBody()->getElements().empty())
       continue;
 
-    auto Entry = TLCD->getBody()->getElement(0);
+    auto Entry = TLCD->getBody()->getFirstElement();
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (auto *E = Entry.dyn_cast<Expr*>())
