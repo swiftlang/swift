@@ -920,17 +920,6 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   decl->setAddedImplicitInitializers();
 
-  auto &ctx = decl->getASTContext();
-  SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (!ctor->isInvalid()) {
-        auto type = getMemberTypeForComparison(ctx, ctor, nullptr);
-        declaredInitializers.push_back({ctor, type});
-      }
-    }
-  }
-
   // We can only inherit initializers if we have a superclass.
   // FIXME: We should be bailing out earlier in the function, but unfortunately
   // that currently regresses associated type inference for cases like
@@ -942,6 +931,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
   // Check whether the user has defined a designated initializer for this class,
   // and whether all of its stored properties have initial values.
+  auto &ctx = decl->getASTContext();
   bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
   bool defaultInitable =
       areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
@@ -985,14 +975,19 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
     // A designated or required initializer has not been overridden.
 
     bool alreadyDeclared = false;
-    for (const auto &ctorAndType : declaredInitializers) {
-      auto *ctor = ctorAndType.first;
-      auto type = ctorAndType.second;
-      auto parentType = getMemberTypeForComparison(ctx, superclassCtor, ctor);
+    for (auto *member : decl->getMembers()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        // Skip any invalid constructors.
+        if (ctor->isInvalid())
+          continue;
 
-      if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
-        alreadyDeclared = true;
-        break;
+        auto type = swift::getMemberTypeForComparison(ctor, nullptr);
+        auto parentType = swift::getMemberTypeForComparison(superclassCtor, ctor);
+
+        if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
+          alreadyDeclared = true;
+          break;
+        }
       }
     }
 
