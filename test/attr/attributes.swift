@@ -286,10 +286,10 @@ func unownedOptionals(x: C) {
 
 // @_nonEphemeral attribute
 struct S1<T> {
-  func foo(@_nonEphemeral _ x: String) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
-  func bar(@_nonEphemeral _ x: T) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+  func foo(@_nonEphemeral _ x: String) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
+  func bar(@_nonEphemeral _ x: T) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
 
-  func baz<U>(@_nonEphemeral _ x: U) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+  func baz<U>(@_nonEphemeral _ x: U) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
 
   func qux(@_nonEphemeral _ x: UnsafeMutableRawPointer) {}
   func quux(@_nonEphemeral _ x: UnsafeMutablePointer<Int>?) {}

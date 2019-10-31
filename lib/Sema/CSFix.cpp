@@ -1026,8 +1026,8 @@ TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
 }
 
 std::string TreatEphemeralAsNonEphemeral::getName() const {
-  llvm::SmallString<32> name;
+  std::string name;
   name += "treat ephemeral as non-ephemeral for ";
   name += ::getName(ConversionKind);
-  return name.c_str();
+  return name;
 }

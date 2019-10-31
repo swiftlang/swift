@@ -2796,7 +2796,7 @@ NOTE(escaping_optional_type_argument, none,
 
 // @_nonEphemeral attribute
 ERROR(non_ephemeral_non_pointer_type,none,
-      "@_nonEphemeral attribute currently only applies to pointer types", ())
+      "@_nonEphemeral attribute only applies to pointer types", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
