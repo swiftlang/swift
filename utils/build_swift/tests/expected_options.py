@@ -213,6 +213,7 @@ EXPECTED_DEFAULTS = {
     'test_sourcekitlsp': False,
     'test_skstresstester': False,
     'test_swiftevolve': False,
+    'test_toolchainbenchmarks': False,
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -546,6 +547,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-sourcekit-lsp', dest='test_sourcekitlsp'),
     DisableOption('--skip-test-skstresstester', dest='test_skstresstester'),
     DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
+    DisableOption('--skip-test-toolchain-benchmarks', dest='test_toolchainbenchmarks'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),
