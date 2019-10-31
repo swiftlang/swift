@@ -100,11 +100,11 @@ static constexpr const char * const diagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
-static constexpr const char *const debugDiagnosticStrings[] = {
-#define ERROR(ID, Options, Text, Signature) Text " [" #ID "]",
-#define WARNING(ID, Options, Text, Signature) Text " [" #ID "]",
-#define NOTE(ID, Options, Text, Signature) Text " [" #ID "]",
-#define REMARK(ID, Options, Text, Signature) Text " [" #ID "]",
+static constexpr const char *const diagnosticStringIDs[] = {
+#define ERROR(ID, Options, Text, Signature) #ID,
+#define WARNING(ID, Options, Text, Signature) #ID,
+#define NOTE(ID, Options, Text, Signature) #ID,
+#define REMARK(ID, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
@@ -703,6 +703,7 @@ static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
   case DiagnosticState::Behavior::Ignore:
     llvm_unreachable("trying to map an ignored diagnostic");
   case DiagnosticState::Behavior::Error:
+  case DiagnosticState::Behavior::ErrorFromWarning:
   case DiagnosticState::Behavior::Fatal:
     return DiagnosticKind::Error;
   case DiagnosticState::Behavior::Note:
@@ -775,7 +776,7 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
     if (suppressWarnings)
       return set(Behavior::Ignore);
     if (warningsAsErrors)
-      return set(Behavior::Error);
+      return set(Behavior::ErrorFromWarning);
   }
 
   //   4) Otherwise remap the diagnostic kind
@@ -934,7 +935,8 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 
   return DiagnosticInfo(
       diagnostic.getID(), loc, toDiagnosticKind(behavior),
-      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames()),
+      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames(),
+        behavior == DiagnosticState::Behavior::ErrorFromWarning),
       diagnostic.getArgs(), getDefaultDiagnosticLoc(), /*child note info*/ {},
       diagnostic.getRanges(), diagnostic.getFixIts(), diagnostic.isChildNote());
 }
@@ -964,11 +966,21 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 }
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                                  bool printDiagnosticName) {
+                                                  bool printDiagnosticName,
+                                                  bool fromWarningsAsErrors) {
+  const char *diagString = diagnosticStrings[(unsigned)id];
+  if (!printDiagnosticName && !fromWarningsAsErrors)
+    return diagString;
+
+  SmallString<128> buffer(diagString);
+  if (fromWarningsAsErrors)
+    buffer.append(" [-warnings-as-errors]");
   if (printDiagnosticName) {
-    return debugDiagnosticStrings[(unsigned)id];
+    buffer.append(" [");
+    buffer.append(diagnosticStringIDs[(unsigned) id]);
+    buffer.append("]");
   }
-  return diagnosticStrings[(unsigned)id];
+  return TransactionStrings.insert(buffer.str()).first->getKeyData();
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {

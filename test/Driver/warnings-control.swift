@@ -9,7 +9,7 @@ func foo() -> Int {
 	let x = 1
 	var y = 2
 // DEFAULT:    warning: variable 'y' was never mutated; consider changing to 'let' constant
-// WERR:       error: variable 'y' was never mutated; consider changing to 'let' constant
+// WERR:       error: variable 'y' was never mutated; consider changing to 'let' constant [-warnings-as-errors]
 // NOWARN-NOT: variable 'y' was never mutated
 	return x + y
 }
