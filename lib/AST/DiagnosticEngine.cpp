@@ -1026,7 +1026,7 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     if (content.empty())
       continue;
 
-    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
 }
