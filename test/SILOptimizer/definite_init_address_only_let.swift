@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-ownership-stripping-after-serialization -verify %s
 
 func foo<T>(a: Bool, t: T) {
   let x: T

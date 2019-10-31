@@ -1508,6 +1508,145 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Computes whether all of the stored properties in a nominal type have initial
+/// values.
+class AreAllStoredPropertiesDefaultInitableRequest
+    : public SimpleRequest<AreAllStoredPropertiesDefaultInitableRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether this type has a user-defined designated initializer. This
+/// does not include a synthesized designated initializer used to satisfy a
+/// conformance.
+class HasUserDefinedDesignatedInitRequest
+    : public SimpleRequest<HasUserDefinedDesignatedInitRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this type has a synthesized memberwise initializer.
+class HasMemberwiseInitRequest
+    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, StructDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a memberwise initializer for a given type.
+class SynthesizeMemberwiseInitRequest
+    : public SimpleRequest<SynthesizeMemberwiseInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this type has a synthesized zero parameter default
+/// initializer.
+class HasDefaultInitRequest
+    : public SimpleRequest<HasDefaultInitRequest, bool(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a default initializer for a given type.
+class SynthesizeDefaultInitRequest
+    : public SimpleRequest<SynthesizeDefaultInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class CompareDeclSpecializationRequest
+    : public SimpleRequest<CompareDeclSpecializationRequest,
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, DeclContext *DC,
+                                ValueDecl *VD1, ValueDecl *VD2,
+                                bool dynamic) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

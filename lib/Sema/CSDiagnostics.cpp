@@ -2291,13 +2291,14 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   if (auto errorCodeProtocol =
           TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            errorCodeType, errorCodeProtocol, getDC(),
-            ConformanceCheckFlags::InExpression)) {
-      Type errorType = conformance
-                           ->getTypeWitnessByName(errorCodeType,
-                                                  getASTContext().Id_ErrorType)
-                           ->getCanonicalType();
+    auto conformance = TypeChecker::conformsToProtocol(
+        errorCodeType, errorCodeProtocol, getDC(),
+        ConformanceCheckFlags::InExpression);
+    if (conformance) {
+      Type errorType =
+          conformance
+              .getTypeWitnessByName(errorCodeType, getASTContext().Id_ErrorType)
+              ->getCanonicalType();
       if (errorType) {
         auto diagnostic =
             emitDiagnostic(anchor->getLoc(), diag::cannot_throw_error_code,
@@ -2612,9 +2613,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
   for (auto protocol : layout.getProtocols()) {
-    if (!getTypeChecker().conformsToProtocol(
-            FromType, protocol->getDecl(), getDC(),
-            ConformanceCheckFlags::InExpression)) {
+    if (!TypeChecker::conformsToProtocol(FromType, protocol->getDecl(), getDC(),
+                                         ConformanceCheckFlags::InExpression)) {
       missingProtoTypeStrings.push_back(protocol->getString());
     }
   }
@@ -4427,7 +4427,9 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
     auto &cs = getConstraintSystem();
     auto *locator =
         cs.getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    if (cs.hasFixFor(locator))
+    if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
+          return fix->getLocator() == locator;
+        }))
       return false;
   }
 
@@ -5053,36 +5055,6 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   emitDiagnostic(anchor->getLoc(), diag::throws_functiontype_mismatch,
                  getFromType(), getToType());
-  return true;
-}
-
-bool UnnecessaryCoercionFailure::diagnoseAsError() {
-  auto expr = cast<CoerceExpr>(getAnchor());
-  auto sourceRange =
-      SourceRange(expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End);
-
-  if (isa<TypeAliasType>(getFromType().getPointer()) &&
-      isa<TypeAliasType>(getToType().getPointer())) {
-    auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
-    auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
-    // If the typealias are different, we need a warning
-    // mentioning both types.
-    if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
-      emitDiagnostic(expr->getLoc(),
-                     diag::unnecessary_same_typealias_type_coercion,
-                     getFromType(), getToType())
-
-          .fixItRemove(sourceRange);
-    } else {
-      emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
-                     getToType())
-          .fixItRemove(sourceRange);
-    }
-  } else {
-    emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
-                   getToType())
-        .fixItRemove(sourceRange);
-  }
   return true;
 }
 

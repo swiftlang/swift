@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s
+// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s -enable-ownership-stripping-after-serialization
 
 // High-level tests that DI rejects passing let constants to
 // mutating witness methods

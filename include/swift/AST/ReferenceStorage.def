@@ -55,7 +55,7 @@
 /// UNCHECKED_REF_STORAGE
 ///   Name##RetainValueInst
 ///   Name##ReleaseValueInst
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 /// LOADABLE_REF_STORAGE
 ///   Ref*ToNameInst
 ///   Name*ToRefInst
@@ -63,7 +63,7 @@
 ///   Load##Name##Inst
 ///   Store##Name##Inst
 /// ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 ///   StrongRetain##Name##Inst
 ///   Name##RetainInst
 ///   Name##ReleaseInst
@@ -78,7 +78,7 @@
 /// ALWAYS_LOADABLE_CHECKED_REF_STORAGE
 ///   Ref*ToNameInst
 ///   Name*ToRefInst
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 ///   StrongRetain##Name##Inst
 ///   Name##RetainInst
 ///   Name##ReleaseInst
@@ -87,7 +87,7 @@
 ///   Name*ToRefInst
 ///   Load##Name##Inst
 ///   Store##Name##Inst
-///   Copy##Name##ValueInst
+///   StrongCopy##Name##ValueInst
 ///   StrongRetain##Name##Inst
 ///   Name##RetainInst
 ///   Name##ReleaseInst

@@ -111,15 +111,6 @@ bool hasNativeSwiftDecl(const clang::Decl *decl);
 /// Translation API nullability from an API note into an optional kind.
 OptionalTypeKind translateNullability(clang::NullabilityKind kind);
 
-/// Determine whether the given class has designated initializers,
-/// consulting
-bool hasDesignatedInitializers(const clang::ObjCInterfaceDecl *classDecl);
-
-/// Determine whether the given method is a designated initializer
-/// of the given class.
-bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
-                             const clang::ObjCMethodDecl *method);
-
 /// Determine whether the given method is a required initializer
 /// of the given class.
 bool isRequiredInitializer(const clang::ObjCMethodDecl *method);

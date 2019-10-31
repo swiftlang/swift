@@ -370,7 +370,7 @@ func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
 func testSelectorStyleArguments2(let x: Int, // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
                                  let bar y: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
 // expected-error @-1 {{expected ',' separator}}
-// expected-error @-2 {{parameter requires an explicit type}}
+// expected-error @-2 {{expected ':' following argument label and parameter name}}
 }
 func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}

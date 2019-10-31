@@ -5038,17 +5038,18 @@ public:
       errorResult = maybeErrorResult.get();
     }
 
-    Optional<ProtocolConformanceRef> witnessMethodConformance;
+    ProtocolConformanceRef witnessMethodConformance;
     if (*representation == SILFunctionTypeRepresentation::WitnessMethod) {
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
     GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
-
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
-                                errorResult, ctx, witnessMethodConformance);
+                                errorResult,
+                                SubstitutionMap(), false,
+                                ctx, witnessMethodConformance);
   }
 
   Expected<Type> deserializeArraySliceType(ArrayRef<uint64_t> scratch,
@@ -5387,9 +5388,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // conformance requirements are on Self. This isn't actually a /safe/ change
     // even in Objective-C, but we mostly just don't want to crash.
 
-    // FIXME: DenseMap requires that its value type be default-constructible,
-    // which ProtocolConformanceRef is not, hence the extra Optional.
-    llvm::SmallDenseMap<ProtocolDecl *, Optional<ProtocolConformanceRef>, 16>
+    llvm::SmallDenseMap<ProtocolDecl *, ProtocolConformanceRef, 16>
         conformancesForProtocols;
     while (conformanceCount--) {
       ProtocolConformanceRef nextConformance = readConformance(DeclTypeCursor);
@@ -5404,7 +5403,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           req.getSecondType()->castTo<ProtocolType>()->getDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
-        reqConformances.push_back(iter->getSecond().getValue());
+        reqConformances.push_back(iter->getSecond());
       } else {
         // Put in an abstract conformance as a placeholder. This is a lie, but
         // there's not much better we can do. We're relying on the fact that

@@ -10,6 +10,9 @@ entry(%x : @guaranteed $Builtin.AnyObject):
   // CHECK-native: swift_retain
   // CHECK-objc: swift_unknownObjectRetain
   %y = copy_value %x : $Builtin.AnyObject
+  br bb1
+
+bb1:
   // CHECK-native: swift_release
   // CHECK-objc: swift_unknownObjectRelease
   destroy_value %y : $Builtin.AnyObject

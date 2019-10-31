@@ -303,6 +303,12 @@ final internal class __StringStorage
 
   @objc(isEqualToString:)
   @_effects(readonly)
+  final internal func isEqualToString(to other: AnyObject?) -> Int8 {
+    return _isEqual(other)
+  }
+  
+  @objc(isEqual:)
+  @_effects(readonly)
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
@@ -811,7 +817,13 @@ final internal class __SharedStringStorage
 
   @objc(isEqualToString:)
   @_effects(readonly)
-  final internal func isEqual(to other:AnyObject?) -> Int8 {
+  final internal func isEqualToString(to other: AnyObject?) -> Int8 {
+    return _isEqual(other)
+  }
+  
+  @objc(isEqual:)
+  @_effects(readonly)
+  final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
 

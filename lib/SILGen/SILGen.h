@@ -393,8 +393,8 @@ public:
 
   /// Find the conformance of the given Swift type to the
   /// _BridgedStoredNSError protocol.
-  Optional<ProtocolConformanceRef>
-  getConformanceToBridgedStoredNSError(SILLocation loc, Type type);
+  ProtocolConformanceRef getConformanceToBridgedStoredNSError(SILLocation loc,
+                                                              Type type);
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();

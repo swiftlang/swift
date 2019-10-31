@@ -380,12 +380,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
-    auto confResult = substitutionMap.lookupConformance(
+    auto conf = substitutionMap.lookupConformance(
         wmi->getLookupType(), wmi->getConformance().getRequirement());
-    if (!confResult)
+    if (conf.isInvalid())
       return getUnknown(evaluator, value,
                         UnknownReason::UnknownWitnessMethodConformance);
-    auto conf = confResult.getValue();
     auto &module = wmi->getModule();
     SILFunction *fn =
         module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
@@ -1100,8 +1099,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // call.
     auto op = apply->getOperand(i + 1);
     SymbolicValue argValue = getConstantValue(op);
-    if (!argValue.isConstant())
-      return argValue;
+    if (!argValue.isConstant()) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::createCallArgumentUnknown(i));
+    }
     paramConstants.push_back(argValue);
   }
 
@@ -1122,9 +1123,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   auto calleeFnType = callee->getLoweredFunctionType();
   assert(
       !calleeFnType->hasSelfParam() ||
-      !calleeFnType->getSelfInstanceType()->getClassOrBoundGenericClass() &&
+      !calleeFnType->getSelfInstanceType(callee->getModule())
+                   ->getClassOrBoundGenericClass() &&
       "class methods are not supported");
-  if (calleeFnType->getGenericSignature()) {
+  if (calleeFnType->getInvocationGenericSignature()) {
     // Get the substitution map of the call.  This maps from the callee's space
     // into the caller's world. Witness methods require additional work to
     // compute a mapping that is valid for the callee.
@@ -1133,7 +1135,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     if (calleeFnType->getRepresentation() ==
         SILFunctionType::Representation::WitnessMethod) {
       auto protocol =
-          calleeFnType->getWitnessMethodConformance().getRequirement();
+          calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
       auto protoSelfToConcreteType =
@@ -1142,12 +1144,12 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       // Self type of the requirement.
       auto conf = protoSelfToConcreteType.lookupConformance(
           protocol->getSelfInterfaceType()->getCanonicalType(), protocol);
-      if (!conf.hasValue())
+      if (conf.isInvalid())
         return getUnknown(evaluator, (SILInstruction *)apply,
                           UnknownReason::UnknownWitnessMethodConformance);
 
       callSubMap = getWitnessMethodSubstitutions(
-          apply->getModule(), ApplySite(apply), callee, conf.getValue());
+          apply->getModule(), ApplySite(apply), callee, conf);
 
       /// Remark: If we ever start to care about evaluating classes,
       /// getSubstitutionsForCallee() is the analogous mapping function we
@@ -2047,7 +2049,7 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
   return {None, None};
 }
 
-bool ConstExprStepEvaluator::isFailStopError(SymbolicValue errorVal) {
+bool swift::isFailStopError(SymbolicValue errorVal) {
   assert(errorVal.isUnknown());
 
   switch (errorVal.getUnknownReason().getKind()) {
@@ -2103,4 +2105,9 @@ void ConstExprStepEvaluator::dumpState() { internalState->dump(); }
 
 bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
   return classifyFunction(fun).hasValue();
+}
+
+bool swift::isConstantEvaluable(SILFunction *fun) {
+  assert(fun && "fun should not be nullptr");
+  return fun->hasSemanticsAttr("constant_evaluable");
 }

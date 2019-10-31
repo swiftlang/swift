@@ -376,6 +376,77 @@ DeclContext *Decl::getInnermostDeclContext() const {
   return getDeclContext();
 }
 
+bool Decl::isInvalid() const {
+  switch (getKind()) {
+#define VALUE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    return Bits.Decl.Invalid;
+  case DeclKind::Param: {
+    // Parameters are special because closure parameters may not have type
+    // annotations. In which case, the interface type request returns
+    // ErrorType. Therefore, consider parameters with implicit types to always
+    // be valid.
+    auto *PD = cast<ParamDecl>(this);
+    if (!PD->getTypeRepr() && !PD->hasInterfaceType())
+      return false;
+  }
+    LLVM_FALLTHROUGH;
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::OpaqueType:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Module:
+  case DeclKind::Var:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::EnumElement:
+    return cast<ValueDecl>(this)->getInterfaceType()->hasError();
+  }
+
+  llvm_unreachable("Unknown decl kind");
+}
+
+void Decl::setInvalid() {
+  switch (getKind()) {
+#define VALUE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    Bits.Decl.Invalid = true;
+    return;
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::OpaqueType:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Module:
+  case DeclKind::Var:
+  case DeclKind::Param:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::EnumElement:
+    cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
+    return;
+  }
+
+  llvm_unreachable("Unknown decl kind");
+}
+
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
 }
@@ -3832,6 +3903,49 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
     StructLoc(StructLoc)
 {
   Bits.StructDecl.HasUnreferenceableStorage = false;
+}
+
+bool NominalTypeDecl::hasMemberwiseInitializer() const {
+  // Currently only structs can have memberwise initializers.
+  auto *sd = dyn_cast<StructDecl>(this);
+  if (!sd)
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<StructDecl *>(sd);
+  return evaluateOrDefault(ctx.evaluator, HasMemberwiseInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
+  if (!hasMemberwiseInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
+}
+
+bool NominalTypeDecl::hasDefaultInitializer() const {
+  // Currently only structs and classes can have default initializers.
+  if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, HasDefaultInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
+  if (!hasDefaultInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           SynthesizeDefaultInitRequest{mutableThis}, nullptr);
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,

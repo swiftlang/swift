@@ -601,29 +601,6 @@ OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
   llvm_unreachable("Invalid NullabilityKind.");
 }
 
-bool importer::hasDesignatedInitializers(
-    const clang::ObjCInterfaceDecl *classDecl) {
-  if (classDecl->hasDesignatedInitializers())
-    return true;
-
-  return false;
-}
-
-bool importer::isDesignatedInitializer(
-    const clang::ObjCInterfaceDecl *classDecl,
-    const clang::ObjCMethodDecl *method) {
-  // If the information is on the AST, use it.
-  if (classDecl->hasDesignatedInitializers()) {
-    auto *methodParent = method->getClassInterface();
-    if (!methodParent ||
-        methodParent->getCanonicalDecl() == classDecl->getCanonicalDecl()) {
-      return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
-    }
-  }
-
-  return false;
-}
-
 bool importer::isRequiredInitializer(const clang::ObjCMethodDecl *method) {
   // FIXME: No way to express this in Objective-C.
   return false;

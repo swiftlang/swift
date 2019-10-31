@@ -470,15 +470,15 @@ namespace {
 
       auto subs =
         type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
-      requirements.enumerateFulfillments(IGF.IGM, subs,
-                                [&](unsigned reqtIndex, CanType type,
-                                    Optional<ProtocolConformanceRef> conf) {
-        if (conf) {
-          Values.push_back(emitWitnessTableRef(IGF, type, *conf));
-        } else {
-          Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
-        }
-      });
+      requirements.enumerateFulfillments(
+          IGF.IGM, subs,
+          [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
+            if (conf) {
+              Values.push_back(emitWitnessTableRef(IGF, type, conf));
+            } else {
+              Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
+            }
+          });
 
       collectTypes(IGF.IGM, decl);
       assert(Types.size() == Values.size());

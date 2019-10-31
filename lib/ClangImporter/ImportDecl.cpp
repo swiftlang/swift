@@ -2726,7 +2726,6 @@ namespace {
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-        structDecl->setAddedImplicitInitializers();
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -2775,7 +2774,6 @@ namespace {
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
-          errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FrozenAttr(/*IsImplicit*/true));
@@ -3203,7 +3201,6 @@ namespace {
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
-      result->setAddedImplicitInitializers();
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -4415,7 +4412,7 @@ namespace {
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
-                                       Optional<CtorInitializerKind> kindIn,
+                                       CtorInitializerKind kind,
                                        bool required,
                                        ObjCSelector selector,
                                        ImportedName importedName,
@@ -4540,39 +4537,40 @@ namespace {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
-      auto isMatch = [&](const T *singleResult, bool baseNameMatches) -> bool {
+      auto isMatch = [&](const T *singleResult, bool baseNameMatches,
+                         bool allowObjCMismatch) -> bool {
         const DeclAttributes &attrs = singleResult->getAttrs();
 
         // Skip versioned variants.
         if (attrs.isUnavailableInSwiftVersion(languageVersion))
           return false;
 
-        // Skip if type not exposed to Objective-C.
-        // If the base name doesn't match, then a matching
-        // custom name in an @objc attribute is required.
-        if (baseNameMatches && !singleResult->isObjC())
-          return false;
-
-        // If Clang decl has a custom Swift name, then we know that
-        // `name` is the base name we're looking for.
-        if (hasKnownSwiftName)
-          return baseNameMatches;
+        // If Clang decl has a custom Swift name, then we know that the name we
+        // did direct lookup for is correct.
+        // 'allowObjCMismatch' shouldn't exist, but we need it for source
+        // compatibility where a previous version of the compiler didn't check
+        // @objc-ness at all.
+        if (hasKnownSwiftName || allowObjCMismatch) {
+          assert(baseNameMatches);
+          return allowObjCMismatch || singleResult->isObjC();
+        }
 
         // Skip if a different name is used for Objective-C.
         if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
           if (auto objcName = objcAttr->getName())
             return objcName->getSimpleName() == name;
 
-        return baseNameMatches;
+        return baseNameMatches && singleResult->isObjC();
       };
 
       // First look at Swift types with the same name.
-      SmallVector<ValueDecl *, 4> results;
-      overlay->lookupValue(name, NLKind::QualifiedLookup, results);
+      SmallVector<ValueDecl *, 4> swiftDeclsByName;
+      overlay->lookupValue(name, NLKind::QualifiedLookup, swiftDeclsByName);
       T *found = nullptr;
-      for (auto result : results) {
+      for (auto result : swiftDeclsByName) {
         if (auto singleResult = dyn_cast<T>(result)) {
-          if (isMatch(singleResult, /*baseNameMatches=*/true)) {
+          if (isMatch(singleResult, /*baseNameMatches=*/true,
+                      /*allowObjCMismatch=*/false)) {
             if (found)
               return nullptr;
             found = singleResult;
@@ -4580,14 +4578,36 @@ namespace {
         }
       }
 
-      if (!found && !hasKnownSwiftName) {
+      if (!found && hasKnownSwiftName)
+        return nullptr;
+
+      if (!found) {
         // Try harder to find a match looking at just custom Objective-C names.
-        SmallVector<Decl *, 64> results;
-        overlay->getTopLevelDecls(results);
-        for (auto result : results) {
+        SmallVector<Decl *, 64> allTopLevelDecls;
+        overlay->getTopLevelDecls(allTopLevelDecls);
+        for (auto result : allTopLevelDecls) {
           if (auto singleResult = dyn_cast<T>(result)) {
             // The base name _could_ match but it's irrelevant here.
-            if (isMatch(singleResult, /*baseNameMatches=*/false)) {
+            if (isMatch(singleResult, /*baseNameMatches=*/false,
+                        /*allowObjCMismatch=*/false)) {
+              if (found)
+                return nullptr;
+              found = singleResult;
+            }
+          }
+        }
+      }
+
+      if (!found) {
+        // Go back to the first list and find classes with matching Swift names
+        // *even if the ObjC name doesn't match.*
+        // This shouldn't be allowed but we need it for source compatibility;
+        // people used `@class SwiftNameOfClass` as a workaround for not
+        // having the previous loop, and it "worked".
+        for (auto result : swiftDeclsByName) {
+          if (auto singleResult = dyn_cast<T>(result)) {
+            if (isMatch(singleResult, /*baseNameMatches=*/true,
+                        /*allowObjCMismatch=*/true)) {
               if (found)
                 return nullptr;
               found = singleResult;
@@ -5484,7 +5504,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-  structDecl->setAddedImplicitInitializers();
 
   // Import the type of the underlying storage
   auto storedUnderlyingType = Impl.importTypeIgnoreIUO(
@@ -5760,7 +5779,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-  structDecl->setAddedImplicitInitializers();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet});
@@ -6081,9 +6099,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   }
 
   bool redundant;
-  auto result =
-      importConstructor(objcMethod, dc, implicit, kind, required, selector,
-                        importedName, params, variadic, redundant);
+  auto result = importConstructor(objcMethod, dc, implicit,
+                                  kind.getValueOr(importedName.getInitKind()),
+                                  required, selector, importedName, params,
+                                  variadic, redundant);
 
   // If this is a compatibility stub, mark it as such.
   if (result && correctSwiftName)
@@ -6193,7 +6212,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
 /// constructor declaration appropriately.
 ConstructorDecl *SwiftDeclConverter::importConstructor(
     const clang::ObjCMethodDecl *objcMethod, DeclContext *dc, bool implicit,
-    Optional<CtorInitializerKind> kindIn, bool required, ObjCSelector selector,
+    CtorInitializerKind kind, bool required, ObjCSelector selector,
     ImportedName importedName, ArrayRef<const clang::ParmVarDecl *> args,
     bool variadic, bool &redundant) {
   redundant = false;
@@ -6201,35 +6220,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Figure out the type of the container.
   auto ownerNominal = dc->getSelfNominalTypeDecl();
   assert(ownerNominal && "Method in non-type context?");
-
-  // Find the interface, if we can.
-  const clang::ObjCInterfaceDecl *interface = nullptr;
-  if (auto classDecl = dyn_cast<ClassDecl>(ownerNominal)) {
-    interface =
-        dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
-  }
-
-  // If we weren't told what kind of initializer this should be,
-  // figure it out now.
-  CtorInitializerKind kind;
-
-  if (kindIn) {
-    kind = *kindIn;
-
-    // If we know this is a designated initializer, mark it as such.
-    if (interface && hasDesignatedInitializers(interface) &&
-        isDesignatedInitializer(interface, objcMethod))
-      kind = CtorInitializerKind::Designated;
-  } else {
-    // If the owning Objective-C class has designated initializers and this
-    // is not one of them, treat it as a convenience initializer.
-    if (interface && hasDesignatedInitializers(interface) &&
-        !isDesignatedInitializer(interface, objcMethod)) {
-      kind = CtorInitializerKind::Convenience;
-    } else {
-      kind = CtorInitializerKind::Designated;
-    }
-  }
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
@@ -7274,9 +7264,9 @@ void SwiftDeclConverter::importInheritedConstructors(
   };
 
   // The kind of initializer to import. If this class has designated
-  // initializers, everything it imports is a convenience initializer.
+  // initializers, everything it inherits is a convenience initializer.
   Optional<CtorInitializerKind> kind;
-  if (hasDesignatedInitializers(curObjCClass))
+  if (curObjCClass->hasDesignatedInitializers())
     kind = CtorInitializerKind::Convenience;
 
 

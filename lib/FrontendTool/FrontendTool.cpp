@@ -605,13 +605,9 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (!(FixitAll || shouldTakeFixit(Kind, Info)))
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (!(FixitAll || shouldTakeFixit(Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
       AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
@@ -1822,13 +1818,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     SourceManager dummyMgr;
 
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
-                         "fatal error encountered during compilation; please "
-                         "file a bug report with your project and the crash "
-                         "log",
-                         {}, DiagnosticInfo(), SourceLoc());
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo(), SourceLoc());
+    DiagnosticInfo errorInfo(
+        DiagID(0), SourceLoc(), DiagnosticKind::Error,
+        "fatal error encountered during compilation; please file a bug report "
+        "with your project and the crash log",
+        {}, SourceLoc(), {}, {}, {}, false);
+    DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note,
+                            reason, {}, SourceLoc(), {}, {}, {}, false);
+    PDC.handleDiagnostic(dummyMgr, errorInfo);
+    PDC.handleDiagnostic(dummyMgr, noteInfo);
     if (shouldCrash)
       abort();
   };

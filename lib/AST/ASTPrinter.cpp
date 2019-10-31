@@ -950,6 +950,9 @@ void PrintAST::printAttributes(const Decl *D) {
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/Attr.def"
+    } else if (isa<FuncDecl>(D)) {
+      Options.ExcludeAttrList.push_back(DAK_Mutating);
+      Options.ExcludeAttrList.push_back(DAK_NonMutating);
     }
 
     // If the declaration is implicitly @objc, print the attribute now.
@@ -976,12 +979,6 @@ void PrintAST::printAttributes(const Decl *D) {
       Printer.printAttrName("final");
       Printer << " ";
     }
-  }
-
-  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
-  // for which that is true.
-  if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-    printMutatingModifiersIfNeeded(accessor);
   }
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
@@ -1706,9 +1703,11 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
 }
 
 void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
-  if (accessor->isAssumedNonMutating() && accessor->isMutating()) {
+  if (accessor->isAssumedNonMutating() && accessor->isMutating() &&
+      !Options.excludeAttrKind(DAK_Mutating)) {
     Printer.printKeyword("mutating", Options, " ");
-  } else if (accessor->isExplicitNonMutating()) {
+  } else if (accessor->isExplicitNonMutating() &&
+             !Options.excludeAttrKind(DAK_NonMutating)) {
     Printer.printKeyword("nonmutating", Options, " ");
   }
 }
@@ -2717,6 +2716,10 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+
+  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
+  // for which that is true.
+  printMutatingModifiersIfNeeded(decl);
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
@@ -2773,7 +2776,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     if (!Options.SkipIntroducerKeywords) {
       if (decl->isStatic() && Options.PrintStaticKeyword)
         printStaticKeyword(decl->getCorrectStaticSpelling());
-      if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
+      if (decl->isMutating() && !Options.excludeAttrKind(DAK_Mutating)) {
         Printer.printKeyword("mutating", Options, " ");
       } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
         Printer.printKeyword("__consuming", Options, " ");
@@ -2869,7 +2872,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
 
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (elt->hasInterfaceType() && !elt->getInterfaceType()->hasError()) {
+    if (elt->hasInterfaceType() && !elt->isInvalid()) {
       // Walk to the params of the associated values.
       // (EnumMetaType) -> (AssocValues) -> Enum
       params = elt->getInterfaceType()->castTo<AnyFunctionType>()
@@ -2966,7 +2969,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   }, [&] { // Parameters
     printGenericDeclGenericParams(decl);
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (decl->hasInterfaceType() && !decl->getInterfaceType()->hasError()) {
+    if (decl->hasInterfaceType() && !decl->isInvalid()) {
       // Walk to the params of the subscript's indices.
       params = decl->getInterfaceType()->castTo<AnyFunctionType>()->getParams();
     }
@@ -3815,9 +3818,8 @@ public:
     }
   }
 
-  void printFunctionExtInfo(
-      SILFunctionType::ExtInfo info,
-      Optional<ProtocolConformanceRef> witnessMethodConformance) {
+  void printFunctionExtInfo(SILFunctionType::ExtInfo info,
+                            ProtocolConformanceRef witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
 
@@ -3848,7 +3850,7 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance->getRequirement()->getDeclaredType());
+            witnessMethodConformance.getRequirement()->getDeclaredType());
         break;
       case SILFunctionType::Representation::Closure:
         Printer << "closure";
@@ -3927,6 +3929,17 @@ public:
     PrintAST(Printer, Options).printGenericSignature(genericSig, flags);
   }
 
+  void printSubstitutions(SubstitutionMap subs) {
+    Printer << " <";
+    interleave(subs.getReplacementTypes(),
+               [&](Type type) {
+                 visit(type);
+               }, [&]{
+                 Printer << ", ";
+               });
+    Printer << ">";
+  }
+  
   void visitGenericFunctionType(GenericFunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
     SWIFT_DEFER {
@@ -3987,13 +4000,16 @@ public:
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
     printFunctionExtInfo(T->getExtInfo(),
-                         T->getWitnessMethodConformanceOrNone());
+                         T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
-    if (auto sig = T->getGenericSignature()) {
+    if (auto sig = T->getSubstGenericSignature()) {
       printGenericSignature(sig,
                             PrintAST::PrintParams |
                             PrintAST::PrintRequirements);
       Printer << " ";
+      if (T->isGenericSignatureImplied()) {
+        Printer << "in ";
+      }
     }
 
     Printer << "(";
@@ -4027,10 +4043,15 @@ public:
       assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
       Printer.printSeparator(first, ", ");
       Printer << "@error ";
-      T->getErrorResult().getType().print(Printer, Options);
+      T->getErrorResult().getInterfaceType().print(Printer, Options);
     }
 
     if (totalResults != 1) Printer << ")";
+  
+    if (auto substitutions = T->getSubstitutions()) {
+      Printer << " for ";
+      printSubstitutions(substitutions);
+    }
   }
 
   void visitSILBlockStorageType(SILBlockStorageType *T) {
@@ -4070,14 +4091,7 @@ public:
 
     // The arguments to the layout, if any, do come from the outer environment.
     if (auto subMap = T->getSubstitutions()) {
-      Printer << " <";
-      interleave(subMap.getReplacementTypes(),
-                 [&](Type type) {
-                   visit(type);
-                 }, [&]{
-                   Printer << ", ";
-                 });
-      Printer << ">";
+      printSubstitutions(subMap);
     }
   }
 
@@ -4476,7 +4490,7 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
   Printer << getStringForParameterConvention(getConvention());
-  getType().print(Printer, Opts);
+  getInterfaceType().print(Printer, Opts);
 }
 
 static StringRef getStringForResultConvention(ResultConvention conv) {
@@ -4500,7 +4514,7 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   Printer << getStringForResultConvention(getConvention());
-  getType().print(Printer, Opts);
+  getInterfaceType().print(Printer, Opts);
 }
 
 std::string Type::getString(const PrintOptions &PO) const {

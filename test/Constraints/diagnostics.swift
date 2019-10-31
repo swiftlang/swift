@@ -86,7 +86,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}  expected-error{{variable 'j' is not bound by any pattern}}
+for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -303,7 +303,7 @@ _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
 func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
-  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}} // expected-warning {{redundant cast to '(Double, Double)' has no effect}} {{56-75=}}
+  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}}
 }
 
 // Diagnose passing an array in lieu of variadic parameters

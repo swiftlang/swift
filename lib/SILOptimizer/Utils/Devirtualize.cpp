@@ -412,7 +412,8 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
     return SubstitutionMap();
 
   // Add any generic substitutions for the base class.
-  Type baseSelfType = baseCalleeType->getSelfParameter().getType();
+  Type baseSelfType = baseCalleeType->getSelfParameter()
+                                    .getArgumentType(module, baseCalleeType);
   if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
     baseSelfType = metatypeType->getInstanceType();
 
@@ -437,7 +438,8 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   SubstitutionMap origSubMap = applySite.getSubstitutionMap();
 
   Type calleeSelfType =
-      applySite.getOrigCalleeType()->getSelfParameter().getType();
+      applySite.getOrigCalleeType()->getSelfParameter()
+               .getArgumentType(module, applySite.getOrigCalleeType());
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
     calleeSelfType = metatypeType->getInstanceType();
   auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
@@ -449,7 +451,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   if (auto calleeClassSig = calleeClassDecl->getGenericSignatureOfContext())
     origDepth = calleeClassSig->getGenericParams().back()->getDepth() + 1;
 
-  auto baseCalleeSig = baseCalleeType->getGenericSignature();
+  auto baseCalleeSig = baseCalleeType->getInvocationGenericSignature();
 
   return
     SubstitutionMap::combineSubstitutionMaps(baseSubMap,
@@ -569,10 +571,11 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
   SILValue token = newBAI->getTokenResult();
 
   // The token will only be used by end_apply and abort_apply. Use that to
-  // insert the end_borrows we need.
+  // insert the end_borrows we need /after/ those uses.
   for (auto *use : token->getUses()) {
-    SILBuilderWithScope borrowBuilder(use->getUser(),
-                                      builder.getBuilderContext());
+    SILBuilderWithScope borrowBuilder(
+        &*std::next(use->getUser()->getIterator()),
+        builder.getBuilderContext());
     for (SILValue borrow : newArgBorrows) {
       borrowBuilder.createEndBorrow(loc, borrow);
     }
@@ -938,15 +941,15 @@ swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
   assert(witnessFnTy->getRepresentation() ==
          SILFunctionTypeRepresentation::WitnessMethod);
 
-  auto requirementSig = applySite.getOrigCalleeType()->getGenericSignature();
-  auto witnessThunkSig = witnessFnTy->getGenericSignature();
+  auto requirementSig = applySite.getOrigCalleeType()->getInvocationGenericSignature();
+  auto witnessThunkSig = witnessFnTy->getInvocationGenericSignature();
 
   SubstitutionMap origSubs = applySite.getSubstitutionMap();
 
   auto *mod = module.getSwiftModule();
   bool isSelfAbstract =
-    witnessFnTy->getSelfInstanceType()->is<GenericTypeParamType>();
-  auto *classWitness = witnessFnTy->getWitnessMethodClass();
+    witnessFnTy->getSelfInstanceType(module)->is<GenericTypeParamType>();
+  auto *classWitness = witnessFnTy->getWitnessMethodClass(module);
 
   return ::getWitnessMethodSubstitutions(mod, cRef, requirementSig,
                                          witnessThunkSig, origSubs,
