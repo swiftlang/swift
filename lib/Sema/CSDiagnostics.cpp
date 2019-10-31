@@ -5453,3 +5453,41 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsNote() {
   }
   return false;
 }
+
+bool ExtraneousCallFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
+
+  auto *anchor = getAnchor();
+  auto *locator = getLocator();
+
+  // If this is something like `foo()` where `foo` is a variable
+  // or a property, let's suggest dropping `()`.
+  auto removeParensFixIt = [&](InFlightDiagnostic &diagnostic) {
+    auto *argLoc = cs.getConstraintLocator(getRawAnchor(),
+                                           ConstraintLocator::ApplyArgument);
+
+    if (auto *TE =
+            dyn_cast_or_null<TupleExpr>(simplifyLocatorToAnchor(argLoc))) {
+      if (TE->getNumElements() == 0) {
+        diagnostic.fixItRemove(TE->getSourceRange());
+      }
+    }
+  };
+
+  if (auto overload = getChoiceFor(cs.getCalleeLocator(locator))) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      if (auto *enumCase = dyn_cast<EnumElementDecl>(decl)) {
+        auto diagnostic = emitDiagnostic(
+            anchor->getLoc(), diag::unexpected_arguments_in_enum_case,
+            enumCase->getName());
+        removeParensFixIt(diagnostic);
+        return true;
+      }
+    }
+  }
+
+  auto diagnostic = emitDiagnostic(
+      anchor->getLoc(), diag::cannot_call_non_function_value, getType(anchor));
+  removeParensFixIt(diagnostic);
+  return true;
+}
