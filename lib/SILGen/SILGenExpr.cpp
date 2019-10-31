@@ -3549,7 +3549,30 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     [this, &operands, E](const KeyPathExpr::Component &component) {
       if (!component.getIndexExpr())
         return;
-      
+
+      if (auto *parenExpr = dyn_cast<ParenExpr>(component.getIndexExpr())) {
+        if (auto *defaultArg =
+                dyn_cast<DefaultArgumentExpr>(parenExpr->getSubExpr())) {
+          const ParamDecl *defaultParam = getParameterAt(
+              cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()), 0);
+          parenExpr->setSubExpr(defaultParam->getDefaultValue());
+        }
+      }
+
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(component.getIndexExpr())) {
+        size_t count = 0;
+        for (auto *element : tupleExpr->getElements()) {
+          if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(element)) {
+            const ParamDecl *defaultParam = getParameterAt(
+                cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()),
+                count++);
+            tupleExpr->setElement(count - 1, defaultParam->getDefaultValue());
+          } else {
+            (void)++count;
+          }
+        }
+      }
+
       // Evaluate the index arguments.
       SmallVector<RValue, 2> indexValues;
       auto indexResult = visit(component.getIndexExpr(), SGFContext());
