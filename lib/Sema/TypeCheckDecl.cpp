@@ -499,11 +499,11 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   
   // Make sure this type conforms to OptionSet
   auto *optionSetProto = tc.Context.getProtocol(KnownProtocolKind::OptionSet);
-  bool conformsToOptionSet = tc.containsProtocol(
+  bool conformsToOptionSet = (bool)tc.containsProtocol(
                                                   DC->getSelfTypeInContext(),
                                                   optionSetProto,
                                                   DC,
-                                                  /*Flags*/None).hasValue();
+                                                  /*Flags*/None);
   
   if (!conformsToOptionSet)
     return;
