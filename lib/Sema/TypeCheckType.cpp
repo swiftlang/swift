@@ -565,9 +565,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AssociatedTypeDecl>(typeDecl) ||
-            (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+        if (isa<AssociatedTypeDecl>(typeDecl)) {
           // FIXME: We should use this lookup method for the Interface
           // stage too, but right now that causes problems with
           // Sequence.SubSequence vs Collection.SubSequence; the former
@@ -1295,10 +1293,23 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     // Otherwise, check for an ambiguity.
     if (!resolution.areSameType(current, type)) {
       isAmbiguous = true;
-      break;
+      // If a typealias collides with an associatedtype in generic requirement
+      // position, prefer the associated type.
+      if (options.getContext() == TypeResolverContext::GenericRequirement) {
+        if (isa<TypeAliasDecl>(currentDecl) && isa<AssociatedTypeDecl>(typeDecl)) {
+          current = type;
+          currentDecl = typeDecl;
+          currentDC = foundDC;
+          isAmbiguous = false;
+        } else if (isa<AssociatedTypeDecl>(currentDecl) &&
+                   isa<TypeAliasDecl>(typeDecl)) {
+          isAmbiguous = false;
+        }
+      }
+      if (isAmbiguous) break;
     }
 
-    // We have a found multiple type aliases that refer to the same thing.
+    // We have found multiple type aliases that refer to the same thing.
     // Ignore the duplicate.
   }
 
