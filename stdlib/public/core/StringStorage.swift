@@ -297,7 +297,7 @@ final internal class __StringStorage
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8> {
-    return start
+    return start._unsafelyUnwrappedUnchecked
   }
 
   @objc(cStringUsingEncoding:)
@@ -851,7 +851,7 @@ final internal class __SharedStringStorage
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8> {
-    return start
+    return start._unsafelyUnwrappedUnchecked
   }
 
   @objc(cStringUsingEncoding:)

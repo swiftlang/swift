@@ -192,14 +192,14 @@ internal func _cocoaStringCopyUTF8(
 
 @_effects(releasenone)
 private func _NSStringGetUTF8Pointer(
-  _ o: _StringSelectorHolder,
+  _ o: _StringSelectorHolder
 ) -> UnsafePointer<UInt8> {
   return o._utf8String()
 }
 
 @_effects(releasenone)
 internal func _cocoaStringGetUTF8Pointer(
-  _ target: _CocoaString,
+  _ target: _CocoaString
 ) -> UnsafePointer<UInt8> {
   return _NSStringGetUTF8Pointer(_objc(target))
 }
@@ -309,7 +309,7 @@ internal enum _KnownCocoaString {
 
   private static let stringClasses = (
     storage: unsafeBitCast(__StringStorage.self, to: UInt.self),
-    shared: unsafeBitCast(__SharedStringStorage.self, to: UInt.self)
+    shared: unsafeBitCast(__SharedStringStorage.self, to: UInt.self),
     mutable: unsafeBitCast(_SwiftNSMutableString.self, to: UInt.self)
   )
   
@@ -763,7 +763,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     // our CoW to make it a bit faster
     let anchor = _contents._bridgeToObjectiveCImpl()
     let unmanagedAnchor = Unmanaged.passRetained(anchor)
-    unmanagedAnchor.autorelease()
+    _ = unmanagedAnchor.autorelease()
     return _cocoaStringGetUTF8Pointer(anchor)
   }
 
