@@ -212,14 +212,15 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(NTD->getMembers(), true);
 
-    // Avoid populating the cache with the members of invalid extension
-    // declarations.  These members can be used to point validation inside of
-    // a malformed context.
-    if (D->isInvalid()) continue;
+    if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+      // Avoid populating the cache with the members of invalid extension
+      // declarations.  These members can be used to point validation inside of
+      // a malformed context.
+      if (ED->isInvalid()) continue;
 
-    if (auto *ED = dyn_cast<ExtensionDecl>(D))
       if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(ED->getMembers(), true);
+    }
   }
 }
 
@@ -716,7 +717,7 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getDisplayDecls, (Results));
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   ASTContext &ctx = getASTContext();
 
@@ -725,7 +726,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // If the existential type cannot be represented or the protocol does not
   // conform to itself, there's no point in looking further.
   if (!protocol->existentialConformsToSelf())
-    return None;
+    return ProtocolConformanceRef::forInvalid();
 
   auto layout = type->getExistentialLayout();
 
@@ -742,7 +743,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
         type->castTo<ProtocolType>()->getDecl() == protocol)
       return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
-    return None;
+    return ProtocolConformanceRef::forInvalid();
   }
 
   // If the existential is class-constrained, the class might conform
@@ -775,11 +776,11 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
   // We didn't find our protocol in the existential's list; it doesn't
   // conform.
-  return None;
+  return ProtocolConformanceRef::forInvalid();
 }
 
-Optional<ProtocolConformanceRef>
-ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
+ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
+                                                     ProtocolDecl *protocol) {
   ASTContext &ctx = getASTContext();
 
   // A dynamic Self type conforms to whatever its underlying type
@@ -799,10 +800,8 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
     // concrete.
     if (auto super = archetype->getSuperclass()) {
       if (auto inheritedConformance = lookupConformance(super, protocol)) {
-        return ProtocolConformanceRef(
-                 ctx.getInheritedConformance(
-                   type,
-                   inheritedConformance->getConcrete()));
+        return ProtocolConformanceRef(ctx.getInheritedConformance(
+            type, inheritedConformance.getConcrete()));
       }
     }
 
@@ -811,7 +810,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
         return ProtocolConformanceRef(protocol);
     }
 
-    return None;
+    return ProtocolConformanceRef::forInvalid();
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -833,12 +832,13 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
-  if (!nominal || isa<ProtocolDecl>(nominal)) return None;
+  if (!nominal || isa<ProtocolDecl>(nominal))
+    return ProtocolConformanceRef::forInvalid();
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(this, protocol, conformances))
-    return None;
+    return ProtocolConformanceRef::forInvalid();
 
   // FIXME: Ambiguity resolution.
   auto conformance = conformances.front();
@@ -862,8 +862,8 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
            "We already found the inherited conformance");
 
     // Create the inherited conformance entry.
-    conformance
-      = ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
+    conformance =
+        ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
     return ProtocolConformanceRef(conformance);
   }
 

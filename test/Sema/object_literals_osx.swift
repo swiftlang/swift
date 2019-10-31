@@ -24,3 +24,6 @@ let p1: Path = #fileLiteral(resourceName: "what.txt")
 let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}
 
 let text = #fileLiteral(resourceName: "TextFile.txt").relativeString! // expected-error{{type of expression is ambiguous without more context}}
+
+// rdar://problem/49861813
+#fileLiteral() // expected-error {{cannot convert value of type '()' to expected argument type '(resourceName: String)'}}

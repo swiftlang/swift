@@ -487,12 +487,12 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC, TypeChecker &tc) {
+                               DeclContext *owningDC) {
   if (!genericParams)
     return;
 
   for (auto gp : *genericParams) {
-    tc.checkDeclAttributes(gp);
+    TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
 
@@ -634,13 +634,8 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
-  // FIXME: Computes isInvalid() below.
-  (void) current->getInterfaceType();
-
   // Ignore invalid and anonymous declarations.
-  if (current->isInvalid() ||
-      !current->hasInterfaceType() ||
-      !current->hasName())
+  if (current->isInvalid() || !current->hasName())
     return;
 
   // If this declaration isn't from a source file, don't check it.
@@ -679,7 +674,9 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
     // Skip invalid declarations and ourselves.
-    if (current == other || other->isInvalid())
+    //
+    // FIXME: Breaking a cycle here with hasInterfaceType() is bogus.
+    if (current == other || (other->hasInterfaceType() && other->isInvalid()))
       continue;
 
     // Skip declarations in other modules.
@@ -704,9 +701,6 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // FIXME: Computes isInvalid() below.
-    (void) other->getInterfaceType();
-
     // Skip invalid declarations.
     if (other->isInvalid())
       continue;
@@ -719,19 +713,13 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (!other->isAccessibleFrom(currentDC))
       continue;
 
-    const auto markInvalid = [&current]() {
-      current->setInvalid();
-      if (current->hasInterfaceType())
-        current->setInterfaceType(ErrorType::get(current->getInterfaceType()));
-    };
-
     // Thwart attempts to override the same declaration more than once.
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
       current->diagnose(diag::multiple_override, current->getFullName());
       other->diagnose(diag::multiple_override_prev, other->getFullName());
-      markInvalid();
+      current->setInvalid();
       break;
     }
 
@@ -878,7 +866,7 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
             other->diagnose(diag::invalid_redecl_prev, other->getFullName());
           });
         }
-        markInvalid();
+        current->setInvalid();
       }
 
       // Make sure we don't do this checking again for the same decl. We also
@@ -1543,10 +1531,10 @@ computeAutomaticEnumValueKind(EnumDecl *ED) {
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
     ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return TypeChecker::conformsToProtocol(rawTy, proto,
-                                           ED->getDeclContext(), None);
+    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext(),
+                                           None);
   };
-  
+
   static auto otherLiteralProtocolKinds = {
     KnownProtocolKind::ExpressibleByFloatLiteral,
     KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
@@ -1593,9 +1581,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   
   Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
-    // FIXME: Computes isInvalid() below.
-    (void) elt->getInterfaceType();
-
     // If the element has been diagnosed up to now, skip it.
     if (elt->isInvalid())
       continue;
@@ -2241,7 +2226,7 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
-    TC.checkUnsupportedProtocolType(decl);
+    TypeChecker::checkUnsupportedProtocolType(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = TC.Context;
@@ -2289,11 +2274,11 @@ public:
   }
   
   void visitImportDecl(ImportDecl *ID) {
-    TC.checkDeclAttributes(ID);
+    TypeChecker::checkDeclAttributes(ID);
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
-    TC.checkDeclAttributes(OD);
+    TypeChecker::checkDeclAttributes(OD);
     auto &Ctx = OD->getASTContext();
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
@@ -2311,7 +2296,7 @@ public:
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
-    TC.checkDeclAttributes(PGD);
+    TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
     checkAccessControl(TC, PGD);
   }
@@ -2377,7 +2362,7 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(VD);
+    TypeChecker::checkDeclAttributes(VD);
 
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
@@ -2431,7 +2416,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     DeclContext *DC = PBD->getDeclContext();
 
-    TC.checkDeclAttributes(PBD);
+    TypeChecker::checkDeclAttributes(PBD);
 
     bool isInSILMode = false;
     if (auto sourceFile = DC->getParentSourceFile())
@@ -2472,7 +2457,6 @@ public:
         auto markVarAndPBDInvalid = [PBD, var] {
           PBD->setInvalid();
           var->setInvalid();
-          var->setInterfaceType(ErrorType::get(var->getASTContext()));
         };
         
         // Properties with an opaque return type need an initializer to
@@ -2529,7 +2513,7 @@ public:
       });
     }
 
-    TC.checkDeclAttributes(PBD);
+    TypeChecker::checkDeclAttributes(PBD);
 
     checkAccessControl(TC, PBD);
 
@@ -2578,12 +2562,12 @@ public:
     (void) SD->getGenericSignature();
 
     if (!SD->isInvalid()) {
-      TC.checkReferencedGenericParams(SD);
-      checkGenericParams(SD->getGenericParams(), SD, TC);
-      TC.checkProtocolSelfRequirements(SD);
+      TypeChecker::checkReferencedGenericParams(SD);
+      checkGenericParams(SD->getGenericParams(), SD);
+      TypeChecker::checkProtocolSelfRequirements(SD);
     }
 
-    TC.checkDeclAttributes(SD);
+    TypeChecker::checkDeclAttributes(SD);
 
     checkAccessControl(TC, SD);
 
@@ -2604,7 +2588,7 @@ public:
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
 
-    TC.checkParameterAttributes(SD->getIndices());
+    TypeChecker::checkParameterAttributes(SD->getIndices());
     checkDefaultArguments(TC, SD->getIndices());
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
@@ -2627,7 +2611,7 @@ public:
     (void) TAD->getGenericSignature();
     (void) TAD->getUnderlyingType();
 
-    TC.checkDeclAttributes(TAD);
+    TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TC, TAD);
 
   }
@@ -2636,12 +2620,12 @@ public:
     // Force requests that can emit diagnostics.
     (void) OTD->getGenericSignature();
 
-    TC.checkDeclAttributes(OTD);
+    TypeChecker::checkDeclAttributes(OTD);
     checkAccessControl(TC, OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    TC.checkDeclAttributes(AT);
+    TypeChecker::checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
     auto *proto = AT->getProtocol();
@@ -2732,7 +2716,7 @@ public:
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
-    checkGenericParams(ED->getGenericParams(), ED, TC);
+    checkGenericParams(ED->getGenericParams(), ED);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2745,7 +2729,7 @@ public:
     for (Decl *member : ED->getMembers())
       visit(member);
 
-    TC.checkDeclAttributes(ED);
+    TypeChecker::checkDeclAttributes(ED);
 
     checkInheritanceClause(ED);
 
@@ -2778,7 +2762,7 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    checkGenericParams(SD->getGenericParams(), SD, TC);
+    checkGenericParams(SD->getGenericParams(), SD);
 
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
@@ -2790,7 +2774,7 @@ public:
 
     TC.checkPatternBindingCaptures(SD);
 
-    TC.checkDeclAttributes(SD);
+    TypeChecker::checkDeclAttributes(SD);
 
     checkInheritanceClause(SD);
 
@@ -2901,7 +2885,7 @@ public:
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();
 
-    checkGenericParams(CD->getGenericParams(), CD, TC);
+    checkGenericParams(CD->getGenericParams(), CD);
 
     {
       // Check for circular inheritance.
@@ -3038,7 +3022,7 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(CD);
+    TypeChecker::checkDeclAttributes(CD);
 
     checkInheritanceClause(CD);
 
@@ -3075,7 +3059,7 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    TC.checkDeclAttributes(PD);
+    TypeChecker::checkDeclAttributes(PD);
 
     checkAccessControl(TC, PD);
 
@@ -3186,15 +3170,15 @@ public:
     (void) FD->getOperatorDecl();
 
     if (!FD->isInvalid()) {
-      checkGenericParams(FD->getGenericParams(), FD, TC);
-      TC.checkReferencedGenericParams(FD);
-      TC.checkProtocolSelfRequirements(FD);
+      checkGenericParams(FD->getGenericParams(), FD);
+      TypeChecker::checkReferencedGenericParams(FD);
+      TypeChecker::checkProtocolSelfRequirements(FD);
     }
 
     checkAccessControl(TC, FD);
 
-    TC.checkParameterAttributes(FD->getParameters());
-    TC.checkDeclAttributes(FD);
+    TypeChecker::checkParameterAttributes(FD->getParameters());
+    TypeChecker::checkDeclAttributes(FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3280,10 +3264,10 @@ public:
     (void) EED->getInterfaceType();
     auto *ED = EED->getParentEnum();
 
-    TC.checkDeclAttributes(EED);
+    TypeChecker::checkDeclAttributes(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      TC.checkParameterAttributes(PL);
+      TypeChecker::checkParameterAttributes(PL);
       checkDefaultArguments(TC, PL);
     }
 
@@ -3387,14 +3371,14 @@ public:
       }
     }
 
-    checkGenericParams(ED->getGenericParams(), ED, TC);
+    checkGenericParams(ED->getGenericParams(), ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
     TC.ConformanceContexts.push_back(ED);
 
-    TC.checkDeclAttributes(ED);
+    TypeChecker::checkDeclAttributes(ED);
     checkAccessControl(TC, ED);
 
     checkExplicitAvailability(ED);
@@ -3408,7 +3392,7 @@ public:
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
-    TC.checkDeclAttributes(ICD);
+    TypeChecker::checkDeclAttributes(ICD);
   }
 
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
@@ -3427,13 +3411,13 @@ public:
     (void) CD->getInitKind();
 
     if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams(), CD, TC);
-      TC.checkReferencedGenericParams(CD);
-      TC.checkProtocolSelfRequirements(CD);
+      checkGenericParams(CD->getGenericParams(), CD);
+      TypeChecker::checkReferencedGenericParams(CD);
+      TypeChecker::checkProtocolSelfRequirements(CD);
     }
 
-    TC.checkDeclAttributes(CD);
-    TC.checkParameterAttributes(CD->getParameters());
+    TypeChecker::checkDeclAttributes(CD);
+    TypeChecker::checkParameterAttributes(CD->getParameters());
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
@@ -3548,7 +3532,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    TC.checkDeclAttributes(DD);
+    TypeChecker::checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
@@ -3571,6 +3555,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   if (!dc->getParentSourceFile())
     return true;
 
+  auto &Context = proto->getASTContext();
   NominalTypeDecl *conformingDecl = dc->getSelfNominalTypeDecl();
   assert(conformingDecl && "Must have conforming declaration");
 
@@ -4374,7 +4359,8 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     //
     // Once that's through, this will only fire during circular validation.
     if (!namingPattern) {
-      if (!VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+      if (VD->hasInterfaceType() &&
+          !VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
         VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
       }
 
@@ -4408,15 +4394,18 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   TypeChecker::addImplicitConstructors(CD);
 
   auto forceConformance = [&](ProtocolDecl *protocol) {
-    if (auto ref = TypeChecker::conformsToProtocol(
-          CD->getDeclaredInterfaceType(), protocol, CD,
-          ConformanceCheckFlags::SkipConditionalRequirements,
-          SourceLoc())) {
-      auto conformance = ref->getConcrete();
-      if (conformance->getDeclContext() == CD &&
-          conformance->getState() == ProtocolConformanceState::Incomplete) {
-        TC.checkConformance(conformance->getRootNormalConformance());
-      }
+    auto ref = TypeChecker::conformsToProtocol(
+        CD->getDeclaredInterfaceType(), protocol, CD,
+        ConformanceCheckFlags::SkipConditionalRequirements, SourceLoc());
+
+    if (ref.isInvalid()) {
+      return;
+    }
+
+    auto conformance = ref.getConcrete();
+    if (conformance->getDeclContext() == CD &&
+        conformance->getState() == ProtocolConformanceState::Incomplete) {
+      TC.checkConformance(conformance->getRootNormalConformance());
     }
   };
 
@@ -4570,8 +4559,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
-static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
-                                                           DeclContext *dc,
+static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
                                                            Pattern *pattern) {
   switch (pattern->getKind()) {
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
@@ -4589,12 +4577,13 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     auto type = pattern->getType();
 
     // For literal-convertible types, form the corresponding literal.
-#define CHECK_LITERAL_PROTOCOL(Kind, String) \
-    if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) { \
-      if (tc.conformsToProtocol(type, proto, dc, \
-                                ConformanceCheckFlags::InExpression)) \
-        return std::string(String); \
-    }
+#define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
+  if (auto proto = TypeChecker::getProtocol(                                   \
+          type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
+    if (TypeChecker::conformsToProtocol(type, proto, dc,                       \
+                                        ConformanceCheckFlags::InExpression))  \
+      return std::string(String);                                              \
+  }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "[:]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "\"\"")
@@ -4613,7 +4602,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
   case PatternKind::Paren: {
     if (auto sub = buildDefaultInitializerString(
-                     tc, dc, cast<ParenPattern>(pattern)->getSubPattern())) {
+            dc, cast<ParenPattern>(pattern)->getSubPattern())) {
       return "(" + *sub + ")";
     }
 
@@ -4624,7 +4613,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     std::string result = "(";
     bool first = true;
     for (auto elt : cast<TuplePattern>(pattern)->getElements()) {
-      if (auto sub = buildDefaultInitializerString(tc, dc, elt.getPattern())) {
+      if (auto sub = buildDefaultInitializerString(dc, elt.getPattern())) {
         if (first) {
           first = false;
         } else {
@@ -4642,21 +4631,21 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
 
   case PatternKind::Typed:
     return buildDefaultInitializerString(
-             tc, dc, cast<TypedPattern>(pattern)->getSubPattern());
+        dc, cast<TypedPattern>(pattern)->getSubPattern());
 
   case PatternKind::Var:
     return buildDefaultInitializerString(
-             tc, dc, cast<VarPattern>(pattern)->getSubPattern());
+        dc, cast<VarPattern>(pattern)->getSubPattern());
   }
 
   llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Diagnose a class that does not have any initializers.
-static void diagnoseClassWithoutInitializers(TypeChecker &tc,
-                                             ClassDecl *classDecl) {
-  tc.diagnose(classDecl, diag::class_without_init,
-              classDecl->getDeclaredType());
+static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+  ASTContext &C = classDecl->getASTContext();
+  C.Diags.diagnose(classDecl, diag::class_without_init,
+                   classDecl->getDeclaredType());
 
   // HACK: We've got a special case to look out for and diagnose specifically to
   // improve the experience of seeing this, and mitigate some confusion.
@@ -4672,13 +4661,12 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   // listing the members that prevented initializer synthesis.
   // TODO: Add a fixit along with this suggestion.
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
-    ASTContext &C = tc.Context;
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    if (auto ref = TypeChecker::conformsToProtocol(superclassType, decodableProto,
-                                                   superclassDecl,
-                                                   ConformanceCheckOptions(),
-                                                   SourceLoc())) {
+    auto ref = TypeChecker::conformsToProtocol(
+        superclassType, decodableProto, superclassDecl,
+        ConformanceCheckOptions(), SourceLoc());
+    if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
       //
@@ -4686,9 +4674,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       // and isn't implicit; otherwise, on the subclass itself.
       ValueDecl *diagDest = classDecl;
       auto initFrom = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
-      auto result = tc.lookupMember(superclassDecl, superclassType, initFrom,
+      auto result =
+          TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     NameLookupFlags::ProtocolMembers |
-                                    NameLookupFlags::IgnoreAccessControl);
+                                        NameLookupFlags::IgnoreAccessControl);
 
       if (!result.empty() && !result.front().getValueDecl()->isImplicit())
         diagDest = result.front().getValueDecl();
@@ -4702,10 +4691,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      if ((ref = tc.conformsToProtocol(superclassType, encodableProto,
-                                       superclassDecl,
-                                       ConformanceCheckOptions(),
-                                       SourceLoc()))) {
+      auto ref = TypeChecker::conformsToProtocol(
+          superclassType, encodableProto, superclassDecl,
+          ConformanceCheckOptions(), SourceLoc());
+      if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
         // The direct lookup here won't see an encode(to:) if it is inherited
@@ -4715,7 +4704,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
           diagName = diag::codable_suggest_overriding_init_here;
       }
 
-      tc.diagnose(diagDest, diagName);
+      C.Diags.diagnose(diagDest, diagName);
     }
   }
 
@@ -4773,27 +4762,27 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       Optional<InFlightDiagnostic> diag;
       switch (vars.size()) {
       case 1:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_1,
-                                 vars[0]->getName()));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_1,
+                                      vars[0]->getName()));
         break;
       case 2:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_2,
-                                 vars[0]->getName(), vars[1]->getName()));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_2,
+                                      vars[0]->getName(), vars[1]->getName()));
         break;
       case 3:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
-                                 vars[2]->getName(), false));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_3plus,
+                                      vars[0]->getName(), vars[1]->getName(),
+                                      vars[2]->getName(), false));
         break;
       default:
-        diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
-                                 vars[2]->getName(), true));
+        diag.emplace(C.Diags.diagnose(varLoc, diag::note_no_in_class_init_3plus,
+                                      vars[0]->getName(), vars[1]->getName(),
+                                      vars[2]->getName(), true));
         break;
       }
 
-      if (auto defaultValueSuggestion
-             = buildDefaultInitializerString(tc, classDecl, pattern))
+      if (auto defaultValueSuggestion =
+              buildDefaultInitializerString(classDecl, pattern))
         diag->fixItInsertAfter(pattern->getEndLoc(),
                                " = " + *defaultValueSuggestion);
     }
@@ -4831,5 +4820,5 @@ void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
   }
 
-  diagnoseClassWithoutInitializers(*this, classDecl);
+  diagnoseClassWithoutInitializers(classDecl);
 }

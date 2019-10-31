@@ -1000,6 +1000,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
       std::make_shared<SwiftNameLookupExtension>(
           importer->Impl.BridgingHeaderLookupTable,
           importer->Impl.LookupTables, importer->Impl.SwiftContext,
+          importer->Impl.getBufferImporterForDiagnostics(),
           importer->Impl.platformAvailability,
           importer->Impl.InferImportAsMember));
 
@@ -1330,7 +1331,8 @@ bool ClangImporter::Implementation::importHeader(
   }
 
   // Finalize the lookup table, which may fail.
-  finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter());
+  finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter(),
+                      getBufferImporterForDiagnostics());
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -1852,6 +1854,7 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
+      BuffersForDiagnostics(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DWARFImporter(dwarfImporterDelegate) {}
 

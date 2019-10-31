@@ -33,12 +33,12 @@ class VarDecl;
 
 class DerivedConformance {
 public:
-  TypeChecker &TC;
+  ASTContext &Context;
   Decl *ConformanceDecl;
   NominalTypeDecl *Nominal;
   ProtocolDecl *Protocol;
 
-  DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+  DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                      NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
   /// Retrieve the context in which the conformance is declared (either the

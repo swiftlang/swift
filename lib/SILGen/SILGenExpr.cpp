@@ -3226,10 +3226,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SubstitutionMap hashableSubsMap = SubstitutionMap::get(
           hashGenericSig,
           [&](SubstitutableType *type) -> Type { return formalTy; },
-          [&](CanType dependentType, Type replacementType,
-              ProtocolDecl *proto)->Optional<ProtocolConformanceRef> {
-            return hashable;
-          });
+          [&](CanType dependentType, Type replacementType, ProtocolDecl *proto)
+              -> ProtocolConformanceRef { return hashable; });
 
       // Read the storage.
       ManagedValue base = ManagedValue::forBorrowedAddressRValue(indexAddr);

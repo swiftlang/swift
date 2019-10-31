@@ -1255,7 +1255,7 @@ bool ConstraintGraph::contractEdges() {
           rep2->getImpl().canBindToLValue()) ||
          // Allow l-value contractions when binding parameter types.
          isParamBindingConstraint)) {
-      if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
         auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
         if (CS.solverState)
           log.indent(CS.solverState->depth * 2);

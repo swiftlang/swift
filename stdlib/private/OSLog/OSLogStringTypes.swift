@@ -32,7 +32,8 @@ extension OSLogInterpolation {
   ///  - argumentString: the interpolated expression of type String, which is autoclosured.
   ///  - privacy: a privacy qualifier which is either private or public. Default is private.
   ///  TODO: create a specifier to denote auto-inferred privacy level and make it default.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ argumentString: @autoclosure @escaping () -> String,
@@ -50,9 +51,9 @@ extension OSLogInterpolation {
 
   /// Update preamble and append argument headers based on the parameters of
   /// the interpolation.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
-  @usableFromInline
   internal mutating func addStringHeaders(_ isPrivate: Bool) {
     // Append argument header.
     let header = getArgumentHeader(isPrivate: isPrivate, type: .string)
@@ -87,7 +88,9 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of String type, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @usableFromInline
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal mutating func append(_ value: @escaping () -> String) {
     argumentClosures.append({ serialize(value(), at: &$0, using: &$1) })
   }

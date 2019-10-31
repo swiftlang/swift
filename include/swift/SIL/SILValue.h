@@ -181,7 +181,7 @@ struct ValueOwnershipKind {
   /// that the two ownership kinds are "compatibile".
   ///
   /// The reason why we do not compare directy is to allow for
-  /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
+  /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
     return merge(other).hasValue();
   }
@@ -449,7 +449,7 @@ struct OperandOwnershipKindMap {
 
   /// Return the OperandOwnershipKindMap that tests for compatibility with
   /// ValueOwnershipKind kind. This means that it will accept a element whose
-  /// ownership is ValueOwnershipKind::Any.
+  /// ownership is ValueOwnershipKind::None.
   static OperandOwnershipKindMap
   compatibilityMap(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
     OperandOwnershipKindMap set;

@@ -841,8 +841,8 @@ static bool omitNeedlessWordsInFunctionName(
             param->getType(),
             getParamOptionality(swiftLanguageVersion, param,
                                 !nonNullArgs.empty() && nonNullArgs[i]),
-            nameImporter.getIdentifier(baseName), numParams, argumentName,
-            i == 0, isLastParameter, nameImporter) != DefaultArgumentKind::None;
+            nameImporter.getIdentifier(baseName), argumentName, i == 0,
+            isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
                                                      param->getOriginalType())

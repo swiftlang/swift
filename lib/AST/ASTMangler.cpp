@@ -1334,16 +1334,15 @@ static bool containsRetroactiveConformance(
       continue;
     ProtocolDecl *proto =
         requirement.getSecondType()->castTo<ProtocolType>()->getDecl();
-    Optional<ProtocolConformanceRef> conformance =
-        subMap.lookupConformance(requirement.getFirstType()->getCanonicalType(),
-                                 proto);
-    if (!conformance) {
+    auto conformance = subMap.lookupConformance(
+        requirement.getFirstType()->getCanonicalType(), proto);
+    if (conformance.isInvalid()) {
       // This should only happen when mangling invalid ASTs, but that happens
       // for indexing purposes.
       continue;
     }
-    if (conformance->isConcrete() &&
-        containsRetroactiveConformance(conformance->getConcrete(), module)) {
+    if (conformance.isConcrete() &&
+        containsRetroactiveConformance(conformance.getConcrete(), module)) {
       return true;
     }
   }
@@ -2367,7 +2366,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   parentGenericSig = GenericSignature();
 
   auto &C = decl->getASTContext();
-  if (!decl->getInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
+  if (decl->isInvalid()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
                                   C.TheErrorType);
@@ -2707,7 +2706,7 @@ void ASTMangler::appendConcreteProtocolConformance(
         appendOperator("HO");
       } else {
         auto conditionalConf = module->lookupConformance(canType, proto);
-        appendConcreteProtocolConformance(conditionalConf->getConcrete());
+        appendConcreteProtocolConformance(conditionalConf.getConcrete());
       }
       appendListSeparator(firstRequirement);
       break;

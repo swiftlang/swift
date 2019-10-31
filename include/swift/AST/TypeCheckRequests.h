@@ -1627,6 +1627,26 @@ public:
   bool isCached() const { return true; }
 };
 
+class CompareDeclSpecializationRequest
+    : public SimpleRequest<CompareDeclSpecializationRequest,
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, DeclContext *DC,
+                                ValueDecl *VD1, ValueDecl *VD2,
+                                bool dynamic) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks whether this declaration inherits its superclass' designated and
 /// convenience initializers.
 class InheritsSuperclassInitializersRequest

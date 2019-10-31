@@ -311,7 +311,7 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}} expected-error {{variable 'i' is not bound by any pattern}}
+    for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}

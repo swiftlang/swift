@@ -29,6 +29,9 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,

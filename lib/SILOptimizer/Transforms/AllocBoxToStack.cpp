@@ -601,10 +601,10 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getSubstGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      OrigFTI->getSubstitutions(), OrigFTI->isGenericSignatureImplied(),
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), OrigFTI->getSubstitutions(),
+      OrigFTI->isGenericSignatureImplied(), M.getASTContext(),
+      OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
