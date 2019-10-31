@@ -1454,17 +1454,16 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
-DifferentiableAttr::DifferentiableAttr(AbstractFunctionDecl *original,
-                                       bool implicit, SourceLoc atLoc,
-                                       SourceRange baseRange, bool linear,
-                                       IndexSubset *indices,
+DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
+                                       SourceLoc atLoc, SourceRange baseRange,
+                                       bool linear, IndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
       Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
       ParameterIndices(indices) {
-  setOriginalFunction(original);
+  setOriginalDeclaration(original);
   setDerivativeGenericSignature(derivativeGenSig);
 }
 
@@ -1484,10 +1483,9 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
-                           SourceLoc atLoc, SourceRange baseRange,
-                           bool linear, IndexSubset *indices,
-                           Optional<DeclNameWithLoc> jvp,
+DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
+                           SourceRange baseRange, bool linear,
+                           IndexSubset *indices, Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
@@ -1498,10 +1496,11 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                                       std::move(vjp), derivativeGenSig);
 }
 
-void DifferentiableAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
-  assert(!OriginalFunction && "Original function cannot have already been set");
-  assert(decl && "Original function must be non-null");
-  OriginalFunction = decl;
+void DifferentiableAttr::setOriginalDeclaration(Decl *decl) {
+  assert(decl && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = decl;
 }
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {

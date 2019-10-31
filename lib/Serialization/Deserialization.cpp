@@ -2180,7 +2180,7 @@ static void setOriginalDeclarationInDifferentiableAttributes(
   DeclAttributes tempAttrs;
   tempAttrs.setRawAttributeChain(attrs);
   for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>())
-    const_cast<DifferentiableAttr *>(attr)->setOriginalFunction(decl);
+    const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(decl);
 }
 // SWIFT_ENABLE_TENSORFLOW END
 

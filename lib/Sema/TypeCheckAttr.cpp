@@ -3274,8 +3274,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  if (!attr->getOriginalFunction())
-    attr->setOriginalFunction(original);
+  if (!attr->getOriginalDeclaration())
+    attr->setOriginalDeclaration(original);
   TC.resolveDeclSignature(original);
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();

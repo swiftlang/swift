@@ -17,6 +17,16 @@ struct Foo: Differentiable {
   @differentiable
   var computedProperty: Float { 1 }
 
+  var computedPropertyGetter: Float {
+    @differentiable
+    get { 1 }
+  }
+
   @differentiable
   subscript() -> Float { 1 }
+
+  subscript(_ x: Float) -> Float {
+    @differentiable
+    get { 1 }
+  }
 }
