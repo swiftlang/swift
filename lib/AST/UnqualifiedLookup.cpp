@@ -754,7 +754,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
         // for lookup.
         DeclContext *const BaseDC =
             isOutsideBodyOfFunction(AFD) ? fnDeclContext
-            : capturedSelfContext ?:  AFD;
+            : capturedSelfContext ? capturedSelfContext
+            :  AFD;
         // If we are inside of a method, check to see if there are any ivars in
         // scope, and if so, whether this is a reference to one of them.
         // FIXME: We should persist this information between lookups.
