@@ -148,7 +148,7 @@ public:
                                  const DeclContext *dc);
 
   /// This is a hack to cope with main file parsing and REPL parsing, where
-  /// we can add ImportDecls after name binding.
+  /// we can add ImportDecls after import resolution.
   void clear() {
     ImportSetForDC.clear();
   }

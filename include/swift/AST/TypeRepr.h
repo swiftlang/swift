@@ -263,7 +263,7 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
-  /// name binding will resolve this to a specific declaration.
+  /// name lookup will resolve this to a specific declaration.
   llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was

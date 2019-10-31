@@ -1,4 +1,4 @@
-//===--- NameBinding.cpp - Name Binding -----------------------------------===//
+//===--- ResolveImports.cpp - Import Resolution ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -383,8 +383,8 @@ void swift::resolveImportsAndOperators(SourceFile &SF, unsigned StartElem) {
   SharedTimer timer("Import resolution");
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
-  if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {
-    SF.ASTStage = SourceFile::NameBound;
+  if (SF.ASTStage == SourceFile::ImportsResolved || SF.Decls.empty()) {
+    SF.ASTStage = SourceFile::ImportsResolved;
     return;
   }
 
@@ -414,6 +414,6 @@ void swift::resolveImportsAndOperators(SourceFile &SF, unsigned StartElem) {
 
   SF.addImports(ImportedModules);
 
-  SF.ASTStage = SourceFile::NameBound;
+  SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
 }

@@ -78,7 +78,7 @@ private:
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the Name Binding phase.
+  /// This is filled in by the import resolution phase.
   ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -186,8 +186,8 @@ public:
     Parsing,
     /// Parsing has completed.
     Parsed,
-    /// Name binding has completed.
-    NameBound,
+    /// Import resolution has completed.
+    ImportsResolved,
     /// Type checking has completed.
     TypeChecked
   };

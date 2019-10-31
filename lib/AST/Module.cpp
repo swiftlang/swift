@@ -1031,7 +1031,7 @@ static Optional<OP_DECL *> lookupOperatorDeclForName(
   }
 
   auto &SF = cast<SourceFile>(File);
-  assert(SF.ASTStage >= SourceFile::NameBound);
+  assert(SF.ASTStage >= SourceFile::ImportsResolved);
 
   // Look for an operator declaration in the current module.
   auto found = (SF.*OP_MAP).find(Name);

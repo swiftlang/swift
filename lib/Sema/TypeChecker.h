@@ -541,7 +541,7 @@ enum class FunctionBuilderClosurePreCheck : uint8_t {
   HasReturnStmt,
 };
 
-/// The Swift type checker, which takes a parsed AST and performs name binding,
+/// The Swift type checker, which takes a parsed AST and performs validation,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final : public LazyResolver {
 public:
@@ -760,7 +760,7 @@ public:
 
   /// Validate the given type.
   ///
-  /// Type validation performs name binding, checking of generic arguments,
+  /// Type validation performs name lookup, checking of generic arguments,
   /// and so on to determine whether the given type is well-formed and can
   /// be used as a type.
   ///

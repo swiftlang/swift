@@ -420,7 +420,7 @@ public:
       verifyParsed(node);
 
       // If we've bound names already, verify as a bound node.
-      if (!SF || SF->ASTStage >= SourceFile::NameBound)
+      if (!SF || SF->ASTStage >= SourceFile::ImportsResolved)
         verifyBound(node);
 
       // If we've checked types already, do some extra verification.

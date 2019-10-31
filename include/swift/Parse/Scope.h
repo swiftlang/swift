@@ -168,7 +168,7 @@ inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   assert(CurScope && "no scope");
   // If we found nothing, or we found a decl at the top-level, return nothing.
   // We ignore results at the top-level because we may have overloading that
-  // will be resolved properly by name binding.
+  // will be resolved properly by name lookup and overload resolution.
   std::pair<unsigned, ValueDecl *> Res = HT.lookup(CurScope->HTScope, Name);
   if (Res.first < ResolvableDepth)
     return 0;

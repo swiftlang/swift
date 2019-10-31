@@ -657,7 +657,7 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
 }
 
 void CompilerInstance::performParseAndResolveImportsOnly() {
-  performSemaUpTo(SourceFile::NameBound);
+  performSemaUpTo(SourceFile::ImportsResolved);
 }
 
 void CompilerInstance::performSema() {
@@ -837,12 +837,12 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     auto *SF = dyn_cast<SourceFile>(File);
     if (!SF)
       return true;
-    return SF->ASTStage >= SourceFile::NameBound;
+    return SF->ASTStage >= SourceFile::ImportsResolved;
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
 
-  // If the limiting AST stage is name binding, we're done.
-  if (limitStage <= SourceFile::NameBound) {
+  // If the limiting AST stage is import resolution, we're done.
+  if (limitStage <= SourceFile::ImportsResolved) {
     return;
   }
 
@@ -981,7 +981,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
       case SourceFile::Parsing:
       case SourceFile::Parsed:
         llvm_unreachable("invalid limit stage");
-      case SourceFile::NameBound:
+      case SourceFile::ImportsResolved:
         resolveImportsAndOperators(MainFile, CurTUElem);
         break;
       case SourceFile::TypeChecked:

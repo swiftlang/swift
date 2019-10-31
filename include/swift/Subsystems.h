@@ -150,7 +150,7 @@ namespace swift {
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
   ///
-  /// \param StartElem Where to start for incremental name binding in the main
+  /// \param StartElem Where to start for incremental import and operator resolution in the main
   ///                  source file.
   void resolveImportsAndOperators(SourceFile &SF, unsigned StartElem = 0);
 
@@ -159,14 +159,14 @@ namespace swift {
   /// be compared against the results from the debugger.
   void performDebuggerTestingTransform(SourceFile &SF);
 
-  /// Once parsing and name-binding are complete, this optionally transforms the
+  /// Once parsing and type checking are complete, this optionally transforms the
   /// ASTs to add calls to external logging functions.
   ///
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
   
-  /// Once parsing and name-binding are complete this optionally walks the ASTs
+  /// Once parsing and type checking are complete this optionally walks the ASTs
   /// to add calls to externally provided functions that simulate
   /// "program counter"-like debugging events.
   void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
@@ -201,7 +201,7 @@ namespace swift {
   /// \returns a reference to the type checker instance.
   TypeChecker &createTypeChecker(ASTContext &Ctx);
 
-  /// Once parsing and name-binding are complete, this walks the AST to resolve
+  /// Once parsing and preliminary import resolution are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
