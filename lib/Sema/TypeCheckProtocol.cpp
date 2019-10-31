@@ -5374,22 +5374,18 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(Context, proto);
 
   // Find the default for the given associated type.
-  auto findAssociatedTypeDefault =
-      [&](AssociatedTypeDecl *assocType,
-          AssociatedTypeDecl **defaultedAssocTypeOut = nullptr) -> Type {
+  auto findAssociatedTypeDefault = [](AssociatedTypeDecl *assocType)
+      -> std::pair<Type, AssociatedTypeDecl *> {
     auto defaultedAssocType =
         AssociatedTypeInference::findDefaultedAssociatedType(assocType);
     if (!defaultedAssocType)
-      return nullptr;
+      return {Type(), nullptr};
 
     Type defaultType = defaultedAssocType->getDefaultDefinitionType();
     if (!defaultType)
-      return nullptr;
+      return {Type(), nullptr};
 
-    if (defaultedAssocTypeOut)
-      *defaultedAssocTypeOut = defaultedAssocType;
-
-    return defaultType;
+    return {defaultType, defaultedAssocType};
   };
 
   for (auto *requirement : proto->getMembers()) {
@@ -5402,7 +5398,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(valueDecl)) {
       if (assocType->getOverriddenDecls().empty()) {
-        if (Type defaultType = findAssociatedTypeDefault(assocType))
+        if (Type defaultType = findAssociatedTypeDefault(assocType).first)
           proto->setDefaultTypeWitness(assocType, defaultType);
       }
 
@@ -5457,9 +5453,10 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     }
 
     // Dig out the default associated type definition.
-    AssociatedTypeDecl *defaultedAssocType = nullptr;
-    Type defaultAssocType = findAssociatedTypeDefault(assocType,
-                                                      &defaultedAssocType);
+    AssociatedTypeDecl *defaultedAssocDecl = nullptr;
+    Type defaultAssocType;
+    std::tie(defaultAssocType, defaultedAssocDecl) =
+        findAssociatedTypeDefault(assocType);
     if (!defaultAssocType)
       continue;
 
@@ -5472,13 +5469,14 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (conformance.isInvalid()) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.
-      diagnose(proto, diag::assoc_type_default_conformance_failed,
-               defaultAssocType, assocType->getFullName(), req.getFirstType(),
-               req.getSecondType());
-      diagnose(defaultedAssocType, diag::assoc_type_default_here,
-               assocType->getFullName(), defaultAssocType)
-        .highlight(
-          defaultedAssocType->getDefaultDefinitionTypeRepr()->getSourceRange());
+      proto->diagnose(diag::assoc_type_default_conformance_failed,
+                      defaultAssocType, assocType->getFullName(),
+                      req.getFirstType(), req.getSecondType());
+      defaultedAssocDecl
+          ->diagnose(diag::assoc_type_default_here, assocType->getFullName(),
+                     defaultAssocType)
+          .highlight(defaultedAssocDecl->getDefaultDefinitionTypeRepr()
+                         ->getSourceRange());
 
       continue;
     }
