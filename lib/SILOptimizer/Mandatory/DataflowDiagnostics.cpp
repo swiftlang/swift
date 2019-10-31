@@ -60,9 +60,8 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
 
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
-  auto numElements = BS->getNumElements();
-  if (numElements > 0) {
-    auto element = BS->getElement(numElements - 1);
+  if (!BS->empty()) {
+    auto element = BS->getLastElement();
     if (auto expr = element.dyn_cast<Expr *>()) {
       if (expr->getType()->isEqual(ResTy)) {
         Context.Diags.diagnose(

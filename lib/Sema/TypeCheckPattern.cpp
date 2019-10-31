@@ -46,7 +46,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   if (!body || body->getNumElements() != 1)
     return nullptr;
 
-  auto *retStmtRaw = body->getElement(0).dyn_cast<Stmt *>();
+  auto *retStmtRaw = body->getFirstElement().dyn_cast<Stmt *>();
   auto *retStmt = dyn_cast_or_null<ReturnStmt>(retStmtRaw);
   if (!retStmt)
     return nullptr;

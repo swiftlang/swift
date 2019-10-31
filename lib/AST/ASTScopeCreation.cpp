@@ -640,8 +640,7 @@ public:
     // Can occur in illegal code
     if (auto *const s = n.dyn_cast<Stmt *>()) {
       if (auto *const bs = dyn_cast<BraceStmt>(s))
-        ASTScopeAssert(bs->getNumElements() == 0,
-                       "Might mess up insertion point");
+        ASTScopeAssert(bs->empty(), "Might mess up insertion point");
     }
     return !n.isDecl(DeclKind::Var);
   }

@@ -982,7 +982,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && !dd->getBody()->empty())
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.

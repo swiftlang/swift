@@ -2673,7 +2673,7 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
 
   if (auto TLCD = dyn_cast<TopLevelCodeDecl>(getDC())) {
     if (TLCD->getBody()->isImplicit()) {
-      if (auto decl = TLCD->getBody()->getElement(0).dyn_cast<Decl *>()) {
+      if (auto decl = TLCD->getBody()->getFirstElement().dyn_cast<Decl *>()) {
         if (auto binding = dyn_cast<PatternBindingDecl>(decl)) {
           PBD = binding;
         }

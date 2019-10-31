@@ -173,10 +173,13 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
+  bool empty() const { return getNumElements() == 0; }
   unsigned getNumElements() const { return Bits.BraceStmt.NumElements; }
 
-  ASTNode getElement(unsigned i) const { return getElements()[i]; }
-  void setElement(unsigned i, ASTNode node) { getElements()[i] = node; }
+  ASTNode getFirstElement() const { return getElements().front(); }
+  ASTNode getLastElement() const { return getElements().back(); }
+
+  void setFirstElement(ASTNode node) { getElements().front() = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
