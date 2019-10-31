@@ -16,17 +16,17 @@ func twoParams(_ x: Float, _ y: Double) -> Double {
 }
 
 @transposing(twoParams, wrt: 0) 
-func twoParamsT1(_ y: Double, _ t: Double) ->  Float {
+func twoParamsT1(_ y: Double, _ t: Double) -> Float {
   return Float(t + y)
 }
 
 @transposing(twoParams, wrt: 1) 
-func twoParamsT2(_ x: Float, _ t: Double) ->  Double {
+func twoParamsT2(_ x: Float, _ t: Double) -> Double {
   return Double(x) + t
 }
 
 @transposing(twoParams, wrt: (0, 1)) 
-func twoParamsT3(_ t: Double) ->  (Float, Double) {
+func twoParamsT3(_ t: Double) -> (Float, Double) {
   return (Float(t), t)
 }
 
@@ -163,7 +163,8 @@ func missingDiffSelfRequirementT<T: AdditiveArithmetic>(x: T) -> T {
 
 // TODO: error should be "can only transpose with respect to parameters that conform to 'Differentiable' and where 'Int == Int.TangentVector'"
 // but currently there is an assertion failure.
-/*func missingSelfRequirement<T: Differentiable>(x: T) 
+/*
+func missingSelfRequirement<T: Differentiable>(x: T)
   -> T where T.TangentVector == T {
   return x
 }
@@ -171,7 +172,8 @@ func missingDiffSelfRequirementT<T: AdditiveArithmetic>(x: T) -> T {
 @transposing(missingSelfRequirement, wrt: 0)
 func missingSelfRequirementT<T: Differentiable>(x: T) -> T {
   return x
-}*/
+}
+*/
 
 func differentGenericConstraint<T: Differentiable & BinaryFloatingPoint>(x: T)
 -> T where T == T.TangentVector {
@@ -199,7 +201,6 @@ func transposingInt(x: Float, y: Int) -> Float {
 func transposingIntT1(x: Float, t: Float) -> Int {
   return Int(x)
 }
-
 
 // expected-error @+1 {{'@transposing' attribute requires original function result to conform to 'Differentiable'}}
 @transposing(transposingInt, wrt: 0)
@@ -258,11 +259,11 @@ extension Float {
     return Double(self)
   }
 
-  // TODO: throw an error due to Int not being differentiable.
-  // @transposing(Int.myAdding, wrt: (self, 0))
-  // func addingT3() -> (Int, Double) {
-  //   return (Int(self), Double(self))
-  // }
+  // expected-error @+1 {{can only transpose with respect to parameters that conform to 'Differentiable' and where 'Int == Int.TangentVector'}}
+  @transposing(Int.myAdding, wrt: (self, 0))
+  func addingT3() -> (Int, Double) {
+    return (Int(self), Double(self))
+  }
 }
 
 // Static methods.
@@ -395,7 +396,12 @@ extension Double {
 
 // Nested struct
 struct level1 {
-  struct level2 {
+  struct level2: Differentiable & AdditiveArithmetic {
+    func foo(x: Float) -> Float {
+      return x
+    }
+  }
+  struct level2_nondiff {
     func foo(x: Float) -> Float {
       return x
     }
@@ -411,6 +417,12 @@ extension Float {
   @transposing(level1.level2.foo, wrt: (self, 0))
   func t() -> (level1.level2, Float) {
     return (level1.level2(), self)
+  }
+
+  // expected-error @+1 {{can only transpose with respect to parameters that conform to 'Differentiable' and where 'level1.level2_nondiff == level1.level2_nondiff.TangentVector'}}
+  @transposing(level1.level2_nondiff.foo, wrt: (self, 0))
+  func t() -> (level1.level2_nondiff, Float) {
+    return (level1.level2_nondiff(), self)
   }
 }
 
