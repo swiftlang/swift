@@ -986,7 +986,8 @@ public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
   Optional<ExpressionTimer> Timer;
-  
+
+  friend class Solution;
   friend class ConstraintFix;
   friend class OverloadChoice;
   friend class ConstraintGraph;
@@ -3033,7 +3034,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type, bool forDiagnostics = false) const;
+  Type simplifyType(Type type) const;
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -3072,6 +3073,11 @@ private:
   ConversionEphemeralness
   isConversionEphemeral(ConversionRestrictionKind conversion,
                         ConstraintLocatorBuilder locator);
+
+  /// Simplifies a type by replacing type variables with the result of
+  /// \c getFixedTypeFn and performing lookup on dependent member types.
+  Type simplifyTypeImpl(Type type,
+      llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const;
 
   /// Attempt to simplify the given construction constraint.
   ///
