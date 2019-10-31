@@ -554,12 +554,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  // Caches whether a given declaration is "as specialized" as another.
-  llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
-                            /*isDynamicOverloadComparison*/ unsigned>,
-                 bool>
-      specializedOverloadComparisonCache;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
@@ -1654,9 +1648,8 @@ public:
   /// A declaration is more specialized than another declaration if its type
   /// is a subtype of the other declaration's type (ignoring the 'self'
   /// parameter of function declarations) and if
-  Comparison compareDeclarations(DeclContext *dc,
-                                 ValueDecl *decl1,
-                                 ValueDecl *decl2);
+  static Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
+                                        ValueDecl *decl2);
 
   /// Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
