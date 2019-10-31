@@ -2986,7 +2986,8 @@ static IndexSubset *computeDifferentiationParameters(
       case ParsedAutoDiffParameter::Kind::Ordered: {
         auto index = parsedWrtParams[i].getIndex();
         if (index >= numParams) {
-          TC.diagnose(paramLoc, diag::diff_params_clause_param_index_out_of_range);
+          TC.diagnose(paramLoc,
+                      diag::diff_params_clause_param_index_out_of_range);
           return nullptr;
         }
         // Parameter names must be specified in the original order.
@@ -3008,69 +3009,44 @@ static IndexSubset *computeDifferentiationParameters(
 // Computes `IndexSubset` from the given parsed transposing parameters
 // (possibly empty) for the given function, then verifies that the parameter
 // indices are valid.
-// - If parsed parameters are empty, infer parameter indices.
-// - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
 static IndexSubset *computeTransposingParameters(
     TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
-    AbstractFunctionDecl *transposeFunc, bool isCurried,
-    GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc
-) {
+    AbstractFunctionDecl *transposeFunction, bool isCurried,
+    GenericEnvironment *transposeGenEnv, SourceLoc attrLoc) {
   // Get function type and parameters.
-  TC.resolveDeclSignature(transposeFunc);
-  auto *functionType = transposeFunc->getInterfaceType()
-                           ->castTo<AnyFunctionType>();
+  TC.resolveDeclSignature(transposeFunction);
+  auto *transposeFunctionType =
+      transposeFunction->getInterfaceType()->castTo<AnyFunctionType>();
   
   ArrayRef<TupleTypeElt> transposeResultTypes;
   // Return type of '@transposing' function can have single type or tuple
   // of types.
-  auto temp = functionType->getResult();
+  auto transposeResultType = transposeFunctionType->getResult();
   if (isCurried)
-    temp = temp->getAs<AnyFunctionType>()->getResult();
-  
-  if (auto t = temp->getAs<TupleType>()) {
-    transposeResultTypes = t->getElements();
+    transposeResultType =
+        transposeResultType->castTo<AnyFunctionType>()->getResult();
+  if (auto resultTupleType = transposeResultType->getAs<TupleType>()) {
+    transposeResultTypes = resultTupleType->getElements();
   } else {
-    transposeResultTypes = ArrayRef<TupleTypeElt>(temp);
+    transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResultType);
   }
-  
-  auto &params = *transposeFunc->getParameters();
-  auto isInstanceMethod = transposeFunc->isInstanceMember();
-  
-  bool wrtSelf = false;
-  if (isCurried && !parsedWrtParams.empty() &&
-      parsedWrtParams.front().getKind() == ParsedAutoDiffParameter::Kind::Self)
-    wrtSelf = true;
-  
-  // Make sure the self type is differentiable.
-  if (isCurried && wrtSelf) {
-    auto selfType = transposeFunc->getImplicitSelfDecl()->getInterfaceType();
-    if (derivativeGenEnv)
-      selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
-    if (!conformsToDifferentiable(selfType, transposeFunc)) {
-      TC.diagnose(attrLoc, diag::diff_function_no_parameters,
-                  transposeFunc->getFullName())
-          .highlight(transposeFunc->getSignatureSourceRange());
-      return nullptr;
-    }
-  }
-  
-  // If parsed differentiation parameters are empty, infer parameter indices
-  // from the function type.
-  // TODO(bartchr): still need to do this!
-//  if (parsedWrtParams.empty())
-//    return TypeChecker::inferTransposingParameters(
-//        function, derivativeGenEnv);
-  
+  auto isInstanceMethod = transposeFunction->isInstanceMember();
+
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  unsigned numParams = params.size() + transposeResultTypes.size();
-  auto paramIndices = SmallBitVector(numParams);
+  auto numUncurriedParams = transposeFunctionType->getNumParams();
+  if (auto *resultFnType =
+      transposeFunctionType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  auto numParams = numUncurriedParams + parsedWrtParams.size() - 1;
+  auto parameterBits = SmallBitVector(numParams);
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
     switch (parsedWrtParams[i].getKind()) {
     case ParsedAutoDiffParameter::Kind::Named: {
-      TC.diagnose(paramLoc, diag::transposing_attr_cant_use_named_wrt_params,
+      TC.diagnose(paramLoc, diag::transposing_attr_cannot_use_named_wrt_params,
                   parsedWrtParams[i].getName());
       return nullptr;
     }
@@ -3086,13 +3062,14 @@ static IndexSubset *computeTransposingParameters(
         TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
         return nullptr;
       }
-      paramIndices.set(numParams - 1);
+      parameterBits.set(parameterBits.size() - 1);
       break;
     }
     case ParsedAutoDiffParameter::Kind::Ordered: {
       auto index = parsedWrtParams[i].getIndex();
       if (index >= numParams) {
-        TC.diagnose(paramLoc, diag::diff_params_clause_param_index_out_of_range);
+        TC.diagnose(paramLoc,
+                    diag::diff_params_clause_param_index_out_of_range);
         return nullptr;
       }
       // Parameter names must be specified in the original order.
@@ -3101,13 +3078,13 @@ static IndexSubset *computeTransposingParameters(
                     diag::diff_params_clause_params_not_original_order);
         return nullptr;
       }
-      paramIndices.set(index);
+      parameterBits.set(index);
       lastIndex = index;
       break;
     }
     }
   }
-  return IndexSubset::get(TC.Context, paramIndices);
+  return IndexSubset::get(TC.Context, parameterBits);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -3172,6 +3149,7 @@ static bool checkDifferentiationParameters(
   }
   return false;
 }
+
 // SWIFT_ENABLE_TENSORFLOW
 // Checks if the given `IndexSubset` instance is valid for the
 // given function type in the given derivative generic environment and module
@@ -3409,7 +3387,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
     whereClauseGenEnv = whereClauseGenSig->getGenericEnvironment();
     // Store the resolved derivative generic signature in the attribute.
-    attr->setDerivativeGenericSignature(ctx, whereClauseGenSig);
+    attr->setDerivativeGenericSignature(whereClauseGenSig);
   }
 
   // Validate the 'wrt:' parameters.
@@ -3631,24 +3609,25 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
       derivativeInterfaceType->getAutoDiffOriginalFunctionType();
 
   std::function<bool(GenericSignature, GenericSignature)>
-    checkGenericSignatureSatisfied =
-        [&](GenericSignature source, GenericSignature target) {
-          // If target is null, then its requirements are satisfied.
-          if (!target)
-            return true;
-          // If source is null but target is not null, then target's
-          // requirements are not satisfied.
-          if (!source)
-            return false;
-          // Check if target's requirements are satisfied by source.
-          return TC.checkGenericArguments(
-                     derivative, original.Loc.getBaseNameLoc(),
-                     original.Loc.getBaseNameLoc(), Type(),
-                     source->getGenericParams(), target->getRequirements(),
-                     [](SubstitutableType *dependentType) {
-                       return Type(dependentType);
-                     }, lookupConformance, None) == RequirementCheckResult::Success;
-  };
+      checkGenericSignatureSatisfied = [&](GenericSignature source,
+                                           GenericSignature target) {
+        // If target is null, then its requirements are satisfied.
+        if (!target)
+          return true;
+        // If source is null but target is not null, then target's
+        // requirements are not satisfied.
+        if (!source)
+          return false;
+        // Check if target's requirements are satisfied by source.
+        return TC.checkGenericArguments(
+            derivative, original.Loc.getBaseNameLoc(),
+            original.Loc.getBaseNameLoc(), Type(),
+            source->getGenericParams(), target->getRequirements(),
+            [](SubstitutableType *dependentType) {
+              return Type(dependentType);
+            },
+            lookupConformance, None) == RequirementCheckResult::Success;
+      };
 
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
     TC.validateDecl(originalCandidate);
@@ -3886,29 +3865,6 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
 }
 
-/// Pushes the subset's parameter's types to `paramTypes`, in the order in
-/// which they appear in the function type. For example,
-///
-///   functionType = (A, B, C) -> R
-///   if "A" and "C" are in the set,
-///   ==> pushes {A, C} to `paramTypes`.
-///
-void getIndexSubsetParameterTypes(
-    IndexSubset *indexSubset, AnyFunctionType *functionType,
-    SmallVectorImpl<Type> &paramTypes, bool isCurried) {
-  auto *fnTy = functionType;
-  if (isCurried) {
-    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
-  }
-
-  for (unsigned paramIndex : range(fnTy->getNumParams())) {
-    if ((paramIndex < indexSubset->getCapacity()) &&
-        indexSubset->contains(paramIndex)) {
-      paramTypes.push_back(fnTy->getParams()[paramIndex].getPlainType());
-    }
-  }
-}
-
 void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto &ctx = TC.Context;
   auto *transpose = dyn_cast<FuncDecl>(D);
@@ -3916,8 +3872,8 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto original = attr->getOriginal();
   TC.resolveDeclSignature(transpose);
-  auto *transposeInterfaceType = transpose->getInterfaceType()
-                                     ->castTo<AnyFunctionType>();
+  auto *transposeInterfaceType =
+      transpose->getInterfaceType()->castTo<AnyFunctionType>();
   
   // Get checked wrt param indices.
   auto *wrtParamIndices = attr->getParameterIndices();
@@ -3926,18 +3882,12 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // This is defined for parsed attributes.
   auto parsedWrtParams = attr->getParsedParameters();
   
-  bool wrtSelf = false;
-  if (!parsedWrtParams.empty())
-    wrtSelf = parsedWrtParams.front().getKind() ==
-              ParsedAutoDiffParameter::Kind::Self;
-
   // If checked wrt param indices are not specified, compute them.
   bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
   if (!wrtParamIndices)
     wrtParamIndices = computeTransposingParameters(
-                          TC, parsedWrtParams, transpose, isCurried,
-                          transpose->getGenericEnvironment(),
-                          attr->getLocation());
+        TC, parsedWrtParams, transpose, isCurried,
+        transpose->getGenericEnvironment(), attr->getLocation());
   if (!wrtParamIndices) {
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
@@ -3954,9 +3904,14 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     return;
   }
 
+  bool wrtSelf = false;
+  if (!parsedWrtParams.empty())
+    wrtSelf = parsedWrtParams.front().getKind() ==
+        ParsedAutoDiffParameter::Kind::Self;
+
   auto *expectedOriginalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(
-          attr, wrtParamIndices, wrtSelf);
+          wrtParamIndices, wrtSelf);
 
   // `R` result type must conform to `Differentiable`.
   auto expectedOriginalResultType = expectedOriginalFnType->getResult();
@@ -3968,10 +3923,10 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     expectedOriginalResultType = transpose->mapTypeIntoContext(
         expectedOriginalResultType);
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultConf = TC.conformsToProtocol(expectedOriginalResultType,
-      diffableProto, transpose->getDeclContext(), None);
-
-  if (!valueResultConf) {
+  auto resultConf = TC.conformsToProtocol(expectedOriginalResultType,
+                                          diffableProto,
+                                          transpose->getDeclContext(), None);
+  if (!resultConf) {
     TC.diagnose(attr->getLocation(),
                 diag::transposing_attr_result_value_not_differentiable,
                 expectedOriginalFnType);
@@ -3982,25 +3937,25 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
 
   // Compute expected original function type.
   std::function<bool(GenericSignature, GenericSignature)>
-    checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                         GenericSignature target) {
-          // If target is null, then its requirements are satisfied.
-          if (!target)
-            return true;
-          // If source is null but target is not null, then target's
-          // requirements are not satisfied.
-          if (!source)
-            return false;
-          // Check if target's requirements are satisfied by source.
-          return TC.checkGenericArguments(
-                     transpose, original.Loc.getBaseNameLoc(),
-                     original.Loc.getBaseNameLoc(), Type(),
-                     source->getGenericParams(), target->getRequirements(),
-                     [](SubstitutableType *dependentType) {
-                       return Type(dependentType);
-                     },
-                     lookupConformance, None) == RequirementCheckResult::Success;
-    };
+      checkGenericSignatureSatisfied = [&](GenericSignature source,
+                                           GenericSignature target) {
+        // If target is null, then its requirements are satisfied.
+        if (!target)
+          return true;
+        // If source is null but target is not null, then target's
+        // requirements are not satisfied.
+        if (!source)
+          return false;
+        // Check if target's requirements are satisfied by source.
+        return TC.checkGenericArguments(
+            transpose, original.Loc.getBaseNameLoc(),
+            original.Loc.getBaseNameLoc(), Type(),
+            source->getGenericParams(), target->getRequirements(),
+            [](SubstitutableType *dependentType) {
+              return Type(dependentType);
+            },
+            lookupConformance, None) == RequirementCheckResult::Success;
+      };
   
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
     TC.validateDecl(originalCandidate);
@@ -4069,8 +4024,8 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // Gather differentiation parameters.
   // Differentiation parameters are with respect to the original function.
   SmallVector<Type, 4> wrtParamTypes;
-  getIndexSubsetParameterTypes(wrtParamIndices, expectedOriginalFnType,
-                               wrtParamTypes, isCurried);
+  autodiff::getSubsetParameterTypes(wrtParamIndices, expectedOriginalFnType,
+                                    wrtParamTypes);
 
   // Check if differentiation parameter indices are valid.
   if (checkTransposingParameters(TC, originalFn, wrtParamTypes,
@@ -4084,38 +4039,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
 
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(wrtParamIndices);
-
-  // Check if original function type matches expected original function type
-  // we computed.
-  std::function<bool(GenericSignature, GenericSignature)>
-      genericComparison =
-          [&](GenericSignature a, GenericSignature b) { return a.getPointer() == b.getPointer(); };
-  if (!checkFunctionSignature(
-           cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
-           originalFn->getInterfaceType()->getCanonicalType(),
-           genericComparison)) {
-    // Emit differential/pullback type mismatch error on attribute.
-    TC.diagnose(attr->getLocation(),
-                diag::differentiating_attr_result_func_type_mismatch,
-                transpose->getName(), originalFn->getName());
-    // Emit note with expected differential/pullback type on actual type
-    // location.
-    auto *tupleReturnTypeRepr =
-    cast<TupleTypeRepr>(transpose->getBodyResultTypeLoc().getTypeRepr());
-    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
-    TC.diagnose(funcEltTypeRepr->getStartLoc(),
-                diag::differentiating_attr_result_func_type_mismatch_note,
-                transpose->getName(), expectedOriginalFnType)
-        .highlight(funcEltTypeRepr->getSourceRange());
-    // Emit note showing original function location, if possible.
-    if (originalFn->getLoc().isValid())
-      TC.diagnose(originalFn->getLoc(),
-                  diag::differentiating_attr_result_func_original_note,
-                  originalFn->getFullName());
-    D->getAttrs().removeAttribute(attr);
-    attr->setInvalid();
-    return;
-  }
 }
 
 static bool

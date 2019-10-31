@@ -1464,7 +1464,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
       Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
       ParameterIndices(indices) {
-  setDerivativeGenericSignature(context, derivativeGenSig);
+  setDerivativeGenericSignature(derivativeGenSig);
 }
 
 DifferentiableAttr *

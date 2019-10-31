@@ -1050,7 +1050,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            // SWIFT_ENABLE_TENSORFLOW
-           Attr = 0, Attr2 = 0, Attr3 = 0, NumSubs = 0, NumConformances = 0,
+           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
            IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
