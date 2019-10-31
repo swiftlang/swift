@@ -105,6 +105,7 @@ extension _AbstractStringStorage {
     }
   }
 
+  @inline(__always)
   @_effects(readonly)
   internal func _nativeIsEqual<T:_AbstractStringStorage>(
     _ nativeOther: T
