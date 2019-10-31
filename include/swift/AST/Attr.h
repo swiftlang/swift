@@ -1632,8 +1632,7 @@ public:
   GenericSignature getDerivativeGenericSignature() const {
     return DerivativeGenericSignature;
   }
-  void setDerivativeGenericSignature(ASTContext &context,
-                                     GenericSignature derivativeGenSig) {
+  void setDerivativeGenericSignature(GenericSignature derivativeGenSig) {
     DerivativeGenericSignature = derivativeGenSig;
   }
 
