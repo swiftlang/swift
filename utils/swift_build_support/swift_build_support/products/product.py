@@ -47,6 +47,15 @@ class Product(object):
         """
         return True
 
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        """is_swiftpm_unified_build_product -> bool
+
+        Whether this product should be build in the unified build of SwiftPM
+        products.
+        """
+        return False
+
     def should_build(self, host_target):
         """should_build() -> Bool
 

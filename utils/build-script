@@ -808,12 +808,17 @@ class BuildScriptInvocation(object):
                     continue
                 product_source = product_class.product_source_name()
                 product_name = product_class.product_name()
+                if product_class.is_swiftpm_unified_build_product():
+                    build_dir = self.workspace.swiftpm_unified_build_dir(
+                        host_target)
+                else:
+                    build_dir = self.workspace.build_dir(
+                        host_target, product_name)
                 product = product_class(
                     args=self.args,
                     toolchain=self.toolchain,
                     source_dir=self.workspace.source_dir(product_source),
-                    build_dir=self.workspace.build_dir(
-                        host_target, product_name))
+                    build_dir=build_dir)
                 if product.should_build(host_target):
                     print("--- Building %s ---" % product_name)
                     product.build(host_target)
