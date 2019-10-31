@@ -978,7 +978,8 @@ def create_argument_parser():
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
            help='skip testing SwiftEvolve')
-    option('--skip-test-toolchain-benchmarks', toggle_false('test_toolchainbenchmarks'),
+    option('--skip-test-toolchain-benchmarks',
+           toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
 
     # -------------------------------------------------------------------------
