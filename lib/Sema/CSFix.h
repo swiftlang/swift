@@ -211,6 +211,10 @@ enum class FixKind : uint8_t {
   /// If an array was passed to a variadic argument, give a specific diagnostic
   /// and offer to drop the brackets if it's a literal.
   ExpandArrayIntoVarargs,
+
+  /// Remove extraneous call to something which can't be invoked e.g.
+  /// a variable, a property etc.
+  RemoveCall,
 };
 
 class ConstraintFix {
@@ -1467,6 +1471,21 @@ public:
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
                                       Type toType, ConstraintLocator *locator);
+};
+
+class RemoveInvalidCall final : public ConstraintFix {
+  RemoveInvalidCall(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveCall, locator) {}
+
+public:
+  std::string getName() const {
+    return "remove extraneous call from value of non-function type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const;
+
+  static RemoveInvalidCall *create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator);
 };
 
 } // end namespace constraints
