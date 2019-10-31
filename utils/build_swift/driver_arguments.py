@@ -208,6 +208,7 @@ def _apply_default_arguments(args):
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
         args.test_swiftevolve = False
+        args.test_toolchainbenchmarks = False
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
@@ -977,6 +978,8 @@ def create_argument_parser():
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
            help='skip testing SwiftEvolve')
+    option('--skip-test-toolchain-benchmarks', toggle_false('test_toolchainbenchmarks'),
+           help='skip testing toolchain benchmarks')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')

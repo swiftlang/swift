@@ -35,7 +35,7 @@ class Benchmarks(product.Product):
         run_build_script_helper(host_target, self, self.args)
 
     def should_test(self, host_target):
-        return True
+        return self.args.test_toolchainbenchmarks
 
     def test(self, host_target):
         """Just run a single instance of the command for both .debug and
