@@ -636,8 +636,6 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
-  llvm::MachO::Target target(triple);
-  file.addTarget(target);
 
   llvm::MachO::Target target(triple);
   file.addTarget(target);
