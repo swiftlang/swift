@@ -2010,7 +2010,6 @@ void ConstraintSystem::partitionForDesignatedTypes(
 // Performance hack: if there are two generic overloads, and one is
 // more specialized than the other, prefer the more-specialized one.
 static Constraint *tryOptimizeGenericDisjunction(
-                                          TypeChecker &tc,
                                           DeclContext *dc,
                                           ArrayRef<Constraint *> constraints) {
   llvm::SmallVector<Constraint *, 4> choices;
@@ -2067,7 +2066,7 @@ static Constraint *tryOptimizeGenericDisjunction(
   if (!isViable(declA) || !isViable(declB))
     return nullptr;
 
-  switch (tc.compareDeclarations(dc, declA, declB)) {
+  switch (TypeChecker::compareDeclarations(dc, declA, declB)) {
   case Comparison::Better:
     return choices[0];
 
@@ -2085,7 +2084,7 @@ void ConstraintSystem::partitionDisjunction(
     SmallVectorImpl<unsigned> &PartitionBeginning) {
   // Apply a special-case rule for favoring one generic function over
   // another.
-  if (auto favored = tryOptimizeGenericDisjunction(TC, DC, Choices)) {
+  if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
     favorConstraint(favored);
   }
 
