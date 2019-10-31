@@ -2344,6 +2344,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
         !propertyType->isEqual(expectedPropertyType)) {
       var->diagnose(diag::property_wrapper_incompatible_property,
                     propertyType, wrapperType);
+      var->setInvalid();
+      var->setInterfaceType(ErrorType::get(propertyType));
       if (auto nominalWrapper = wrapperType->getAnyNominal()) {
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                  nominalWrapper->getFullName());

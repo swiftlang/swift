@@ -596,6 +596,8 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
     var->diagnose(diag::property_wrapper_incompatible_property,
                   propertyType, rawType);
+    var->setInvalid();
+    var->setInterfaceType(ErrorType::get(propertyType));
     if (auto nominalWrapper = rawType->getAnyNominal()) {
       nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                nominalWrapper->getFullName());
