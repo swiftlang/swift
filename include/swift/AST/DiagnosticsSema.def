@@ -1421,6 +1421,12 @@ ERROR(corresponding_param_not_defaulted,none,
 NOTE(inherited_default_param_here,none,
      "corresponding parameter declared here", ())
 
+WARNING(option_set_zero_constant,none,
+        "static property %0 produces an empty option set",
+        (Identifier))
+NOTE(option_set_empty_set_init,none,
+     "use [] to silence this warning", ())
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())

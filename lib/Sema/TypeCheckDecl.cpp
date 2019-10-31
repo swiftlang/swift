@@ -484,6 +484,68 @@ static void checkInheritanceClause(
   }
 }
 
+// Check for static properties that produce empty option sets
+// using a rawValue initializer with a value of '0'
+static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
+  // Check if property is a 'static let'
+  if (!VD->isStatic() || !VD->isLet())
+    return;
+  
+  auto DC = VD->getDeclContext();
+  
+  // Make sure property is of same type as the type it is declared in
+  if (!VD->getType()->isEqual(DC->getSelfTypeInContext()))
+    return;
+  
+  // Make sure this type conforms to OptionSet
+  auto *optionSetProto = tc.Context.getProtocol(KnownProtocolKind::OptionSet);
+  bool conformsToOptionSet = (bool)tc.containsProtocol(
+                                                  DC->getSelfTypeInContext(),
+                                                  optionSetProto,
+                                                  DC,
+                                                  /*Flags*/None);
+  
+  if (!conformsToOptionSet)
+    return;
+  
+  auto PBD = VD->getParentPatternBinding();
+  if (!PBD)
+    return;
+  
+  auto initIndex = PBD->getPatternEntryIndexForVarDecl(VD);
+  auto init = PBD->getInit(initIndex);
+
+  // Make sure property is being set with a constructor
+  auto ctor = dyn_cast_or_null<CallExpr>(init);
+  if (!ctor)
+    return;
+  auto ctorCalledVal = ctor->getCalledValue();
+  if (!ctorCalledVal)
+    return;
+  if (!isa<ConstructorDecl>(ctorCalledVal))
+    return;
+  
+  // Make sure it is calling the rawValue constructor
+  if (ctor->getNumArguments() != 1)
+    return;
+  if (ctor->getArgumentLabels().front() != tc.Context.Id_rawValue)
+    return;
+  
+  // Make sure the rawValue parameter is a '0' integer literal
+  auto *args = cast<TupleExpr>(ctor->getArg());
+  auto intArg = dyn_cast<IntegerLiteralExpr>(args->getElement(0));
+  if (!intArg)
+    return;
+  if (intArg->getValue() != 0)
+    return;
+  
+  auto loc = VD->getLoc();
+  tc.diagnose(loc, diag::option_set_zero_constant, VD->getName());
+  tc.diagnose(loc, diag::option_set_empty_set_init)
+  .fixItReplace(args->getSourceRange(), "([])");
+}
+
+
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
@@ -2387,6 +2449,8 @@ public:
           VD->diagnose(diag::dynamic_self_in_mutable_property);
       }
     }
+    
+    checkForEmptyOptionSet(VD, TC);
 
     // Under the Swift 3 inference rules, if we have @IBInspectable or
     // @GKInspectable but did not infer @objc, warn that the attribute is
