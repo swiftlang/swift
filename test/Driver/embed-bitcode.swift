@@ -1,6 +1,6 @@
 // RUN: %target-swiftc_driver -driver-print-bindings -embed-bitcode %s 2>&1 | %FileCheck -check-prefix=CHECK-%target-object-format %s
-// CHECK-macho: "swift", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
-// CHECK-macho: "swift", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
+// CHECK-macho: "swift-frontend", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
+// CHECK-macho: "swift-frontend", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-macho: "ld", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
 // CHECK-coff: "swiftc.{{exe}}", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
 // CHECK-coff: "swiftc.{{exe}}", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
@@ -93,23 +93,23 @@
 // CHECK-LIB-WMO: -parse-stdlib
 
 // RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module %s %S/../Inputs/empty.swift -module-name ABC 2>&1 -### | %FileCheck %s -check-prefix=CHECK-LIB
-// CHECK-LIB: swift{{c?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
-// CHECK-LIB: swift{{c?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
-// CHECK-LIB: swift{{c?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -c
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift{{c?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -c
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift{{c?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -emit-module
-// CHECK-LIB-NOT: swift{{c?(\.exe)?"?}} -frontend
+// CHECK-LIB-NOT: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module-path a.swiftmodule %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE

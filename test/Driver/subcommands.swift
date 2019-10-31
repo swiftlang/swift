@@ -20,7 +20,7 @@
 // RUN: cd %t.dir && %swift_driver_plain -### t.swift 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-INTERPRETER %s
 // RUN: cd %t.dir && %swift_driver_plain -### subpath/build 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-INTERPRETER %s
 
-// CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift -frontend -interpret
+// CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift-frontend -frontend -interpret
 
 
 // Check that 'swift foo' invokes 'swift-foo'.
