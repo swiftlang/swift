@@ -2645,7 +2645,8 @@ public:
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType = normal->getTypeWitness(assocType);
+          auto replacementType =
+              normal->getTypeWitnessUncached(assocType).getWitnessType();
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;
@@ -2677,7 +2678,7 @@ public:
           }
 
           // Check the witness substitutions.
-          const auto &witness = normal->getWitness(req);
+          const auto &witness = normal->getWitnessUncached(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             Generics.push_back(genericEnv->getGenericSignature());

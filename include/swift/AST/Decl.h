@@ -7289,6 +7289,11 @@ inline void simple_display(llvm::raw_ostream &out,
   simple_display(out, static_cast<const Decl *>(decl));
 }
 
+inline void simple_display(llvm::raw_ostream &out,
+                           const AssociatedTypeDecl *decl) {
+  simple_display(out, static_cast<const Decl *>(decl));
+}
+
 /// Display GenericContext.
 ///
 /// The template keeps this sorted down in the overload set relative to the

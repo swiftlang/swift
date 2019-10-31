@@ -430,22 +430,16 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-          // FIXME(InterfaceTypeRequest): Remove this.
-          (void)VD->getInterfaceType();
-          if (auto *TypeResolver = VD->getASTContext().getLazyResolver()) {
-            if (!NormalConformance->hasWitness(VD) &&
-                (Conformance->getDeclContext()->getParentSourceFile() !=
-                FromContext->getParentSourceFile()))
-              TypeResolver->resolveWitness(NormalConformance, VD);
-          }
-          // Skip value requirements that have corresponding witnesses. This cuts
-          // down on duplicates.
-          if (!NormalConformance->hasWitness(VD) ||
-              !NormalConformance->getWitness(VD) ||
-              NormalConformance->getWitness(VD).getDecl()->getFullName()
-                != VD->getFullName()) {
-            Consumer.foundDecl(VD, ReasonForThisProtocol);
-          }
+          if (!VD->isProtocolRequirement())
+            continue;
+
+          // Skip value requirements that have corresponding witnesses. This
+          // cuts down on duplicates.
+          auto witness = NormalConformance->getWitness(VD);
+          if (witness && witness.getDecl()->getFullName() == VD->getFullName())
+            continue;
+
+          Consumer.foundDecl(VD, ReasonForThisProtocol);
         }
       }
     }

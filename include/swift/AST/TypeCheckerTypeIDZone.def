@@ -68,6 +68,8 @@ SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned,
                    TypeResolutionStage),
               SeparatelyCached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
+              bool(ClassDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InitKindRequest,
               CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
@@ -180,5 +182,10 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
-              bool(ClassDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
+              TypeWitnessAndDecl(NormalProtocolConformance *,
+                                 AssociatedTypeDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
+              Witness(NormalProtocolConformance *, ValueDecl *),
+              SeparatelyCached, NoLocationInfo)
