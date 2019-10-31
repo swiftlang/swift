@@ -3560,15 +3560,12 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       }
 
       if (auto *tupleExpr = dyn_cast<TupleExpr>(component.getIndexExpr())) {
-        size_t count = 0;
-        for (auto *element : tupleExpr->getElements()) {
-          if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(element)) {
+        for (size_t i = 0, n = tupleExpr->getNumElements(); i < n; ++i) {
+          if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(tupleExpr->getElement(i))) {
             const ParamDecl *defaultParam = getParameterAt(
                 cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()),
-                count++);
-            tupleExpr->setElement(count - 1, defaultParam->getDefaultValue());
-          } else {
-            (void)++count;
+                i);
+            tupleExpr->setElement(i, defaultParam->getDefaultValue());
           }
         }
       }
