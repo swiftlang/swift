@@ -3026,10 +3026,15 @@ public:
           auto CDC = dyn_cast<ConstructorDecl>(CurrDeclContext);
           if (!CDC)
             return;
-          // We do not want 'init' completions for 'self' in non-convenience
-          // initializers and for 'super' in convenience initializers.
-          if ((IsSelfRefExpr && CDC->isConvenienceInit()) ||
-              ((IsSuperRefExpr && !CDC->isConvenienceInit())))
+
+          // For classes, we do not want 'init' completions for 'self' in
+          // non-convenience initializers and for 'super' in convenience initializers.
+          if (ExprType->is<ClassType>()) {
+            if ((IsSelfRefExpr && !CDC->isConvenienceInit()) ||
+                (IsSuperRefExpr && CDC->isConvenienceInit()))
+              return;
+          }
+          if (IsSelfRefExpr || IsSuperRefExpr)
             addConstructorCall(CD, Reason, dynamicLookupInfo, None, None,
                                /*IsOnType=*/false);
         }
