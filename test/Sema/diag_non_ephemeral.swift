@@ -411,7 +411,10 @@ func testNonEphemeralInDotMember() {
 
 func testNonEphemeralWithVarOverloads() {
   takesRaw(&overloadedVar) // expected-error {{ambiguous use of 'overloadedVar'}}
-  takesRaw(&overloadedVarOnlyOneViable)
+
+  // Even though only one of the overloads produces an ephemeral pointer, the
+  // diagnostic doesn't affect solver behaviour, so we diagnose an ambiguity.
+  takesRaw(&overloadedVarOnlyOneResilient) // expected-error {{ambiguous use of 'overloadedVarOnlyOneResilient'}}
 
   takesRaw(&overloadedVarDifferentTypes) // expected-error {{ambiguous use of 'overloadedVarDifferentTypes'}}
 
@@ -487,4 +490,18 @@ func takesPointerOverload(x: Int = 0, @_nonEphemeral _ ptr: UnsafeMutablePointer
 func testAmbiguity() {
   var arr = [1, 2, 3]
   takesPointerOverload(&arr) // expected-error {{no exact matches in call to global function 'takesPointerOverload(x:_:)'}}
+}
+
+func takesPointerOverload2(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
+func takesPointerOverload2<T>(_ x: T?) {}
+func takesPointerOverload2(_ x: Any) {}
+func takesPointerOverload2(_ x: [Int]?) {}
+
+func testNonEphemeralErrorDoesntAffectOverloadResolution() {
+  // Make sure we always pick the pointer overload, even though the other
+  // overloads are all viable.
+  var arr = [1, 2, 3]
+  takesPointerOverload2(arr) // expected-error {{cannot pass '[Int]' to parameter; argument #1 must be a pointer that outlives the call to 'takesPointerOverload2'}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesPointerOverload2'}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }

@@ -411,10 +411,7 @@ func testNonEphemeralInDotMember() {
 
 func testNonEphemeralWithVarOverloads() {
   takesRaw(&overloadedVar) // expected-error {{ambiguous use of 'overloadedVar'}}
-
-  // Because non-ephemeral violations are only a warning in this mode, we need to consider both overloads.
-  takesRaw(&overloadedVarOnlyOneViable) // expected-error {{ambiguous use of 'overloadedVarOnlyOneViable'}}
-
+  takesRaw(&overloadedVarOnlyOneResilient) // expected-error {{ambiguous use of 'overloadedVarOnlyOneResilient'}}
   takesRaw(&overloadedVarDifferentTypes) // expected-error {{ambiguous use of 'overloadedVarDifferentTypes'}}
 
   func takesIntPtr(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}

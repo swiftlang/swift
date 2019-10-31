@@ -7933,14 +7933,15 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning it's shouldn't affect the solver.
-  if (!fix->isWarning()) {
-    // Otherswise increase the score. If this would make the current
-    // solution worse than the best solution we've seen already, stop now.
+  // If this is just a warning, it shouldn't affect the solver. Otherwise,
+  // increase the score.
+  if (!fix->isWarning())
     increaseScore(SK_Fix, impact);
-    if (worseThanBestSolution())
-      return true;
-  }
+
+  // If we've made the current solution worse than the best solution we've seen
+  // already, stop now.
+  if (worseThanBestSolution())
+    return true;
 
   if (isAugmentingFix(fix)) {
     // Always useful, unless duplicate of exactly the same fix and location.
@@ -8084,30 +8085,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // note of the fix.
     auto conversion = theFix->getConversionKind();
     switch (isConversionEphemeral(conversion, locator)) {
-    case ConversionEphemeralness::Ephemeral: {
-      if (recordFix(fix))
+    case ConversionEphemeralness::Ephemeral:
+      // Record the fix with an impact of zero. This ensures that non-ephemeral
+      // diagnostics don't impact solver behavior.
+      if (recordFix(fix, /*impact*/ 0))
         return SolutionKind::Error;
 
-      // FIXME: Currently, as a performance hack, we short-circuit disjunctions
-      // such that we favour array-to-pointer conversions over inout-to-pointer
-      // conversions. However we don't do this when fixes are involved.
-      // Therefore in order to improve diagnostics for cases where both
-      // array-to-pointer and inout-to-pointer are viable with fixes, increase
-      // the score of inout-to-pointer by 1. This means we'll complain about
-      // the use of array-to-pointer, which is more likely to be what the user
-      // was trying to do.
-      //
-      // Ideally, we would either have a proper ranking rule that favors
-      // array-to-pointer over inout-to-pointer (not just within a disjunction),
-      // or we would have some logic to merge solutions with fixes that would
-      // be better diagnosed by a single fix rather than an ambiguity error
-      // with notes from fixes.
-      if (!theFix->isWarning() &&
-          conversion == ConversionRestrictionKind::InoutToPointer)
-        increaseScore(SK_ValueToPointerConversion);
-
       return SolutionKind::Solved;
-    }
     case ConversionEphemeralness::NonEphemeral:
       return SolutionKind::Solved;
     case ConversionEphemeralness::Unresolved:

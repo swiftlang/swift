@@ -33,7 +33,7 @@ public var globalFragile: Int8 = 0
 public var overloadedVar = 0
 
 @_fixed_layout
-public var overloadedVarOnlyOneViable = 0
+public var overloadedVarOnlyOneResilient = 0
 
 @_fixed_layout
 public var overloadedVarDifferentTypes = 0
