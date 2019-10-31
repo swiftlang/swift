@@ -46,6 +46,8 @@ namespace swift {
   class ValueDecl;
   struct PrintOptions;
 
+  void bindExtensions(SourceFile &SF);
+
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
 

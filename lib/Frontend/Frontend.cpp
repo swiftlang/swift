@@ -845,8 +845,13 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 
   // If the limiting AST stage is name binding, we're done.
   if (limitStage <= SourceFile::NameBound) {
+    if (Invocation.isCodeCompletion()) {
+      performCodeCompletionSecondPass(*PersistentState.get(),
+                                      *Invocation.getCodeCompletionFactory());
+    }
     return;
   }
+  assert(!Invocation.isCodeCompletion());
 
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
@@ -870,10 +875,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     }
   });
 
-  if (Invocation.isCodeCompletion()) {
-    performCodeCompletionSecondPass(*PersistentState.get(),
-                                    *Invocation.getCodeCompletionFactory());
-  }
   finishTypeChecking(TypeCheckOptions);
 }
 
