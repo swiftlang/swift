@@ -215,6 +215,8 @@ enum class FixKind : uint8_t {
   /// Remove extraneous call to something which can't be invoked e.g.
   /// a variable, a property etc.
   RemoveCall,
+
+  AllowInvalidUseOfTrailingClosure,
 };
 
 class ConstraintFix {
@@ -1486,6 +1488,24 @@ public:
 
   static RemoveInvalidCall *create(ConstraintSystem &cs,
                                    ConstraintLocator *locator);
+};
+
+class AllowInvalidUseOfTrailingClosure final : public AllowArgumentMismatch {
+  AllowInvalidUseOfTrailingClosure(ConstraintSystem &cs, Type argType,
+                                   Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::AllowInvalidUseOfTrailingClosure,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const {
+    return "allow invalid use of trailing closure";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const;
+
+  static AllowInvalidUseOfTrailingClosure *create(ConstraintSystem &cs,
+                                                  Type argType, Type paramType,
+                                                  ConstraintLocator *locator);
 };
 
 } // end namespace constraints
