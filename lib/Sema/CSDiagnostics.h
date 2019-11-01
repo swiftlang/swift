@@ -1921,6 +1921,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
+public:
+  InvalidUseOfTrailingClosure(Expr *root, ConstraintSystem &cs, Type argType,
+                              Type paramType, ConstraintLocator *locator)
+      : ArgumentMismatchFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
