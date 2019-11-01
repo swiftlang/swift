@@ -4225,11 +4225,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (interfaceType->hasArchetype())
       interfaceType = interfaceType->mapTypeOutOfContext();
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    // TypeChecker::checkDeclDifferentiableAttributes(VD);
-    // SWIFT_ENABLE_TENSORFLOW END
-
     // In SIL mode, VarDecls are written as having reference storage types.
     if (!interfaceType->is<ReferenceStorageType>()) {
       if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
@@ -4292,11 +4287,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         funcTy = FunctionType::get({selfParam}, funcTy);
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    // TypeChecker::checkDeclDifferentiableAttributes(AFD);
-    // SWIFT_ENABLE_TENSORFLOW END
-
     return funcTy;
   }
 
@@ -4313,11 +4303,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       funcTy = GenericFunctionType::get(sig, argTy, elementTy);
     else
       funcTy = FunctionType::get(argTy, elementTy);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
-    // TypeChecker::checkDeclDifferentiableAttributes(SD);
-    // SWIFT_ENABLE_TENSORFLOW END
 
     return funcTy;
   }
