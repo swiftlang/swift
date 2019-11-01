@@ -604,8 +604,8 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   
   internal init(_ str: String) {
     _contents = str
-    assert(_contents._guts.isFastUTF8)
     super.init()
+    assert(_contents._guts.isFastUTF8)
   }
   
   final internal var asString: String {
