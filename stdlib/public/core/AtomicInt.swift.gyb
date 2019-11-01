@@ -14,13 +14,16 @@
   def lowerFirst(str):
     return str[:1].lower() + str[1:] if str else ""
 
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+
   integerOperations = [
-    # Swift name,        operator, doc
-    ('WrappingAdd',      '&+',     "wrapping add"),
-    ('WrappingSubtract', '&-',     "wrapping subtract"),
-    ('BitwiseAnd',       '&',      "bitwise and"),
-    ('BitwiseOr',        '|',      "bitwise or"),
-    ('BitwiseXor',       '^',      "bitwise xor")
+    # Swift name,         operator, label, doc
+    ('WrappingIncrement', '&+',     "by",  "wrapping add"),
+    ('WrappingDecrement', '&-',     "by",  "wrapping subtract"),
+    ('BitwiseAnd',        '&',      "_",   "bitwise and"),
+    ('BitwiseOr',         '|',      "_",   "bitwise or"),
+    ('BitwiseXor',        '^',      "_",   "bitwise xor")
   ]
 }%
 
@@ -30,6 +33,8 @@
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct AtomicInt: Anchored {
+  public typealias Value = Int
+
   @usableFromInline
   internal let _anchor: AnyObject
 
@@ -125,7 +130,7 @@ extension AtomicInt {
 }
 
 
-% for (name, op, doc) in integerOperations:
+% for (name, op, label, doc) in integerOperations:
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicInt {
   /// Perform an atomic ${doc} operation and return the original value, with
@@ -140,12 +145,12 @@ extension AtomicInt {
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public func fetchThen${name}(
-    _ operand: Int,
+    ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> Int {
     Int(bitPattern:
       _ptr._atomicFetchThen${name}Word(
-        UInt(bitPattern: operand),
+        ${argLabel(label)}UInt(bitPattern: operand),
         ordering: ordering))
   }
 
@@ -159,31 +164,40 @@ extension AtomicInt {
   % end
   /// - Returns: The new value after the operation.
   @_transparent @_alwaysEmitIntoClient
-  @discardableResult
   public func ${lowerFirst(name)}ThenFetch(
-    _ operand: Int,
+    ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> Int {
-    fetchThen${name}(operand, ordering: ordering) ${op} operand
+    fetchThen${name}(${argLabel(label)}operand, ordering: ordering) ${op} operand
   }
 }
 % end
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicInt {
+  /// Atomically increments the current value by the specified integer, with the
+  /// specified memory ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `Int` values.
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by delta: Int = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    fetchThenWrappingAdd(delta, ordering: ordering)
+    fetchThenWrappingIncrement(by: delta, ordering: ordering)
   }
 
+  /// Atomically decrements the current value by the specified integer, with the
+  /// specified memory ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `Int` values.
   @_transparent @_alwaysEmitIntoClient
   public func wrappingDecrement(
     by delta: Int = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    fetchThenWrappingSubtract(delta, ordering: ordering)
+    fetchThenWrappingDecrement(by: delta, ordering: ordering)
   }
 }

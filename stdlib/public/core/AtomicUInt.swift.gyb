@@ -14,13 +14,16 @@
   def lowerFirst(str):
     return str[:1].lower() + str[1:] if str else ""
 
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+
   integerOperations = [
-    # Swift name,        operator, doc
-    ('WrappingAdd',      '&+',     "wrapping add"),
-    ('WrappingSubtract', '&-',     "wrapping subtract"),
-    ('BitwiseAnd',       '&',      "bitwise and"),
-    ('BitwiseOr',        '|',      "bitwise or"),
-    ('BitwiseXor',       '^',      "bitwise xor")
+    # Swift name,         operator, label, doc
+    ('WrappingIncrement', '&+',     "by",  "wrapping add"),
+    ('WrappingDecrement', '&-',     "by",  "wrapping subtract"),
+    ('BitwiseAnd',        '&',      "_",   "bitwise and"),
+    ('BitwiseOr',         '|',      "_",   "bitwise or"),
+    ('BitwiseXor',        '^',      "_",   "bitwise xor")
   ]
 }%
 
@@ -119,7 +122,7 @@ extension AtomicUInt {
 % end
 
 
-% for (name, op, doc) in integerOperations:
+% for (name, op, label, doc) in integerOperations:
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AtomicUInt {
   /// Perform an atomic ${doc} operation and return the original value, with
@@ -134,10 +137,10 @@ extension AtomicUInt {
   @_transparent @_alwaysEmitIntoClient
   @discardableResult
   public func fetchThen${name}(
-    _ operand: UInt,
+    ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
-    _ptr._atomicFetchThen${name}Word(operand, ordering: ordering)
+    _ptr._atomicFetchThen${name}Word(${argLabel(label)}operand, ordering: ordering)
   }
 
   /// Perform an atomic ${doc} operation and return the new value, with
@@ -150,12 +153,14 @@ extension AtomicUInt {
   % end
   /// - Returns: The new value after the operation.
   @_transparent @_alwaysEmitIntoClient
-  @discardableResult
   public func ${lowerFirst(name)}ThenFetch(
-    _ operand: UInt,
+    ${label} operand: Int,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
-    _ptr._atomicFetchThen${name}Word(operand, ordering: ordering) ${op} operand
+    _ptr._atomicFetchThen${name}Word(
+      ${argLabel(label)}operand,
+      ordering: ordering
+    ) ${op} operand
   }
 }
 % end
@@ -167,7 +172,7 @@ extension AtomicUInt {
     by delta: UInt = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ptr._atomicFetchThenWrappingAddWord(delta, ordering: ordering)
+    _ptr._atomicFetchThenWrappingIncrementWord(by: delta, ordering: ordering)
   }
 
   @_transparent @_alwaysEmitIntoClient
@@ -175,6 +180,6 @@ extension AtomicUInt {
     by delta: UInt = 1,
     ordering: AtomicUpdateOrdering
   ) {
-    _ptr._atomicFetchThenWrappingSubtract(delta, ordering: ordering)
+    _ptr._atomicFetchThenWrappingDecrementWord(by: delta, ordering: ordering)
   }
 }

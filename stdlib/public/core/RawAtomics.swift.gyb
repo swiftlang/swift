@@ -17,31 +17,34 @@
       ('relaxed',                'Relaxed',    'relaxed',                 'monotonic', 'monotonic'),
       ('acquiring',              'Acquiring',  'acquiring',               'acquire',   'acquire'),
       ('releasing',              'Releasing',  'releasing',               'release',   'monotonic'),
-      ('acquiringAndReleasing',  '',           'acquiring-and-releasing', 'acqrel',    'acquire'),
+      ('acquiringAndReleasing',  'Barrier',    'acquiring-and-releasing', 'acqrel',    'acquire'),
     ]
 
   def loadOrderings():
     return [
       # Swift enum case,         API name,    doc name,     llvm name
       ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
-      ('acquiring',              '',          'acquiring',  'acquire'),
+      ('acquiring',              'Acquiring', 'acquiring',  'acquire'),
     ]
 
   def storeOrderings():
     return [
       # Swift enum case,         API name,    doc name,     llvm name
       ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
-      ('releasing',              '',          'releasing',  'release'),
+      ('releasing',              'Releasing', 'releasing',  'release'),
     ]
 
   integerOperations = [
-    # Swift name,        llvm name,  operator, doc
-    ('WrappingAdd',      'add',      '&+',     "wrapping add"),
-    ('WrappingSubtract', 'sub',      '&-',     "wrapping subtract"),
-    ('BitwiseAnd',       'and',      '&',      "bitwise and"),
-    ('BitwiseOr',        'or',       '|',      "bitwise or"),
-    ('BitwiseXor',       'xor',      '^',      "bitwise xor")
+    # Swift name,         llvm name,  operator, label, doc
+    ('WrappingIncrement', 'add',      '&+',     "by",  "wrapping add"),
+    ('WrappingDecrement', 'sub',      '&-',     "by",  "wrapping subtract"),
+    ('BitwiseAnd',        'and',      '&',      "_",   "bitwise and"),
+    ('BitwiseOr',         'or',       '|',      "_",   "bitwise or"),
+    ('BitwiseXor',        'xor',      '^',      "_",   "bitwise xor")
   ]
+
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
 }%
 
 //------------------------------------------------------------------------------
@@ -71,13 +74,14 @@ extension UnsafeMutableRawPointer {
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public
+  @usableFromInline
+  internal
   func _atomicLoadWord(ordering: AtomicLoadOrdering) -> UInt {
     switch ordering {
     case .relaxed:
       return _atomicRelaxedLoadWord()
     default:
-      return _atomicLoadWord()
+      return _atomicAcquiringLoadWord()
     }
   }
 }
@@ -108,7 +112,8 @@ extension UnsafeMutableRawPointer {
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public
+  @usableFromInline
+  internal
   func _atomicStoreWord(
     _ desired: UInt,
     ordering: AtomicStoreOrdering
@@ -117,7 +122,7 @@ extension UnsafeMutableRawPointer {
     case .relaxed:
       _atomicRelaxedStoreWord(desired)
     default:
-      _atomicStoreWord(desired)
+      _atomicReleasingStoreWord(desired)
     }
   }
 }
@@ -153,7 +158,8 @@ extension UnsafeMutableRawPointer {
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public
+  @usableFromInline
+  internal
   func _atomicExchangeWord(
     _ desired: UInt,
     ordering: AtomicUpdateOrdering
@@ -166,7 +172,7 @@ extension UnsafeMutableRawPointer {
     case .releasing:
       return _atomicReleasingExchangeWord(desired)
     default:
-      return _atomicExchangeWord(desired)
+      return _atomicBarrierExchangeWord(desired)
     }
   }
 }
@@ -233,7 +239,8 @@ extension UnsafeMutableRawPointer {
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public
+  @usableFromInline
+  internal
   func _atomicCompareExchangeWord(
     expected: inout UInt,
     desired: UInt,
@@ -253,7 +260,7 @@ extension UnsafeMutableRawPointer {
         expected: &expected,
         desired: desired)
     default:
-      return _atomicCompareExchangeWord(
+      return _atomicBarrierCompareExchangeWord(
         expected: &expected,
         desired: desired)
     }
@@ -261,7 +268,7 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
-% for (swiftName, builtinName, operator, doc) in integerOperations:
+% for (swiftName, builtinName, operator, label, doc) in integerOperations:
 %   for _, apiOrder, docOrder, llvmOrder, _ in rmwOrderings():
   /// Perform an atomic ${doc} operation and return the new value,
   /// with ${docOrder} memory ordering.
@@ -278,7 +285,9 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment hook
-  func _atomic${apiOrder}FetchThen${swiftName}Word(_ operand: UInt) -> UInt {
+  func _atomic${apiOrder}FetchThen${swiftName}Word(
+    ${label} operand: UInt
+  ) -> UInt {
     let value = Builtin.atomicrmw_${builtinName}_${llvmOrder}_Word(
       _rawValue, operand._builtinWordValue)
     return UInt(value)
@@ -288,7 +297,7 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
-% for (swiftName, builtinName, operator, doc) in integerOperations:
+% for (swiftName, builtinName, operator, label, doc) in integerOperations:
   /// Perform an atomic ${doc} operation and return the new value,
   /// with the specified memory ordering.
   ///
@@ -304,20 +313,21 @@ extension UnsafeMutableRawPointer {
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_alwaysEmitIntoClient
   @_transparent // Debug performance
-  public
+  @usableFromInline
+  internal
   func _atomicFetchThen${swiftName}Word(
-    _ operand: UInt,
+    ${label} operand: UInt,
     ordering: AtomicUpdateOrdering
   ) -> UInt {
     switch ordering {
     case .relaxed:
-      return _atomicRelaxedFetchThen${swiftName}Word(operand)
+      return _atomicRelaxedFetchThen${swiftName}Word(${argLabel(label)}operand)
     case .acquiring:
-      return _atomicAcquiringFetchThen${swiftName}Word(operand)
+      return _atomicAcquiringFetchThen${swiftName}Word(${argLabel(label)}operand)
     case .releasing:
-      return _atomicReleasingFetchThen${swiftName}Word(operand)
+      return _atomicReleasingFetchThen${swiftName}Word(${argLabel(label)}operand)
     default:
-      return _atomicFetchThen${swiftName}Word(operand)
+      return _atomicBarrierFetchThen${swiftName}Word(${argLabel(label)}operand)
     }
   }
 % end

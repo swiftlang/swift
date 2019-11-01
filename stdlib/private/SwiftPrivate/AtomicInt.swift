@@ -31,34 +31,34 @@ public final class _stdlib_AtomicInt {
   }
 
   public func store(_ desired: Int) {
-    _valuePtr._atomicStoreWord(UInt(bitPattern: desired))
+    _valuePtr._atomicReleasingStoreWord(UInt(bitPattern: desired))
   }
 
   public func load() -> Int {
-    return Int(bitPattern: _valuePtr._atomicLoadWord())
+    return Int(bitPattern: _valuePtr._atomicAcquiringLoadWord())
   }
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenWrappingAddWord(
-      UInt(bitPattern: operand))
+    let word = _valuePtr._atomicBarrierFetchThenWrappingIncrementWord(
+      by: UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenBitwiseAndWord(
+    let word = _valuePtr._atomicBarrierFetchThenBitwiseAndWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenBitwiseOrWord(
+    let word = _valuePtr._atomicBarrierFetchThenBitwiseOrWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenBitwiseXorWord(
+    let word = _valuePtr._atomicBarrierFetchThenBitwiseXorWord(
       UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
@@ -78,7 +78,7 @@ public final class _stdlib_AtomicInt {
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedWord = UInt(bitPattern: expected)
-    let success = _valuePtr._atomicCompareExchangeWord(
+    let success = _valuePtr._atomicBarrierCompareExchangeWord(
       expected: &expectedWord,
       desired: UInt(bitPattern: desired))
     expected = Int(bitPattern: expectedWord)
