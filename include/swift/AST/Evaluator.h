@@ -187,6 +187,9 @@ class Evaluator {
   /// Whether to dump detailed debug info for cycles.
   bool debugDumpCycles;
 
+  /// Whether we're building a request dependency graph.
+  bool buildDependencyGraph;
+
   /// Used to report statistics about which requests were evaluated, if
   /// non-null.
   UnifiedStatsReporter *stats = nullptr;
@@ -237,7 +240,9 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags, bool debugDumpCycles=false);
+  Evaluator(DiagnosticEngine &diags,
+            bool debugDumpCycles,
+            bool buildDependencyGraph);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
@@ -370,7 +375,8 @@ private:
   getResultUncached(const Request &request) {
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
-    dependencies.find_as(request)->second.clear();
+    if (buildDependencyGraph)
+      dependencies.find_as(request)->second.clear();
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
