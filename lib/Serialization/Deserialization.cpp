@@ -2167,7 +2167,8 @@ static bool attributeChainContains(DeclAttribute *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Set original declaration in `@differentiable` attributes.
+// Set original declaration and parameter indices in `@differentiable`
+// attributes.
 //
 // Serializing/deserializing the original declaration DeclID in
 // `@differentiable` attributes does not work because it causes
@@ -2175,12 +2176,17 @@ static bool attributeChainContains(DeclAttribute *attr) {
 //
 // Instead, call this ad-hoc function after deserializing a declaration to set
 // it as the original declaration in its `@differentiable` attributes.
-static void setOriginalDeclarationInDifferentiableAttributes(
-    Decl *decl, DeclAttribute *attrs) {
+static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
+    Decl *decl, DeclAttribute *attrs,
+    llvm::DenseMap<DifferentiableAttr *, IndexSubset *>
+        &diffAttrParamIndicesMap) {
   DeclAttributes tempAttrs;
   tempAttrs.setRawAttributeChain(attrs);
-  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>())
-    const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(decl);
+  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
+    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
+    diffAttr->setOriginalDeclaration(decl);
+    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
+  }
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
@@ -2204,6 +2210,8 @@ class swift::DeclDeserializer {
 
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
+
+  llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
 
   Identifier privateDiscriminator;
   unsigned localDiscriminator = 0;
@@ -4098,7 +4106,11 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         auto *diffAttr = DifferentiableAttr::create(
             ctx, isImplicit, SourceLoc(), SourceRange(), linear,
             /*parsedParameters*/ {}, jvp, vjp, /*trailingWhereClause*/ nullptr);
-        diffAttr->setParameterIndices(indices);
+        // Cache parameter indices so that they can set later.
+        // `DifferentiableAttr::setParameterIndices` cannot be called here
+        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
+        // be called first.
+        diffAttrParamIndicesMap[diffAttr] = indices;
         diffAttr->setDerivativeGenericSignature(derivativeGenSig);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
@@ -4250,12 +4262,14 @@ DeclDeserializer::getDeclCheckedImpl() {
 
   switch (recordID) {
   // SWIFT_ENABLE_TENSORFLOW
-  // Set original declaration in `@differentiable` attributes.
+  // Set original declaration and parameter indices in `@differentiable`
+  // attributes.
 #define CASE(RECORD_NAME) \
   case decls_block::RECORD_NAME##Layout::Code: {\
     auto decl = deserialize##RECORD_NAME(scratch, blobData); \
     if (decl) \
-      setOriginalDeclarationInDifferentiableAttributes(decl.get(), DAttrs); \
+      setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
+          decl.get(), DAttrs, diffAttrParamIndicesMap); \
     return decl; \
   }
   // SWIFT_ENABLE_TENSORFLOW END

@@ -83,6 +83,14 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       !constant.autoDiffDerivativeFunctionIdentifier &&
       !constant.isStoredPropertyInitializer() &&
       !constant.isThunk()) {
+    // NOTE: Validate `@differentiable` attributes on `AccessorDecl`s by calling
+    // `getParameterIndices`. This is significant to prevent duplicate SIL
+    // `[differentiable]` attribute generation: `getParameterIndices` deletes
+    // `@differentiable` attributes whose original declaration is an
+    // `AbstractStorageDecl`.
+    if (isa<AccessorDecl>(decl))
+      for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
+        (void)A->getParameterIndices();
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
       // Get lowered argument indices.
       auto *paramIndices = A->getParameterIndices();

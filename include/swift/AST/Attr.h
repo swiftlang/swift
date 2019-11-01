@@ -1540,6 +1540,7 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  friend class DifferentiableAttributeParameterIndicesRequest;
 
   /// The declaration on which the `@differentiable` attribute is declared.
   Decl *OriginalDeclaration = nullptr;
@@ -1558,7 +1559,8 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
+  /// The bit stores whether the parameter indices have been computed.
+  llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff derivative functions. Resolved by the
@@ -1575,9 +1577,9 @@ class DifferentiableAttr final
                               Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
 
-  explicit DifferentiableAttr(Decl *original, bool implicit,
-                              SourceLoc atLoc, SourceRange baseRange,
-                              bool linear, IndexSubset *indices,
+  explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
+                              SourceRange baseRange, bool linear,
+                              IndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
@@ -1611,12 +1613,9 @@ public:
   /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  IndexSubset *getParameterIndices() const {
-    return ParameterIndices;
-  }
-  void setParameterIndices(IndexSubset *pi) {
-    ParameterIndices = pi;
-  }
+  bool hasComputedParameterIndices() const;
+  IndexSubset *getParameterIndices() const;
+  void setParameterIndices(IndexSubset *paramIndices);
 
   /// The parsed differentiation parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
@@ -1647,8 +1646,7 @@ public:
   void setVJPFunction(FuncDecl *decl);
 
   bool parametersMatch(const DifferentiableAttr &other) const {
-    assert(ParameterIndices && other.ParameterIndices);
-    return ParameterIndices == other.ParameterIndices;
+    return getParameterIndices() == other.getParameterIndices();
   }
 
   /// Get the derivative generic environment for the given `@differentiable`

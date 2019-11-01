@@ -613,13 +613,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
-      (void)member->getAccessor(AccessorKind::Get)->getInterfaceType();
+      auto *getter = member->getSynthesizedAccessor(AccessorKind::Get);
+      (void)getter->getInterfaceType();
       // If member or its getter already has a `@differentiable` attribute,
       // continue.
       if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
-          member->getAccessor(AccessorKind::Get)
-              ->getAttrs()
-              .hasAttribute<DifferentiableAttr>())
+          getter->getAttrs().hasAttribute<DifferentiableAttr>())
         continue;
       GenericSignature derivativeGenSig = GenericSignature();
       // If the parent declaration context is an extension, the nominal type may
@@ -628,9 +627,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
         derivativeGenSig = extDecl->getGenericSignature();
       auto *diffableAttr = DifferentiableAttr::create(
-          member->getAccessor(AccessorKind::Get), /*implicit*/ true,
-          SourceLoc(), SourceLoc(), /*linear*/ false, {}, None, None,
-          derivativeGenSig);
+          getter, /*implicit*/ true, SourceLoc(), SourceLoc(),
+          /*linear*/ false, {}, None, None, derivativeGenSig);
       member->getAttrs().add(diffableAttr);
       // Set getter `@differentiable` attribute parameter indices.
       diffableAttr->setParameterIndices(IndexSubset::get(C, 1, {0}));
