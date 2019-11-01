@@ -394,7 +394,6 @@ internal func _withTemporaryBridgedCocoaString<R>(
       return try work(tmp)
     }
     return try work(String(_StringGuts(buffer, isASCII: true)))
-    }
   }
 }
 
