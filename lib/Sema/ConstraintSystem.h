@@ -2360,7 +2360,7 @@ public:
 
   /// Retrieve the representative of the equivalence class containing
   /// this type variable.
-  TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
+  TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
@@ -2467,7 +2467,7 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  Type getFixedTypeRecursive(Type type, bool wantRValue) {
+  Type getFixedTypeRecursive(Type type, bool wantRValue) const {
     TypeMatchOptions flags = None;
     return getFixedTypeRecursive(type, flags, wantRValue);
   }
@@ -2485,7 +2485,7 @@ public:
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue);
+                             bool wantRValue) const;
 
   /// Determine whether the given type variable occurs within the given type.
   ///
@@ -3027,7 +3027,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type);
+  Type simplifyType(Type type) const;
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -3478,15 +3478,15 @@ private:
     }
   };
 
-  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type);
+  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
       bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings);
-  PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
+      bool &addOptionalSupertypeBindings) const;
+  PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
 private:
   /// Add a constraint to the constraint system.
@@ -3836,8 +3836,8 @@ public:
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
-  void print(raw_ostream &out);
-  void print(raw_ostream &out, Expr *);
+  void print(raw_ostream &out) const;
+  void print(raw_ostream &out, Expr *) const;
 };
 
 /// Compute the shuffle required to map from a given tuple type to

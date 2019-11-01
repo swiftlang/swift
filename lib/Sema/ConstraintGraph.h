@@ -160,7 +160,7 @@ private:
   mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
 
   /// Print this graph node.
-  void print(llvm::raw_ostream &out, unsigned indent);
+  void print(llvm::raw_ostream &out, unsigned indent) const;
 
   SWIFT_DEBUG_DUMP;
 

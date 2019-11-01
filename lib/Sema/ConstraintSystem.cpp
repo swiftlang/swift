@@ -746,7 +746,7 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
-                                             bool wantRValue) {
+                                             bool wantRValue) const {
 
   if (wantRValue)
     type = type->getRValueType();
@@ -2259,7 +2259,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 }
 
 template <typename Fn>
-Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
+Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
+                      Fn getFixedTypeFn) {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
       return getFixedTypeFn(tvt);
@@ -2305,7 +2306,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
   });
 }
 
-Type ConstraintSystem::simplifyType(Type type) {
+Type ConstraintSystem::simplifyType(Type type) const {
   if (!type->hasTypeVariable())
     return type;
 
