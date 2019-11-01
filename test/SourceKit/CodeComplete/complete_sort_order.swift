@@ -33,8 +33,6 @@ func test() {
 // CONTEXT: key.kind: source.lang.swift.decl
 // CONTEXT-NEXT: key.name: "x"
 // CONTEXT-NOT: key.name:
-// CONTEXT: key.name: "complete_sort_order",
-// CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "foo(a:)"
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "foo(a:)"
@@ -43,6 +41,7 @@ func test() {
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
 // CONTEXT: key.name: "#column"
+// CONTEXT: key.name: "complete_sort_order"
 
 // RUN: %complete-test -tok=STMT_0 %s | %FileCheck %s -check-prefix=STMT
 func test1() {

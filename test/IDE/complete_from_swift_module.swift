@@ -62,9 +62,9 @@ import corrupted_module
 func testQualifyingModulesSuggested() -> #^QUALIFYING_MODULE^# {
   let x = #^QUALIFYING_MODULE_2^#
   // QUALIFYING_MODULE: Begin completions
-  // QUALIFYING_MODULE-DAG: Decl[Module]/OtherModule[swift_ide_test]: swift_ide_test[#Module#]; name=swift_ide_test
-  // QUALIFYING_MODULE-DAG: Decl[Module]/OtherModule[Swift]:    Swift[#Module#]; name=Swift
-  // QUALIFYING_MODULE-DAG: Decl[Module]/OtherModule[foo_swift_module]: foo_swift_module[#Module#]; name=foo_swift_module
+  // QUALIFYING_MODULE-DAG: Decl[Module]/None: swift_ide_test[#Module#]; name=swift_ide_test
+  // QUALIFYING_MODULE-DAG: Decl[Module]/None: Swift[#Module#]; name=Swift
+  // QUALIFYING_MODULE-DAG: Decl[Module]/None: foo_swift_module[#Module#]; name=foo_swift_module
   // QUALIFYING_MODULE: End completions
 }
 

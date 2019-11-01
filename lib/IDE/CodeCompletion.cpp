@@ -1728,7 +1728,7 @@ public:
       CodeCompletionResultBuilder Builder(Sink,
                                           CodeCompletionResult::ResultKind::
                                           Declaration,
-                                          SemanticContextKind::OtherModule,
+                                          SemanticContextKind::None,
                                           expectedTypeContext);
       auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
       Builder.setAssociatedDecl(MD);
@@ -1771,7 +1771,7 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
-        SemanticContextKind::OtherModule,
+        SemanticContextKind::None,
         expectedTypeContext);
     Builder.setAssociatedDecl(MD);
     Builder.addTextChunk(MD->getNameStr());

@@ -32,7 +32,6 @@ func test001() {
 // TOP_LEVEL_0_ALL-NEXT: z
 // TOP_LEVEL_0_ALL-NEXT: A
 // TOP_LEVEL_0_ALL-NEXT: B
-// TOP_LEVEL_0_ALL-NEXT: complete_requestlimit
 // TOP_LEVEL_0_ALL-NEXT: test
 
 // TOP_LEVEL_0_3: let
