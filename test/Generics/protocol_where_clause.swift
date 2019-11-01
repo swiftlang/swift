@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -print-ast %s | %FileCheck %s
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 
@@ -91,7 +91,11 @@ protocol SR10831_P1 {
 protocol SR10831_P2: SR10831_P1 where A == G<G<C?>> {}
 protocol SR10831_P3: SR10831_P2 where B == Int, C == G<B> {}
 
-struct SR10831: SR10831_P3 {} // OK
+struct SR10831: SR10831_P3 { // OK
+  // CHECK: typealias A = G<G<G<Int>?>>
+  // CHECK: typealias B = Int
+  // CHECK: typealias C = G<Int>
+}
 
 
 // SR-11671:
@@ -102,6 +106,12 @@ protocol SR11671_P1 {
 protocol SR11671_P2: SR11671_P1 where A == Self {}
 protocol SR11671_P3: SR11671_P2 where B == G<Self?> {}
 
-struct SR11671_S1: SR11671_P3 {} // OK
+struct SR11671_S1: SR11671_P3 { // OK
+  // CHECK: typealias A = SR11671_S1
+  // CHECK: typealias B = G<SR11671_S1?>
+}
 
-struct SR11671_S2<T, U>: SR11671_P3 {} // OK
+struct SR11671_S2<T, U>: SR11671_P3 { // OK
+  // CHECK: typealias A = SR11671_S2<T, U>
+  // CHECK: typealias B = G<SR11671_S2<T, U>?>
+}
