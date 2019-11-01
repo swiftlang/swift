@@ -152,7 +152,7 @@ extension _AbstractStringStorage {
       return 0
     }
 
-    if self === other {
+    guard self !== other else {
       return 1
     }
 
@@ -172,40 +172,41 @@ extension _AbstractStringStorage {
     case .cocoa(otherStr):
       // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
-      if _isNSString(otherStr) != 1 {
+      guard _isNSString(otherStr) == 1 else {
         return 0
       }
+      
       // At this point we've proven that it is an NSString of some sort, but not
       // one of ours.
-
       defer { _fixLifetime(otherStr) }
 
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(otherStr)
 
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let otherStart = _cocoaASCIIPointer(otherStr) {
-        //We know that otherUTF16Length is also its byte count at this point
-        if count != otherUTF16Length {
+      guard let otherStart = _cocoaASCIIPointer(otherStr) else {
+        if UTF16Length != otherUTF16Length {
           return 0
         }
-        return withFastUTF8 {
-          let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
-          return (ourStart == otherStart ||
-            (ourStart, otherStart, count) == 0)) ? 1 : 0
-        }
+        
+        /*
+         The abstract implementation of -isEqualToString: falls back to compare:
+         immediately, so when we run out of fast options to try, do the same.
+         We can likely be more clever here if need be
+         */
+        return _cocoaStringCompare(self, other) == 0 ? 1 : 0
       }
-
-      if UTF16Length != otherUTF16Length {
+      
+      //We know that otherUTF16Length is also its byte count at this point
+      guard count == otherUTF16Length else {
         return 0
       }
-
-      /*
-       The abstract implementation of -isEqualToString: falls back to -compare:
-       immediately, so when we run out of fast options to try, do the same.
-       We can likely be more clever here if need be
-      */
-      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+      
+      return withFastUTF8 {
+        let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
+        return (ourStart == otherStart ||
+          memcmp(ourStart, otherStart, count) == 0) ? 1 : 0
+      }
     }
   }
 

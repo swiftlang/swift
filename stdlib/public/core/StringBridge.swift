@@ -317,15 +317,15 @@ internal enum _KnownCocoaString {
     }
 #endif
     
-    switch _swift_classOfObjCHeapObject(str) {
-    case __StringStorage.self:
+    switch ObjectIdentifier(_swift_classOfObjCHeapObject(str)) {
+    case ObjectIdentifier(__StringStorage.self):
       self = .storage(_unsafeUncheckedDowncast(cocoaString,
                                                to: __StringStorage.self))
-    case __SharedStringStorage.self:
+    case ObjectIdentifier(__SharedStringStorage.self):
       self = .shared(_unsafeUncheckedDowncast(cocoaString,
                                               to: __SharedStringStorage.self))
-    case _SwiftNSMutableString.self:
-      self = .shared(_unsafeUncheckedDowncast(cocoaString,
+    case ObjectIdentifier(_SwiftNSMutableString.self):
+      self = .mutable(_unsafeUncheckedDowncast(cocoaString,
                                               to: _SwiftNSMutableString.self))
     default:
       self = .cocoa(str)
@@ -678,28 +678,28 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
     let guts = _contents._guts
-    if !guts.isSmall && guts.isASCII {
-      assert(guts.isFastUTF8)
-      return guts.
-        _object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked._asCChar
+    guard !guts.isSmall && guts.isASCII else {
+      return nil
     }
-    return nil
+    assert(guts.isFastUTF8)
+    return guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked._asCChar
   }
 
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8> {
     let guts = _contents._guts
-    if !guts.isSmall {
-      assert(guts.isFastUTF8)
-      return guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked
+    guard !guts.isSmall else {
+      // This is Cocoa's trick for returning an "autoreleased char *", but using
+      // our CoW to make it a bit faster
+      let anchor = _contents._bridgeToObjectiveCImpl()
+      let unmanagedAnchor = Unmanaged.passRetained(anchor)
+      _ = unmanagedAnchor.autorelease()
+      return _cocoaStringGetUTF8Pointer(anchor)
     }
-    // This is Cocoa's trick for returning an "autoreleased char *", but using
-    // our CoW to make it a bit faster
-    let anchor = _contents._bridgeToObjectiveCImpl()
-    let unmanagedAnchor = Unmanaged.passRetained(anchor)
-    _ = unmanagedAnchor.autorelease()
-    return _cocoaStringGetUTF8Pointer(anchor)
+    assert(guts.isFastUTF8)
+    return guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked
+    
   }
 
   @objc(cStringUsingEncoding:)
@@ -749,7 +749,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   final internal func _convertIncomingNSRange(_ range: _SwiftNSRange)
     -> (Range<String.Index>, scalarAligned: Bool) {
       let range = _contents._toUTF16Indices(
-          range.location ..< range.location + range.length
+        range.location ..< range.location + range.length
       )
       let rs = range.startIndex
       let re = range.endIndex
@@ -766,11 +766,11 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
       // surrogate pair, then we play things safe and transcode to UTF16
       var utf16 = Array(_contents.utf16)
       utf16.replaceSubrange(range.location ..< range.location + range.length,
-                            with: $0)
+                            with: str)
       _contents = String(decoding: utf16, as: UTF16.self)
       return
     }
-    _contents.replaceSubrange(range, with: $0)
+    _contents.replaceSubrange(range, with: str)
   }
   
   @objc(replaceCharactersInRange:withString:)
