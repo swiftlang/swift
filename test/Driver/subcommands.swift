@@ -8,7 +8,7 @@
 // RUN: %t.dir/usr/bin/swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 // RUN: %t.dir/usr/bin/swift repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 
-// CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift -frontend -repl
+// CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift{{.*}} -repl
 
 
 // RUN: %empty-directory(%t.dir)
