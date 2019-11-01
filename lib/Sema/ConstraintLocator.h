@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINTLOCATOR_H
 #define SWIFT_SEMA_CONSTRAINTLOCATOR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -491,14 +492,10 @@ public:
   }
   
   /// Produce a debugging dump of this locator.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
-  void dump(SourceManager *SM, raw_ostream &OS) LLVM_ATTRIBUTE_USED;
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 
 private:
   /// Initialize a constraint locator with an anchor and a path.

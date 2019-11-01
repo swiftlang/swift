@@ -3777,11 +3777,11 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   for (auto moduleName : moduleNames) {
     llvm::errs() << "<<" << moduleName << " lookup table>>\n";
     LookupTables[moduleName]->deserializeAll();
-    LookupTables[moduleName]->dump();
+    LookupTables[moduleName]->dump(llvm::errs());
   }
 
   llvm::errs() << "<<Bridging header lookup table>>\n";
-  BridgingHeaderLookupTable->dump();
+  BridgingHeaderLookupTable->dump(llvm::errs());
 }
 
 DeclName ClangImporter::

@@ -19,6 +19,7 @@
 #define SWIFT_AST_WITNESS_H
 
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 
@@ -182,9 +183,7 @@ public:
     return {};
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dump() const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void dump(llvm::raw_ostream &out) const;
 };

@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_SCOPE_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/TreeScopedHashTable.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -59,8 +60,7 @@ public:
   
   SavedScope saveCurrentScope();
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 enum class ScopeKind {

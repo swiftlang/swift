@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_MANGLER_H
 
 #include "swift/Demangling/ManglingUtils.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
@@ -118,7 +119,7 @@ protected:
   /// Verify that demangling and remangling works.
   static void verify(StringRef mangledName);
 
-  void dump();
+  SWIFT_DEBUG_DUMP;
 
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);

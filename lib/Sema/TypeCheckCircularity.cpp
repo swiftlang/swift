@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/Basic/Debug.h"
 
 using namespace swift;
 
@@ -72,7 +73,7 @@ struct PathElement {
   size_t TupleIndex;
   Type Ty;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &out) const;
 };
 
@@ -87,7 +88,7 @@ public:
   const PathElement &operator[](size_t index) const { return Elements[index]; }
   const PathElement &back() const { return Elements.back(); }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void printCycle(llvm::raw_ostream &out, size_t cycleIndex) const;
   void printInfinite(llvm::raw_ostream &out) const;
 

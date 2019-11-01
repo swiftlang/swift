@@ -3611,15 +3611,15 @@ void Solution::dump(raw_ostream &out) const {
   }
 }
 
-void ConstraintSystem::dump() {
+void ConstraintSystem::dump() const {
   print(llvm::errs());
 }
 
-void ConstraintSystem::dump(Expr *E) {
+void ConstraintSystem::dump(Expr *E) const {
   print(llvm::errs(), E);
 }
 
-void ConstraintSystem::print(raw_ostream &out, Expr *E) {
+void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
   auto getTypeOfExpr = [&](const Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
@@ -3640,7 +3640,7 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) {
   E->dump(out, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent);
 }
 
-void ConstraintSystem::print(raw_ostream &out) {
+void ConstraintSystem::print(raw_ostream &out) const {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
                                true);

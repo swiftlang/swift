@@ -185,7 +185,7 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '>';
 }
 
-void GenericParamList::dump() {
+void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }

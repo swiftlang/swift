@@ -31,6 +31,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -740,9 +741,7 @@ public:
     return None;
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
   void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
@@ -2362,7 +2361,7 @@ public:
 
   /// Retrieve the representative of the equivalence class containing
   /// this type variable.
-  TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
+  TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
@@ -2457,7 +2456,7 @@ public:
 
   /// Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
-  Type getFixedType(TypeVariableType *typeVar) {
+  Type getFixedType(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getFixedType(getSavedBindings());
   }
 
@@ -2469,7 +2468,7 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  Type getFixedTypeRecursive(Type type, bool wantRValue) {
+  Type getFixedTypeRecursive(Type type, bool wantRValue) const {
     TypeMatchOptions flags = None;
     return getFixedTypeRecursive(type, flags, wantRValue);
   }
@@ -2487,7 +2486,7 @@ public:
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue);
+                             bool wantRValue) const;
 
   /// Determine whether the given type variable occurs within the given type.
   ///
@@ -3029,7 +3028,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type);
+  Type simplifyType(Type type) const;
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -3480,15 +3479,15 @@ private:
     }
   };
 
-  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type);
+  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
       bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings);
-  PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
+      bool &addOptionalSupertypeBindings) const;
+  PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
 private:
   /// Add a constraint to the constraint system.
@@ -3804,8 +3803,7 @@ public:
       return LiteralProtocols;
     }
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                              "only for use within the debugger");
+    SWIFT_DEBUG_DUMP;
   };
 
   bool haveTypeInformationForAllArguments(FunctionType *fnType);
@@ -3836,14 +3834,11 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(Expr *) LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(dump(Expr *));
 
-  void print(raw_ostream &out);
-  void print(raw_ostream &out, Expr *);
+  void print(raw_ostream &out) const;
+  void print(raw_ostream &out, Expr *) const;
 };
 
 /// Compute the shuffle required to map from a given tuple type to

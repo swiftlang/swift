@@ -45,7 +45,7 @@ ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
   return ConcreteDeclRef(baseDecl, subs);
 }
 
-void ConcreteDeclRef::dump(raw_ostream &os) {
+void ConcreteDeclRef::dump(raw_ostream &os) const {
   if (!getDecl()) {
     os << "**NULL**";
     return;
@@ -61,6 +61,6 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
   }
 }
 
-void ConcreteDeclRef::dump() {
+void ConcreteDeclRef::dump() const {
   dump(llvm::errs());
 }

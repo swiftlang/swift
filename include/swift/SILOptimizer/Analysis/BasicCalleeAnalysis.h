@@ -54,8 +54,7 @@ public:
       : CalleeFunctions(llvm::makeArrayRef(List.begin(), List.end())),
         IsIncomplete(IsIncomplete) {}
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void print(llvm::raw_ostream &os) const;
 
@@ -167,8 +166,7 @@ public:
     Cache.reset();
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void print(llvm::raw_ostream &os) const;
 

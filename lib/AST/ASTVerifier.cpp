@@ -512,8 +512,8 @@ public:
       if (auto *DC = dyn_cast<DeclContext>(D)) {
         if (D->getDeclContext() != DC->getParent()) {
           Out << "Decl's DeclContext not in sync with DeclContext's parent\n";
-          D->getDeclContext()->dumpContext();
-          DC->getParent()->dumpContext();
+          D->getDeclContext()->printContext(Out);
+          DC->getParent()->printContext(Out);
           abort();
         }
       }
@@ -1652,7 +1652,7 @@ public:
 
       if (E->getConformance().getRequirement() != hashableDecl) {
         Out << "conformance on AnyHashableErasureExpr was not for Hashable\n";
-        E->getConformance().dump();
+        E->getConformance().dump(Out);
         abort();
       }
 

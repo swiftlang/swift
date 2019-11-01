@@ -515,7 +515,8 @@ private:
 
     auto FnTy = SILTy.getAs<SILFunctionType>();
     if (!FnTy) {
-      LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
+      LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: ";
+                 SILTy.print(llvm::dbgs());
                  llvm::dbgs() << "\n");
       return CanSILFunctionType();
     }
@@ -803,14 +804,14 @@ private:
       if (!Reconstructed) {
         llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
-        Ty->dump();
+        Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty)) {
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
-        Ty->dump();
+        Ty->dump(llvm::errs());
         llvm::errs() << "Reconstructed type:\n";
-        Reconstructed->dump();
+        Reconstructed->dump(llvm::errs());
         abort();
       }
 #endif
@@ -1172,7 +1173,7 @@ private:
 
     if (!BaseTy) {
       LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
-                 DbgTy.getType()->dump();
+                 DbgTy.getType()->dump(llvm::dbgs());
                  llvm::dbgs() << "\n");
       if (!InternalType) {
         StringRef Name = "<internal>";
@@ -1499,8 +1500,9 @@ private:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
-      LLVM_DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
-                 llvm::errs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
+                 DbgTy.getType()->dump(llvm::dbgs());
+                 llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);

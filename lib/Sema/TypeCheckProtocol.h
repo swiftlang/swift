@@ -24,6 +24,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -114,8 +115,7 @@ struct InferredAssociatedTypesByWitness {
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 /// The set of witnesses that were considered when attempting to

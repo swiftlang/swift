@@ -130,8 +130,7 @@ public:
   BBEnumTagDataflowState(const BBEnumTagDataflowState &Other) = default;
   ~BBEnumTagDataflowState() = default;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   bool init(EnumCaseDataflowContext &Context, SILBasicBlock *NewBB);
 

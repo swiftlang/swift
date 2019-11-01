@@ -20,6 +20,7 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -452,17 +453,13 @@ public:
 
   /// Dump the dependencies of the given request to the debugging stream
   /// as a tree.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dumpDependencies(const AnyRequest &request) const LLVM_ATTRIBUTE_USED,
-    "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpDependencies(const AnyRequest &request));
 
   /// Print all dependencies known to the evaluator as a single Graphviz
   /// directed graph.
   void printDependenciesGraphviz(llvm::raw_ostream &out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dumpDependenciesGraphviz() const LLVM_ATTRIBUTE_USED,
-    "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpDependenciesGraphviz());
 };
 
 template <typename Request>

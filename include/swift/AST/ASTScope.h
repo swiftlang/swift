@@ -32,6 +32,7 @@
 #include "swift/AST/NameLookup.h" // for DeclVisibilityKind
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceManager.h"
@@ -330,8 +331,7 @@ protected:
   virtual NullablePtr<const void> addressForPrinting() const;
 
 public:
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineColumn);
 

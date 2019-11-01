@@ -27,6 +27,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
@@ -540,9 +541,7 @@ public:
   /// leaf node, etc.
   llvm::DenseMap<Expr *, unsigned> getPreorderIndexMap();
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
