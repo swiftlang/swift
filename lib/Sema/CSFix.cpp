@@ -994,3 +994,18 @@ RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator()) RemoveInvalidCall(cs, locator);
 }
+
+bool AllowInvalidUseOfTrailingClosure::diagnose(Expr *expr, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InvalidUseOfTrailingClosure failure(expr, cs, getFromType(), getToType(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidUseOfTrailingClosure *
+AllowInvalidUseOfTrailingClosure::create(ConstraintSystem &cs, Type argType,
+                                         Type paramType,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidUseOfTrailingClosure(cs, argType, paramType, locator);
+}
