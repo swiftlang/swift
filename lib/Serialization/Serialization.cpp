@@ -3188,8 +3188,8 @@ public:
         defaultArgumentText);
 
     if (interfaceType->hasError()) {
-      param->getDeclContext()->dumpContext();
-      interfaceType->dump();
+      param->getDeclContext()->printContext(llvm::errs());
+      interfaceType->dump(llvm::errs());
       llvm_unreachable("error in interface type of parameter");
     }
   }

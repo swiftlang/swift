@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -121,7 +122,7 @@ namespace {
                                  DeclContext *dynamicContext,
                                  DeclContext *staticContext);
       
-      void dump() const;
+      SWIFT_DEBUG_DUMP;
       
     private:
       SelfBounds findSelfBounds(DeclContext *dc);
@@ -368,11 +369,13 @@ namespace {
                                         bool isCascadingUse, NLOptions baseNLOptions);
     
   public:
-    void dump() const;
-    void dumpScopes() const;
+    SWIFT_DEBUG_DUMP;
+    SWIFT_DEBUG_DUMPER(dumpResults());
+    SWIFT_DEBUG_DUMPER(dumpScopes());
+
+    void printScopes(raw_ostream &OS) const;
     void print(raw_ostream &OS) const;
-    
-    void dumpResults() const;
+    void printResults(raw_ostream &OS) const;
 
     bool verifyEqualTo(const UnqualifiedLookupFactory &&, StringRef thisLabel,
                        StringRef otherLabel) const;
@@ -1245,16 +1248,17 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
   llvm::errs() << "\n";
 }
 
-void UnqualifiedLookupFactory::dumpScopes() const {
-  llvm::errs() << "\n\nScopes:\n";
-  DC->getParentSourceFile()->getScope().print(llvm::errs());
-  llvm::errs() << "\n";
+void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
+void UnqualifiedLookupFactory::dumpScopes() const { printScopes(llvm::errs()); }
+void UnqualifiedLookupFactory::dumpResults() const { printResults(llvm::errs()); }
+
+void UnqualifiedLookupFactory::printScopes(raw_ostream &out) const {
+  out << "\n\nScopes:\n";
+  DC->getParentSourceFile()->getScope().print(out);
+  out << "\n";
 }
 
-void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
-
-void UnqualifiedLookupFactory::dumpResults() const {
-  auto &out = llvm::errs();
+void UnqualifiedLookupFactory::printResults(raw_ostream &out) const {
   for (auto i : indices(Results)) {
     if (i == resultsSizeBeforeLocalsPass)
       out << "============== next pass ============\n";
@@ -1301,12 +1305,12 @@ static void writeInconsistent(const UnqualifiedLookupFactory &me,
                               const UnqualifiedLookupFactory &other,
                               StringRef otherLabel, llvm::Twine s) {
   writeFirstLine(me, s);
-  other.dump();
+  other.print(llvm::errs());
   llvm::errs() << "\n" << thisLabel << " Results:\n";
-  me.dumpResults();
+  me.printResults(llvm::errs());
   llvm::errs() << "\n" << otherLabel << " Results:\n";
-  other.dumpResults();
-  me.dumpScopes();
+  other.printResults(llvm::errs());
+  me.printScopes(llvm::errs());
 }
 
 #pragma mark comparing results

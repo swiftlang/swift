@@ -2798,8 +2798,8 @@ public:
     if (paramTy->hasError()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
-      DC->dumpContext();
-      paramTy->dump();
+      DC->printContext(llvm::errs());
+      paramTy->dump(llvm::errs());
       MF.fatal();
     }
 
@@ -5153,7 +5153,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
   if (typeOrOffset.get()->hasError()) {
-    typeOrOffset.get()->dump();
+    typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
   }

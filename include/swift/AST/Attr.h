@@ -17,6 +17,7 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
@@ -1583,7 +1584,7 @@ public:
   /// a declaration is deprecated on all deployment targets, or null otherwise.
   const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
 
-  void dump(const Decl *D = nullptr) const;
+  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
   static void print(ASTPrinter &Printer, const PrintOptions &Options,

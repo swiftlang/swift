@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 
 #include "swift/Basic/APIntMap.h"
@@ -242,7 +243,7 @@ namespace {
 
       SpaceKind getKind() const { return Kind; }
 
-      void dump() const LLVM_ATTRIBUTE_USED;
+      SWIFT_DEBUG_DUMP;
 
       size_t getSize(TypeChecker &TC, const DeclContext *DC) const {
         SmallPtrSet<TypeBase *, 4> cache;

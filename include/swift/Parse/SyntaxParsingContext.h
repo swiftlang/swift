@@ -14,6 +14,7 @@
 #define SWIFT_PARSE_SYNTAXPARSINGCONTEXT_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
@@ -345,8 +346,7 @@ public:
   void synthesize(tok Kind, SourceLoc Loc);
 
   /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
-  LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
-                            "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpStorage());
 };
 
 } // namespace swift

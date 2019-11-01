@@ -23,6 +23,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -320,7 +321,7 @@ public:
                              LookupConformanceFn conformances,
                              SubstOptions options=None) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };
 

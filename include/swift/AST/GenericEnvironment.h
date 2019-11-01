@@ -21,6 +21,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -160,7 +161,7 @@ public:
 
   void dump(raw_ostream &os) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 };
   
 } // end namespace swift

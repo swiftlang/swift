@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -245,9 +246,7 @@ public:
 
   void print(llvm::raw_ostream &Out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const
-                              LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without

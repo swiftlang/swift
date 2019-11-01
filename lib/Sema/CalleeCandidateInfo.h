@@ -20,6 +20,8 @@
 #ifndef SWIFT_SEMA_CALLEECANDIDATEINFO_H
 #define SWIFT_SEMA_CALLEECANDIDATEINFO_H
 
+#include "swift/Basic/Debug.h"
+
 namespace swift {
   
   using namespace constraints;
@@ -140,7 +142,8 @@ namespace swift {
       return Type();
     }
 
-    void dump() const LLVM_ATTRIBUTE_USED;
+    void dump(llvm::raw_ostream &os) const;
+    SWIFT_DEBUG_DUMP;
   };
 
   class CalleeCandidateInfo {
@@ -229,7 +232,8 @@ namespace swift {
     /// list.
     bool diagnoseSimpleErrors(const Expr *E);
     
-    void dump() const LLVM_ATTRIBUTE_USED;
+    void dump(llvm::raw_ostream &os) const;
+    SWIFT_DEBUG_DUMP;
     
   private:
     void collectCalleeCandidates(Expr *fnExpr, bool implicitDotSyntax);

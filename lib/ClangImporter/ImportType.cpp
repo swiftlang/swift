@@ -762,8 +762,8 @@ namespace {
         LLVM_FALLTHROUGH;
       default:
         if (!underlyingResult.AbstractType->isEqual(mappedType)) {
-          underlyingResult.AbstractType->dump();
-          mappedType->dump();
+          underlyingResult.AbstractType->dump(llvm::errs());
+          mappedType->dump(llvm::errs());
         }
         assert(underlyingResult.AbstractType->isEqual(mappedType) &&
                "typedef without special typedef kind was mapped "
