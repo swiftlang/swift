@@ -167,14 +167,14 @@ public:
   LocalContext *CurLocalContext = nullptr;
 
   bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || SourceMgr.getCodeCompletionLoc().isValid();
+    return DelayBodyParsing || isCodeCompletionFirstPass();
   }
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
   }
 
-  bool isCodeCompletionFirstPass() {
+  bool isCodeCompletionFirstPass() const {
     return L->isCodeCompletion() && !CodeCompletion;
   }
 
@@ -1057,6 +1057,7 @@ public:
                                        bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+  void parseAbstractFunctionBodyDelayed();
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 

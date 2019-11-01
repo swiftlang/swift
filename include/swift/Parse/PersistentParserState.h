@@ -56,6 +56,7 @@ public:
   enum class DelayedDeclKind {
     TopLevelCodeDecl,
     Decl,
+    FunctionBody,
   };
 
   class DelayedDeclState {
