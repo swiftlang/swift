@@ -299,41 +299,36 @@ private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
 }
 
 internal enum _KnownCocoaString {
-  case storage
-  case shared
-  case mutable
-  case cocoa
+  case storage(__StringStorage)
+  case shared(__SharedStringStorage)
+  case mutable(_SwiftNSMutableString)
+  case cocoa(_CocoaString)
 #if !(arch(i386) || arch(arm))
-  case tagged
+  case tagged(_CocoaString)
 #endif
 
-  private static let stringClasses = (
-    storage: unsafeBitCast(__StringStorage.self, to: UInt.self),
-    shared: unsafeBitCast(__SharedStringStorage.self, to: UInt.self),
-    mutable: unsafeBitCast(_SwiftNSMutableString.self, to: UInt.self)
-  )
-  
   @inline(__always)
   init(_ str: _CocoaString) {
 
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(str) {
-      self = .tagged
+      self = .tagged(str)
       return
     }
 #endif
     
-    let classes = _KnownCocoaString.stringClasses
-
-    switch unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self) {
-    case classes.storage:
-      self = .storage
-    case classes.shared:
-      self = .shared
-    case classes.mutable:
-      self = .mutable
+    switch _swift_classOfObjCHeapObject(str) {
+    case __StringStorage.self:
+      self = .storage(_unsafeUncheckedDowncast(cocoaString,
+                                               to: __StringStorage.self))
+    case __SharedStringStorage.self:
+      self = .shared(_unsafeUncheckedDowncast(cocoaString,
+                                              to: __SharedStringStorage.self))
+    case _SwiftNSMutableString.self:
+      self = .shared(_unsafeUncheckedDowncast(cocoaString,
+                                              to: _SwiftNSMutableString.self))
     default:
-      self = .cocoa
+      self = .cocoa(str)
     }
   }
 }
@@ -365,86 +360,40 @@ internal func _cocoaASCIIPointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
   return _NSStringASCIIPointer(_objc(str))
 }
 
-private enum CocoaStringPointer {
-  case ascii(UnsafePointer<UInt8>)
-  case utf8(UnsafePointer<UInt8>)
-  case utf16(UnsafePointer<UInt16>)
-  case none
-}
-
-@_effects(readonly)
-private func _getCocoaStringPointer(
-  _ cfImmutableValue: _CocoaString
-) -> CocoaStringPointer {
-  if let asciiPtr = _cocoaASCIIPointer(cfImmutableValue) {
-    // NOTE: CFStringGetCStringPointer means ASCII
-    return .ascii(asciiPtr)
-  }
-  if let utf16Ptr = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue) {
-    return .utf16(utf16Ptr)
-  }
-  return .none
-}
-
+// This does not create a bridged String that's safe to use past the current
+// stack frame, e.g. it does not defensively copy it and so on.
 @_effects(releasenone)
-internal func _withBridgedCocoaStringOrContents<R>(
-  _ cocoaString: _CocoaString,
-  _ work: (UnsafeBufferPointer<UInt8>?, String?, Bool) throws -> R
+internal func _withTemporaryBridgedCocoaString<R>(
+  _ cocoaString: _CocoaString?,
+  _ work: (String) throws -> R
 ) rethrows -> R {
+  guard let cocoaString = cocoaString else {
+    return try work("")
+  }
   switch _KnownCocoaString(cocoaString) {
-  case .storage:
-    let storage = _unsafeUncheckedDowncast(cocoaString,
-                                           to: __StringStorage.self)
-    return try work(
-      nil,
-      storage.asString,
-      storage.isASCII
-    )
-  case .shared:
-    let storage = _unsafeUncheckedDowncast(cocoaString,
-                                           to: __SharedStringStorage.self)
-    return try work(
-      nil,
-      storage.asString,
-      storage.isASCII
-    )
+  case .storage(storage):
+    return try work(storage.asString)
+  case .shared(storage):
+    return try work(storage.asString)
     #if !(arch(i386) || arch(arm))
-  case .tagged:
-    return try work(
-      nil,
-      String(_StringGuts(_SmallString(taggedCocoa: cocoaString))),
-      true
-    )
+  case .tagged(str):
+    let tmpStr = String(_StringGuts(_SmallString(taggedCocoa: str)))
+    return try work(.string(tmpStr, true))
     #endif
-  case .mutable:
-    let storage = _unsafeUncheckedDowncast(cocoaString,
-                                           to: _SwiftNSMutableString.self)
-    return try work(
-      nil,
-      storage.asString,
-      storage.isASCII
-    )
-  case .cocoa:
-    var fastUTF8 = false
-    let length = _stdlib_binary_CFStringGetLength(cocoaString)
-    switch _getCocoaStringPointer(cocoaString) {
-    case .ascii(let ptr):
-      return try work(
-        UnsafeBufferPointer<UInt8>(start: ptr, count: length),
-        nil,
-        true
-      )
-    case .utf8(_):
-      fastUTF8 = true
-      fallthrough
-    default:
+  case .mutable(storage):
+    return try work(storage.asString)
+  case .cocoa(str):
+    let length = _stdlib_binary_CFStringGetLength(str)
+    guard let ascii = _cocoaASCIIPointer(str) else {
       let tmp = _StringGuts(
-        cocoa: cocoaString,
-        providesFastUTF8: fastUTF8,
+        cocoa: str,
+        providesFastUTF8: false,
         isASCII: false,
         length: length
       )
-      return try work(nil, String(tmp), false)
+      return try work(tmp)
+    }
+    return try work(String(_StringGuts(buffer, isASCII: true)))
     }
   }
 }
@@ -453,20 +402,17 @@ internal func _withBridgedCocoaStringOrContents<R>(
 @_effects(releasenone) // @opaque
 internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   switch _KnownCocoaString(cocoaString) {
-  case .storage:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: __StringStorage.self).asString._guts
-  case .shared:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: __SharedStringStorage.self).asString._guts
-  case .mutable:
-    return _unsafeUncheckedDowncast(
-      cocoaString, to: _SwiftNSMutableString.self).asString._guts
+  case .storage(storage):
+    return storage.asString._guts
+  case .shared(storage):
+    return storage.asString._guts
+  case .mutable(storage):
+    return storage.asString._guts
 #if !(arch(i386) || arch(arm))
-  case .tagged:
-    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
+  case .tagged(str):
+    return _StringGuts(_SmallString(taggedCocoa: str))
 #endif
-  case .cocoa:
+  case .cocoa(str):
     // "Copy" it into a value to be sure nobody will modify behind
     // our backs. In practice, when value is already immutable, this
     // just does a retain.
@@ -477,7 +423,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     //      happen; might as well eagerly bridge it in.
     //   3) If it's mutable with associated information, must make the call
     let immutableCopy
-      = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
+      = _stdlib_binary_CFStringCreateCopy(str) as AnyObject
 
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(immutableCopy) {
@@ -485,18 +431,12 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     }
 #endif
 
-    let (fastUTF8, isASCII): (Bool, Bool)
-    switch _getCocoaStringPointer(immutableCopy) {
-    case .ascii(_): (fastUTF8, isASCII) = (true, true)
-    case .utf8(_): (fastUTF8, isASCII) = (true, false)
-    default:  (fastUTF8, isASCII) = (false, false)
-    }
+    let ascii = _cocoaASCIIPointer(immutableCopy)
     let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-
     return _StringGuts(
       cocoa: immutableCopy,
-      providesFastUTF8: fastUTF8,
-      isASCII: isASCII,
+      providesFastUTF8: ascii != nil,
+      isASCII: ascii != nil,
       length: length)
   }
 }
@@ -664,6 +604,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   
   internal init(_ str: String) {
     _contents = str
+    assert(_contents._guts.isFastUTF8)
     super.init()
   }
   
@@ -707,12 +648,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   @objc
   final internal var hash: UInt {
     @_effects(readonly) get {
-      if isASCII {
-        return _contents._guts.withFastUTF8 {
-          return _cocoaHashASCIIBytes($0.baseAddress!, length: $0.count)
-        }
-      }
-      return _cocoaHashString(self)
+      return _getCocoaHash()
     }
   }
 
@@ -733,10 +669,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   @objc
   final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
-      if isASCII {
-        return _cocoaASCIIEncoding
-      }
-      return _cocoaUTF8Encoding
+      return _getFastestEncoding()
     }
   }
 
@@ -746,8 +679,10 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
     let guts = _contents._guts
-    if !guts.isSmall && guts.isFastUTF8 && guts.isASCII {
-      return guts._object.fastUTF8.baseAddress!._asCChar
+    if !guts.isSmall && guts.isASCII {
+      assert(guts.isFastUTF8)
+      return guts.
+        _object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked._asCChar
     }
     return nil
   }
@@ -756,8 +691,9 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8> {
     let guts = _contents._guts
-    if !guts.isSmall && guts.isFastUTF8 {
-      return guts._object.fastUTF8.baseAddress!
+    if !guts.isSmall {
+      assert(guts.isFastUTF8)
+      return guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked
     }
     // This is Cocoa's trick for returning an "autoreleased char *", but using
     // our CoW to make it a bit faster
@@ -811,42 +747,54 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     return _SwiftNSMutableString(_contents)
   }
   
+  final internal func _convertIncomingNSRange(_ range: _SwiftNSRange)
+    -> (Range<String.Index>, scalarAligned: Bool) {
+      let range = _contents._toUTF16Indices(
+          range.location ..< range.location + range.length
+      )
+      let rs = range.startIndex
+      let re = range.endIndex
+      let scalarAligned =
+        (rs._isScalarAligned || rs.transcodedOffset == 0) &&
+        (re._isScalarAligned || re.transcodedOffset == 0)
+      return (range, scalarAligned)
+  }
+  
+  final func _replace(in range: _SwiftNSRange, with str: String) {
+    let (range, scalarAligned) = _convertIncomingNSRange(range)
+    guard _fastPath(scalarAligned) else {
+      // Slow path: if they're doing something like replacing one half of a
+      // surrogate pair, then we play things safe and transcode to UTF16
+      var utf16 = Array(_contents.utf16)
+      utf16.replaceSubrange(range.location ..< range.location + range.length,
+                            with: $0)
+      _contents = String(decoding: utf16, as: UTF16.self)
+      return
+    }
+    _contents.replaceSubrange(range, with: $0)
+  }
+  
   @objc(replaceCharactersInRange:withString:)
   final func replaceCharacters(
     in range: _SwiftNSRange,
     with aString: _CocoaString?
   ) {
-    let range = _contents._toUTF16Indices(
-      range.location ..< range.location + range.length
-    )
-    if let string = aString {
-      _withBridgedCocoaStringOrContents(string) { (buffer, str, isASCII)
-        -> Void in
-        let replacement = str ?? String(_StringGuts(buffer!, isASCII: isASCII))
-        _contents.replaceSubrange(range, with: replacement)
-      }
-    } else {
-      _contents.replaceSubrange(range, with: [])
+    _withTemporaryBridgedCocoaString(string) {
+      _replace(in: range, with: $0)
     }
   }
   
   @objc(appendString:)
   final func appendString(_ aString: _CocoaString?) {
-    if let string = aString {
-      _withBridgedCocoaStringOrContents(string) { (buffer, str, isASCII)
-        -> Void in
-        let newContents = str ?? String(_StringGuts(buffer!, isASCII: isASCII))
-        _contents.append(newContents)
-      }
+    _withTemporaryBridgedCocoaString(aString) {
+      _contents.append($0)
+      return
     }
   }
   
   @objc(deleteCharactersInRange:)
   final func deleteCharacters(in range: _SwiftNSRange) {
-    let range = _contents._toUTF16Indices(
-      range.location ..< range.location + range.length
-    )
-    _contents.replaceSubrange(range, with: [])
+    _replace(in: range, with: "")
   }
   
   @objc(insertString:atIndex:)

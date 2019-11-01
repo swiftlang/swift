@@ -84,13 +84,35 @@ extension _AbstractStringStorage {
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       return withFastUTF8 {
-        outputPtr.initialize(from: $0.baseAddress!, count: $0.count)
+        outputPtr.initialize(from: $0.baseAddress._unsafelyUnwrappedUnchecked,
+                             count: $0.count)
         outputPtr[count] = 0
         return 1
       }
     default:
       return  _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
     }
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _getCocoaHash() -> UInt {
+    if isASCII {
+      return withFastUTF8 {
+        return _cocoaHashASCIIBytes($0.baseAddress._unsafelyUnwrappedUnchecked,
+                                    length: $0.count)
+      }
+    }
+    return _cocoaHashString(self)
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _getFastestEncoding() -> UInt {
+    if isASCII {
+      return _cocoaASCIIEncoding
+    }
+    return _cocoaUTF8Encoding
   }
 
   @inline(__always)
@@ -114,9 +136,9 @@ extension _AbstractStringStorage {
       return 0
     }
     return withFastUTF8 { (buffer) in
-      let ourStart = buffer.baseAddress!
+      let ourStart = buffer.baseAddress._unsafelyUnwrappedUnchecked
       return nativeOther.withFastUTF8 { (otherBuffer) in
-        let otherStart = otherBuffer.baseAddress!
+        let otherStart = otherBuffer.baseAddress._unsafelyUnwrappedUnchecked
         return (ourStart == otherStart ||
           (memcmp(ourStart, otherStart, count) == 0)) ? 1 : 0
       }
@@ -136,44 +158,41 @@ extension _AbstractStringStorage {
 
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
-    let knownOther = _KnownCocoaString(other)
-    switch knownOther {
-    case .storage:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __StringStorage.self))
-    case .shared:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
-    case .mutable:
-      return _nativeIsEqual(
-        _unsafeUncheckedDowncast(other, to: _SwiftNSMutableString.self))
+    switch _KnownCocoaString(other) {
+    case .storage(storage):
+      return _nativeIsEqual(storage)
+    case .shared(storage):
+      return _nativeIsEqual(storage)
+    case .mutable(storage):
+      return _nativeIsEqual(storage)
 #if !(arch(i386) || arch(arm))
-    case .tagged:
+    case .tagged(otherStr):
       fallthrough
 #endif
-    case .cocoa:
+    case .cocoa(otherStr):
       // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
-      if _isNSString(other) != 1 {
+      if _isNSString(otherStr) != 1 {
         return 0
       }
       // At this point we've proven that it is an NSString of some sort, but not
       // one of ours.
 
-      defer { _fixLifetime(other) }
+      defer { _fixLifetime(otherStr) }
 
-      let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
+      let otherUTF16Length = _stdlib_binary_CFStringGetLength(otherStr)
 
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let otherStart = _cocoaASCIIPointer(other) {
+      if let otherStart = _cocoaASCIIPointer(otherStr) {
         //We know that otherUTF16Length is also its byte count at this point
         if count != otherUTF16Length {
           return 0
         }
         return withFastUTF8 {
-          return ($0.baseAddress! == otherStart ||
-            (memcmp($0.baseAddress!, otherStart, count) == 0)) ? 1 : 0
+          let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
+          return (ourStart == otherStart ||
+            (ourStart, otherStart, count) == 0)) ? 1 : 0
         }
       }
 
@@ -260,12 +279,7 @@ final internal class __StringStorage
   @objc
   final internal var hash: UInt {
     @_effects(readonly) get {
-      if isASCII {
-        return withFastUTF8 {
-          return _cocoaHashASCIIBytes($0.baseAddress!, length: $0.count)
-        }
-      }
-      return _cocoaHashString(self)
+      return _getCocoaHash()
     }
   }
 
@@ -318,10 +332,7 @@ final internal class __StringStorage
   @objc
   final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
-      if isASCII {
-        return _cocoaASCIIEncoding
-      }
-      return _cocoaUTF8Encoding
+      return _getFastestEncoding()
     }
   }
 
@@ -801,15 +812,7 @@ final internal class __SharedStringStorage
   @objc
   final internal var hash: UInt {
     @_effects(readonly) get {
-      if isASCII {
-        return withFastUTF8 {
-          return _cocoaHashASCIIBytes(
-            $0.baseAddress._unsafelyUnwrappedUnchecked,
-            length: $0.count
-          )
-        }
-      }
-      return _cocoaHashString(self)
+      return _getCocoaHash()
     }
   }
 
@@ -831,10 +834,7 @@ final internal class __SharedStringStorage
   @objc
   final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
-      if isASCII {
-        return _cocoaASCIIEncoding
-      }
-      return _cocoaUTF8Encoding
+      return _getFastestEncoding()
     }
   }
 
