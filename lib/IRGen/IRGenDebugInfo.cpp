@@ -1000,6 +1000,29 @@ private:
     return BitWidth;
   }
 
+  /// Create a sized container for a sizeless type. Used to represent
+  /// BoundGenericEnums that may have different sizes depending on what they are
+  /// bound to, but still share a mangled name.
+  llvm::DIType *createOpaqueStructWithSizedContainer(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName) {
+    // Let the MDNode folding set do the work of uniquing the inner type. This
+    // should be cheap.
+    llvm::DICompositeType *UniqueType = DBuilder.createStructType(
+        Scope, Name, File, Line, 0, 0, Flags, nullptr,
+        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+    llvm::Metadata *Elements[] = {
+        DBuilder.createMemberType(Scope, "", File, 0, SizeInBits,
+                                  AlignInBits, 0, Flags, UniqueType)};
+
+    return DBuilder.createStructType(
+        Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
+        llvm::dwarf::DW_LANG_Swift);
+  }
+
   llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
                                          llvm::DIFile *File, unsigned Line,
                                          llvm::DINode::DIFlags Flags,
@@ -1413,12 +1436,9 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
-                              Flags);
-      else
-        return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
-                                  SizeInBits, AlignInBits, Flags, MangledName);
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl->getName().str(), File, L.Line, SizeInBits, AlignInBits,
+          Flags, MangledName);
     }
 
     case TypeKind::BuiltinVector: {
