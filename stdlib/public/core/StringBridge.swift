@@ -371,18 +371,18 @@ internal func _withTemporaryBridgedCocoaString<R>(
     return try work("")
   }
   switch _KnownCocoaString(cocoaString) {
-  case .storage(storage):
+  case .storage(let storage):
     return try work(storage.asString)
-  case .shared(storage):
+  case .shared(let storage):
     return try work(storage.asString)
     #if !(arch(i386) || arch(arm))
-  case .tagged(str):
+  case .tagged(let str):
     let tmpStr = String(_StringGuts(_SmallString(taggedCocoa: str)))
     return try work(.string(tmpStr, true))
     #endif
-  case .mutable(storage):
+  case .mutable(let storage):
     return try work(storage.asString)
-  case .cocoa(str):
+  case .cocoa(let str):
     let length = _stdlib_binary_CFStringGetLength(str)
     guard let ascii = _cocoaASCIIPointer(str) else {
       let tmp = _StringGuts(
@@ -393,7 +393,7 @@ internal func _withTemporaryBridgedCocoaString<R>(
       )
       return try work(tmp)
     }
-    return try work(String(_StringGuts(buffer, isASCII: true)))
+    return try work(String(_StringGuts(ascii, isASCII: true)))
   }
 }
 
@@ -401,17 +401,17 @@ internal func _withTemporaryBridgedCocoaString<R>(
 @_effects(releasenone) // @opaque
 internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   switch _KnownCocoaString(cocoaString) {
-  case .storage(storage):
+  case .storage(let storage):
     return storage.asString._guts
-  case .shared(storage):
+  case .shared(let storage):
     return storage.asString._guts
-  case .mutable(storage):
+  case .mutable(let storage):
     return storage.asString._guts
 #if !(arch(i386) || arch(arm))
-  case .tagged(str):
+  case .tagged(let str):
     return _StringGuts(_SmallString(taggedCocoa: str))
 #endif
-  case .cocoa(str):
+  case .cocoa(let str):
     // "Copy" it into a value to be sure nobody will modify behind
     // our backs. In practice, when value is already immutable, this
     // just does a retain.
@@ -748,25 +748,25 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   
   final internal func _convertIncomingNSRange(_ range: _SwiftNSRange)
     -> (Range<String.Index>, scalarAligned: Bool) {
-      let range = _contents._toUTF16Indices(
-        range.location ..< range.location + range.length
-      )
-      let rs = range.startIndex
-      let re = range.endIndex
-      let scalarAligned =
-        (rs._isScalarAligned || rs.transcodedOffset == 0) &&
-        (re._isScalarAligned || re.transcodedOffset == 0)
-      return (range, scalarAligned)
+    let range = _contents._toUTF16Indices(
+      range.location ..< range.location + range.length
+    )
+    let rs = range.startIndex
+    let re = range.endIndex
+    let scalarAligned =
+      (rs._isScalarAligned || rs.transcodedOffset == 0) &&
+      (re._isScalarAligned || re.transcodedOffset == 0)
+    return (range, scalarAligned)
   }
   
-  final func _replace(in range: _SwiftNSRange, with str: String) {
-    let (range, scalarAligned) = _convertIncomingNSRange(range)
+  final func _replace(in nsRange: _SwiftNSRange, with str: String) {
+    let (range, scalarAligned) = _convertIncomingNSRange(nsRange)
     guard _fastPath(scalarAligned) else {
       // Slow path: if they're doing something like replacing one half of a
       // surrogate pair, then we play things safe and transcode to UTF16
       var utf16 = Array(_contents.utf16)
-      utf16.replaceSubrange(range.location ..< range.location + range.length,
-                            with: str)
+      let cocoaRange = nsRange.location ..< nsRange.location + nsRange.length
+      utf16.replaceSubrange(cocoaRange, with: str)
       _contents = String(decoding: utf16, as: UTF16.self)
       return
     }

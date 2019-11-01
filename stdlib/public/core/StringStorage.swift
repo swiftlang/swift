@@ -159,17 +159,17 @@ extension _AbstractStringStorage {
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
     switch _KnownCocoaString(other) {
-    case .storage(storage):
+    case .storage(let storage):
       return _nativeIsEqual(storage)
-    case .shared(storage):
+    case .shared(let storage):
       return _nativeIsEqual(storage)
-    case .mutable(storage):
+    case .mutable(let storage):
       return _nativeIsEqual(storage)
 #if !(arch(i386) || arch(arm))
-    case .tagged(otherStr):
+    case .tagged(let otherStr):
       fallthrough
 #endif
-    case .cocoa(otherStr):
+    case .cocoa(let otherStr):
       // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
       guard _isNSString(otherStr) == 1 else {
