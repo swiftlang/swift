@@ -5491,3 +5491,20 @@ bool ExtraneousCallFailure::diagnoseAsError() {
   removeParensFixIt(diagnostic);
   return true;
 }
+
+bool InvalidUseOfTrailingClosure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto &cs = getConstraintSystem();
+
+  emitDiagnostic(anchor->getLoc(), diag::trailing_closure_bad_param,
+                 getToType())
+      .highlight(anchor->getSourceRange());
+
+  if (auto overload = getChoiceFor(cs.getCalleeLocator(getLocator()))) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
+    }
+  }
+
+  return true;
+}

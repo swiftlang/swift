@@ -996,7 +996,10 @@ RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
 }
 
 bool AllowInvalidUseOfTrailingClosure::diagnose(Expr *expr, bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  InvalidUseOfTrailingClosure failure(expr, cs, getFromType(), getToType(),
+                                      getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowInvalidUseOfTrailingClosure *
