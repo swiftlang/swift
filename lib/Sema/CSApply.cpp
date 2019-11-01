@@ -4656,27 +4656,6 @@ namespace {
 
         conformances.push_back(*hashableConformance);
       }
-      
-      newIndexExpr->dump();
-      if (auto *parenExpr = dyn_cast<ParenExpr>(newIndexExpr)) {
-        if (auto *defaultArg =
-                dyn_cast<DefaultArgumentExpr>(parenExpr->getSubExpr())) {
-          const ParamDecl *defaultParam = getParameterAt(
-              cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()), 0);
-          parenExpr->setSubExpr(defaultParam->getDefaultValue());
-        }
-      }
-
-      if (auto *tupleExpr = dyn_cast<TupleExpr>(newIndexExpr)) {
-        for (size_t i = 0, n = tupleExpr->getNumElements(); i < n; ++i) {
-          if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(tupleExpr->getElement(i))) {
-            const ParamDecl *defaultParam = getParameterAt(
-                cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()),
-                i);
-            tupleExpr->setElement(i, defaultParam->getDefaultValue());
-          }
-        }
-      }
 
       component.setSubscriptIndexHashableConformances(conformances);
       return component;
@@ -5421,10 +5400,15 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
       // Otherwise, create a call of the default argument generator.
       } else {
-        defArg =
-            new (tc.Context) DefaultArgumentExpr(callee, paramIdx,
-                                                 arg->getStartLoc(),
-                                                 param.getParameterType());
+        const ParamDecl *defaultParam = getParameterAt(cast<ValueDecl>(callee.getDecl()), newArgs.size());
+        defArg = defaultParam->getDefaultValue();
+        
+        if (defArg == nullptr) {
+          defArg =
+              new (tc.Context) DefaultArgumentExpr(callee, paramIdx,
+                                                   arg->getStartLoc(),
+                                                   param.getParameterType());
+        }
       }
 
       cs.cacheType(defArg);
@@ -5554,27 +5538,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
     }
   }
 
-//  arg->dump();
-//  if (auto *parenExpr = dyn_cast<ParenExpr>(arg)) {
-//    if (auto *defaultArg =
-//            dyn_cast<DefaultArgumentExpr>(parenExpr->getSubExpr())) {
-//      const ParamDecl *defaultParam = getParameterAt(
-//          cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()), 0);
-//      parenExpr->setSubExpr(defaultParam->getDefaultValue());
-//    }
-//  }
-//
-//  if (auto *tupleExpr = dyn_cast<TupleExpr>(arg)) {
-//    for (size_t i = 0, n = tupleExpr->getNumElements(); i < n; ++i) {
-//      if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(tupleExpr->getElement(i))) {
-//        const ParamDecl *defaultParam = getParameterAt(
-//            cast<ValueDecl>(defaultArg->getDefaultArgsOwner().getDecl()),
-//            i);
-//        tupleExpr->setElement(i, defaultParam->getDefaultValue());
-//      }
-//    }
-//  }
-  
   arg->setType(paramType);
   return cs.cacheType(arg);
 }
