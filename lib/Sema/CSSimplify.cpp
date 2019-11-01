@@ -430,12 +430,30 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have a trailing closure, it maps to the last parameter.
   if (hasTrailingClosure && numParams > 0) {
-    const auto &param = params[numParams - 1];
+    unsigned lastParamIdx = numParams - 1;
+    bool lastAcceptsTrailingClosure =
+        acceptsTrailingClosure(params[lastParamIdx]);
+
+    // If the last parameter is defaulted, this might be
+    // an attempt to use a trailing closure with previous
+    // parameter that accepts a function type e.g.
     //
+    // func foo(_: () -> Int, _ x: Int = 0) {}
+    // foo { 42 }
+    if (!lastAcceptsTrailingClosure && numParams > 1 &&
+        paramInfo.hasDefaultArgument(lastParamIdx)) {
+      auto paramType = params[lastParamIdx - 1].getPlainType();
+      // If the parameter before defaulted last accepts.
+      if (paramType->is<AnyFunctionType>()) {
+        lastAcceptsTrailingClosure = true;
+        lastParamIdx -= 1;
+      }
+    }
+
     bool isExtraClosure = false;
     // If there is no suitable last parameter to accept the trailing closure,
     // notify the listener and bail if we need to.
-    if (!acceptsTrailingClosure(param)) {
+    if (!lastAcceptsTrailingClosure) {
       if (numArgs > numParams) {
         // Argument before the trailing closure.
         unsigned prevArg = numArgs - 2;
@@ -443,6 +461,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
         // If the argument before trailing closure matches
         // last parameter, this is just a special case of
         // an extraneous argument.
+        const auto param = params[numParams - 1];
         if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
           isExtraClosure = true;
           if (listener.extraArgument(numArgs - 1))
@@ -451,7 +470,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
       }
 
       if (!isExtraClosure &&
-          listener.trailingClosureMismatch(numParams - 1, numArgs - 1))
+          listener.trailingClosureMismatch(lastParamIdx, numArgs - 1))
         return true;
     }
 
@@ -460,7 +479,7 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
     ++numClaimedArgs;
     // Let's claim the trailing closure unless it's an extra argument.
     if (!isExtraClosure)
-      parameterBindings[numParams - 1].push_back(numArgs - 1);
+      parameterBindings[lastParamIdx].push_back(numArgs - 1);
   }
 
   // Mark through the parameters, binding them to their arguments.

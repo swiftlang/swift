@@ -907,3 +907,10 @@ do {
 // via the 'T -> U => T -> ()' implicit conversion.
 let badResult = { (fn: () -> ()) in fn }
 // expected-error@-1 {{expression resolves to an unused function}}
+
+// rdar://problem/55102498 - closure's result type can't be inferred if the last parameter has a default value
+func test_trailing_closure_with_defaulted_last() {
+  func foo<T>(fn: () -> T, value: Int = 0) {}
+  foo { 42 } // Ok
+  foo(fn: { 42 }) // Ok
+}
