@@ -255,7 +255,35 @@ public:
 
   /// Evaluate the given request and produce its result,
   /// consulting/populating the cache as required.
-  template<typename Request>
+  template<typename Request,
+           typename std::enable_if<Request::hasExternalCache>::type* = nullptr>
+  llvm::Expected<typename Request::OutputType>
+  operator()(const Request &request) {
+    if (request.isCached())
+      if (auto cached = request.getCachedResult())
+        return *cached;
+
+    // Check for a cycle.
+    if (checkDependency(getCanonicalRequest(request))) {
+      return llvm::Error(
+        llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
+    }
+
+    // Make sure we remove this from the set of active requests once we're
+    // done.
+    SWIFT_DEFER {
+      assert(activeRequests.back().castTo<Request>() == request);
+      activeRequests.pop_back();
+    };
+
+    // Get the result.
+    return getResult(request);
+  }
+
+  /// Evaluate the given request and produce its result,
+  /// consulting/populating the cache as required.
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
   llvm::Expected<typename Request::OutputType>
   operator()(const Request &request) {
     // Check for a cycle.
