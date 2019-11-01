@@ -2166,6 +2166,24 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// Set original declaration in `@differentiable` attributes.
+//
+// Serializing/deserializing the original declaration DeclID in
+// `@differentiable` attributes does not work because it causes
+// `@differentiable` attribute deserialization to enter an infinite loop.
+//
+// Instead, call this ad-hoc function after deserializing a declaration to set
+// it as the original declaration in its `@differentiable` attributes.
+static void setOriginalDeclarationInDifferentiableAttributes(
+    Decl *decl, DeclAttribute *attrs) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attrs);
+  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>())
+    const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(decl);
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 Decl *ModuleFile::getDecl(DeclID DID) {
   Expected<Decl *> deserialized = getDeclChecked(DID);
   if (!deserialized) {
@@ -4084,10 +4102,11 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
           parametersBitVector[i] = parameters[i];
         auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
-        auto diffAttr =
-            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
-                                       SourceRange(), linear, indices, jvp, vjp,
-                                       derivativeGenSig);
+        auto *diffAttr = DifferentiableAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
+            /*parsedParameters*/ {}, jvp, vjp, /*trailingWhereClause*/ nullptr);
+        diffAttr->setParameterIndices(indices);
+        diffAttr->setDerivativeGenericSignature(derivativeGenSig);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;
@@ -4237,9 +4256,16 @@ DeclDeserializer::getDeclCheckedImpl() {
      &MF, declOrOffset, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
+  // SWIFT_ENABLE_TENSORFLOW
+  // Set original declaration in `@differentiable` attributes.
 #define CASE(RECORD_NAME) \
-  case decls_block::RECORD_NAME##Layout::Code: \
-    return deserialize##RECORD_NAME(scratch, blobData);
+  case decls_block::RECORD_NAME##Layout::Code: {\
+    auto decl = deserialize##RECORD_NAME(scratch, blobData); \
+    if (decl) \
+      setOriginalDeclarationInDifferentiableAttributes(decl.get(), DAttrs); \
+    return decl; \
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   CASE(TypeAlias)
   CASE(GenericTypeParamDecl)

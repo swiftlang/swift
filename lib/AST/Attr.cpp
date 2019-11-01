@@ -1454,16 +1454,16 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
-DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
+DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
-                                       bool linear,
-                                       IndexSubset *indices,
+                                       bool linear, IndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
       Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
       ParameterIndices(indices) {
+  setOriginalDeclaration(original);
   setDerivativeGenericSignature(derivativeGenSig);
 }
 
@@ -1483,17 +1483,24 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(ASTContext &context, bool implicit,
-                           SourceLoc atLoc, SourceRange baseRange,
-                           bool linear, IndexSubset *indices,
-                           Optional<DeclNameWithLoc> jvp,
+DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
+                           SourceRange baseRange, bool linear,
+                           IndexSubset *indices, Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
-  void *mem = context.Allocate(sizeof(DifferentiableAttr),
-                               alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
+  auto &ctx = original->getASTContext();
+  void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
+                           alignof(DifferentiableAttr));
+  return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
                                       linear, indices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
+}
+
+void DifferentiableAttr::setOriginalDeclaration(Decl *decl) {
+  assert(decl && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = decl;
 }
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
