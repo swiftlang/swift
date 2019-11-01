@@ -3139,12 +3139,11 @@ public:
   /// Given the type of an autodiff derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
-  
+
   /// Given the type of a transposing derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *
-  getTransposeOriginalFunctionType(TransposingAttr *attr,
-                                   IndexSubset *wrtParamIndices,
+  getTransposeOriginalFunctionType(IndexSubset *wrtParamIndices,
                                    bool wrtSelf);
 
   AnyFunctionType *getWithoutDifferentiability() const;

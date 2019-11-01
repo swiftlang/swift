@@ -628,8 +628,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
         derivativeGenSig = extDecl->getGenericSignature();
       auto *diffableAttr = DifferentiableAttr::create(
-          C, /*implicit*/ true, SourceLoc(), SourceLoc(),
-          /*linear*/ false, {}, None, None, derivativeGenSig);
+          member->getAccessor(AccessorKind::Get), /*implicit*/ true,
+          SourceLoc(), SourceLoc(), /*linear*/ false, {}, None, None,
+          derivativeGenSig);
       member->getAttrs().add(diffableAttr);
       // Set getter `@differentiable` attribute parameter indices.
       diffableAttr->setParameterIndices(IndexSubset::get(C, 1, {0}));

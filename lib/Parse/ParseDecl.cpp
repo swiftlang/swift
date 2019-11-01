@@ -3384,6 +3384,13 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
     consumeToken();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static void setOriginalFunctionInDifferentiableAttributes(
+    DeclAttributes Attributes, Decl *D) {
+  for (auto *attr : Attributes.getAttributes<DifferentiableAttr>())
+    const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(D);
+}
+
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -3788,6 +3795,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     Decl *D = DeclResult.get();
     if (!declWasHandledAlready(D)) {
       Handler(D);
+      // SWIFT_ENABLE_TENSORFLOW
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (auto attr = D->getAttrs().getAttribute<QuotedAttr>()) {
           // TODO(TF-718): Properly mangle names for quote decls.
@@ -3825,7 +3833,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
           Handler(quoteDecl);
         }
       }
+      // SWIFT_ENABLE_TENSORFLOW END
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    setOriginalFunctionInDifferentiableAttributes(D->getAttrs(), D);
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   if (!DeclResult.isParseError()) {
@@ -5579,6 +5591,12 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
 
   accessors.record(*this, PrimaryVar, Invalid);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  for (auto *accessor : accessors.Accessors)
+    setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
+                                                  accessor);
+  // SWIFT_ENABLE_TENSORFLOW END
+
   return makeParserResult(PrimaryVar);
 }
 
@@ -5833,6 +5851,9 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
+      // SWIFT_ENABLE_TENSORFLOW
+      setOriginalFunctionInDifferentiableAttributes(Attributes, VD);
+      // SWIFT_ENABLE_TENSORFLOW END
       setLocalDiscriminator(VD);
       Decls.push_back(VD);
       if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
@@ -7086,6 +7107,12 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   }
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()));
+
+  // SWIFT_ENABLE_TENSORFLOW
+  for (auto *accessor : accessors.Accessors)
+    setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
+                                                  accessor);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
