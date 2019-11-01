@@ -1,3 +1,5 @@
+// UNSUPPORTED: -windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/Mods/Foo.swiftmodule
 // RUN: mkdir -p %t/Mods/Bar.swiftmodule
