@@ -3724,9 +3724,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
           Handler(quoteDecl);
         }
       }
-      setOriginalFunctionInDifferentiableAttributes(D->getAttrs(), D);
       // SWIFT_ENABLE_TENSORFLOW END
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    setOriginalFunctionInDifferentiableAttributes(D->getAttrs(), D);
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   if (!DeclResult.isParseError()) {

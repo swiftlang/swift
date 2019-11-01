@@ -3274,8 +3274,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  if (!attr->getOriginalDeclaration())
-    attr->setOriginalDeclaration(original);
+  assert(attr->getOriginalDeclaration() &&
+         "`@differentiable` attribute should have original declaration set "
+         "during construction or parsing");
   TC.resolveDeclSignature(original);
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
