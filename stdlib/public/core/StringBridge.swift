@@ -319,13 +319,13 @@ internal enum _KnownCocoaString {
     
     switch ObjectIdentifier(_swift_classOfObjCHeapObject(str)) {
     case ObjectIdentifier(__StringStorage.self):
-      self = .storage(_unsafeUncheckedDowncast(cocoaString,
+      self = .storage(_unsafeUncheckedDowncast(str,
                                                to: __StringStorage.self))
     case ObjectIdentifier(__SharedStringStorage.self):
-      self = .shared(_unsafeUncheckedDowncast(cocoaString,
+      self = .shared(_unsafeUncheckedDowncast(str,
                                               to: __SharedStringStorage.self))
     case ObjectIdentifier(_SwiftNSMutableString.self):
-      self = .mutable(_unsafeUncheckedDowncast(cocoaString,
+      self = .mutable(_unsafeUncheckedDowncast(str,
                                               to: _SwiftNSMutableString.self))
     default:
       self = .cocoa(str)
@@ -378,7 +378,7 @@ internal func _withTemporaryBridgedCocoaString<R>(
     #if !(arch(i386) || arch(arm))
   case .tagged(let str):
     let tmpStr = String(_StringGuts(_SmallString(taggedCocoa: str)))
-    return try work(.string(tmpStr, true))
+    return try work(tmpStr)
     #endif
   case .mutable(let storage):
     return try work(storage.asString)
@@ -391,9 +391,10 @@ internal func _withTemporaryBridgedCocoaString<R>(
         isASCII: false,
         length: length
       )
-      return try work(tmp)
+      return try work(String(tmp))
     }
-    return try work(String(_StringGuts(ascii, isASCII: true)))
+    let asciiBuffer = UnsafeBufferPointer(start: ascii, count: length)
+    return try work(String(_StringGuts(asciiBuffer, isASCII: true)))
   }
 }
 
@@ -751,8 +752,8 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     let range = _contents._toUTF16Indices(
       range.location ..< range.location + range.length
     )
-    let rs = range.startIndex
-    let re = range.endIndex
+    let rs = range.lowerBound
+    let re = range.upperBound
     let scalarAligned =
       (rs._isScalarAligned || rs.transcodedOffset == 0) &&
       (re._isScalarAligned || re.transcodedOffset == 0)
@@ -766,7 +767,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
       // surrogate pair, then we play things safe and transcode to UTF16
       var utf16 = Array(_contents.utf16)
       let cocoaRange = nsRange.location ..< nsRange.location + nsRange.length
-      utf16.replaceSubrange(cocoaRange, with: str)
+      utf16.replaceSubrange(cocoaRange, with: str.utf16)
       _contents = String(decoding: utf16, as: UTF16.self)
       return
     }
@@ -778,7 +779,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     in range: _SwiftNSRange,
     with aString: _CocoaString?
   ) {
-    _withTemporaryBridgedCocoaString(string) {
+    _withTemporaryBridgedCocoaString(aString) {
       _replace(in: range, with: $0)
     }
   }
