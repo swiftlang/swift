@@ -3,18 +3,42 @@
 .. default-role:: term
 .. title:: Library Evolution Support in Swift ("Resilience")
 
-:Author: Jordan Rose
-:Author: John McCall
-
 .. note::
 
     This document uses some Sphinx-specific features which are not available on
-    GitHub. For proper rendering, download and build the docs yourself. Jordan
-    Rose also posts occasional snapshots at
-    https://jrose-apple.github.io/swift-library-evolution/.
+    GitHub. For proper rendering, download and build the docs yourself.
 
-One of Swift's primary design goals is to allow efficient execution of code
-without sacrificing load-time abstraction of implementation.
+Since Swift 5, ABI-stable platforms have supported `library evolution`_, the
+ability to change a library without breaking source or binary compatibility.
+This model is intended to serve library designers whose libraries will evolve
+over time. Such libraries must be both `backwards-compatible`, meaning that
+existing clients should continue to work even when the library is updated, and
+`forwards-compatible`, meaning that future clients will be able run using the
+current version of the library. In simple terms:
+
+- Last year's apps should work with this year's library.
+- Next year's apps should work with this year's library.
+
+This document is intended to be a specification for *which* changes can be made
+without breaking binary compatibility. When a library author wants to make a
+change, they can jump to the relevant section of this document to see if it's
+allowed. Anything *not* listed in this document should be assumed unsafe, i.e.
+changing it will break binary compatibility.
+
+Library evolution was formally described in `SE-0260 <SE0260_>`_, but this
+document should be kept up to date as new features are added to the language.
+
+.. _library evolution: https://swift.org/blog/abi-stability-and-more/
+.. _SE0260: https://github.com/apple/swift-evolution/blob/master/proposals/0260-library-evolution.md
+
+.. contents:: :local:
+
+
+Background
+==========
+
+One of Swift's primary design goals has always been to allow efficient
+execution of code without sacrificing load-time abstraction of implementation.
 
 Abstraction of implementation means that code correctly written against a
 published interface will correctly function when the underlying implementation
@@ -49,24 +73,14 @@ This last point is a specific case of a general tenet of Swift: **the default
 behavior is safe**. Where possible, choices made when an entity is first
 published should not limit its evolution in the future.
 
-.. contents:: :local:
-
 
 Introduction
 ============
 
-This model is intended to serve library designers whose libraries will evolve
-over time. Such libraries must be both `backwards-compatible`, meaning that
-existing clients should continue to work even when the library is updated, and
-`forwards-compatible`, meaning that future clients will be able run using the
-current version of the library. In simple terms:
-
-- Last year's apps should work with this year's library.
-- Next year's apps should work with this year's library.
-
 This document will frequently refer to a *library* which vends public APIs, and
 a single *client* that uses them. The same principles apply even when multiple
-libraries and multiple clients are involved.
+libraries and multiple clients are involved. It also uses the term `ABI-public`
+introduced in `SE-0193 <SE0193_>`_.
 
 This document is primarily concerned with `binary compatibility`, i.e. what
 changes can safely be made to a library between releases that will not break
@@ -94,15 +108,15 @@ with a single app target are not forced to think about access control, anyone
 writing a bundled library should (ideally) not be required to use any of the
 annotations described below in order to achieve full performance.
 
+.. _SE0193: https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md
 .. _Swift Package Manager: https://swift.org/package-manager/
 
 .. note::
 
     This model may, however, be useful for library authors that want to
-    preserve *source* compatibility, and it is hoped that the tool for
-    `Checking Binary Compatibility`_ described below will also be useful for
-    this purpose. Additionally, we may decide to use some of these annotations
-    as performance hints for *non-*\ optimized builds.
+    preserve *source* compatibility, though this document mostly doesn't
+    discuss that. Additionally, some of these annotations are useful for
+    performance today, such as ``@inlinable``.
 
 The term "resilience" comes from the occasional use of "fragile" to describe
 certain constructs that have very strict binary compatibility rules. For
@@ -118,9 +132,6 @@ Supported Evolution
 This section describes the various changes that are safe to make when releasing
 a new version of a library, i.e. changes that will not break binary
 compatibility. They are organized by declaration type.
-
-Anything *not* listed in this document should be assumed unsafe.
-
 
 Top-Level Functions
 ~~~~~~~~~~~~~~~~~~~
@@ -155,10 +166,11 @@ No other changes are permitted; the following are particularly of note:
 Inlinable Functions
 -------------------
 
-Functions are a very common example of resilience: the function's declaration
-is published as API, but its body may change between library versions as long
-as it upholds the same semantic contracts. This applies to other function-like
-constructs as well: initializers, accessors, and deinitializers.
+Functions are a very common example of "abstraction of implementation": the
+function's declaration is published as API, but its body may change between
+library versions as long as it upholds the same semantic contracts. This
+applies to other function-like constructs as well: initializers, accessors, and
+deinitializers.
 
 However, sometimes it is useful to provide the body to clients as well. There
 are a few common reasons for this:
@@ -317,12 +329,6 @@ This restricts changes a fair amount:
 - Changing the body of an accessor is a `binary-compatible source-breaking
   change`.
 
-.. admonition:: TODO
-
-    It Would Be Nice(tm) to allow marking the *getter* of a top-level variable
-    inlinable while still allowing the setter to change. This would need
-    syntax, though.
-
 Any inlinable accessors must follow the rules for `inlinable functions`_, as
 described above.
 
@@ -351,7 +357,10 @@ the following changes are permitted:
 - Adding ``@dynamicCallable`` to the struct.
 
 The important most aspect of a Swift struct is its value semantics, not its
-layout.
+layout. Note that adding a stored property to a struct is *not* a breaking
+change even with Swift's synthesis of memberwise and no-argument initializers;
+these initializers are always ``internal`` and thus not exposed to clients
+outside the module.
 
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
 or accessor within a struct.
@@ -866,6 +875,8 @@ the compiler must assume that new overrides may eventually appear from outside
 the module if the class is marked ``open`` unless the member is marked
 ``final``.
 
+For more information, see `SE-0193 <SE0193_>`_.
+
 
 Optimization
 ============
@@ -897,12 +908,12 @@ current module, since once it's inlined it will be.
 Summary
 =======
 
-When possible, Swift gives library authors freedom to evolve their code
-without breaking binary compatibility. This has implications for both the
-semantics and performance of client code, and so library owners also have tools
-to waive the ability to make certain future changes. The language guarantees
-that client code will never accidentally introduce implicit dependencies on
-specific versions of libraries.
+When possible, Swift gives library authors freedom to evolve their code without
+breaking binary compatibility. This has implications for both the semantics and
+performance of client code, and so library owners also have tools to waive the
+ability to make certain future changes. When shipping libraries as part of the
+OS, the availability model guarantees that client code will never accidentally
+introduce implicit dependencies on specific versions of libraries.
 
 
 Glossary
@@ -918,19 +929,13 @@ Glossary
   ABI-public
     Describes entities that are part of a library's `ABI`. Marked ``public``,
     ``open``, ``@usableFromInline``, or ``@inlinable`` in Swift. See
-    `SE-0193 <SE0193>`_ for more information.
+    `SE-0193 <SE0193_>`_ for more information.
 
   API
     An `entity` in a library that a `client` may use, or the collection of all
     such entities in a library. (If contrasting with `SPI`, only those entities
     that are available to arbitrary clients.) Marked ``public`` or ``open`` in
     Swift. Stands for "Application Programming Interface".
-
-  availability context
-    The collection of library and platform versions that can be assumed, at
-    minimum, to be present in a certain block of code. Availability contexts
-    are always properly nested, and the global availability context includes
-    the module's minimum deployment target and minimum dependency versions.
 
   backwards-compatible
     A modification to an API that does not break existing clients. May also
@@ -973,14 +978,6 @@ Glossary
   module
     The primary unit of code sharing in Swift. Code in a module is always built
     together, though it may be spread across several source files.
-
-  performance assertion
-    See `Other Promises About Types`_.
-
-  resilience domain
-    A grouping for code that will always be recompiled and distributed
-    together, and can thus take advantage of details about a type
-    even if it changes in the future.
 
   SPI
     A subset of `API` that is only available to certain clients. Stands for
