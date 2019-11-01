@@ -2176,7 +2176,7 @@ static bool attributeChainContains(DeclAttribute *attr) {
 // Instead, call this ad-hoc function after deserializing a declaration to set
 // it as the original declaration in its `@differentiable` attributes.
 static void setOriginalDeclarationInDifferentiableAttributes(
-    AbstractFunctionDecl *decl, DeclAttribute *attrs) {
+    Decl *decl, DeclAttribute *attrs) {
   DeclAttributes tempAttrs;
   tempAttrs.setRawAttributeChain(attrs);
   for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>())
@@ -2583,11 +2583,6 @@ public:
 
     ctor->setImplicitlyUnwrappedOptional(isIUO);
     ctor->computeType();
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // Set original declaration in `@differentiable` attributes.
-    setOriginalDeclarationInDifferentiableAttributes(ctor, DAttrs);
-    // SWIFT_ENABLE_TENSORFLOW END
 
     return ctor;
   }
@@ -3061,11 +3056,6 @@ public:
 
     // Set the interface type.
     fn->computeType();
-
-    // SWIFT_ENABLE_TENSORFLOW
-    // Set original declaration in `@differentiable` attributes.
-    setOriginalDeclarationInDifferentiableAttributes(fn, DAttrs);
-    // SWIFT_ENABLE_TENSORFLOW END
 
     return fn;
   }
@@ -4266,9 +4256,16 @@ DeclDeserializer::getDeclCheckedImpl() {
      &MF, declOrOffset, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
+  // SWIFT_ENABLE_TENSORFLOW
+  // Set original declaration in `@differentiable` attributes.
 #define CASE(RECORD_NAME) \
-  case decls_block::RECORD_NAME##Layout::Code: \
-    return deserialize##RECORD_NAME(scratch, blobData);
+  case decls_block::RECORD_NAME##Layout::Code: {\
+    auto decl = deserialize##RECORD_NAME(scratch, blobData); \
+    if (decl) \
+      setOriginalDeclarationInDifferentiableAttributes(decl.get(), DAttrs); \
+    return decl; \
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   CASE(TypeAlias)
   CASE(GenericTypeParamDecl)
