@@ -78,8 +78,9 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
-  auto allKeyPathsInterfaceType = computeAllKeyPathsType(nominal);
-  auto allKeyPathsType = parentDC->mapTypeIntoContext(allKeyPathsInterfaceType);
+  auto partialKeyPathInterfaceType = computePartialKeyPathType(nominal);
+  auto partialKeyPathType =
+      parentDC->mapTypeIntoContext(partialKeyPathInterfaceType);
 
   auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
@@ -97,17 +98,17 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
     auto *dotExpr = new (C)
         UnresolvedDotExpr(nominalTypeExpr, SourceLoc(), member->getFullName(),
                           DeclNameLoc(), /*Implicit*/ true);
-    auto *keyPathExpr =
+    Expr *keyPathExpr =
         new (C) KeyPathExpr(SourceLoc(), dotExpr, nullptr, /*Implicit*/ true);
+    // NOTE(TF-575): Adding an explicit coercion expression here is necessary
+    // due to type-checker changes.
+    keyPathExpr = new (C) CoerceExpr(
+        keyPathExpr, SourceLoc(), TypeLoc::withoutLoc(partialKeyPathType));
     keyPathExprs.push_back(keyPathExpr);
   }
   // Return array of all key path expressions.
   Expr *keyPathsArrayExpr =
       ArrayExpr::create(C, SourceLoc(), keyPathExprs, {}, SourceLoc());
-  // NOTE(TF-575): Adding an explicit coercion expression here is necessary due
-  // to a missing regression.
-  keyPathsArrayExpr = new (C) CoerceExpr(
-      keyPathsArrayExpr, SourceLoc(), TypeLoc::withoutLoc(allKeyPathsType));
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), keyPathsArrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
