@@ -552,8 +552,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitIdentityExpr(IdentityExpr *E) {
-    E->dump();
-    
     if (Expr *subExpr = doIt(E->getSubExpr())) {
       E->setSubExpr(subExpr);
       return E;
@@ -1013,8 +1011,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathExpr(KeyPathExpr *E) {
-    E->dump();
-    
     // For an ObjC key path, the string literal expr serves as the semantic
     // expression.
     if (auto objcStringLiteral = E->getObjCStringLiteralExpr()) {

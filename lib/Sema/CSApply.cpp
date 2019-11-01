@@ -4201,7 +4201,7 @@ namespace {
       return E;
     }
 
-    Expr *visitKeyPathExpr(KeyPathExpr *E) {      
+    Expr *visitKeyPathExpr(KeyPathExpr *E) {
       if (E->isObjC()) {
         cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
         return E;
@@ -5402,7 +5402,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
       } else {
         const ParamDecl *defaultParam = getParameterAt(cast<ValueDecl>(callee.getDecl()), newArgs.size());
         defArg = defaultParam->getDefaultValue();
-        
+
         if (defArg == nullptr) {
           defArg =
               new (tc.Context) DefaultArgumentExpr(callee, paramIdx,

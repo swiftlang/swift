@@ -3549,7 +3549,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     [this, &operands, E](const KeyPathExpr::Component &component) {
       if (!component.getIndexExpr())
         return;
-
+      
       // Evaluate the index arguments.
       SmallVector<RValue, 2> indexValues;
       auto indexResult = visit(component.getIndexExpr(), SGFContext());

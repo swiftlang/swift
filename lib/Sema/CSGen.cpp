@@ -1687,7 +1687,6 @@ namespace {
     }
 
     Type visitIdentityExpr(IdentityExpr *expr) {
-      expr->dump();
       return CS.getType(expr->getSubExpr());
     }
 
@@ -1719,7 +1718,7 @@ namespace {
       return optTy;
     }
 
-    virtual Type visitParenExpr(ParenExpr *expr) {      
+    virtual Type visitParenExpr(ParenExpr *expr) {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
