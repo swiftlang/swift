@@ -73,8 +73,8 @@ void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
 
 bool Evaluator::checkDependency(const AnyRequest &request) {
   // If there is an active request, record it's dependency on this request.
-  if (!activeRequests.empty())
-    dependencies[activeRequests.back()].push_back(request);
+  //if (!activeRequests.empty())
+  //  dependencies[activeRequests.back()].push_back(request);
 
   // Record this as an active request.
   if (activeRequests.insert(request)) {
