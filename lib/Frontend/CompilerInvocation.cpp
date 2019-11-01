@@ -1078,6 +1078,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
     Opts.DisableClangModuleSkeletonCUs = true;
 
+  if (Args.hasArg(OPT_disable_debugger_shadow_copies))
+    Opts.DisableDebuggerShadowCopies = true;
+
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   

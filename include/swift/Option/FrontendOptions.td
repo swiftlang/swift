@@ -453,6 +453,11 @@ def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
   HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
            "local variables so they can be compared against the results from the debugger.">;
 
+def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies">,
+  HelpText<"Disable debugger shadow copies of local variables."
+           "This option is only useful for testing the compiler.">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
