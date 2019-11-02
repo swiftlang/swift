@@ -157,8 +157,8 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
       ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      return sourceMgr.isBeforeInBuffer(loc,
-                                        scope->getSourceRangeOfScope().End);
+      return !sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
+                                         loc);
     }
   };
   auto *const *child = std::lower_bound(
