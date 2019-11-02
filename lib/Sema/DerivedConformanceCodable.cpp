@@ -370,10 +370,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     return nullptr;
 
   // Forcibly derive conformance to CodingKey.
-  //
-  // FIXME: Drop the dependency on the type checker.
-  auto *tc = static_cast<TypeChecker *>(C.getLazyResolver());
-  tc->checkConformancesInContext(enumDecl, enumDecl);
+  TypeChecker::checkConformancesInContext(enumDecl, enumDecl);
 
   // Add to the type.
   target->addMember(enumDecl);

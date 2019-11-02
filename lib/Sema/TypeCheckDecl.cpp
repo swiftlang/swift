@@ -4450,9 +4450,6 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
 
   auto &Context = CD->getASTContext();
 
-  // FIXME: Remove TypeChecker dependencies below
-  auto &TC = *(TypeChecker *) Context.getLazyResolver();
-
   // We need to add implicit initializers because they
   // affect vtable layout.
   TypeChecker::addImplicitConstructors(CD);
@@ -4469,7 +4466,7 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
     auto conformance = ref.getConcrete();
     if (conformance->getDeclContext() == CD &&
         conformance->getState() == ProtocolConformanceState::Incomplete) {
-      TC.checkConformance(conformance->getRootNormalConformance());
+      TypeChecker::checkConformance(conformance->getRootNormalConformance());
     }
   };
 

@@ -1097,7 +1097,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref.getConcrete()->getRootConformance())) {
       if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-        checkConformance(conformance);
+        TypeChecker::checkConformance(conformance);
       }
     }
 

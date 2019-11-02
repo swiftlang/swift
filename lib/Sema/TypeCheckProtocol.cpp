@@ -982,7 +982,8 @@ bool WitnessChecker::findBestWitness(
   numViable = 0;
 
   // FIXME: Remove dependnecy on the lazy resolver.
-  auto *TC = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
+  auto *TC = static_cast<TypeChecker *>(
+      requirement->getASTContext().getLazyResolver());
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
     SmallVector<ValueDecl *, 4> witnesses;
@@ -1265,7 +1266,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
 /// having this wrapper can help issue a fixit that inserts protocol stubs from
 /// multiple protocols under checking.
 class swift::MultiConformanceChecker {
-  TypeChecker &TC;
+  ASTContext &Context;
   llvm::SmallVector<ValueDecl*, 16> UnsatisfiedReqs;
   llvm::SmallVector<ConformanceChecker, 4> AllUsedCheckers;
   llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
@@ -1279,9 +1280,9 @@ class swift::MultiConformanceChecker {
   /// Determine whether the given requirement was left unsatisfied.
   bool isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req);
 public:
-  MultiConformanceChecker(TypeChecker &TC): TC(TC){}
+  MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
 
-  ASTContext &getASTContext() const { return TC.Context; }
+  ASTContext &getASTContext() const { return Context; }
 
   /// Add a conformance into the batched checker.
   void addConformance(NormalProtocolConformance *conformance) {
@@ -4221,7 +4222,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  MultiConformanceChecker checker(*this);
+  MultiConformanceChecker checker(conformance->getProtocol()->getASTContext());
   checker.addConformance(conformance);
   checker.checkAllConformances();
 }
@@ -4522,10 +4523,8 @@ static bool shouldWarnAboutPotentialWitness(
 }
 
 /// Diagnose a potential witness.
-static void diagnosePotentialWitness(TypeChecker &tc,
-                                     NormalProtocolConformance *conformance,
-                                     ValueDecl *req,
-                                     ValueDecl *witness,
+static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
+                                     ValueDecl *req, ValueDecl *witness,
                                      AccessLevel access) {
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
@@ -4538,7 +4537,9 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   // Describe why the witness didn't satisfy the requirement.
   WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  auto match = matchWitness(tc, oneUseCache, conformance->getProtocol(),
+  // FIXME: Remove dependnecy on the lazy resolver.
+  auto *TC = static_cast<TypeChecker *>(req->getASTContext().getLazyResolver());
+  auto match = matchWitness(*TC, oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
   if (match.Kind == MatchKind::ExactMatch &&
       req->isObjC() && !witness->isObjC()) {
@@ -4819,7 +4820,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                                &diagnostics);
 
   // The conformance checker bundle that checks all conformances in the context.
-  MultiConformanceChecker groupChecker(*this);
+  auto &Context = dc->getASTContext();
+  MultiConformanceChecker groupChecker(Context);
 
   bool anyInvalid = false;
   for (auto conformance : conformances) {
@@ -4899,11 +4901,11 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       auto diagID = differentlyConditional
                         ? diag::redundant_conformance_adhoc_conditional
                         : diag::redundant_conformance_adhoc;
-      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
-               diag.Protocol->getName(),
-               existingModule->getName() ==
-                   extendedNominal->getParentModule()->getName(),
-               existingModule->getName());
+      Context.Diags.diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
+                             diag.Protocol->getName(),
+                             existingModule->getName() ==
+                                 extendedNominal->getParentModule()->getName(),
+                             existingModule->getName());
 
       // Complain about any declarations in this extension whose names match
       // a requirement in that protocol.
@@ -4928,9 +4930,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           if (valueIsType != requirementIsType)
             continue;
 
-          diagnose(value, diag::redundant_conformance_witness_ignored,
-                   value->getDescriptiveKind(), value->getFullName(),
-                   diag.Protocol->getFullName());
+          value->diagnose(diag::redundant_conformance_witness_ignored,
+                          value->getDescriptiveKind(), value->getFullName(),
+                          diag.Protocol->getFullName());
           break;
         }
       }
@@ -4938,8 +4940,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       auto diagID = differentlyConditional
                         ? diag::redundant_conformance_conditional
                         : diag::redundant_conformance;
-      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
-               diag.Protocol->getName());
+      Context.Diags.diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
+                             diag.Protocol->getName());
     }
 
     // Special case: explain that 'RawRepresentable' conformance
@@ -4951,18 +4953,19 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                                          diag.Protocol) &&
           enumDecl->hasRawType() &&
           enumDecl->getInherited()[0].getSourceRange().isValid()) {
-        diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
-                 diag::enum_declares_rawrep_with_raw_type,
-                 dc->getDeclaredInterfaceType(), enumDecl->getRawType());
+        auto inheritedLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+        Context.Diags.diagnose(
+            inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
+            dc->getDeclaredInterfaceType(), enumDecl->getRawType());
         continue;
       }
     }
 
-    diagnose(existingDecl, diag::declared_protocol_conformance_here,
-             dc->getDeclaredInterfaceType(),
-             static_cast<unsigned>(diag.ExistingKind),
-             diag.Protocol->getName(),
-             diag.ExistingExplicitProtocol->getName());
+    existingDecl->diagnose(diag::declared_protocol_conformance_here,
+                           dc->getDeclaredInterfaceType(),
+                           static_cast<unsigned>(diag.ExistingKind),
+                           diag.Protocol->getName(),
+                           diag.ExistingExplicitProtocol->getName());
   }
 
   // If there were any unsatisfied requirements, check whether there
@@ -5034,8 +5037,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           bool diagnosed = false;
           for (auto conformance : conformances) {
             if (conformance->getProtocol() == req->getDeclContext()) {
-              diagnosePotentialWitness(*this,
-                                       conformance->getRootNormalConformance(),
+              diagnosePotentialWitness(conformance->getRootNormalConformance(),
                                        req, value, defaultAccess);
               diagnosed = true;
               break;
