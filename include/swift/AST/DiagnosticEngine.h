@@ -673,6 +673,9 @@ namespace swift {
     /// Use descriptive diagnostic style when available.
     bool useDescriptiveDiagnostics = false;
 
+    /// Path to diagnostic documentation directory.
+    std::string diagnosticDocumentationPath = "";
+
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
@@ -721,6 +724,13 @@ namespace swift {
     }
     bool getUseDescriptiveDiagnostics() const {
       return useDescriptiveDiagnostics;
+    }
+
+    void setDiagnosticDocumentationPath(std::string path) {
+      diagnosticDocumentationPath = path;
+    }
+    StringRef getDiagnosticDocumentationPath() {
+      return diagnosticDocumentationPath;
     }
 
     void ignoreDiagnostic(DiagID id) {

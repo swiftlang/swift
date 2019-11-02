@@ -69,6 +69,12 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     return;
 
   printDiagnostic(SM, Info);
+  for (auto path : Info.EducationalNotePaths) {
+    auto buffer = llvm::MemoryBuffer::getFile(path);
+    if (buffer) {
+      Stream << buffer->get()->getBuffer() << "\n";
+    }
+  }
 
   for (auto ChildInfo : Info.ChildDiagnosticInfo) {
     printDiagnostic(SM, *ChildInfo);
