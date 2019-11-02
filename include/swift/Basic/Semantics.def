@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// This macro is used to map the global definition name of a semantic attribute to its raw value.
+//   NAME: the global name used in the compiler
+//   C_STR: the raw value used in swift
+//
 // SEMA_ATTR(NAME, C_STR)
 //
 //===----------------------------------------------------------------------===//
@@ -69,18 +73,6 @@ SEMA_ATTR(FASTPATH, "fastpath")
 SEMA_ATTR(SLOWPATH, "slowpath")
 SEMA_ATTR(PROGRAMTERMINATION_POINT, "programtermination_point")
 SEMA_ATTR(CONVERT_TO_OBJECTIVE_C, "convertToObjectiveC")
-
-// SEMA_ATTR(, "456")
-// SEMA_ATTR(, "123")
-// SEMA_ATTR(, "223")
-// SEMA_ATTR(, "bar")
-// SEMA_ATTR(, "class")
-// SEMA_ATTR(, "crazy")
-// SEMA_ATTR(, "enum")
-// SEMA_ATTR(, "struct")
-// SEMA_ATTR(, "struct1")
-// SEMA_ATTR(, "struct2")
-// SEMA_ATTR(, "test_driver")
 
 #undef SEMA_ATTR
 
