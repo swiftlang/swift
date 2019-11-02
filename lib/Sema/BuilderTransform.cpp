@@ -932,15 +932,19 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
 
   // Determine whether we're inferring the underlying type for the opaque
   // result type of this function.
+  ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
-    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func))
+    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
       options |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
+      resultConstraintKind = ConstraintKind::OpaqueUnderlyingType;
+    }
   }
 
   ConstraintSystem cs(*this, func, options);
 
   // FIXME: check the result
   cs.matchFunctionBuilder(func, builderType, resultContextType,
+                          resultConstraintKind,
                           /*calleeLocator=*/nullptr,
                           /*FIXME:*/ConstraintLocatorBuilder(nullptr));
 
@@ -960,6 +964,7 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
 
 ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
     AnyFunctionRef fn, Type builderType, Type bodyResultType,
+    ConstraintKind bodyResultConstraintKind,
     ConstraintLocator *calleeLocator,
     ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
@@ -1048,8 +1053,8 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   applied->bodyResultType = bodyResultType;
 
   // Convert the transformed expression to the result type of the function.
-  addConstraint(ConstraintKind::Conversion, transformedType,
-                bodyResultType, locator);
+  addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
+                locator);
 
   // Record the transformation.
   assert(std::find_if(

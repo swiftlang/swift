@@ -3336,6 +3336,7 @@ public:
   /// appropriate set of constraints.
   TypeMatchResult matchFunctionBuilder(AnyFunctionRef fn, Type builderType,
                                        Type bodyResultType,
+                                       ConstraintKind bodyResultConstraintKind,
                                        ConstraintLocator *calleeLocator,
                                        ConstraintLocatorBuilder locator);
 

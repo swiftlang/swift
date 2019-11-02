@@ -1082,7 +1082,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
               cs.getType(closure)->castTo<FunctionType>()->getResult();
           auto result =
               cs.matchFunctionBuilder(closure, functionBuilderType,
-                                      bodyResultType, calleeLocator, loc);
+                                      bodyResultType,
+                                      ConstraintKind::Conversion,
+                                      calleeLocator, loc);
           if (result.isFailure())
             return result;
         }
