@@ -2465,7 +2465,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.
-  diagnoseFailureForExpr(expr);
+  diagnoseFailureFor(expr);
   return true;
 }
 

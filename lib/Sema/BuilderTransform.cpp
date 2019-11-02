@@ -633,6 +633,7 @@ class BuilderClosureRewriter
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
   std::function<Expr *(Expr *)> rewriteExpr;
+  CoerceExprFn coerceExpr;
 
   /// Retrieve the temporary variable that will be used to capture the
   /// value of the given expression.
@@ -683,7 +684,9 @@ private:
     case FunctionBuilderTarget::ReturnValue: {
       // Return the expression.
       ConstraintSystem &cs = solution.getConstraintSystem();
-      finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
+      finalCapturedExpr = coerceExpr(
+          finalCapturedExpr, builderTransform.bodyResultType,
+          cs.getConstraintLocator(capturedExpr));
       return new (ctx) ReturnStmt(implicitLoc, finalCapturedExpr);
     }
 
@@ -723,10 +726,11 @@ public:
   BuilderClosureRewriter(const Solution &solution,
                          DeclContext *dc,
                          const AppliedBuilderTransform &builderTransform,
-                         std::function<Expr *(Expr *)> rewriteExpr)
+                         std::function<Expr *(Expr *)> rewriteExpr,
+                         CoerceExprFn coerceExpr)
     : ctx(solution.getConstraintSystem().getASTContext()),
       solution(solution), dc(dc), builderTransform(builderTransform),
-      rewriteExpr(rewriteExpr) { }
+      rewriteExpr(rewriteExpr), coerceExpr(coerceExpr) { }
 
   Stmt *visitBraceStmt(BraceStmt *braceStmt, FunctionBuilderTarget target,
                        Optional<FunctionBuilderTarget> innerTarget = None) {
@@ -905,8 +909,10 @@ BraceStmt *swift::applyFunctionBuilderTransform(
     AppliedBuilderTransform applied,
     BraceStmt *body,
     DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr) {
-  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteExpr);
+    std::function<Expr *(Expr *)> rewriteExpr,
+    CoerceExprFn coerceExpr) {
+  BuilderClosureRewriter rewriter(solution, dc, applied, rewriteExpr,
+                                  coerceExpr);
   auto captured = rewriter.takeCapturedStmt(body);
   return cast<BraceStmt>(
     rewriter.visitBraceStmt(
@@ -920,39 +926,36 @@ BraceStmt *
 TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
                                                Type builderType) {
   // Form a constraint system to type-check the body.
-  ConstraintSystemOptions options = None;
-  if (auto resultInterfaceTy = func->getResultInterfaceType()) {
-    auto resultContextTy = func->mapTypeIntoContext(resultInterfaceTy);
-    if (auto opaque = resultContextTy->getAs<OpaqueTypeArchetypeType>()) {
-      if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func))
-        options |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
-    }
+  ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  auto resultInterfaceTy = func->getResultInterfaceType();
+  auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
+
+  // Determine whether we're inferring the underlying type for the opaque
+  // result type of this function.
+  if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
+    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func))
+      options |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
   }
 
-#if false
   ConstraintSystem cs(*this, func, options);
 
-  // Try to build a single result expression.
-  // FIXME: Need a constraint system to check all of this at once. Ugh
-  BuilderClosureVisitor visitor(Context, &cs, FD,
-                                /*wantExpr=*/true, builderType);
-  Expr *returnExpr = visitor.visit(body);
-  if (!returnExpr)
-    return nullptr;
+  // FIXME: check the result
+  cs.matchFunctionBuilder(func, builderType, resultContextType,
+                          /*calleeLocator=*/nullptr,
+                          /*FIXME:*/ConstraintLocatorBuilder(nullptr));
 
-  // Make sure we have a usable result type for the body.
-  Type returnType = AnyFunctionRef(FD).getBodyResultType();
-  if (!returnType || returnType->hasError())
-    return nullptr;
+  // FIXME: Do we wire up the contextual type in the constraint system?
 
-  auto loc = returnExpr->getStartLoc();
-  auto returnStmt =
-    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
-  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
-                           body->getRBraceLoc());
-#else
-  return func->getBody();
-#endif
+  // Solve the constraint system.
+  SmallVector<Solution, 4> solutions;
+  if (cs.solve(solutions) || solutions.size() != 1) {
+    // FIXME: Report an error :)
+    llvm::errs() << "BOOM!\n";
+    return nullptr;
+  }
+
+  return cast_or_null<BraceStmt>(
+      cs.applySolution(solutions.front(), func));
 }
 
 ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
@@ -1042,6 +1045,12 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   Type transformedType = getType(applied->returnExpr);
   assert(transformedType && "Missing type");
 
+  applied->bodyResultType = bodyResultType;
+
+  // Convert the transformed expression to the result type of the function.
+  addConstraint(ConstraintKind::Conversion, transformedType,
+                bodyResultType, locator);
+
   // Record the transformation.
   assert(std::find_if(
       builderTransformedFunctions.begin(),
@@ -1052,10 +1061,6 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
          "already transformed this function along this path!?!");
   builderTransformedFunctions.push_back({ fn, std::move(*applied) });
 
-  // Bind the result type of the function to the type of the transformed
-  // expression.
-  addConstraint(ConstraintKind::Equal, bodyResultType, transformedType,
-                locator);
   return getTypeMatchSuccess();
 }
 

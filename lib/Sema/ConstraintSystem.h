@@ -508,6 +508,9 @@ struct AppliedBuilderTransform {
   /// The builder type that was applied to the closure.
   Type builderType;
 
+  /// The result type of the function body.
+  Type bodyResultType;
+
   /// An expression whose value has been recorded for later use.
   struct RecordedExpr {
     /// The temporary value that captures the value of the expression, if
@@ -1004,6 +1007,54 @@ struct DynamicCallableMethods {
   bool isValid() const {
     return !argumentsMethods.empty() || !keywordArgumentsMethods.empty();
   }
+};
+
+/// Describes the target to which a constraint system's solution can be
+/// applied.
+class SolutionApplicationTarget {
+  enum class Kind {
+    expression,
+    function
+  } kind;
+
+  union {
+    Expr *expression;
+    AnyFunctionRef function;
+  };
+
+public:
+  SolutionApplicationTarget(Expr *expr) {
+    kind = Kind::expression;
+    expression = expr;
+  }
+
+  SolutionApplicationTarget(AnyFunctionRef fn) {
+    kind = Kind::function;
+    function = fn;
+  }
+
+  Expr *getAsExpr() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression;
+
+    case Kind::function:
+      return nullptr;
+    }
+  }
+
+  Optional<AnyFunctionRef> getAsFunction() const {
+    switch (kind) {
+    case Kind::expression:
+      return None;
+
+    case Kind::function:
+      return function;
+    }
+  }
+
+  /// Walk the contents of the application target.
+  llvm::PointerUnion<Expr *, Stmt *> walk(ASTWalker &walker);
 };
 
 /// Describes a system of constraints on type variables, the
@@ -1772,7 +1823,8 @@ private:
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
-  bool applySolutionFixes(Expr *E, const Solution &solution);
+  bool applySolutionFixes(SolutionApplicationTarget target,
+                          const Solution &solution);
 
   /// If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
@@ -2150,12 +2202,12 @@ public:
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
   ///
-  /// \param expr The expression whose constraints we're investigating for a
+  /// \param target The AST whose constraints we're investigating for a
   /// better diagnostic.
   ///
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
-  void diagnoseFailureForExpr(Expr *expr);
+  void diagnoseFailureFor(SolutionApplicationTarget target);
 
   bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
@@ -3670,7 +3722,7 @@ public:
   /// \returns true if an error occurred, false otherwise.  Note that multiple
   /// ambiguous solutions for the same constraint system are considered to be
   /// success by this API.
-  bool solve(Expr *const expr, SmallVectorImpl<Solution> &solutions,
+  bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables =
                  FreeTypeVariableBinding::Disallow);
 
@@ -3694,7 +3746,7 @@ private:
   /// It doesn't filter solutions, that's the job of top-level `solve` methods.
   ///
   /// \param solutions The set of solutions to this system of constraints.
-  void solve(SmallVectorImpl<Solution> &solutions);
+  void solveImpl(SmallVectorImpl<Solution> &solutions);
 
   /// Compare two solutions to the same set of constraints.
   ///
@@ -3733,6 +3785,12 @@ public:
   findBestSolution(SmallVectorImpl<Solution> &solutions,
                    bool minimize);
 
+private:
+  llvm::PointerUnion<Expr *, Stmt *> applySolutionImpl(
+      Solution &solution, SolutionApplicationTarget target,
+      Type convertType, bool discardedExpr, bool skipClosures);
+
+public:
   /// Apply a given solution to the expression, producing a fully
   /// type-checked expression.
   ///
@@ -3743,8 +3801,17 @@ public:
   /// \param skipClosures if true, don't descend into bodies of
   /// non-single expression closures.
   Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType, bool discardedExpr,
-                      bool skipClosures);
+                      Type convertType, bool discardedExpr, bool skipClosures) {
+    return applySolutionImpl(solution, expr, convertType, discardedExpr,
+                             skipClosures).get<Expr *>();
+  }
+
+  /// Apply a given solution to the given function's body, producing a fully
+  /// type-checked statement.
+  BraceStmt *applySolution(Solution &solution, AnyFunctionRef fn) {
+    return cast_or_null<BraceStmt>(
+        applySolutionImpl(solution, fn, Type(), false, false).get<Stmt *>());
+  }
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
@@ -4473,6 +4540,10 @@ bool exprNeedsParensOutsideFollowingOperator(
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
 
+/// Function object used to coerce an expression to a different type.
+using CoerceExprFn =
+    std::function<Expr *(Expr *, Type, constraints::ConstraintLocator *)>;
+
 /// Apply the given function builder transform within a specific solution
 /// to produce the rewritten body.
 ///
@@ -4490,7 +4561,8 @@ BraceStmt *applyFunctionBuilderTransform(
     constraints::AppliedBuilderTransform applied,
     BraceStmt *body,
     DeclContext *dc,
-    std::function<Expr *(Expr *)> rewriteExpr);
+    std::function<Expr *(Expr *)> rewriteExpr,
+    CoerceExprFn coerceExpr);
 
 } // end namespace swift
 

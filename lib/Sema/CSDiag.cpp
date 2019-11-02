@@ -4369,7 +4369,7 @@ bool FailureDiagnosis::diagnoseExprFailure() {
 ///
 /// This is guaranteed to always emit an error message.
 ///
-void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
   // Continue simplifying any active constraints left in the system.  We can end
   // up with them because the solver bails out as soon as it sees a Failure.  We
   // don't want to leave them around in the system because later diagnostics
@@ -4378,6 +4378,12 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   simplify(/*ContinueAfterFailures*/true);
 
   // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
+  auto expr = target.getAsExpr();
+  if (!expr) {
+    // FIXME: Diagnostic is important here. Ugh!
+    return;
+  }
+
   if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
     expr = RB->getSubExpr();
 

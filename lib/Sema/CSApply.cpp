@@ -4675,8 +4675,8 @@ namespace {
     }
 
     const AppliedBuilderTransform *getAppliedBuilderTransform(
-       ClosureExpr *closure) {
-      auto known = solution.builderTransformedFunctions.find(closure);
+       AnyFunctionRef fn) {
+      auto known = solution.builderTransformedFunctions.find(fn);
       return known != solution.builderTransformedFunctions.end()
           ? &known->second
           : nullptr;
@@ -7504,15 +7504,7 @@ namespace {
                        Rewriter.getAppliedBuilderTransform(closure)) {
           // Apply the function builder to the closure. We want to be in the
           // context of the closure for subsequent transforms.
-          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
-          auto newBody = applyFunctionBuilderTransform(
-              Rewriter.solution, *transform, closure->getBody(), closure,
-              [&](Expr *expr) {
-                Expr *result = expr->walk(*this);
-                if (result)
-                  cs.setExprTypes(result);
-                return result;
-              });
+          auto newBody = applyFunctionBuilderBodyTransform(closure, transform);
           closure->setBody(newBody, /*isSingleExpression=*/false);
 
           cs.setExprTypes(closure);
@@ -7553,6 +7545,29 @@ namespace {
 
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    /// Apply the function builder transform to the body of the given function.
+    BraceStmt *applyFunctionBuilderBodyTransform(
+        AnyFunctionRef fn, const AppliedBuilderTransform *transform) {
+      llvm::SaveAndRestore<DeclContext *> savedDC(
+          Rewriter.dc, fn.getAsDeclContext());
+      return applyFunctionBuilderTransform(
+        Rewriter.solution, *transform, fn.getBody(), fn.getAsDeclContext(),
+        [&](Expr *expr) {
+          auto &cs = Rewriter.getConstraintSystem();
+          Expr *result = expr->walk(*this);
+          if (!result)
+            return result;
+
+
+          cs.setExprTypes(result);
+          return result;
+        },
+        [&](Expr *expr, Type toType, ConstraintLocator *locator) {
+          toType = Rewriter.solution.simplifyType(toType);
+          return Rewriter.coerceToType(expr, toType, locator);
+        });
+    }
   };
 } // end anonymous namespace
 
@@ -7569,7 +7584,8 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
 
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
-bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
+bool ConstraintSystem::applySolutionFixes(
+    SolutionApplicationTarget target, const Solution &solution) {
   // First transfer all of the deduced information back
   // to the constraint system.
   applySolution(solution);
@@ -7595,18 +7611,14 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       if (E == root)
         return {true, E};
 
-#if false
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         auto result = solution.builderTransformedFunctions.find(closure);
         if (result != solution.builderTransformedFunctions.end()) {
-          auto *transformedExpr = result->second.singleExpr;
-          // Since this closure has been transformed into something
-          // else let's look inside transformed expression instead.
-          transformedExpr->walk(*this);
-          return {false, E};
+          // FIXME: push the applied builder transform so we can query it
+          // for each statement.
+          return {true, E};
         }
       }
-#endif
 
       diagnose(E);
       return {true, E};
@@ -7642,17 +7654,17 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
     }
   };
 
-  DiagnosticWalker diagnostics(E, solution);
-  E->walk(diagnostics);
+  DiagnosticWalker diagnostics(target.getAsExpr(), solution);
+  target.walk(diagnostics);
   return diagnostics.hadErrors();
 }
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
-                                      Type convertType,
-                                      bool discardedExpr,
-                                      bool skipClosures) {
+llvm::PointerUnion<Expr *, Stmt *>
+ConstraintSystem::applySolutionImpl(
+    Solution &solution, SolutionApplicationTarget target, Type convertType,
+    bool discardedExpr, bool skipClosures) {
   // Add the node types back.
   for (auto &nodeType : solution.addedNodeTypes) {
     setType(nodeType.first, nodeType.second);
@@ -7664,7 +7676,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     if (shouldSuppressDiagnostics())
       return nullptr;
 
-    bool diagnosedErrorsViaFixes = applySolutionFixes(expr, solution);
+    bool diagnosedErrorsViaFixes = applySolutionFixes(target, solution);
     // If all of the available fixes would result in a warning,
     // we can go ahead and apply this solution to AST.
     if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {
@@ -7676,7 +7688,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureForExpr(expr);
+      diagnoseFailureFor(target);
       return nullptr;
     }
   }
@@ -7684,10 +7696,19 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
-  // Apply the solution to the expression.
-  auto result = expr->walk(walker);
-  if (!result)
-    return nullptr;
+  // Apply the solution to the target.
+  llvm::PointerUnion<Expr *, Stmt *> result;
+  if (auto expr = target.getAsExpr()) {
+    result = expr->walk(walker);
+  } else {
+    auto fn = *target.getAsFunction();
+    auto transform = rewriter.getAppliedBuilderTransform(fn);
+    assert(transform && "Not applying builder transform?");
+    result = walker.applyFunctionBuilderBodyTransform(fn, transform);
+  }
+
+  if (result.isNull())
+    return result;
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
@@ -7710,30 +7731,36 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       return nullptr;
   }
 
-  // We are supposed to use contextual type only if it is present and
-  // this expression doesn't represent the implicit return of the single
-  // expression function which got deduced to be `Never`.
-  auto shouldCoerceToContextualType = [&]() {
-    return convertType && !(getType(result)->isUninhabited() &&
-                            getContextualTypePurpose() == CTP_ReturnSingleExpr);
-  };
+  if (auto resultExpr = result.dyn_cast<Expr *>()) {
+    Expr *expr = target.getAsExpr();
+    assert(expr && "Can't have expression result without expression target");
 
-  // If we're supposed to convert the expression to some particular type,
-  // do so now.
-  if (shouldCoerceToContextualType()) {
-    result = rewriter.coerceToType(result, convertType,
-                                   getConstraintLocator(expr));
-    if (!result)
-      return nullptr;
-  } else if (getType(result)->hasLValueType() && !discardedExpr) {
-    // We referenced an lvalue. Load it.
-    result = rewriter.coerceToType(result, getType(result)->getRValueType(),
-                                   getConstraintLocator(expr));
+    // We are supposed to use contextual type only if it is present and
+    // this expression doesn't represent the implicit return of the single
+    // expression function which got deduced to be `Never`.
+    auto shouldCoerceToContextualType = [&]() {
+      return convertType && !(getType(resultExpr)->isUninhabited() &&
+                              getContextualTypePurpose() == CTP_ReturnSingleExpr);
+    };
+
+    // If we're supposed to convert the expression to some particular type,
+    // do so now.
+    if (shouldCoerceToContextualType()) {
+      resultExpr = rewriter.coerceToType(resultExpr, convertType,
+                                         getConstraintLocator(expr));
+      if (!resultExpr)
+        return nullptr;
+    } else if (getType(resultExpr)->hasLValueType() && !discardedExpr) {
+      // We referenced an lvalue. Load it.
+      resultExpr = rewriter.coerceToType(resultExpr, getType(resultExpr)->getRValueType(),
+                                     getConstraintLocator(expr));
+    }
+
+    if (resultExpr)
+      rewriter.finalize(resultExpr);
   }
 
-  if (result)
-    rewriter.finalize(result);
-
+  // FIXME: finalize when we have a statement?
   return result;
 }
 
@@ -7758,4 +7785,15 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 
   rewriter.finalize(result);
   return result;
+}
+
+llvm::PointerUnion<Expr *, Stmt *> SolutionApplicationTarget::walk(
+    ASTWalker &walker) {
+  switch (kind) {
+  case Kind::expression:
+    return getAsExpr()->walk(walker);
+
+  case Kind::function:
+    return getAsFunction()->getBody()->walk(walker);
+  }
 }

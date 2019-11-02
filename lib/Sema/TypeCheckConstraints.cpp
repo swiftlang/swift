@@ -2463,7 +2463,7 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (CS.solve(expr, viable, FreeTypeVariableBinding::Disallow))
+  if (CS.solve(viable, FreeTypeVariableBinding::Disallow))
     return nullptr;
 
   auto &solution = viable[0];
@@ -3231,7 +3231,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   if (openArchetypes) {
     assert(!unwrappedIUO && "FIXME");
     SmallVector<Solution, 4> solutions;
-    return !cs.solve(nullptr, solutions, FreeTypeVariableBinding::Allow);
+    return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
   }
 
   if (auto solution = cs.solveSingle()) {
@@ -3434,7 +3434,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if ((cs.solve(expr, viable) || viable.size() != 1) &&
+  if ((cs.solve(viable) || viable.size() != 1) &&
       cs.salvage(viable, expr)) {
     return true;
   }
