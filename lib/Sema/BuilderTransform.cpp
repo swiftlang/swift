@@ -948,8 +948,6 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *func,
                           /*calleeLocator=*/nullptr,
                           /*FIXME:*/ConstraintLocatorBuilder(nullptr));
 
-  // FIXME: Do we wire up the contextual type in the constraint system?
-
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
   if (cs.solve(solutions) || solutions.size() != 1) {
