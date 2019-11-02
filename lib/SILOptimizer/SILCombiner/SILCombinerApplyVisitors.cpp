@@ -907,8 +907,8 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
         (archetypeTy->getConformsTo().size() == 1)) {
       PD = archetypeTy->getConformsTo()[0];
     } else if (ArgType.isExistentialType() && !ArgType.isAnyObject() &&
-               !SwiftArgType->isAny() && SwiftArgType->getAnyNominal()) {
-      PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+               !SwiftArgType->isAny()) {
+      PD = dyn_cast_or_null<ProtocolDecl>(SwiftArgType->getAnyNominal());
     }
   }
 
