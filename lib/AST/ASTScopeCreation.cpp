@@ -605,20 +605,24 @@ private:
     };
     const auto r1 = getRangeableSourceRange(n1);
     const auto r2 = getRangeableSourceRange(n2);
-    const int startOrder = cmpLoc(r1.Start, r2.Start);
     const int endOrder = cmpLoc(r1.End, r2.End);
 
 #ifndef NDEBUG
+    const int startOrder = cmpLoc(r1.Start, r2.Start);
+
     if (startOrder * endOrder == -1) {
       llvm::errs() << "*** Start order contradicts end order between: ***\n";
       dumpRangeable(n1, llvm::errs());
       llvm::errs() << "\n*** and: ***\n";
       dumpRangeable(n2, llvm::errs());
     }
-#endif
     ASTScopeAssert(startOrder * endOrder != -1,
                    "Start order contradicts end order");
-    return startOrder + endOrder < 1;
+    // When building Swift.o can see two nodes for same AccessorDecl.
+    ASTScopeAssert(r1 == r2 || endOrder != 0,
+                   "Must have unambiguous ordering for scope-lookup to work");
+#endif
+    return endOrder < 1;
   }
 
   static bool isVarDeclInPatternBindingDecl(ASTNode n1, ASTNode n2) {
