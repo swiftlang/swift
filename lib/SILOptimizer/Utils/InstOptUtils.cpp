@@ -756,9 +756,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
 
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((friLeftFun->hasSemanticsAttr("string.makeUTF8")
+  if (!((friLeftFun->hasSemanticsAttr(STRING_MAKE_UTF8)
          && aiLeftOperandsNum == 5)
-        || (friRightFun->hasSemanticsAttr("string.makeUTF8")
+        || (friRightFun->hasSemanticsAttr(STRING_MAKE_UTF8)
             && aiRightOperandsNum == 5)))
     return false;
 

@@ -119,7 +119,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
     return nullptr;
 
   SILFunction *callee = apply->getCalleeFunction();
-  if (!callee || !callee->hasSemanticsAttr("string.makeUTF8"))
+  if (!callee || !callee->hasSemanticsAttr(STRING_MAKE_UTF8))
     return nullptr;
   return callee;
 }

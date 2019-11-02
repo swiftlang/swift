@@ -121,6 +121,12 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_WORD = {
     "Builtin.Word"};
 
+/// The name of the semantics of make utf8 string
+constexpr static StringLiteral STRING_MAKE_UTF8 = "string.makeUTF8";
+
+/// The name of the semantics of string equal
+constexpr static StringLiteral STRING_EQUALS = "string.equals";
+
 } // end namespace swift
 
 #endif // SWIFT_STRINGS_H

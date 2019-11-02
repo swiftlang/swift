@@ -1535,7 +1535,7 @@ constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);
   if (!stringInitSite || !stringInitSite.getReferencedFunctionOrNull() ||
       !stringInitSite.getReferencedFunctionOrNull()->hasSemanticsAttr(
-          "string.makeUTF8")) {
+          STRING_MAKE_UTF8)) {
     // Emit diagnostics only on non-transparent functions.
     if (enableDiagnostics && !caller->isTransparent()) {
       diagnose(caller->getASTContext(), bi->getLoc().getSourceLoc(),

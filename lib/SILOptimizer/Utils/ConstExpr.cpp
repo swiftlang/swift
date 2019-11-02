@@ -73,11 +73,11 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   // There are two string initializers in the standard library with the
   // semantics "string.makeUTF8". They are identical from the perspective of
   // the interpreter. One of those functions is probably redundant and not used.
-  if (fn->hasSemanticsAttr("string.makeUTF8"))
+  if (fn->hasSemanticsAttr(STRING_MAKE_UTF8))
     return WellKnownFunction::StringMakeUTF8;
   if (fn->hasSemanticsAttr("string.append"))
     return WellKnownFunction::StringAppend;
-  if (fn->hasSemanticsAttr("string.equals"))
+  if (fn->hasSemanticsAttr(STRING_EQUALS))
     return WellKnownFunction::StringEquals;
   if (fn->hasSemanticsAttr("string.escapePercent.get"))
     return WellKnownFunction::StringEscapePercent;
