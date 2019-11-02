@@ -981,7 +981,7 @@ bool WitnessChecker::findBestWitness(
   bool anyFromUnconstrainedExtension;
   numViable = 0;
 
-  // FIXME: Remove dependnecy on the lazy resolver.
+  // FIXME: Remove dependency on the lazy resolver.
   auto *TC = static_cast<TypeChecker *>(
       requirement->getASTContext().getLazyResolver());
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
@@ -4537,7 +4537,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   // Describe why the witness didn't satisfy the requirement.
   WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  // FIXME: Remove dependnecy on the lazy resolver.
+  // FIXME: Remove dependency on the lazy resolver.
   auto *TC = static_cast<TypeChecker *>(req->getASTContext().getLazyResolver());
   auto match = matchWitness(*TC, oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
