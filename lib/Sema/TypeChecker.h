@@ -1015,10 +1015,6 @@ public:
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
 
-  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
-    addImplicitConstructors(nominal);
-  }
-
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
     synthesizeMemberForLookup(nominal, member);
   }
@@ -1524,11 +1520,11 @@ public:
   };
 
   /// Completely check the given conformance.
-  void checkConformance(NormalProtocolConformance *conformance);
+  static void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
-  void checkConformancesInContext(DeclContext *dc,
-                                  IterableDeclContext *idc);
+  static void checkConformancesInContext(DeclContext *dc,
+                                         IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
   static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);

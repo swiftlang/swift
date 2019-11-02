@@ -293,10 +293,10 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
       auto decl = TC.ConformanceContexts[i];
       if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-        TC.checkConformancesInContext(ext, ext);
+        TypeChecker::checkConformancesInContext(ext, ext);
       else {
         auto *ntd = cast<NominalTypeDecl>(decl);
-        TC.checkConformancesInContext(ntd, ntd);
+        TypeChecker::checkConformancesInContext(ntd, ntd);
 
         // Finally, we can check classes for missing initializers.
         if (auto *classDecl = dyn_cast<ClassDecl>(ntd))

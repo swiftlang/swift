@@ -1077,6 +1077,9 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                                             DeclName member) {
   auto baseName = member.getBaseName();
 
+  if (baseName == DeclBaseName::createConstructor())
+    addImplicitConstructors(target);
+
   // Checks whether the target conforms to the given protocol. If the
   // conformance is incomplete, force the conformance.
   //
@@ -1097,7 +1100,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref.getConcrete()->getRootConformance())) {
       if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-        checkConformance(conformance);
+        TypeChecker::checkConformance(conformance);
       }
     }
 

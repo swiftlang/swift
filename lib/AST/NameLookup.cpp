@@ -1572,9 +1572,6 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
 
     // Make sure we've resolved implicit members, if we need them.
     if (typeResolver) {
-      if (member.getBaseName() == DeclBaseName::createConstructor())
-        typeResolver->resolveImplicitConstructors(current);
-
       typeResolver->resolveImplicitMember(current, member);
     }
 
