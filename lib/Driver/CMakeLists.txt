@@ -33,7 +33,8 @@ target_link_libraries(swiftDriver PRIVATE
 if(SWIFT_BUILD_STATIC_STDLIB)
   set(static_stdlib_lnk_file_list)
   foreach(sdk ${SWIFT_CONFIGURED_SDKS})
-    if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
+    if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF" OR
+       "${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "WASM")
       string(TOLOWER "${sdk}" lowercase_sdk)
       if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
         set(ICU_STATICLIB "TRUE")
