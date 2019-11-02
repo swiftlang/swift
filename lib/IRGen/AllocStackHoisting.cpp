@@ -21,7 +21,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/Basic/Semantics.h"
+#include "swift/AST/SemanticAttrs.h"
 
 #include "IRGenModule.h"
 #include "NonFixedTypeInfo.h"

@@ -77,7 +77,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/OptimizationMode.h"
-#include "swift/Basic/Semantics.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/BasicBlockUtils.h"

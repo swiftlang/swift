@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "objectoutliner"
 #include "swift/AST/ASTMangler.h"
-#include "swift/Basic/Semantics.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
