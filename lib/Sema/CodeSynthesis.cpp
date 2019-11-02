@@ -1080,51 +1080,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   if (baseName == DeclBaseName::createConstructor())
     addImplicitConstructors(target);
 
-  // Checks whether the target conforms to the given protocol. If the
-  // conformance is incomplete, force the conformance.
-  //
-  // Returns whether the target conforms to the protocol.
-  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
-    if (!protocol)
-      return false;
-
-    auto targetType = target->getDeclaredInterfaceType();
-    auto ref =
-        conformsToProtocol(targetType, protocol, target,
-                           ConformanceCheckFlags::SkipConditionalRequirements);
-
-    if (ref.isInvalid()) {
-      return false;
-    }
-
-    if (auto *conformance = dyn_cast<NormalProtocolConformance>(
-            ref.getConcrete()->getRootConformance())) {
-      if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-        TypeChecker::checkConformance(conformance);
-      }
-    }
-
-    return true;
-  };
-
   if (member.isSimpleName() && !baseName.isSpecial()) {
-    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
-      // CodingKeys is a special type which may be synthesized as part of
-      // Encodable/Decodable conformance. If the target conforms to either
-      // protocol and would derive conformance to either, the type may be
-      // synthesized.
-      // If the target conforms to either and the conformance has not yet been
-      // evaluated, then we should do that here.
-      //
-      // Try to synthesize Decodable first. If that fails, try to synthesize
-      // Encodable. If either succeeds and CodingKeys should have been
-      // synthesized, it will be synthesized.
-      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-      if (!evaluateTargetConformanceTo(decodableProto))
-        (void)evaluateTargetConformanceTo(encodableProto);
-    }
-
     if ((baseName.getIdentifier().str().startswith("$") ||
          baseName.getIdentifier().str().startswith("_")) &&
         baseName.getIdentifier().str().size() > 1) {
@@ -1141,31 +1097,6 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
           }
         }
       }
-    }
-
-  } else {
-    auto argumentNames = member.getArgumentNames();
-    if (member.isCompoundName() && argumentNames.size() != 1)
-      return;
-
-    if (baseName == DeclBaseName::createConstructor() &&
-        (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
-      // init(from:) may be synthesized as part of derived conformance to the
-      // Decodable protocol.
-      // If the target should conform to the Decodable protocol, check the
-      // conformance here to attempt synthesis.
-      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-      (void)evaluateTargetConformanceTo(decodableProto);
-    } else if (!baseName.isSpecial() &&
-               baseName.getIdentifier() == Context.Id_encode &&
-               (member.isSimpleName() ||
-                argumentNames.front() == Context.Id_to)) {
-      // encode(to:) may be synthesized as part of derived conformance to the
-      // Encodable protocol.
-      // If the target should conform to the Encodable protocol, check the
-      // conformance here to attempt synthesis.
-      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-      (void)evaluateTargetConformanceTo(encodableProto);
     }
   }
 }
