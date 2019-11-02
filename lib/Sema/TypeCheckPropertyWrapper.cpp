@@ -546,8 +546,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   }
 
   // Compute the type of the property to plug in to the wrapper type.
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)var->getInterfaceType();
   Type propertyType = var->getType();
   if (!propertyType || propertyType->hasError())
     return Type();
