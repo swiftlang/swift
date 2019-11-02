@@ -1654,6 +1654,29 @@ public:
   bool isCached() const { return true; }
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+class DifferentiableAttributeParameterIndicesRequest :
+    public SimpleRequest<DifferentiableAttributeParameterIndicesRequest,
+                         IndexSubset *(DifferentiableAttr *, Decl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<IndexSubset *>
+  evaluate(Evaluator &evaluator, DifferentiableAttr *attr, Decl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<IndexSubset *> getCachedResult() const;
+  void cacheResult(IndexSubset *value) const;
+};
+// SWIFT_ENABLE_TENSORFLOW END
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

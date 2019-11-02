@@ -24,6 +24,8 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeRepr.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/ParameterList.h"
@@ -1461,9 +1463,9 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
-      ParameterIndices(indices) {
+      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
   setOriginalDeclaration(original);
+  setParameterIndices(indices);
   setDerivativeGenericSignature(derivativeGenSig);
 }
 
@@ -1501,6 +1503,31 @@ void DifferentiableAttr::setOriginalDeclaration(Decl *decl) {
   assert(!OriginalDeclaration &&
          "Original declaration cannot have already been set");
   OriginalDeclaration = decl;
+}
+
+bool DifferentiableAttr::hasComputedParameterIndices() const {
+  return ParameterIndicesAndBit.getInt();
+}
+
+IndexSubset *DifferentiableAttr::getParameterIndices() const {
+  assert(getOriginalDeclaration() &&
+         "Original declaration must have been resolved");
+  auto &ctx = getOriginalDeclaration()->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      DifferentiableAttributeParameterIndicesRequest{
+          const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
+      nullptr);
+}
+
+void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
+  assert(getOriginalDeclaration() &&
+         "Original declaration must have been resolved");
+  auto &ctx = getOriginalDeclaration()->getASTContext();
+  ctx.evaluator.cacheOutput(
+      DifferentiableAttributeParameterIndicesRequest{
+          const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
+      std::move(paramIndices));
 }
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {

@@ -1063,18 +1063,6 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-789): Figure out the proper way to typecheck these.
-void TypeChecker::checkDeclDifferentiableAttributes(Decl *D) {
-  AttributeChecker Checker(D);
-  for (auto attr : D->getAttrs()) {
-    if (!isa<DifferentiableAttr>(attr) || !attr->isValid() ||
-        !attr->canAppearOnDecl(D))
-      continue;
-    Checker.visit(attr);
-  }
-}
-
 /// Returns true if the given method is an valid implementation of a
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
@@ -3205,6 +3193,19 @@ static bool checkTransposingParameters(
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
+  // Call `getParameterIndices` to trigger a
+  // `DifferentiableAttributeParameterIndicesRequest`, which currently performs
+  // full `@differentiable` type-checking.
+  // TODO: Consider creating separate requests for the following functionality:
+  // - `DifferentiableAttr::getJVPFunction`
+  // - `DifferentiableAttr::getVJPFunction`
+  // - `DifferentiableAttr::getDerivativeGenericSignature`
+  (void)attr->getParameterIndices();
+}
+
+llvm::Expected<IndexSubset *>
+DifferentiableAttributeParameterIndicesRequest::evaluate(
+    Evaluator &evaluator, DifferentiableAttr *attr, Decl *D) const {
   // Skip checking implicit `@differentiable` attributes. We currently assume
   // that all implicit `@differentiable` attributes are valid.
   // Motivation: some implicit attributes do not contain a where clause, and
@@ -3212,26 +3213,31 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // where clauses and requirements consistently is a larger problem, to be
   // revisited.
   if (attr->isImplicit())
-    return;
+    return nullptr;
 
+  auto &ctx = D->getASTContext();
+  auto &diags = ctx.Diags;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
   // If functions is marked as linear, you cannot have a custom VJP and/or
   // a JVP.
   if (attr->isLinear() && (attr->getVJP() || attr->getJVP())) {
-    diagnoseAndRemoveAttr(attr,
+    diagnoseAndRemoveAttr(diags, D, attr,
                           diag::attr_differentiable_no_vjp_or_jvp_when_linear);
-    return;
+    attr->setInvalid();
+    return nullptr;
   }
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
     if (asd->getImplInfo().isSimpleStored() &&
         (attr->getJVP() || attr->getVJP())) {
-      diagnoseAndRemoveAttr(attr,
+      diagnoseAndRemoveAttr(
+          diags, D, attr,
           diag::differentiable_attr_stored_property_variable_unsupported);
-      return;
+      attr->setInvalid();
+      return nullptr;
     }
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.
@@ -3253,13 +3259,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Global immutable vars, for example, have no getter, and therefore trigger
   // this.
   if (!original) {
-    diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
-    return;
+    diagnoseAndRemoveAttr(diags, D, attr, diag::invalid_decl_attribute, attr);
+    attr->setInvalid();
+    return nullptr;
   }
 
-  assert(attr->getOriginalDeclaration() &&
-         "`@differentiable` attribute should have original declaration set "
-         "during construction or parsing");
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
@@ -3268,12 +3272,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto originalResultTy = originalFnTy->getResult();
   if (isMethod)
     originalResultTy = originalResultTy->castTo<AnyFunctionType>()->getResult();
-  if (originalResultTy->isEqual(Ctx.TheEmptyTupleType)) {
-    diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
-                   original->getFullName())
+  if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
+    diags.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
+                original->getFullName())
         .highlight(original->getSourceRange());
     attr->setInvalid();
-    return;
+    return nullptr;
   }
 
   bool isOriginalProtocolRequirement =
@@ -3291,10 +3295,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     //  result - JVPs/VJPs would not type-check.
     if (auto *originalFn = dyn_cast<FuncDecl>(original)) {
       if (originalFn->hasDynamicSelfResult()) {
-        diagnose(attr->getLocation(),
-                 diag::differentiable_attr_class_member_no_dynamic_self);
+        diags.diagnose(attr->getLocation(),
+                       diag::differentiable_attr_class_member_no_dynamic_self);
         attr->setInvalid();
-        return;
+        return nullptr;
       }
     }
 
@@ -3302,10 +3306,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // Extra JVP/VJP type calculation logic is necessary because classes have
     // both allocators and initializers.
     if (auto *initDecl = dyn_cast<ConstructorDecl>(original)) {
-      diagnose(attr->getLocation(),
-               diag::differentiable_attr_class_init_not_yet_supported);
+      diags.diagnose(attr->getLocation(),
+                     diag::differentiable_attr_class_init_not_yet_supported);
       attr->setInvalid();
-      return;
+      return nullptr;
     }
   }
 
@@ -3324,33 +3328,33 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // `@differentiable` attributes on protocol requirements do not support
     // 'where' clauses.
     if (isOriginalProtocolRequirement) {
-      diagnose(attr->getLocation(),
-               diag::differentiable_attr_protocol_req_where_clause);
+      diags.diagnose(attr->getLocation(),
+                     diag::differentiable_attr_protocol_req_where_clause);
       attr->setInvalid();
-      return;
+      return nullptr;
     }
     if (whereClause->getRequirements().empty()) {
       // Where clause must not be empty.
-      diagnose(attr->getLocation(),
-               diag::differentiable_attr_empty_where_clause);
+      diags.diagnose(attr->getLocation(),
+                     diag::differentiable_attr_empty_where_clause);
       attr->setInvalid();
-      return;
+      return nullptr;
     }
 
     auto originalGenSig = original->getGenericSignature();
     if (!originalGenSig) {
       // Attributes with where clauses can only be declared on
       // generic functions.
-      diagnose(attr->getLocation(),
-               diag::differentiable_attr_nongeneric_trailing_where,
-               original->getFullName())
-        .highlight(whereClause->getSourceRange());
+      diags.diagnose(attr->getLocation(),
+                     diag::differentiable_attr_nongeneric_trailing_where,
+                     original->getFullName())
+          .highlight(whereClause->getSourceRange());
       attr->setInvalid();
-      return;
+      return nullptr;
     }
 
     // Build a new generic signature for autodiff derivative functions.
-    GenericSignatureBuilder builder(Ctx);
+    GenericSignatureBuilder builder(ctx);
     // Add the original function's generic signature.
     builder.addGenericSignature(originalGenSig);
 
@@ -3369,9 +3373,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
         // Layout requirements are not supported.
         case RequirementKind::Layout:
-          diagnose(attr->getLocation(),
-                   diag::differentiable_attr_layout_req_unsupported)
-            .highlight(reqRepr->getSourceRange());
+          diags.diagnose(attr->getLocation(),
+                         diag::differentiable_attr_layout_req_unsupported)
+              .highlight(reqRepr->getSourceRange());
           errorOccurred = true;
           return false;
         }
@@ -3385,7 +3389,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
     if (errorOccurred) {
       attr->setInvalid();
-      return;
+      return nullptr;
     }
 
     // Compute generic signature and environment for autodiff associated
@@ -3402,9 +3406,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.
   auto parsedWrtParams = attr->getParsedParameters();
-  // Get checked wrt param indices.
-  // This is defined only for compiler-synthesized attributes.
-  auto *checkedWrtParamIndices = attr->getParameterIndices();
 
   // Compute the derivative function type.
   auto derivativeFnTy = originalFnTy;
@@ -3412,15 +3413,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     derivativeFnTy = whereClauseGenEnv->mapTypeIntoContext(derivativeFnTy)
         ->castTo<AnyFunctionType>();
 
-  // If checked wrt param indices are not specified, compute them.
-  if (!checkedWrtParamIndices)
-    checkedWrtParamIndices =
-        computeDifferentiationParameters(parsedWrtParams, original,
-                                         whereClauseGenEnv, attr->getAttrName(),
-                                         attr->getLocation());
+  auto *checkedWrtParamIndices =
+      computeDifferentiationParameters(parsedWrtParams, original,
+                                       whereClauseGenEnv, attr->getAttrName(),
+                                       attr->getLocation());
   if (!checkedWrtParamIndices) {
     attr->setInvalid();
-    return;
+    return nullptr;
   }
 
   // Check if differentiation parameter indices are valid.
@@ -3428,11 +3427,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           original, checkedWrtParamIndices, derivativeFnTy, whereClauseGenEnv,
           original->getModuleContext(), parsedWrtParams, attr->getLocation())) {
     attr->setInvalid();
-    return;
+    return nullptr;
   }
-
-  // Set the checked differentiation parameter indices in the attribute.
-  attr->setParameterIndices(checkedWrtParamIndices);
 
   if (whereClauseGenEnv)
     originalResultTy =
@@ -3441,20 +3437,20 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     originalResultTy = original->mapTypeIntoContext(originalResultTy);
   // Check that original function's result type conforms to `Differentiable`.
   if (!conformsToDifferentiable(originalResultTy, original)) {
-    diagnose(attr->getLocation(),
-             diag::differentiable_attr_result_not_differentiable,
-             originalResultTy);
+    diags.diagnose(attr->getLocation(),
+                   diag::differentiable_attr_result_not_differentiable,
+                   originalResultTy);
     attr->setInvalid();
-    return;
+    return nullptr;
   }
 
   // `@differentiable` attributes on protocol requirements do not support
   // JVP/VJP.
   if (isOriginalProtocolRequirement && (attr->getJVP() || attr->getVJP())) {
-    diagnose(attr->getLocation(),
-             diag::differentiable_attr_protocol_req_assoc_func);
+    diags.diagnose(attr->getLocation(),
+                   diag::differentiable_attr_protocol_req_assoc_func);
     attr->setInvalid();
-    return;
+    return nullptr;
   }
 
   // Resolve the JVP declaration, if it exists.
@@ -3476,7 +3472,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
     if (!jvp) {
       attr->setInvalid();
-      return;
+      return nullptr;
     }
     // Memorize the jvp reference in the attribute.
     attr->setJVPFunction(jvp);
@@ -3501,7 +3497,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
     if (!vjp) {
       attr->setInvalid();
-      return;
+      return nullptr;
     }
     // Memorize the vjp reference in the attribute.
     attr->setVJPFunction(vjp);
@@ -3516,34 +3512,36 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     auto *getterDecl = asd->getAccessor(AccessorKind::Get);
     auto *newAttr = DifferentiableAttr::create(
         getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
-        attr->isLinear(), attr->getParameterIndices(), attr->getJVP(),
+        attr->isLinear(), checkedWrtParamIndices, attr->getJVP(),
         attr->getVJP(), attr->getDerivativeGenericSignature());
     newAttr->setJVPFunction(attr->getJVPFunction());
     newAttr->setVJPFunction(attr->getVJPFunction());
-    auto insertion = Ctx.DifferentiableAttrs.try_emplace(
-        {getterDecl, newAttr->getParameterIndices()}, newAttr);
+    auto insertion = ctx.DifferentiableAttrs.try_emplace(
+        {getterDecl, checkedWrtParamIndices}, newAttr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
     if (!insertion.second) {
-      diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
-      diagnose(insertion.first->getSecond()->getLocation(),
-               diag::differentiable_attr_duplicate_note);
-      return;
+      diagnoseAndRemoveAttr(diags, D, attr,
+                            diag::differentiable_attr_duplicate);
+      diags.diagnose(insertion.first->getSecond()->getLocation(),
+                     diag::differentiable_attr_duplicate_note);
+      return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
-    return;
+    return checkedWrtParamIndices;
   }
-  auto insertion = Ctx.DifferentiableAttrs.try_emplace(
-      {D, attr->getParameterIndices()}, attr);
+  auto insertion = ctx.DifferentiableAttrs.try_emplace(
+      {D, checkedWrtParamIndices}, attr);
   // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
-    diagnose(insertion.first->getSecond()->getLocation(),
-             diag::differentiable_attr_duplicate_note);
-    return;
+    diagnoseAndRemoveAttr(diags, D, attr, diag::differentiable_attr_duplicate);
+    diags.diagnose(insertion.first->getSecond()->getLocation(),
+                   diag::differentiable_attr_duplicate_note);
+    return nullptr;
   }
+  return checkedWrtParamIndices;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

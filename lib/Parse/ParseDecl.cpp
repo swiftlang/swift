@@ -3390,6 +3390,7 @@ static void setOriginalFunctionInDifferentiableAttributes(
   for (auto *attr : Attributes.getAttributes<DifferentiableAttr>())
     const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(D);
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
@@ -3836,6 +3837,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // SWIFT_ENABLE_TENSORFLOW END
     }
     // SWIFT_ENABLE_TENSORFLOW
+    // Set original declaration in `@differentiable` attributes.
     setOriginalFunctionInDifferentiableAttributes(D->getAttrs(), D);
     // SWIFT_ENABLE_TENSORFLOW END
   }
@@ -5592,6 +5594,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   accessors.record(*this, PrimaryVar, Invalid);
 
   // SWIFT_ENABLE_TENSORFLOW
+  // Set original declaration in `@differentiable` attributes.
   for (auto *accessor : accessors.Accessors)
     setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
                                                   accessor);
@@ -5852,6 +5855,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
       // SWIFT_ENABLE_TENSORFLOW
+      // Set original declaration in `@differentiable` attributes.
       setOriginalFunctionInDifferentiableAttributes(Attributes, VD);
       // SWIFT_ENABLE_TENSORFLOW END
       setLocalDiscriminator(VD);
@@ -7109,6 +7113,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()));
 
   // SWIFT_ENABLE_TENSORFLOW
+  // Set original declaration in `@differentiable` attributes.
   for (auto *accessor : accessors.Accessors)
     setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
                                                   accessor);

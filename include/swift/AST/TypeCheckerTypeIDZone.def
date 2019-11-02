@@ -34,6 +34,11 @@ SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
+// SWIFT_ENABLE_TENSORFLOW
+SWIFT_REQUEST(TypeChecker, DifferentiableAttributeParameterIndicesRequest,
+              IndexSubset *(DifferentiableAttr *, Decl *),
+              SeparatelyCached, NoLocationInfo)
+// SWIFT_ENABLE_TENSORFLOW END
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
               NoLocationInfo)
