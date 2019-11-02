@@ -205,8 +205,7 @@ static ValueDecl *deriveVectorProtocol_method(
     Identifier argumentLabel, Identifier parameterName, Type parameterType,
     Type returnType, AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
@@ -237,7 +236,7 @@ static ValueDecl *deriveVectorProtocol_method(
     // The implicit memberwise constructor must be explicitly created so that
     // it can called in `VectorProtocol` methods. Normally, the memberwise
     // constructor is synthesized during SILGen, which is too late.
-    auto *initDecl = createMemberwiseImplicitConstructor(TC, nominal);
+    auto *initDecl = createMemberwiseImplicitConstructor(C, nominal);
     nominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
@@ -252,7 +251,7 @@ static ValueDecl *deriveVectorProtocol_method(
 static ValueDecl *deriveVectorProtocol_unaryMethodOnScalar(
     DerivedConformance &derived, Identifier methodBaseName,
     Identifier argumentLabel, Identifier parameterName) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto *nominal = derived.Nominal;
   auto *parentDC = derived.getConformanceContext();
 
@@ -278,16 +277,16 @@ ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   auto &C = requirement->getASTContext();
-  if (requirement->getBaseName() == TC.Context.Id_scaled)
+  if (requirement->getBaseName() == Context.Id_scaled)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_scaled, C.Id_by, C.Id_scale);
-  if (requirement->getBaseName() == TC.Context.Id_adding)
+  if (requirement->getBaseName() == Context.Id_adding)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_adding, Identifier(), C.Id_x);
-  if (requirement->getBaseName() == TC.Context.Id_subtracting)
+  if (requirement->getBaseName() == Context.Id_subtracting)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_subtracting, Identifier(), C.Id_x);
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }
 
@@ -295,9 +294,9 @@ Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_VectorSpaceScalar)
+  if (requirement->getBaseName() == Context.Id_VectorSpaceScalar)
     return deriveVectorProtocol_VectorSpaceScalar(
         Nominal, getConformanceContext());
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }

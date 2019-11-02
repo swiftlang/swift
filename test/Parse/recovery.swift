@@ -152,7 +152,7 @@ func missingControllingExprInFor() {
   for ; true { // expected-error {{C-style for statement has been removed in Swift 3}}
   }
 
-  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}} expected-error{{variable 'i' is not bound by any pattern}}
+  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}}
     i += 1
   }
 }
@@ -174,13 +174,11 @@ func missingControllingExprInForEach() {
   {
   }
 
-  // expected-error @+3 {{variable 'i' is not bound by any pattern}}
   // expected-error @+2 {{expected 'in' after for-each pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
   for i {
   }
 
-  // expected-error @+3 {{variable 'i' is not bound by any pattern}}
   // expected-error @+2 {{expected 'in' after for-each pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
   for var i {
@@ -201,7 +199,6 @@ func missingControllingExprInForEach() {
   for for in {
   }
 
-  // expected-error @+1 {{variable 'i' is not bound by any pattern}}
   for i in { // expected-error {{expected Sequence expression for for-each loop}}
   }
 

@@ -114,8 +114,7 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl, void *) {
 /// Derive a '_typeList' implementation.
 static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
@@ -317,7 +316,7 @@ static ValueDecl *deriveTensorGroup_constructor(
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
@@ -347,7 +346,7 @@ static ValueDecl *deriveTensorGroup_constructor(
 
 // Synthesize the `init(_owning:)` function declaration.
 static ValueDecl *deriveTensorGroup_init(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
@@ -367,10 +366,10 @@ ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_typeList)
+  if (requirement->getBaseName() == Context.Id_typeList)
     return deriveTensorGroup_typeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorGroup_init(*this);
-  TC.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
   return nullptr;
 }

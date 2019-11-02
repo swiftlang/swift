@@ -137,7 +137,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       // treat it as unavailable, which is a very close failure.
       if (declCloseness.first == CC_ExactMatch &&
           VD->getAttrs().isUnavailable(CS.getASTContext()) &&
-          !CS.TC.getLangOpts().DisableAvailabilityChecking)
+          !CS.getASTContext().LangOpts.DisableAvailabilityChecking)
         declCloseness.first = CC_Unavailable;
       
       // Likewise, if the candidate is inaccessible from the scope it is being

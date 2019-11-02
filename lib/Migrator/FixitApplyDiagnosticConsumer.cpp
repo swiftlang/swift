@@ -32,20 +32,17 @@ void FixitApplyDiagnosticConsumer::printResult(llvm::raw_ostream &OS) const {
 }
 
 void FixitApplyDiagnosticConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
-  if (Loc.isInvalid()) {
+    SourceManager &SM, const DiagnosticInfo &Info) {
+  if (Info.Loc.isInvalid()) {
     return;
   }
-  auto ThisBufferID = SM.findBufferContainingLoc(Loc);
+  auto ThisBufferID = SM.findBufferContainingLoc(Info.Loc);
   auto ThisBufferName = SM.getIdentifierForBuffer(ThisBufferID);
   if (ThisBufferName != BufferName) {
     return;
   }
 
-  if (!shouldTakeFixit(Kind, Info)) {
+  if (!shouldTakeFixit(Info)) {
     return;
   }
 

@@ -1634,6 +1634,26 @@ public:
   bool isCached() const { return true; }
 };
 
+class CompareDeclSpecializationRequest
+    : public SimpleRequest<CompareDeclSpecializationRequest,
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, DeclContext *DC,
+                                ValueDecl *VD1, ValueDecl *VD2,
+                                bool dynamic) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

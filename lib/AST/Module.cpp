@@ -212,14 +212,15 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(NTD->getMembers(), true);
 
-    // Avoid populating the cache with the members of invalid extension
-    // declarations.  These members can be used to point validation inside of
-    // a malformed context.
-    if (D->isInvalid()) continue;
+    if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+      // Avoid populating the cache with the members of invalid extension
+      // declarations.  These members can be used to point validation inside of
+      // a malformed context.
+      if (ED->isInvalid()) continue;
 
-    if (auto *ED = dyn_cast<ExtensionDecl>(D))
       if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(ED->getMembers(), true);
+    }
   }
 }
 

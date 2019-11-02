@@ -770,9 +770,6 @@ public:
       if (VD->isRecursiveValidation())
         continue;
 
-      // FIXME: This is used to compute isInvalid() below.
-      (void) VD->getInterfaceType();
-
       auto &PossiblyConflicting = DeclsByName[VD->getBaseName()];
 
       if (VD->isInvalid()) {
@@ -815,9 +812,6 @@ public:
         auto *OtherVD = *I;
         if (OtherVD->isRecursiveValidation())
           continue;
-
-        // FIXME: This is used to compute isInvalid() below.
-        (void) OtherVD->getInterfaceType();
 
         if (OtherVD->isInvalid())
           continue;

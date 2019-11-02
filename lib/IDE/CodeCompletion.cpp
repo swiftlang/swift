@@ -2431,8 +2431,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (!AFD || !AFD->getInterfaceType() ||
-        !AFD->getInterfaceType()->is<AnyFunctionType>()) {
+    if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
       // Probably, calling closure type expression.
       foundFunction(AFT);
       addPattern();

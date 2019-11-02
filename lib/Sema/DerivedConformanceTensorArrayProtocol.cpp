@@ -222,7 +222,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
@@ -253,7 +253,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
 // Synthesize the `_unpackTensorHandles(into:)` function declaration.
 static ValueDecl
 *deriveTensorArrayProtocol_unpackTensorHandles(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
@@ -327,8 +327,7 @@ deriveBodyTensorArrayProtocol_tensorHandleCount(AbstractFunctionDecl *funcDecl,
 static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
     DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type intType = C.getInt32Decl()->getDeclaredType();
@@ -408,8 +407,7 @@ deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl, void *) {
 static ValueDecl *deriveTensorArrayProtocol_typeList(
     DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
@@ -608,7 +606,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
 // Synthesize the `init(_owning:count:)` function declaration.
 static ValueDecl
 *deriveTensorArrayProtocol_init(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
 
@@ -655,15 +653,15 @@ ValueDecl *DerivedConformance::deriveTensorArrayProtocol(
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_unpackTensorHandles)
+  if (requirement->getBaseName() == Context.Id_unpackTensorHandles)
     return deriveTensorArrayProtocol_unpackTensorHandles(*this);
-  if (requirement->getBaseName() == TC.Context.Id_tensorHandleCount)
+  if (requirement->getBaseName() == Context.Id_tensorHandleCount)
     return deriveTensorArrayProtocol_tensorHandleCount(*this);
-  if (requirement->getBaseName() == TC.Context.Id_typeList)
+  if (requirement->getBaseName() == Context.Id_typeList)
     return deriveTensorArrayProtocol_typeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorArrayProtocol_init(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_tensor_array_protocol_requirement);
   return nullptr;
 }

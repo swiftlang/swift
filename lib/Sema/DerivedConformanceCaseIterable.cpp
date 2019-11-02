@@ -87,14 +87,11 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   if (!canDeriveConformance(Nominal))
     return nullptr;
 
-  ASTContext &C = TC.Context;
-
   // Build the necessary decl.
-  if (requirement->getBaseName() != C.Id_allCases) {
+  if (requirement->getBaseName() != Context.Id_allCases) {
     requirement->diagnose(diag::broken_case_iterable_requirement);
     return nullptr;
   }
-
 
   // Define the property.
   auto *returnTy = computeAllCasesType(Nominal);
@@ -102,7 +99,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) =
-      declareDerivedProperty(C.Id_allCases, returnTy, returnTy,
+      declareDerivedProperty(Context.Id_allCases, returnTy, returnTy,
                              /*isStatic=*/true, /*isFinal=*/true);
 
   // Define the getter.
@@ -123,11 +120,12 @@ Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
   if (!canDeriveConformance(Nominal))
     return nullptr;
 
-  if (assocType->getName() == TC.Context.Id_AllCases) {
+  if (assocType->getName() == Context.Id_AllCases) {
     return deriveCaseIterable_AllCases(*this);
   }
 
-  TC.diagnose(assocType->getLoc(), diag::broken_case_iterable_requirement);
+  Context.Diags.diagnose(assocType->getLoc(),
+                         diag::broken_case_iterable_requirement);
   return nullptr;
 }
 

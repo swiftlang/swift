@@ -421,7 +421,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
-  auto &ctx = decl->getASTContext();
   for (auto *genParam : genericSig->getGenericParams()) {
     auto *paramDecl = genParam->getDecl();
     if (paramDecl->getDepth() != fnGenericParamsDepth)
@@ -439,10 +438,8 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      ctx.Diags.diagnose(paramDecl->getLoc(),
-                         diag::unreferenced_generic_parameter,
-                         paramDecl->getNameStr());
-      decl->setInterfaceType(ErrorType::get(ctx));
+      paramDecl->diagnose(diag::unreferenced_generic_parameter,
+                          paramDecl->getNameStr());
       decl->setInvalid();
     }
   }

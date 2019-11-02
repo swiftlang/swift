@@ -791,7 +791,8 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
   // The final step for this constructor is to set up the superclass type,
   // without which we will not perform an matching. Early exits therefore imply
   // that there is no way we can match this declaration.
-  if (decl->isInvalid())
+  // FIXME: Break the cycle here.
+  if (decl->hasInterfaceType() && decl->isInvalid())
     return;
 
   auto *dc = decl->getDeclContext();

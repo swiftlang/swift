@@ -554,12 +554,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  // Caches whether a given declaration is "as specialized" as another.
-  llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
-                            /*isDynamicOverloadComparison*/ unsigned>,
-                 bool>
-      specializedOverloadComparisonCache;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
@@ -1115,7 +1109,7 @@ public:
       SubstOptions options = None);
 
   /// Diagnose if the class has no designated initializers.
-  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 
   ///
   /// Add any implicitly-defined constructors required for the given
@@ -1494,7 +1488,7 @@ public:
     return getUnopenedTypeOfReference(
         value, baseType, UseDC,
         [&](VarDecl *var) -> Type {
-          if (!var->getInterfaceType() || var->isInvalid())
+          if (var->isInvalid())
             return ErrorType::get(Context);
 
           return wantInterfaceType ? value->getInterfaceType()
@@ -1624,16 +1618,15 @@ public:
   /// \returns nullptr if the derivation failed, or the derived declaration
   ///          if it succeeded. If successful, the derived declaration is added
   ///          to TypeDecl's body.
-  ValueDecl *deriveProtocolRequirement(DeclContext *DC,
-                                       NominalTypeDecl *TypeDecl,
-                                       ValueDecl *Requirement);
+  static ValueDecl *deriveProtocolRequirement(DeclContext *DC,
+                                              NominalTypeDecl *TypeDecl,
+                                              ValueDecl *Requirement);
 
   /// Derive an implicit type witness for the given associated type in
   /// the conformance of the given nominal type to some known
   /// protocol.
-  Type deriveTypeWitness(DeclContext *DC,
-                         NominalTypeDecl *nominal,
-                         AssociatedTypeDecl *assocType);
+  static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
+                                AssociatedTypeDecl *assocType);
 
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
@@ -1729,9 +1722,8 @@ public:
   /// A declaration is more specialized than another declaration if its type
   /// is a subtype of the other declaration's type (ignoring the 'self'
   /// parameter of function declarations) and if
-  Comparison compareDeclarations(DeclContext *dc,
-                                 ValueDecl *decl1,
-                                 ValueDecl *decl2);
+  static Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
+                                        ValueDecl *decl2);
 
   /// Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
@@ -1756,13 +1748,14 @@ public:
   ///
   /// \returns null if the protocol is not available. This represents a
   /// problem with the Standard Library.
-  ProtocolDecl *getProtocol(SourceLoc loc, KnownProtocolKind kind);
+  static ProtocolDecl *getProtocol(ASTContext &ctx, SourceLoc loc,
+                                   KnownProtocolKind kind);
 
   /// Retrieve the literal protocol for the given expression.
   ///
   /// \returns the literal protocol, if known and available, or null if the
   /// expression does not have an associated literal protocol.
-  ProtocolDecl *getLiteralProtocol(Expr *expr);
+  static ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
   DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
 
@@ -1848,7 +1841,7 @@ public:
   /// is sufficient to safely conform to the requirement in the context
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
-  bool
+  static bool
   isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
                                    ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
@@ -1996,10 +1989,10 @@ public:
           [](const GenericTypeParamDecl *) { return Type(); });
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+  static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<Identifier> omitNeedlessWords(VarDecl *var);
+  static Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
   /// Calculate edit distance between declaration names.
   static unsigned getCallEditDistance(DeclName writtenName,
@@ -2026,7 +2019,8 @@ public:
 
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
-  DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  static DeclTypeCheckingSemantics
+  getDeclTypeCheckingSemantics(ValueDecl *decl);
 
   /// SWIFT_ENABLE_TENSORFLOW
   // Returns the function declaration corresponding to the given function name

@@ -5528,7 +5528,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                                     VarLoc, Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);
-    storage->setInvalid(true);
+    storage->setInvalid();
 
     Pattern *pattern =
       TypedPattern::createImplicit(Context, new (Context) NamedPattern(storage),
@@ -5538,7 +5538,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
                                               StaticSpelling,
                                               VarLoc, entry, CurDeclContext);
-    binding->setInvalid(true);
+    binding->setInvalid();
     storage->setParentPatternBinding(binding);
 
     Decls.push_back(binding);

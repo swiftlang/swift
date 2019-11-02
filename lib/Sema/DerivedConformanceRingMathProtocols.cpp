@@ -78,12 +78,12 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 // Get the effective memberwise initializer of the given nominal type, or create
 // it if it does not exist.
 static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    TypeChecker &TC, NominalTypeDecl *nominal) {
+    ASTContext &ctx, NominalTypeDecl *nominal) {
   auto &C = nominal->getASTContext();
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
   auto *initDecl = createMemberwiseImplicitConstructor(
-      TC, nominal);
+      ctx, nominal);
   nominal->addMember(initDecl);
   C.addSynthesizedDecl(initDecl);
   return initDecl;
@@ -220,7 +220,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                                      MathOperator op) {
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
 
   // Create parameter declaration with the given name and type.
@@ -391,7 +391,7 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 
 // Synthesize the static property declaration for `AdditiveArithmetic.zero`.
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   return deriveRingProperty(derived, C.Id_zero, /*isStatic*/ true,
                             {deriveBodyAdditiveArithmetic_zero, nullptr});
 }
@@ -400,7 +400,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
 // `PointwiseMultiplicative.one`.
 static ValueDecl *
 derivePointwiseMultiplicative_one(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   return deriveRingProperty(derived, C.Id_one, /*isStatic*/ true,
                             {deriveBodyPointwiseMultiplicative_one, nullptr});
 }
@@ -409,7 +409,7 @@ derivePointwiseMultiplicative_one(DerivedConformance &derived) {
 // `PointwiseMultiplicative.reciprocal`.
 static ValueDecl *
 derivePointwiseMultiplicative_reciprocal(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   return deriveRingProperty(
       derived, C.Id_reciprocal, /*isStatic*/ false,
       {deriveBodyPointwiseMultiplicative_reciprocal, nullptr});
@@ -421,14 +421,14 @@ DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("+"))
+  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
+  if (requirement->getBaseName() == Context.getIdentifier("+"))
     return deriveMathOperator(*this, Add);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("-"))
+  if (requirement->getBaseName() == Context.getIdentifier("-"))
     return deriveMathOperator(*this, Subtract);
-  if (requirement->getBaseName() == TC.Context.Id_zero)
+  if (requirement->getBaseName() == Context.Id_zero)
     return deriveAdditiveArithmetic_zero(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_additive_arithmetic_requirement);
   return nullptr;
 }
@@ -439,14 +439,14 @@ DerivedConformance::derivePointwiseMultiplicative(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
-  if (requirement->getBaseName() == TC.Context.getIdentifier(".*"))
+  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
+  if (requirement->getBaseName() == Context.getIdentifier(".*"))
     return deriveMathOperator(*this, Multiply);
-  if (requirement->getBaseName() == TC.Context.Id_one)
+  if (requirement->getBaseName() == Context.Id_one)
     return derivePointwiseMultiplicative_one(*this);
-  if (requirement->getBaseName() == TC.Context.Id_reciprocal)
+  if (requirement->getBaseName() == Context.Id_reciprocal)
     return derivePointwiseMultiplicative_reciprocal(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_pointwise_multiplicative_requirement);
   return nullptr;
 }

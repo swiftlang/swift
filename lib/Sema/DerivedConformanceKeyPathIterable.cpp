@@ -59,7 +59,7 @@ static ArraySliceType *computeAllKeyPathsType(NominalTypeDecl *nominal) {
 // module is not resilient and the `ValueDecl` is effectively public.
 // TODO: Dedupe with DerivedConformanceRawRepresentable.cpp.
 static void maybeMarkAsInlinable(DerivedConformance &derived, ValueDecl *decl) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
   if (!parentDC->getParentModule()->isResilient()) {
     auto access = decl->getFormalAccessScope(
@@ -120,7 +120,7 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
 static ValueDecl *
 deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   auto returnInterfaceTy = computeAllKeyPathsType(nominal);
   auto returnTy =
@@ -160,9 +160,9 @@ ValueDecl *DerivedConformance::deriveKeyPathIterable(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_allKeyPaths)
+  if (requirement->getBaseName() == Context.Id_allKeyPaths)
     return deriveKeyPathIterable_allKeyPaths(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;
 }
@@ -172,9 +172,9 @@ Type DerivedConformance::deriveKeyPathIterable(
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_AllKeyPaths)
+  if (requirement->getBaseName() == Context.Id_AllKeyPaths)
     return deriveKeyPathIterable_AllKeyPaths(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;
 }

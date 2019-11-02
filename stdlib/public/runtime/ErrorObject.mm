@@ -512,7 +512,8 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
   Class NSErrorClass = getNSErrorClass();
 
   // The object must be an NSError subclass.
-  if (![reinterpret_cast<id>(object) isKindOfClass: NSErrorClass])
+  if (isObjCTaggedPointerOrNull(object) ||
+      ![reinterpret_cast<id>(object) isKindOfClass: NSErrorClass])
     return false;
 
   id srcInstance = reinterpret_cast<id>(object);

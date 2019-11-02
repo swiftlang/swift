@@ -2875,7 +2875,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
 
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (elt->hasInterfaceType() && !elt->getInterfaceType()->hasError()) {
+    if (elt->hasInterfaceType() && !elt->isInvalid()) {
       // Walk to the params of the associated values.
       // (EnumMetaType) -> (AssocValues) -> Enum
       params = elt->getInterfaceType()->castTo<AnyFunctionType>()
@@ -2972,7 +2972,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   }, [&] { // Parameters
     printGenericDeclGenericParams(decl);
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (decl->hasInterfaceType() && !decl->getInterfaceType()->hasError()) {
+    if (decl->hasInterfaceType() && !decl->isInvalid()) {
       // Walk to the params of the subscript's indices.
       params = decl->getInterfaceType()->castTo<AnyFunctionType>()->getParams();
     }

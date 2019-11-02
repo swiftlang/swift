@@ -570,7 +570,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Referencing type(of:) and other decls with special type-checking
       // behavior as functions is not implemented. Maybe we could wrap up the
       // special-case behavior in a closure someday...
-      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+      if (TypeChecker::getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
                     DRE->getDecl()->getBaseName().getIdentifier());
@@ -2103,7 +2103,7 @@ public:
     
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
-    if (!VD->getInterfaceType() || VD->isInvalid()) {
+    if (VD->isInvalid()) {
       sawError = true;
       return false;
     }
@@ -3152,11 +3152,10 @@ class ObjCSelectorWalker : public ASTWalker {
 
     // Look for members with the given name.
     auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
-    auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
-                                  nominal->getDeclaredInterfaceType(),
-                                  lookupName,
-                                  (defaultMemberLookupOptions |
-                                   NameLookupFlags::KnownPrivate));
+    auto result = TypeChecker::lookupMember(
+        const_cast<DeclContext *>(DC), nominal->getDeclaredInterfaceType(),
+        lookupName,
+        (defaultMemberLookupOptions | NameLookupFlags::KnownPrivate));
 
     // If we didn't find multiple methods, there is no ambiguity.
     if (result.size() < 2) return false;
@@ -3793,8 +3792,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       ValueDecl * fnDecl = appendMethod.getDecl();
 
       // If things aren't set up right, just hope for the best.
-      if (!fnDecl || !fnDecl->getInterfaceType() ||
-           fnDecl->getInterfaceType()->hasError())
+      if (!fnDecl || fnDecl->isInvalid())
         return false;
 
       // If the decl expects an optional, that's fine.
@@ -4206,7 +4204,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->getInterfaceType() || afd->isInvalid() || isa<DestructorDecl>(afd))
+  if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -4286,7 +4284,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->getInterfaceType() || var->isInvalid())
+  if (var->isInvalid())
     return None;
 
   if (var->getName().empty())

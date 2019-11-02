@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#import "ClangSourceBufferImporter.h"
-#import "swift/Basic/SourceManager.h"
-#import "clang/Basic/SourceManager.h"
-#import "llvm/Support/MemoryBuffer.h"
+#include "ClangSourceBufferImporter.h"
+#include "swift/Basic/SourceManager.h"
+#include "clang/Basic/SourceManager.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 using namespace swift::importer;

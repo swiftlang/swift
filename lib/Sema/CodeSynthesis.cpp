@@ -282,9 +282,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 }
 
 ConstructorDecl *swift::createMemberwiseImplicitConstructor(
-    TypeChecker &tc, NominalTypeDecl *decl) {
+    ASTContext &ctx, NominalTypeDecl *decl) {
   return createImplicitConstructor(decl, ImplicitConstructorKind::Memberwise,
-                                   tc.Context);
+                                   ctx);
 }
 
 /// Create a stub body that emits a fatal error message.
