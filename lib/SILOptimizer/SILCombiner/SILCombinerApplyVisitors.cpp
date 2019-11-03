@@ -1335,6 +1335,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // Check if it is legal to perform the propagation.
   if (WMI->getConformance().isConcrete())
     return nullptr;
+
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
   if (!WMI->getLookupType()->isOpenedExistential())

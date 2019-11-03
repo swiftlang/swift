@@ -213,7 +213,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
             getAddressOfStackInit(instance, user, isOpenedValueCopied)) {
       openedVal = stackInitVal;
     }
-    
+
     // Handle:
     //   %4 = open_existential_ref
     //   %5 = alloc_stack

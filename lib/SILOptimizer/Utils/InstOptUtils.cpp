@@ -471,8 +471,9 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
   // No cast is required if types are the same.
   if (srcTy == destTy)
     return value;
-  
-  if (srcTy.isAddress() == destTy.isAddress()) return nullptr;
+
+  if (srcTy.isAddress() == destTy.isAddress())
+    return nullptr;
 
   if (srcTy.isAddress() && destTy.isAddress()) {
     // Cast between two addresses and that's it.
