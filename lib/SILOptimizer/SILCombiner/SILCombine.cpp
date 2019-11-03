@@ -144,7 +144,7 @@ public:
 
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
-  
+
   LLVM_DEBUG(llvm::dbgs() << "\n\nSILCOMBINE ITERATION #" << Iteration << " on "
                           << F.getName() << "\n");
 
@@ -152,41 +152,37 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   addReachableCodeToWorklist(&*F.begin());
 
   SILCombineCanonicalize scCanonicalize(Worklist);
-    
+
   // match test program:
-  ReturnInst * retVal;
-  
-  for (auto &block: F) {
-    auto matchedResult = match(block.begin(), block.end(),
-                               AnyRange(),
-                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
-                                  return bi->getBuiltinKind().hasValue() &&
-                                         bi->getBuiltinKind().getValue() == BuiltinValueKind::SAddOver;
-                               }),
-                               AnyRange(),
-                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
-                                 return bi->getBuiltinKind().hasValue() &&
-                                        bi->getBuiltinKind().getValue() == BuiltinValueKind::SSubOver;
-                               }),
-                               AnyRange(),
-                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
-                                 return bi->getBuiltinKind().hasValue() &&
-                                        bi->getBuiltinKind().getValue() == BuiltinValueKind::And;
-                               }),
-                               AnyRange(),
-                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
-                                 return bi->getBuiltinKind().hasValue() &&
-                                        bi->getBuiltinKind().getValue() == BuiltinValueKind::SSubOver;
-                               }),
-                               AnyRange(),
-                               make_info_block<ReturnInst, true>());
-    
+  ReturnInst *retVal;
+
+  for (auto &block : F) {
+    auto matchedResult = match(
+        block.begin(), block.end(), AnyRange(),
+        make_info_block<BuiltinInst, false>([](BuiltinInst *bi) {
+          return bi->getBuiltinKind().hasValue() &&
+                 bi->getBuiltinKind().getValue() == BuiltinValueKind::SAddOver;
+        }),
+        AnyRange(), make_info_block<BuiltinInst, false>([](BuiltinInst *bi) {
+          return bi->getBuiltinKind().hasValue() &&
+                 bi->getBuiltinKind().getValue() == BuiltinValueKind::SSubOver;
+        }),
+        AnyRange(), make_info_block<BuiltinInst, false>([](BuiltinInst *bi) {
+          return bi->getBuiltinKind().hasValue() &&
+                 bi->getBuiltinKind().getValue() == BuiltinValueKind::And;
+        }),
+        AnyRange(), make_info_block<BuiltinInst, false>([](BuiltinInst *bi) {
+          return bi->getBuiltinKind().hasValue() &&
+                 bi->getBuiltinKind().getValue() == BuiltinValueKind::SSubOver;
+        }),
+        AnyRange(), make_info_block<ReturnInst, true>());
+
     if (!matchedResult.hasValue())
       continue;
-    
+
     std::tie(retVal) = matchedResult.getValue();
   }
-  
+
   assert(retVal);
 
   // Process until we run out of items in our worklist.
