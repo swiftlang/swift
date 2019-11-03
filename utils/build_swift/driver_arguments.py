@@ -203,6 +203,7 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
+        args.test_swiftpm = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
@@ -556,6 +557,9 @@ def create_argument_parser():
 
     option(['-p', '--swiftpm'], store_true('build_swiftpm'),
            help='build swiftpm')
+
+    option(['--install-swiftpm'], toggle_true('install_swiftpm'),
+           help='install swiftpm')
 
     option(['--swiftsyntax'], store_true('build_swiftsyntax'),
            help='build swiftSyntax')
@@ -968,6 +972,8 @@ def create_argument_parser():
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
 
+    option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
+           help='skip testing swiftpm')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
            help='skip testing SwiftSyntax')
     option('--skip-test-indexstore-db', toggle_false('test_indexstoredb'),
