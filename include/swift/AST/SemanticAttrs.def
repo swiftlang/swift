@@ -9,14 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This macro is used to map the global definition name of a semantic
-// attribute to its raw value.
-//   NAME: the global name used in the compiler
-//   C_STR: the raw value used in swift
-//
-// SEMANTICS_ATTR(NAME, C_STR)
-//
+///
+/// \file
+/// This macro is used to map the global definition name of a semantic
+/// attribute to its raw value.
+///   NAME: the global name used in the compiler
+///   C_STR: the raw value used in swift
+///
+/// SEMANTICS_ATTR(NAME, C_STR)
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SEMANTICS_ATTR
