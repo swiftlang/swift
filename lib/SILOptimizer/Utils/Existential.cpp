@@ -19,6 +19,8 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
+#include <iostream>
+
 using namespace swift;
 
 /// Determine InitExistential from global_addr.
@@ -203,6 +205,8 @@ static SILValue getAddressOfStackInit(SILValue allocStackAddr,
 OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
   SILValue openedVal = use.get();
   SILInstruction *user = use.getUser();
+  openedVal->dump();
+  user->dump();
   if (auto *instance = dyn_cast<AllocStackInst>(openedVal)) {
     // Handle:
     //   %opened = open_existential_addr
@@ -212,6 +216,11 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     if (auto stackInitVal =
             getAddressOfStackInit(instance, user, isOpenedValueCopied)) {
       openedVal = stackInitVal;
+    }
+    
+    auto firstUse = *instance->getUses().begin();
+    if (auto *store = dyn_cast<StoreInst>(firstUse->getUser())) {
+      openedVal = store->getSrc();
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {

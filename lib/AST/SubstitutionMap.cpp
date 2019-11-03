@@ -33,6 +33,8 @@
 #include "swift/AST/Types.h"
 #include "llvm/Support/Debug.h"
 
+#include <iostream>
+
 using namespace swift;
 
 SubstitutionMap::Storage::Storage(
