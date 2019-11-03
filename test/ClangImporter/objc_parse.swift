@@ -184,8 +184,8 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{ambiguous subscript with base type 'NSMutableDictionary' and index type '_'}}
-  let q = dict[nil]  // expected-error {{ambiguous subscript}}
+  dict[nil] = a // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
+  let q = dict[nil]  // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
   _ = q
 }
 

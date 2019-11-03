@@ -414,3 +414,10 @@ func rdar_50512161() {
     foo(item: item) // expected-error {{generic parameter 'I' could not be inferred}}
   }
 }
+
+// SR-11609: Compiler crash on missing conformance for default param
+func test_sr_11609() {
+  func foo<T : Initable>(_ x: T = .init()) -> T { x } // expected-note {{where 'T' = 'String'}}
+  let _: String = foo()
+  // expected-error@-1 {{local function 'foo' requires that 'String' conform to 'Initable'}}
+}

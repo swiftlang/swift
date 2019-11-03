@@ -122,3 +122,23 @@ Casts.test("testConditionalBridgedCastFromSwiftToNSObjectDerivedClass") {
   }
   expectEqual(0, LifetimeTracked.instances)
 }
+
+protocol Q {}
+class K { }
+class D: Q {}
+typealias AnyQ = Q & AnyObject
+typealias KQ = K & Q
+
+Casts.test("testCastProtocolCompoWithAnyObjectToProtocolCompoTypeSuperclass") {
+  let shouldBeNil = (D() as AnyQ) as? KQ
+  expectNil(shouldBeNil)
+}
+
+protocol QAny: AnyObject {}
+typealias KQAny = K & QAny
+class F: QAny {}
+
+Casts.test("testCastProtocolWithAnyObjectToProtocolCompoTypeSuperclass") {
+  let shouldBeNil = (F() as QAny) as? KQAny
+  expectNil(shouldBeNil)
+}

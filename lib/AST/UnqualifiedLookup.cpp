@@ -20,12 +20,16 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -118,7 +122,7 @@ namespace {
                                  DeclContext *dynamicContext,
                                  DeclContext *staticContext);
       
-      void dump() const;
+      SWIFT_DEBUG_DUMP;
       
     private:
       SelfBounds findSelfBounds(DeclContext *dc);
@@ -167,7 +171,6 @@ namespace {
     DeclContext *const DC;
     ModuleDecl &M;
     const ASTContext &Ctx;
-    LazyResolver *const TypeResolver;
     const SourceLoc Loc;
     const SourceManager &SM;
     
@@ -202,14 +205,12 @@ namespace {
     // clang-format off
     UnqualifiedLookupFactory(DeclName Name,
                              DeclContext *const DC,
-                             LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
                              UnqualifiedLookup &lookupToBeCreated);
     
     UnqualifiedLookupFactory(DeclName Name,
                              DeclContext *const DC,
-                             LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
                              SmallVectorImpl<LookupResultEntry> &Results,
@@ -227,15 +228,15 @@ namespace {
           whereToLook, isCascadingUse.getValueOr(resolution)};
       }
     };
-    
-    bool useASTScopesForExperimentalLookup() const;
-    
+
+    bool useASTScopesForLookup() const;
+
     /// For testing, assume this lookup is enabled:
-    bool useASTScopesForExperimentalLookupIfEnabled() const;
-    
+    bool useASTScopesForLookupIfEnabled() const;
+
     void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
-    void experimentallyLookInASTScopes();
+    void lookInASTScopes();
 
     /// Can lookup stop searching for results, assuming hasn't looked for outer
     /// results yet?
@@ -368,15 +369,17 @@ namespace {
                                         bool isCascadingUse, NLOptions baseNLOptions);
     
   public:
-    void dump() const;
-    void dumpScopes() const;
+    SWIFT_DEBUG_DUMP;
+    SWIFT_DEBUG_DUMPER(dumpResults());
+    SWIFT_DEBUG_DUMPER(dumpScopes());
+
+    void printScopes(raw_ostream &OS) const;
     void print(raw_ostream &OS) const;
-    
-    void dumpResults() const;
-    
-    bool verifyEqualTo(const UnqualifiedLookupFactory &&, const char *thisLabel,
-                       const char *otherLabel) const;
-    
+    void printResults(raw_ostream &OS) const;
+
+    bool verifyEqualTo(const UnqualifiedLookupFactory &&, StringRef thisLabel,
+                       StringRef otherLabel) const;
+
     /// Legacy lookup is wrong here; we should NOT find this symbol.
     bool shouldDiffer() const;
     StringRef getSourceFileName() const;
@@ -433,11 +436,10 @@ public:
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclName Name,
                             DeclContext *const DC,
-                            LazyResolver *TypeResolver,
                             SourceLoc Loc,
                             Options options,
                             UnqualifiedLookup &lookupToBeCreated)
-: UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options,
+: UnqualifiedLookupFactory(Name, DC, Loc, options,
     lookupToBeCreated.Results,
     lookupToBeCreated.IndexOfFirstOuterResult)
 
@@ -446,7 +448,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclName Name,
                             DeclContext *const DC,
-                            LazyResolver *TypeResolver,
                             SourceLoc Loc,
                             Options options,
                             SmallVectorImpl<LookupResultEntry> &Results,
@@ -456,7 +457,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   DC(DC),
   M(*DC->getParentModule()),
   Ctx(M.getASTContext()),
-  TypeResolver(TypeResolver ? TypeResolver : Ctx.getLazyResolver()),
   Loc(Loc),
   SM(Ctx.SourceMgr),
   DebugClient(M.getDebugClient()),
@@ -476,37 +476,55 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 #ifndef NDEBUG
   ++lookupCounter;
-  stopForDebuggingIfStartingTargetLookup(false);
+  auto localCounter = lookupCounter;
+  (void)localCounter; // for debugging
 #endif
+  FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
+                                  DC->getParentSourceFile());
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
   ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUse{
       DC, initialIsCascadingUse};
-  const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
-  if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
+  const bool crosscheckUnqualifiedLookup =
+      Ctx.LangOpts.CrosscheckUnqualifiedLookup;
+  if (useASTScopesForLookup()) {
     static bool haveWarned = false;
     if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
-    experimentallyLookInASTScopes();
-    return;
+    lookInASTScopes();
+  } else {
+#ifndef NDEBUG
+    stopForDebuggingIfStartingTargetLookup(false);
+#endif
+
+    if (Name.isOperator())
+      lookupOperatorInDeclContexts(contextAndIsCascadingUse);
+    else
+      lookupNamesIntroducedBy(contextAndIsCascadingUse);
   }
 
-  if (Name.isOperator())
-    lookupOperatorInDeclContexts(contextAndIsCascadingUse);
-  else
-    lookupNamesIntroducedBy(contextAndIsCascadingUse);
-
-  if (compareToASTScopes && useASTScopesForExperimentalLookupIfEnabled()) {
+  if (crosscheckUnqualifiedLookup && useASTScopesForLookupIfEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
-    UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
-                                         results, indexOfFirstOuterResult);
-    scopeLookup.experimentallyLookInASTScopes();
-    assert(verifyEqualTo(std::move(scopeLookup), "UnqualifedLookup",
-                         "Scope lookup"));
+    UnqualifiedLookupFactory altLookup(Name, DC, Loc, options, results,
+                                       indexOfFirstOuterResult);
+    if (!useASTScopesForLookup())
+      altLookup.lookInASTScopes();
+    else if (Name.isOperator())
+      altLookup.lookupOperatorInDeclContexts(contextAndIsCascadingUse);
+    else
+      altLookup.lookupNamesIntroducedBy(contextAndIsCascadingUse);
+
+    const auto *ASTScopeLabel = "ASTScope lookup";
+    const auto *contextLabel = "context-bsed lookup";
+    const auto *mainLabel =
+        useASTScopesForLookup() ? ASTScopeLabel : contextLabel;
+    const auto *alternateLabel =
+        useASTScopesForLookup() ? contextLabel : ASTScopeLabel;
+    assert(verifyEqualTo(std::move(altLookup), mainLabel, alternateLabel));
   }
 }
 
@@ -531,16 +549,15 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
   recordCompletionOfAScope();
 }
 
-bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
-  return Ctx.LangOpts.EnableASTScopeLookup &&
-         useASTScopesForExperimentalLookupIfEnabled();
+bool UnqualifiedLookupFactory::useASTScopesForLookup() const {
+  return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
 }
 
-bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookupIfEnabled()
-    const {
-  return Loc.isValid() && DC->getParentSourceFile() &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::SIL;
+bool UnqualifiedLookupFactory::useASTScopesForLookupIfEnabled() const {
+  if (!Loc.isValid())
+    return false;
+  const auto *const SF = DC->getParentSourceFile();
+  return SF && SF->isSuitableForASTScopes();
 }
 
 #pragma mark context-based lookup definitions
@@ -666,7 +683,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
   const bool isCascadingUse =
       AFD->isCascadingContextForLookup(false) &&
       (isCascadingUseArg.getValueOr(
-          Loc.isInvalid() || !AFD->getBody() ||
+          Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
           !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)));
 
   if (AFD->getDeclContext()->isTypeContext())
@@ -769,7 +786,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMiscContext(
   assert(isa<TopLevelCodeDecl>(dc) ||
          isa<Initializer>(dc) ||
          isa<TypeAliasDecl>(dc) ||
-         isa<SubscriptDecl>(dc));
+         isa<SubscriptDecl>(dc) ||
+         isa<EnumElementDecl>(dc));
   finishLookingInContext(
     AddGenericParameters::Yes,
     dc,
@@ -817,7 +835,9 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
   // FIXME: when we can parse and typecheck the function body partially
   // for code completion, AFD->getBody() check can be removed.
 
-  if (Loc.isInvalid() || !AFD->getBody()) {
+  if (Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
+      !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc) ||
+      !AFD->getBody()) {
     return;
   }
 
@@ -966,25 +986,16 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 }
 
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
-  // Add private imports to the extra search list.
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(dc)) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    FU->getImportedModules(extraImports, importFilter);
-  }
-
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, TypeResolver, dc, extraImports);
+  lookupInModule(dc, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+                 resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
-    removeShadowedDecls(CurModuleResults, &M);
+    removeShadowedDecls(CurModuleResults, dc);
   }
 
   for (auto VD : CurModuleResults) {
@@ -1025,17 +1036,14 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
-    forAllVisibleModules(
-        dc, [&](const ModuleDecl::ImportedModule &import) -> bool {
-          if (import.second == desiredModule) {
-            Results.push_back(LookupResultEntry(import.second));
+    // Make sure the desired module is actually visible from the current
+    // context.
+    if (Ctx.getImportCache().isImportedBy(desiredModule, dc)) {
+      Results.push_back(LookupResultEntry(desiredModule));
 #ifndef NDEBUG
-            addedResult(Results.back());
+      addedResult(Results.back());
 #endif
-            return false;
-          }
-          return true;
-        });
+    }
   }
 }
 
@@ -1108,7 +1116,7 @@ UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
 
 #pragma mark ASTScopeImpl support
 
-void UnqualifiedLookupFactory::experimentallyLookInASTScopes() {
+void UnqualifiedLookupFactory::lookInASTScopes() {
 
   ASTScopeDeclConsumerForUnqualifiedLookup consumer(*this);
 
@@ -1152,7 +1160,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     // In order to preserve the behavior of the existing context-based lookup,
     // which finds all results for non-local variables at the top level instead
     // of stopping at the first one, ignore results at the top level that are
-    // not local variables. The caller \c experimentallyLookInASTScopes will
+    // not local variables. The caller \c lookInASTScopes will
     // then do the appropriate work when the scope lookup fails. In
     // FindLocalVal::visitBraceStmt, it sees PatternBindingDecls, not VarDecls,
     // so a VarDecl at top level would not be found by the context-based lookup.
@@ -1204,12 +1212,16 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
 // clang-format off
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
                                      DeclContext *const DC,
-                                     LazyResolver *TypeResolver,
                                      SourceLoc Loc,
                                      Options options)
     // clang-format on
     : IndexOfFirstOuterResult(0) {
-  UnqualifiedLookupFactory factory(Name, DC, TypeResolver, Loc, options, *this);
+
+  auto *stats = DC->getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumUnqualifiedLookup++;
+
+  UnqualifiedLookupFactory factory(Name, DC, Loc, options, *this);
   factory.performUnqualifiedLookup();
 }
 
@@ -1236,16 +1248,17 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
   llvm::errs() << "\n";
 }
 
-void UnqualifiedLookupFactory::dumpScopes() const {
-  llvm::errs() << "\n\nScopes:\n";
-  DC->getParentSourceFile()->getScope().print(llvm::errs());
-  llvm::errs() << "\n";
+void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
+void UnqualifiedLookupFactory::dumpScopes() const { printScopes(llvm::errs()); }
+void UnqualifiedLookupFactory::dumpResults() const { printResults(llvm::errs()); }
+
+void UnqualifiedLookupFactory::printScopes(raw_ostream &out) const {
+  out << "\n\nScopes:\n";
+  DC->getParentSourceFile()->getScope().print(out);
+  out << "\n";
 }
 
-void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
-
-void UnqualifiedLookupFactory::dumpResults() const {
-  auto &out = llvm::errs();
+void UnqualifiedLookupFactory::printResults(raw_ostream &out) const {
   for (auto i : indices(Results)) {
     if (i == resultsSizeBeforeLocalsPass)
       out << "============== next pass ============\n";
@@ -1281,45 +1294,40 @@ StringRef UnqualifiedLookupFactory::getSourceFileName() const {
   return DC->getParentSourceFile()->getFilename();
 }
 
-static void writeFirstLine(const UnqualifiedLookupFactory &ul, StringRef s) {
+static void writeFirstLine(const UnqualifiedLookupFactory &ul, llvm::Twine s) {
   std::string line =
       std::string("In file: ") + ul.getSourceFileName().str() + ", " + s.str();
   writeLine(line);
 }
 
 static void writeInconsistent(const UnqualifiedLookupFactory &me,
-                              const char *thisLabel,
+                              StringRef thisLabel,
                               const UnqualifiedLookupFactory &other,
-                              const char *otherLabel, StringRef s) {
+                              StringRef otherLabel, llvm::Twine s) {
   writeFirstLine(me, s);
-  other.dump();
+  other.print(llvm::errs());
   llvm::errs() << "\n" << thisLabel << " Results:\n";
-  me.dumpResults();
+  me.printResults(llvm::errs());
   llvm::errs() << "\n" << otherLabel << " Results:\n";
-  other.dumpResults();
-  me.dumpScopes();
+  other.printResults(llvm::errs());
+  me.printScopes(llvm::errs());
 }
 
 #pragma mark comparing results
 
 bool UnqualifiedLookupFactory::verifyEqualTo(
-    const UnqualifiedLookupFactory &&other, const char *thisLabel,
-    const char *otherLabel) const {
+    const UnqualifiedLookupFactory &&other, const StringRef thisLabel,
+    StringRef otherLabel) const {
   if (shouldDiffer()) {
      return true;
   }
-  auto writeErr = [&](StringRef s) {
+  auto writeErr = [&](llvm::Twine s) {
     writeInconsistent(*this, thisLabel, other, otherLabel, s);
   };
   if (Results.size() != other.Results.size()) {
-    const bool tooMany = Results.size() < other.Results.size();
-    writeErr(std::string(tooMany ? "Found too many: " : "Found too few: ") +
-             std::to_string(Results.size()) + " vs " +
-             std::to_string(other.Results.size()));
-    if (tooMany)
-      assert(false && "ASTScopeImpl found too many");
-    else
-      assert(false && "ASTScopeImpl found too few");
+    writeErr(thisLabel + " found " + std::to_string(Results.size()) + " but " +
+             otherLabel + " found " + std::to_string(other.Results.size()));
+    assert(false && "mismatch in number of results");
   }
   for (size_t i : indices(Results)) {
     const auto &e = Results[i];
@@ -1334,7 +1342,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
         llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
-        assert(false && "ASTScopeImpl found different Decl");
+        assert(false && "other lookup found different Decl");
       }
     }
     if (e.getDeclContext() != oe.getDeclContext()) {
@@ -1349,7 +1357,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
              + std::to_string(IndexOfFirstOuterResult)
              + std::string( ", is: ")
              + std::to_string(other.IndexOfFirstOuterResult));
-    assert(false && "ASTScopeImpl IndexOfFirstOuterResult differs");
+    assert(false && "other lookup IndexOfFirstOuterResult differs");
   }
   if (recordedSF != other.recordedSF) {
     writeErr(std::string("recordedSF differs: shouldBe: ") +
@@ -1358,13 +1366,13 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
              std::string(" is: ") +
              (other.recordedSF ? other.recordedSF->getFilename().str()
                                : std::string("<no name>")));
-    assert(false && "ASTScopeImpl recordedSF differs");
+    assert(false && "other lookup recordedSF differs");
   }
   if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
     writeErr(std::string("recordedIsCascadingUse differs: shouldBe: ") +
              std::to_string(recordedIsCascadingUse) + std::string(" is: ") +
              std::to_string(other.recordedIsCascadingUse));
-    assert(false && "ASTScopeImpl recordedIsCascadingUse differs");
+    assert(false && "other lookup recordedIsCascadingUse differs");
   }
   return true;
 }

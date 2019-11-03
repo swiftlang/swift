@@ -332,6 +332,17 @@ public:
     return completeList.getValue();
   }
 
+  Optional<ArrayRef<SILInstruction *>>
+  getPartiallyPostDomReleaseSet(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
+      return None;
+    auto partialList = iter->second.getPartiallyPostDomReleases();
+    if (!partialList)
+      return None;
+    return partialList;
+  }
+
   ArrayRef<SILInstruction *> getReleasesForArgument(SILValue value) const {
     auto *arg = dyn_cast<SILArgument>(value);
     if (!arg)

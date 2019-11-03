@@ -14,6 +14,8 @@ class X {
     }
     set {}
   }
+
+  @objc func hasDefaultParam(_ x: Int = 0) {}
 }
 
 @objc protocol P {
@@ -356,3 +358,13 @@ func getIUOPropertyDynamically(x: AnyObject) -> Any {
   return x.iuoProperty
 }
 
+// SR-11648
+// CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup24testAnyObjectWithDefaultyyyXlF
+func testAnyObjectWithDefault(_ x: AnyObject) {
+  // CHECK: function_ref default argument 0 of X.hasDefaultParam(_:)
+  // CHECK: [[DEFGEN:%[0-9]+]] = function_ref @$s14dynamic_lookup1XC15hasDefaultParamyySiFfA_ : $@convention(thin) () -> Int
+  // CHECK: [[DEFARG:%[0-9]+]] = apply %4() : $@convention(thin) () -> Int
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENEDX:%[0-9]+]] : $@opened("{{.*}}") AnyObject, #X.hasDefaultParam!1.foreign : (X) -> (Int) -> (), $@convention(objc_method) (Int, @opened("{{.*}}") AnyObject) -> ()
+  // CHECK: apply [[METHOD]]([[DEFARG]], [[OPENEDX]])
+  x.hasDefaultParam()
+}

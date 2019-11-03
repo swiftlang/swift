@@ -91,6 +91,9 @@ if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
 if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
     config.available_features.add('runtime_function_counters')
 
+if "@SWIFT_BUILT_STANDALONE@" == "TRUE":
+    config.available_features.add('standalone_build')
+
 if "@CMAKE_GENERATOR@" == "Xcode":
     xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
                                  'bin')

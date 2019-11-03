@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -109,8 +110,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key, 0);
+      return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -347,7 +347,7 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 
   if (auto *Undef = dyn_cast<SILUndef>(Val)) {
     // The first two IDs are reserved for SILUndef.
-    if (Undef->getOwnershipKind() == ValueOwnershipKind::Any)
+    if (Undef->getOwnershipKind() == ValueOwnershipKind::None)
       return 0;
 
     assert(Undef->getOwnershipKind() == ValueOwnershipKind::Owned);
@@ -391,9 +391,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // If we have a body, we might have a generic environment.
-  GenericEnvironmentID genericEnvID = 0;
+  GenericSignatureID genericSigID = 0;
   if (!NoBody)
-    genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
+    if (auto *genericEnv = F.getGenericEnvironment())
+      genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
   DeclID clangNodeOwnerID;
   if (F.hasClangNode())
@@ -409,6 +410,14 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+
+  Optional<llvm::VersionTuple> available;
+  auto availability = F.getAvailabilityForLinkage();
+  if (!availability.isAlwaysAvailable()) {
+    available = availability.getOSVersion().getLowerEndpoint();
+  }
+  ENCODE_VER_TUPLE(available, available)
+
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
@@ -416,19 +425,21 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(),
+      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
+      (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
-      FnID, replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      FnID, replacedFunctionID, genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-    SILSpecializeAttrLayout::emitRecord(Out, ScratchRecord, specAttrAbbrCode,
-                                        (unsigned)SA->isExported(),
-                                        (unsigned)SA->getSpecializationKind());
-    S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
+    SILSpecializeAttrLayout::emitRecord(
+        Out, ScratchRecord, specAttrAbbrCode,
+        (unsigned)SA->isExported(),
+        (unsigned)SA->getSpecializationKind(),
+        S.addGenericSignatureRef(SA->getSpecializedSignature()));
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1223,13 +1234,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst:
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::Name##ReleaseInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::Name##ReleaseInst:                                  \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")

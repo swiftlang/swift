@@ -13,9 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 #define SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 
+#include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -207,7 +207,7 @@ public:
   }
 
   DeclBaseName getLastName() const {
-    for (auto &piece : reversed(path)) {
+    for (auto &piece : llvm::reverse(path)) {
       DeclBaseName result = piece.getAsBaseName();
       if (!result.empty())
         return result;

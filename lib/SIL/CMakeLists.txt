@@ -31,6 +31,7 @@ add_swift_host_library(swiftSIL STATIC
   SILGlobalVariable.cpp
   SILInstruction.cpp
   SILInstructions.cpp
+  SILInstructionWorklist.cpp
   SILLocation.cpp
   SILModule.cpp
   SILFunctionBuilder.cpp

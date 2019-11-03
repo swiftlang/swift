@@ -73,7 +73,7 @@ public:
 
     for (auto *Param: *Parent->getParameters()) {
       if (!--NextIndex) {
-        return findChild(Param->getTypeLoc());
+        return findChild(Param->getTypeRepr());
       }
     }
     llvm_unreachable("child index out of bounds");
@@ -291,7 +291,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto addDiffItems = [&](ValueDecl *VD) {
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
-      if (swift::ide::printDeclUSR(VD, OS))
+      if (swift::ide::printValueDeclUSR(VD, OS))
         return;
       auto Items = DiffStore.getDiffItems(Buffer.str());
       results.insert(results.end(), Items.begin(), Items.end());
@@ -1384,7 +1384,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto *OD = AFD->getOverriddenDecl();
     llvm::SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
-    if (swift::ide::printDeclUSR(OD, OS))
+    if (swift::ide::printValueDeclUSR(OD, OS))
       return SourceLoc();
     return OverridingRemoveNames.find(OS.str()) == OverridingRemoveNames.end() ?
       SourceLoc() : OverrideLoc;
@@ -1406,7 +1406,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           llvm::SmallString<64> Buffer;
           llvm::raw_svector_ostream OS(Buffer);
           auto *RD = DSC->getFn()->getReferencedDecl().getDecl();
-          if (swift::ide::printDeclUSR(RD, OS))
+          if (swift::ide::printValueDeclUSR(RD, OS))
             return false;
           return USRs.find(OS.str()) != USRs.end();
         }

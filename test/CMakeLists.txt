@@ -87,7 +87,7 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps ${deps_binaries})
   else()
     foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}")
+      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}${CMAKE_EXECUTABLE_SUFFIX}")
     endforeach()
   endif()
 
@@ -205,7 +205,7 @@ foreach(SDK ${SWIFT_SDKS})
 
     # NOTE create a stub BlocksRuntime library that can be used for the
     # reflection tests
-    file(WRITE ${test_bin_dir}/BlocksRuntime.c
+    file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
       "void
 #if defined(_WIN32)
 __declspec(dllexport)
@@ -220,7 +220,7 @@ _Block_release(void) { }\n")
       ARCHITECTURE ${ARCH}
       SDK ${SDK}
       INSTALL_IN_COMPONENT dev
-      ${test_bin_dir}/BlocksRuntime.c)
+      ${test_bin_dir}/Inputs/BlocksRuntime.c)
     set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
       LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}

@@ -19,6 +19,7 @@
 #define SWIFT_MIGRATOR_ASTMIGRATORPASS_H
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Migrator/EditorAdapter.h"
 
 namespace swift {

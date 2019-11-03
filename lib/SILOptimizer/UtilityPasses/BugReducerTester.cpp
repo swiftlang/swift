@@ -88,7 +88,9 @@ class BugReducerTester : public SILFunctionTransform {
                                           false /*noescape*/),
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
         ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(),
-        ResultInfoArray, None, getFunction()->getModule().getASTContext());
+        ResultInfoArray, None,
+        SubstitutionMap(), false,
+        getFunction()->getModule().getASTContext());
 
     SILOptFunctionBuilder FunctionBuilder(*this);
     SILFunction *F = FunctionBuilder.getOrCreateSharedFunction(

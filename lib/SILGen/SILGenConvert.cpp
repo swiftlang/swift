@@ -498,7 +498,7 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
   auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
 
-  auto *genericSig = converter->getGenericSignature();
+  auto genericSig = converter->getGenericSignature();
   auto subMap =
     SubstitutionMap::combineSubstitutionMaps(firstSubMap,
                                              secondSubMap,
@@ -641,8 +641,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is known to conform to _BridgedStoredNSError,
     // call the _nsError witness getter to extract the NSError directly,
     // then just erase the NSError.
-    if (auto storedNSErrorConformance =
-          SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType)) {
+    auto storedNSErrorConformance =
+        SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
+    if (storedNSErrorConformance) {
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(existentialTL.getLoweredType());
 
@@ -650,9 +651,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
-      if (storedNSErrorConformance->isConcrete()) {
+      if (storedNSErrorConformance.isConcrete()) {
         if (auto normal = dyn_cast<NormalProtocolConformance>(
-                                    storedNSErrorConformance->getConcrete())) {
+                storedNSErrorConformance.getConcrete())) {
           if (auto witnessVar = normal->getWitness(nsErrorVar)) {
             nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
             nsErrorVarSubstitutions = witnessVar.getSubstitutions();
@@ -763,7 +764,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   }
 
   switch (existentialTL.getLoweredType().getObjectType()
-            .getPreferredExistentialRepresentation(SGM.M, concreteFormalType)) {
+            .getPreferredExistentialRepresentation(concreteFormalType)) {
   case ExistentialRepresentation::None:
     llvm_unreachable("not an existential type");
   case ExistentialRepresentation::Metatype: {
@@ -932,7 +933,7 @@ SILGenFunction::emitOpenExistential(
   assert(isInFormalEvaluationScope());
 
   SILType existentialType = existentialValue.getType();
-  switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
+  switch (existentialType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on

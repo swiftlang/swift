@@ -15,6 +15,7 @@
 
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -87,7 +88,7 @@ public:
     return None;
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace swift

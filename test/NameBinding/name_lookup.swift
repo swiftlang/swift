@@ -13,7 +13,7 @@ class ThisBase1 {
   }
 
   func baseFunc0() {}
-  func baseFunc1(_ a: Int) {} // expected-note 2 {{found this candidate}}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -223,14 +223,11 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0() // expected-error {{instance member 'baseFunc0' cannot be used on type 'ThisDerived1'}}
-    self.baseFunc0(ThisBase1())() // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
-    
+    self.baseFunc0(ThisBase1())() // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
+
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{instance member 'baseFunc1' cannot be used on type 'ThisDerived1'}}
-    // TODO(diagnostics): Constraint system is not currently set up to handle this case because overload choice
-    // would have a type of `(A) -> (Int) -> Void` which then gets fixed up to be `(B) -> (Int) -> Void` when
-    // the choice is attempted.
-    self.baseFunc1(ThisBase1())(42) // expected-error {{ambiguous reference to member 'baseFunc1'}}
+    self.baseFunc1(ThisBase1())(42) // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
     self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
@@ -239,7 +236,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisDerived1'}}
-    self.baseExtStaticVar = 42
+    self.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticFunc0()
 
@@ -264,7 +261,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.derivedExtProp = 42 // expected-error {{member 'derivedExtProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtFunc0() // expected-error {{instance member 'derivedExtFunc0' cannot be used on type 'ThisDerived1'}}
-    self.derivedExtStaticVar = 42
+    self.derivedExtStaticVar = 42 // expected-error {{instance member 'derivedExtStaticVar' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticProp = 42 // expected-error {{member 'derivedExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticFunc0()
 
@@ -305,7 +302,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisBase1'}}
-    super.baseExtStaticVar = 42 
+    super.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()
 
@@ -485,7 +482,7 @@ struct MyStruct {
 // <rdar://problem/19935319> QoI: poor diagnostic initializing a variable with a non-class func
 class Test19935319 {
   let i = getFoo()  // expected-error {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
-  
+
   func getFoo() -> Int {}
 }
 
@@ -619,19 +616,21 @@ struct PatternBindingWithTwoVars1 { var x = 3, y = x }
 // expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
-// expected-error@-1 {{type 'PatternBindingWithTwoVars2' has no member 'y'}}
-// expected-note@-2 {{did you mean 'x'?}}
-// expected-note@-3 {{did you mean 'y'?}}
+// expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
 
-// This one should be accepted, but for now PatternBindingDecl validation
-// circularity detection is not fine grained enough.
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
-// expected-note@-2 {{did you mean 'x'?}}
-// expected-note@-3 {{did you mean 'y'?}}
+// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-2 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-3 {{circular reference}}
+// expected-note@-4 {{through reference here}}
+// expected-note@-5 {{through reference here}}
+// expected-note@-6 {{through reference here}}
+// expected-note@-7 {{through reference here}}
+// expected-note@-8 {{through reference here}}
+
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {
-  let closure1 = { closure2() } // expected-error {{let 'closure1' references itself}}
-  let closure2 = { closure1() }
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
 }

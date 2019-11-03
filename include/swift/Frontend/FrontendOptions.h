@@ -72,9 +72,12 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to look in when loading a parseable interface file, to see if a
+  /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
+
+  /// For these modules, we should prefer using Swift interface when importing them.
+  std::vector<std::string> PreferInterfaceForModules;
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
@@ -153,6 +156,9 @@ public:
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
 
+  /// Ignore .swiftsourceinfo file when trying to get source locations from module imported decls.
+  bool IgnoreSwiftSourceInfo = false;
+
   /// When true, emitted module files will always contain options for the
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
@@ -176,6 +182,8 @@ public:
   ///
   /// \sa swift::SharedTimer
   bool DebugTimeCompilation = false;
+
+  bool SkipNonInlinableFunctionBodies = false;
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
@@ -336,6 +344,7 @@ private:
 
 public:
   static bool doesActionGenerateSIL(ActionType);
+  static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);

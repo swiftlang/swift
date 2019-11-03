@@ -12,13 +12,13 @@
 
 #define DEBUG_TYPE "sil-escape"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/DebugUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -1376,10 +1376,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->getNode(cast<SingleValueInstruction>(I), this);
       return;
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-    case SILInstructionKind::Name##RetainInst: \
-    case SILInstructionKind::StrongRetain##Name##Inst: \
-    case SILInstructionKind::Copy##Name##ValueInst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::StrongRetainInst:

@@ -52,8 +52,9 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
             ? SILSpecializeAttr::SpecializationKind::Full
             : SILSpecializeAttr::SpecializationKind::Partial;
-    F->addSpecializeAttr(SILSpecializeAttr::create(M, SA->getRequirements(),
-                                                   SA->isExported(), kind));
+    F->addSpecializeAttr(
+        SILSpecializeAttr::create(M, SA->getSpecializedSgnature(),
+                                  SA->isExported(), kind));
   }
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
@@ -161,8 +162,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(/*forModule=*/nullptr, availCtx))
-      F->setWeakLinked();
+    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();

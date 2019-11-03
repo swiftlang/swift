@@ -214,6 +214,11 @@ debugging press <CTRL>-C on the LLDB prompt.
 Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
+swift/Basic/Debug.h includes macros to help contributors declare these methods
+with the proper attributes to ensure they'll be available in the debugger. In
+particular, if you see ``SWIFT_DEBUG_DUMP`` in a class declaration, that class
+has a ``dump()`` method you can call.
+
 Debugging and Profiling on SIL level
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -51,3 +51,54 @@ func testFunc() {
   let f = \S.i
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
+
+
+// SR-11234
+public extension Array {
+    func sorted<C: Comparable, K: KeyPath<Element, C>>(by keyPath: K) -> Array<Element> {
+        let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
+        return sortedA
+    }
+}
+
+// rdar://problem/54322807
+struct X<T> {
+  init(foo: KeyPath<T, Bool>) { }
+  init(foo: KeyPath<T, Bool?>) { }
+}
+
+struct Wibble {
+  var boolProperty = false
+}
+
+struct Bar {
+  var optWibble: Wibble? = nil
+}
+
+class Foo {
+  var optBar: Bar? = nil
+}
+
+func testFoo<T: Foo>(_: T) {
+  let _: X<T> = .init(foo: \.optBar!.optWibble?.boolProperty)
+}
+
+// rdar://problem/56131416
+
+enum Rdar56131416 {
+  struct Pass<T> {}
+  static func f<T, U>(_ value: T, _ prop: KeyPath<T, U>) -> Pass<U> { fatalError() }
+
+  struct Fail<T> {}
+  static func f<T, U>(_ value: T, _ transform: (T) -> U) -> Fail<U> { fatalError() }
+  
+  static func takesCorrectType(_: Pass<UInt>) {}
+}
+
+func rdar56131416() {
+  // This call should not be ambiguous.
+  let result = Rdar56131416.f(1, \.magnitude) // no-error
+  
+  // This type should be selected correctly.
+  Rdar56131416.takesCorrectType(result)
+}

@@ -278,6 +278,18 @@ internal class __SwiftNativeNSArray {
 
 @_fixed_layout
 @usableFromInline
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSMutableArrayBase)
+internal class _SwiftNativeNSMutableArray {
+  @inlinable
+  @nonobjc
+  internal init() {}
+//  @objc public init(coder: AnyObject) {}
+  @inlinable
+  deinit {}
+}
+
+@_fixed_layout
+@usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSDictionaryBase)
 internal class __SwiftNativeNSDictionary {
   @nonobjc

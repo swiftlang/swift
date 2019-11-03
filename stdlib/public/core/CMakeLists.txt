@@ -184,6 +184,7 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
+  BuiltinMath.swift.gyb
   Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
@@ -194,6 +195,13 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )
+
+# Compile differentiable programming sources only if enabled.
+set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES)
+if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+  # TODO: Add `_Differentiable` protocol.
+  message(STATUS "Differentiable programming standard library additions enabled.")
+endif()
 
 # The complete list of sources in the core standard library.  Includes
 # all the essential sources listed above.
@@ -213,12 +221,12 @@ set(SWIFTLIB_SOURCES
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+  ${SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES}
   )
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
   ExistentialCollection.swift.gyb
-  MathFunctions.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
@@ -229,8 +237,6 @@ set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
   list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_framework_depends Foundation)
-  list(APPEND swift_core_framework_depends CoreFoundation)
   list(APPEND swift_core_private_link_libraries icucore)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker
@@ -287,8 +293,6 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
-
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

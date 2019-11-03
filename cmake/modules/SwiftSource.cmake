@@ -229,6 +229,7 @@ function(_compile_swift_files
   # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-enable-library-evolution")
+    list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)
@@ -309,9 +310,13 @@ function(_compile_swift_files
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
+      set(specific_module_project_dir "${specific_module_dir}/Project")
+      set(source_info_file "${specific_module_project_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
     else()
       set(specific_module_dir)
+      set(specific_module_project_dir)
+      set(source_info_file "${module_base}.swiftsourceinfo")
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -322,10 +327,15 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
+    if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
       list(APPEND swift_module_flags
-           "-emit-parseable-module-interface-path" "${interface_file}")
+           "-emit-module-interface-path" "${interface_file}")
+    endif()
+
+    if (NOT SWIFTFILE_IS_STDLIB_CORE)
+      list(APPEND swift_module_flags
+           "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
@@ -348,7 +358,8 @@ function(_compile_swift_files
     swift_install_in_component(DIRECTORY "${specific_module_dir}"
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                               OPTIONAL)
+                               OPTIONAL
+                               PATTERN "Project" EXCLUDE)
   else()
     swift_install_in_component(FILES ${module_outputs}
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
@@ -489,9 +500,11 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
+          ${specific_module_project_dir}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
+          "-emit-module-source-info-path" "${source_info_file}"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}

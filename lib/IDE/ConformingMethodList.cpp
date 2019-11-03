@@ -164,7 +164,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   } LocalConsumer(CurDeclContext, T, expectedTypes, result);
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
-                           CurDeclContext->getASTContext().getLazyResolver(),
                            /*includeInstanceMembers=*/false);
 }
 

@@ -19,14 +19,15 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Availability.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
@@ -40,7 +41,9 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class AvailabilitySpec;
+  class IdentTypeRepr;
   class Type;
+  class TypeRepr;
   class ValueDecl;
   class Decl;
   class DeclRefExpr;
@@ -538,9 +541,7 @@ public:
   /// leaf node, etc.
   llvm::DenseMap<Expr *, unsigned> getPreorderIndexMap();
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
@@ -926,10 +927,12 @@ public:
   void setBody(BraceStmt * b) { Body = b; }
 
   SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
-
-  SourceRange getSourceRange() const {
-    return SubExpr ? SubExpr->getSourceRange() : SourceRange();
+  
+  SourceLoc getStartLoc() const {
+    return SubExpr ? SubExpr->getStartLoc() : SourceLoc();
   }
+
+  SourceLoc getEndLoc() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
@@ -1027,6 +1030,8 @@ public:
     // token, so the range should be (Start == End).
     return Loc;
   }
+  
+  /// Could also be computed by relexing.
   SourceLoc getTrailingQuoteLoc() const {
     return TrailingQuoteLoc;
   }
@@ -3443,7 +3448,7 @@ public:
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the parameters of this closure.
@@ -4656,7 +4661,8 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
+    auto SrcEnd = Src->getEndLoc();
+    return (SrcEnd.isValid() ? SrcEnd : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.

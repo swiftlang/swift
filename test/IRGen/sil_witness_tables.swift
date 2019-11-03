@@ -43,7 +43,7 @@ struct Conformer: Q, QQ {
 // CHECK: ]
 // CHECK: [[CONFORMER_P_WITNESS_TABLE]] = hidden global [5 x i8*] [
 // CHECK:   @"associated conformance 18sil_witness_tables9ConformerVAA1PAA5AssocAaDP_AA1A"
-// CHECK:   "symbolic 18sil_witness_tables14AssocConformerV"
+// CHECK:   "symbolic{{.*}}18sil_witness_tables14AssocConformerV"
 // CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @"$s18sil_witness_tables9ConformerVAA1PA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW" to i8*),
 // CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @"$s18sil_witness_tables9ConformerVAA1PA2aDP14instanceMethod{{[_0-9a-zA-Z]*}}FTW" to i8*)
 // CHECK: ]

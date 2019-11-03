@@ -92,15 +92,18 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  Type getType(Expr *expr) const;
-  Type getType(const TypeLoc &loc) const;
+  Type getType(Expr *expr, bool wantRValue = true) const;
+  Type getType(const TypeLoc &loc, bool wantRValue = true) const;
 
   /// Resolve type variables present in the raw type, if any.
-  Type resolveType(Type rawType, bool reconstituteSugar = false) const {
+  Type resolveType(Type rawType, bool reconstituteSugar = false,
+                   bool wantRValue = true) const {
     auto resolvedType = CS.simplifyType(rawType);
-    return reconstituteSugar
-               ? resolvedType->reconstituteSugar(/*recursive*/ true)
-               : resolvedType;
+
+    if (reconstituteSugar)
+      resolvedType = resolvedType->reconstituteSugar(/*recursive*/ true);
+
+    return wantRValue ? resolvedType->getRValueType() : resolvedType;
   }
 
   /// Resolve type variables present in the raw type, using generic parameter
@@ -144,13 +147,7 @@ protected:
   /// by the constraint solver.
   ResolvedOverloadSetListItem *
   getResolvedOverload(ConstraintLocator *locator) const {
-    auto resolvedOverload = CS.getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == locator)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+    return CS.findSelectedOverloadFor(locator);
   }
 
   /// Retrive the constraint locator for the given anchor and
@@ -172,11 +169,15 @@ protected:
   /// `x.foo` or `x[0]` extract and return its base expression.
   Expr *getBaseExprFor(Expr *anchor) const;
 
-  /// \returns An argument expression if given anchor is a call, member
-  /// reference or subscript, nullptr otherwise.
-  Expr *getArgumentExprFor(Expr *anchor) const;
+  /// For a given locator describing an argument application, or a constraint
+  /// within an argument application, returns the argument list for that
+  /// application. If the locator is not for an argument application, or
+  /// the argument list cannot be found, returns \c nullptr.
+  Expr *getArgumentListExprFor(ConstraintLocator *locator) const;
 
-  Optional<SelectedOverload> getChoiceFor(Expr *) const;
+  /// \returns The overload choice made by the constraint system for the callee
+  /// of a given locator's anchor, or \c None if no such choice can be found.
+  Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -197,6 +198,101 @@ private:
   std::pair<Expr *, bool> computeAnchor() const;
 };
 
+/// Provides information about the application of a function argument to a
+/// parameter.
+class FunctionArgApplyInfo {
+  Expr *ArgExpr;
+  unsigned ArgIdx;
+  Type ArgType;
+
+  unsigned ParamIdx;
+
+  Type FnInterfaceType;
+  FunctionType *FnType;
+  const ValueDecl *Callee;
+
+public:
+  FunctionArgApplyInfo(Expr *argExpr, unsigned argIdx, Type argType,
+                       unsigned paramIdx, Type fnInterfaceType,
+                       FunctionType *fnType, const ValueDecl *callee)
+      : ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType), ParamIdx(paramIdx),
+        FnInterfaceType(fnInterfaceType), FnType(fnType), Callee(callee) {}
+
+  /// \returns The argument being applied.
+  Expr *getArgExpr() const { return ArgExpr; }
+
+  /// \returns The position of the argument, starting at 1.
+  unsigned getArgPosition() const { return ArgIdx + 1; }
+
+  /// \returns The position of the parameter, starting at 1.
+  unsigned getParamPosition() const { return ParamIdx + 1; }
+
+  /// \returns The type of the argument being applied, including any generic
+  /// substitutions.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  Type getArgType(bool withSpecifier = false) const {
+    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The interface type for the function being applied. Note that this
+  /// may not a function type, for example it could be a generic parameter.
+  Type getFnInterfaceType() const { return FnInterfaceType; }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return FnType; }
+
+  /// \returns The callee for the application.
+  const ValueDecl *getCallee() const { return Callee; }
+
+private:
+  Type getParamTypeImpl(AnyFunctionType *fnTy,
+                        bool lookThroughAutoclosure) const {
+    auto param = fnTy->getParams()[ParamIdx];
+    auto paramTy = param.getPlainType();
+    if (lookThroughAutoclosure && param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+    return paramTy;
+  }
+
+public:
+  /// \returns The type of the parameter which the argument is being applied to,
+  /// including any generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return getParamTypeImpl(FnType, lookThroughAutoclosure);
+  }
+
+  /// \returns The interface type of the parameter which the argument is being
+  /// applied to.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
+    if (!interfaceFnTy) {
+      // If the interface type isn't a function, then just return the resolved
+      // parameter type.
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+    }
+    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter which the argument is being applied
+  /// to.
+  ParameterTypeFlags getParameterFlags() const {
+    return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
+  }
+};
+
 /// Base class for all of the diagnostics related to generic requirement
 /// failures, provides common information like failed requirement,
 /// declaration where such requirement comes from, etc.
@@ -214,7 +310,7 @@ protected:
   /// The source of the requirement, if available. One exception
   /// is failure associated with conditional requirement where
   /// underlying conformance is specialized.
-  const GenericSignature *Signature;
+  GenericSignature Signature;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -227,8 +323,8 @@ protected:
   Type LHS, RHS;
 
 public:
-  RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
-                     Type lhs, Type rhs, ConstraintLocator *locator)
+  RequirementFailure(ConstraintSystem &cs, Expr *expr, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator),
         Conformance(getConformanceForConditionalReq(locator)),
         Signature(getSignature(locator)), AffectedDecl(getDeclRef()),
@@ -236,14 +332,10 @@ public:
     assert(locator);
     assert(isConditional() || Signature);
     assert(AffectedDecl);
-
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto &last = path.back();
-    assert(last.isTypeParameterRequirement() ||
-           last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    assert(getRequirementDC() &&
+           "Couldn't find where the requirement came from?");
+    assert(getGenericContext() &&
+           "Affected decl not within a generic context?");
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -254,13 +346,9 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    assert(!path.empty());
-
-    auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    return reqElt.getIndex();
   }
 
   /// The generic base type where failing requirement comes from.
@@ -294,60 +382,23 @@ protected:
   virtual DiagInReference getDiagnosticInRereference() const = 0;
   virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
-  /// Determine whether it would be possible to diagnose
-  /// current requirement failure.
-  bool canDiagnoseFailure() const {
-    // If this is a conditional requirement failure,
-    // we have a lot more information compared to
-    // type requirement case, because we know that
-    // underlying conformance requirement matched.
-    if (isConditional())
-      return true;
-
-    auto *anchor = getAnchor();
-    // In the situations like this:
-    //
-    // ```swift
-    // enum E<T: P> { case foo(T) }
-    // let _: E = .foo(...)
-    // ```
-    //
-    // `E` is going to be opened twice. First, when
-    // it's used as a contextual type, and when `E.foo`
-    // is found and its function type is opened.
-    // We still want to record both fixes but should
-    // avoid diagnosing the same problem multiple times.
-    if (isa<UnresolvedMemberExpr>(anchor)) {
-      auto path = getLocator()->getPath();
-      if (path.front().getKind() != ConstraintLocator::UnresolvedMember)
-        return false;
-    }
-
-    // For static/initializer calls there is going to be
-    // a separate fix, attached to the argument, which is
-    // much easier to diagnose.
-    // For operator calls we can't currently produce a good
-    // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(anchor)));
-  }
-
   static bool isOperator(const ApplyExpr *apply) {
     return isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
            isa<BinaryExpr>(apply);
   }
+
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 
 private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
 
   /// Retrieve generic signature where this parameter originates from.
-  GenericSignature *getSignature(ConstraintLocator *locator);
+  GenericSignature getSignature(ConstraintLocator *locator);
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
-
-  /// Determine whether given declaration represents a static
-  /// or instance property/method, excluding operators.
-  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.
@@ -367,62 +418,43 @@ public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, Type> conformance)
-      : RequirementFailure(cs, expr, RequirementKind::Conformance,
-                           conformance.first, conformance.second, locator) {}
+      : RequirementFailure(cs, expr, conformance.first, conformance.second,
+                           locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::Conformance ||
+           reqElt.getRequirementKind() == RequirementKind::Layout);
+  }
 
   bool diagnoseAsError() override;
 
 protected:
+  /// Check whether this requirement is associated with one of the
+  /// operator overloads, in cases like that sometimes it makes more
+  /// sense to produce a generic diagnostic about operator reference
+  /// instead of conformance, because it could be something like
+  /// `true + true`, and it doesn't make much sense to suggest to
+  /// add a conformance from one library type to another.
+  bool diagnoseAsAmbiguousOperatorRef();
+
   DiagOnDecl getDiagnosticOnDecl() const override {
-    return diag::type_does_not_conform_decl_owner;
+    return (getRequirement().getKind() == RequirementKind::Layout ?
+            diag::type_does_not_conform_anyobject_decl_owner :
+            diag::type_does_not_conform_decl_owner);
   }
 
   DiagInReference getDiagnosticInRereference() const override {
-    return diag::type_does_not_conform_in_decl_ref;
+    return (getRequirement().getKind() == RequirementKind::Layout ?
+            diag::type_does_not_conform_anyobject_in_decl_ref :
+            diag::type_does_not_conform_in_decl_ref);
   }
 
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
-};
-
-/// Diagnostics for mismatched generic arguments e.g
-/// ```swift
-/// struct F<G> {}
-/// let _:F<Int> = F<Bool>()
-/// ```
-class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
-  ArrayRef<unsigned> Mismatches;
-
-public:
-  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
-                                  BoundGenericType *actual,
-                                  BoundGenericType *required,
-                                  ArrayRef<unsigned> mismatches,
-                                  ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), Actual(actual),
-        Required(required), Mismatches(mismatches) {}
-
-  bool diagnoseAsError() override;
 
 private:
-  void emitNotesForMismatches() {
-    for (unsigned position : Mismatches) {
-      emitNoteForMismatch(position);
-    }
-  }
-
-  void emitNoteForMismatch(int mismatchPosition);
-
-  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
-
-  /// The actual type being used.
-  BoundGenericType *getActual() const { return Actual; }
-
-  /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const { return Required; }
+  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+                                 Type protocolType) const;
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -444,8 +476,10 @@ class SameTypeRequirementFailure final : public RequirementFailure {
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::SameType, lhs, rhs,
-                           locator) {}
+      : RequirementFailure(cs, expr, lhs, rhs, locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::SameType);
+  }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -478,8 +512,10 @@ class SuperclassRequirementFailure final : public RequirementFailure {
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::Superclass, lhs, rhs,
-                           locator) {}
+      : RequirementFailure(cs, expr, lhs, rhs, locator) {
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::Superclass);
+  }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -533,15 +569,6 @@ private:
   /// passing such parameter as an @escaping argument, or trying to
   /// assign it to a variable which expects @escaping function.
   bool diagnoseParameterUse() const;
-};
-
-class MissingForcedDowncastFailure final : public FailureDiagnostic {
-public:
-  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
-
-  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to attempting member access on optional base
@@ -637,9 +664,6 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  void fixItChangeInoutArgType(const Expr *arg, Type actualType,
-                               Type neededType) const;
-
   /// Given an expression that has a non-lvalue type, dig into it until
   /// we find the part of the expression that prevents the entire subexpression
   /// from being mutable.  For example, in a sequence like "x.v.v = 42" we want
@@ -682,6 +706,9 @@ public:
 
   bool diagnoseAsError() override;
 
+  /// If we're trying to convert something to `nil`.
+  bool diagnoseConversionToNil() const;
+
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
@@ -692,6 +719,14 @@ public:
   /// Produce a specialized diagnostic if this is an attempt to initialize
   /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
   bool diagnoseConversionToDictionary() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to throw
+  /// something with doesn't conform to `Error`.
+  bool diagnoseThrowsTypeMismatch() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to `yield`
+  /// something of incorrect type.
+  bool diagnoseYieldByReferenceMismatch() const;
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
@@ -736,14 +771,16 @@ protected:
   /// conversion is possible.
   bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
 
+  /// Try to add a fix-it to conform the decl context (if it's a type) to the
+  /// protocol
+  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+
   /// Check whether this contextual failure represents an invalid
   /// conversion from array literal to dictionary.
   static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
                                             Type contextualType);
 
 private:
-  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
-
   Type resolve(Type rawType) {
     auto type = resolveType(rawType)->getWithoutSpecifierType();
     if (auto *BGT = type->getAs<BoundGenericType>()) {
@@ -768,8 +805,53 @@ private:
   bool isIntegerToStringIndexConversion() const;
 
 protected:
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
+
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatchFailure final : public ContextualFailure {
+  ArrayRef<unsigned> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  Type actualType, Type requiredType,
+                                  ArrayRef<unsigned> mismatches,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, actualType, requiredType, locator),
+        Mismatches(mismatches) {
+    assert(actualType->is<BoundGenericType>());
+    assert(requiredType->is<BoundGenericType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
+    }
+  }
+
+  void emitNoteForMismatch(int mismatchPosition);
+
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const {
+    return getFromType()->castTo<BoundGenericType>();
+  }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const {
+    return getToType()->castTo<BoundGenericType>();
+  }
 };
 
 /// Diagnose failures related to conversion between throwing function type
@@ -811,7 +893,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -822,7 +904,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -841,6 +923,30 @@ public:
       : ContextualFailure(expr, cs, argTy, paramTy, locator) {}
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public ContextualFailure {
+public:
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                        ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
 };
 
 /// Diagnose mismatches relating to tuple destructuring.
@@ -1179,38 +1285,89 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
-  unsigned NumSynthesized;
+  SmallVector<Param, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          FunctionType *funcType,
-                          unsigned numSynthesized,
+                          ArrayRef<Param> synthesizedArgs,
                           ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), Fn(funcType),
-        NumSynthesized(numSynthesized) {}
+      : FailureDiagnostic(root, cs, locator),
+        SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
+    assert(!SynthesizedArgs.empty() && "No missing arguments?!");
+  }
 
   bool diagnoseAsError() override;
+
+  bool diagnoseSingleMissingArgument() const;
 
 private:
-  /// If missing arguments come from trailing closure,
+  /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
-  bool diagnoseTrailingClosure(ClosureExpr *closure);
-};
+  bool diagnoseClosure(ClosureExpr *closure);
 
-class DefaultArgumentTypeMismatch final : public FailureDiagnostic {
-  using Param = AnyFunctionType::Param;
+  /// Diagnose cases when instead of multiple distinct arguments
+  /// call got a single tuple argument with expected arity/types.
+  bool diagnoseInvalidTupleDestructuring() const;
 
-  Type FromType;
-  Type ToType;
+  /// Determine whether missing arguments are associated with
+  /// an implicit call to a property wrapper initializer e.g.
+  /// `@Foo(answer: 42) var question = "ultimate question"`
+  bool isPropertyWrapperInitialization() const;
+
+  /// Gather informatioin associated with expression that represents
+  /// a call - function, arguments, # of arguments and whether it has
+  /// a trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(Expr *anchor) const;
+
+  /// Transform given argument into format suitable for a fix-it
+  /// text e.g. `[<label>:]? <#<type#>`
+  void forFixIt(llvm::raw_svector_ostream &out,
+                const AnyFunctionType::Param &argument) const;
 
 public:
-  DefaultArgumentTypeMismatch(Expr *root, ConstraintSystem &cs, Type fromType,
-                              Type toType, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), FromType(fromType),
-        ToType(toType) {}
+  /// Due to the fact that `matchCallArgument` can't and
+  /// doesn't take types into consideration while matching
+  /// arguments to parameters, for cases where both arguments
+  /// are un-labeled, it's impossible to say which one is missing:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// In this case first argument is missing, but we end up with
+  /// two fixes - argument mismatch (for #1) and missing argument
+  /// (for #2), which is incorrect so it has to be handled specially.
+  static bool isMisplacedMissingArgument(ConstraintSystem &cs,
+                                         ConstraintLocator *locator);
+};
+
+class ExtraneousArgumentsFailure final : public FailureDiagnostic {
+  FunctionType *ContextualType;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArgs;
+
+public:
+  ExtraneousArgumentsFailure(
+      Expr *root, ConstraintSystem &cs, FunctionType *contextualType,
+      ArrayRef<std::pair<unsigned, AnyFunctionType::Param>> extraArgs,
+      ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        ContextualType(resolveType(contextualType)->castTo<FunctionType>()),
+        ExtraArgs(extraArgs.begin(), extraArgs.end()) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  bool diagnoseSingleExtraArgument() const;
+
+  unsigned getTotalNumArguments() const {
+    return ContextualType->getNumParams() + ExtraArgs.size();
+  }
+
+  bool isContextualMismatch() const {
+    auto *locator = getLocator();
+    return locator->isLastElement<LocatorPathElt::ContextualType>() ||
+           locator->isLastElement<LocatorPathElt::ApplyArgToParam>();
+  }
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
@@ -1445,30 +1602,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose extraneous use of address of (`&`) which could only be
-/// associated with arguments to inout parameters e.g.
-///
-/// ```swift
-/// struct S {}
-///
-/// var a: S = ...
-/// var b: S = ...
-///
-/// a = &b
-/// ```
-class InvalidUseOfAddressOf final : public FailureDiagnostic {
-public:
-  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
-                        ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator) {}
-
-  bool diagnoseAsError() override;
-
-protected:
-  /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
-};
-
 /// Diagnose an attempt return something from a function which
 /// doesn't have a return type specified e.g.
 ///
@@ -1516,6 +1649,24 @@ public:
   }
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose a conversion mismatch between object types of `inout`
+/// argument/parameter e.g. `'inout S' argument conv 'inout P'`.
+///
+/// Even if `S` conforms to `P` there is no subtyping rule for
+/// argument type of `inout` parameter, they have to be equal.
+class InOutConversionFailure final : public ContextualFailure {
+public:
+  InOutConversionFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                         Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Suggest to change a type of the argument if possible.
+  void fixItChangeArgumentType() const;
 };
 
 /// Diagnose generic argument omission e.g.
@@ -1604,99 +1755,170 @@ public:
                                               Type paramTy,
                                               ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situation when an array is passed instead of varargs.
+///
+/// ```swift
+/// func foo(_ x: Int...) {}
+/// foo([1,2,3]]) // foo expects varags like foo(1,2,3) instead.
+/// ```
+class ExpandArrayIntoVarargsFailure final : public ContextualFailure {
+public:
+  ExpandArrayIntoVarargsFailure(Expr *root, ConstraintSystem &cs, Type lhs,
+                                Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  void tryDropArrayBracketsFixIt(Expr *anchor) const;
+};
+
+/// Diagnose a situation there is a mismatch between argument and parameter
+/// types e.g.:
+///
+/// ```swift
+/// func foo(_: String) {}
+/// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
+/// ```
+class ArgumentMismatchFailure : public ContextualFailure {
+  // FIXME: Currently ArgumentMismatchFailure can be used from CSDiag, in which
+  // case it's possible we're not able to resolve the arg apply info. Once
+  // the CSDiag logic has been removed, we should be able to store Info
+  // unwrapped.
+  Optional<FunctionArgApplyInfo> Info;
+
+public:
+  ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator),
+        Info(getFunctionArgApplyInfo(getLocator())) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  /// If both argument and parameter are represented by `ArchetypeType`
+  /// produce a special diagnostic in case their names match.
+  bool diagnoseArchetypeMismatch() const;
+
+  /// Tailored diagnostic for pattern matching with `~=` operator.
+  bool diagnosePatternMatchingMismatch() const;
+
+  /// Tailored diagnostics for argument mismatches associated with
+  /// reference equality operators `===` and `!==`.
+  bool diagnoseUseOfReferenceEqualityOperator() const;
+
+protected:
+  /// \returns The position of the argument being diagnosed, starting at 1.
+  unsigned getArgPosition() const { return Info->getArgPosition(); }
+
+  /// \returns The position of the parameter being diagnosed, starting at 1.
+  unsigned getParamPosition() const { return Info->getParamPosition(); }
+
+  /// Returns the argument expression being diagnosed.
+  ///
+  /// Note this may differ from \c getAnchor(), which will return a smaller
+  /// sub-expression if the failed constraint is for a sub-expression within
+  /// an argument. For example, in an argument conversion from (T, U) to (U, U),
+  /// the conversion from T to U may fail. In this case, \c getArgExpr() will
+  /// return the (T, U) expression, whereas \c getAnchor() will return the T
+  /// expression.
+  Expr *getArgExpr() const { return Info->getArgExpr(); }
+
+  /// Returns the argument type for the conversion being diagnosed.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  ///
+  /// Note this may differ from \c getFromType(), which will give the source
+  /// type of a failed constraint for the argument conversion. For example in
+  /// an argument conversion from T? to U?, the conversion from T to U may fail.
+  /// In this case, \c getArgType() will return T?, whereas \c getFromType()
+  /// will return T.
+  Type getArgType(bool withSpecifier = false) const {
+    return Info->getArgType(withSpecifier);
+  }
+
+  /// \returns The interface type for the function being applied.
+  Type getFnInterfaceType() const { return Info->getFnInterfaceType(); }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return Info->getFnType(); }
+
+  /// \returns The callee for the argument conversion, if any.
+  const ValueDecl *getCallee() const {
+    return Info ? Info->getCallee() : nullptr;
+  }
+
+  /// \returns The full name of the callee, or a null decl name if there is no
+  /// callee.
+  DeclName getCalleeFullName() const {
+    return getCallee() ? getCallee()->getFullName() : DeclName();
+  }
+
+  /// Returns the type of the parameter involved in the mismatch, including any
+  /// generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  ///
+  /// Note this may differ from \c getToType(), see the note on \c getArgType().
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return Info->getParamType(lookThroughAutoclosure);
+  }
+
+  /// Returns the type of the parameter involved in the mismatch.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  ///
+  /// Note this may differ from \c getToType(), see the note on \c getArgType().
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    return Info->getParamInterfaceType(lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter involved in the mismatch.
+  ParameterTypeFlags getParameterFlags() const {
+    return Info->getParameterFlags();
+  }
+
+  /// \returns The flags of a parameter at a given index.
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return Info->getParameterFlagsAtIndex(idx);
+  }
+
+  /// Situations like this:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// Are currently impossible to fix correctly,
+  /// so we have to attend to that in diagnostics.
+  bool diagnoseMisplacedMissingArgument() const;
+
+  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class MissingForcedDowncastFailure final : public ContextualFailure {
+public:
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs, Type fromType,
+                               Type toType, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, fromType, toType, locator) {}
 
   bool diagnoseAsError() override;
 };
 
-/// Provides information about the application of a function argument to a
-/// parameter.
-class FunctionArgApplyInfo {
-  Expr *ArgExpr;
-  unsigned ArgIdx;
-  Type ArgType;
-
-  unsigned ParamIdx;
-
-  Type FnInterfaceType;
-  FunctionType *FnType;
-  const ValueDecl *Callee;
-
+class ExtraneousCallFailure final : public FailureDiagnostic {
 public:
-  FunctionArgApplyInfo(Expr *argExpr, unsigned argIdx, Type argType,
-                       unsigned paramIdx, Type fnInterfaceType,
-                       FunctionType *fnType, const ValueDecl *callee)
-      : ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType), ParamIdx(paramIdx),
-        FnInterfaceType(fnInterfaceType), FnType(fnType), Callee(callee) {}
+  ExtraneousCallFailure(Expr *expr, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator) {}
 
-  /// \returns The argument being applied.
-  Expr *getArgExpr() const { return ArgExpr; }
-
-  /// \returns The position of the argument, starting at 1.
-  unsigned getArgPosition() const { return ArgIdx + 1; }
-
-  /// \returns The position of the parameter, starting at 1.
-  unsigned getParamPosition() const { return ParamIdx + 1; }
-
-  /// \returns The type of the argument being applied, including any generic
-  /// substitutions.
-  ///
-  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
-  /// the argument, if any.
-  Type getArgType(bool withSpecifier = false) const {
-    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
-  }
-
-  /// \returns The interface type for the function being applied. Note that this
-  /// may not a function type, for example it could be a generic parameter.
-  Type getFnInterfaceType() const { return FnInterfaceType; }
-
-  /// \returns The function type being applied, including any generic
-  /// substitutions.
-  FunctionType *getFnType() const { return FnType; }
-
-  /// \returns The callee for the application.
-  const ValueDecl *getCallee() const { return Callee; }
-
-private:
-  Type getParamTypeImpl(AnyFunctionType *fnTy,
-                        bool lookThroughAutoclosure) const {
-    auto param = fnTy->getParams()[ParamIdx];
-    auto paramTy = param.getPlainType();
-    if (lookThroughAutoclosure && param.isAutoClosure())
-      paramTy = paramTy->castTo<FunctionType>()->getResult();
-    return paramTy;
-  }
-
-public:
-  /// \returns The type of the parameter which the argument is being applied to,
-  /// including any generic substitutions.
-  ///
-  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
-  /// should be treated as being of type T.
-  Type getParamType(bool lookThroughAutoclosure = true) const {
-    return getParamTypeImpl(FnType, lookThroughAutoclosure);
-  }
-
-  /// \returns The interface type of the parameter which the argument is being
-  /// applied to.
-  ///
-  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
-  /// should be treated as being of type T.
-  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
-    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
-    if (!interfaceFnTy) {
-      // If the interface type isn't a function, then just return the resolved
-      // parameter type.
-      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
-    }
-    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
-  }
-
-  /// \returns The flags of the parameter which the argument is being applied
-  /// to.
-  ParameterTypeFlags getParameterFlags() const {
-    return FnType->getParams()[ParamIdx].getParameterFlags();
-  }
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints

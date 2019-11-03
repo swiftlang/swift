@@ -117,6 +117,9 @@ private:
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
   llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
 
+  /// The key is the number of witness tables.
+  llvm::DenseMap<unsigned, llvm::StructType *> OpaqueExistentialTypes;
+
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
   const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
@@ -182,6 +185,8 @@ public:
                                             bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
 
+  llvm::Type *getExistentialType(unsigned numWitnessTables);
+
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.
   void pushGenericContext(CanGenericSignature signature);
@@ -203,7 +208,7 @@ private:
 
   /// Read a YAML legacy type layout dump. Returns false on success, true on
   /// error.
-  bool readLegacyTypeInfo(StringRef path);
+  bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
   Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
 

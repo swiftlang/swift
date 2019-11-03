@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
@@ -126,7 +127,7 @@ static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
   if (!isSourceRangeCached(true))
     out << "(uncached) ";
-  SourceRange range = getUncachedSourceRange(/*omitAssertions=*/true);
+  SourceRange range = computeSourceRangeOfScope(/*omitAssertions=*/true);
   printSourceRange(out, range, getSourceManager());
 }
 
@@ -151,10 +152,11 @@ NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
 void GenericTypeOrExtensionScope::printSpecifics(llvm::raw_ostream &out) const {
   if (shouldHaveABody() && !doesDeclHaveABody())
     out << "<no body>";
-  else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
-    out << "'" << n->getFullName() << "'";
-  else
-    out << "<no extended nominal?!>";
+  // Sadly, the following can trip assertions
+  //  else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
+  //    out << "'" << n->getFullName() << "'";
+  //  else
+  //    out << "<no extended nominal?!>";
 }
 
 void GenericParamScope::printSpecifics(llvm::raw_ostream &out) const {
@@ -198,4 +200,13 @@ bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }
 
 bool IterableTypeScope::doesDeclHaveABody() const {
   return getBraces().Start != getBraces().End;
+}
+
+void ast_scope::simple_display(llvm::raw_ostream &out,
+                               const ASTScopeImpl *scope) {
+  // Cannot call scope->print(out) because printing an ASTFunctionBodyScope
+  // gets the source range which can cause a request to parse it.
+  // That in turn causes the request dependency printing code to blow up
+  // as the AnyRequest ends up with a null.
+  out << scope->getClassName() << "\n";
 }

@@ -35,6 +35,7 @@ namespace swift {
   class ForeignErrorConvention;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
+  class ModuleDecl;
   class SILBuilder;
   class SILLocation;
   class SILModule;
@@ -71,16 +72,16 @@ inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
 CanSILFunctionType
 adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
                    ParameterConvention calleeConv,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance);
+                   ProtocolConformanceRef witnessMethodConformance);
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   ProtocolConformanceRef witnessMethodConformance) {
   return adjustFunctionType(type, extInfo, type->getCalleeConvention(),
                             witnessMethodConformance);
 }
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   ProtocolConformanceRef witnessMethodConformance) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
   auto contextConvention = DefaultThickCalleeConvention;
@@ -254,7 +255,7 @@ public:
   void print(llvm::raw_ostream &os) const;
 
   /// Dump out the internal state of this type lowering to llvm::dbgs().
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?
@@ -591,7 +592,7 @@ class TypeConverter {
   llvm::BumpPtrAllocator IndependentBPA;
 
   struct CachingTypeKey {
-    GenericSignature *Sig;
+    CanGenericSignature Sig;
     AbstractionPattern::CachingKey OrigType;
     CanType SubstType;
 
@@ -688,7 +689,7 @@ class TypeConverter {
   
   llvm::DenseMap<OverrideKey, SILConstantInfo *> ConstantOverrideTypes;
 
-  llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
+  llvm::DenseMap<SILDeclRef, CaptureInfo> LoweredCaptures;
 
   /// Cache of loadable SILType to number of (estimated) fields
   ///
@@ -712,10 +713,10 @@ class TypeConverter {
                               const TypeLowering *lowering);
 
 public:
-  SILModule &M;
+  ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(SILModule &m);
+  TypeConverter(ModuleDecl &m);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -803,7 +804,8 @@ public:
   }
 
   SILType getLoweredLoadableType(Type t,
-                                 ResilienceExpansion forExpansion) {
+                                 ResilienceExpansion forExpansion,
+                                 SILModule &M) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
         (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
@@ -842,10 +844,13 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
-  
+
+  /// Get the generic environment for a constant.
+  GenericSignature getConstantGenericSignature(SILDeclRef constant);
+
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
+
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
     return getConstantInfo(constant).getSILType();
@@ -891,11 +896,6 @@ public:
   SILType getEmptyTupleType() {
     return SILType::getPrimitiveObjectType(TupleType::getEmpty(Context));
   }
-  
-  /// Get a function type curried with its capture context.
-  CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
-                                              CanAnyFunctionType funcType,
-                                              AnyFunctionRef closure);
 
   /// Describes what we're trying to compute a bridged type for.
   ///
@@ -942,17 +942,6 @@ public:
   SILType getSubstitutedStorageType(AbstractStorageDecl *value,
                                     Type lvalueType);
 
-  /// Retrieve the set of archetypes closed over by the given function.
-  GenericEnvironment *getEffectiveGenericEnvironment(AnyFunctionRef fn,
-                                                     CaptureInfo captureInfo);
-
-  /// Retrieve the set of generic parameters closed over by the given function.
-  CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
-                                                   CaptureInfo captureInfo);
-
-  /// Retrieve the set of generic parameters closed over by the context.
-  CanGenericSignature getEffectiveGenericSignature(DeclContext *dc);
-
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.
   ///
@@ -978,10 +967,28 @@ public:
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
 
-  /// Get the capture list from a closure, with transitive function captures
-  /// flattened.
-  CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
-  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
+  /// Get the capture list for a function or default argument, with transitive
+  /// function captures flattened.
+  CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
+  bool hasLoweredLocalCaptures(SILDeclRef fn);
+
+#ifndef NDEBUG
+  /// If \c false, \c childDC is in a context it cannot capture variables from,
+  /// so it is expected that Sema may not have computed its \c CaptureInfo.
+  ///
+  /// This call exists for use in assertions; do not use it to skip capture
+  /// processing.
+  static bool canCaptureFromParent(DeclContext *childDC) {
+    // This call was added because Sema leaves the captures of functions that
+    // cannot capture anything uncomputed.
+    // TODO: Make Sema set them to CaptureInfo::empty() instead.
+
+    if (childDC)
+      if (auto decl = childDC->getAsDecl())
+         return decl->getDeclContext()->isLocalContext();
+    return true;
+  }
+#endif
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.
@@ -1001,11 +1008,13 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(SILType type1, SILType type2,
+  ABIDifference checkForABIDifferences(SILModule &M,
+                                       SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
   /// Same as above but for SIL function types.
-  ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
+  ABIDifference checkFunctionForABIDifferences(SILModule &M,
+                                               SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
 
@@ -1101,7 +1110,7 @@ namespace llvm {
     }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
-        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.Sig);
+        DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
       auto hashOrig =
         CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =

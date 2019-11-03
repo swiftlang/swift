@@ -998,8 +998,6 @@ struct TargetClassMetadata : public TargetAnyClassMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
-  friend class ReflectionContext;
-
   TargetClassMetadata() = default;
   constexpr TargetClassMetadata(const TargetAnyClassMetadata<Runtime> &base,
              ClassFlags flags,

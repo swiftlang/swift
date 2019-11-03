@@ -19,7 +19,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -759,6 +759,10 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
   if (!B.hasOwnership())
     return svi;
 
+  assert((isa<LoadBorrowInst>(svi) || isa<LoadInst>(svi)) &&
+         "Expected to have a /real/ load here since we assume that we have a "
+         "unary operand instruction");
+
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
   bool foundLoop = false;
@@ -780,9 +784,10 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
-    auto error =
-        valueHasLinearLifetime(cvi, {svi}, {}, visitedBlocks, deadEndBlocks,
-                               errorKind, &leakingBlocks);
+    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+    auto error = checker.checkValue(
+        cvi, {BranchPropagatedUser(&svi->getAllOperands()[0])}, {}, errorKind,
+        &leakingBlocks);
     if (!error.getFoundError())
       continue;
 
@@ -1434,7 +1439,7 @@ static SILType getMemoryType(AllocationInst *memory) {
   if (auto *abi = dyn_cast<AllocBoxInst>(memory)) {
     assert(abi->getBoxType()->getLayout()->getFields().size() == 1 &&
            "optimizing multi-field boxes not implemented");
-    return abi->getBoxType()->getFieldType(abi->getModule(), 0);
+    return getSILBoxFieldType(abi->getBoxType(), abi->getModule().Types, 0);
   }
 
   assert(isa<AllocStackInst>(memory));

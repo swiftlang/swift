@@ -25,20 +25,20 @@ class SomeMethods {
 // Test self-conformance
 
 func takesObjCClass<T : ObjCClass>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}}
-func takesObjCProtocol<T : ObjCProtocol>(_: T) {}
-func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}}
+func takesObjCProtocol<T : ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCClass'}}
+func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCProtocol'}} expected-note {{where 'T' = 'ObjCClass'}}
 
 func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProtocol) {
   takesObjCClass(c)
   takesObjCClass(p) // expected-error {{global function 'takesObjCClass' requires that 'ObjCProtocol' inherit from 'ObjCClass'}}
   takesObjCClass(cp)
 
-  takesObjCProtocol(c) // expected-error {{argument type 'ObjCClass' does not conform to expected type 'ObjCProtocol'}}
+  takesObjCProtocol(c) // expected-error {{global function 'takesObjCProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
   takesObjCProtocol(p)
   takesObjCProtocol(cp)
 
   // FIXME: Bad diagnostics
-  takesObjCClassAndProtocol(c) // expected-error {{argument type 'ObjCClass' does not conform to expected type 'ObjCProtocol'}}
+  takesObjCClassAndProtocol(c) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
   takesObjCClassAndProtocol(p) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCProtocol' inherit from 'ObjCClass'}}
   takesObjCClassAndProtocol(cp)
 }
@@ -59,6 +59,6 @@ func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
   _ = m1 as (ObjCClass & ObjCProtocol).Type
   _ = m1 as? (ObjCClass & ObjCProtocol).Type // expected-warning {{always succeeds}}
 
-  _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{'(ObjCClass & StaticObjCProtocol).Protocol' is not convertible to '(ObjCClass & StaticObjCProtocol).Type'; did you mean to use 'as!' to force downcast?}}
+  _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{cannot convert value of type '(ObjCClass & StaticObjCProtocol).Protocol' to type '(ObjCClass & StaticObjCProtocol).Type' in coercion}}
   _ = m2 as? (ObjCClass & StaticObjCProtocol).Type // FIXME should 'always fail'
 }

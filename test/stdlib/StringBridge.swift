@@ -1,4 +1,8 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: cp %s %t/main.swift
+// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %t/main.swift %S/../Inputs/SmallStringTestUtilities.swift -o %t.out -O
+// RUN: %target-run %t.out
+
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -14,29 +18,6 @@ extension String {
   }
 
 
-}
-
-func expectSmall(_ str: String,
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
- ) {
-  switch str._classify()._form {
-    case ._small: return
-    default: expectationFailure("expected: small", trace: "",
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-func expectCocoa(_ str: String,
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
- ) {
-  switch str._classify()._form {
-    case ._cocoa: return
-    default: expectationFailure("expected: cocoa", trace: "",
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
 }
 
 StringBridgeTests.test("Tagged NSString") {
@@ -75,6 +56,48 @@ StringBridgeTests.test("Tagged NSString") {
 #endif // not 32bit
 }
 
+StringBridgeTests.test("Bridging") {
+  // Test bridging retains small string form
+  func bridge(_ small: _SmallString) -> String {
+    return String(_StringGuts(small))._bridgeToObjectiveCImpl() as! String
+  }
+  func runTestSmall(_ input: String) throws {
+    // Constructed through CF
+    guard let fromCocoaSmall = _SmallString(
+      _cocoaString: input as NSString
+    ) else {
+        throw "Didn't fit"
+    }
+    verifySmallString(fromCocoaSmall, input)
+    verifySmallString(fromCocoaSmall, bridge(fromCocoaSmall))
+  }
+
+  // Pass tests
+
+  #if arch(i386) || arch(arm)
+  #else
+  if #available(macOS 10.10, iOS 9, *) {
+    expectDoesNotThrow({ try runTestSmall("abc") })
+    expectDoesNotThrow({ try runTestSmall("defghijk") })
+    expectDoesNotThrow({ try runTestSmall("aaaaaaaaaaa") })
+  } else {
+    // OS X 10.9, iOS 7/8 did not have tagged strings
+    expectThrows("Didn't fit", { try runTestSmall("abc") })
+    expectThrows("Didn't fit", { try runTestSmall("defghijk") })
+    expectThrows("Didn't fit", { try runTestSmall("aaaaaaaaaaa") })
+  }
+  #endif
+
+  // Fail tests
+  //
+  expectThrows("Didn't fit", { try runTestSmall("\u{0}") })
+  expectThrows("Didn't fit", { try runTestSmall("0123456789abcde") })
+  expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcd") })
+  expectThrows("Didn't fit", { try runTestSmall("👨‍👦") })
+  expectThrows("Didn't fit", { try runTestSmall("👨‍👩‍👦") })
+  expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcde") })
+}
+
 func returnOne<T>(_ t: T) -> Int { return 1 }
 StringBridgeTests.test("Character from NSString") {
   guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
@@ -102,4 +125,3 @@ StringBridgeTests.test("Character from NSString") {
 
 
 runAllTests()
-

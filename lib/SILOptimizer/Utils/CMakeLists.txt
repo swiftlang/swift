@@ -1,5 +1,6 @@
 silopt_register_sources(
-  CFG.cpp
+  BasicBlockOptUtils.cpp
+  CFGOptUtils.cpp
   CanonicalizeInstruction.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
@@ -9,8 +10,8 @@ silopt_register_sources(
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp
+  InstOptUtils.cpp
   LoadStoreOptUtils.cpp
-  Local.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
   PerformanceInlinerUtils.cpp
@@ -18,4 +19,5 @@ silopt_register_sources(
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp
+  ValueLifetime.cpp
 )

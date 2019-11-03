@@ -18,6 +18,7 @@
 #define SWIFT_AST_PARAMETERLIST_H
 
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -111,8 +112,6 @@ public:
     /// The cloned pattern is for an inherited constructor; mark default
     /// arguments as inherited, and mark unnamed arguments as named.
     Inherited = 0x02,
-    /// The cloned pattern will strip type information.
-    WithoutTypes = 0x04,
   };
 
   friend OptionSet<CloneFlags> operator|(CloneFlags flag1, CloneFlags flag2) {
@@ -133,7 +132,7 @@ public:
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   
   //  void print(raw_ostream &OS) const;

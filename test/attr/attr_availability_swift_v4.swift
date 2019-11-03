@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 %s
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 @available(swift 3)
 func swiftShortThree() {}

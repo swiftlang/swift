@@ -62,8 +62,8 @@ protocol Bas {}
 func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
-  // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X]], i32 0, i32 0
-  // CHECK: [[VALUE_ADDR:%.*]] = call %swift.opaque* @__swift_project_boxed_opaque_existential_1({{.*}} [[BUFFER]], %swift.type* [[METADATA]])
+  // CHECK: [[BUFFER:%.*]] = bitcast %T17generic_metatypes3BasP* [[X]] to %__opaque_existential_type_1*
+  // CHECK: [[VALUE_ADDR:%.*]] = call %swift.opaque* @__swift_project_boxed_opaque_existential_1(%__opaque_existential_type_1* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[VALUE_ADDR]], %swift.type* [[METADATA]], i1 true)
   // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* %0, i32 0, i32 2
   // CHECK: [[WTABLE:%.*]] = load i8**, i8*** [[WTABLE_ADDR]]
@@ -77,13 +77,13 @@ func protocolTypeof(_ x: Bas) -> Bas.Type {
 struct Zim : Bas {}
 class Zang : Bas {}
 
-// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA3ZimVmF"()
+// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA3ZimVmF"() #0
 func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
   // CHECK: ret { %swift.type*, i8** } {{.*}} @"$s17generic_metatypes3ZimVMf", {{.*}} @"$s17generic_metatypes3ZimVAA3BasAAWP"
   return z
 }
 
-// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF"(%swift.type*)
+// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA4ZangCmF"(%swift.type*) #0
 func metatypeErasure(_ z: Zang.Type) -> Bas.Type {
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
   // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s17generic_metatypes4ZangCAA3BasAAWP", i32 0, i32 0), 1
@@ -146,4 +146,4 @@ func makeGenericMetatypes() {
 // CHECK:   ret %swift.metadata_response
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
-// CHECK: attributes [[NOUNWIND_OPT]] = { noinline nounwind "no-frame-pointer-elim"="false" {{.*}} "target-cpu"
+// CHECK: attributes [[NOUNWIND_OPT]] = { noinline nounwind "frame-pointer"="none" "target-cpu"

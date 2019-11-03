@@ -82,7 +82,8 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   else
     self = (IGF.CurFn->arg_end() - 1);
 
-  auto selfTy = funcTy->getSelfParameter().getSILStorageType();
+  auto selfTy = funcTy->getSelfParameter()
+                      .getSILStorageType(IGF.IGM.getSILModule(), funcTy);
 
   llvm::Value *metadata;
   if (selfTy.is<MetatypeType>()) {

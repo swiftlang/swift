@@ -8,10 +8,11 @@
 // CHECK-LABEL: define{{.*}} void @"$s27protocol_accessor_multifile14useExistentialyyF"()
 func useExistential() {
   // CHECK: [[BOX:%.+]] = alloca %T27protocol_accessor_multifile5ProtoP,
-  // CHECK: call swiftcc void @"$s27protocol_accessor_multifile17globalExistentialAA5Proto_pvg"({{%.+}} [[BOX]])
+  // CHECK: call swiftcc void @"$s27protocol_accessor_multifile17globalExistentialAA5Proto_pvg"(%T27protocol_accessor_multifile5ProtoP* noalias nocapture sret [[BOX]])
   // CHECK: call swiftcc void @"$s27protocol_accessor_multifile5ProtoPAAE6methodyyF"
   globalExistential.method()
-  // CHECK: call void @__swift_destroy_boxed_opaque_existential_1({{%.+}} [[BOX]])
+  // CHECK: [[BITCAST:%.*]] = bitcast %T27protocol_accessor_multifile5ProtoP* [[BOX]] to %__opaque_existential_type_1*
+  // CHECK: call void @__swift_destroy_boxed_opaque_existential_1(%__opaque_existential_type_1* [[BITCAST]])
   // CHECK: ret void
 }
 

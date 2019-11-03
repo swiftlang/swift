@@ -1943,66 +1943,67 @@ func testSTSDump<RegularValue>(_ regular: RegularValue, _ expected: String) {
 }
 
 
-sameTypeSuite.test("Subclass") {
-  testSTSDump(STSContainer.Subclass<Int>(),
-              STSContainer℠.Subclass<Int>(),
-              """
-    - Mirror.STSContainer<Mirror.STSOuter>.Subclass<Swift.Int> #0
-      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
-    """)
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+  sameTypeSuite.test("Subclass") {
+    testSTSDump(STSContainer.Subclass<Int>(),
+                STSContainer℠.Subclass<Int>(),
+                """
+      - Mirror.STSContainer<Mirror.STSOuter>.Subclass<Swift.Int> #0
+        - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+      """)
 
-  testSTSDump(STSContainer.Subclass2<Int>(),
-              STSContainer℠.Subclass2<Int>(),
-              """
-    - Mirror.STSContainer<Mirror.STSOuter>.Subclass2<Swift.Int> #0
-      - super: Mirror.STSContainer<Mirror.STSOuter>.GenericSuperclass<Swift.Int>\n
-    """)
+    testSTSDump(STSContainer.Subclass2<Int>(),
+                STSContainer℠.Subclass2<Int>(),
+                """
+      - Mirror.STSContainer<Mirror.STSOuter>.Subclass2<Swift.Int> #0
+        - super: Mirror.STSContainer<Mirror.STSOuter>.GenericSuperclass<Swift.Int>\n
+      """)
 
-  testSTSDump(STSContainer.Subclass3<[STSOuter]>(),
-              """
-    - Mirror.STSContainer<Mirror.STSOuter>.Subclass3<Swift.Array<Mirror.STSOuter>> #0
-      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
-    """)
+    testSTSDump(STSContainer.Subclass3<[STSOuter]>(),
+                """
+      - Mirror.STSContainer<Mirror.STSOuter>.Subclass3<Swift.Array<Mirror.STSOuter>> #0
+        - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+      """)
 
-  testSTSDump(STSContainer.Subclass<Int>.ExtraNested(),
-              STSContainer℠.Subclass<Int>.ExtraNested(),
-              """
-    - Mirror.STSContainer<Mirror.STSOuter>.Subclass<Swift.Int>.ExtraNested #0
-      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
-    """)
+    testSTSDump(STSContainer.Subclass<Int>.ExtraNested(),
+                STSContainer℠.Subclass<Int>.ExtraNested(),
+                """
+      - Mirror.STSContainer<Mirror.STSOuter>.Subclass<Swift.Int>.ExtraNested #0
+        - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+      """)
 
-  testSTSDump(STSContainer.MoreNesting<Bool>.Subclass<Int>(),
-              STSContainer℠.MoreNesting<Bool>.Subclass<Int>(),
-              """
-    - Mirror.STSContainer<Mirror.STSOuter>.MoreNesting<Swift.Bool>.Subclass<Swift.Int> #0
-      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
-    """)
+    testSTSDump(STSContainer.MoreNesting<Bool>.Subclass<Int>(),
+                STSContainer℠.MoreNesting<Bool>.Subclass<Int>(),
+                """
+      - Mirror.STSContainer<Mirror.STSOuter>.MoreNesting<Swift.Bool>.Subclass<Swift.Int> #0
+        - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+      """)
+  }
+
+  sameTypeSuite.test("Fields") {
+    testSTSDump(STSContainer.Fields<Int>(),
+                STSContainer℠.Fields<Int>(),
+                """
+      ▿ Mirror.STSContainer<Mirror.STSOuter>.Fields<Swift.Int>
+        - x: nil
+        - y: nil\n
+      """)
+  }
+
+  sameTypeSuite.test("Cases") {
+    testSTSDump(STSContainer.Cases<Int>.a(.init()),
+                STSContainer℠.Cases<Int>.a(.init()),
+                """
+      - Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.a\n
+      """)
+
+    testSTSDump(STSContainer.Cases<Int>.b(.init()),
+                STSContainer℠.Cases<Int>.b(.init()),
+                """
+      ▿ Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.b
+        - b: 0\n
+      """)
+  }
 }
-
-sameTypeSuite.test("Fields") {
-  testSTSDump(STSContainer.Fields<Int>(),
-              STSContainer℠.Fields<Int>(),
-              """
-    ▿ Mirror.STSContainer<Mirror.STSOuter>.Fields<Swift.Int>
-      - x: nil
-      - y: nil\n
-    """)
-}
-
-sameTypeSuite.test("Cases") {
-  testSTSDump(STSContainer.Cases<Int>.a(.init()),
-              STSContainer℠.Cases<Int>.a(.init()),
-              """
-    - Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.a\n
-    """)
-
-  testSTSDump(STSContainer.Cases<Int>.b(.init()),
-              STSContainer℠.Cases<Int>.b(.init()),
-              """
-    ▿ Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.b
-      - b: 0\n
-    """)
-}
-
 
 runAllTests()

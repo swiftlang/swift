@@ -11,15 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SILInliner.h"
 
 using namespace swift;
 

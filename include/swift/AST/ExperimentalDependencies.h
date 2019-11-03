@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
 #define SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/Hashing.h"
@@ -222,6 +223,7 @@ public:
   bool insert(const Key1 &k1, const Key2 &k2, Value &v) {
     const bool r1 = map1.insert(k1, k2, v);
     const bool r2 = map2.insert(k2, k1, v);
+    (void)r2;
     assertConsistent(r1, r2);
     return r1;
   }
@@ -497,7 +499,8 @@ public:
 
   std::string humanReadableName() const;
 
-  void dump() const { llvm::errs() << asString() << "\n"; }
+  void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }
+  SWIFT_DEBUG_DUMP { dump(llvm::errs()); }
 
   /// For debugging, needed for \ref TwoStageMap::verify
   std::string asString() const;
@@ -608,7 +611,8 @@ public:
   /// needs to set the fingerprint *after* the node has been created.
   void setFingerprint(Optional<std::string> fp) { fingerprint = fp; }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
+  void dump(llvm::raw_ostream &os) const;
 
   std::string humanReadableName(StringRef where) const;
 
@@ -684,7 +688,6 @@ public:
     if (n != getSequenceNumber())
       defsIDependUpon.insert(n);
   }
-  void dump() const { DepGraphNode::dump(); }
 
   std::string humanReadableName() const {
     return DepGraphNode::humanReadableName("here");

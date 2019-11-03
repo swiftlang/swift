@@ -13,7 +13,7 @@
 #define DEBUG_TYPE "sil-lsbase"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

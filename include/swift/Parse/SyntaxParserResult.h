@@ -29,17 +29,17 @@ public:
       : SyntaxNode(None), ASTResult(nullptr) {}
   SyntaxParserResult(ParserStatus Status)
       : SyntaxNode(None), ASTResult(Status) {}
-  SyntaxParserResult(llvm::Optional<Syntax> SyntaxNode, AST *ASTNode)
-      : SyntaxNode(SyntaxNode), ASTResult(ASTNode) {}
-  SyntaxParserResult(ParserStatus Status, llvm::Optional<Syntax> SyntaxNode,
+  SyntaxParserResult(llvm::Optional<Syntax> &&SyntaxNode, AST *ASTNode)
+      : SyntaxNode(std::move(SyntaxNode)), ASTResult(ASTNode) {}
+  SyntaxParserResult(ParserStatus Status, llvm::Optional<Syntax> &&SyntaxNode,
                      AST *ASTNode)
-      : SyntaxNode(SyntaxNode), ASTResult(makeParserResult(Status, ASTNode)) {}
+      : SyntaxNode(std::move(SyntaxNode)), ASTResult(makeParserResult(Status, ASTNode)) {}
 
   /// Convert from a different but compatible parser result.
   template <typename U, typename Enabler = typename std::enable_if<
                             std::is_base_of<AST, U>::value>::type>
-  SyntaxParserResult(SyntaxParserResult<Syntax, U> Other)
-      : SyntaxNode(Other.SyntaxNode), ASTResult(Other.ASTResult) {}
+  SyntaxParserResult(SyntaxParserResult<Syntax, U> &&Other)
+      : SyntaxNode(std::move(Other.SyntaxNode)), ASTResult(Other.ASTResult) {}
 
 
   bool isNull() const { return ASTResult.isNull(); }
@@ -58,9 +58,9 @@ public:
     return SyntaxNode.hasValue();
   }
 
-  Syntax getSyntax() const {
+  Syntax getSyntax() {
     assert(SyntaxNode.hasValue() && "getSyntax from None value");
-    return *SyntaxNode;
+    return std::move(*SyntaxNode);
   }
 
   SyntaxParserResult<Syntax, AST> &
@@ -73,16 +73,16 @@ public:
 /// Create a successful parser result.
 template <typename Syntax, typename AST>
 static inline SyntaxParserResult<Syntax, AST>
-makeSyntaxResult(llvm::Optional<Syntax> SyntaxNode, AST *ASTNode) {
-  return SyntaxParserResult<Syntax, AST>(SyntaxNode, ASTNode);
+makeSyntaxResult(llvm::Optional<Syntax> &&SyntaxNode, AST *ASTNode) {
+  return SyntaxParserResult<Syntax, AST>(std::move(SyntaxNode), ASTNode);
 }
 
 /// Create a result with the specified status.
 template <typename Syntax, typename AST>
 static inline SyntaxParserResult<Syntax, AST>
-makeSyntaxResult(ParserStatus Status, llvm::Optional<Syntax> SyntaxNode,
+makeSyntaxResult(ParserStatus Status, llvm::Optional<Syntax> &&SyntaxNode,
                  AST *ASTNode) {
-  return SyntaxParserResult<Syntax, AST>(Status, SyntaxNode, ASTNode);
+  return SyntaxParserResult<Syntax, AST>(Status, std::move(SyntaxNode), ASTNode);
 }
 
 /// Create a result (null or non-null) with error and code completion bits set.

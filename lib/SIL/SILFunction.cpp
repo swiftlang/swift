@@ -18,39 +18,33 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
+#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
 
-ArrayRef<Requirement> SILSpecializeAttr::getRequirements() const {
-  return {const_cast<SILSpecializeAttr *>(this)->getRequirementsData(),
-          numRequirements};
-}
-
-SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Requirement> requirements,
-                                     bool exported, SpecializationKind kind)
-    : numRequirements(requirements.size()), kind(kind), exported(exported) {
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
+SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
+                                     GenericSignature specializedSig)
+    : kind(kind), exported(exported), specializedSignature(specializedSig) { }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             ArrayRef<Requirement> requirements,
+                                             GenericSignature specializedSig,
                                              bool exported,
                                              SpecializationKind kind) {
-  unsigned size =
-      sizeof(SILSpecializeAttr) + sizeof(Requirement) * requirements.size();
-  void *buf = M.allocate(size, alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(requirements, exported, kind);
+  void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
+  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig);
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
-  if (getLoweredFunctionType()->getGenericSignature()) {
+  if (getLoweredFunctionType()->getInvocationGenericSignature()) {
     Attr->F = this;
     SpecializeAttrSet.push_back(Attr);
   }
@@ -102,17 +96,22 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsExactSelfClass_t isExactSelfClass)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
-      DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
+      EntryCount(entryCount),
+      Availability(AvailabilityContext::alwaysAvailable()),
+      Bare(isBareSILFunction), Transparent(isTrans),
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false), IsWeakLinked(false),
+      HasCReferences(false), IsWeakImported(false),
       IsDynamicReplaceable(isDynamic),
       ExactSelfClass(isExactSelfClass),
-      OptMode(OptimizationMode::NotSet),
-      EffectsKindAttr(E), EntryCount(entryCount) {
+      Inlined(false), Zombie(false), HasOwnership(true),
+      WasDeserializedCanonical(false), IsWithoutActuallyEscapingThunk(false),
+      OptMode(unsigned(OptimizationMode::NotSet)),
+      EffectsKindAttr(unsigned(E)) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
+  setDebugScope(DebugScope);
 
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
@@ -196,8 +195,8 @@ ASTContext &SILFunction::getASTContext() const {
 }
 
 OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
-  if (OptMode != OptimizationMode::NotSet)
-    return OptMode;
+  if (OptimizationMode(OptMode) != OptimizationMode::NotSet)
+    return OptimizationMode(OptMode);
 
   return getModule().getOptions().OptMode;
 }
@@ -224,13 +223,13 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   auto genericSig = getGenericSignature()->getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInSignature(*genericSig),
+                    LookUpConformanceInSignature(genericSig.getPointer()),
                     genericSig);
 }
 
 bool SILFunction::isNoReturnFunction() const {
   return SILType::getPrimitiveObjectType(getLoweredFunctionType())
-      .isNoReturnFunction();
+      .isNoReturnFunction(getModule());
 }
 
 const TypeLowering &
@@ -254,7 +253,8 @@ SILType SILFunction::getLoweredType(Type t) const {
 }
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
-  return getModule().Types.getLoweredLoadableType(t, getResilienceExpansion());
+  auto &M = getModule();
+  return M.Types.getLoweredLoadableType(t, getResilienceExpansion(), M);
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
@@ -263,6 +263,27 @@ const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
 
 bool SILFunction::isTypeABIAccessible(SILType type) const {
   return getModule().isTypeABIAccessible(type, getResilienceExpansion());
+}
+
+bool SILFunction::isWeakImported() const {
+  // For imported functions check the Clang declaration.
+  if (ClangNodeOwner)
+    return ClangNodeOwner->getClangDecl()->isWeakImported();
+
+  // For native functions check a flag on the SILFunction
+  // itself.
+  if (!isAvailableExternally())
+    return false;
+
+  if (isAlwaysWeakImported())
+    return true;
+
+  if (Availability.isAlwaysAvailable())
+    return false;
+
+  auto fromContext = AvailabilityContext::forDeploymentTarget(
+      getASTContext());
+  return !fromContext.isContainedIn(Availability);
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {

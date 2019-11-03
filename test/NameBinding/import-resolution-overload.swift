@@ -2,7 +2,8 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_intFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_boolFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify -swift-version 4
+// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify -swift-version 5
 
 // RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump
 // RUN: %FileCheck %s < %t.astdump
@@ -14,15 +15,15 @@ import var overload_vars.scopedVar
 import func overload_boolFunctions.scopedFunction
 
 struct LocalType {}
-func something(_ obj: LocalType) -> LocalType { return obj } // expected-note {{found this candidate}}
-func something(_ a: Int, _ b: Int, _ c: Int) -> () {} // expected-note {{found this candidate}}
+func something(_ obj: LocalType) -> LocalType { return obj }
+func something(_ a: Int, _ b: Int, _ c: Int) -> () {}
 
 var _ : Bool = something(true)
 var _ : Int = something(1)
 var _ : (Int, Int) = something(1, 2)
 var _ : LocalType = something(LocalType())
 var _ : () = something(1, 2, 3)
-something = 42 // expected-error {{ambiguous reference to member 'something'}}
+something = 42
 
 let ambValue = ambiguousWithVar // no-warning - var preferred
 let ambValueChecked: Int = ambValue
@@ -36,11 +37,11 @@ localVar(42)  // expected-error {{cannot call value of non-function type 'Bool'}
 var _ : localVar // should still work
 
 _ = scopedVar // no-warning
-scopedVar(42) // expected-error {{cannot call value of non-function type 'Int'}}
+scopedVar(42)
 
 var _ : Bool = scopedFunction(true)
 var _ : Int  = scopedFunction(42)
-scopedFunction = 42 // expected-error {{ambiguous reference to member 'scopedFunction'}}
+scopedFunction = 42
 
 // FIXME: Should be an error -- a type name and a function cannot overload.
 var _ : Int = TypeNameWins(42)

@@ -108,6 +108,27 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     h.log(##"The interpolated value is \##(x)"##)
     h.log(#"Sparkling heart should appear in the next line. \#n \#u{1F496}"#)
   }
+
+  OSLogTestSuite.test("integer types") {
+    let h = Logger()
+    h.log("Smallest 32-bit integer value: \(Int32.min, format: .hex)")
+  }
+
+  OSLogTestSuite.test("dynamic strings") {
+    let h = Logger()
+
+    let smallString = "a"
+    h.log("A small string: \(smallString, privacy: .public)")
+
+    let largeString = "This is a large String"
+    h.log("\(largeString, privacy: .public)")
+
+    let concatString = "hello" + " - " + "world"
+    h.log("A dynamic string: \(concatString, privacy: .public)")
+
+    let interpolatedString = "\(31) trillion digits of pi are known so far"
+    h.log("\(interpolatedString)")
+  }
 }
 
 // The following tests check the correctness of the format string and the
@@ -190,31 +211,70 @@ internal struct OSLogBufferChecker {
 
     expectEqual(size, buffer[startIndex + 1])
 
-    // Check every byte of the payload.
-    withUnsafeBytes(of: expectedData) { expectedBytes in
-      for i in 0..<Int(size) {
-        // Argument data starts after the two header bytes.
-        expectEqual(
-          expectedBytes[i],
-          buffer[startIndex + 2 + i],
-          "mismatch at byte number \(i) of the expected value \(expectedData)")
+    // Check the payload and diagnose error. Strings are specially handled as
+    // only their addresses are stored in the buffer, and their addresses could
+    // not be compared directly.
+    if !(expectedData is String) {
+      withUnsafeBytes(of: expectedData) { expectedBytes in
+        for i in 0..<Int(size) {
+          // Argument data starts after the two header bytes.
+          expectEqual(
+            expectedBytes[i],
+            buffer[startIndex + 2 + i],
+            "mismatch at byte number \(i) "
+              + "of the expected value \(expectedData)")
+        }
       }
+      return
+    }
+
+    // Read the pointer to a string stored in the buffer and compare it with
+    // the expected string using `strcmp`. Note that it is important we use a C
+    // function here to compare the string as it more closely represents the C
+    // os_log functions.
+    var stringAddress: Int = 0
+    // Copy the bytes of the address byte by byte. Note that
+    // RawPointer.load(fromByteOffset:,_) function cannot be used here as the
+    // address: `buffer + offset` is not aligned for reading an Int.
+    for i in 0..<Int(size) {
+      stringAddress |= Int(buffer[startIndex + 2 + i]) << (8 * i)
+    }
+
+    let bufferDataPointer = UnsafePointer<Int8>(bitPattern: stringAddress)
+    (expectedData as! String).withCString {
+      let compareResult = strcmp($0, bufferDataPointer)
+      expectEqual(0, compareResult, "strcmp returned \(compareResult)")
     }
   }
 
   /// Check whether the bytes starting from `startIndex` contain the encoding
   /// for an Int.
-  internal func checkInt(
+  internal func checkInt<T>(
     startIndex: Int,
     flag: ArgumentFlag,
-    expectedInt: Int
-  ) {
+    expectedInt: T
+  ) where T : FixedWidthInteger {
     checkArgument(
       startIndex: startIndex,
-      size: UInt8(MemoryLayout<Int>.size),
+      size: UInt8(MemoryLayout<T>.size),
       flag: flag,
       type: .scalar,
       expectedData: expectedInt)
+  }
+
+  /// Check whether the bytes starting from `startIndex` contain the encoding
+  /// for a string.
+  internal func checkString(
+    startIndex: Int,
+    flag: ArgumentFlag,
+    expectedString: String
+  ) {
+    checkArgument(
+      startIndex: startIndex,
+      size: UInt8(MemoryLayout<UnsafePointer<Int8>>.size),
+      flag: flag,
+      type: .string,
+      expectedData: expectedString)
   }
 
   /// Check the given assertions on the arguments stored in the byte buffer.
@@ -426,4 +486,89 @@ InterpolationTestSuite.test("string interpolations with percents") {
         hasPrivate: false,
         hasNonScalar: false)
   })
+}
+
+InterpolationTestSuite.test("integer types") {
+  _checkFormatStringAndBuffer("Int32 max: \(Int32.max)") {
+    (formatString, buffer) in
+    expectEqual("Int32 max: %{public}d", formatString)
+
+    let bufferChecker = OSLogBufferChecker(buffer)
+    bufferChecker.checkSummaryBytes(
+      argumentCount: 1,
+      hasPrivate: false,
+      hasNonScalar: false)
+
+    bufferChecker.checkArguments({
+      bufferChecker.checkInt(
+        startIndex: $0,
+        flag: .publicFlag,
+        expectedInt: Int32.max)
+    })
+  }
+}
+
+InterpolationTestSuite.test("string arguments") {
+  let small = "a"
+  let large = "this is a large string"
+  _checkFormatStringAndBuffer(
+    """
+    small: \(small, privacy: .public) \
+    large: \(large, privacy: .private)
+    """) {
+    (formatString, buffer) in
+      expectEqual("small: %{public}s large: %{private}s", formatString)
+
+    let bufferChecker = OSLogBufferChecker(buffer)
+    bufferChecker.checkSummaryBytes(
+      argumentCount: 2,
+      hasPrivate: true,
+      hasNonScalar: true
+    )
+
+    bufferChecker.checkArguments({
+      bufferChecker.checkString(
+        startIndex: $0,
+        flag: .publicFlag,
+        expectedString: small)
+    },
+    { bufferChecker.checkString(
+      startIndex: $0,
+      flag: .privateFlag,
+      expectedString: large)
+    })
+  }
+}
+
+InterpolationTestSuite.test("dynamic strings") {
+  let concatString = "hello" + " - " + "world"
+  let interpolatedString = "\(31) trillion digits of pi are known so far"
+
+  _checkFormatStringAndBuffer(
+    """
+    concat: \(concatString, privacy: .public) \
+    interpolated: \(interpolatedString, privacy: .private)
+    """) {
+    (formatString, buffer) in
+    expectEqual("concat: %{public}s interpolated: %{private}s", formatString)
+
+    let bufferChecker = OSLogBufferChecker(buffer)
+    bufferChecker.checkSummaryBytes(
+      argumentCount: 2,
+      hasPrivate: true,
+      hasNonScalar: true
+    )
+
+    bufferChecker.checkArguments({
+      bufferChecker.checkString(
+        startIndex: $0,
+        flag: .publicFlag,
+        expectedString: concatString)
+    },
+    { bufferChecker.checkString(
+        startIndex: $0,
+        flag: .privateFlag,
+        expectedString: interpolatedString)
+    })
+  }
 }

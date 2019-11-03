@@ -12,7 +12,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -23,7 +25,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the type checker type zone (zone 10).
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -66,22 +68,29 @@ void swift::simple_display(llvm::raw_ostream &out, Type type) {
     out << "null";
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const TypeRepr *TyR) {
+  if (TyR)
+    TyR->print(out);
+  else
+    out << "null";
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
+  out << "(";
+  simple_display(out, source.getType());
+  out << ", ";
+  simple_display(out, source.getTypeRepr());
+  out << ")";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
 
-TypeLoc &InheritedTypeRequest::getTypeLoc(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
-}
-
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   return typeLoc.getLoc();
 }
 
@@ -91,7 +100,8 @@ bool InheritedTypeRequest::isCached() const {
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   if (typeLoc.wasValidated())
     return typeLoc.getType();
 
@@ -100,7 +110,8 @@ Optional<Type> InheritedTypeRequest::getCachedResult() const {
 
 void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   typeLoc.setType(value);
 }
 
@@ -157,15 +168,15 @@ bool EnumRawTypeRequest::isCached() const {
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {
   auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.RawType.getInt())
-    return enumDecl->LazySemanticInfo.RawType.getPointer();
+  if (enumDecl->LazySemanticInfo.hasRawType())
+    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
 
   return None;
 }
 
 void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+  enumDecl->LazySemanticInfo.cacheRawType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -354,20 +365,27 @@ SourceLoc RequirementRequest::getNearestLoc() const {
   return owner.getLoc();
 }
 
-MutableArrayRef<RequirementRepr>
-RequirementRequest::getRequirements(WhereClauseOwner owner) {
-  if (auto genericParams = owner.source.dyn_cast<GenericParamList *>()) {
+void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  // For now, the GSB does a better job of describing the exact structure of
+  // the cycle.
+  //
+  // FIXME: We should consider merging the circularity handling the GSB does
+  // into this request.  See rdar://55263708
+}
+
+MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
+  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
   }
 
-  if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
+  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
     
     return { };
   }
 
-  auto decl = owner.source.dyn_cast<Decl *>();
+  auto decl = source.dyn_cast<Decl *>();
   if (!decl)
     return { };
 
@@ -391,14 +409,15 @@ RequirementRequest::getRequirements(WhereClauseOwner owner) {
   return { };
 }
 
-bool RequirementRequest::visitRequirements(
-      WhereClauseOwner owner, TypeResolutionStage stage,
-      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback) {
-  auto &evaluator = owner.dc->getASTContext().evaluator;
-  auto requirements = getRequirements(owner);
+bool WhereClauseOwner::visitRequirements(
+    TypeResolutionStage stage,
+    llvm::function_ref<bool(Requirement, RequirementRepr *)> callback)
+    const && {
+  auto &evaluator = dc->getASTContext().evaluator;
+  auto requirements = getRequirements();
   for (unsigned index : indices(requirements)) {
     // Resolve to a requirement.
-    auto req = evaluator(RequirementRequest{owner, index, stage});
+    auto req = evaluator(RequirementRequest{*this, index, stage});
     if (req) {
       // Invoke the callback. If it returns true, we're done.
       if (callback(*req, &requirements[index]))
@@ -407,10 +426,10 @@ bool RequirementRequest::visitRequirements(
       continue;
     }
 
-    llvm::handleAllErrors(req.takeError(),
-      [](const CyclicalRequestError<RequirementRequest> &E) {
-        // cycle detected
-      });
+    llvm::handleAllErrors(
+        req.takeError(), [](const CyclicalRequestError<RequirementRequest> &E) {
+          // cycle detected
+        });
   }
 
   return false;
@@ -419,7 +438,7 @@ bool RequirementRequest::visitRequirements(
 RequirementRepr &RequirementRequest::getRequirement() const {
   auto owner = std::get<0>(getStorage());
   auto index = std::get<1>(getStorage());
-  return getRequirements(owner)[index];
+  return owner.getRequirements()[index];
 }
 
 bool RequirementRequest::isCached() const {
@@ -493,49 +512,20 @@ void swift::simple_display(llvm::raw_ostream &out,
 // DefaultTypeRequest caching.
 //----------------------------------------------------------------------------//
 
-SourceFile *DefaultTypeRequest::getSourceFile() const {
-  return getDeclContext()->getParentSourceFile();
-}
-
-Type &DefaultTypeRequest::getCache() const {
-  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
-      getSourceFile(), getKnownProtocolKind());
-}
-
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
-  auto const &cachedType = getCache();
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  const auto &cachedType = DC->getASTContext().getDefaultTypeRequestCache(
+      DC->getParentSourceFile(), knownProtocolKind);
   return cachedType ? Optional<Type>(cachedType) : None;
 }
 
-void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
-
-const char *
-DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-
-  // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return typeName;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return nullptr;
-  }
-}
-
-bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-      
-    // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return performLocalLookup;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return false;
-  }
+void DefaultTypeRequest::cacheResult(Type value) const {
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  auto &cacheEntry = DC->getASTContext().getDefaultTypeRequestCache(
+                         DC->getParentSourceFile(), knownProtocolKind);
+  cacheEntry = value;
 }
 
 bool PropertyWrapperTypeInfoRequest::isCached() const {
@@ -573,11 +563,6 @@ void swift::simple_display(
   out << "{ ";
   if (propertyWrapper.valueVar)
     out << propertyWrapper.valueVar->printRef();
-  else
-    out << "null";
-  out << ", ";
-  if (propertyWrapper.wrappedValueInit)
-    out << propertyWrapper.wrappedValueInit->printRef();
   else
     out << "null";
   out << " }";
@@ -823,4 +808,266 @@ IsImplicitlyUnwrappedOptionalRequest::getCachedResult() const {
 void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setImplicitlyUnwrappedOptional(value);
+}
+
+//----------------------------------------------------------------------------//
+// GenericSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<GenericSignature> GenericSignatureRequest::getCachedResult() const {
+  auto *GC = std::get<0>(getStorage());
+  if (GC->GenericSigAndBit.getInt()) {
+    return GC->GenericSigAndBit.getPointer();
+  }
+  return None;
+}
+
+void GenericSignatureRequest::cacheResult(GenericSignature value) const {
+  auto *GC = std::get<0>(getStorage());
+  GC->GenericSigAndBit.setPointerAndInt(value, true);
+}
+
+//----------------------------------------------------------------------------//
+// InferredGenericSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
+  // For now, the GSB does a better job of describing the exact structure of
+  // the cycle.
+  //
+  // FIXME: We should consider merging the circularity handling the GSB does
+  // into this request.  See rdar://55263708
+}
+
+//----------------------------------------------------------------------------//
+// UnderlyingTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type>
+UnderlyingTypeRequest::getCachedResult() const {
+  auto *typeAlias = std::get<0>(getStorage());
+  if (auto type = typeAlias->UnderlyingTy.getType())
+    return type;
+  return None;
+}
+
+void UnderlyingTypeRequest::cacheResult(Type value) const {
+  auto *typeAlias = std::get<0>(getStorage());
+  typeAlias->UnderlyingTy.setType(value);
+}
+
+void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// EnumRawValuesRequest computation.
+//----------------------------------------------------------------------------//
+
+bool EnumRawValuesRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
+}
+
+Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+  auto *ED = std::get<0>(getStorage());
+  if (ED->LazySemanticInfo.hasCheckedRawValues())
+    return true;
+  return None;
+}
+
+void EnumRawValuesRequest::cacheResult(bool) const {
+  auto *ED = std::get<0>(getStorage());
+  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues |
+      EnumDecl::HasFixedRawValuesAndTypes;
+  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+}
+
+void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // This request computes the raw type, and so participates in cycles involving
+  // it. For now, the raw type provides a rich enough circularity diagnostic
+  // that we can silence ourselves.
+}
+
+void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
+
+}
+
+//----------------------------------------------------------------------------//
+// IsStaticRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsStaticRequest::getCachedResult() const {
+  auto *FD = std::get<0>(getStorage());
+  return FD->getCachedIsStatic();
+}
+
+void IsStaticRequest::cacheResult(bool result) const {
+  auto *FD = std::get<0>(getStorage());
+  FD->setStatic(result);
+}
+
+//----------------------------------------------------------------------------//
+// NeedsNewVTableEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> NeedsNewVTableEntryRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.NeedsNewVTableEntryComputed)
+    return decl->LazySemanticInfo.NeedsNewVTableEntry;
+  return None;
+}
+
+void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
+  decl->LazySemanticInfo.NeedsNewVTableEntry = value;
+}
+
+//----------------------------------------------------------------------------//
+// ParamSpecifierRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ParamSpecifier> ParamSpecifierRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedSpecifier();
+}
+
+void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setSpecifier(specifier);
+}
+
+//----------------------------------------------------------------------------//
+// ResultTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
+    return funcDecl->getBodyResultTypeLoc();
+  auto *subscriptDecl = cast<SubscriptDecl>(decl);
+  return subscriptDecl->getElementTypeLoc();
+}
+
+Optional<Type> ResultTypeRequest::getCachedResult() const {
+  if (auto type = getResultTypeLoc().getType())
+    return type;
+
+  return None;
+}
+
+void ResultTypeRequest::cacheResult(Type type) const {
+  getResultTypeLoc().setType(type);
+}
+
+//----------------------------------------------------------------------------//
+// PatternBindingEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<const PatternBindingEntry *>
+PatternBindingEntryRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  if (!PBD->getPatternList()[idx].isFullyValidated()) {
+    return None;
+  }
+  return &PBD->getPatternList()[idx];
+}
+
+void PatternBindingEntryRequest::cacheResult(
+    const PatternBindingEntry *value) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setFullyValidated();
+}
+
+//----------------------------------------------------------------------------//
+// NamingPatternRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
+  auto *VD = std::get<0>(getStorage());
+  if (auto *Pat = VD->NamingPattern) {
+    return Pat;
+  }
+  return None;
+}
+
+void NamingPatternRequest::cacheResult(NamedPattern *value) const {
+  auto *VD = std::get<0>(getStorage());
+  VD->NamingPattern = value;
+}
+
+//----------------------------------------------------------------------------//
+// InterfaceTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> InterfaceTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto Ty = decl->TypeAndAccess.getPointer()) {
+    return Ty;
+  }
+  return None;
+}
+
+void InterfaceTypeRequest::cacheResult(Type type) const {
+  auto *decl = std::get<0>(getStorage());
+  if (type) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+    assert(!type->hasArchetype() && "Archetype in interface type");
+  }
+  decl->TypeAndAccess.setPointer(type);
+}
+
+//----------------------------------------------------------------------------//
+// LookupPrecedenceGroupRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc.getLoc();
+}
+
+void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto &desc = std::get<0>(getStorage());
+  if (auto pathDir = desc.pathDirection) {
+    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
+  } else {
+    diags.diagnose(desc.nameLoc, diag::circular_reference);
+  }
+}
+
+void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+  auto &desc = std::get<0>(getStorage());
+  diag.diagnose(desc.nameLoc,
+                 diag::circular_reference_through_precedence_group, desc.ident);
+}
+
+SourceLoc PrecedenceGroupDescriptor::getLoc() const {
+  return nameLoc;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const PrecedenceGroupDescriptor &desc) {
+  out << "precedence group " << desc.ident << " at ";
+  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+}
+
+//----------------------------------------------------------------------------//
+// InheritsSuperclassInitializersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedInheritsSuperclassInitializers();
+}
+
+void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setInheritsSuperclassInitializers(value);
 }

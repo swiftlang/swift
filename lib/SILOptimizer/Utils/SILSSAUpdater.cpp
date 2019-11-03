@@ -10,19 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/SSAUpdaterImpl.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/Basic/Malloc.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/SSAUpdaterImpl.h"
 
 using namespace swift;
 

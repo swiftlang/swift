@@ -1024,3 +1024,25 @@ bb0(%0 : $Builtin.Int64):
   %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int64), 0
   return %2 : $Builtin.Int64
 }
+
+// CHECK-LABEL: sil [canonical] @isConcrete_true : $@convention(thin) (@thin UInt.Type) -> Builtin.Int1 {
+// CHECK: bb0(
+// CHECK-NEXT: [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-NEXT: } // end sil function 'isConcrete_true'
+sil [canonical] @isConcrete_true : $@convention(thin) (@thin UInt.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin UInt.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin UInt.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [canonical] @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+// CHECK: bb0(
+// CHECK-NEXT: [[RESULT:%.*]] = builtin "isConcrete"(
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-NEXT: } // end sil function 'isConcrete_false'
+sil [canonical] @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}

@@ -191,10 +191,12 @@ public:
     }
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     unsigned StartOffset = OS.tell();
     Info.References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {

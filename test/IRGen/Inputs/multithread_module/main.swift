@@ -10,7 +10,7 @@ class Derived : Base {
 	}
 }
 
-private struct MyStruct : MyProto {
+public struct MyStruct : MyProto {
 
 	var x: Int
 

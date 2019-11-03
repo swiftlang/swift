@@ -1782,6 +1782,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
       case file_types::TY_SwiftModuleFile:
       case file_types::TY_SwiftModuleDocFile:
+      case file_types::TY_SwiftSourceInfoFile:
         if (OI.ShouldGenerateModule && !OI.shouldLink()) {
           // When generating a .swiftmodule as a top-level output (as opposed
           // to, for example, linking an image), treat .swiftmodule files as
@@ -1824,7 +1825,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
-      case file_types::TY_SwiftParseableInterfaceFile:
+      case file_types::TY_SwiftModuleInterfaceFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2541,13 +2542,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   if (OI.ShouldGenerateModule &&
-      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
-    chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
-                                   Output.get());
+      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
+    chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory, Output.get());
+    chooseSwiftSourceInfoOutputPath(C, OutputMap, workingDirectory, Output.get());
+  }
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path))
-    chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
+    chooseModuleInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
@@ -2786,35 +2788,68 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C,
   }
 }
 
+static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
+                                                const TypeToPathMap *OutputMap,
+                                                StringRef workingDirectory,
+                                                CommandOutput *Output,
+                                                file_types::ID fileID,
+                                                bool shouldUseProjectFolder = false,
+                                                Optional<options::ID> optId = llvm::None) {
+  if (hasExistingAdditionalOutput(*Output, fileID))
+    return;
+  // Honor driver option for this path if it's given
+  if (optId.hasValue()) {
+    if (const Arg *A = C.getArgs().getLastArg(*optId)) {
+      Output->setAdditionalOutputForType(fileID, StringRef(A->getValue()));
+      return;
+    }
+  }
+
+  StringRef OFMOutputPath;
+  if (OutputMap) {
+    auto iter = OutputMap->find(fileID);
+    if (iter != OutputMap->end())
+      OFMOutputPath = iter->second;
+  }
+  if (!OFMOutputPath.empty()) {
+    // Prefer a path from the OutputMap.
+    Output->setAdditionalOutputForType(fileID, OFMOutputPath);
+  } else if (Output->getPrimaryOutputType() != file_types::TY_Nothing) {
+    auto ModulePath = Output->getAnyOutputForType(file_types::TY_SwiftModuleFile);
+    bool isTempFile = C.isTemporaryFile(ModulePath);
+    auto ModuleName = llvm::sys::path::filename(ModulePath);
+    llvm::SmallString<128> Path(llvm::sys::path::parent_path(ModulePath));
+    if (shouldUseProjectFolder) {
+      llvm::sys::path::append(Path, "Project");
+      // If the build system has created a Project dir for us to include the file, use it.
+      if (!llvm::sys::fs::exists(Path)) {
+        llvm::sys::path::remove_filename(Path);
+      }
+    }
+    llvm::sys::path::append(Path, ModuleName);
+    llvm::sys::path::replace_extension(Path, file_types::getExtension(fileID));
+    Output->setAdditionalOutputForType(fileID, Path);
+    if (isTempFile)
+      C.addTemporaryFile(Path);
+  }
+}
+
+void Driver::chooseSwiftSourceInfoOutputPath(Compilation &C,
+                                             const TypeToPathMap *OutputMap,
+                                             StringRef workingDirectory,
+                                             CommandOutput *Output) const {
+  chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
+                                      file_types::TY_SwiftSourceInfoFile,
+                                      /*shouldUseProjectFolder*/true,
+                                      options::OPT_emit_module_source_info_path);
+}
+
 void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
                                             const TypeToPathMap *OutputMap,
                                             StringRef workingDirectory,
                                             CommandOutput *Output) const {
-
-  if (hasExistingAdditionalOutput(*Output, file_types::TY_SwiftModuleDocFile))
-    return;
-
-  StringRef OFMModuleDocOutputPath;
-  if (OutputMap) {
-    auto iter = OutputMap->find(file_types::TY_SwiftModuleDocFile);
-    if (iter != OutputMap->end())
-      OFMModuleDocOutputPath = iter->second;
-  }
-  if (!OFMModuleDocOutputPath.empty()) {
-    // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(file_types::TY_SwiftModuleDocFile,
-                                       OFMModuleDocOutputPath);
-  } else if (Output->getPrimaryOutputType() != file_types::TY_Nothing) {
-    // Otherwise, put it next to the swiftmodule file.
-    llvm::SmallString<128> Path(
-        Output->getAnyOutputForType(file_types::TY_SwiftModuleFile));
-    bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(
-        Path, file_types::getExtension(file_types::TY_SwiftModuleDocFile));
-    Output->setAdditionalOutputForType(file_types::TY_SwiftModuleDocFile, Path);
-    if (isTempFile)
-      C.addTemporaryFile(Path);
-  }
+  chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
+                                      file_types::TY_SwiftModuleDocFile);
 }
 
 void Driver::chooseRemappingOutputPath(Compilation &C,
@@ -2844,7 +2879,7 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
   }
 }
 
-void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
+void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                           StringRef workingDirectory,
                                           llvm::SmallString<128> &buffer,
                                           CommandOutput *output) const {
@@ -2866,9 +2901,9 @@ void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
       C.getOutputInfo(), C.getArgs(),
       options::OPT_emit_module_interface_path,
-      file_types::TY_SwiftParseableInterfaceFile,
+      file_types::TY_SwiftModuleInterfaceFile,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
-  output->setAdditionalOutputForType(file_types::TY_SwiftParseableInterfaceFile,
+  output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
                                      outputPath);
 }
 

@@ -107,7 +107,6 @@ class TypeMatcher {
     TRIVIAL_CASE(BuiltinRawPointerType)
     TRIVIAL_CASE(BuiltinNativeObjectType)
     TRIVIAL_CASE(BuiltinBridgeObjectType)
-    TRIVIAL_CASE(BuiltinUnknownObjectType)
     TRIVIAL_CASE(BuiltinUnsafeValueBufferType)
     TRIVIAL_CASE(BuiltinVectorType)
     TRIVIAL_CASE(SILTokenType)

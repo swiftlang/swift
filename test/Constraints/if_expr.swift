@@ -28,7 +28,7 @@ useDouble(c)
 useDouble(d)
 
 var z = true ? a : b // expected-error{{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
-var _ = a ? b : b // expected-error{{'Int' is not convertible to 'Bool'}}
+var _ = a ? b : b // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
 
 
@@ -51,13 +51,13 @@ useD1(i) // expected-error{{cannot convert value of type 'B' to expected argumen
 useD2(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D2'}}
 
 var x = true ? 1 : 0
-var y = 22 ? 1 : 0 // expected-error{{'Int' is not convertible to 'Bool'}}
+var y = 22 ? 1 : 0 // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
-_ = x ? x : x // expected-error {{'Int' is not convertible to 'Bool'}}
+_ = x ? x : x // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
 
-_ = (x: true) ? true : false // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
-_ = (x: 1) ? true : false // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+_ = (x: true) ? true : false // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
+_ = (x: 1) ? true : false // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
 
 let ib: Bool! = false
 let eb: Bool? = .some(false)

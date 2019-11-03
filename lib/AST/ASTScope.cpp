@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/NullablePtr.h"
@@ -41,6 +42,8 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclName name, SourceLoc loc,
     const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
+  if (auto *s = SF->getASTContext().Stats)
+    ++s->getFrontendCounters().NumASTScopeLookups;
   return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
                                          consumer);
 }
@@ -51,7 +54,17 @@ Optional<bool> ASTScope::computeIsCascadingUse(
   return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void ASTScope::dump() const { impl->dump(); }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
+
 void ASTScope::print(llvm::raw_ostream &out) const { impl->print(out); }
 void ASTScope::dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineCol) {
   impl->dumpOneScopeMapLocation(lineCol);
@@ -82,7 +95,7 @@ AbstractClosureScope::getClosureIfClosureScope() const {
 
 // Conservative, because using precise info would be circular
 SourceRange
-AttachedPropertyWrapperScope::getSourceRangeFor(const VarDecl *const vd) {
+AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
     if (sr.isInvalid())
@@ -166,7 +179,7 @@ NullablePtr<DeclContext> BraceStmtScope::getDeclContext() const {
 NullablePtr<DeclContext>
 DefaultArgumentInitializerScope::getDeclContext() const {
   auto *dc = decl->getDefaultArgumentInitContext();
-  assert(dc && "If scope exists, this must exist");
+  ASTScopeAssert(dc, "If scope exists, this must exist");
   return dc;
 }
 
@@ -177,10 +190,7 @@ NullablePtr<DeclContext> CaptureListScope::getDeclContext() const {
 }
 
 NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
-  return decl->getParentPatternBinding()
-      ->getPatternList()
-      .front()
-      .getInitContext();
+  return decl->getParentPatternBinding()->getInitContext(0);
 }
 
 NullablePtr<DeclContext> AbstractFunctionDeclScope::getDeclContext() const {
@@ -255,6 +265,9 @@ ExtensionScope::getCorrespondingNominalTypeDecl() const {
 
 void ASTScopeImpl::preOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
   fn(this);
+  preOrderChildrenDo(fn);
+}
+void ASTScopeImpl::preOrderChildrenDo(function_ref<void(ASTScopeImpl *)> fn) {
   for (auto *child : getChildren())
     child->preOrderDo(fn);
 }
@@ -272,4 +285,23 @@ ArrayRef<StmtConditionElement> ConditionalClauseScope::getCond() const {
 const StmtConditionElement &
 ConditionalClauseScope::getStmtConditionElement() const {
   return getCond()[index];
+}
+
+unsigned ASTScopeImpl::countDescendants() const {
+  unsigned count = 0;
+  const_cast<ASTScopeImpl *>(this)->preOrderDo(
+      [&](ASTScopeImpl *) { ++count; });
+  return count - 1;
+}
+
+// Can fail if a subscope is lazy and not reexpanded
+void ASTScopeImpl::assertThatTreeDoesNotShrink(function_ref<void()> fn) {
+#ifndef NDEBUG
+  unsigned beforeCount = countDescendants();
+#endif
+  fn();
+#ifndef NDEBUG
+  unsigned afterCount = countDescendants();
+  ASTScopeAssert(beforeCount <= afterCount, "shrank?!");
+#endif
 }

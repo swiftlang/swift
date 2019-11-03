@@ -22,6 +22,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -29,6 +30,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
+
+#define DEBUG_TYPE "Sema"
 using namespace swift;
 
 /// Return true if this expression is an implicit promotion from T to T?.
@@ -470,8 +473,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         isExistential = instanceTy->isExistentialType();
         if (!isExistential &&
             instanceTy->mayHaveMembers() &&
-            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                   instanceTy).empty()) {
+            !TypeChecker::lookupConstructors(const_cast<DeclContext *>(DC),
+                                             instanceTy).empty()) {
           TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
             .fixItInsertAfter(E->getEndLoc(), "()");
         }
@@ -525,7 +528,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
+      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
                                /*Loc=*/SourceLoc(),
                                UnqualifiedLookup::Flags::KnownPrivate);
 
@@ -567,7 +570,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Referencing type(of:) and other decls with special type-checking
       // behavior as functions is not implemented. Maybe we could wrap up the
       // special-case behavior in a closure someday...
-      if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
+      if (TypeChecker::getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
                     DRE->getDecl()->getBaseName().getIdentifier());
@@ -629,10 +632,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       auto subMap = DRE->getDeclRef().getSubstitutions();
-      auto fromTy =
-        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
-      auto toTy =
-        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
+      auto fromTy = subMap.getReplacementTypes()[0];
+      auto toTy = subMap.getReplacementTypes()[1];
 
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
@@ -1477,9 +1478,13 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  interleave(typeDecl->getInnermostGenericParamTypes(),
-             printGenericParamSummary, [&]{ genericParamText << ", "; });
-
+  // FIXME: We can potentially be in the middle of creating a generic signature
+  // if we get here.  Break this cycle.
+  if (typeDecl->hasComputedGenericSignature()) {
+    interleave(typeDecl->getInnermostGenericParamTypes(),
+               printGenericParamSummary, [&]{ genericParamText << ", "; });
+  }
+  
   genericParamText << ">";
   return true;
 }
@@ -1794,9 +1799,15 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
   }
 }
 
-bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
-                                          ValueDecl *decl,
-                                          const ValueDecl *base) {
+namespace {
+enum NoteKind_t {
+  FixItReplace,
+  FixItInsert,
+};
+
+static bool fixItOverrideDeclarationTypesImpl(
+    ValueDecl *decl, const ValueDecl *base,
+    SmallVectorImpl<std::tuple<NoteKind_t, SourceRange, std::string>> &notes) {
   // For now, just rewrite cases where the base uses a value type and the
   // override uses a reference type, and the value type is bridged to the
   // reference type. This is a way to migrate code that makes use of types
@@ -1859,7 +1870,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     options.SynthesizeSugarOnTypes = true;
 
     newOverrideTy->print(baseTypeStr, options);
-    diag.fixItReplace(typeRange, baseTypeStr.str());
+    notes.emplace_back(FixItReplace, typeRange, baseTypeStr.str().str());
     return true;
   };
 
@@ -1879,7 +1890,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
         overrideFnTy->getExtInfo().isNoEscape() &&
         // The overridden function type should be escaping.
         !baseFnTy->getExtInfo().isNoEscape()) {
-      diag.fixItInsert(typeRange.Start, "@escaping ");
+      notes.emplace_back(FixItInsert, typeRange, "@escaping ");
       return true;
     }
     return false;
@@ -1917,7 +1928,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       for_each(*fn->getParameters(),
                *baseFn->getParameters(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypesImpl(param, baseParam, notes);
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
@@ -1943,7 +1954,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       for_each(*subscript->getIndices(),
                *baseSubscript->getIndices(),
                [&](ParamDecl *param, const ParamDecl *baseParam) {
-        fixedAny |= fixItOverrideDeclarationTypes(diag, param, baseParam);
+        fixedAny |= fixItOverrideDeclarationTypesImpl(param, baseParam, notes);
       });
     }
 
@@ -1958,6 +1969,26 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   }
 
   llvm_unreachable("unknown overridable member");
+}
+};
+
+bool swift::computeFixitsForOverridenDeclaration(
+    ValueDecl *decl, const ValueDecl *base,
+    llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag) {
+  SmallVector<std::tuple<NoteKind_t, SourceRange, std::string>, 4> Notes;
+  bool hasNotes = ::fixItOverrideDeclarationTypesImpl(decl, base, Notes);
+
+  Optional<InFlightDiagnostic> diagnostic = diag(hasNotes);
+  if (!diagnostic) return hasNotes;
+
+  for (const auto &note : Notes) {
+    if (std::get<0>(note) == FixItReplace) {
+      diagnostic->fixItReplace(std::get<1>(note), std::get<2>(note));
+    } else {
+      diagnostic->fixItInsert(std::get<1>(note).Start, std::get<2>(note));
+    }
+  }
+  return hasNotes;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1994,6 +2025,10 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
+
+#ifndef NDEBUG
+  llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
+#endif
   
   bool sawError = false;
   
@@ -2044,8 +2079,8 @@ public:
     if (!PBD) return false;
 
     bool sawMutation = false;
-    for (const auto &PBE : PBD->getPatternList()) {
-      PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
         auto it = VarDecls.find(VD);
         sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
       });
@@ -2068,7 +2103,7 @@ public:
     
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
-    if (VD->isInvalid() || !VD->hasType()) {
+    if (VD->isInvalid()) {
       sawError = true;
       return false;
     }
@@ -2131,6 +2166,12 @@ public:
       }
     }
 
+    // Don't walk into implicit accessors, since eg. an observer's setter
+    // references the variable, but we don't want to consider it as a real
+    // "use".
+    if (isa<AccessorDecl>(D) && D->isImplicit())
+      return false;
+
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
       // variables.
@@ -2158,8 +2199,8 @@ public:
           Decl *D = node.get<Decl *>();
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
-          for (PatternBindingEntry PBE : PBD->getPatternList()) {
-            PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
+          for (auto idx : range(PBD->getNumPatternEntries())) {
+            PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
               VarDecls[VD] = RK_Read|RK_Written;
             });
           }
@@ -2455,11 +2496,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
         if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
-            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
+            !isa<TypedPattern>(pbd->getPattern(0))) {
           unsigned varKind = var->isLet();
           SourceRange replaceRange(
               pbd->getStartLoc(),
-              pbd->getPatternList()[0].getPattern()->getEndLoc());
+              pbd->getPattern(0)->getEndLoc());
           Diags.diagnose(var->getLoc(), diag::pbd_never_used,
                          var->getName(), varKind)
             .fixItReplace(replaceRange, "_");
@@ -2734,12 +2775,18 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
+  STATISTIC(VarDeclUsageCheckerExprVisits,
+            "# of times VarDeclUsageChecker::walkToExprPre is called");
+  ++VarDeclUsageCheckerExprVisits;
+
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
+
+  assert(AllExprsSeen.insert(E).second && "duplicate traversal");
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
@@ -2785,9 +2832,13 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     return { false, E };
   }
   
-  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
-  if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
+  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
+  // and only walk the subexpr.
+  if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
+    oee->getSubExpr()->walk(*this);
+    return { false, E };
+  }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
@@ -2867,11 +2918,11 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
 }
 
 // Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
+static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
-    TC.checkUnsupportedProtocolType(cs);
+    TypeChecker::checkUnsupportedProtocolType(ctx, cs);
 
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
@@ -2898,25 +2949,25 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
       if (prevLoc.isInvalid() || thisLoc.isInvalid())
         continue;
       
-      auto &SM = TC.Context.SourceMgr;
+      auto &SM = ctx.SourceMgr;
       auto prevLineCol = SM.getLineAndColumn(prevLoc);
       if (SM.getLineNumber(thisLoc) != prevLineCol.first)
         continue;
-      
-      TC.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+
+      ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
         .highlight(items[i].getPattern()->getSourceRange())
         .highlight(where->getSourceRange());
       
       // Whitespace it out to the same column as the previous item.
       std::string whitespace(prevLineCol.second-1, ' ');
-      TC.diagnose(thisLoc, diag::add_where_newline)
+      ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
         .fixItInsert(thisLoc, "\n"+whitespace);
 
       auto whereRange = SourceRange(items[i].getWhereLoc(),
                                     where->getEndLoc());
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
       auto whereText = SM.extractText(charRange);
-      TC.diagnose(prevLoc, diag::duplicate_where)
+      ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
         .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
         .highlight(items[i-1].getSourceRange());
     }
@@ -3101,11 +3152,10 @@ class ObjCSelectorWalker : public ASTWalker {
 
     // Look for members with the given name.
     auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
-    auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
-                                  nominal->getDeclaredInterfaceType(),
-                                  lookupName,
-                                  (defaultMemberLookupOptions |
-                                   NameLookupFlags::KnownPrivate));
+    auto result = TypeChecker::lookupMember(
+        const_cast<DeclContext *>(DC), nominal->getDeclaredInterfaceType(),
+        lookupName,
+        (defaultMemberLookupOptions | NameLookupFlags::KnownPrivate));
 
     // If we didn't find multiple methods, there is no ambiguity.
     if (result.size() < 2) return false;
@@ -3742,8 +3792,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       ValueDecl * fnDecl = appendMethod.getDecl();
 
       // If things aren't set up right, just hope for the best.
-      if (!fnDecl || !fnDecl->getInterfaceType() ||
-           fnDecl->getInterfaceType()->hasError())
+      if (!fnDecl || fnDecl->isInvalid())
         return false;
 
       // If the decl expects an optional, that's fine.
@@ -3942,16 +3991,16 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   if (!TC.Context.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
-    diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+    diagAvailability(E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
-  TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
+  TypeChecker::checkUnsupportedProtocolType(TC.Context, const_cast<Stmt *>(S));
     
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(TC, switchStmt);
+    checkSwitch(TC.Context, switchStmt);
 
   checkStmtConditionTrailingClosure(TC, S);
   
@@ -4155,9 +4204,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasInterfaceType())
-    validateDecl(afd);
-
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
@@ -4238,10 +4284,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->hasInterfaceType())
-    validateDecl(var);
-
-  if (var->isInvalid() || !var->hasInterfaceType())
+  if (var->isInvalid())
     return None;
 
   if (var->getName().empty())

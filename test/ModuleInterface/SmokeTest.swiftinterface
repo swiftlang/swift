@@ -1,0 +1,97 @@
+// The "flags" line in this test deliberately has no flags and no space after
+// the colon, just to make sure that works (even though it'll never be printed
+// that way).
+
+// swift-module-flags:
+// swift-interface-format-version: 1.0
+
+// Make sure parse-only works...
+// RUN: %target-swift-frontend -parse %s
+
+// ...and then make sure parse-and-typecheck-and-serialize works.
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -compile-module-from-interface -o %t/SmokeTest.swiftmodule %s
+// RUN: %target-swift-ide-test -print-module -module-to-print SmokeTest -I %t -source-filename x -print-interface > %t/SmokeTest.txt
+// RUN: %FileCheck %s < %t/SmokeTest.txt
+// RUN: %FileCheck -check-prefix NEGATIVE %s < %t/SmokeTest.txt
+// RUN: llvm-bcanalyzer -dump %t/SmokeTest.swiftmodule | grep FILE_DEPENDENCY
+
+// CHECK-LABEL: public class TestClass
+public class TestClass {
+  // CHECK: public init(){{$}}
+  public init()
+
+  // CHECK: public func method(){{$}}
+  public func method()
+
+  // CHECK: public subscript(_: Int) -> Void{{$}}
+  public subscript(_: Int) -> Void { get set }
+
+  // CHECK: public var prop: Int{{$}}
+  public var prop: Int { get set }
+
+  // CHECK: public static var propWithNoAccessors: Int{{$}}
+  public static var propWithNoAccessors: Int
+
+  // NEGATIVE-NOT: deinit
+  deinit
+} // CHECK: {{^}$}}
+
+// CHECK-LABEL: public class TestEmptyClass {
+public class TestEmptyClass {
+} // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: public struct TestEmptyStruct {
+public struct TestEmptyStruct {
+} // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: public enum TestEnum
+public enum TestEnum {
+  // CHECK: case a
+  case a
+
+  // CHECK: public init(){{$}}
+  public init()
+
+  // CHECK: public func method(){{$}}
+  public func method()
+
+  // CHECK: public subscript(_: Int) -> Void{{$}}
+  public subscript(_: Int) -> Void { get set }
+
+  // CHECK: public var prop: Int{{$}}
+  public var prop: Int { get set }
+
+  // CHECK: public static var propWithNoAccessors: Int{{$}}
+  public static var propWithNoAccessors: Int
+} // CHECK: {{^}$}}
+
+// CHECK-LABEL: public struct TestStruct
+public struct TestStruct {
+  // CHECK: public init(){{$}}
+  public init()
+
+  // CHECK: public func method(){{$}}
+  public func method()
+
+  // CHECK: public subscript(_: Int) -> Void{{$}}
+  public subscript(_: Int) -> Void { get set }
+
+  // CHECK: public var prop: Int{{$}}
+  public var prop: Int { get set }
+
+  // CHECK: public static var propWithNoAccessors: Int{{$}}
+  public static var propWithNoAccessors: Int
+} // CHECK: {{^}$}}
+
+// CHECK: public let globalWithNoAccessors: Int{{$}}
+public let globalWithNoAccessors: Int
+
+// CHECK: public var readOnlyVar: Int { get }{{$}}
+public var readOnlyVar: Int { get }
+
+// CHECK: public var readWriteVar: Int{{$}}
+public var readWriteVar: Int { get set }
+
+// CHECK: public func verySimpleFunction(){{$}}
+public func verySimpleFunction()

@@ -41,7 +41,7 @@ protocol HasThreeAssocTypes {
 // GLOBAL-SAME:    @"$s23associated_type_witness13WithUniversalVAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1P",
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness13WithUniversalVAA8AssockedAA5AssocAaDP_AA1Q"
-// GLOBAL-SAME:    i64 add (i64 ptrtoint (<{ [36 x i8], i8 }>* @"symbolic 23associated_type_witness9UniversalV" to i64), i64 1) to i8*)
+// GLOBAL-SAME:    i64 add (i64 ptrtoint (<{ {{.*}} }>* @"symbolic{{.*}}23associated_type_witness9UniversalV" to i64), i64 1) to i8*)
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
   typealias Assoc = Universal
@@ -52,7 +52,7 @@ struct WithUniversal : Assocked {
 // GLOBAL-SAME:    @"$s23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAA5Assoc_AA1P"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAA5Assoc_AA1Q"
-// GLOBAL-SAME:    @"symbolic 23associated_type_witness9UniversalV"
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness9UniversalV"
 // GLOBAL-SAME:  ]
 struct GenericWithUniversal<T> : Assocked {
   typealias Assoc = Universal
@@ -90,7 +90,7 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1P"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1Q"
-// GLOBAL-SAME:    @"symbolic 23associated_type_witness4PairVyxq_G"
+// GLOBAL-SAME:    @"symbolic{{.*}}23associated_type_witness4PairV{{.*}}"
 // GLOBAL-SAME:  ]
 
 struct Computed<T, U> : Assocked {

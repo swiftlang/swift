@@ -23,6 +23,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -152,13 +153,13 @@ public:
 
   /// Retrieve the type witness for the given associated type.
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      SubstOptions options = None) const;
+                      SubstOptions options=None) const;
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = None) const;
+                        SubstOptions options=None) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
@@ -249,7 +250,7 @@ public:
 
   /// Get the generic signature containing the parameters open on the conforming
   /// interface type.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature getGenericSignature() const;
 
   /// Get the substitutions associated with this conformance.
   SubstitutionMap getSubstitutions(ModuleDecl *M) const;
@@ -311,15 +312,16 @@ public:
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
-  ProtocolConformance *subst(SubstitutionMap subMap) const;
+  ProtocolConformance *subst(SubstitutionMap subMap,
+                             SubstOptions options=None) const;
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
   ProtocolConformance *subst(TypeSubstitutionFn subs,
                              LookupConformanceFn conformances,
-                             SubstOptions options = None) const;
+                             SubstOptions options=None) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };
 
@@ -342,8 +344,7 @@ public:
   bool isInvalid() const;
 
   /// Whether this conformance is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule,
-                      AvailabilityContext fromContext) const;
+  bool isWeakImported(ModuleDecl *fromModule) const;
 
   bool hasWitness(ValueDecl *requirement) const;
   Witness getWitness(ValueDecl *requirement) const;
@@ -589,7 +590,7 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = None) const;
+                        SubstOptions options=None) const;
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
@@ -714,12 +715,12 @@ public:
 
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options) const {
+                        SubstOptions options=None) const {
     llvm_unreachable("self-conformances never have associated types");
   }
 
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      SubstOptions options) const {
+                      SubstOptions options=None) const {
     llvm_unreachable("self-conformances never have associated types");
   }
 
@@ -860,7 +861,7 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = None) const;
+                        SubstOptions options=None) const;
 
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
@@ -972,7 +973,7 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options = None) const {
+                        SubstOptions options=None) const {
     return InheritedConformance->getTypeWitnessAndDecl(assocType, options);
   }
 

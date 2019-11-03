@@ -4,8 +4,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
 // RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import External
 import External2
@@ -539,3 +538,50 @@ struct Test : RandomAccessCollection {
         return foos[i.offset].p
     }
 }
+
+@inline(never)
+func useAbstractFunction<T: P>(_ fn: (Int64) -> T) {}
+
+public func testThinToThick() {
+  useAbstractFunction(bar)
+}
+
+// CHECK-LABEL: sil @$s1A19rdar56410009_normalyyF
+public func rdar56410009_normal() {
+  // CHECK: [[EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF
+  // CHECK: = apply [[EXTERNAL_RESILIENT_WRAPPER]]<@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸>({{%.+}}, {{%.+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ExternalP2> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF", 0) 🦸<τ_0_0>
+  _ = externalResilientWrapper(externalResilient())
+} // CHECK: end sil function '$s1A19rdar56410009_normalyyF'
+
+// CHECK-LABEL: sil @$s1A25rdar56410009_inlinedInneryyF
+public func rdar56410009_inlinedInner() {
+  // CHECK: [[EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF
+  // CHECK: = apply [[EXTERNAL_RESILIENT_WRAPPER]]<Int64>({{%.+}}, {{%.+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ExternalP2> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF", 0) 🦸<τ_0_0>
+  _ = externalResilientWrapper(inlinableExternalResilient())
+} // CHECK: end sil function '$s1A25rdar56410009_inlinedInneryyF'
+
+// CHECK-LABEL: sil @$s1A25rdar56410009_inlinedOuteryyF
+public func rdar56410009_inlinedOuter() {
+  // CHECK: [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFAA08externalD0QryFQOyQo__Tg5
+  // CHECK: = apply [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER]]({{%.+}}, {{%.+}}) : $@convention(thin) (@in_guaranteed @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸) -> @out @_opaqueReturnTypeOf("$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlF", 0) 🦸<@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸>
+  _ = inlinableExternalResilientWrapper(externalResilient())
+} // CHECK: end sil function '$s1A25rdar56410009_inlinedOuteryyF'
+
+// Specialized from above
+// CHECK-LABEL: sil shared [noinline] @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFAA08externalD0QryFQOyQo__Tg5
+// CHECK: [[WRAPPER_INIT:%.+]] = function_ref @$s9External29WrapperP2VyACyxGxcfC
+// CHECK: = apply [[WRAPPER_INIT]]<@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸>({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : ExternalP2> (@in τ_0_0, @thin WrapperP2<τ_0_0>.Type) -> @out WrapperP2<τ_0_0>
+// CHECK: end sil function '$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFAA08externalD0QryFQOyQo__Tg5'
+
+// Specialized from below
+// CHECK-LABEL: sil shared [noinline] @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFs5Int64V_Tg5
+// CHECK: [[WRAPPER_INIT:%.+]] = function_ref @$s9External29WrapperP2VyACyxGxcfC
+// CHECK: = apply [[WRAPPER_INIT]]<Int64>({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : ExternalP2> (@in τ_0_0, @thin WrapperP2<τ_0_0>.Type) -> @out WrapperP2<τ_0_0>
+// CHECK: end sil function '$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFs5Int64V_Tg5'
+
+// CHECK-LABEL: sil @$s1A24rdar56410009_inlinedBothyyF
+public func rdar56410009_inlinedBoth() {
+  // CHECK: [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFs5Int64V_Tg5
+  // CHECK: = apply [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER]]({{%.+}}, {{%.+}}) : $@convention(thin) (Int64) -> @out @_opaqueReturnTypeOf("$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlF", 0) 🦸<Int64>
+  _ = inlinableExternalResilientWrapper(inlinableExternalResilient())
+} // CHECK:  end sil function '$s1A24rdar56410009_inlinedBothyyF'

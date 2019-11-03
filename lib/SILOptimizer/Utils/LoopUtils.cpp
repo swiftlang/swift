@@ -19,7 +19,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

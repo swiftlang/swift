@@ -14,13 +14,14 @@
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -869,6 +870,9 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
+  // Disable to build syntax tree because code-completion skips some portion of
+  // source text. That breaks an invariant of syntax tree building.
+  Invocation.getLangOptions().BuildSyntaxTree = false;
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -1502,7 +1506,7 @@ private:
 
   void printLoc(SourceLoc Loc, raw_ostream &OS) {
     OS << '@';
-    if (Loc.isValid()) {
+    if (Loc.isValid() && SM.findBufferContainingLoc(Loc) == BufferID) {
       auto LineCol = SM.getLineAndColumn(Loc, BufferID);
       OS  << LineCol.first << ':' << LineCol.second;
     }
@@ -1519,16 +1523,16 @@ private:
         OS << 'i';
       if (isa<ConstructorDecl>(D) && Entity.IsRef) {
         OS << "Ctor";
-        printLoc(D->getLoc(), OS);
+        printLoc(D->getLoc(/*SerializedOK*/false), OS);
         if (Entity.CtorTyRef) {
           OS << '-';
           OS << Decl::getKindName(Entity.CtorTyRef->getKind());
-          printLoc(Entity.CtorTyRef->getLoc(), OS);
+          printLoc(Entity.CtorTyRef->getLoc(/*SerializedOK*/false), OS);
         }
       } else {
         OS << Decl::getKindName(D->getKind());
         if (Entity.IsRef)
-          printLoc(D->getLoc(), OS);
+          printLoc(D->getLoc(/*SerializedOK*/false), OS);
       }
 
     } else {
@@ -1957,9 +1961,11 @@ public:
     OS << "</synthesized>";
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     OS << "<ref:" << Decl::getKindName(TD->getKind()) << '>';
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
     OS << "</ref>";
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
@@ -2228,7 +2234,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
     UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile(), nullptr);
+                             CI.getPrimarySourceFile());
     for (auto result : lookup.Results) {
       result.getValueDecl()->print(*Printer, Options);
 
@@ -2500,6 +2506,18 @@ public:
     }
   }
 
+  void printSerializedLoc(Decl *D) {
+    auto moduleLoc = cast<FileUnit>(D->getDeclContext()->getModuleScopeContext())->
+      getBasicLocsForDecl(D);
+    if (!moduleLoc.hasValue())
+      return;
+    if (!moduleLoc->Loc.isValid())
+      return;
+    OS << moduleLoc->SourceFilePath
+       << ":" << moduleLoc->Loc.Line
+       << ":" << moduleLoc->Loc.Column << ": ";
+  }
+
   bool walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return true;
@@ -2508,8 +2526,10 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << SM.getDisplayNameForLoc(VD->getLoc())
+        OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      } else {
+        printSerializedLoc(D);
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
       printDeclName(VD);
@@ -2525,8 +2545,10 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << SM.getDisplayNameForLoc(D->getLoc())
+        OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      } else {
+        printSerializedLoc(D);
       }
       OS << Decl::getKindName(D->getKind()) << "/";
       OS << " ";
@@ -2658,7 +2680,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
     }
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
-    M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
+    for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.second->getName();
       if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
@@ -2677,7 +2699,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
-    });
+    }
   }
 
   return ExitCode;
@@ -2793,7 +2815,7 @@ private:
   void printUSR(const ValueDecl *VD, SourceLoc Loc) {
     printLoc(Loc);
     OS << ' ';
-    if (ide::printDeclUSR(VD, OS))
+    if (ide::printValueDeclUSR(VD, OS))
       OS << "ERROR:no-usr";
     OS << '\n';
   }
@@ -2879,7 +2901,7 @@ private:
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
-      printDeclUSR(VD, OS);
+      printValueDeclUSR(VD, OS);
     }
 
     std::string error;

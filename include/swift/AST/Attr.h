@@ -17,6 +17,7 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
@@ -258,11 +259,9 @@ protected:
       ownership : NumReferenceOwnershipBits
     );
 
-    SWIFT_INLINE_BITFIELD_FULL(SpecializeAttr, DeclAttribute, 1+1+32,
+    SWIFT_INLINE_BITFIELD(SpecializeAttr, DeclAttribute, 1+1,
       exported : 1,
-      kind : 1,
-      : NumPadBits,
-      numRequirements : 32
+      kind : 1
     );
 
     SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute,
@@ -355,6 +354,30 @@ public:
 
     /// Whether client code cannot use the attribute.
     UserInaccessible = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 7),
+
+    /// Whether adding this attribute can break API
+    APIBreakingToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 8),
+
+    /// Whether removing this attribute can break API
+    APIBreakingToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 9),
+
+    /// Whether adding this attribute can break ABI
+    ABIBreakingToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 10),
+
+    /// Whether removing this attribute can break ABI
+    ABIBreakingToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 11),
+
+    /// The opposite of APIBreakingToAdd
+    APIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 12),
+
+    /// The opposite of APIBreakingToRemove
+    APIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 13),
+
+    /// The opposite of ABIBreakingToAdd
+    ABIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 14),
+
+    /// The opposite of ABIBreakingToRemove
+    ABIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 15),
   };
 
   LLVM_READNONE
@@ -435,6 +458,27 @@ public:
 
   static bool isUserInaccessible(DeclAttrKind DK) {
     return getOptions(DK) & UserInaccessible;
+  }
+
+  static bool isAddingBreakingABI(DeclAttrKind DK) {
+    return getOptions(DK) & ABIBreakingToAdd;
+  }
+
+#define DECL_ATTR(_, CLASS, OPTIONS, ...)                                                         \
+  static constexpr bool isOptionSetFor##CLASS(DeclAttrOptions Bit) {                              \
+    return (OPTIONS) & Bit;                                                                       \
+  }
+#include "swift/AST/Attr.def"
+
+  static bool isAddingBreakingAPI(DeclAttrKind DK) {
+    return getOptions(DK) & APIBreakingToAdd;
+  }
+
+  static bool isRemovingBreakingABI(DeclAttrKind DK) {
+    return getOptions(DK) & ABIBreakingToRemove;
+  }
+  static bool isRemovingBreakingAPI(DeclAttrKind DK) {
+    return getOptions(DK) & APIBreakingToRemove;
   }
 
   bool isDeclModifier() const {
@@ -1236,39 +1280,29 @@ public:
 
 private:
   TrailingWhereClause *trailingWhereClause;
-
-  Requirement *getRequirementsData() {
-    return reinterpret_cast<Requirement *>(this+1);
-  }
+  GenericSignature specializedSignature;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
-                 SpecializationKind kind);
-
-  SpecializeAttr(SourceLoc atLoc, SourceRange Range,
-                 ArrayRef<Requirement> requirements,
-                 bool exported,
-                 SpecializationKind kind);
+                 SpecializationKind kind,
+                 GenericSignature specializedSignature);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
-                                bool exported, SpecializationKind kind);
-
-  static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                SourceRange Range,
-                                ArrayRef<Requirement> requirement,
-                                bool exported, SpecializationKind kind);
+                                bool exported, SpecializationKind kind,
+                                GenericSignature specializedSignature
+                                    = nullptr);
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  ArrayRef<Requirement> getRequirements() const;
-
-  MutableArrayRef<Requirement> getRequirements() {
-    return { getRequirementsData(), Bits.SpecializeAttr.numRequirements };
+  GenericSignature getSpecializedSgnature() const {
+    return specializedSignature;
   }
 
-  void setRequirements(ASTContext &Ctx, ArrayRef<Requirement> requirements);
+  void setSpecializedSignature(GenericSignature newSig) {
+    specializedSignature = newSig;
+  }
 
   bool isExported() const {
     return Bits.SpecializeAttr.exported;
@@ -1550,7 +1584,7 @@ public:
   /// a declaration is deprecated on all deployment targets, or null otherwise.
   const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
 
-  void dump(const Decl *D = nullptr) const;
+  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
   static void print(ASTPrinter &Printer, const PrintOptions &Options,
@@ -1639,7 +1673,7 @@ private:
 public:
   template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<llvm::iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<const_iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
                              const_iterator>;
 

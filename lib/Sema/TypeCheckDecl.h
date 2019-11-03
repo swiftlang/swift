@@ -25,8 +25,6 @@ class DeclContext;
 class ValueDecl;
 class Pattern;
 
-bool doesContextHaveValueSemantics(DeclContext *dc);
-
 /// Walks up the override chain for \p CD until it finds an initializer that is
 /// required and non-implicit. If no such initializer exists, returns the
 /// declaration where \c required was introduced (i.e. closest to the root
@@ -38,8 +36,8 @@ bool checkOverrides(ValueDecl *decl);
 
 // Implemented in TypeCheckStorage.cpp
 void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx);
-void validatePatternBindingEntries(TypeChecker &tc,
-                                   PatternBindingDecl *binding);
+
 }
 
 #endif
+

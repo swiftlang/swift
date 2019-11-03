@@ -38,7 +38,7 @@ public:
   static SILUndef *getSentinelValue(SILType type, OwnerTy owner) {
     // Ownership kind isn't used here, the value just needs to have a unique
     // address.
-    return new (*owner) SILUndef(type, ValueOwnershipKind::Any);
+    return new (*owner) SILUndef(type, ValueOwnershipKind::None);
   }
 
   ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }

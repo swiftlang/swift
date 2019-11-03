@@ -991,9 +991,7 @@ class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conf
 typealias A = BadProto1
 typealias B = BadProto1
 
-extension A & B { // okay
-
-}
+extension A & B {} // expected-warning {{extending a protocol composition is not supported; extending 'BadProto1' instead}}
 
 // Suppress near-miss warning for unlabeled initializers.
 protocol P9 {

@@ -69,7 +69,7 @@ open class OtherDerived : Derived {
 // VTable thunks for methods of Base redispatch to methods of Derived
 // --
 
-// CHECK-LABEL: sil private [ossa] @$s17vtables_multifile7DerivedC14privateMethod1yyFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyFTV : $@convention(method) (@guaranteed Derived) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile7DerivedC14privateMethod1yyFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyFTV : $@convention(method) (@guaranteed Derived) -> () {
 // CHECK: bb0(%0 : @guaranteed $Derived):
 // CHECK-NEXT:  [[METHOD:%.*]] = class_method %0 : $Derived, #Derived.privateMethod1!1 : (Derived) -> () -> (), $@convention(method) (@guaranteed Derived) -> ()
 // CHECK-NEXT:  apply [[METHOD]](%0) : $@convention(method) (@guaranteed Derived) -> ()
@@ -77,7 +77,7 @@ open class OtherDerived : Derived {
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil private [ossa] @$s17vtables_multifile7DerivedC14privateMethod2yyyXlSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyyXlFTV : $@convention(method) (@guaranteed Optional<AnyObject>, @guaranteed Derived) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile7DerivedC14privateMethod2yyyXlSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyyXlFTV : $@convention(method) (@guaranteed Optional<AnyObject>, @guaranteed Derived) -> () {
 // CHECK: bb0(%0 : @guaranteed $Optional<AnyObject>, %1 : @guaranteed $Derived):
 // CHECK-NEXT:  [[METHOD:%.*]] = class_method %1 : $Derived, #Derived.privateMethod2!1 : (Derived) -> (AnyObject?) -> (), $@convention(method) (@guaranteed Optional<AnyObject>, @guaranteed Derived) -> ()
 // CHECK-NEXT:  apply [[METHOD]](%0, %1) : $@convention(method) (@guaranteed Optional<AnyObject>, @guaranteed Derived) -> ()
@@ -85,7 +85,7 @@ open class OtherDerived : Derived {
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil private [ossa] @$s17vtables_multifile7DerivedC14privateMethod3yySiSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyySiFTV : $@convention(method) (Int, @guaranteed Derived) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile7DerivedC14privateMethod3yySiSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyySiFTV : $@convention(method) (Int, @guaranteed Derived) -> () {
 // CHECK: bb0(%0 : $Int, %1 : @guaranteed $Derived):
 // CHECK-NEXT:  [[ARG:%.*]] = enum $Optional<Int>, #Optional.some!enumelt.1, %0 : $Int
 // CHECK-NEXT:  [[METHOD:%.*]] = class_method %1 : $Derived, #Derived.privateMethod3!1 : (Derived) -> (Int?) -> (), $@convention(method) (Optional<Int>, @guaranteed Derived) -> ()
@@ -94,7 +94,7 @@ open class OtherDerived : Derived {
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil private [ossa] @$s17vtables_multifile7DerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed Derived) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile7DerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed Derived) -> () {
 // CHECK: bb0(%0 : $*Int, %1 : @guaranteed $Derived):
 // CHECK-NEXT:  [[ARG:%.*]] = load [trivial] %0 : $*Int
 // CHECK-NEXT:  [[METHOD:%.*]] = class_method %1 : $Derived, #Derived.privateMethod4!1 : (Derived) -> (Int) -> (), $@convention(method) (Int, @guaranteed Derived) -> ()

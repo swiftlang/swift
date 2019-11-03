@@ -13,13 +13,13 @@ This document describes some of the problems with our current "declaration" type
 Problems with the Current Approach
 ----------------------------------
 
-The current declaration type checker---in particular, ``validateDecl``, which assigns a type to a given declaration---is the source of a large number of Swift bugs, including crashes on both well-formed and ill-formed code, different behavior depending on the order of declarations within a file or across multiple files, infinite recursion, and broken ASTs. The main issues are:
+The current declaration type checker is the source of a large number of Swift bugs, including crashes on both well-formed and ill-formed code, different behavior depending on the order of declarations within a file or across multiple files, infinite recursion, and broken ASTs. The main issues are:
 
 **Conceptual phases are tangled together**: We have a vague notion that there are phases within the compiler, e.g., extension binding occurs before name binding, which occurs before type checking. However, the implementations in the compiler don't respect phases: extension binding goes through type validation, which does both name binding and type checking. Name lookup attempts to do type checking so that it can establish whether one declaration shadows another.
 
 **Unprincipled recursion**: Whenever type checking some particular declaration requires information about another declaration, it recurses to type-check that declaration. There are dozens of these recursion points scattered throughout the compiler, which makes it impossible to reason about the recursion or deal with, e.g., recursion that is too deep for the program stack.
 
-**Ad hoc recursion breaking**: When we do encounter circular dependencies, we have scattered checks for recursion based on a number of separate bits stashed in the AST: ``BeingTypeChecked``, ``EarlyAttrValidation``,  ``ValidatingGenericSignature``, etc. Adding these checks is unprincipled: adding a new check in the wrong place tends to break working code (because the dependency is something the compiler should be able to handle), while missing a check permits infinite recursion to continue.
+**Ad hoc recursion breaking**: When we do encounter circular dependencies, we have scattered checks for recursion based on a number of separate bits stashed in the AST: ``isComputingRequirementSignature()``, ``isComputingPatternBindingEntry()``,  ``isComputingGenericSignature()/hasComputedGenericSignature()``, etc. Adding these checks is unprincipled: adding a new check in the wrong place tends to break working code (because the dependency is something the compiler should be able to handle), while missing a check permits infinite recursion to continue.
 
 **Type checker does too much work**: validating a declaration is all-or-nothing. It includes computing its type, but also checking redeclarations and overrides, as well as numerous other aspects that a user of that declaration might not care about. Aside from the performance impact of checking too much, this can introduce false circularities in type-checking, because the user might only need some very basic information to continue.
 
@@ -156,7 +156,7 @@ The proposed architecture is significantly different from the current type check
 
 **Dependency graph and priority queue**: Extend the current-phase trait with an operation that enumerates the dependencies that need to be satisfied to bring a given AST node up to a particular phase. Start with ``TypeRepr`` nodes, and use the dependency graph and priority queue to satisfy all dependencies ahead of time, eliminating direct recursion from the type-resolution code path. Build circular-dependency detection within this test-bed.
 
-**Incremental adoption of dependency graph**: Make other AST nodes (``Pattern``, ``VarDecl``, etc.) implement the phase-awareness trait, enumerating dependencies and updating their logic to perform minimal updates. Certain entry points that are used for ad hoc recursion (such as ``validateDecl``) can push/pop dependency graph and priority-queue instances, which leaves the existing ad hoc recursion checking in place but allows isolated subproblems to use the newer mechanisms.
+**Incremental adoption of dependency graph**: Make other AST nodes (``Pattern``, ``VarDecl``, etc.) implement the phase-awareness trait, enumerating dependencies and updating their logic to perform minimal updates. Certain entry points that are used for ad hoc recursion can push/pop dependency graph and priority-queue instances, which leaves the existing ad hoc recursion checking in place but allows isolated subproblems to use the newer mechanisms.
 
 **Strengthen accessor assertions**: As ad hoc recursion gets eliminated from the type checker, strengthen assertions on the various AST nodes to make sure the AST node has been brought to the appropriate phase.
 

@@ -114,7 +114,7 @@ bool ASTScript::execute() const {
     return true;
   }
 
-  UnqualifiedLookup viewLookup(ctx.getIdentifier("View"), swiftUI, nullptr);
+  UnqualifiedLookup viewLookup(ctx.getIdentifier("View"), swiftUI);
   auto viewProtocol =
     dyn_cast_or_null<ProtocolDecl>(viewLookup.getSingleTypeResult());
   if (!viewProtocol) {

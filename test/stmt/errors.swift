@@ -117,9 +117,9 @@ func nine() throws {
   try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
 func ten_helper(_ x: Int) {}
-func ten_helper(_ x: Int, y: Int) throws {}
+func ten_helper(_ x: Int, y: Int) throws {} // expected-note {{'ten_helper(_:y:)' declared here}}
 func ten() throws {
-  try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}} {{18-21=}}
+  try ten_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}} {{18-18=<#Int#>, }}
 }
 
 // rdar://21074857
@@ -209,17 +209,37 @@ class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
 func sr_6400_4() {
   do {
     throw SR_6400_E.castError
-  } catch let error as SR_6400_A { // expected-warning {{cast from 'Error' to unrelated type 'SR_6400_A' always fails}} // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
-    print("Foo")
+  } catch let error as SR_6400_A { // Okay
+    print(error)
   } catch {
     print("Bar")
   }
   
   do {
     throw SR_6400_E.castError
-  } catch let error as SR_6400_B { // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
-    print("Foo")
+  } catch let error as SR_6400_B { // Okay
+    print(error)
   } catch {
     print("Bar")
+  }
+}
+
+// SR-11402
+
+protocol SR_11402_P {}
+class SR_11402_Superclass {}
+class SR_11402_Subclass: SR_11402_Superclass, SR_11402_P {}
+
+func sr_11402_func1(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Superclass { // Okay
+    print(y)
+  }
+}
+
+final class SR_11402_Final {}
+
+func sr_11402_func2(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Final { // expected-warning {{cast from 'SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
+    print(y)
   }
 }

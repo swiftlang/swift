@@ -4,6 +4,10 @@
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-library-evolution %s -read-legacy-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-library-evolution -O %s -read-legacy-type-info-path=%S/Inputs/legacy_type_info/a.yaml
 
+// Verify that this feature works with the VFS.
+// RUN: sed -e "s|INPUT_DIR|%/S/Inputs|g" -e "s|OUT_DIR|%/t|g" %S/Inputs/legacy_type_info/vfsoverlay.yaml > %t/overlay.yaml
+// RUN: %target-swift-frontend -vfsoverlay %/t/overlay.yaml -I %t -emit-ir -enable-library-evolution -O %s -read-legacy-type-info-path=%t/a_moved.yaml
+
 // We only use fragile class layouts when Objective-C interop is enabled.
 
 // REQUIRES: objc_interop

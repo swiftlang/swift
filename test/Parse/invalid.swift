@@ -76,7 +76,7 @@ protocol Animal<Food> {  // expected-error {{protocols do not allow generic para
 // SR-573 - Crash with invalid parameter declaration
 class Starfish {}
 struct Salmon {}
-func f573(s Starfish,  // expected-error {{parameter requires an explicit type}}
+func f573(s Starfish,  // expected-error {{expected ':' following argument label and parameter name}}
           _ ss: Salmon) -> [Int] {}
 func g573() { f573(Starfish(), Salmon()) }
 
@@ -89,7 +89,7 @@ func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter
 // expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
 func SR979d(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
 // expected-error @-1 {{expected ',' separator}} {{20-20=,}} 
-// expected-error @-2 {{parameter requires an explicit type}}
+// expected-error @-2 {{expected ':' following argument label and parameter name}}
 // expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{13-17=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
 func SR979g(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}

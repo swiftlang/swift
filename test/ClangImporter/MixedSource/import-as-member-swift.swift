@@ -2,4 +2,12 @@
 
 @objc internal class Outer {}
 
-_ = Outer.Nested()
+@objc(OuterByObjCName_ObjC)
+internal class OuterByObjCName_Swift {}
+
+@objc(OuterBySwiftName_ObjC)
+internal class OuterBySwiftName_Swift {}
+
+_ = Outer.Nested(a: 1)
+_ = OuterByObjCName_Swift.Nested(b: 2)
+_ = OuterBySwiftName_Swift.Nested(c: 3)

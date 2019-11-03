@@ -24,7 +24,6 @@ common unit testing patterns that is used in this project.
 
 import logging
 import sys
-
 from StringIO import StringIO
 from contextlib import contextmanager
 

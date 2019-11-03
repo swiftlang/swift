@@ -24,6 +24,10 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
+namespace llvm {
+class FileCollector;
+}
+
 namespace clang {
 class DependencyCollector;
 }
@@ -54,8 +58,9 @@ enum class Bridgeability : unsigned {
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
-
-  explicit DependencyTracker(bool TrackSystemDeps);
+  explicit DependencyTracker(
+      bool TrackSystemDeps,
+      std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
   ///

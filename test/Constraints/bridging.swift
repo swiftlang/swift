@@ -180,11 +180,7 @@ func dictionaryToNSDictionary() {
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
 struct NotEquatable {}
 func notEquatableError(_ d: Dictionary<Int, NotEquatable>) -> Bool {
-  // FIXME: Another awful diagnostic.
-  return d == d // expected-error{{'<Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool' requires that 'NotEquatable' conform to 'Equatable'}}
-  // expected-note @-1 {{requirement from conditional conformance of 'Dictionary<Int, NotEquatable>' to 'Equatable'}}
-  // expected-error @-2 {{type 'NotEquatable' does not conform to protocol 'Equatable'}}
-  // expected-note @-3{{requirement specified as 'NotEquatable' : 'Equatable'}}
+  return d == d // expected-error{{operator function '==' requires that 'NotEquatable' conform to 'Equatable'}}
 }
 
 // NSString -> String
@@ -265,14 +261,12 @@ func rdar19831919() {
 
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions
 func rdar19831698() {
-  var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  var v70 = true + 1 // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
-  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Array<Element>, Array<Element>), (Other, Self), (Self, Other)}}
-  var v75 = true + "str" // expected-error {{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
+  var v73 = true + [] // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
+  var v75 = true + "str" // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
 }
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
@@ -291,7 +285,8 @@ func rdar19836341(_ ns: NSString?, vns: NSString?) {
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(_ ns: NSString?) {
-  var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'NSString?' to expected argument type 'String?'}}{{21-21= as String?}}
+  var s: String = ns ?? "str" as String as String // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{19-19=(}} {{50-50=) as String}}
+  // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'NSString'}} {{50-50= as NSString}}
   var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}{{43-43= as NSString}}
 
   let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}{{39-39= as NSString?}}
@@ -373,4 +368,9 @@ func bridgeTupleToAnyObject() {
   let x = (1, "two")
   let y = x as AnyObject
   _ = y
+}
+
+// Array defaulting and bridging type checking error per rdar://problem/54274245
+func rdar54274245(_ arr: [Any]?) {
+  _ = (arr ?? []) as [NSObject]
 }

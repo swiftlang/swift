@@ -61,7 +61,7 @@ entry(%x : $float3):
 // armv7k-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
 // powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
-// s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
+// s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
 entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4
