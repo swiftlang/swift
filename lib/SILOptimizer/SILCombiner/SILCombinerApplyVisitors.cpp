@@ -33,8 +33,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 
-#include <iostream>
-
 using namespace swift;
 using namespace swift::PatternMatch;
 
@@ -987,7 +985,6 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
     SILOpenedArchetypesTracker &OpenedArchetypesTracker) {
   for (unsigned ArgIdx = 0; ArgIdx < Apply.getNumArguments(); ArgIdx++) {
     auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
-    ArgASTType->dump();
     if (!ArgASTType->hasArchetype())
       continue;
 
@@ -1335,13 +1332,9 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                                     WitnessMethodInst *WMI) {
-  WMI->getConformance().dump();
-  
   // Check if it is legal to perform the propagation.
   if (WMI->getConformance().isConcrete())
     return nullptr;
-
-  WMI->getLookupType()->dump();
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
   if (!WMI->getLookupType()->isOpenedExistential())
@@ -1364,8 +1357,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // Bail, if no argument has a concrete existential to propagate.
   if (COEIs.empty())
     return nullptr;
-  
-  std::cout << "here" << std::endl;
 
   auto SelfCOEIIt =
       COEIs.find(Apply.getCalleeArgIndex(Apply.getSelfArgumentOperand()));
@@ -1404,12 +1395,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
     replaceWitnessMethodInst(WMI, BuilderCtx, SelfCEI.ConcreteType,
                              SelfConformance);
   }
-  
-  std::cout << "done" << std::endl;
-  
-  std::cout << std::endl << "FULL FN:" << std::endl;
-  Apply.getFunction()->dump();
-  std::cout << std::endl;
 
   /// Create the new apply instruction using concrete types for arguments.
   return createApplyWithConcreteType(Apply, COEIs, BuilderCtx);
@@ -1685,8 +1670,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    AI->dump();
-    WMI->dump();
     if (propagateConcreteTypeOfInitExistential(AI, WMI)) {
       return nullptr;
     }

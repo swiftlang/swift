@@ -49,10 +49,9 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
   // (ref_to_raw_pointer x)
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand()))
-    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand())) {
+    if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
       return Builder.createRefToRawPointer(RRPI->getLoc(), IER->getOperand(),
                                            RRPI->getType());
-    }
 
   return nullptr;
 }

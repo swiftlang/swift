@@ -1255,15 +1255,12 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
 
   // Release of a classbound existential converted from a class is just a
   // release of the class, squish the conversion.
-  if (auto ier = dyn_cast<InitExistentialRefInst>(SRI->getOperand())) {
-//    ier->dump();
-//    ier->getOperand()->dump();
+  if (auto ier = dyn_cast<InitExistentialRefInst>(SRI->getOperand()))
     if (ier->hasOneUse()) {
       SRI->setOperand(ier->getOperand());
       eraseInstFromFunction(*ier);
       return SRI;
     }
-  }
   
   return nullptr;
 }
