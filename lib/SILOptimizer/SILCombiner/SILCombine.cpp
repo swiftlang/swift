@@ -23,6 +23,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/match.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -141,121 +142,6 @@ public:
   }
 };
 
-static Optional<StructInst*>
-getStructIfLiteral (StoreInst *store) {
-  if (auto *structLiteral = dyn_cast<StructInst>(store->getSrc())) {
-    auto literal = structLiteral->getElementOperands()[0].get();
-    if (!dyn_cast<LiteralInst>(literal)) {
-      return NoneType{};
-    } else {
-      return structLiteral;
-    }
-  }
-  return NoneType{};
-}
-
-static Optional<SmallVector<std::pair<SILValue, SILValue>, 8>>
-getArrayLiteralElements(PointerToAddressInst *ptr) {
-  SmallVector<std::pair<SILValue, SILValue>, 8> out;
-  
-  for (auto *useInst : ptr->getUses()) {
-    if (auto *store = dyn_cast<StoreInst>(useInst->getUser())) {
-      if (auto structLiteral = getStructIfLiteral(store))
-      	out.push_back(std::make_pair(structLiteral.getValue(), store->getDest()));
-    }
-    
-    if (auto *indexAddr = dyn_cast<IndexAddrInst>(useInst->getUser())) {
-      for (auto *indexUse : indexAddr->getUses()) {
-        if (auto *store = dyn_cast<StoreInst>(indexUse->getUser())) {
-          if (auto structLiteral = getStructIfLiteral(store))
-            out.push_back(std::make_pair(structLiteral.getValue(), store->getDest()));
-        }
-      }
-    }
-  }
-  
-  if (out.size() == 0) { return NoneType{}; }
-  return out;
-}
-
-bool SILCombiner::constantFoldArrayMap(SILFunction &F) {
-  for (auto& block : F) {
-    SmallVector<std::pair<SILValue, SILValue>, 8> foundElements;
-    bool foundCreateArr = false;
-    
-    auto matchedResult = match(block.begin(), block.end(),
-                               AnyRange(),
-                               make_info_block<ApplyInst, false>([&foundCreateArr](ApplyInst *applyInst) -> bool {
-                                 auto *func = applyInst->getReferencedFunctionOrNull();
-      													 if (func == nullptr) return false;
-                                 if (func->getName().contains("allocateUninitializedArray")) {
-                                   foundCreateArr = true;
-                                   return true;
-                                 }
-                                 return false;
-                               }),
-                               AnyRange(),
-                               make_info_block<PointerToAddressInst, false>([&foundCreateArr, &foundElements](PointerToAddressInst *ptr) -> bool {
-                                  if (!foundCreateArr) return false;
-                                  if (auto elements = getArrayLiteralElements(ptr)) {
-                                    foundElements = elements.getValue();
-                                    return true;
-                                  }
-                                  return false;
-                               }),
-                               AnyRange(),
-                               make_info_block<FunctionRefInst, true>([](FunctionRefInst *closure) -> bool {
-                                 if (auto *fn = closure->getReferencedFunctionOrNull()) {
-        												 	 // This is not the reference to the current function, it's the reference to the closure.
-        												 	 if (fn->getName().contains("optimize_me")) {
-                                     return true;
-                                 	 }
-      													 }
-      													 return false;
-                               }),
-                               AnyRange(),
-                               make_info_block<ApplyInst, true>([](ApplyInst *applyInst) -> bool {
-                                 auto *func = applyInst->getReferencedFunctionOrNull();
-                                 if (func == nullptr) return false;
-                                 if (func->getName().contains("mapy")) {
-                                   return true;
-                                 }
-                                 return false;
-                               }),
-                               InfoBlock<ReturnInst, true>());
-    
-    if (matchedResult == None) continue;
-    auto [closureToApply, oldApplyInst, oldReturn] = matchedResult.getValue();
-        
-    if (foundElements.size() < 1) continue;
-            
-    Builder.setInsertionPoint(oldApplyInst);
-    for (auto& argPair : foundElements) {
-      auto arg = argPair.first;
-      auto dest = argPair.second;
-      auto *apply = Builder.createApply(closureToApply->getLoc(), closureToApply, SubstitutionMap(), {arg});
-      Builder.createStore(apply->getLoc(), apply, dest, StoreOwnershipQualifier::Unqualified);
-    }
-    
-    SILValue array;
-    if (auto *arrayPtr = dyn_cast<AllocStackInst>(oldApplyInst->getArgument(1))) {
-      for (auto *useInst : arrayPtr->getUses()) {
-        if (auto *store = dyn_cast<StoreInst>(useInst->getUser())) {
-          array = store->getSrc();
-        }
-      }
-    }
-
-    Builder.setInsertionPoint(oldReturn);
-    Builder.createReturn(oldReturn->getLoc(), array);
-    eraseInstFromFunction(*oldReturn);
-    eraseInstFromFunction(*oldApplyInst);
-    
-    return true;
-  }
-  return false;
-}
-
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
   
@@ -266,8 +152,42 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   addReachableCodeToWorklist(&*F.begin());
 
   SILCombineCanonicalize scCanonicalize(Worklist);
+    
+  // match test program:
+  ReturnInst * retVal;
   
-  MadeChange |= constantFoldArrayMap(F);
+  for (auto &block: F) {
+    auto matchedResult = match(block.begin(), block.end(),
+                               AnyRange(),
+                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
+                                  return bi->getBuiltinKind().hasValue() &&
+                                         bi->getBuiltinKind().getValue() == BuiltinValueKind::SAddOver;
+                               }),
+                               AnyRange(),
+                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
+                                 return bi->getBuiltinKind().hasValue() &&
+                                        bi->getBuiltinKind().getValue() == BuiltinValueKind::SSubOver;
+                               }),
+                               AnyRange(),
+                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
+                                 return bi->getBuiltinKind().hasValue() &&
+                                        bi->getBuiltinKind().getValue() == BuiltinValueKind::And;
+                               }),
+                               AnyRange(),
+                               make_info_block<BuiltinInst, false>([](BuiltinInst *bi){
+                                 return bi->getBuiltinKind().hasValue() &&
+                                        bi->getBuiltinKind().getValue() == BuiltinValueKind::SSubOver;
+                               }),
+                               AnyRange(),
+                               make_info_block<ReturnInst, true>());
+    
+    if (!matchedResult.hasValue())
+      continue;
+    
+    std::tie(retVal) = matchedResult.getValue();
+  }
+  
+  assert(retVal);
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -280,7 +200,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // skip them.
     if (I == nullptr)
       continue;
-    
+
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I)) {
       LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
