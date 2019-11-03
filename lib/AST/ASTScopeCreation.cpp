@@ -731,6 +731,10 @@ void ASTScope::
   impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 }
 
+bool ASTScope::areInactiveIfConfigClausesSupported() {
+  return ScopeCreator::includeInactiveIfConfigClauses;
+}
+
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
   return scopeCreator->sourceFileScope;
