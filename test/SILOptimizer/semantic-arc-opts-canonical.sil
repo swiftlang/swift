@@ -1,0 +1,436 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
+class Klass {}
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+struct AnotherStruct {
+  var i : Builtin.Int32
+  var c : Klass
+}
+
+struct StructMemberTest {
+  var c : Klass
+  var s : AnotherStruct
+  var t : (Builtin.Int32, AnotherStruct)
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil @fakeoptional_guaranteed_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @argument_only_destroy_user_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+sil [ossa] @argument_only_destroy_user_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @argument_diamond_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject):
+// CHECK-NEXT: [[RESULT:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: cond_br undef, [[LHSBB:bb[0-9]+]], [[RHSBB:bb[0-9]+]]
+//
+// CHECK: [[LHSBB]]:
+// CHECK-NEXT: br [[EPILOGBB:bb[0-9]+]]
+//
+// CHECK: [[RHSBB]]:
+// CHECK-NEXT: br [[EPILOGBB]]
+//
+// CHECK: [[EPILOGBB]]:
+// CHECK-NEXT: return [[RESULT]]
+sil [ossa] @argument_diamond_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = copy_value %1 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @argument_copy_borrow_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject
+// CHECK-NOT: copy_value
+// CHECK-NOT: begin_borrow
+// CHECK: apply {{%.*}}([[ARG]])
+// CHECK-NOT: end_borrow
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'argument_copy_borrow_test_case'
+sil [ossa] @argument_copy_borrow_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = begin_borrow %1 : $Builtin.NativeObject
+  apply %2(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %3 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @argument_copy_of_copy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'argument_copy_of_copy'
+sil [ossa] @argument_copy_of_copy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  %3 = copy_value %2 : $Builtin.NativeObject
+  %4 = begin_borrow %3 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NativeObjectPair):
+// CHECK-NOT: copy_value
+// CHECK-NOT: begin_borrow
+// CHECK:   [[FIELD:%.*]] = struct_extract [[ARG]]
+// CHECK:   apply {{%.*}}([[FIELD]]) :
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'copy_struct_extract_guaranteed_use'
+sil [ossa] @copy_struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %1 = copy_value %0 : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @struct_extract_copy_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NativeObjectPair):
+// CHECK:   [[FIELD:%.*]] = struct_extract [[ARG]]
+// CHECK:   apply {{%.*}}([[FIELD]])
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'struct_extract_copy_guaranteed_use'
+sil [ossa] @struct_extract_copy_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %1 = struct_extract %0 : $NativeObjectPair, #NativeObjectPair.obj1
+  %2 = copy_value %1 : $Builtin.NativeObject
+  %3 = begin_borrow %2 : $Builtin.NativeObject
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %3 : $Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'process_forwarding_uses'
+sil [ossa] @process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %1 = copy_value %0 : $NativeObjectPair
+  (%2, %3) = destructure_struct %1 : $NativeObjectPair
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'process_forwarding_uses_2'
+sil [ossa] @process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Do not eliminate a copy from an unowned value. This will cause us to pass the
+// unowned value as guaranteed... =><=.
+//
+// CHECK-LABEL: sil [ossa] @unowned_arg_copy : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'unowned_arg_copy'
+sil [ossa] @unowned_arg_copy : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : @unowned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_live_range_multiple_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: bb3:
+// CHECK:     destroy_value
+// CHECK: } // end sil function 'dead_live_range_multiple_destroy_value'
+sil [ossa] @dead_live_range_multiple_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject) :
+  %1 = copy_value %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_live_range_multiple_destroy_value_consuming_user : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK: } // end sil function 'dead_live_range_multiple_destroy_value_consuming_user'
+sil [ossa] @dead_live_range_multiple_destroy_value_consuming_user : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject) :
+  %1 = copy_value %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  %2 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Simple in_guaranteed argument load_copy.
+// CHECK-LABEL: sil [ossa] @load_copy_from_in_guaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK: load_borrow
+// CHECK: load_borrow
+// CHECK: load [copy]
+// CHECK: } // end sil function 'load_copy_from_in_guaranteed'
+sil [ossa] @load_copy_from_in_guaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %g = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  // Simple same bb.
+  %1 = load [copy] %0 : $*Builtin.NativeObject
+  apply %g(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %1 : $Builtin.NativeObject
+
+  // Diamond.
+  %2 = load [copy] %0 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %g(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  // Consuming use blocks.
+  %3 = load [copy] %0 : $*Builtin.NativeObject
+  %4 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destructure_test : $@convention(thin) (@guaranteed StructMemberTest) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
+// CHECK:   [[EXT:%.*]] = struct_extract [[ARG]]
+// CHECK:   ([[DEST_1:%.*]], [[DEST_2:%.*]]) = destructure_tuple [[EXT]]
+// CHECK:   [[RESULT:%.*]] = struct_extract [[DEST_2]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'destructure_test'
+sil [ossa] @destructure_test : $@convention(thin) (@guaranteed StructMemberTest) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $StructMemberTest):
+  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
+  %3 = copy_value %2 : $(Builtin.Int32, AnotherStruct)
+  (%4, %5) = destructure_tuple %3 : $(Builtin.Int32, AnotherStruct)
+  %6 = begin_borrow %5 : $AnotherStruct
+  %7 = struct_extract %6 : $AnotherStruct, #AnotherStruct.i
+  end_borrow %6 : $AnotherStruct
+  destroy_value %5 : $AnotherStruct
+  return %7 : $Builtin.Int32
+}
+
+// Make sure that in a case where we have multiple non-trivial values passed to
+// a forwarding instruction we do not optimize... but if we only have one (and
+// multiple trivial arguments), we can.
+//
+// CHECK-LABEL: sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
+// CHECK: copy_value
+// CHECK: copy_value
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'multiple_arg_forwarding_inst_test'
+sil [ossa] @multiple_arg_forwarding_inst_test : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.Int32) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject, %1a : $Builtin.Int32):
+  %2 = copy_value %0 : $Builtin.NativeObject
+  %3 = copy_value %1 : $Builtin.NativeObject
+  %4 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
+  destroy_value %4 : $(Builtin.NativeObject, Builtin.NativeObject)
+
+  %5 = copy_value %0 : $Builtin.NativeObject
+  %6 = tuple(%5 : $Builtin.NativeObject, %1a : $Builtin.Int32)
+  destroy_value %6 : $(Builtin.NativeObject, Builtin.Int32)
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// TODO: We should be able to optimize these switch_enum. Make sure that today
+// we do not do so though.
+// CHECK-LABEL: sil [ossa] @switch_enum_test_no_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'switch_enum_test_no_default'
+sil [ossa] @switch_enum_test_no_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
+  %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @switch_enum_test_with_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'switch_enum_test_with_default'
+sil [ossa] @switch_enum_test_with_default : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
+  %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, default bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
+  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_not_add_trivial_users_of_owned_values_to_isconsumed_worklist : $@convention(thin) (@guaranteed (Klass, MyInt)) -> Builtin.Int32 {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'do_not_add_trivial_users_of_owned_values_to_isconsumed_worklist'
+sil [ossa] @do_not_add_trivial_users_of_owned_values_to_isconsumed_worklist : $@convention(thin) (@guaranteed (Klass, MyInt)) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $(Klass, MyInt)):
+  %1 = copy_value %0 : $(Klass, MyInt)
+  (%2, %3) = destructure_tuple %1 : $(Klass, MyInt)
+  %4 = struct_extract %3 : $MyInt, #MyInt.value
+  destroy_value %2 : $Klass
+  return %4 : $Builtin.Int32
+}
+
+// Make sure that we do not optimize this case.
+//
+// CHECK-LABEL: sil [ossa] @handle_phi_address_nodes : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'handle_phi_address_nodes'
+sil [ossa] @handle_phi_address_nodes : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt.1, %0 : $Klass
+  %2 = copy_value %1 : $FakeOptional<Klass>
+  %3 = copy_value %1 : $FakeOptional<Klass>
+
+  %4 = alloc_stack $FakeOptional<Klass>
+  store %2 to [init] %4 : $*FakeOptional<Klass>
+  %5 = alloc_stack $FakeOptional<Klass>
+  store %3 to [init] %5 : $*FakeOptional<Klass>
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%4 : $*FakeOptional<Klass>)
+
+bb2:
+  br bb3(%5 : $*FakeOptional<Klass>)
+
+bb3(%6 : $*FakeOptional<Klass>):
+  %7 = load [copy] %6 : $*FakeOptional<Klass>
+  %8 = function_ref @fakeoptional_guaranteed_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  apply %8(%7) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  destroy_value %7 : $FakeOptional<Klass>
+  destroy_addr %5 : $*FakeOptional<Klass>
+  dealloc_stack %5 : $*FakeOptional<Klass>
+  destroy_addr %4 : $*FakeOptional<Klass>
+  dealloc_stack %4 : $*FakeOptional<Klass>
+  %9999 = tuple()
+  return %9999 : $()
+}

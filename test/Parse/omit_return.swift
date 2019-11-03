@@ -1005,7 +1005,7 @@ var fvs_stubMyOwnFatalError: () {
 var fvs_forceTryExplicit: String {
     get { "ok" }
     set {
-        return try! failableIdentity("shucks") // expected-error {{unexpected non-void return value in void function}}
+        return try! failableIdentity("shucks") // expected-error {{cannot convert value of type 'String' to expected argument type '()'}}
     }
 }
 

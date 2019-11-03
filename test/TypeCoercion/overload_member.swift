@@ -71,7 +71,7 @@ func test_mixed_overload(_ a: A, x: X, y: Y) {
   x1 = x
   var y1 = a.mixed(y: y) // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{12-12=A.}}
   
-  A.mixed(x) // expected-error{{missing argument label 'y:' in call}}
+  A.mixed(x) // expected-error{{cannot convert value of type 'X' to expected argument type 'A'}}
   var x2 = A.mixed(a)(x: x)
   x2 = x
   var y2 = A.mixed(y: y)
@@ -157,7 +157,7 @@ extension A {
   }
 
   class func test_mixed_overload_static(a: A, x: X, y: Y) {
-    mixed(x) // expected-error{{missing argument label 'y:' in call}}
+    mixed(x) // expected-error{{cannot convert value of type 'X' to expected argument type 'A'}}
     var x2 = mixed(a)(x: x)
     x2 = x
     var y2 = mixed(y: y)

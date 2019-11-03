@@ -10,124 +10,124 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A sequence on which normally-eager operations such as `map` and
-/// `filter` are implemented lazily.
+/// A sequence on which normally-eager sequence operations are implemented
+/// lazily.
 ///
 /// Lazy sequences can be used to avoid needless storage allocation
 /// and computation, because they use an underlying sequence for
-/// storage and compute their elements on demand.  For example,
+/// storage and compute their elements on demand. For example, `doubled` in
+/// this code sample is a sequence containing the values `2`, `4`, and `6`.
 ///
-///     [1, 2, 3].lazy.map { $0 * 2 }
+///     let doubled = [1, 2, 3].lazy.map { $0 * 2 }
 ///
-/// is a sequence containing { `2`, `4`, `6` }.  Each time an element
-/// of the lazy sequence is accessed, an element of the underlying
-/// array is accessed and transformed by the closure.
+/// Each time an element of the lazy sequence `doubled` is accessed, the 
+/// closure accesses and transforms an element of the underlying array.
 ///
-/// Sequence operations taking closure arguments, such as `map` and
-/// `filter`, are normally eager: they use the closure immediately and
-/// return a new array.  Using the `lazy` property gives the standard
+/// Sequence operations that take closure arguments, such as `map(_:)` and
+/// `filter(_:)`, are normally eager: They use the closure immediately and
+/// return a new array. When you use the `lazy` property, you give the standard
 /// library explicit permission to store the closure and the sequence
 /// in the result, and defer computation until it is needed.
 ///
-/// To add new lazy sequence operations, extend this protocol with
-/// methods that return lazy wrappers that are themselves
-/// `LazySequenceProtocol`s.  For example, given an eager `scan`
-/// method defined as follows
+/// ## Adding New Lazy Operations
+///
+/// To add a new lazy sequence operation, extend this protocol with
+/// a method that returns a lazy wrapper that itself conforms to
+/// `LazySequenceProtocol`.  For example, an eager `scan(_:_:)`
+/// method is defined as follows:
 ///
 ///     extension Sequence {
-///       /// Returns an array containing the results of
-///       ///
-///       ///   p.reduce(initial, nextPartialResult)
-///       ///
-///       /// for each prefix `p` of `self`, in order from shortest to
-///       /// longest.  For example:
-///       ///
-///       ///     (1..<6).scan(0, +) // [0, 1, 3, 6, 10, 15]
-///       ///
-///       /// - Complexity: O(n)
-///       func scan<ResultElement>(
-///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
-///       ) -> [ResultElement] {
-///         var result = [initial]
-///         for x in self {
-///           result.append(nextPartialResult(result.last!, x))
+///         /// Returns an array containing the results of
+///         ///
+///         ///   p.reduce(initial, nextPartialResult)
+///         ///
+///         /// for each prefix `p` of `self`, in order from shortest to
+///         /// longest. For example:
+///         ///
+///         ///     (1..<6).scan(0, +) // [0, 1, 3, 6, 10, 15]
+///         ///
+///         /// - Complexity: O(n)
+///         func scan<Result>(
+///             _ initial: Result,
+///             _ nextPartialResult: (Result, Element) -> Result
+///         ) -> [Result] {
+///             var result = [initial]
+///             for x in self {
+///                 result.append(nextPartialResult(result.last!, x))
+///             }
+///             return result
 ///         }
-///         return result
-///       }
 ///     }
 ///
-/// we can build a sequence that lazily computes the elements in the
-/// result of `scan`:
+/// You can build a sequence type that lazily computes the elements in the
+/// result of a scan:
 ///
-///     struct LazyScanIterator<Base: IteratorProtocol, ResultElement>
-///       : IteratorProtocol {
-///       mutating func next() -> ResultElement? {
-///         return nextElement.map { result in
-///           nextElement = base.next().map { nextPartialResult(result, $0) }
-///           return result
-///         }
-///       }
-///       var nextElement: ResultElement? // The next result of next().
-///       var base: Base                  // The underlying iterator.
-///       let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
-///     }
-///     
-///     struct LazyScanSequence<Base: Sequence, ResultElement>
-///       : LazySequenceProtocol // Chained operations on self are lazy, too
+///     struct LazyScanSequence<Base: Sequence, Result>
+///         : LazySequenceProtocol
 ///     {
-///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
-///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(),
-///           nextPartialResult: nextPartialResult)
-///       }
-///       let initial: ResultElement
-///       let base: Base
-///       let nextPartialResult:
-///         (ResultElement, Base.Element) -> ResultElement
+///         let initial: Result
+///         let base: Base
+///         let nextPartialResult:
+///             (Result, Base.Element) -> Result
+///
+///         struct Iterator: IteratorProtocol {
+///             var base: Base.Iterator
+///             var nextElement: Result?
+///             let nextPartialResult:
+///                 (Result, Base.Element) -> Result
+///             
+///             mutating func next() -> Result? {
+///                 return nextElement.map { result in
+///                     nextElement = base.next().map {
+///                         nextPartialResult(result, $0)
+///                     }
+///                     return result
+///                 }
+///             }
+///         }
+///         
+///         func makeIterator() -> Iterator {
+///             return Iterator(
+///                 base: base.makeIterator(),
+///                 nextElement: initial as Result?,
+///                 nextPartialResult: nextPartialResult)
+///         }
 ///     }
 ///
-/// and finally, we can give all lazy sequences a lazy `scan` method:
+/// Finally, you can give all lazy sequences a lazy `scan(_:_:)` method:
 ///     
 ///     extension LazySequenceProtocol {
-///       /// Returns a sequence containing the results of
-///       ///
-///       ///   p.reduce(initial, nextPartialResult)
-///       ///
-///       /// for each prefix `p` of `self`, in order from shortest to
-///       /// longest.  For example:
-///       ///
-///       ///     Array((1..<6).lazy.scan(0, +)) // [0, 1, 3, 6, 10, 15]
-///       ///
-///       /// - Complexity: O(1)
-///       func scan<ResultElement>(
-///         _ initial: ResultElement,
-///         _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
-///       ) -> LazyScanSequence<Self, ResultElement> {
-///         return LazyScanSequence(
-///           initial: initial, base: self, nextPartialResult: nextPartialResult)
-///       }
+///         func scan<Result>(
+///             _ initial: Result,
+///             _ nextPartialResult: @escaping (Result, Element) -> Result
+///         ) -> LazyScanSequence<Self, Result> {
+///             return LazyScanSequence(
+///                 initial: initial, base: self, nextPartialResult: nextPartialResult)
+///         }
 ///     }
 ///
-/// - See also: `LazySequence`
+/// With this type and extension method, you can call `.lazy.scan(_:_:)` on any
+/// sequence to create a lazily computed scan. The resulting `LazyScanSequence`
+/// is itself lazy, too, so further sequence operations also defer computation.
 ///
-/// - Note: The explicit permission to implement further operations
-///   lazily applies only in contexts where the sequence is statically
-///   known to conform to `LazySequenceProtocol`.  Thus, side-effects such
-///   as the accumulation of `result` below are never unexpectedly
-///   dropped or deferred:
+/// The explicit permission to implement operations lazily applies 
+/// only in contexts where the sequence is statically known to conform to
+/// `LazySequenceProtocol`. In the following example, because the extension 
+/// applies only to `Sequence`, side-effects such as the accumulation of
+/// `result` are never unexpectedly dropped or deferred:
 ///
-///       extension Sequence where Element == Int {
+///     extension Sequence where Element == Int {
 ///         func sum() -> Int {
-///           var result = 0
-///           _ = self.map { result += $0 }
-///           return result
+///             var result = 0
+///             _ = self.map { result += $0 }
+///             return result
 ///         }
-///       }
+///     }
 ///
-///   [We don't recommend that you use `map` this way, because it
-///   creates and discards an array. `sum` would be better implemented
-///   using `reduce`].
+/// Don't actually use `map` for this purpose, however, because it creates 
+/// and discards the resulting array. Instead, use `reduce` for summing 
+/// operations, or `forEach` or a `for`-`in` loop for operations with side 
+/// effects.
 public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.

@@ -17,7 +17,6 @@
 #ifndef SWIFT_SIL_SILGLOBALVARIABLE_H
 #define SWIFT_SIL_SILGLOBALVARIABLE_H
 
-#include <string>
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"

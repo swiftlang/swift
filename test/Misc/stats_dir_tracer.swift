@@ -2,7 +2,6 @@
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %s -trace-stats-events
 // RUN: %FileCheck -input-file %t/*.csv %s
 
-// CHECK-DAG: {{[0-9]+,[0-9]+,"exit","typecheck-expr","Sema.NumTypesDeserialized",[0-9]+,[0-9]+,"Call","\[.*stats_dir_tracer.swift.*\]"}}
 // CHECK-DAG: {{[0-9]+,[0-9]+,"exit","typecheck-expr","Sema.NumConstraintScopes",[0-9]+,[0-9]+,"Sequence","\[.*stats_dir_tracer.swift.*\]"}}
 // CHECK-DAG: {{[0-9]+,[0-9]+,"exit","SuperclassDeclRequest","Sema.SuperclassDeclRequest",[0-9]+,[0-9]+,"Bar","\[.*stats_dir_tracer.swift.*\]"}}
 

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 5 -g %s -o %t/a.out
+// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -1017,6 +1017,11 @@ keyPath.test("nested generics") {
   let nestedKeyPath = nested.foo()
   typealias DictType = [UInt? : [Float]]
   expectTrue(nestedKeyPath is KeyPath<DictType, DictType.Values>)
+}
+
+keyPath.test("tail allocated c array") {
+  let offset = MemoryLayout<foo>.offset(of: \foo.tailallocatedarray)!
+  expectEqual(4, offset)
 }
 
 runAllTests()

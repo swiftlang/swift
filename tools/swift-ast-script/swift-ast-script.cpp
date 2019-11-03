@@ -62,7 +62,8 @@ private:
 
 }
 
-int main(int argc, const char *argv[]) {
+// ISO C++ does not allow 'main' to be used by a program [-Wmain]
+int main2(int argc, const char *argv[]) {
   PROGRAM_START(argc, argv);
 
   // Look for the first "--" in the arguments.
@@ -87,7 +88,11 @@ int main(int argc, const char *argv[]) {
   frontendArgs.push_back("-typecheck");
 
   int frontendResult =
-    performFrontend(frontendArgs, argv[0], (void*) &main, &observer);
+    performFrontend(frontendArgs, argv[0], (void*) &main2, &observer);
 
   return (observer.hadError() ? 1 : frontendResult);
+}
+
+int main(int argc, const char *argv[]) {
+  return main2(argc, argv);
 }

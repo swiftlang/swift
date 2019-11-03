@@ -105,8 +105,7 @@ enum Complex {
 }
 
 func complex() {
-  if Complex.A(1) == .B { } // expected-error{{binary operator '==' cannot be applied to operands of type 'Complex' and '_'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
+  if Complex.A(1) == .B { } // expected-error{{cannot convert value of type 'Complex' to expected argument type 'CustomHashable'}}
 }
 
 // Enums with equatable payloads are equatable if they explicitly conform.

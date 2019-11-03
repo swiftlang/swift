@@ -208,8 +208,8 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
-static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
-                                        ArgList &Args) {
+static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
+                                     ArgList &Args) {
   using namespace options;
 
   Opts.PreserveTypesAsWritten |=
@@ -218,17 +218,17 @@ static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
-static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
-                                       FrontendOptions &FOpts,
-                                       ArgList &Args, DiagnosticEngine &Diags) {
-  if (!FOpts.InputsAndOutputs.hasParseableInterfaceOutputPath())
+static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
+                                    FrontendOptions &FOpts,
+                                    ArgList &Args, DiagnosticEngine &Diags) {
+  if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
     if (A->getOption().hasFlag(options::ModuleInterfaceOption))
       A->render(Args, RenderedArgs);
   }
-  llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
+  llvm::raw_string_ostream OS(Opts.Flags);
   interleave(RenderedArgs,
              [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
              [&] { OS << " "; });
@@ -292,9 +292,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
-  Opts.DisableTsanInoutInstrumentation |=
-      Args.hasArg(OPT_disable_tsan_inout_instrumentation);
-
   if (FrontendOpts.InputKind == InputFileKind::SIL)
     Opts.DisableAvailabilityChecking = true;
   
@@ -337,7 +334,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(options::OPT_enable_astscope_lookup,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
       Opts.DisableParserLookup;
-  Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
+  Opts.CrosscheckUnqualifiedLookup |=
+      Args.hasArg(OPT_crosscheck_unqualified_lookup);
+  Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
 
@@ -441,8 +440,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
-  if (Args.getLastArg(OPT_enable_function_builder_one_way_constraints))
-    Opts.FunctionBuilderOneWayConstraints = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -674,6 +671,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
+  Opts.EnableDescriptiveDiagnostics |=
+      Args.hasArg(OPT_enable_descriptive_diagnostics);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
@@ -758,6 +757,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
+
+  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies))
+    Opts.SkipNonInlinableFunctionBodies = true;
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -936,6 +938,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
     Opts.InstallName = A->getValue();
   }
 
+  Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
+
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     if (auto vers = version::Version::parseVersionString(
           A->getValue(), SourceLoc(), &Diags)) {
@@ -1074,6 +1078,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
     Opts.DisableClangModuleSkeletonCUs = true;
 
+  if (Args.hasArg(OPT_disable_debugger_shadow_copies))
+    Opts.DisableDebuggerShadowCopies = true;
+
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
@@ -1196,11 +1203,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
     }
   }
-                             
-  // Autolink runtime compatibility libraries, if asked to.
-  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+
+  auto getRuntimeCompatVersion = [&] () -> Optional<llvm::VersionTuple> {
     Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
-    
     if (auto versionArg = Args.getLastArg(
                                   options::OPT_runtime_compatibility_version)) {
       auto version = StringRef(versionArg->getValue());
@@ -1216,15 +1221,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       runtimeCompatibilityVersion =
                            getSwiftRuntimeCompatibilityVersionForTarget(Triple);
     }
-      
-    Opts.AutolinkRuntimeCompatibilityLibraryVersion =
-                                                    runtimeCompatibilityVersion;
+    return runtimeCompatibilityVersion;
+  };
+
+  // Autolink runtime compatibility libraries, if asked to.
+  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+    Opts.AutolinkRuntimeCompatibilityLibraryVersion = getRuntimeCompatVersion();
   }
 
   if (!Args.hasArg(options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
-        getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+        getRuntimeCompatVersion();
   }
   return false;
 }
@@ -1354,9 +1362,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  ParseParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs);
-  SaveParseableInterfaceArgs(ParseableInterfaceOpts, FrontendOpts,
-                             ParsedArgs, Diags);
+  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs);
+  SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;

@@ -33,22 +33,22 @@ import Foundation
 // CHECK-NEXT: %[[T3:.+]] = icmp ne %swift.error* %[[T2]], null
 // CHECK-NEXT: br i1 %[[T3]], label %[[L1:.+]], label %[[L2:.+]]
 
-// CHECK: ; <label>:[[L2]]:                                     ; preds = %entry
+// CHECK: [[L2]]:                                     ; preds = %entry
 // CHECK-NEXT: %[[T4:.+]] = phi %TSo10CFArrayRefa* [ %[[T0]], %entry ]
 // CHECK-NEXT: %[[T5:.+]] = ptrtoint %TSo10CFArrayRefa* %[[T4]] to i{{32|64}}
 // CHECK-NEXT: br label %[[L3:.+]]
 
-// CHECK: ; <label>:[[L1]]:                                     ; preds = %entry
+// CHECK: [[L1]]:                                     ; preds = %entry
 // CHECK-NEXT: %[[T6:.+]] = phi %swift.error* [ %[[T2]], %entry ]
 // CHECK-NEXT: store %swift.error* null, %swift.error** %swifterror, align {{[0-9]+}}
 // CHECK-NEXT: %[[T7:.+]] = icmp eq i{{32|64}} %{{.+}}, 0
 // CHECK-NEXT: br i1 %[[T7]], label %[[L4:.+]], label %[[L5:.+]]
 
-// CHECK: ; <label>:[[L5]]:                                     ; preds = %[[L1]]
+// CHECK: [[L5]]:                                     ; preds = %[[L1]]
 // CHECK-NEXT: %[[T8:.+]] = inttoptr i{{32|64}} %{{.+}} to i8*
 // CHECK-NEXT: br label %[[L6:.+]]
 
-// CHECK: ; <label>:[[L6]]:                                     ; preds = %[[L5]]
+// CHECK: [[L6]]:                                     ; preds = %[[L5]]
 // CHECK-NEXT: %[[T9:.+]] = phi i8* [ %[[T8]], %[[L5]] ]
 // CHECK-NEXT: %[[T10:.+]] = call swiftcc %TSo7NSErrorC* @"$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF"(%swift.error* %[[T6]]) #{{[0-9]+}}
 // CHECK: call swiftcc void @"$sSA7pointeexvs"(%swift.opaque* noalias nocapture %{{.+}}, i8* %[[T9]], %swift.type* %{{.+}}) #{{[0-9]+}}
@@ -56,14 +56,14 @@ import Foundation
 // CHECK: call void @swift_errorRelease(%swift.error* %[[T6]]) #{{[0-9]+}}
 // CHECK-NEXT: br label %[[L7:.+]]
 
-// CHECK: ; <label>:[[L4]]:                                     ; preds = %[[L1]]
+// CHECK: [[L4]]:                                     ; preds = %[[L1]]
 // CHECK-NEXT: call void @swift_errorRelease(%swift.error* %[[T6]]) #{{[0-9]+}}
 // CHECK-NEXT: br label %[[L7]]
 
-// CHECK: ; <label>:[[L7]]:                                     ; preds = %[[L6]], %[[L4]]
+// CHECK: [[L7]]:                                     ; preds = %[[L6]], %[[L4]]
 // CHECK-NEXT: br label %[[L3]]
 
-// CHECK: ; <label>:[[L3]]:                                     ; preds = %[[L2]], %[[L7]]
+// CHECK: [[L3]]:                                     ; preds = %[[L2]], %[[L7]]
 // CHECK-NEXT: %[[T12:.+]] = phi i{{32|64}} [ 0, %[[L7]] ], [ %[[T5]], %[[L2]] ]
 // CHECK-NEXT: %[[T13:.+]] = bitcast %T25unmanaged_objc_throw_func9SR_9035_CC* %{{.+}} to i8*
 // CHECK-NEXT: call void @llvm.objc.release(i8* %[[T13]])

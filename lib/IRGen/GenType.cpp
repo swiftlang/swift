@@ -1105,8 +1105,9 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
-bool TypeConverter::readLegacyTypeInfo(StringRef path) {
-  auto fileOrErr = llvm::MemoryBuffer::getFile(path);
+bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
+                                       StringRef path) {
+  auto fileOrErr = fs.getBufferForFile(path);
   if (!fileOrErr)
     return true;
 
@@ -1209,6 +1210,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  auto fs =
+      IGM.getSwiftModule()->getASTContext().SourceMgr.getFileSystem();
   if (path.empty()) {
     const auto &Triple = IGM.Context.LangOpts.Target;
 
@@ -1225,7 +1228,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     bool found = false;
     for (auto &RuntimeLibraryPath
          : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
-      if (llvm::sys::fs::exists(RuntimeLibraryPath)) {
+      if (fs->exists(RuntimeLibraryPath)) {
         defaultPath.append(RuntimeLibraryPath);
         found = true;
         break;
@@ -1245,7 +1248,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     path = defaultPath;
   }
 
-  bool error = readLegacyTypeInfo(path);
+  bool error = readLegacyTypeInfo(*fs, path);
   if (error)
     llvm::report_fatal_error("Cannot read '" + path + "'");
 }
@@ -1288,7 +1291,7 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature().getGenericEnvironment();
+  return genericSig->getCanonicalSignature()->getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -1562,7 +1565,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment();
+  auto canGenericEnv = canGenericSig->getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -1788,8 +1791,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -1920,9 +1921,6 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
-        if (!field->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(field);
-
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
@@ -1946,9 +1944,6 @@ namespace {
       for (auto elt : decl->getAllElements()) {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
-
-        if (!elt->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
 
         if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -2277,7 +2272,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment();
+  auto canGenericEnv = canGenericSig->getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.

@@ -39,7 +39,7 @@ func acceptColorTagged<Result>(@TaggedBuilder<Color> body: (Color) -> Result) {
 func testAcceptColorTagged(i: Int, s: String) {
   acceptColorTagged { color in
     i.tag(color)
-    s.tag(.green)
+    s.tag(Color.green)
   }
 }
 

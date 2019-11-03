@@ -1,5 +1,4 @@
 // RUN: %scale-test --invert-result --begin 2 --end 6 --step 1 --select NumLeafScopes %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 // REQUIRES: rdar42969824
 

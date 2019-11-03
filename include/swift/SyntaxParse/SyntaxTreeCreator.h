@@ -53,6 +53,7 @@ public:
 
   void acceptSyntaxRoot(OpaqueSyntaxNode root, SourceFile &SF);
 
+private:
   OpaqueSyntaxNode recordToken(tok tokenKind,
                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
                                ArrayRef<ParsedTriviaPiece> trailingTrivia,
@@ -64,12 +65,10 @@ public:
                                    ArrayRef<OpaqueSyntaxNode> elements,
                                    CharSourceRange range) override;
 
+  void discardRecordedNode(OpaqueSyntaxNode node) override;
+
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
-
-  OpaqueSyntaxNodeKind getOpaqueKind() override {
-    return OpaqueSyntaxNodeKind::LibSyntax;
-  }
 };
 
 } // end namespace swift

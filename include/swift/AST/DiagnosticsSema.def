@@ -37,6 +37,10 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
+#endif
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -145,6 +149,8 @@ ERROR(could_not_use_member_on_existential,none,
       "member %1 cannot be used on value of protocol type %0; use a generic"
       " constraint instead",
       (Type, DeclName))
+FIXIT(replace_with_type,"%0",(Type))
+FIXIT(insert_type_qualification,"%0.",(Type))
 
 ERROR(candidate_inaccessible,none,
       "%0 is inaccessible due to "
@@ -297,6 +303,9 @@ ERROR(cannot_infer_closure_type,none,
 ERROR(cannot_infer_closure_result_type,none,
       "unable to infer complex closure return type; "
       "add explicit type to disambiguate", ())
+FIXIT(insert_closure_return_type,
+      "%select{| () }1-> %0 %select{|in }1",
+      (Type, bool))
 
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
@@ -344,6 +353,9 @@ ERROR(cannot_throw_error_code,none,
       "thrown error code type %0 does not conform to 'Error'; construct an %1 "
       "instance", (Type, Type))
 
+FIXIT(insert_type_coercion,
+      " %select{as!|as}0 %1",(bool, Type))
+
 ERROR(bad_yield_count,none,
       "expected %0 yield value(s)", (unsigned))
 
@@ -361,15 +373,26 @@ ERROR(cannot_convert_default_arg_value,none,
       (Type,Type))
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
-ERROR(default_argument_literal_cannot_convert, none,
-      "cannot call %0 %1 because default argument of type %2 cannot be "
-      "converted to type %3", (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value cannot be converted to type %0", (Type))
 
 ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
+
+NOTE(candidate_has_invalid_argument_at_position,none,
+     "candidate expects %select{|in-out }2value of type %0 for parameter #%1",
+     (Type, unsigned, bool))
+
+ERROR(cannot_convert_array_to_variadic,none,
+      "cannot pass array of type %0 as variadic arguments of type %1",
+      (Type,Type))
+NOTE(candidate_would_match_array_to_variadic,none,
+     "candidate would match if array elements were passed as"
+     " variadic arguments of type %0", (Type))
+NOTE(suggest_pass_elements_directly,none,
+     "remove brackets to pass array elements directly", ())
+
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
@@ -381,6 +404,12 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+
+ERROR(cannot_convert_condition_value,none,
+      "cannot convert value of type %0 to expected condition type %1",
+      (Type, Type))
+ERROR(cannot_convert_condition_value_nil,none,
+      "'nil' is not compatible with expected condition type %0", (Type))
 
 ERROR(cannot_yield_rvalue_by_reference_same_type,none,
       "cannot yield immutable value of type %0 as an inout yield", (Type))
@@ -462,6 +491,9 @@ ERROR(cannot_convert_coerce_nil,none,
 ERROR(cannot_convert_assign,none,
       "cannot assign value of type %0 to type %1",
       (Type,Type))
+NOTE(assign_protocol_conformance_fix_it,none,
+     "add missing conformance to %0 to %1 %2",
+     (Type, DescriptiveDeclKind, Type))
 ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
       (Type, Type))
@@ -851,6 +883,8 @@ NOTE(found_this_precedence_group,none,
 ERROR(unknown_precedence_group,none,
       "unknown precedence group %0", (Identifier))
 ERROR(precedence_group_cycle,none,
+      "cycle in '%select{lowerThan|higherThan}0' relation", (bool))
+ERROR(higher_than_precedence_group_cycle,none,
       "cycle in higherThan relation: %0", (StringRef))
 ERROR(precedence_group_lower_within_module,none,
       "precedence group cannot be given lower precedence than group in same"
@@ -860,6 +894,8 @@ ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
 NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
+NOTE(circular_reference_through_precedence_group, none,
+     "through reference to precedence group %0 here", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -1084,10 +1120,14 @@ ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,
       "missing argument for parameter #%0 in call", (unsigned))
+ERROR(missing_arguments_in_call,none,
+      "missing arguments for parameters %0 in call", (StringRef))
 ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,none,
       "extra argument in call", ())
+ERROR(extra_arguments_in_call,none,
+      "extra arguments at positions %0 in call", (StringRef))
 ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,
@@ -1095,6 +1135,11 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
+NOTE(candidate_with_extraneous_args,none,
+      "candidate %0 requires %1 argument%s1, "
+      "but %2 %select{were|was}3 %select{provided|used in closure body}4",
+      (Type, unsigned, unsigned, bool, bool))
+
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
@@ -1121,7 +1166,10 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
 ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
-      "'ExpressibleByStringLiteral' or a keypath", (Type))
+      "'ExpressibleByStringLiteral' or a key path", (Type))
+NOTE(invalid_dynamic_member_subscript, none,
+     "add an explicit argument label to this subscript to satisfy "
+     "the @dynamicMemberLookup requirement", ())
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1373,6 +1421,12 @@ ERROR(corresponding_param_not_defaulted,none,
 NOTE(inherited_default_param_here,none,
      "corresponding parameter declared here", ())
 
+WARNING(option_set_zero_constant,none,
+        "static property %0 produces an empty option set",
+        (Identifier))
+NOTE(option_set_empty_set_init,none,
+     "use [] to silence this warning", ())
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
@@ -1472,6 +1526,9 @@ ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
+ERROR(variable_bound_by_no_pattern,none,
+      "variable %0 is not bound by any pattern",
+      (DeclName))
 
 WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",
@@ -1601,6 +1658,11 @@ ERROR(inferred_opaque_type,none,
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
+WARNING(composition_in_extended_type,none,
+        "extending a protocol composition is not supported; extending %0 "
+        "instead", (Type))
+NOTE(composition_in_extended_type_alternative,none,
+     "did you mean to extend the most specific type %0 instead?", (Type))
 ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
@@ -1625,6 +1687,11 @@ NOTE(objc_generic_extension_using_type_parameter_here,none,
      "generic parameter used here", ())
 NOTE(objc_generic_extension_using_type_parameter_try_objc,none,
      "add '@objc' to allow uses of 'self' within the function body", ())
+ERROR(invalid_nominal_extension,none,
+      "extension of type %0 must be declared as an extension of %1",
+      (Type, Type))
+NOTE(invalid_nominal_extension_rewrite,none,
+     "did you mean to extend %0 instead?", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -1635,10 +1702,19 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(type_cannot_conform, none,
+      "%select{|value of protocol }0type %1 cannot conform to %2; "
+      "only struct/enum/class types can conform to protocols",
+      (bool, Type, Type))
+NOTE(required_by_opaque_return,none,
+    "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
+NOTE(required_by_decl,none,
+     "required by %0 %1 where %2 = %3",
+     (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(required_by_decl_ref,none,
+     "required by referencing %0 %1 on %2 where %3 = %4",
+     (DescriptiveDeclKind, DeclName, Type, Type, Type))
 
-ERROR(protocol_does_not_conform_objc,none,
-      "protocol type %0 cannot conform to %1 because only concrete "
-      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",
@@ -1657,12 +1733,18 @@ ERROR(type_does_not_conform_owner,none,
 ERROR(type_does_not_conform_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 conform to %4",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires that %3 be a class type",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
-ERROR(type_does_not_conform_in_opaque_return,none,
-      "return type of %0 %1 requires that %2 conform to %3",
+ERROR(type_does_not_conform_anyobject_decl_owner,none,
+      "%0 %1 requires that %2 be a class type",
       (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(type_does_not_conform_in_opaque_return,none,
+      "return type of %0 %1 requires that %2 %select{conform to %3|be a class type}4",
+      (DescriptiveDeclKind, DeclName, Type, Type, bool))
 ERROR(types_not_equal_decl,none,
       "%0 %1 requires the types %2 and %3 be equivalent",
       (DescriptiveDeclKind, DeclName, Type, Type))
@@ -1681,6 +1763,8 @@ NOTE(where_requirement_failure_both_subst,none,
      "where %0 = %1, %2 = %3", (Type, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
+NOTE(wrapped_type_satisfies_requirement,none,
+     "wrapped type %0 satisfies this requirement; did you mean to unwrap?", (Type))
 NOTE(candidate_types_conformance_requirement,none,
      "candidate requires that %0 conform to %1 "
      "(requirement specified as %2 == %3%4)",
@@ -1833,16 +1917,16 @@ ERROR(protocol_access,none,
       "|private or fileprivate}4 because %select{it refines|its 'where' clause uses}2"
       "|%select{in this context|fileprivate|internal|public|%error}1 "
       "%select{protocol cannot refine|protocol's 'where' clause cannot use}2}0 "
-      "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
-      (bool, AccessLevel, bool, AccessLevel, bool))
+      "%select{a private|a fileprivate|an internal|%error|%error}3 %5",
+      (bool, AccessLevel, bool, AccessLevel, bool, DescriptiveDeclKind))
 WARNING(protocol_access_warn,none,
         "%select{protocol should be declared "
         "%select{private|fileprivate|internal|%error|%error}1 because "
         "%select{it refines|its 'where' clause uses}2"
         "|%select{in this context|fileprivate|internal|public|%error}1 "
         "%select{protocol should not refine|protocol's 'where' clause should not use}2}0 "
-        "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
-        (bool, AccessLevel, bool, AccessLevel, bool))
+        "%select{a private|a fileprivate|an internal|%error|%error}3 %5",
+        (bool, AccessLevel, bool, AccessLevel, bool, DescriptiveDeclKind))
 ERROR(protocol_usable_from_inline,none,
       "protocol %select{refined|used}0 by '@usableFromInline' protocol "
       "must be '@usableForInline' or public", (bool))
@@ -2223,10 +2307,8 @@ ERROR(multiple_override,none,
 NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
-ERROR(override_unavailable,none,
-      "cannot override %0 which has been marked unavailable", (DeclBaseName))
-ERROR(override_unavailable_msg, none,
-      "cannot override %0 which has been marked unavailable: %1",
+ERROR(override_unavailable, none,
+      "cannot override %0 which has been marked unavailable%select{|: %1}1",
       (DeclBaseName, StringRef))
 
 ERROR(override_less_available,none,
@@ -2618,6 +2700,8 @@ ERROR(dynamic_self_invalid_method,none,
       "covariant 'Self' can only appear at the top level of method result type", ())
 ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
+ERROR(dynamic_self_default_arg,none,
+      "covariant 'Self' type cannot be referenced from a default argument expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -2657,6 +2741,11 @@ ERROR(rethrows_without_throwing_parameter,none,
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
       ())
+
+ERROR(invalid_autoclosure_and_convention_attributes,none,
+      "'@convention(%0)' attribute is not allowed on '@autoclosure' types",
+      (StringRef))
+
 ERROR(autoclosure_function_input_nonunit,none,
       "argument type of @autoclosure parameter must be '()'", ())
 
@@ -3314,6 +3403,11 @@ ERROR(unresolved_label_corrected,none,
       "use of unresolved label %0; did you mean %1?",
       (Identifier, Identifier))
 
+ERROR(foreach_sequence_does_not_conform_to_expected_protocol,none,
+      "for-in loop requires %0 to conform to %1"
+      "%select{|; did you mean to unwrap optional?}2",
+      (Type, Type, bool))
+
 // Switch Stmt
 ERROR(no_match_operator,none,
       "no binary '~=' operator available for 'switch' statement", ())
@@ -3432,8 +3526,14 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
+NOTE(note_maybe_forgot_to_form_tuple,none,
+     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
+ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
+      "%0 %select{%1 |}2expects %3 separate arguments"
+      "%select{|; remove extra parentheses to change tuple into separate arguments}4",
+      (DescriptiveDeclKind, DeclName, bool, unsigned, bool))
 
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
@@ -3582,9 +3682,6 @@ ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
       "Error}0 type", (unsigned))
-ERROR(pointer_type_not_found,none,
-      "broken standard library: cannot find "
-      "%select{UnsafePointer|UnsafeMutablePointer}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
@@ -4118,26 +4215,15 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
 
 ERROR(availability_decl_unavailable, none,
       "%select{getter for |setter for |}0%1 is unavailable"
-      "%select{ in %3|}2",
-      (unsigned, DeclName, bool, StringRef))
+      "%select{ in %3|}2%select{|: %4}4",
+      (unsigned, DeclName, bool, StringRef, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
       "%select{getter for |setter for |}0%1 has been "
       "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
-      "'%4'",
-      (unsigned, DeclName, bool, unsigned, StringRef))
-
-ERROR(availability_decl_unavailable_rename_msg, none,
-      "%select{getter for |setter for |}0%1 has been "
-      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
-      "'%4': %5",
+      "'%4'%select{|: %5}5",
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
-
-ERROR(availability_decl_unavailable_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable"
-      "%select{ in %3|}2: %4",
-      (unsigned, DeclName, bool, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
@@ -4153,12 +4239,7 @@ NOTE(availability_obsoleted, none,
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2",
-        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple))
-
-WARNING(availability_deprecated_msg, none,
-        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2: %6",
+        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
@@ -4193,6 +4274,9 @@ NOTE(availability_guard_with_version_check, none,
 
 NOTE(availability_add_attribute, none,
      "add @available attribute to enclosing %0", (DescriptiveDeclKind))
+FIXIT(insert_available_attr,
+      "@available(%0 %1, *)\n%2",
+      (StringRef, StringRef, StringRef))
 
 ERROR(availability_accessor_only_version_newer, none,
       "%select{getter|setter}0 for %1 is only available in %2 %3"
@@ -4482,10 +4566,6 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_wrapper_ambiguous_initial_value_init, none,
-  "property wrapper type %0 has multiple initial-value initializers", (Type))
-ERROR(property_wrapper_ambiguous_default_value_init, none,
-  "property wrapper type %0 has multiple default-value initializers", (Type))
 ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing property wrapper type %3 "
@@ -4610,4 +4690,5 @@ ERROR(function_builder_arguments, none,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef FIXIT
 #endif

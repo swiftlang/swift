@@ -74,7 +74,6 @@ namespace {
     LookupResult &Result;
     DeclContext *DC;
     NameLookupOptions Options;
-    bool IsMemberLookup;
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
@@ -86,53 +85,20 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        NameLookupOptions options,
-                        bool isMemberLookup)
-      : Result(result), DC(dc), Options(options),
-        IsMemberLookup(isMemberLookup) {
+                        NameLookupOptions options)
+      : Result(result), DC(dc), Options(options) {
       if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
-    /// Determine whether we should filter out the results by removing
-    /// overridden and shadowed declarations.
-    /// FIXME: We should *always* do this, but there are weird assumptions
-    /// about the results of unqualified name lookup, e.g., that a local
-    /// variable not having a type indicates that it hasn't been seen yet.
-    bool shouldFilterResults() const {
-      // Member lookups always filter results.
-      if (IsMemberLookup) return true;
-
-      bool allAreInOtherModules = true;
-      auto currentModule = DC->getParentModule();
-      for (const auto &found : Result) {
-        // We found a member, so we need to filter.
-        if (found.getBaseDecl() != nullptr)
-          return true;
-
-        // We found something in our own module.
-        if (found.getValueDecl()->getDeclContext()->getParentModule() ==
-              currentModule)
-          allAreInOtherModules = false;
-      }
-
-      // FIXME: Only perform shadowing if we found things from other modules.
-      // This prevents us from introducing additional type-checking work
-      // during name lookup.
-      return allAreInOtherModules;
-    }
-
     ~LookupResultBuilder() {
-      // Check whether we should do this filtering aat all.
-      if (!shouldFilterResults()) return;
-
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
       removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      removeShadowedDecls(FoundDecls, DC->getParentModule());
-      removeShadowedDecls(FoundOuterDecls, DC->getParentModule());
+      removeShadowedDecls(FoundDecls, DC);
+      removeShadowedDecls(FoundOuterDecls, DC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.
@@ -234,7 +200,7 @@ namespace {
       auto conformance = TypeChecker::conformsToProtocol(conformingType,
                                                          foundProto, DC,
                                                          conformanceOptions);
-      if (!conformance) {
+      if (conformance.isInvalid()) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
         // not a class constraint if any.
@@ -244,7 +210,7 @@ namespace {
         return;
       }
 
-      if (conformance->isAbstract()) {
+      if (conformance.isAbstract()) {
         assert(foundInType->is<ArchetypeType>() ||
                foundInType->isExistentialType());
         addResult(found);
@@ -253,7 +219,7 @@ namespace {
 
       // Dig out the witness.
       ValueDecl *witness = nullptr;
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
         witness = concrete->getTypeWitnessAndDecl(assocType)
           .second;
@@ -301,11 +267,11 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, nullptr, loc,
+  UnqualifiedLookup lookup(name, dc, loc,
                            convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
-  LookupResultBuilder builder(result, dc, options, /*memberLookup*/false);
+  LookupResultBuilder builder(result, dc, options);
   for (auto idx : indices(lookup.Results)) {
     const auto &found = lookup.Results[idx];
     // Determine which type we looked through to find this result.
@@ -336,7 +302,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
   {
     // Try lookup without ProtocolMembers first.
     UnqualifiedLookup lookup(
-        name, dc, nullptr, loc,
+        name, dc, loc,
         ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     if (!lookup.Results.empty() ||
@@ -352,7 +318,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
     UnqualifiedLookup lookup(
-        name, dc, nullptr, loc,
+        name, dc, loc,
         ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
@@ -381,10 +347,9 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
 
-  LookupResultBuilder builder(result, dc, options,
-                              /*memberLookup*/true);
+  LookupResultBuilder builder(result, dc, options);
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(type, name, subOptions, nullptr, lookupResults);
+  dc->lookupQualified(type, name, subOptions, lookupResults);
 
   for (auto found : lookupResults)
     builder.add(found, nullptr, type, /*isOuter=*/false);
@@ -393,8 +358,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 }
 
 bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
-  auto memberType = typeDecl->getDeclaredInterfaceType();
-
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -405,28 +368,38 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   //
   // FIXME: Could lift this restriction once we have sugared
   // "member types".
-  if (type->is<UnboundGenericType>() &&
-      isa<TypeAliasDecl>(typeDecl) &&
-      cast<TypeAliasDecl>(typeDecl)->getGenericParams() == nullptr &&
-      memberType->hasTypeParameter()) {
-    return true;
-  }
+  if (type->is<UnboundGenericType>()) {
+    // Generic typealiases can be accessed with an unbound generic
+    // base, since we represent the member type as an unbound generic
+    // type.
+    //
+    // Non-generic type aliases can only be accessed if the
+    // underlying type is not dependent.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (!aliasDecl->isGeneric() &&
+          aliasDecl->getUnderlyingType()->getCanonicalType()
+            ->hasTypeParameter()) {
+        return true;
+      }
+    }
 
-  if (type->is<UnboundGenericType>() &&
-      isa<AssociatedTypeDecl>(typeDecl)) {
-    return true;
+    if (isa<AssociatedTypeDecl>(typeDecl))
+      return true;
   }
 
   if (type->isExistentialType() &&
       typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-    // TODO: Temporarily allow typealias and associated type lookup on
-    //       existential type iff it doesn't have any type parameters.
-    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
-      return memberType->hasTypeParameter();
-
-    // Don't allow lookups of nested types of an existential type,
-    // because there is no way to represent such types.
-    return true;
+    // Allow typealias member access on existential types if the underlying
+    // type does not have any type parameters.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (aliasDecl->getUnderlyingType()->getCanonicalType()
+          ->hasTypeParameter())
+        return true;
+    } else {
+      // Don't allow lookups of other nested types of an existential type,
+      // because there is no way to represent such types.
+      return true;
+    }
   }
 
   return false;
@@ -448,7 +421,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
-  if (!dc->lookupQualified(type, name, subOptions, nullptr, decls))
+  if (!dc->lookupQualified(type, name, subOptions, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -457,16 +430,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
-    // FIXME: This should happen before we attempt shadowing checks.
-    if (!typeDecl->hasInterfaceType()) {
-      dc->getASTContext().getLazyResolver()->resolveDeclSignature(typeDecl);
-      if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
-        continue;
+    // HACK: Lookups rooted at a typealias are trying to look for its underlying
+    // type so they shouldn't also find that same typealias.
+    if (decl == dyn_cast<TypeAliasDecl>(dc)) {
+      continue;
     }
 
-    auto memberType = typeDecl->getDeclaredInterfaceType();
-
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
@@ -490,11 +462,12 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       // FIXME: This is a hack, we should be able to remove this entire 'if'
       // statement once we learn how to deal with the circularity here.
-      if (isa<TypeAliasDecl>(typeDecl) &&
-          isa<ProtocolDecl>(typeDecl->getDeclContext())) {
-        if (!type->is<ArchetypeType>() &&
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+        if (isa<ProtocolDecl>(aliasDecl->getDeclContext()) &&
+            !type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
-            memberType->hasTypeParameter() &&
+            aliasDecl->getUnderlyingType()->getCanonicalType()
+              ->hasTypeParameter() &&
             !options.contains(NameLookupFlags::PerformConformanceCheck)) {
           continue;
         }
@@ -510,8 +483,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                         typeDecl, type);
+    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                              typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -531,10 +504,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      // If we're validating the protocol recursively, bail out.
-      if (!protocol->hasValidSignature())
-        continue;
-
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);
       if (!conformance) {
@@ -543,7 +512,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
@@ -670,10 +639,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   });
 
   if (baseTypeOrNull) {
-    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, this,
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
                              /*include instance members*/ true, gsb);
   } else {
-    lookupVisibleDecls(consumer, DC, this, /*top level*/ true,
+    lookupVisibleDecls(consumer, DC, /*top level*/ true,
                        corrections.Loc.getBaseNameLoc());
   }
 

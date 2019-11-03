@@ -12,19 +12,19 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -100,6 +100,13 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   }
 
   llvm_unreachable("Unhandled TypeTraitResult in switch.");
+}
+
+SILInstruction *SILCombiner::optimizeBuiltinIsConcrete(BuiltinInst *BI) {
+  if (BI->getOperand(0)->getType().hasArchetype())
+    return nullptr;
+
+  return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), 1);
 }
 
 static unsigned getTypeWidth(SILType Ty) {
@@ -525,6 +532,8 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)
+    return optimizeBuiltinIsConcrete(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayNoAlias ||

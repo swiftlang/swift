@@ -20,21 +20,17 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
-#include "swift/Parse/ParsedSyntaxNodes.h"
-#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Parse/HiddenLibSyntaxAction.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
-#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -112,7 +108,6 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 using namespace swift;
 using namespace swift::syntax;
 
-void DelayedParsingCallbacks::anchor() { }
 void SILParserTUStateBase::anchor() { }
 
 namespace {
@@ -138,6 +133,9 @@ public:
 
 private:
   void parseFunctionBody(AbstractFunctionDecl *AFD) {
+    // FIXME: This duplicates the evaluation of
+    // ParseAbstractFunctionBodyRequest, but installs a code completion
+    // factory.
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
@@ -145,15 +143,15 @@ private:
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
                      /*DelayBodyParsing=*/false);
-    TheParser.SyntaxContext->setDiscard();
+    TheParser.SyntaxContext->disable();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    if (ParserState.hasFunctionBodyState(AFD))
-      TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    auto body = TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    AFD->setBodyParsed(body);
 
     if (CodeCompletion)
       CodeCompletion->doneParsing();
@@ -170,9 +168,11 @@ static void parseDelayedDecl(
   SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
-                   /*DelayBodyParsing=*/false);
-  TheParser.SyntaxContext->setDiscard();
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
+
+  // Disable libSyntax creation in the delayed parsing.
+  TheParser.SyntaxContext->disable();
+
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
     CodeCompletion.reset(
@@ -319,7 +319,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
           const ParsedTrivia &TrailingTrivia) {
-        CharSourceRange TokRange = Tok.getRangeWithoutBackticks();
+        CharSourceRange TokRange = Tok.getRange();
         SourceLoc LeadingTriviaLoc =
           TokRange.getStart().getAdvancedLoc(-LeadingTrivia.getLength());
         SourceLoc TrailingTriviaLoc =
@@ -328,7 +328,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
           LeadingTrivia.convertToSyntaxTrivia(LeadingTriviaLoc, SM, BufferID);
         Trivia syntaxTrailingTrivia =
           TrailingTrivia.convertToSyntaxTrivia(TrailingTriviaLoc, SM, BufferID);
-        auto Text = OwnedString::makeRefCounted(Tok.getText());
+        auto Text = OwnedString::makeRefCounted(Tok.getRawText());
         auto ThisToken =
             RawSyntax::make(Tok.getKind(), Text, syntaxLeadingTrivia.Pieces,
                             syntaxTrailingTrivia.Pieces,
@@ -519,19 +519,12 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(
-                    SyntaxContext, SF, L->getBufferID(),
-                    std::make_shared<HiddenLibSyntaxAction>(
-                        SPActions,
-                        std::make_shared<SyntaxTreeCreator>(
-                            SF.getASTContext().SourceMgr,
-                            L->getBufferID(),
-                            SF.SyntaxParsingCache,
-                            SF.getASTContext().getSyntaxArena())))),
-    Generator(SF.getASTContext()) {
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
+                                           L->getBufferID(),
+                                           std::move(SPActions))) {
   State = PersistentState;
   if (!State) {
-    OwnedState.reset(new PersistentParserState(Context));
+    OwnedState.reset(new PersistentParserState());
     State = OwnedState.get();
   }
 
@@ -583,20 +576,7 @@ SourceLoc Parser::consumeToken() {
   return consumeTokenWithoutFeedingReceiver();
 }
 
-ParsedTokenSyntax Parser::consumeTokenSyntax() {
-  TokReceiver->receive(Tok);
-  ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
-      Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
-
-  // todo [gsoc]: remove when possible
-  // todo [gsoc]: handle backtracking properly
-  Generator.pushLoc(Tok.getLoc());
-
-  consumeTokenWithoutFeedingReceiver();
-  return ParsedToken;
-}
-
-SourceLoc Parser::getEndOfPreviousLoc() {
+SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
@@ -968,8 +948,6 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-/// Parse the specified expected token and return its location on success.  On failure, emit the specified
-/// error diagnostic,  a note at the specified note location, and return the location of the previous token.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
@@ -982,23 +960,42 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = PreviousLoc;
+    TokLoc = getLocForMissingMatchingToken();
     return true;
   }
 
   return false;
 }
 
+SourceLoc Parser::getLocForMissingMatchingToken() const {
+  // At present, use the same location whether it's an error or whether
+  // the matching token is missing.
+  // Both cases supply a location for something the user didn't type.
+  return getErrorOrMissingLoc();
+}
+
+SourceLoc Parser::getErrorOrMissingLoc() const {
+  // The next token might start a new enclosing construct,
+  // and SourceLoc's are always at the start of a token (for example, for
+  // fixits, so use the previous token's SourceLoc and allow a subnode to end
+  // right at the same place as its supernode.
+
+  // The tricky case is when the previous token is an InterpolatedStringLiteral.
+  // Then, there will be names in scope whose SourceLoc is *after* the
+  // the location of a missing close brace.
+  // ASTScope tree creation will have to cope.
+
+  return PreviousLoc;
+}
+
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   switch (ListKind) {
-  case SyntaxKind::FunctionCallArgumentList:
-    return SyntaxKind::FunctionCallArgument;
+  case SyntaxKind::TupleExprElementList:
+    return SyntaxKind::TupleExprElement;
   case SyntaxKind::ArrayElementList:
     return SyntaxKind::ArrayElement;
   case SyntaxKind::DictionaryElementList:
     return SyntaxKind::DictionaryElement;
-  case SyntaxKind::TupleElementList:
-    return SyntaxKind::TupleElement;
   case SyntaxKind::FunctionParameterList:
     return SyntaxKind::FunctionParameter;
   case SyntaxKind::TupleTypeElementList:
@@ -1094,7 +1091,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+    RightLoc =
+        Tok.is(RightK) ? consumeToken() : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }

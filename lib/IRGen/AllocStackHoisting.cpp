@@ -62,8 +62,7 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
   bool foundWeaklyImported =
       SILTy.getASTType().findIf([&Mod](CanType type) -> bool {
         if (auto nominal = type->getNominalOrBoundGenericNominal())
-          if (nominal->isWeakImported(Mod.getSwiftModule(),
-                                      Mod.getAvailabilityContext())) {
+          if (nominal->isWeakImported(Mod.getSwiftModule())) {
             return true;
           }
         return false;

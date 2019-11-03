@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -38,6 +39,29 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
 static_assert(IsTriviallyDestructible<TypeAttributes>::value,
               "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
 
+#define DECL_ATTR(Name, Id, ...)                                                                     \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToAdd),     \
+              #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                        \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToRemove) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToRemove),     \
+              #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                     \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToAdd) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToAdd),     \
+              #Name " needs to specify either APIBreakingToAdd or APIStableToAdd");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                        \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToRemove) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
+              #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
+#include "swift/AST/Attr.def"
 
 // Only allow allocation of attributes using the allocator in ASTContext.
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
@@ -561,10 +585,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     Printer << "exported: "<<  exported << ", ";
     Printer << "kind: " << kind << ", ";
+    SmallVector<Requirement, 4> requirementsScratch;
+    ArrayRef<Requirement> requirements;
+    if (auto sig = attr->getSpecializedSgnature())
+      requirements = sig->getRequirements();
 
-    if (!attr->getRequirements().empty()) {
-      Printer << "where ";
-    }
     std::function<Type(Type)> GetInterfaceType;
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (!FnDecl || !FnDecl->getGenericEnvironment())
@@ -577,8 +602,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       GetInterfaceType = [=](Type Ty) -> Type {
         return GenericEnv->getSugaredType(Ty);
       };
+
+      if (auto sig = attr->getSpecializedSgnature()) {
+        requirementsScratch = sig->requirementsNotSatisfiedBy(
+            GenericEnv->getGenericSignature());
+        requirements = requirementsScratch;
+      }
     }
-    interleave(attr->getRequirements(),
+
+    if (!requirements.empty()) {
+      Printer << "where ";
+    }
+
+    interleave(requirements,
                [&](Requirement req) {
                  auto FirstTy = GetInterfaceType(req.getFirstType());
                  if (req.getKind() != RequirementKind::Layout) {
@@ -1073,8 +1109,15 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
     return attr;
 
   // If D is an extension member, check if the extension is unavailable.
-  if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
-    return AvailableAttr::isUnavailable(ext);
+  //
+  // Skip decls imported from Clang, they could be associated to the wrong
+  // extension and inherit undesired unavailability. The ClangImporter
+  // associates Objective-C protocol members to the first category where the
+  // protocol is directly or indirectly adopted, no matter its availability
+  // and the availability of other categories. rdar://problem/53956555
+  if (!D->getClangNode())
+    if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
+        return AvailableAttr::isUnavailable(ext);
 
   return nullptr;
 }
@@ -1082,38 +1125,14 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause,
                                bool exported,
-                               SpecializationKind kind)
-    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      trailingWhereClause(clause) {
+                               SpecializationKind kind,
+                               GenericSignature specializedSignature)
+    : DeclAttribute(DAK_Specialize, atLoc, range,
+                    /*Implicit=*/clause == nullptr),
+      trailingWhereClause(clause),
+      specializedSignature(specializedSignature) {
   Bits.SpecializeAttr.exported = exported;
   Bits.SpecializeAttr.kind = unsigned(kind);
-  Bits.SpecializeAttr.numRequirements = 0;
-}
-
-SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
-                               ArrayRef<Requirement> requirements,
-                               bool exported,
-                               SpecializationKind kind)
-    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false) {
-  Bits.SpecializeAttr.exported = exported;
-  Bits.SpecializeAttr.kind = unsigned(kind);
-  Bits.SpecializeAttr.numRequirements = requirements.size();
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
-
-void SpecializeAttr::setRequirements(ASTContext &Ctx,
-                                     ArrayRef<Requirement> requirements) {
-  unsigned numClauseRequirements =
-      (trailingWhereClause) ? trailingWhereClause->getRequirements().size() : 0;
-  assert(requirements.size() <= numClauseRequirements);
-  if (!numClauseRequirements)
-    return;
-  Bits.SpecializeAttr.numRequirements = requirements.size();
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
-
-ArrayRef<Requirement> SpecializeAttr::getRequirements() const {
-  return const_cast<SpecializeAttr*>(this)->getRequirements();
 }
 
 TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
@@ -1124,28 +1143,11 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TrailingWhereClause *clause,
                                        bool exported,
-                                       SpecializationKind kind) {
-  unsigned numRequirements = (clause) ? clause->getRequirements().size() : 0;
-  unsigned size =
-      sizeof(SpecializeAttr) + (numRequirements * sizeof(Requirement));
-  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
-  return new (mem)
-      SpecializeAttr(atLoc, range, clause, exported, kind);
+                                       SpecializationKind kind,
+                                       GenericSignature specializedSignature) {
+  return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
+                                  specializedSignature);
 }
-
-SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
-                                       SourceRange range,
-                                       ArrayRef<Requirement> requirements,
-                                       bool exported,
-                                       SpecializationKind kind) {
-  unsigned numRequirements = requirements.size();
-  unsigned size =
-      sizeof(SpecializeAttr) + (numRequirements * sizeof(Requirement));
-  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
-  return new (mem)
-      SpecializeAttr(atLoc, range, requirements, exported, kind);
-}
-
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
                                TypeLoc ProtocolType,

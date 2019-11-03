@@ -26,7 +26,7 @@ struct GenericProperty<T: P> {
 let (bim, bam): some P = (1, 2) // expected-error{{'some' type can only be declared on a single property declaration}}
 var computedProperty: some P {
   get { return 1 }
-  set { _ = newValue + 1 } // TODO expected-error{{}} expected-note{{}}
+  set { _ = newValue + 1 } // expected-error{{cannot convert value of type 'some P' to expected argument type 'Int'}}
 }
 struct SubscriptTest {
   subscript(_ x: Int) -> some P {
@@ -172,8 +172,11 @@ func recursion(x: Int) -> some P {
   return recursion(x: x - 1)
 }
 
-// FIXME: We need to emit a better diagnostic than the failure to convert Never to opaque.
-func noReturnStmts() -> some P { fatalError() } // expected-error{{cannot convert return expression of type 'Never' to return type 'some P'}} expected-error{{no return statements}}
+func noReturnStmts() -> some P {} // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
+func returnUninhabited() -> some P { // expected-note {{opaque return type declared here}}
+    fatalError() // expected-error{{return type of global function 'returnUninhabited()' requires that 'Never' conform to 'P'}}
+}
 
 func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}}
   if x {
@@ -266,10 +269,10 @@ func associatedTypeIdentity() {
 
   sameType(cr, c.r_out())
   sameType(dr, d.r_out())
-  sameType(cr, dr) // expected-error{{}}
+  sameType(cr, dr) // expected-error{{}} expected-note {{}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
-  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
+  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}} expected-note {{}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
@@ -373,9 +376,9 @@ protocol P_51641323 {
 
 func rdar_51641323() {
   struct Foo: P_51641323 {
-    var foo: some P_51641323 { {} }
-    // expected-error@-1 {{return type of property 'foo' requires that '() -> ()' conform to 'P_51641323'}}
-    // expected-note@-2 {{opaque return type declared here}}
+    var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only struct/enum/class types can conform to protocols}}
+    }
   }
 }
 

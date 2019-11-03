@@ -210,7 +210,7 @@ void SILOpenedArchetypesTracker::dump() const {
     auto Archetype = KV.first;
     auto Def = KV.second;
     llvm::dbgs() << "open archetype:\n";
-    Type(Archetype)->dump();
+    Type(Archetype)->dump(llvm::dbgs());
     llvm::dbgs() << "defined at: " << *Def << "\n";
   }
   llvm::dbgs() << "}\n";

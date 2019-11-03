@@ -512,7 +512,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // so after re-abstracting the signature we must dispatch to the dynamic
 // thunk.
 
-// CHECK-LABEL: sil private [ossa] @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
 // CHECK: bb0(%0 : $*Int, %1 : @guaranteed $ConcreteDerived):
 // CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
 // CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @$s7dynamic15ConcreteDerivedC6methodyySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()

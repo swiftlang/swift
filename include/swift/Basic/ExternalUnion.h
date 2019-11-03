@@ -433,27 +433,27 @@ struct MembersHelper<> {
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void copyConstruct(void *self, int index, const void *other) {
-    llvm_unreachable("bad index");
+    assert(false && "bad index");
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void moveConstruct(void *self, int index, void *other) {
-    llvm_unreachable("bad index");
+    assert(false && "bad index");
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void copyAssignSame(int index, void *self, const void *other) {
-    llvm_unreachable("bad index");
+    assert(false && "bad index");
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void moveAssignSame(int index, void *self, void *other) {
-    llvm_unreachable("bad index");
+    assert(false && "bad index");
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   static void destruct(int index, void *self) {
-    llvm_unreachable("bad index");
+    assert(false && "bad index");
   }
 };
 

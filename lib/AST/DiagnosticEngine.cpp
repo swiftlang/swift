@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
@@ -108,6 +109,13 @@ static constexpr const char *const debugDiagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
+static constexpr const char *const fixItStrings[] = {
+#define DIAG(KIND, ID, Options, Text, Signature)
+#define FIXIT(ID, Text, Signature) Text,
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a fix-it>",
+};
+
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
   perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
@@ -162,10 +170,11 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
 /// Add an insertion fix-it to the currently-active diagnostic.  The
 /// text is inserted immediately *after* the token specified.
 ///
-InFlightDiagnostic &InFlightDiagnostic::fixItInsertAfter(SourceLoc L,
-                                                         StringRef Str) {
+InFlightDiagnostic &
+InFlightDiagnostic::fixItInsertAfter(SourceLoc L, StringRef FormatString,
+                                     ArrayRef<DiagnosticArgument> Args) {
   L = Lexer::getLocForEndOfToken(Engine->SourceMgr, L);
-  return fixItInsert(L, Str);
+  return fixItInsert(L, FormatString, Args);
 }
 
 /// Add a token-based removal fix-it to the currently-active
@@ -189,10 +198,20 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}));
+  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::fixItReplace(SourceRange R, StringRef FormatString,
+                                 ArrayRef<DiagnosticArgument> Args) {
+  auto &SM = Engine->SourceMgr;
+  auto charRange = toCharSourceRange(SM, R);
+
+  Engine->getActiveDiagnostic().addFixIt(
+      Diagnostic::FixIt(charRange, FormatString, Args));
+  return *this;
+}
 
 InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
                                                      StringRef Str) {
@@ -207,6 +226,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
 
   // If we're replacing with something that wants spaces around it, do a bit of
   // extra work so that we don't suggest extra spaces.
+  // FIXME: This could probably be applied to structured fix-its as well.
   if (Str.back() == ' ') {
     if (isspace(extractCharAfter(SM, charRange.getEnd())))
       Str = Str.drop_back();
@@ -215,18 +235,19 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
     if (isspace(extractCharBefore(SM, charRange.getStart())))
       Str = Str.drop_front();
   }
-
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, Str));
-  return *this;
+  
+  return fixItReplace(R, "%0", {Str});
 }
 
-InFlightDiagnostic &InFlightDiagnostic::fixItReplaceChars(SourceLoc Start,
-                                                          SourceLoc End,
-                                                          StringRef Str) {
+InFlightDiagnostic &
+InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
+                                      StringRef FormatString,
+                                      ArrayRef<DiagnosticArgument> Args) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(
-        toCharSourceRange(Engine->SourceMgr, Start, End), Str));
+    Engine->getActiveDiagnostic().addFixIt(
+        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, Start, End),
+                          FormatString, Args));
   return *this;
 }
 
@@ -242,10 +263,10 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   auto text1 = SM.extractText(charRange1);
   auto text2 = SM.extractText(charRange2);
 
-  Engine->getActiveDiagnostic()
-    .addFixIt(Diagnostic::FixIt(charRange1, text2));
-  Engine->getActiveDiagnostic()
-    .addFixIt(Diagnostic::FixIt(charRange2, text1));
+  Engine->getActiveDiagnostic().addFixIt(
+      Diagnostic::FixIt(charRange1, "%0", {text2}));
+  Engine->getActiveDiagnostic().addFixIt(
+      Diagnostic::FixIt(charRange2, "%0", {text1}));
   return *this;
 }
 
@@ -256,6 +277,14 @@ void InFlightDiagnostic::flush() {
   IsActive = false;
   if (Engine)
     Engine->flushActiveDiagnostic();
+}
+
+void Diagnostic::addChildNote(Diagnostic &&D) {
+  assert(storedDiagnosticInfos[(unsigned)D.ID].kind == DiagnosticKind::Note &&
+         "Only notes can have a parent.");
+  assert(storedDiagnosticInfos[(unsigned)ID].kind != DiagnosticKind::Note &&
+         "Notes can't have children.");
+  ChildNotes.push_back(std::move(D));
 }
 
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
@@ -359,7 +388,7 @@ static bool isInterestingTypealias(Type type) {
   // Compatibility aliases are only interesting insofar as their underlying
   // types are interesting.
   if (aliasDecl->isCompatibilityAlias()) {
-    auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
+    auto underlyingTy = aliasDecl->getUnderlyingType();
     return isInterestingTypealias(underlyingTy);
   }
 
@@ -377,7 +406,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
     return false;
 
   // Don't show generic type parameters.
-  if (type->hasTypeParameter())
+  if (type->getCanonicalType()->hasTypeParameter())
     return false;
 
   // Only show 'aka' if there's a typealias involved; other kinds of sugar
@@ -449,8 +478,14 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::String:
-    assert(Modifier.empty() && "Improper modifier for string argument");
-    Out << Arg.getAsString();
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              Arg.getAsString().empty() ? 0 : 1, FormatOpts,
+                              Out);
+    } else {
+      assert(Modifier.empty() && "Improper modifier for string argument");
+      Out << Arg.getAsString();
+    }
     break;
 
   case DiagnosticArgumentKind::Identifier:
@@ -776,10 +811,11 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
   TentativeDiagnostics.clear();
 }
 
-void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+Optional<DiagnosticInfo>
+DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic.getID());
   if (behavior == DiagnosticState::Behavior::Ignore)
-    return;
+    return None;
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
@@ -819,7 +855,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           // FIXME: Horrible, horrible hackaround. We're not getting a
           // DeclContext everywhere we should.
           if (!dc) {
-            return;
+            return None;
           }
 
           while (!dc->isModuleContext()) {
@@ -896,17 +932,35 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
   }
 
-  // Pass the diagnostic off to the consumer.
-  DiagnosticInfo Info;
-  Info.ID = diagnostic.getID();
-  Info.Ranges = diagnostic.getRanges();
-  Info.FixIts = diagnostic.getFixIts();
-  for (auto &Consumer : Consumers) {
-    Consumer->handleDiagnostic(
-        SourceMgr, loc, toDiagnosticKind(behavior),
-        diagnosticStringFor(Info.ID, getPrintDiagnosticNames()),
-        diagnostic.getArgs(), Info, getDefaultDiagnosticLoc());
+  return DiagnosticInfo(
+      diagnostic.getID(), loc, toDiagnosticKind(behavior),
+      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames()),
+      diagnostic.getArgs(), getDefaultDiagnosticLoc(), /*child note info*/ {},
+      diagnostic.getRanges(), diagnostic.getFixIts(), diagnostic.isChildNote());
+}
+
+void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+  if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
+    SmallVector<DiagnosticInfo, 1> childInfo;
+    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
+    auto childNotes = diagnostic.getChildNotes();
+    for (unsigned idx = 0; idx < childNotes.size(); ++idx) {
+      if (auto child = diagnosticInfoForDiagnostic(childNotes[idx])) {
+        childInfo.push_back(*child);
+        childInfoPtrs.push_back(&childInfo[idx]);
+      }
+    }
+    info->ChildDiagnosticInfo = childInfoPtrs;
+    for (auto &consumer : Consumers) {
+      consumer->handleDiagnostic(SourceMgr, *info);
+    }
   }
+
+  // For compatibility with DiagnosticConsumers which don't know about child
+  // notes. These can be ignored by consumers which do take advantage of the
+  // grouping.
+  for (auto &childNote : diagnostic.getChildNotes())
+    emitDiagnostic(childNote);
 }
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
@@ -915,6 +969,10 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
     return debugDiagnosticStrings[(unsigned)id];
   }
   return diagnosticStrings[(unsigned)id];
+}
+
+const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {
+  return fixItStrings[(unsigned)id];
 }
 
 void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(
@@ -944,6 +1002,10 @@ DiagnosticSuppression::~DiagnosticSuppression() {
     diags.addConsumer(*consumer);
 }
 
+bool DiagnosticSuppression::isEnabled(const DiagnosticEngine &diags) {
+  return diags.getConsumers().empty();
+}
+
 BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
     const SourceFile &SF)
     : Diags(SF.getASTContext().Diags) {
@@ -964,7 +1026,7 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     if (content.empty())
       continue;
 
-    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
 }

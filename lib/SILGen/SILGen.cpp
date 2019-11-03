@@ -25,6 +25,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
@@ -86,7 +87,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     SmallVector<ValueDecl *, 2> decls;
-    mod->lookupValue(/*AccessPath=*/{}, ctx.getIdentifier(functionName),
+    mod->lookupValue(ctx.getIdentifier(functionName),
                      NLKind::QualifiedLookup, decls);
     if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
@@ -105,8 +106,6 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                    moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
-
-    assert(fd->hasInterfaceType() && "bridging functions must be type-checked");
 
     // Check that the function takes the expected arguments and returns the
     // expected result type.
@@ -219,16 +218,9 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getSingleRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -251,17 +243,10 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getSingleRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -284,19 +269,9 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  AssociatedTypeDecl *found = nullptr;
-  DeclName name(ctx.Id_ObjectiveCType);
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      found = assocType;
-      break;
-    }
-  }
-
+  auto *found = proto->getAssociatedType(ctx.Id_ObjectiveCType);
   if (!found)
-    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+    diagnose(loc, diag::bridging_objcbridgeable_broken, ctx.Id_ObjectiveCType);
 
   BridgedObjectiveCType = found;
   return found;
@@ -309,8 +284,10 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
 
   // Find the conformance to _ObjectiveCBridgeable.
   auto result = SwiftModule->lookupConformance(type, proto);
-  if (result) return result->getConcrete();
-  return nullptr;
+  if (result.isInvalid())
+    return nullptr;
+
+  return result.getConcrete();
 }
 
 ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
@@ -337,24 +314,18 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
 
   // Look for _nsError.
   auto &ctx = getASTContext();
-  VarDecl *found = nullptr;
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(ctx.Id_nsError, flags)) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      found = var;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<VarDecl>(
+      proto->getSingleRequirement(ctx.Id_nsError));
 
   NSErrorRequirement = found;
   return found;
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return None;
+  if (!proto)
+    return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
   return SwiftModule->lookupConformance(type, proto);
@@ -381,8 +352,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
                                    cast<ProtocolDecl>(error));
 
-  if (conformance && conformance->isConcrete())
-    NSErrorConformanceToError = conformance->getConcrete();
+  if (conformance.isConcrete())
+    NSErrorConformanceToError = conformance.getConcrete();
   else
     NSErrorConformanceToError = nullptr;
   return *NSErrorConformanceToError;
@@ -457,9 +428,10 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
+                                         SubstitutionMap(), false,
                                          getASTContext());
 
-  auto env = sig->createGenericEnvironment();
+  auto env = sig->getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(SILLinkage::PublicExternal,
@@ -517,6 +489,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
+                                   SubstitutionMap(), false,
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -783,7 +756,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
 void SILGenModule::
 emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                             const CaptureInfo &captureInfo) {
+                                             CaptureInfo captureInfo) {
   assert(TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()
          && "no valid code generator for top-level function?!");
 
@@ -887,7 +860,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
           });
 
       // Constructors may not have bodies if they've been imported, or if they've
-      // been parsed from a parseable interface.
+      // been parsed from a module interface.
       if (decl->hasBody()) {
         SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
         emitOrDelayFunction(
@@ -962,8 +935,8 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
-    for (auto entry : pbd->getPatternList())
-      if (entry.getExecutableInit())
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (pbd->getExecutableInit(i))
         return true;
   }
 
@@ -1009,7 +982,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && !dd->getBody()->empty())
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.
@@ -1128,12 +1101,11 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
 
 void SILGenModule::
 emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
-  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
-  auto *var = pbdEntry.getAnchoringVarDecl();
-  auto *init = pbdEntry.getInit();
-  auto *initDC = pbdEntry.getInitContext();
-  auto &captureInfo = pbdEntry.getCaptureInfo();
-  assert(!pbdEntry.isInitializerSubsumed());
+  auto *var = pbd->getAnchoringVarDecl(i);
+  auto *init = pbd->getInit(i);
+  auto *initDC = pbd->getInitContext(i);
+  auto captureInfo = pbd->getCaptureInfo(i);
+  assert(!pbd->isInitializerSubsumed(i));
 
   // If this is the backing storage for a property with an attached wrapper
   // that was initialized with `=`, use that expression as the initializer.
@@ -1166,6 +1138,24 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
     }
 
     SGF.emitGeneratorFunction(constant, init, /*EmitProfilerIncrement=*/true);
+    postEmitFunction(constant, f);
+  });
+}
+
+void SILGenModule::
+emitPropertyWrapperBackingInitializer(VarDecl *var) {
+  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+  emitOrDelayFunction(*this, constant, [this, constant, var](SILFunction *f) {
+    preEmitFunction(constant, var, f, var);
+    PrettyStackTraceSILFunction X(
+        "silgen emitPropertyWrapperBackingInitializer", f);
+    auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+    assert(wrapperInfo.initializeFromOriginal);
+    f->createProfiler(wrapperInfo.initializeFromOriginal, constant,
+                      ForDefinition);
+    auto varDC = var->getInnermostDeclContext();
+    SILGenFunction SGF(*this, *f, varDC);
+    SGF.emitGeneratorFunction(constant, wrapperInfo.initializeFromOriginal);
     postEmitFunction(constant, f);
   });
 }
@@ -1319,7 +1309,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
-  for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
+  for (auto i : range(pd->getNumPatternEntries()))
     if (pd->getExecutableInit(i))
       emitGlobalInitialization(pd, i);
 }
@@ -1682,9 +1672,13 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     visit(D);
   }
 
-  for (Decl *D : sf->LocalTypeDecls) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", D);
-    visit(D);
+  for (TypeDecl *TD : sf->LocalTypeDecls) {
+    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", TD);
+    // FIXME: Delayed parsing would prevent these types from being added to the
+    //        module in the first place.
+    if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+      continue;
+    visit(TD);
   }
 }
 
@@ -1693,7 +1687,8 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
+SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
+                        SILOptions &options, FileUnit *SF) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
   if (SF) {
@@ -1703,7 +1698,7 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
+      new SILModule(mod, tc, options, DC, /*wholeModule*/ SF == nullptr));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
@@ -1752,11 +1747,13 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod, SILOptions &options) {
-  return SILModule::constructSIL(mod, options, nullptr);
+swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(mod, tc, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf);
+swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
 }

@@ -136,7 +136,11 @@ public:
   /// \param T the original \c Type being referenced. May be null.
   /// \param RefTo the \c TypeDecl this is considered a reference to.
   /// \param Name the name to be printed.
-  virtual void printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name);
+  /// \param NameContext the \c PrintNameContext which this type is being
+  ///                    printed in, used to determine how to escape type names.
+  virtual void printTypeRef(
+      Type T, const TypeDecl *RefTo, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal);
 
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);

@@ -139,12 +139,6 @@ void ContextInfoCallbacks::getImplicitMembers(
       if (VD->isOperator())
         return false;
 
-      if (!VD->hasInterfaceType()) {
-        TypeResolver->resolveDeclSignature(VD);
-        if (!VD->hasInterfaceType())
-          return false;
-      }
-
       // Enum element decls can always be referenced by implicit member
       // expression.
       if (isa<EnumElementDecl>(VD))
@@ -175,7 +169,6 @@ void ContextInfoCallbacks::getImplicitMembers(
   } LocalConsumer(CurDeclContext, T, Result);
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
-                           CurDeclContext->getASTContext().getLazyResolver(),
                            /*includeInstanceMembers=*/false);
 }
 

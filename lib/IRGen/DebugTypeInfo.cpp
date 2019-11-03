@@ -154,7 +154,7 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[Size " << size.getValue() << " Alignment "
                << align.getValue() << "] ";
 
-  getType()->dump();
+  getType()->dump(llvm::errs());
   if (StorageType) {
     llvm::errs() << "StorageType=";
     StorageType->dump();

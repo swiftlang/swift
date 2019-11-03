@@ -85,7 +85,7 @@ ConstraintSystem::determineBestBindings() {
       }
     }
 
-    if (TC.getLangOpts().DebugConstraintSolver) {
+    if (getASTContext().LangOpts.DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       bindings.dump(typeVar, log, solverState->depth * 2);
     }
@@ -207,7 +207,7 @@ bool ConstraintSystem::PotentialBindings::isViable(
 }
 
 static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
-                                    ConstraintSystem &CS) {
+                                    const ConstraintSystem &CS) {
   // Look for a literal-conformance constraint on the type variable.
   auto constraints =
       CS.getConstraintGraph().gatherConstraints(
@@ -230,7 +230,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint,
     bool &hasDependentMemberRelationalConstraints,
     bool &hasNonDependentMemberRelationalConstraints,
-    bool &addOptionalSupertypeBindings) {
+    bool &addOptionalSupertypeBindings) const {
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
@@ -378,7 +378,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 ConstraintSystem::PotentialBindings
-ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
+ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
@@ -633,7 +633,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       }
       break;
 
-    case ConstraintKind::OneWayBind: {
+    case ConstraintKind::OneWayEqual: {
       // Don't produce any bindings if this type variable is on the left-hand
       // side of a one-way binding.
       auto firstType = constraint->getFirstType();
@@ -796,7 +796,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 ///
 /// \returns the type to bind to, if the binding is okay.
 Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
-                                                    Type type) {
+                                                    Type type) const {
   // Simplify the type.
   type = simplifyType(type);
 
@@ -978,8 +978,33 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   cs.addConstraint(ConstraintKind::Bind, TypeVar, type, locator);
 
   // If this was from a defaultable binding note that.
-  if (Binding.isDefaultableBinding())
-    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
+  if (Binding.isDefaultableBinding()) {
+    auto *locator = Binding.DefaultableBinding;
+    // If this default binding comes from a "hole"
+    // in the constraint system, we have to propagate
+    // this information and mark this type variable
+    // as well as mark everything adjacent to it as
+    // a potential "hole".
+    //
+    // Consider this example:
+    //
+    // func foo<T: BinaryInteger>(_: T) {}
+    // foo(.bar) <- Since `.bar` can't be inferred due to
+    //              luck of information about its base type,
+    //              it's member type is going to get defaulted
+    //              to `Any` which has to be propaged to type
+    //              variable associated with `T` and vice versa.
+    if (cs.shouldAttemptFixes() && cs.isHoleAt(locator)) {
+      auto &CG = cs.getConstraintGraph();
+      for (auto *constraint : CG.gatherConstraints(
+               TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
+        for (auto *typeVar : constraint->getTypeVariables())
+          cs.recordHole(typeVar);
+      }
+    }
+
+    cs.DefaultedConstraints.push_back(locator);
+  }
 
   return !cs.failedConstraint && !cs.simplify();
 }

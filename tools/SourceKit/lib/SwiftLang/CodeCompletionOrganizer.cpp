@@ -176,7 +176,6 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
       }
       break;
     case CompletionKind::PostfixExprBeginning:
-    case CompletionKind::AssignmentRHS:
     case CompletionKind::CallArg:
     case CompletionKind::ReturnStmtExpr:
     case CompletionKind::YieldStmtExpr:

@@ -115,8 +115,8 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
 
   context.clip(to: rect)
   context.clip(to: rect, mask: image)
-// CHECK:   call void @CGContextClipToRect(%struct.CGContext* [[CONTEXT]], %struct.CGRect* byval nonnull align 8 %{{.*}})
-// CHECK:   call void @CGContextClipToMask(%struct.CGContext* [[CONTEXT]], %struct.CGRect* byval nonnull align 8 %{{.*}}, %struct.CGImage* %{{.*}})
+// CHECK:   call void @CGContextClipToRect(%struct.CGContext* [[CONTEXT]], %struct.CGRect* nonnull byval align 8 %{{.*}})
+// CHECK:   call void @CGContextClipToMask(%struct.CGContext* [[CONTEXT]], %struct.CGRect* nonnull byval align 8 %{{.*}}, %struct.CGImage* %{{.*}})
 
   var slice = CGRect.zero
   var remainder = CGRect.zero
@@ -124,7 +124,7 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
           from: edge)
   assert((slice, remainder) == rect.divided(atDistance: CGFloat(2.0),
                                             from: edge))
-// CHECK:   call void @CGRectDivide(%struct.CGRect* byval nonnull align 8 %{{.*}}, %struct.CGRect* nonnull %{{.*}}, %struct.CGRect* nonnull %{{.*}}, double {{2\.0+.*}}, i32 %{{.*}})
+// CHECK:   call void @CGRectDivide(%struct.CGRect* nonnull byval align 8 %{{.*}}, %struct.CGRect* nonnull %{{.*}}, %struct.CGRect* nonnull %{{.*}}, double {{2\.0+.*}}, i32 %{{.*}})
 //
 // CHECK:   ret void
 }

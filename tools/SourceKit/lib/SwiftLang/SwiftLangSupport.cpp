@@ -829,7 +829,7 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
 }
 
 bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printDeclUSR(D, OS);
+  return ide::printValueDeclUSR(D, OS);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
@@ -873,12 +873,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     if (usePlaceholder)
       OS << "<#T##";
 
-    if (auto substitutedTy = paramTy.subst(substMap))
-      paramTy = substitutedTy;
-
-    if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
+    paramTy = paramTy.subst(substMap);
+    if (paramTy->hasError() && param->getTypeRepr()) {
       // Fallback to 'TypeRepr' printing.
-      param->getTypeLoc().getTypeRepr()->print(OS);
+      param->getTypeRepr()->print(OS);
     } else {
       paramTy.print(OS);
     }

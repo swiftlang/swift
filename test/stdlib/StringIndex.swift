@@ -242,6 +242,9 @@ StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
 }
 
 StringIndexTests.test("Misaligned") {
+  // Misaligned indices were fixed in 5.1
+  guard _hasSwift_5_1() else { return }
+
   func doIt(_ str: String) {
     let characterIndices = Array(str.indices)
     let scalarIndices = Array(str.unicodeScalars.indices) + [str.endIndex]

@@ -215,9 +215,8 @@ func rdar29894174(v: B?) {
 // we would fail to produce a diagnostic.
 func process(p: Any?) {
   compare(p is String)
-  // expected-error@-1 {{cannot invoke 'compare' with an argument list of type '(Bool)'}}
-  // expected-note@-2 {{overloads for 'compare' exist with these partially matching parameter lists: (T, T), (T?, T?)}}
+  // expected-error@-1 {{missing argument for parameter #2 in call}} {{22-22=, <#Bool#>}}
 }
 
-func compare<T>(_: T, _: T) {}
+func compare<T>(_: T, _: T) {} // expected-note {{'compare' declared here}}
 func compare<T>(_: T?, _: T?) {}

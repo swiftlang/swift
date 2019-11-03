@@ -54,6 +54,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   case ResilienceExpansion::Maximal:
     return os << "Maximal";
   }
+  llvm_unreachable("Unhandled ResilienceExpansion in switch");
 }
 
 } // namespace swift

@@ -12,4 +12,20 @@ extension RootClass: P {
   typealias Member = SubClass.Member
 }
 
+class A {
+  enum Reusable {
+    case option1
+    case option2
+  }
+}
 
+class B: A {
+  enum Reusable {
+    case option1 // expected-note {{'option1' declared here}}
+  }
+
+  func process() {
+    _ = B.Reusable.option1
+    _ = B.Reusable.option2 // expected-error {{type 'B.Reusable' has no member 'option2'; did you mean 'option1'?}}
+  }
+}

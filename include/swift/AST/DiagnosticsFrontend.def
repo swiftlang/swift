@@ -124,8 +124,13 @@ ERROR(error_mode_cannot_emit_module,none,
       "this mode does not support emitting modules", ())
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
+ERROR(error_mode_cannot_emit_module_source_info,none,
+      "this mode does not support emitting module source info files", ())
 ERROR(error_mode_cannot_emit_interface,none,
       "this mode does not support emitting module interface files", ())
+ERROR(cannot_emit_ir_skipping_function_bodies,none,
+      "-experimental-skip-non-inlinable-function-bodies does not support "
+      "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())

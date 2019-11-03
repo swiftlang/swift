@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINTLOCATOR_H
 #define SWIFT_SEMA_CONSTRAINTLOCATOR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -53,92 +54,9 @@ public:
   /// Describes the kind of a particular path element, e.g.,
   /// "tuple element", "call result", "base of member lookup", etc.
   enum PathElementKind : unsigned char {
-    /// The argument of function application.
-    ApplyArgument,
-    /// The function being applied.
-    ApplyFunction,
-    /// Matching an argument to a parameter.
-    ApplyArgToParam,
-    /// A generic parameter being opened.
-    ///
-    /// Also contains the generic parameter type itself.
-    GenericParameter,
-    /// The argument type of a function.
-    FunctionArgument,
-    /// The default argument type of a function.
-    DefaultArgument,
-    /// The result type of a function.
-    FunctionResult,
-    /// A tuple element referenced by position.
-    TupleElement,
-    /// A tuple element referenced by name.
-    NamedTupleElement,
-    /// An optional payload.
-    OptionalPayload,
-    /// A generic argument.
-    /// FIXME: Add support for named generic arguments?
-    GenericArgument,
-    /// A member.
-    /// FIXME: Do we need the actual member name here?
-    Member,
-    /// An unresolved member.
-    UnresolvedMember,
-    /// The base of a member expression.
-    MemberRefBase,
-    /// The lookup for a subscript member.
-    SubscriptMember,
-    /// The lookup for a constructor member.
-    ConstructorMember,
-    /// An implicit @lvalue-to-inout conversion; only valid for operator
-    /// arguments.
-    LValueConversion,
-    /// RValue adjustment.
-    RValueAdjustment,
-    /// The result of a closure.
-    ClosureResult,
-    /// The parent of a nested type.
-    ParentType,
-    /// The superclass of a protocol existential type.
-    ExistentialSuperclassType,
-    /// The instance of a metatype type.
-    InstanceType,
-    /// The element type of a sequence in a for ... in ... loop.
-    SequenceElementType,
-    /// An argument passed in an autoclosure parameter
-    /// position, which must match the autoclosure return type.
-    AutoclosureResult,
-    /// The requirement that we're matching during protocol conformance
-    /// checking.
-    Requirement,
-    /// The candidate witness during protocol conformance checking.
-    Witness,
-    /// This is referring to a type produced by opening a generic type at the
-    /// base of the locator.
-    OpenedGeneric,
-    /// A component of a key path.
-    KeyPathComponent,
-    /// The Nth conditional requirement in the parent locator's conformance.
-    ConditionalRequirement,
-    /// A single requirement placed on the type parameters.
-    TypeParameterRequirement,
-    /// Locator for a binding from an IUO disjunction choice.
-    ImplicitlyUnwrappedDisjunctionChoice,
-    /// A result of an expression involving dynamic lookup.
-    DynamicLookupResult,
-    /// The desired contextual type passed in to the constraint system.
-    ContextualType,
-    /// The missing argument synthesized by the solver.
-    SynthesizedArgument,
-    /// The member looked up via keypath based dynamic lookup.
-    KeyPathDynamicMember,
-    /// The type of the key path expression
-    KeyPathType,
-    /// The root of a key path
-    KeyPathRoot,
-    /// The value of a key path
-    KeyPathValue,
-    /// The result type of a key path component. Not used for subscripts.
-    KeyPathComponentResult,
+#define LOCATOR_PATH_ELT(Name) Name,
+#define ABSTRACT_LOCATOR_PATH_ELT(Name)
+#include "ConstraintLocatorPathElts.def"
   };
 
   /// Determine the number of numeric values used for the given path
@@ -149,7 +67,6 @@ public:
     case ApplyFunction:
     case GenericParameter:
     case FunctionArgument:
-    case DefaultArgument:
     case FunctionResult:
     case OptionalPayload:
     case Member:
@@ -165,7 +82,7 @@ public:
     case ExistentialSuperclassType:
     case SequenceElementType:
     case AutoclosureResult:
-    case Requirement:
+    case ProtocolRequirement:
     case Witness:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
@@ -173,6 +90,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case Condition:
       return 0;
 
     case ContextualType:
@@ -187,8 +105,10 @@ public:
 
     case TypeParameterRequirement:
     case ConditionalRequirement:
-    case ApplyArgToParam:
       return 2;
+
+    case ApplyArgToParam:
+      return 3;
     }
 
     llvm_unreachable("Unhandled PathElementKind in switch.");
@@ -206,55 +126,6 @@ public:
     IsFunctionConversion = 0x1,
   };
 
-  static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
-    switch (kind) {
-    case ApplyArgument:
-    case ApplyFunction:
-    case ApplyArgToParam:
-    case SequenceElementType:
-    case ClosureResult:
-    case ConstructorMember:
-    case InstanceType:
-    case AutoclosureResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case ParentType:
-    case ExistentialSuperclassType:
-    case LValueConversion:
-    case RValueAdjustment:
-    case SubscriptMember:
-    case OpenedGeneric:
-    case GenericParameter:
-    case GenericArgument:
-    case NamedTupleElement:
-    case TupleElement:
-    case Requirement:
-    case Witness:
-    case KeyPathComponent:
-    case ConditionalRequirement:
-    case TypeParameterRequirement:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
-    case ContextualType:
-    case SynthesizedArgument:
-    case KeyPathDynamicMember:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
-      return 0;
-
-    case FunctionArgument:
-    case DefaultArgument:
-    case FunctionResult:
-      return IsFunctionConversion;
-    }
-
-    llvm_unreachable("Unhandled PathElementKind in switch.");
-  }
-
   /// One element in the path of a locator, which can include both
   /// a kind (PathElementKind) and a value used to describe specific
   /// kinds further (e.g., the position of a tuple element).
@@ -262,7 +133,7 @@ public:
     /// Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredGenericParameter,
-      StoredRequirement,
+      StoredProtocolRequirement,
       StoredWitness,
       StoredGenericSignature,
       StoredKeyPathDynamicMemberBase,
@@ -286,14 +157,27 @@ public:
     uint64_t storedKind : 3;
 
     /// Encode a path element kind and a value into the storage format.
-    static uint64_t encodeStorage(PathElementKind kind, unsigned value) {
-      return ((uint64_t)value << 8) | kind;
+    static uint64_t encodeStorage(PathElementKind kind, uint64_t value) {
+      return (value << 8) | kind;
     }
 
     /// Decode a storage value into path element kind and value.
-    static std::pair<PathElementKind, unsigned>
+    static std::pair<PathElementKind, uint64_t>
     decodeStorage(uint64_t storage) {
       return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
+    }
+
+    /// Retrieve a value associated with the path element.
+    unsigned getValue(unsigned index) const {
+      unsigned numValues = numNumericValuesInPathElement(getKind());
+      assert(index < numValues && "Index out of range for path element value");
+
+      // We pack values into 16 bit components of the storage, with value0
+      // being stored in the upper bits, valueN in the lower bits. Therefore we
+      // need to shift out any extra values in the lower bits.
+      auto extraValues = numValues - index - 1;
+      auto value = decodeStorage(storage).second >> (extraValues * 16);
+      return value & 0xFFFF;
     }
 
     PathElement(PathElementKind kind, unsigned value)
@@ -301,27 +185,53 @@ public:
     {
       assert(numNumericValuesInPathElement(kind) == 1 &&
              "Path element kind does not require 1 value");
+      assert(value == getValue(0) && "value truncated");
     }
 
-    PathElement(PathElementKind kind, unsigned value1, unsigned value2)
-      : storage(encodeStorage(kind, value1 << 16 | value2)),
+    PathElement(PathElementKind kind, unsigned value0, unsigned value1)
+      : storage(encodeStorage(kind, value0 << 16 | value1)),
         storedKind(StoredKindAndValue)
     {
       assert(numNumericValuesInPathElement(kind) == 2 &&
              "Path element kind does not require 2 values");
+      assert(value0 == getValue(0) && "value0 truncated");
+      assert(value1 == getValue(1) && "value1 truncated");
     }
 
-    PathElement(GenericSignature *sig)
-        : storage((reinterpret_cast<uintptr_t>(sig) >> 3)),
-          storedKind(StoredGenericSignature) {}
+    PathElement(PathElementKind kind, uint64_t value0, uint64_t value1,
+                uint64_t value2)
+        : storage(encodeStorage(kind, value0 << 32 | value1 << 16 | value2)),
+          storedKind(StoredKindAndValue) {
+      assert(numNumericValuesInPathElement(kind) == 3 &&
+             "Path element kind does not require 3 values");
+      assert(value0 == getValue(0) && "value0 truncated");
+      assert(value1 == getValue(1) && "value1 truncated");
+      assert(value2 == getValue(2) && "value2 truncated");
+    }
 
-    PathElement(const NominalTypeDecl *keyPath)
-        : storage((reinterpret_cast<uintptr_t>(keyPath) >> 3)),
-          storedKind(StoredKeyPathDynamicMemberBase) {}
+    /// Store a path element with an associated pointer, accessible using
+    /// \c getStoredPointer.
+    template <typename T>
+    PathElement(StoredKind storedKind, T *ptr)
+        : storage((reinterpret_cast<uintptr_t>(ptr) >> 3)),
+          storedKind(storedKind) {
+      assert(ptr == getStoredPointer<T>());
+    }
+
+    /// Retrieve an associated pointer for the element. The type \c T must match
+    /// the type used when creating the path element.
+    template <typename T>
+    T *getStoredPointer() const {
+      assert(storedKind != StoredKindAndValue);
+      return reinterpret_cast<T *>(storage << 3);
+    }
 
     friend class ConstraintLocator;
 
   public:
+#define LOCATOR_PATH_ELT(Name) class Name;
+#include "ConstraintLocatorPathElts.def"
+
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
     {
@@ -329,100 +239,23 @@ public:
              "Path element requires value");
     }
 
-    PathElement(GenericTypeParamType *type)
-      : storage((reinterpret_cast<uintptr_t>(type) >> 3)),
-        storedKind(StoredGenericParameter)
-    {
-      static_assert(alignof(GenericTypeParamType) >= 4,
-                    "archetypes insufficiently aligned");
-      assert(getGenericParameter() == type);
-    }
-
-    PathElement(PathElementKind kind, ValueDecl *decl)
-      : storage((reinterpret_cast<uintptr_t>(decl) >> 3)),
-        storedKind(kind == Witness ? StoredWitness : StoredRequirement)
-    {
-      assert((kind == Witness || kind == Requirement) &&
-             "Not a witness element");
-      assert(((kind == Requirement && getRequirement() == decl) ||
-              (kind == Witness && getWitness() == decl)));
-    }
-
-    /// Retrieve a path element for a tuple element referred to by
-    /// its position.
-    static PathElement getTupleElement(unsigned position) {
-      return PathElement(TupleElement, position);
-    }
-
-    /// Retrieve a path element for a tuple element referred to by
-    /// its name.
-    static PathElement getNamedTupleElement(unsigned position) {
-      return PathElement(NamedTupleElement, position);
-    }
-
-    /// Retrieve a path element for an argument/parameter comparison in a
-    /// function application.
-    static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
-      return PathElement(ApplyArgToParam, argIdx, paramIdx);
-    }
-
-    /// Retrieve a path element for a generic argument referred to by
-    /// its position.
-    static PathElement getGenericArgument(unsigned position) {
-      return PathElement(GenericArgument, position);
-    }
-    
-    /// Get a path element for a key path component.
-    static PathElement getKeyPathComponent(unsigned position) {
-      return PathElement(KeyPathComponent, position);
-    }
-
-    static PathElement getOpenedGeneric(GenericSignature *sig) {
-      return PathElement(sig);
-    }
-
-    /// Get a path element for a conditional requirement.
-    static PathElement
-    getConditionalRequirementComponent(unsigned index, RequirementKind kind) {
-      return PathElement(ConditionalRequirement, index,
-                         static_cast<unsigned>(kind));
-    }
-
-    static PathElement getTypeRequirementComponent(unsigned index,
-                                                   RequirementKind kind) {
-      return PathElement(TypeParameterRequirement, index,
-                         static_cast<unsigned>(kind));
-    }
-
-    static PathElement getSynthesizedArgument(unsigned position) {
-      return PathElement(SynthesizedArgument, position);
-    }
-
-    static PathElement getKeyPathDynamicMember(const NominalTypeDecl *base) {
-      return PathElement(base);
-    }
-
-    static PathElement getContextualType(bool isForSingleExprFunction = false) {
-      return PathElement(ContextualType, isForSingleExprFunction);
-    }
-
     /// Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
       case StoredGenericParameter:
-        return GenericParameter;
+        return PathElementKind::GenericParameter;
 
-      case StoredRequirement:
-        return Requirement;
+      case StoredProtocolRequirement:
+        return PathElementKind::ProtocolRequirement;
 
       case StoredWitness:
-        return Witness;
+        return PathElementKind::Witness;
 
       case StoredGenericSignature:
-        return OpenedGeneric;
+        return PathElementKind::OpenedGeneric;
 
       case StoredKeyPathDynamicMemberBase:
-        return KeyPathDynamicMember;
+        return PathElementKind::KeyPathDynamicMember;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -431,80 +264,29 @@ public:
       llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
-    /// Retrieve the value associated with this path element,
-    /// if it has one.
-    unsigned getValue() const {
-      unsigned numValues = numNumericValuesInPathElement(getKind());
-      assert(numValues > 0 && "No value in path element!");
-
-      auto value = decodeStorage(storage).second;
-      if (numValues == 1) {
-        return value;
-      }
-
-      return value >> 16;
+    /// Attempts to cast the path element to a specific \c LocatorPathElt
+    /// subclass, returning \c None if unsuccessful.
+    template <class T>
+    Optional<T> getAs() const {
+      if (auto *result = dyn_cast<T>(this))
+        return *result;
+      return None;
     }
 
-    /// Retrieve the second value associated with this path element,
-    /// if it has one.
-    unsigned getValue2() const {
-      unsigned numValues = numNumericValuesInPathElement(getKind());
-      (void)numValues;
-      assert(numValues == 2 && "No second value in path element!");
+    /// Cast the path element to a specific \c LocatorPathElt subclass.
+    template <class T>
+    T castTo() const { return *cast<T>(this); }
 
-      auto value = decodeStorage(storage).second;
-      return value & 0x00FFFF;
-    }
-
-    /// Retrieve the declaration for a witness path element.
-    ValueDecl *getWitness() const {
-      assert(getKind() == Witness && "Is not a witness");
-      return reinterpret_cast<ValueDecl *>(storage << 3);
-    }
-
-    /// Retrieve the actual archetype for a generic parameter path
-    /// element.
-    GenericTypeParamType *getGenericParameter() const {
-      assert(getKind() == GenericParameter &&
-             "Not a generic parameter path element");
-      return reinterpret_cast<GenericTypeParamType *>(storage << 3);
-    }
-
-    /// Retrieve the declaration for a requirement path element.
-    ValueDecl *getRequirement() const {
-      assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
-             "Is not a requirement");
-      return reinterpret_cast<ValueDecl *>(storage << 3);
-    }
-
-    GenericSignature *getGenericSignature() const {
-      assert((static_cast<StoredKind>(storedKind) == StoredGenericSignature) &&
-             "Is not an opened generic");
-      return reinterpret_cast<GenericSignature *>(storage << 3);
-    }
-
-    NominalTypeDecl *getKeyPath() const {
-      assert((static_cast<StoredKind>(storedKind) ==
-              StoredKeyPathDynamicMemberBase) &&
-             "Is not a keypath dynamic member");
-      return reinterpret_cast<NominalTypeDecl *>(storage << 3);
-    }
+    /// Checks whether the path element is a specific \c LocatorPathElt
+    /// subclass.
+    template <class T>
+    bool is() const { return isa<T>(this); }
 
     /// Return the summary flags for this particular element.
-    unsigned getNewSummaryFlags() const {
-      return getSummaryFlagsForPathElement(getKind());
-    }
-
-    bool isTypeParameterRequirement() const {
-      return getKind() == PathElementKind::TypeParameterRequirement;
-    }
+    unsigned getNewSummaryFlags() const;
 
     bool isConditionalRequirement() const {
       return getKind() == PathElementKind::ConditionalRequirement;
-    }
-
-    bool isSynthesizedArgument() const {
-      return getKind() == PathElementKind::SynthesizedArgument;
     }
 
     bool isKeyPathDynamicMember() const {
@@ -521,10 +303,7 @@ public:
 
     /// Determine whether this element points to the contextual type
     /// associated with result of a single expression function.
-    bool isResultOfSingleExprFunction() const {
-      return getKind() == PathElementKind::ContextualType ? bool(getValue())
-                                                          : false;
-    }
+    bool isResultOfSingleExprFunction() const;
   };
 
   /// Return the summary flags for an entire path.
@@ -593,9 +372,112 @@ public:
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
 
-  /// Check whether the last element in the path of this locator
-  /// is of a given kind.
-  bool isLastElement(ConstraintLocator::PathElementKind kind) const;
+  /// Attempts to cast the first path element of the locator to a specific
+  /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
+  /// the locator has no path elements.
+  template <class T>
+  Optional<T> getFirstElementAs() const {
+    auto path = getPath();
+    if (path.empty())
+      return None;
+
+    return path[0].getAs<T>();
+  }
+
+  /// Casts the first path element of the locator to a specific
+  /// \c LocatorPathElt subclass, asserting that it has at least one element.
+  template <class T>
+  T castFirstElementTo() const {
+    auto path = getPath();
+    assert(!path.empty() && "Expected at least one path element!");
+    return path[0].castTo<T>();
+  }
+
+  /// Check whether the last element in the path of this locator (if any)
+  /// is a given \c LocatorPathElt subclass.
+  template <class T>
+  bool isLastElement() const {
+    auto path = getPath();
+    return !path.empty() && path.back().is<T>();
+  }
+
+  /// Attempts to cast the last path element of the locator to a specific
+  /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
+  /// the locator has no path elements.
+  template <class T>
+  Optional<T> getLastElementAs() const {
+    auto path = getPath();
+    if (path.empty())
+      return None;
+
+    return path.back().getAs<T>();
+  }
+
+  /// Casts the last path element of the locator to a specific \c LocatorPathElt
+  /// subclass, asserting that it has at least one element.
+  template <class T>
+  T castLastElementTo() const {
+    auto path = getPath();
+    assert(!path.empty() && "Expected at least one path element!");
+    return path.back().castTo<T>();
+  }
+
+  using PathIterator = ArrayRef<PathElement>::iterator;
+  using PathReverseIterator = ArrayRef<PathElement>::reverse_iterator;
+
+  /// Attempts to find the first element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  ///
+  /// \param iter A reference to an iterator which will be used to iterate
+  /// over the locator's path.
+  template <class T>
+  Optional<T> findFirst(PathIterator &iter) const {
+    auto path = getPath();
+    auto end = path.end();
+    assert(iter >= path.begin() && iter <= end);
+
+    for (; iter != end; ++iter)
+      if (auto elt = iter->getAs<T>())
+        return elt;
+    return None;
+  }
+
+  /// Attempts to find the first element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  template <class T>
+  Optional<T> findFirst() const {
+    auto iter = getPath().begin();
+    return findFirst<T>(iter);
+  }
+
+  /// Attempts to find the last element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  ///
+  /// \param iter A reference to a reverse iterator which will be used to
+  /// iterate over the locator's path.
+  template <class T>
+  Optional<T> findLast(PathReverseIterator &iter) const {
+    auto path = getPath();
+    auto end = path.rend();
+    assert(iter >= path.rbegin() && iter <= end);
+
+    for (; iter != end; ++iter)
+      if (auto elt = iter->getAs<T>())
+        return elt;
+    return None;
+  }
+
+  /// Attempts to find the last element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  template <class T>
+  Optional<T> findLast() const {
+    auto iter = getPath().rbegin();
+    return findLast<T>(iter);
+  }
 
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;
@@ -610,14 +492,10 @@ public:
   }
   
   /// Produce a debugging dump of this locator.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
-  void dump(SourceManager *SM, raw_ostream &OS) LLVM_ATTRIBUTE_USED;
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 
 private:
   /// Initialize a constraint locator with an anchor and a path.
@@ -662,6 +540,260 @@ private:
 };
 
 using LocatorPathElt = ConstraintLocator::PathElement;
+
+// Disallow direct uses of isa/cast/dyn_cast on LocatorPathElt in favor of using
+// is/castTo/getAs. This allows us to work with Optional<T> rather than pointers
+// for getAs, and maintains consistency with ConstraintLocator's
+// isLastElement/castLastElementTo/getLastElementAs members.
+template <class X>
+inline bool
+isa(const LocatorPathElt &) = delete; // Use LocatorPathElt::is instead.
+
+template <class X>
+inline typename llvm::cast_retty<X, LocatorPathElt>::ret_type
+cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::castTo instead.
+
+template <class X>
+inline typename llvm::cast_retty<X, LocatorPathElt>::ret_type
+dyn_cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::getAs instead.
+
+#define SIMPLE_LOCATOR_PATH_ELT(Name) \
+class LocatorPathElt:: Name final : public LocatorPathElt { \
+public: \
+  Name () : LocatorPathElt(ConstraintLocator:: Name) {} \
+                                                        \
+  static bool classof(const LocatorPathElt *elt) { \
+    return elt->getKind() == ConstraintLocator:: Name; \
+  } \
+};
+#include "ConstraintLocatorPathElts.def"
+
+// The following LocatorPathElt subclasses are used to expose accessors for
+// specific path element information. They shouldn't introduce additional
+// storage, as LocatorPathElt gets passed about by value.
+
+class LocatorPathElt::ApplyArgToParam final : public LocatorPathElt {
+public:
+  ApplyArgToParam(unsigned argIdx, unsigned paramIdx, ParameterTypeFlags flags)
+      : LocatorPathElt(ConstraintLocator::ApplyArgToParam, argIdx, paramIdx,
+                       flags.toRaw()) {}
+
+  unsigned getArgIdx() const { return getValue(0); }
+  unsigned getParamIdx() const { return getValue(1); }
+  ParameterTypeFlags getParameterFlags() const {
+    return ParameterTypeFlags::fromRaw(getValue(2));
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ApplyArgToParam;
+  }
+};
+
+class LocatorPathElt::SynthesizedArgument final : public LocatorPathElt {
+public:
+  SynthesizedArgument(unsigned index)
+      : LocatorPathElt(ConstraintLocator::SynthesizedArgument, index) {}
+
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::SynthesizedArgument;
+  }
+};
+
+/// Abstract superclass for any kind of tuple element.
+class LocatorPathElt::AnyTupleElement : public LocatorPathElt {
+protected:
+  AnyTupleElement(PathElementKind kind, unsigned index)
+      : LocatorPathElt(kind, index) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+public:
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->is<LocatorPathElt::TupleElement>() ||
+           elt->is<LocatorPathElt::NamedTupleElement>();
+  }
+};
+
+class LocatorPathElt::TupleElement final
+    : public LocatorPathElt::AnyTupleElement {
+public:
+  TupleElement(unsigned index)
+      : AnyTupleElement(ConstraintLocator::TupleElement, index) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TupleElement;
+  }
+};
+
+class LocatorPathElt::NamedTupleElement final
+    : public LocatorPathElt::AnyTupleElement {
+public:
+  NamedTupleElement(unsigned index)
+      : AnyTupleElement(ConstraintLocator::NamedTupleElement, index) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedTupleElement;
+  }
+};
+
+class LocatorPathElt::KeyPathComponent final : public LocatorPathElt {
+public:
+  KeyPathComponent(unsigned index)
+      : LocatorPathElt(ConstraintLocator::KeyPathComponent, index) {}
+
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::KeyPathComponent;
+  }
+};
+
+class LocatorPathElt::GenericArgument final : public LocatorPathElt {
+public:
+  GenericArgument(unsigned index)
+      : LocatorPathElt(ConstraintLocator::GenericArgument, index) {}
+
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::GenericArgument;
+  }
+};
+
+/// Abstract superclass for any kind of element that describes a requirement
+/// placed on a type within a requirements clause.
+class LocatorPathElt::AnyRequirement : public LocatorPathElt {
+protected:
+  AnyRequirement(PathElementKind kind, unsigned index, RequirementKind reqKind)
+      : LocatorPathElt(kind, index, static_cast<unsigned>(reqKind)) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+public:
+  unsigned getIndex() const { return getValue(0); }
+  RequirementKind getRequirementKind() const {
+    return static_cast<RequirementKind>(getValue(1));
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->is<LocatorPathElt::ConditionalRequirement>() ||
+           elt->is<LocatorPathElt::TypeParameterRequirement>();
+  }
+};
+
+class LocatorPathElt::ConditionalRequirement final
+    : public LocatorPathElt::AnyRequirement {
+public:
+  ConditionalRequirement(unsigned index, RequirementKind reqKind)
+      : AnyRequirement(ConstraintLocator::ConditionalRequirement, index,
+                       reqKind) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ConditionalRequirement;
+  }
+};
+
+class LocatorPathElt::TypeParameterRequirement final
+    : public LocatorPathElt::AnyRequirement {
+public:
+  TypeParameterRequirement(unsigned index, RequirementKind reqKind)
+      : AnyRequirement(ConstraintLocator::TypeParameterRequirement, index,
+                       reqKind) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TypeParameterRequirement;
+  }
+};
+
+class LocatorPathElt::ContextualType final : public LocatorPathElt {
+public:
+  ContextualType(bool isForSingleExprFunction = false)
+      : LocatorPathElt(ConstraintLocator::ContextualType,
+                       isForSingleExprFunction) {}
+
+  /// Whether this element points to the contextual type associated with the
+  /// result of a single expression function.
+  bool isForSingleExprFunction() const { return bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ContextualType;
+  }
+};
+
+class LocatorPathElt::Witness final : public LocatorPathElt {
+public:
+  Witness(ValueDecl *witness)
+      : LocatorPathElt(LocatorPathElt::StoredWitness, witness) {}
+
+  ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::Witness;
+  }
+};
+
+class LocatorPathElt::ProtocolRequirement final : public LocatorPathElt {
+public:
+  ProtocolRequirement(ValueDecl *decl)
+      : LocatorPathElt(LocatorPathElt::StoredProtocolRequirement, decl) {}
+
+  ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ProtocolRequirement;
+  }
+};
+
+class LocatorPathElt::GenericParameter final : public LocatorPathElt {
+public:
+  GenericParameter(GenericTypeParamType *type)
+      : LocatorPathElt(LocatorPathElt::StoredGenericParameter, type) {
+    static_assert(alignof(GenericTypeParamType) >= 4,
+                  "archetypes insufficiently aligned");
+  }
+
+  GenericTypeParamType *getType() const {
+    return getStoredPointer<GenericTypeParamType>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::GenericParameter;
+  }
+};
+
+class LocatorPathElt::OpenedGeneric final : public LocatorPathElt {
+public:
+  OpenedGeneric(GenericSignature sig)
+      : LocatorPathElt(LocatorPathElt::StoredGenericSignature,
+                       sig.getPointer()) {}
+
+  GenericSignature getSignature() const {
+    return getStoredPointer<GenericSignatureImpl>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::OpenedGeneric;
+  }
+};
+
+class LocatorPathElt::KeyPathDynamicMember final : public LocatorPathElt {
+public:
+  KeyPathDynamicMember(NominalTypeDecl *keyPathDecl)
+      : LocatorPathElt(LocatorPathElt::StoredKeyPathDynamicMemberBase,
+                       keyPathDecl) {}
+
+  NominalTypeDecl *getKeyPathDecl() const {
+    return getStoredPointer<NominalTypeDecl>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
+  }
+};
 
 /// A simple stack-only builder object that constructs a
 /// constraint locator without allocating memory.
@@ -713,6 +845,22 @@ public:
 
   bool isFunctionConversion() const {
     return (getSummaryFlags() & ConstraintLocator::IsFunctionConversion);
+  }
+
+  bool isForAutoclosureResult() const {
+    SmallVector<LocatorPathElt, 4> path;
+    getLocatorParts(path);
+
+    auto last = std::find_if(
+        path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+          return elt.getKind() != ConstraintLocator::OptionalPayload &&
+                 elt.getKind() != ConstraintLocator::GenericArgument;
+        });
+
+    if (last != path.rend())
+      return last->getKind() == ConstraintLocator::AutoclosureResult;
+
+    return false;
   }
 
   /// Retrieve the base constraint locator, on which this builder's

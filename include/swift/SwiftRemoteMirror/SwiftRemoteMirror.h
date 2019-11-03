@@ -72,20 +72,20 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 void
 swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context);
 
-/// Add reflection sections for a loaded Swift image.
+/// DEPRECATED. Add reflection sections for a loaded Swift image.
+///
+/// You probably want to use \c swift_reflection_addImage instead.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info);
 
-#if defined(__APPLE__) && defined(__MACH__)
 /// Add reflection information from a loaded Swift image.
 /// Returns true on success, false if the image's memory couldn't be read.
 SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart);
-#endif
 
 /// Returns a boolean indicating if the isa mask was successfully
 /// read, in which case it is stored in the isaMask out parameter.

@@ -55,7 +55,7 @@ case is B,
      is D,
      is S:
   ()
-case is E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
+case is E:
   ()
 default:
   ()
@@ -69,7 +69,7 @@ case let d as D:
   d.d()
 case let s as S:
   s.s()
-case let e as E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
+case let e as E:
   e.e()
 default:
   ()

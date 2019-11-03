@@ -24,20 +24,26 @@ var globalWithEmptyImplicitGetter: Int {}
 // expected-error@-1 {{computed property must have accessors specified}}
 // expected-error@-3 {{function builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 
+// FIXME: extra diagnostics
 @Maker
-var globalWithEmptyExplicitGetter: Int { get {} }  // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+var globalWithEmptyExplicitGetter: Int { get {} }  // expected-error{{type 'Maker' has no member 'buildBlock'}}
+// expected-error@-1 {{cannot convert return expression of type 'Any' to return type 'Int'}}
 
 @Maker
 var globalWithSingleGetter: Int { 0 } // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+// expected-error@-1 {{cannot convert return expression of type 'Any' to return type 'Int'}}
 
 @Maker
 var globalWithMultiGetter: Int { 0; 0 } // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+// expected-error@-1 {{cannot convert return expression of type 'Any' to return type 'Int'}}
 
 @Maker
 func globalFunction() {} // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+// expected-error@-1 {{unexpected non-void return value in void function}}
 
 @Maker
 func globalFunctionWithFunctionParam(fn: () -> ()) {}  // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+// expected-error@-1 {{unexpected non-void return value in void function}}
 
 func makerParam(@Maker
                 fn: () -> ()) {}

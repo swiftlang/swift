@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
@@ -161,7 +162,7 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
-void GenericParamList::print(llvm::raw_ostream &OS) {
+void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
              [&](const GenericTypeParamDecl *P) {
@@ -184,7 +185,7 @@ void GenericParamList::print(llvm::raw_ostream &OS) {
   OS << '>';
 }
 
-void GenericParamList::dump() {
+void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
@@ -616,9 +617,9 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (TAD->getUnderlyingTypeLoc().getType()) {
+      if (auto underlying = TAD->getUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << TAD->getUnderlyingTypeLoc().getType().getString();
+          << underlying.getString();
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
@@ -724,7 +725,7 @@ namespace {
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
-        if (var->hasType())
+        if (auto varTy = var->hasInterfaceType())
           var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         else
           PrintWithColorRAII(OS, TypeColor) << "<null type>";
@@ -760,9 +761,9 @@ namespace {
       auto VarD = dyn_cast<VarDecl>(VD);
       if (VD->isFinal() && !(VarD && VarD->isLet()))
         OS << " final";
-      if (VD->isObjC())
+      if (VD->getAttrs().hasAttribute<ObjCAttr>())
         OS << " @objc";
-      if (VD->isDynamic())
+      if (VD->getAttrs().hasAttribute<DynamicAttr>())
         OS << " dynamic";
       if (auto *attr =
               VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
@@ -894,20 +895,20 @@ namespace {
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
 
-      for (auto entry : PBD->getPatternList()) {
+      for (auto idx : range(PBD->getNumPatternEntries())) {
         OS << '\n';
-        printRec(entry.getPattern());
-        if (entry.getOriginalInit()) {
+        printRec(PBD->getPattern(idx));
+        if (PBD->getOriginalInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
           OS << "Original init:\n";
-          printRec(entry.getOriginalInit());
+          printRec(PBD->getOriginalInit(idx));
         }
-        if (entry.getInit()) {
+        if (PBD->getInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
           OS << "Processed init:\n";
-          printRec(entry.getInit());
+          printRec(PBD->getInit(idx));
         }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -953,32 +954,32 @@ namespace {
         PrintWithColorRAII(OS, IdentifierColor)
           << " apiName=" << P->getArgumentName();
 
-      if (P->hasType()) {
+      if (P->hasInterfaceType()) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
         P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         PrintWithColorRAII(OS, TypeColor) << "'";
-      }
 
-      if (P->hasInterfaceType()) {
         PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
         P->getInterfaceType().print(
             PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      switch (P->getSpecifier()) {
-      case ParamDecl::Specifier::Default:
-        /* nothing */
-        break;
-      case ParamDecl::Specifier::InOut:
-        OS << " inout";
-        break;
-      case ParamDecl::Specifier::Shared:
-        OS << " shared";
-        break;
-      case ParamDecl::Specifier::Owned:
-        OS << " owned";
-        break;
+      if (auto specifier = P->getCachedSpecifier()) {
+        switch (*specifier) {
+        case ParamDecl::Specifier::Default:
+          /* nothing */
+          break;
+        case ParamDecl::Specifier::InOut:
+          OS << " inout";
+          break;
+        case ParamDecl::Specifier::Shared:
+          OS << " shared";
+          break;
+        case ParamDecl::Specifier::Owned:
+          OS << " owned";
+          break;
+        }
       }
 
       if (P->isVariadic())
@@ -987,9 +988,17 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+      }
+
+      if (P->getDefaultValue() &&
+        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+        OS << " ";
+        P->getDefaultArgumentCaptureInfo().print(
+          PrintWithColorRAII(OS, CapturesColor).getOS());
+      }
 
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
@@ -3159,7 +3168,7 @@ static void dumpSubstitutionMapRec(
     SubstitutionMap map, llvm::raw_ostream &out,
     SubstitutionMap::DumpStyle style, unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  auto *genericSig = map.getGenericSignature();
+  auto genericSig = map.getGenericSignature();
   out.indent(indent);
 
   auto printParen = [&](char p) {
@@ -3168,7 +3177,7 @@ static void dumpSubstitutionMapRec(
   printParen('(');
   SWIFT_DEFER { printParen(')'); };
   out << "substitution_map generic_signature=";
-  if (genericSig == nullptr) {
+  if (genericSig.isNull()) {
     out << "<nullptr>";
     return;
   }
@@ -3357,7 +3366,6 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
-    TRIVIAL_TYPE_PRINTER(BuiltinUnknownObject, builtin_unknown_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
@@ -3371,6 +3379,12 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
+      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      if (auto underlying = T->getSinglyDesugaredType()) {
+        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+      } else {
+        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+      }
       if (T->getParent())
         printRec("parent", T->getParent());
 
@@ -3512,10 +3526,6 @@ namespace {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      auto genericEnv = T->getGenericEnvironment();
-      if (auto owningDC = genericEnv->getOwningDeclContext()) {
-        owningDC->printContext(OS, Indent + 2);
-      }
       printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3758,6 +3768,10 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
   // Make sure to print type variables.
   llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
+}
+
+void GenericSignatureImpl::dump() const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).dump();
 }
 
 void GenericEnvironment::dump(raw_ostream &os) const {

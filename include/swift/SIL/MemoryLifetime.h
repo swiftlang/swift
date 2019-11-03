@@ -22,6 +22,16 @@
 
 namespace swift {
 
+void printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits);
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SmallBitVector &bits) {
+  printBitsAsArray(OS, bits);
+  return OS;
+}
+
+void dumpBits(const SmallBitVector &bits);
+
 /// The MemoryLocations utility provides functions to analyze memory locations.
 ///
 /// Memory locations are limited to addresses which are guaranteed to
@@ -131,12 +141,23 @@ public:
     /// \endcode
     int parentIdx;
 
+  private:
+    friend class MemoryLocations;
+
     /// Used to decide if a location is completely covered by its sub-locations.
     ///
     /// -1 means: not yet initialized.
     int numFieldsNotCoveredBySubfields = -1;
 
+    /// The same as ``numFieldsNotCoveredBySubfields``, just for non-trivial
+    /// fields.
+    ///
+    /// -1 means: not yet initialized.
+    int numNonTrivialFieldsNotCovered = -1;
+
     Location(SILValue val, unsigned index, int parentIdx = -1);
+
+    void updateFieldCounters(SILType ty, int increment);
   };
 
 private:
@@ -155,6 +176,9 @@ private:
   /// Those locations are excluded from the locations to keep the bit sets
   /// small. They can be handled separately with handleSingleBlockLocations().
   llvm::SmallVector<SingleValueInstruction *, 16> singleBlockLocations;
+
+  /// The bit-set of locations for which numNonTrivialFieldsNotCovered is > 0.
+  Bits nonTrivialLocations;
 
 public:
   MemoryLocations() {}
@@ -181,6 +205,11 @@ public:
   /// Returns the location with a given \p index.
   const Location *getLocation(unsigned index) const {
     return &locations[index];
+  }
+
+  /// Registers an address projection instruction for a location.
+  void registerProjection(SingleValueInstruction *projection, unsigned locIdx) {
+    addr2LocIdx[projection] = locIdx;
   }
 
   /// Sets the location bits os \p addr in \p bits, if \p addr is associated
@@ -215,6 +244,10 @@ public:
   void handleSingleBlockLocations(
                        std::function<void (SILBasicBlock *block)> handlerFunc);
 
+  /// Returns the set of locations for which have non trivial fields which are
+  /// not covered by sub-fields.
+  const Bits &getNonTrivialLocations();
+
   /// Debug dump the MemoryLifetime internals.
   void dump() const;
 
@@ -244,11 +277,6 @@ private:
 
   /// Calculates Location::numFieldsNotCoveredBySubfields
   void initFieldsCounter(Location &loc);
-
-  /// Only memory locations which store a non-trivial type are considered.
-  bool shouldTrackLocation(SILType type, SILFunction *inFunction) {
-    return !type.isTrivial(*inFunction);
-  }
 };
 
 /// The MemoryDataflow utility calculates global dataflow of memory locations.
@@ -341,13 +369,29 @@ public:
   /// Calculates the BlockState::exitReachable flags.
   void exitReachableAnalysis();
 
+  using JoinOperation = std::function<void (Bits &dest, const Bits &src)>;
+
   /// Derives the block exit sets from the entry sets by applying the gen and
   /// kill sets.
-  void solveDataflowForward();
+  /// At control flow joins, the \p join operation is applied.
+  void solveForward(JoinOperation join);
+
+  /// Calls solveForward() with a bit-intersection as join operation.
+  void solveForwardWithIntersect();
+
+  /// Calls solveForward() with a bit-union as join operation.
+  void solveForwardWithUnion();
 
   /// Derives the block entry sets from the exit sets by applying the gen and
   /// kill sets.
-  void solveDataflowBackward();
+  /// At control flow joins, the \p join operation is applied.
+  void solveBackward(JoinOperation join);
+
+  /// Calls solveBackward() with a bit-intersection as join operation.
+  void solveBackwardWithIntersect();
+
+  /// Calls solveBackward() with a bit-union as join operation.
+  void solveBackwardWithUnion();
 
   /// Debug dump the MemoryLifetime internals.
   void dump() const;

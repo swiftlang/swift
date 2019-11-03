@@ -507,6 +507,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
   ActiveRequest = Opts.Request;
+  bool ShouldIgnoreSourceInfo = true;
   switch (Opts.Request) {
   case SourceKitRequest::None:
     llvm::errs() << "request is not set\n";
@@ -866,6 +867,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
           sourcekitd_request_dictionary_set_int64(Req, KeyUsingSwiftArgs, true);
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
+      ShouldIgnoreSourceInfo = false;
     }
 
     sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
@@ -959,6 +961,17 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
+    if (ShouldIgnoreSourceInfo) {
+      // Ignore .swiftsourceinfo file when testing sourcekitd.
+      // .swiftsourceinfo for stdlib will be available when sourcekitd is tested,
+      // which may make some stdlib-depending sourcekitd tests volatile.
+      // We cannot append the flags when the compiler arguments are for clang
+      // invocation.
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-ignore-module-source-info");
+    }
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
     sourcekitd_request_release(Args);
   }

@@ -1558,11 +1558,13 @@ const char *Compilation::getAllSourcesPath() const {
     std::error_code EC =
         llvm::sys::fs::createTemporaryFile("sources", "", Buffer);
     if (EC) {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_unable_to_make_temporary_file,
-                     EC.message());
+      // Use the constructor that prints both the error code and the
+      // description.
       // FIXME: This should not take down the entire process.
-      llvm::report_fatal_error("unable to create list of input sources");
+      auto error = llvm::make_error<llvm::StringError>(
+          EC,
+          "- unable to create list of input sources");
+      llvm::report_fatal_error(std::move(error));
     }
     auto *mutableThis = const_cast<Compilation *>(this);
     mutableThis->addTemporaryFile(Buffer.str(), PreserveOnSignal::Yes);

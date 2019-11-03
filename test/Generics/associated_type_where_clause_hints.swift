@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift
 
 protocol P0 { }
 protocol P0b { }

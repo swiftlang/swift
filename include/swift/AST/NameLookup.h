@@ -23,85 +23,82 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {
-  class ASTContext;
-  class DeclContext;
-  class DeclName;
-  class Expr;
-  class GenericSignatureBuilder;
-  class LazyResolver;
-  class TupleType;
-  class Type;
-  class TypeDecl;
-  class ValueDecl;
-  struct SelfBounds;
-  class NominalTypeDecl;
+class ASTContext;
+class DeclName;
+class GenericSignatureBuilder;
+class Type;
+class TypeDecl;
+class ValueDecl;
+struct SelfBounds;
+class NominalTypeDecl;
 
-  namespace ast_scope {
-  class ASTSourceFileScope;
-  class ASTScopeImpl;
-  } // namespace ast_scope
+namespace ast_scope {
+class ASTSourceFileScope;
+class ASTScopeImpl;
+} // namespace ast_scope
 
-  /// LookupResultEntry - One result of unqualified lookup.
-  struct LookupResultEntry {
-  private:
-    /// The declaration context through which we found \c Value. For instance,
-    /// \code
-    /// class BaseClass {
-    ///   func foo() {}
-    /// }
-    ///
-    /// class DerivedClass : BaseClass {
-    ///   func bar() {}
-    /// }
-    /// \endcode
-    ///
-    /// When finding \c foo() from the body of \c DerivedClass, \c BaseDC is \c
-    /// DerivedClass.
-    ///
-    /// Another example:
-    /// \code
-    /// class BaseClass {
-    ///   func bar() {}
-    ///   func foo() {}
-    /// }
-    /// \endcode
-    ///
-    /// When finding \c bar() from the function body of \c foo(), \c BaseDC is
-    /// the method \c foo().
-    ///
-    /// \c BaseDC will be the method if \c self is needed for the lookup,
-    /// and will be the type if not.
-    /// In other words: If \c baseDC is a method, it means you found an instance
-    /// member and you should add an implicit 'self.' (Each method has its own
-    /// implicit self decl.) There's one other kind of non-method context that
-    /// has a 'self.' -- a lazy property initializer, which unlike a non-lazy
-    /// property can reference \c self) Hence: \code
-    ///  class Outer {
-    ///    static func s()
-    ///    func i()
-    ///    class Inner {
-    ///      static func ss()
-    ///      func ii() {
-    ///        func F() {
-    ///          ii() // OK! implicitly self.ii; BaseDC is the method
-    ///          s()  // OK! s() is defined in an outer type; BaseDC is the type
-    ///          ss() // error: must write /Inner.ss() here since its static
-    ///          i()  // error: there's no outer 'self.'
-    ///        }
-    ///      }
-    /// \endcode
-    ///
-    /// To sum up:  The distinction is whether you need to know the run-time
-    /// value of \c self. It might be clearer if \code baseDC was always a type,
-    /// and there was an additional \c ParamDecl field in \c LookupResult which
-    /// would store the implicit self, if any. \c BaseDC is always one of your
-    /// outer DCs. if you're inside a type it should never be an extension of
-    /// that type. And if you're inside an extension it will always be an
-    /// extension (if it found something at that level).
+/// LookupResultEntry - One result of unqualified lookup.
+struct LookupResultEntry {
+private:
+  /// The declaration context through which we found \c Value. For instance,
+  /// \code
+  /// class BaseClass {
+  ///   func foo() {}
+  /// }
+  ///
+  /// class DerivedClass : BaseClass {
+  ///   func bar() {}
+  /// }
+  /// \endcode
+  ///
+  /// When finding \c foo() from the body of \c DerivedClass, \c BaseDC is \c
+  /// DerivedClass.
+  ///
+  /// Another example:
+  /// \code
+  /// class BaseClass {
+  ///   func bar() {}
+  ///   func foo() {}
+  /// }
+  /// \endcode
+  ///
+  /// When finding \c bar() from the function body of \c foo(), \c BaseDC is
+  /// the method \c foo().
+  ///
+  /// \c BaseDC will be the method if \c self is needed for the lookup,
+  /// and will be the type if not.
+  /// In other words: If \c baseDC is a method, it means you found an instance
+  /// member and you should add an implicit 'self.' (Each method has its own
+  /// implicit self decl.) There's one other kind of non-method context that
+  /// has a 'self.' -- a lazy property initializer, which unlike a non-lazy
+  /// property can reference \c self) Hence: \code
+  ///  class Outer {
+  ///    static func s()
+  ///    func i()
+  ///    class Inner {
+  ///      static func ss()
+  ///      func ii() {
+  ///        func F() {
+  ///          ii() // OK! implicitly self.ii; BaseDC is the method
+  ///          s()  // OK! s() is defined in an outer type; BaseDC is the type
+  ///          ss() // error: must write /Inner.ss() here since its static
+  ///          i()  // error: there's no outer 'self.'
+  ///        }
+  ///      }
+  /// \endcode
+  ///
+  /// To sum up:  The distinction is whether you need to know the run-time
+  /// value of \c self. It might be clearer if \code baseDC was always a type,
+  /// and there was an additional \c ParamDecl field in \c LookupResult which
+  /// would store the implicit self, if any. \c BaseDC is always one of your
+  /// outer DCs. if you're inside a type it should never be an extension of
+  /// that type. And if you're inside an extension it will always be an
+  /// extension (if it found something at that level).
   DeclContext *BaseDC;
 
   /// The declaration corresponds to the given name; i.e. the decl we are
@@ -147,7 +144,7 @@ public:
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
+  UnqualifiedLookup(DeclName Name, DeclContext *DC,
                     SourceLoc Loc = SourceLoc(), Options options = Options());
   
   using ResultsVector = SmallVector<LookupResultEntry, 4>;
@@ -382,11 +379,11 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 /// other declarations in that set.
 ///
 /// \param decls The set of declarations being considered.
-/// \param curModule The current module.
+/// \param dc The DeclContext from which the lookup was performed.
 ///
 /// \returns true if any shadowed declarations were removed.
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         const ModuleDecl *curModule);
+                         const DeclContext *dc);
 
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
@@ -394,7 +391,6 @@ bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 /// are visible.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         const DeclContext *DC,
-                        LazyResolver *typeResolver,
                         bool IncludeTopLevel,
                         SourceLoc Loc = SourceLoc());
 
@@ -405,56 +401,10 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
-                              LazyResolver *typeResolver,
                               bool includeInstanceMembers,
                               GenericSignatureBuilder *GSB = nullptr);
 
 namespace namelookup {
-enum class ResolutionKind {
-  /// Lookup can match any number of decls, as long as they are all
-  /// overloadable.
-  ///
-  /// If non-overloadable decls are returned, this indicates ambiguous lookup.
-  Overloadable,
-
-  /// Lookup should match a single decl.
-  Exact,
-
-  /// Lookup should match a single decl that declares a type.
-  TypesOnly
-};
-
-/// Performs a lookup into the given module and, if necessary, its
-/// reexports, observing proper shadowing rules.
-///
-/// \param module The module that will contain the name.
-/// \param accessPath The import scope on \p module.
-/// \param name The name to look up.
-/// \param[out] decls Any found decls will be added to this vector.
-/// \param lookupKind Whether this lookup is qualified or unqualified.
-/// \param resolutionKind What sort of decl is expected.
-/// \param typeResolver The type resolver for decls that need to be
-///        type-checked. This is needed for shadowing resolution.
-/// \param moduleScopeContext The top-level context from which the lookup is
-///        being performed, for checking access. This must be either a
-///        FileUnit or a Module.
-/// \param extraImports Private imports to include in this search.
-void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
-                    DeclName name, SmallVectorImpl<ValueDecl *> &decls,
-                    NLKind lookupKind, ResolutionKind resolutionKind,
-                    LazyResolver *typeResolver,
-                    const DeclContext *moduleScopeContext,
-                    ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
-
-template <typename Fn>
-void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
-  DeclContext *moduleScope = DC->getModuleScopeContext();
-  if (auto file = dyn_cast<FileUnit>(moduleScope))
-    file->forAllVisibleModules(fn);
-  else
-    cast<ModuleDecl>(moduleScope)
-        ->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
-}
 
 /// Once name lookup has gathered a set of results, perform any necessary
 /// steps to prune the result set before returning it to the caller.
@@ -499,18 +449,18 @@ getDirectlyInheritedNominalTypeDecls(
 SelfBounds getSelfBoundsFromWhereClause(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
 
-namespace namelookup {
+/// Retrieve the TypeLoc at the given \c index from among the set of
+/// type declarations that are directly "inherited" by the given declaration.
+inline TypeLoc &
+getInheritedTypeLocAtIndex(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                           unsigned index) {
+  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+    return typeDecl->getInherited()[index];
 
-/// Performs a qualified lookup into the given module and, if necessary, its
-/// reexports, observing proper shadowing rules.
-void
-lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
-                           SmallVectorImpl<ValueDecl *> &decls,
-                           NLKind lookupKind,
-                           ResolutionKind resolutionKind,
-                           LazyResolver *typeResolver,
-                           const DeclContext *moduleScopeContext,
-                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+  return decl.get<ExtensionDecl *>()->getInherited()[index];
+}
+
+namespace namelookup {
 
 /// Searches through statements and patterns for local variable declarations.
 class FindLocalVal : public StmtVisitor<FindLocalVal> {
@@ -643,6 +593,12 @@ class ASTScope {
 public:
   ASTScope(SourceFile *);
 
+  void
+  buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+
+  /// Flesh out the tree for dumping
+  void buildFullyExpandedTree();
+
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
   unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
@@ -653,8 +609,7 @@ public:
   computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
                         Optional<bool> initialIsCascadingUse);
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
 

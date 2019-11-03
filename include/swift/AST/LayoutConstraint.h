@@ -18,9 +18,11 @@
 #define SWIFT_LAYOUT_CONSTRAINT_H
 
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/AST/PrintOptions.h"
 
@@ -281,7 +283,7 @@ class LayoutConstraint {
 
   explicit operator bool() const { return Ptr != 0; }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
@@ -289,6 +291,10 @@ class LayoutConstraint {
 
   /// Return the layout constraint as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
+
+  friend llvm::hash_code hash_value(const LayoutConstraint &layout) {
+    return hash_value(layout.getPointer());
+  }
 
   bool operator==(LayoutConstraint rhs) const {
     if (isNull() && rhs.isNull())

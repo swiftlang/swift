@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
@@ -32,6 +31,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
@@ -49,10 +49,12 @@ namespace clang {
 }
 
 namespace swift {
+  class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class ClangModuleLoader;
   class ClangNode;
   class ConcreteDeclRef;
   class ConstructorDecl;
@@ -66,10 +68,8 @@ namespace swift {
   class InFlightDiagnostic;
   class IterableDeclContext;
   class LazyContextData;
-  class LazyGenericContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class LazyMemberParser;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -109,8 +109,13 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
+  class IndexSubset;
 
   enum class KnownProtocolKind : uint8_t;
+
+namespace namelookup {
+  class ImportCache;
+}
 
 namespace syntax {
   class SyntaxArena;
@@ -413,13 +418,6 @@ public:
     return true;
   }
 
-  /// Remove the lazy resolver, if there is one.
-  ///
-  /// FIXME: We probably don't ever want to do this.
-  void removeLazyResolver() {
-    setLazyResolver(nullptr);
-  }
-
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -428,12 +426,6 @@ private:
   void setLazyResolver(LazyResolver *resolver);
 
 public:
-  /// Add a lazy parser for resolving members later.
-  void addLazyParser(LazyMemberParser *parser);
-
-  /// Remove a lazy parser.
-  void removeLazyParser(LazyMemberParser *parser);
-
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
@@ -469,6 +461,8 @@ public:
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
   StructDecl *getObjCBoolDecl() const;
 
+  /// Retrieve the declaration of Foundation.NSCopying.
+  ProtocolDecl *getNSCopyingDecl() const;
   /// Retrieve the declaration of Foundation.NSError.
   ClassDecl *getNSErrorDecl() const;
   /// Retrieve the declaration of Foundation.NSNumber.
@@ -612,7 +606,6 @@ public:
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
   const CanType TheNativeObjectType;      /// Builtin.NativeObject
   const CanType TheBridgeObjectType;      /// Builtin.BridgeObject
-  const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
   const CanType TheSILTokenType;          /// Builtin.SILToken
@@ -690,7 +683,9 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
-  
+
+  namelookup::ImportCache &getImportCache() const;
+
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
   /// Does nothing in non-asserts (NDEBUG) builds.
@@ -823,21 +818,6 @@ public:
   LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
                                               LazyMemberLoader *lazyLoader);
 
-  /// Use the lazy parsers associated with the context to populate the members
-  /// of the given decl context.
-  ///
-  /// \param IDC The context whose member decls should be lazily parsed.
-  void parseMembers(IterableDeclContext *IDC);
-
-  /// Get the lazy function data for the given generic context.
-  ///
-  /// \param lazyLoader If non-null, the lazy loader to use when creating the
-  /// function data. The pointer must either be null or be consistent
-  /// across all calls for the same \p func.
-  LazyGenericContextData *getOrCreateLazyGenericContextData(
-                                              const GenericContext *dc,
-                                              LazyMemberLoader *lazyLoader);
-
   /// Get the lazy iterable context for the given iterable declaration context.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -878,7 +858,7 @@ private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already
   /// have one.
-  void registerGenericSignatureBuilder(GenericSignature *sig,
+  void registerGenericSignatureBuilder(GenericSignature sig,
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
 
@@ -887,12 +867,6 @@ public:
   /// canonical generic signature and module.
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
                                                      CanGenericSignature sig);
-
-  /// Retrieve or create the canonical generic environment of a canonical
-  /// generic signature builder.
-  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                       GenericSignatureBuilder *builder,
-                                       GenericSignature *sig);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
@@ -903,8 +877,8 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
-                                                const ValueDecl *derived);
+  GenericSignature getOverrideGenericSignature(const ValueDecl *base,
+                                               const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisifed by derived method

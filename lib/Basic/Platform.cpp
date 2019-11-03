@@ -141,6 +141,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
+  case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
@@ -161,6 +162,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
+  case llvm::Triple::WASI:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -351,6 +353,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     if (Major == 10) {
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
+      } else if (Minor <= 15) {
+        return llvm::VersionTuple(5, 1);
       } else {
         return None;
       }
@@ -361,6 +365,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     Triple.getiOSVersion(Major, Minor, Micro);
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
+    } else if (Major <= 13) {
+      return llvm::VersionTuple(5, 1);
     } else {
       return None;
     }
@@ -368,6 +374,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
       return llvm::VersionTuple(5, 0);
+    } else if (Major <= 6) {
+      return llvm::VersionTuple(5, 1);
     } else {
       return None;
     }

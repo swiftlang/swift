@@ -1,19 +1,21 @@
 // Test the case when we have a single file in a module.
 //
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %s
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s
 // RUN: llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | %FileCheck %s -check-prefix=FIRST
 
 // Test the case when we have a multiple files in a module.
 //
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/first.swiftmodule -emit-module-doc -emit-module-doc-path %t/first.swiftdoc -primary-file %s %S/Inputs/def_comments.swift
-// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/second.swiftmodule -emit-module-doc -emit-module-doc-path %t/second.swiftdoc %s -primary-file %S/Inputs/def_comments.swift
-// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %t/first.swiftmodule %t/second.swiftmodule
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/first.swiftmodule -emit-module-doc -emit-module-doc-path %t/first.swiftdoc -primary-file %s %S/Inputs/def_comments.swift -emit-module-source-info-path %t/first.swiftsourceinfo
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/second.swiftmodule -emit-module-doc -emit-module-doc-path %t/second.swiftdoc %s -primary-file %S/Inputs/def_comments.swift -emit-module-source-info-path %t/second.swiftsourceinfo
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc %t/first.swiftmodule %t/second.swiftmodule -emit-module-source-info-path %t/comments.swiftsourceinfo
 // RUN: llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=FIRST < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=SECOND < %t.printed.txt
@@ -58,14 +60,41 @@ public protocol P1 { }
 /// Comment for no member extension
 extension first_decl_class_1 : P1 {}
 
-// FIRST: Class/first_decl_generic_class_1 RawComment=[/// first_decl_generic_class_1 Aaa.\n]
-// FIRST: Destructor/first_decl_generic_class_1.deinit RawComment=[/// deinit of first_decl_generic_class_1 Aaa.\n]
-// FIRST: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
-// FIRST: Func/first_decl_class_1.decl_func_1 RawComment=[/// decl_func_1 Aaa.\n]
-// FIRST: Func/first_decl_class_1.decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
-// FIRST: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
+// FIRST: comments.swift:26:14: Class/first_decl_generic_class_1 RawComment=[/// first_decl_generic_class_1 Aaa.\n]
+// FIRST: comments.swift:28:3: Destructor/first_decl_generic_class_1.deinit RawComment=[/// deinit of first_decl_generic_class_1 Aaa.\n]
+// FIRST: comments.swift:33:14: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
+// FIRST: comments.swift:36:15: Func/first_decl_class_1.decl_func_1 RawComment=[/// decl_func_1 Aaa.\n]
+// FIRST: comments.swift:41:15: Func/first_decl_class_1.decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
+// FIRST: comments.swift:45:15: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 
-// SECOND: Extension/ RawComment=[/// Comment for bar1\n] BriefComment=[Comment for bar1]
-// SECOND: Extension/ RawComment=[/// Comment for bar2\n] BriefComment=[Comment for bar2]
-// SECOND: Extension/ RawComment=[/// Comment for no member extension\n] BriefComment=[Comment for no member extension]
-// SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
+// SECOND: comments.swift:49:1: Extension/ RawComment=[/// Comment for bar1\n] BriefComment=[Comment for bar1]
+// SECOND: comments.swift:54:1: Extension/ RawComment=[/// Comment for bar2\n] BriefComment=[Comment for bar2]
+// SECOND: comments.swift:61:1: Extension/ RawComment=[/// Comment for no member extension\n] BriefComment=[Comment for no member extension]
+// SECOND: Inputs/def_comments.swift:2:14: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
+// SECOND: Inputs/def_comments.swift:5:15: Struct/second_decl_struct_1
+// SECOND: Inputs/def_comments.swift:7:9: Accessor/second_decl_struct_1.<getter for second_decl_struct_1.instanceVar>
+// SECOND: Inputs/def_comments.swift:8:9: Accessor/second_decl_struct_1.<setter for second_decl_struct_1.instanceVar>
+// SECOND: Inputs/def_comments.swift:10:17: Enum/second_decl_struct_1.NestedEnum
+// SECOND: Inputs/def_comments.swift:11:22: TypeAlias/second_decl_struct_1.NestedTypealias
+// SECOND: Inputs/def_comments.swift:14:13: Enum/second_decl_enum_1
+// SECOND: Inputs/def_comments.swift:15:10: EnumElement/second_decl_enum_1.Case1
+// SECOND: Inputs/def_comments.swift:16:10: EnumElement/second_decl_enum_1.Case2
+// SECOND: Inputs/def_comments.swift:20:12: Constructor/second_decl_class_2.init
+// SECOND: Inputs/def_comments.swift:23:17: Protocol/second_decl_protocol_1
+// SECOND: Inputs/def_comments.swift:24:20: AssociatedType/second_decl_protocol_1.NestedTypealias
+// SECOND: Inputs/def_comments.swift:25:5: Subscript/second_decl_protocol_1.subscript
+// SECOND: Inputs/def_comments.swift:25:35: Accessor/second_decl_protocol_1.<getter for second_decl_protocol_1.subscript>
+// SECOND: Inputs/def_comments.swift:25:39: Accessor/second_decl_protocol_1.<setter for second_decl_protocol_1.subscript>
+// SECOND: Inputs/def_comments.swift:28:13: Var/decl_var_2 RawComment=none BriefComment=none DocCommentAsXML=none
+// SECOND: Inputs/def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
+// SECOND: Inputs/def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
+// SECOND: NonExistingSource.swift:100000:13: Func/functionAfterPoundSourceLoc
+
+// Test the case when we have to import via a .swiftinterface file.
+//
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/Hidden)
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/Hidden/comments.swiftmodule -emit-module-interface-path %t/comments.swiftinterface -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s -enable-library-evolution -swift-version 5
+// RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t -swift-version 5 | %FileCheck %s -check-prefix=FIRST

@@ -31,5 +31,5 @@ public func testCaptureGlobal() {
   }) // CHECK: {{^}$}}
 }
 
-// CHECK-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"no-frame-pointer-elim"="true"{{.*}}
-// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
+// CHECK-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
+// CHECK-DAG: attributes [[SWIFT_FUNC_ATTR]] = { "frame-pointer"="all" "target-cpu"

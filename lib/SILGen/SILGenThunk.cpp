@@ -26,6 +26,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -132,7 +133,7 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
       auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);
-      auto result = SGF.B.createWitnessMethod(loc, substSelfType, *conformance,
+      auto result = SGF.B.createWitnessMethod(loc, substSelfType, conformance,
                                               next, constantInfo.getSILType());
       return {ManagedValue::forUnmanaged(result), next};
     }
@@ -149,7 +150,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   auto *vd = thunk.getDecl();
 
   if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
+    assert(!SGM.M.Types.hasLoweredLocalCaptures(SILDeclRef(fd)) &&
            "methods cannot have captures");
     (void) fd;
   }
@@ -184,7 +185,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   if (resultTy != toClosure.getType()) {
     CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
     CanSILFunctionType closureFnTy = toClosure.getType().castTo<SILFunctionType>();
-    if (resultFnTy->isABICompatibleWith(closureFnTy).isCompatible()) {
+    if (resultFnTy->isABICompatibleWith(closureFnTy, F).isCompatible()) {
       toClosure = B.createConvertFunction(loc, toClosure, resultTy);
     } else {
       // Compute the partially-applied abstraction pattern for the callee:

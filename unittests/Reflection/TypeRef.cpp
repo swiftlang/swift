@@ -31,7 +31,7 @@ static const std::string Shmrotocol = "Shmrotocol";
 using Param = remote::FunctionParam<const TypeRef *>;
 
 TEST(TypeRefTest, UniqueBuiltinTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto BI1 = Builder.createBuiltinType(ABC, ABC);
   auto BI2 = Builder.createBuiltinType(ABC, ABC);
@@ -42,7 +42,7 @@ TEST(TypeRefTest, UniqueBuiltinTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueNominalTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(ABC, nullptr);
@@ -58,7 +58,7 @@ TEST(TypeRefTest, UniqueNominalTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
@@ -82,7 +82,7 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueTupleTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
@@ -114,7 +114,7 @@ TEST(TypeRefTest, UniqueTupleTypeRef) {
 
 TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   std::vector<const TypeRef *> Void;
   auto VoidResult = Builder.createTupleType(Void, "", false);
@@ -213,7 +213,7 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
   TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABC, false);
@@ -237,7 +237,7 @@ TEST(TypeRefTest, UniqueProtocolTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueMetatypeTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto M1 = Builder.createMetatypeType(N1, None);
@@ -251,7 +251,7 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto M1 = Builder.createExistentialMetatypeType(N1);
@@ -263,7 +263,7 @@ TEST(TypeRefTest, UniqueExistentialMetatypeTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueGenericTypeParameterTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP00_2 = Builder.createGenericTypeParameterType(0, 0);
@@ -276,7 +276,7 @@ TEST(TypeRefTest, UniqueGenericTypeParameterTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
@@ -296,7 +296,7 @@ TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueForeignClassTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto UN1 = Builder.getUnnamedForeignClassType();
   auto UN2 = Builder.getUnnamedForeignClassType();
@@ -310,7 +310,7 @@ TEST(TypeRefTest, UniqueForeignClassTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueObjCClassTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto UN1 = Builder.getUnnamedObjCClassType();
   auto UN2 = Builder.getUnnamedObjCClassType();
@@ -324,7 +324,7 @@ TEST(TypeRefTest, UniqueObjCClassTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueOpaqueTypeRef) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto Op = OpaqueTypeRef::get();
   auto Op1 = Builder.getOpaqueType();
@@ -335,7 +335,7 @@ TEST(TypeRefTest, UniqueOpaqueTypeRef) {
 }
 
 TEST(TypeRefTest, UniqueUnownedStorageType) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(MyClass, nullptr);
   auto N2 = Builder.createNominalType(NotMyClass, nullptr);
@@ -348,7 +348,7 @@ TEST(TypeRefTest, UniqueUnownedStorageType) {
 }
 
 TEST(TypeRefTest, UniqueWeakStorageType) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(MyClass, nullptr);
   auto N2 = Builder.createNominalType(NotMyClass, nullptr);
@@ -361,7 +361,7 @@ TEST(TypeRefTest, UniqueWeakStorageType) {
 }
 
 TEST(TypeRefTest, UniqueUnmanagedStorageType) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto N1 = Builder.createNominalType(MyClass, nullptr);
   auto N2 = Builder.createNominalType(NotMyClass, nullptr);
@@ -377,7 +377,7 @@ TEST(TypeRefTest, UniqueUnmanagedStorageType) {
 // (with the same pointer) as an ABC<T, U> that got substituted
 // with T : Int and U : Int.
 TEST(TypeRefTest, UniqueAfterSubstitution) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   std::string MangledIntName("Si");
   auto NominalInt = Builder.createNominalType(MangledIntName,
@@ -408,7 +408,7 @@ TEST(TypeRefTest, UniqueAfterSubstitution) {
 
 // Make sure subst() and isConcrete() walk into parent types
 TEST(TypeRefTest, NestedTypes) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
 
@@ -439,7 +439,7 @@ TEST(TypeRefTest, NestedTypes) {
 }
 
 TEST(TypeRefTest, DeriveSubstitutions) {
-  TypeRefBuilder Builder;
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);

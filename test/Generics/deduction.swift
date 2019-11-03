@@ -194,7 +194,7 @@ protocol IsBefore {
   func isBefore(_ other: Self) -> Bool
 }
 
-func min2<T : IsBefore>(_ x: T, _ y: T) -> T {
+func min2<T : IsBefore>(_ x: T, _ y: T) -> T { // expected-note {{where 'T' = 'Float'}}
   if y.isBefore(x) { return y }
   return x
 }
@@ -205,23 +205,23 @@ extension Int : IsBefore {
 
 func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   _ = min2(x, y)
-  min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
+  min2(a, b) // expected-error{{global function 'min2' requires that 'Float' conform to 'IsBefore'}}
 }
 
-func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{'R.Element' = 'Double'}}
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{where 'R.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'Double' conform to 'IsBefore'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'IndexingIterator<[Double]>.Element' (aka 'Double') conform to 'IsBefore'}}
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{where 'A.Element' = 'Int', 'B.Element' = 'Double'}}
+// expected-note@-1 {{where 'A.Element' = 'IndexingIterator<[Int]>.Element' (aka 'Int'), 'B.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []
   testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
-  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'Int' and 'Double' be equivalent}}
+  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'IndexingIterator<[Int]>.Element' (aka 'Int') and 'IndexingIterator<[Double]>.Element' (aka 'Double') be equivalent}}
 }
 
 protocol P_GI {
@@ -234,19 +234,18 @@ class C_GI : P_GI {
 
 class GI_Diff {}
 func genericInheritsA<T>(_ x: T) where T : P_GI, T.Y : GI_Diff {}
-// expected-note@-1 {{candidate requires that 'GI_Diff' inherit from 'T.Y' (requirement specified as 'T.Y' : 'GI_Diff' [with T = C_GI])}}
+// expected-note@-1 {{where 'T.Y' = 'C_GI.Y' (aka 'Double')}}
 genericInheritsA(C_GI())
-// expected-error@-1 {{cannot invoke 'genericInheritsA(_:)' with an argument list of type '(C_GI)'}}
+// expected-error@-1 {{global function 'genericInheritsA' requires that 'C_GI.Y' (aka 'Double') inherit from 'GI_Diff'}}
 
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
-protocol Addable {
+protocol Addable { // expected-note {{where 'Self' = 'U'}}
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  u + u // expected-error{{protocol 'Addable' requires that 'U' conform to 'Addable'}}
   return x+y
 }
 
@@ -255,7 +254,7 @@ func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
 //===----------------------------------------------------------------------===//
 struct MyVector<T> { func size() -> Int {} }
 
-func getVectorSize<T>(_ v: MyVector<T>) -> Int {
+func getVectorSize<T>(_ v: MyVector<T>) -> Int { // expected-note {{in call to function 'getVectorSize'}}
   return v.size()
 }
 
@@ -267,7 +266,8 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
 
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<T>'}}
+  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<Any>'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   var x : X, y : Y
   x = ovlVector(vi)
@@ -311,34 +311,32 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}}
+    for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
-    let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
+    let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+    let l = min(3, oi) // expected-error{{global function 'min' requires that 'Int?' conform to 'Comparable'}}
+  // expected-note@-1{{wrapped type 'Int' satisfies this requirement}}
 }
 
 infix operator +&
 func +&<R, S>(lhs: inout R, rhs: S) where R : RangeReplaceableCollection, S : Sequence, R.Element == S.Element {}
-// expected-note@-1 {{candidate requires that the types 'String' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'R.Element' == 'S.Element' [with R = [String], S = String])}}
+// expected-note@-1 {{where 'R.Element' = 'String', 'S.Element' = 'String.Element' (aka 'Character')}}
 
 func rdar33477726_1() {
   var arr: [String] = []
   arr +& "hello"
-  // expected-error@-1 {{binary operator '+&(_:_:)' cannot be applied to operands of type '[String]' and 'String'}}
+  // expected-error@-1 {{operator function '+&' requires the types 'String' and 'String.Element' (aka 'Character') be equivalent}}
 }
 
 func rdar33477726_2<R, S>(_: R, _: S) where R: Sequence, S == R.Element {}
-// expected-note@-1 {{candidate requires that the types 'Int' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'S' == 'R.Element' [with R = String, S = Int])}}
 rdar33477726_2("answer", 42)
-// expected-error@-1 {{cannot invoke 'rdar33477726_2(_:_:)' with an argument list of type '(String, Int)'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String.Element' (aka 'Character')}}
 
 prefix operator +-
 prefix func +-<T>(_: T) where T: Sequence, T.Element == Int {}
-// expected-note@-1 {{candidate requires that the types 'String.Element' (aka 'Character') and 'Int' be equivalent (requirement specified as 'T.Element' == 'Int' [with T = String])}}
+// expected-note@-1 {{where 'T.Element' = 'String.Element' (aka 'Character')}}
 
 +-"hello"
-// expected-error@-1 {{unary operator '+-(_:)' cannot be applied to an operand of type 'String'}}
+// expected-error@-1 {{operator function '+-' requires the types 'String.Element' (aka 'Character') and 'Int' be equivalent}}

@@ -1466,7 +1466,7 @@ namespace {
       // If we have the destructor body, we know whether SILGen
       // generated a -dealloc body.
       if (auto braceStmt = destructor->getBody())
-        return braceStmt->getNumElements() != 0;
+        return !braceStmt->empty();
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
@@ -1998,6 +1998,7 @@ namespace {
       case llvm::Triple::MachO:
         var->setSection("__DATA, __objc_const");
         break;
+      case llvm::Triple::XCOFF:
       case llvm::Triple::COFF:
         var->setSection(".data");
         break;
@@ -2238,7 +2239,6 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                                            MutableArrayRef<TypeLoc>(),
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
-  SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
     /*isNameImplicit=*/true));

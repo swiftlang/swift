@@ -101,8 +101,8 @@ enum ImproperlyHasIVars {
 
 // We used to crash on this.  rdar://14678675
 enum rdar14678675 {
-  case U1,
-  case U2 // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U1, // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U2 
   case U3
 }
 
@@ -125,10 +125,10 @@ enum Recovery5 {
   // expected-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}}
 }
 enum Recovery6 {
-  case Snout, _; // expected-error {{expected identifier after comma in enum 'case' declaration}}
-  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
-  case Tusk, // expected-error {{expected pattern}}
-} // expected-error {{expected identifier after comma in enum 'case' declaration}}
+  case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}} expected-note {{'_' previously declared here}}
+  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}} expected-error {{invalid redeclaration of '_'}}
+  case Tusk, // expected-error {{expected identifier after comma in enum 'case' declaration}}
+} 
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}} expected-note {{do you want to add protocol stubs?}}
 // expected-error@-1{{'RawTypeEmpty' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
@@ -551,4 +551,43 @@ enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
   // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-18=}}
   // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
+}
+
+// SR-11261
+enum SR11261 {
+  case identifier
+  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}}
+  case identifier2
+}
+
+enum SR11261_var {
+  case identifier
+  case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
+  case identifier2
+}
+
+enum SR11261_underscore {
+  case identifier
+  case _ // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
+  case identifier2
+}
+
+enum SR11261_Comma {
+  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
+}
+
+enum SR11261_Newline {
+  case identifier1
+  case identifier2
+  case 
+  case identifier // expected-error {{keyword 'case' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`case`}}
+}
+
+enum SR11261_Newline2 {
+  case 
+  func foo() {} // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
+}
+
+enum SR11261_PatternMatching {
+  case let .foo(x, y): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }

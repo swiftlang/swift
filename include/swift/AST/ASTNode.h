@@ -18,6 +18,7 @@
 #define SWIFT_AST_AST_NODE_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/Basic/Debug.h"
 #include "swift/AST/TypeAlignments.h"
 
 namespace llvm {
@@ -36,10 +37,10 @@ namespace swift {
   enum class DeclKind : uint8_t;
   enum class StmtKind;
 
-  struct ASTNode : public llvm::PointerUnion3<Expr*, Stmt*, Decl*> {
+  struct ASTNode : public llvm::PointerUnion<Expr*, Stmt*, Decl*> {
     // Inherit the constructors from PointerUnion.
-    using PointerUnion3::PointerUnion3;
-    
+    using PointerUnion::PointerUnion;
+
     SourceRange getSourceRange() const;
 
     /// Return the location of the start of the statement.
@@ -62,9 +63,7 @@ namespace swift {
     FUNC(Decl)
 #undef FUNC
     
-    LLVM_ATTRIBUTE_DEPRECATED(
-        void dump() const LLVM_ATTRIBUTE_USED,
-        "only for use within the debugger");
+    SWIFT_DEBUG_DUMP;
     void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
     /// Whether the AST node is implicit.

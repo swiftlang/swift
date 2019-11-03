@@ -346,7 +346,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     bool Failed;
     {
       llvm::raw_svector_ostream OS(SS);
-      Failed = ide::printDeclUSR(VD, OS);
+      Failed = ide::printValueDeclUSR(VD, OS);
     }
     if (!Failed && !SS.empty()) {
       OS << "<USR>" << SS << "</USR>";

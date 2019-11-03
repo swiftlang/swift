@@ -138,22 +138,14 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
     return SILDeclRef();
   auto ConformanceRef =
       SwiftModule->lookupConformance(NativeType, Proto);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return SILDeclRef();
 
-  auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
+  auto Conformance = ConformanceRef.getConcrete();
   // bridgeToObjectiveC
   DeclName Name(Ctx, Ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+    Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
@@ -170,22 +162,14 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
     return SILDeclRef();
   auto ConformanceRef =
       SwiftModule->lookupConformance(NativeType, Proto);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return SILDeclRef();
-  auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
+  auto Conformance = ConformanceRef.getConcrete();
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+      Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
@@ -308,7 +292,9 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
-      Results, None, M.getASTContext());
+      Results, None,
+      SubstitutionMap(), false,
+      M.getASTContext());
   return FunctionType;
 }
 
@@ -737,7 +723,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // release_value %17 : $Optional<NSString>
   //
   auto *Enum = dyn_cast<EnumInst>(Arg);
-  if (!Enum)
+  if (!Enum || !Enum->hasOperand())
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())
@@ -1133,7 +1119,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   if (!BridgedReturn) {
     if (FunTy->getNumResults()) {
       auto OrigResultInfo = FunTy->getSingleResult();
-      Results.push_back(SILResultInfo(OrigResultInfo.getType(),
+      Results.push_back(SILResultInfo(OrigResultInfo.getInterfaceType(),
                                       OrigResultInfo.getConvention() ==
                                               ResultConvention::Autoreleased
                                           ? ResultConvention::Owned
@@ -1147,7 +1133,9 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned, Parameters, {},
-      Results, None, M.getASTContext());
+      Results, None,
+      SubstitutionMap(), false,
+      M.getASTContext());
   return FunctionType;
 }
 

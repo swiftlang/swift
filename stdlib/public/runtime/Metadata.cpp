@@ -1009,8 +1009,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
-    // witnesses.
+    // Blocks are ObjC objects, so can share the AnyObject value
+    // witnesses (stored as "BO" rather than "yXl" for ABI compat).
     Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
     assert(false && "objc block without objc interop?");
@@ -2197,9 +2197,6 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
 static void initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
-  // Resolve symbolic references to a unique mangling that can be encoded in
-  // the class name.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
 
   auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
 
@@ -3961,6 +3958,24 @@ void Metadata::dump() const {
     printf("Labels: %s.\n", tuple->Labels);
   }
 
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this)) {
+    printf("Is class bounded: %s.\n",
+           existential->isClassBounded() ? "true" : "false");
+    auto protocols = existential->getProtocols();
+    bool first = true;
+    printf("Protocols: ");
+    for (auto protocol : protocols) {
+      if (!first)
+        printf(" & ");
+      printf("%s", protocol.getName());
+      first = false;
+    }
+    if (auto *superclass = existential->getSuperclassConstraint())
+      if (auto *contextDescriptor = superclass->getTypeContextDescriptor())
+        printf("Superclass constraint: %s.\n", contextDescriptor->Name.get());
+    printf("\n");
+  }
+
   printf("Generic Args: %p.\n", getGenericArgs());
 
 #if SWIFT_OBJC_INTEROP
@@ -5155,8 +5170,6 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (!verificationEnabled) return;
   
   Demangle::StackAllocatedDemangler<1024> Dem;
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.

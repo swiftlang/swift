@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "DocFormat.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "SourceInfoFormat.h"
+#include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -25,7 +27,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Chrono.h"
@@ -37,6 +38,9 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
+
+static_assert(IsTriviallyDestructible<SerializedASTFile>::value,
+              "SerializedASTFiles are BumpPtrAllocated; d'tors are not called");
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
                                  ArrayRef<unsigned char> signature) {
@@ -388,8 +392,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key.second, 0);
+      return llvm::djbHash(key.second, SWIFTMODULE_HASH_SEED);
     } else {
       return (hash_value_type)key.first;
     }
@@ -451,8 +454,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -512,8 +514,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -548,8 +549,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -604,8 +604,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key.second, 0);
+      return llvm::djbHash(key.second, SWIFTMODULE_HASH_SEED);
     } else {
       return (hash_value_type)key.first;
     }
@@ -779,8 +778,7 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -871,10 +869,6 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Decls, scratch);
         break;
-      case index_block::DECL_CONTEXT_OFFSETS:
-        assert(blobData.empty());
-        allocateBuffer(DeclContexts, scratch);
-        break;
       case index_block::TYPE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(Types, scratch);
@@ -931,10 +925,6 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(GenericSignatures, scratch);
         break;
-      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
-        assert(blobData.empty());
-        allocateBuffer(GenericEnvironments, scratch);
-        break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(SubstitutionMaps, scratch);
@@ -977,8 +967,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTDOC_HASH_SEED_5_1);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -1234,15 +1223,168 @@ bool ModuleFile::readModuleDocIfPresent() {
   return true;
 }
 
+class ModuleFile::DeclUSRTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = StringRef;
+  using data_type = uint32_t;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type key) { return key; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    assert(!key.empty());
+    return llvm::djbHash(key, SWIFTSOURCEINFO_HASH_SEED);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned dataLength = 4;
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char*>(data), length);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data, unsigned length) {
+    assert(length == 4);
+    return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedDeclUSRTable>
+ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  if (fields.empty() || blobData.empty())
+    return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+  return std::unique_ptr<SerializedDeclUSRTable>(
+    SerializedDeclUSRTable::Create(base + tableOffset, base + sizeof(uint32_t),
+                                   base));
+}
+
+bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
+  cursor.EnterSubBlock(DECL_LOCS_BLOCK_ID);
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  while (!cursor.AtEndOfStream()) {
+    auto entry = cursor.advance();
+    switch (entry.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      // Unknown sub-block, which this version of the compiler won't use.
+      if (cursor.SkipBlock())
+        return false;
+      break;
+
+    case llvm::BitstreamEntry::Record:
+      scratch.clear();
+      unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+
+      switch (kind) {
+      case decl_locs_block::BASIC_DECL_LOCS:
+        BasicDeclLocsData = blobData;
+        break;
+      case decl_locs_block::TEXT_DATA:
+        SourceLocsTextData = blobData;
+        break;
+      case decl_locs_block::DECL_USRS:
+        DeclUSRsTable = readDeclUSRsTable(scratch, blobData);
+        break;
+      default:
+        // Unknown index kind, which this version of the compiler won't use.
+        break;
+      }
+      break;
+    }
+  }
+
+  return false;
+}
+
+bool ModuleFile::readModuleSourceInfoIfPresent() {
+  if (!this->ModuleSourceInfoInputBuffer)
+    return true;
+
+  llvm::BitstreamCursor infoCursor{ModuleSourceInfoInputBuffer->getMemBufferRef()};
+  if (!checkModuleSignature(infoCursor, SWIFTSOURCEINFO_SIGNATURE) ||
+      !enterTopLevelModuleBlock(infoCursor, MODULE_SOURCEINFO_BLOCK_ID)) {
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  llvm::BitstreamEntry topLevelEntry;
+
+  bool hasValidControlBlock = false;
+  ValidationInfo info;
+
+  while (!infoCursor.AtEndOfStream()) {
+    topLevelEntry = infoCursor.advance(AF_DontPopBlockAtEnd);
+    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry.ID) {
+    case CONTROL_BLOCK_ID: {
+      infoCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+
+      info = validateControlBlock(infoCursor, scratch,
+                                  {SWIFTSOURCEINFO_VERSION_MAJOR,
+                                   SWIFTSOURCEINFO_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
+      if (info.status != Status::Valid)
+        return false;
+      // Check that the swiftsourceinfo is actually for this module.
+      if (info.name != Name)
+        return false;
+      hasValidControlBlock = true;
+      break;
+    }
+
+    case DECL_LOCS_BLOCK_ID: {
+      if (!hasValidControlBlock || !readDeclLocsBlock(infoCursor))
+        return false;
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (infoCursor.SkipBlock())
+        return false;
+      break;
+    }
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+    return false;
+
+  return true;
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework, serialization::ValidationInfo &info,
     serialization::ExtendedValidationInfo *extInfo)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
+      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
       DeserializedTypeCallback([](Type ty) {}) {
-  assert(getStatus() == Status::Valid);
+  assert(!hasError());
   Bits.IsFramework = isFramework;
 
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -1251,7 +1393,7 @@ ModuleFile::ModuleFile(
 
   if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
-    error();
+    info.status = error(Status::Malformed);
     return;
   }
 
@@ -1290,7 +1432,7 @@ ModuleFile::ModuleFile(
 
     case INPUT_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1311,7 +1453,7 @@ ModuleFile::ModuleFile(
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
-            error();
+            info.status = error(Status::Malformed);
             return;
           }
           Dependencies.push_back({blobData, importKind.getValue(), scoped});
@@ -1351,9 +1493,8 @@ ModuleFile::ModuleFile(
           SearchPaths.push_back({blobData, isFramework, isSystem});
           break;
         }
-        case input_block::PARSEABLE_INTERFACE_PATH: {
-          if (extInfo)
-            extInfo->setParseableInterface(blobData);
+        case input_block::MODULE_INTERFACE_PATH: {
+          ModuleInterfacePath = blobData;
           break;
         }
         default:
@@ -1367,14 +1508,14 @@ ModuleFile::ModuleFile(
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock)
-        error();
+        info.status = error(Status::Malformed);
 
       break;
     }
 
     case DECLS_AND_TYPES_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1383,11 +1524,11 @@ ModuleFile::ModuleFile(
       DeclTypeCursor = cursor;
       DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID);
       if (DeclTypeCursor.advance().Kind == llvm::BitstreamEntry::Error)
-        error();
+        info.status = error(Status::Malformed);
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1395,7 +1536,7 @@ ModuleFile::ModuleFile(
 
     case IDENTIFIER_DATA_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1422,7 +1563,7 @@ ModuleFile::ModuleFile(
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1431,7 +1572,7 @@ ModuleFile::ModuleFile(
 
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock || !readIndexBlock(cursor)) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1444,7 +1585,7 @@ ModuleFile::ModuleFile(
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1457,7 +1598,7 @@ ModuleFile::ModuleFile(
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1467,7 +1608,7 @@ ModuleFile::ModuleFile(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1475,12 +1616,13 @@ ModuleFile::ModuleFile(
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
-    error();
+    info.status = error(Status::Malformed);
     return;
   }
-
+  // Read source info file.
+  readModuleSourceInfoIfPresent();
   if (!readModuleDocIfPresent()) {
-    error(Status::MalformedDocumentation);
+    info.status = error(Status::MalformedDocumentation);
     return;
   }
 }
@@ -1490,7 +1632,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                             bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  assert(getStatus() == Status::Valid && "invalid module file");
+  assert(!hasError() && "error already detected; should not call this");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
@@ -1612,11 +1754,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                                            None);
   }
 
-  return getStatus();
+  return Status::Valid;
 }
 
 std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
-  assert(getStatus() != Status::Valid);
+  assert(hasError());
 
   // Today, the only buffer that might have diagnostics in them is the input
   // buffer, and even then only if it has imported module contents.
@@ -1999,7 +2141,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     DeclMemberTablesCursor.JumpToBit(subTableOffset);
     auto entry = DeclMemberTablesCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
+      fatal();
       return None;
     }
     SmallVector<uint64_t, 64> scratch;
@@ -2215,34 +2357,70 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 
   if (!DeclCommentTable)
     return None;
-
   if (D->isImplicit())
     return None;
-
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    // Compute the USR.
-    llvm::SmallString<128> USRBuffer;
-    {
-      llvm::raw_svector_ostream OS(USRBuffer);
-      if (ide::printExtensionUSR(ED, OS))
-        return None;
-    }
-     return getCommentForDeclByUSR(USRBuffer.str());
-  }
-
-  auto *VD = dyn_cast<ValueDecl>(D);
-  if (!VD)
-    return None;
-
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
-  {
-    llvm::raw_svector_ostream OS(USRBuffer);
-    if (ide::printDeclUSR(VD, OS))
-      return None;
-  }
+  llvm::raw_svector_ostream OS(USRBuffer);
+  if (ide::printDeclUSR(D, OS))
+    return None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+Optional<BasicDeclLocs>
+ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
+  assert(D);
+
+  // Keep these as assertions instead of early exits to ensure that we are not
+  // doing extra work.  These cases should be handled by clients of this API.
+  assert(!D->hasClangNode() &&
+         "cannot find comments for Clang decls in Swift modules");
+  assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
+         "Decl is from a different serialized file");
+  if (!DeclUSRsTable)
+    return None;
+  // Future compilers may not provide BasicDeclLocsData anymore.
+  if (BasicDeclLocsData.empty())
+    return None;
+  if (D->isImplicit())
+    return None;
+  // Compute the USR.
+  llvm::SmallString<128> USRBuffer;
+  llvm::raw_svector_ostream OS(USRBuffer);
+  if (ide::printDeclUSR(D, OS))
+    return None;
+
+  auto It = DeclUSRsTable->find(OS.str());
+  if (It == DeclUSRsTable->end())
+    return None;
+  auto UsrId = *It;
+  uint32_t NumSize = 4;
+  // Size of BasicDeclLocs in the buffer.
+  // FilePathOffset + LocNum * LineColumn
+  uint32_t LineColumnCount = 3;
+  uint32_t RecordSize = NumSize + NumSize * 2 * LineColumnCount;
+  uint32_t RecordOffset = RecordSize * UsrId;
+  assert(RecordOffset < BasicDeclLocsData.size());
+  assert(BasicDeclLocsData.size() % RecordSize == 0);
+  BasicDeclLocs Result;
+  auto *Record = BasicDeclLocsData.data() + RecordOffset;
+  auto ReadNext = [&Record]() {
+    return endian::readNext<uint32_t, little, unaligned>(Record);
+  };
+
+  auto FilePath = SourceLocsTextData.substr(ReadNext());
+  size_t TerminatorOffset = FilePath.find('\0');
+  assert(TerminatorOffset != StringRef::npos && "unterminated string data");
+  Result.SourceFilePath = FilePath.slice(0, TerminatorOffset);
+#define READ_FIELD(X)                                                         \
+Result.X.Line = ReadNext();                                                   \
+Result.X.Column = ReadNext();
+  READ_FIELD(Loc)
+  READ_FIELD(StartLoc)
+  READ_FIELD(EndLoc)
+#undef READ_FIELD
+  return Result;
 }
 
 const static StringRef Separator = "/";
@@ -2355,7 +2533,7 @@ bool SerializedASTFile::hasEntryPoint() const {
 }
 
 bool SerializedASTFile::getAllGenericSignatures(
-                       SmallVectorImpl<GenericSignature*> &genericSignatures) {
+                       SmallVectorImpl<GenericSignature> &genericSignatures) {
   genericSignatures.clear();
   for (unsigned index : indices(File.GenericSignatures)) {
     if (auto genericSig = File.getGenericSignature(index + 1))

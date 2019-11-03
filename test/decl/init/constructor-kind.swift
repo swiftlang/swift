@@ -52,7 +52,9 @@ struct SomeStruct {
   init() {
     self.init()
     self.width = Measurement.self.init(val: width) // expected-error {{cannot convert value of type 'Measurement' to expected argument type 'Int'}}
+    // expected-error@-1 {{'let' property 'width' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
     self.height = Measurement.self.init(val: height) // expected-error {{cannot convert value of type 'Measurement' to expected argument type 'Int'}}
+    // expected-error@-1 {{'let' property 'height' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
   // Designated initializer

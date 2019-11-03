@@ -28,16 +28,8 @@ llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     llvm::cl::desc("Don't abort compliation if the memory lifetime checker "
                    "detects an error."));
 
-namespace swift {
-namespace {
-
-//===----------------------------------------------------------------------===//
-//                            Utility functions
-//===----------------------------------------------------------------------===//
-
 /// Debug dump a location bit vector.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              const SmallBitVector &bits) {
+void swift::printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits) {
   const char *separator = "";
   OS << '[';
   for (int idx = bits.find_first(); idx >= 0; idx = bits.find_next(idx)) {
@@ -45,8 +37,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
     separator = ",";
   }
   OS << ']';
-  return OS;
 }
+
+void swift::dumpBits(const SmallBitVector &bits) {
+  llvm::dbgs() << bits << '\n';
+}
+
+namespace swift {
+namespace {
+
+//===----------------------------------------------------------------------===//
+//                            Utility functions
+//===----------------------------------------------------------------------===//
 
 /// Enlarge the bitset if needed to set the bit with \p idx.
 static void setBitAndResize(SmallBitVector &bits, unsigned idx) {
@@ -73,6 +75,17 @@ static bool allUsesInSameBlock(AllocStackInst *ASI) {
   return numDeallocStacks == 1;
 }
 
+static bool shouldTrackLocation(SILType ty, SILFunction *function) {
+  // Ignore empty tuples and empty structs.
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    return tupleTy->getNumElements() != 0;
+  }
+  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
+    return decl->getStoredProperties().size() != 0;
+  }
+  return true;
+}
+
 } // anonymous namespace
 } // namespace swift
 
@@ -89,6 +102,15 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
     "sub-locations can only be introduced with struct/tuple_element_addr");
   setBitAndResize(subLocations, index);
   setBitAndResize(selfAndParents, index);
+}
+
+void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment) {
+  SILFunction *function = representativeValue->getFunction();
+  if (shouldTrackLocation(ty, function)) {
+    numFieldsNotCoveredBySubfields += increment;
+    if (!ty.isTrivial(*function))
+      numNonTrivialFieldsNotCovered += increment;
+  }
 }
 
 static SILValue getBaseValue(SILValue addr) {
@@ -146,6 +168,12 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   SILFunction *function = loc->getFunction();
   assert(function && "cannot analyze a SILValue which is not in a function");
 
+  // Ignore trivial types to keep the number of locations small. Trivial types
+  // are not interesting anyway, because such memory locations are not
+  // destroyed.
+  if (loc->getType().isTrivial(*function))
+    return;
+
   if (!shouldTrackLocation(loc->getType(), function))
     return;
 
@@ -185,24 +213,39 @@ void MemoryLocations::handleSingleBlockLocations(
   clear();
 }
 
+const MemoryLocations::Bits &MemoryLocations::getNonTrivialLocations() {
+  if (nonTrivialLocations.empty()) {
+    // Compute the bitset lazily.
+    nonTrivialLocations.resize(getNumLocations());
+    nonTrivialLocations.reset();
+    unsigned idx = 0;
+    for (Location &loc : locations) {
+      initFieldsCounter(loc);
+      if (loc.numNonTrivialFieldsNotCovered != 0)
+        nonTrivialLocations.set(idx);
+      ++idx;
+    }
+  }
+  return nonTrivialLocations;
+}
+
 void MemoryLocations::dump() const {
   unsigned idx = 0;
   for (const Location &loc : locations) {
     llvm::dbgs() << "location #" << idx << ": sublocs=" << loc.subLocations
                  << ", parent=" << loc.parentIdx
                  << ", parentbits=" << loc.selfAndParents
+                 << ", #f=" << loc.numFieldsNotCoveredBySubfields
+                 << ", #ntf=" << loc.numNonTrivialFieldsNotCovered
                  << ": " << loc.representativeValue;
     idx++;
   }
 }
 
-void MemoryLocations::dumpBits(const Bits &bits) {
-  llvm::errs() << bits << '\n';
-}
-
 void MemoryLocations::clear() {
   locations.clear();
   addr2LocIdx.clear();
+  nonTrivialLocations.clear();
 }
 
 bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx,
@@ -235,18 +278,26 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
                                             collectedVals, subLocationMap))
           return false;
         break;
-      case SILInstructionKind::StoreInst:
-        if (cast<StoreInst>(user)->getOwnershipQualifier() ==
-              StoreOwnershipQualifier::Trivial) {
+      case SILInstructionKind::StoreInst: {
+        auto *SI = cast<StoreInst>(user);
+        if (!SI->getSrc()->getType().isTrivial(*SI->getFunction()) &&
+            SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial) {
+          // Storing a trivial value into a non trivial location can happen in
+          // case of enums, e.g. store of Optional.none to an Optional<T> where T
+          // is not trivial.
+          // In such a case it can happen that the Optional<T> is not destoyed.
+          // We currently cannot handle such patterns.
           return false;
         }
         break;
+      }
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::EndAccessInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::CopyAddrInst:
       case SILInstructionKind::YieldInst:
@@ -264,16 +315,15 @@ bool MemoryLocations::analyzeAddrProjection(
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
 
   if (!shouldTrackLocation(projection->getType(), projection->getFunction()))
-    return true;
+    return false;
 
   unsigned &subLocIdx = subLocationMap[std::make_pair(parentLocIdx, fieldNr)];
   if (subLocIdx == 0) {
     subLocIdx = locations.size();
     assert(subLocIdx > 0);
-    Location &parentLoc = locations[parentLocIdx];
-
     locations.push_back(Location(projection, subLocIdx, parentLocIdx));
 
+    Location &parentLoc = locations[parentLocIdx];
     locations.back().selfAndParents |= parentLoc.selfAndParents;
 
     int idx = (int)parentLocIdx;
@@ -285,7 +335,8 @@ bool MemoryLocations::analyzeAddrProjection(
 
     initFieldsCounter(parentLoc);
     assert(parentLoc.numFieldsNotCoveredBySubfields >= 1);
-    --parentLoc.numFieldsNotCoveredBySubfields;
+    parentLoc.updateFieldCounters(projection->getType(), -1);
+
     if (parentLoc.numFieldsNotCoveredBySubfields == 0) {
       int idx = (int)parentLocIdx;
       do {
@@ -300,7 +351,7 @@ bool MemoryLocations::analyzeAddrProjection(
                                       subLocationMap)) {
     return false;
   }
-  addr2LocIdx[projection] = subLocIdx;
+  registerProjection(projection, subLocIdx);
   collectedVals.push_back(projection);
   return true;
 }
@@ -309,28 +360,31 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
   if (loc.numFieldsNotCoveredBySubfields >= 0)
     return;
 
+  assert(loc.numNonTrivialFieldsNotCovered < 0);
+
   loc.numFieldsNotCoveredBySubfields = 0;
+  loc.numNonTrivialFieldsNotCovered = 0;
   SILFunction *function = loc.representativeValue->getFunction();
   SILType ty = loc.representativeValue->getType();
-  if (NominalTypeDecl *decl = ty.getNominalOrBoundGenericNominal()) {
+  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
     if (decl->isResilient(function->getModule().getSwiftModule(),
                           function->getResilienceExpansion())) {
       loc.numFieldsNotCoveredBySubfields = INT_MAX;
       return;
     }
+    SILModule &module = function->getModule();
     for (VarDecl *field : decl->getStoredProperties()) {
-      SILType fieldTy = ty.getFieldType(field, function->getModule());
-      if (shouldTrackLocation(fieldTy, function))
-        ++loc.numFieldsNotCoveredBySubfields;
+      loc.updateFieldCounters(ty.getFieldType(field, module), +1);
     }
     return;
   }
-  auto tupleTy = ty.castTo<TupleType>();
-  for (unsigned idx = 0, end = tupleTy->getNumElements(); idx < end; ++idx) {
-    SILType eltTy = ty.getTupleElementType(idx);
-    if (shouldTrackLocation(eltTy, function))
-      ++loc.numFieldsNotCoveredBySubfields;
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    for (unsigned idx = 0, end = tupleTy->getNumElements(); idx < end; ++idx) {
+      loc.updateFieldCounters(ty.getTupleElementType(idx), +1);
+    }
+    return;
   }
+  loc.updateFieldCounters(ty, +1);
 }
 
 
@@ -396,7 +450,7 @@ void MemoryDataflow::exitReachableAnalysis() {
   }
 }
 
-void MemoryDataflow::solveDataflowForward() {
+void MemoryDataflow::solveForward(JoinOperation join) {
   // Pretty standard data flow solving.
   bool changed = false;
   bool firstRound = true;
@@ -406,7 +460,7 @@ void MemoryDataflow::solveDataflowForward() {
       Bits bits = st.entrySet;
       assert(!bits.empty());
       for (SILBasicBlock *pred : st.block->getPredecessorBlocks()) {
-        bits &= block2State[pred]->exitSet;
+        join(bits, block2State[pred]->exitSet);
       }
       if (firstRound || bits != st.entrySet) {
         changed = true;
@@ -420,7 +474,19 @@ void MemoryDataflow::solveDataflowForward() {
   } while (changed);
 }
 
-void MemoryDataflow::solveDataflowBackward() {
+void MemoryDataflow::solveForwardWithIntersect() {
+  solveForward([](Bits &entry, const Bits &predExit){
+    entry &= predExit;
+  });
+}
+
+void MemoryDataflow::solveForwardWithUnion() {
+  solveForward([](Bits &entry, const Bits &predExit){
+    entry |= predExit;
+  });
+}
+
+void MemoryDataflow::solveBackward(JoinOperation join) {
   // Pretty standard data flow solving.
   bool changed = false;
   bool firstRound = true;
@@ -430,7 +496,7 @@ void MemoryDataflow::solveDataflowBackward() {
       Bits bits = st.exitSet;
       assert(!bits.empty());
       for (SILBasicBlock *succ : st.block->getSuccessorBlocks()) {
-        bits &= block2State[succ]->entrySet;
+        join(bits, block2State[succ]->entrySet);
       }
       if (firstRound || bits != st.exitSet) {
         changed = true;
@@ -442,6 +508,18 @@ void MemoryDataflow::solveDataflowBackward() {
     }
     firstRound = false;
   } while (changed);
+}
+
+void MemoryDataflow::solveBackwardWithIntersect() {
+  solveBackward([](Bits &entry, const Bits &predExit){
+    entry &= predExit;
+  });
+}
+
+void MemoryDataflow::solveBackwardWithUnion() {
+  solveBackward([](Bits &entry, const Bits &predExit){
+    entry |= predExit;
+  });
 }
 
 void MemoryDataflow::dump() const {
@@ -485,11 +563,11 @@ class MemoryLifetimeVerifier {
 
   /// Require that all the subLocation bits of the location, associated with
   /// \p addr, are clear in \p bits.
-  void requireBitsClear(Bits &bits, SILValue addr, SILInstruction *where);
+  void requireBitsClear(const Bits &bits, SILValue addr, SILInstruction *where);
 
   /// Require that all the subLocation bits of the location, associated with
   /// \p addr, are set in \p bits.
-  void requireBitsSet(Bits &bits, SILValue addr, SILInstruction *where);
+  void requireBitsSet(const Bits &bits, SILValue addr, SILInstruction *where);
 
   /// Handles locations of the predecessor's terminator, which are only valid
   /// in \p block.
@@ -555,7 +633,7 @@ void MemoryLifetimeVerifier::require(const Bits &wrongBits,
   require(wrongBits.none(), complaint, wrongBits.find_first(), where);
 }
 
-void MemoryLifetimeVerifier::requireBitsClear(Bits &bits, SILValue addr,
+void MemoryLifetimeVerifier::requireBitsClear(const Bits &bits, SILValue addr,
                                              SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
     require(bits & loc->subLocations,
@@ -563,7 +641,7 @@ void MemoryLifetimeVerifier::requireBitsClear(Bits &bits, SILValue addr,
   }
 }
 
-void MemoryLifetimeVerifier::requireBitsSet(Bits &bits, SILValue addr,
+void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
                                            SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
     require(~bits & loc->subLocations,
@@ -623,12 +701,12 @@ void MemoryLifetimeVerifier::initDataflowInBlock(BlockState &state) {
         auto *CAI = cast<CopyAddrInst>(&I);
         if (CAI->isTakeOfSrc())
           state.killBits(CAI->getSrc(), locations);
-        if (CAI->isInitializationOfDest())
-          state.genBits(CAI->getDest(), locations);
+        state.genBits(CAI->getDest(), locations);
         break;
       }
       case SILInstructionKind::DestroyAddrInst:
-        state.killBits(cast<DestroyAddrInst>(&I)->getOperand(), locations);
+      case SILInstructionKind::DeallocStackInst:
+        state.killBits(I.getOperand(0), locations);
         break;
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst: {
@@ -724,9 +802,10 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
     }
   }
 
+  const Bits &nonTrivialLocations = locations.getNonTrivialLocations();
   Bits bits(locations.getNumLocations());
   for (BlockState &st : dataFlow) {
-    if (!st.reachableFromEntry)
+    if (!st.reachableFromEntry || !st.exitReachable)
       continue;
 
     // Check all instructions in the block.
@@ -737,7 +816,7 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
     for (SILBasicBlock *pred : st.block->getPredecessorBlocks()) {
       BlockState *predState = dataFlow.getState(pred);
       if (predState->reachableFromEntry) {
-        require(st.entrySet ^ predState->exitSet,
+        require((st.entrySet ^ predState->exitSet) & nonTrivialLocations,
           "lifetime mismatch in predecessors", &*st.block->begin());
       }
     }
@@ -750,13 +829,13 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
       case SILInstructionKind::UnwindInst:
         require(expectedReturnBits & ~st.exitSet,
           "indirect argument is not alive at function return", term);
-        require(st.exitSet & ~expectedReturnBits,
+        require(st.exitSet & ~expectedReturnBits & nonTrivialLocations,
           "memory is initialized at function return but shouldn't", term);
         break;
       case SILInstructionKind::ThrowInst:
         require(expectedThrowBits & ~st.exitSet,
           "indirect argument is not alive at throw", term);
-        require(st.exitSet & ~expectedThrowBits,
+        require(st.exitSet & ~expectedThrowBits & nonTrivialLocations,
           "memory is initialized at throw but shouldn't", term);
         break;
       default:
@@ -767,6 +846,7 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
 
 void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
   setBitsOfPredecessor(bits, block);
+  const Bits &nonTrivialLocations = locations.getNonTrivialLocations();
 
   for (SILInstruction &I : *block) {
     switch (I.getKind()) {
@@ -789,18 +869,13 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         auto *SI = cast<StoreInst>(&I);
         switch (SI->getOwnershipQualifier()) {
           case StoreOwnershipQualifier::Init:
-            requireBitsClear(bits, SI->getDest(), &I);
+            requireBitsClear(bits & nonTrivialLocations, SI->getDest(), &I);
             locations.setBits(bits, SI->getDest());
             break;
           case StoreOwnershipQualifier::Assign:
-            requireBitsSet(bits, SI->getDest(), &I);
+            requireBitsSet(bits | ~nonTrivialLocations, SI->getDest(), &I);
             break;
           case StoreOwnershipQualifier::Trivial:
-            // A trivial store is either an init or an assign, so we don't
-            // require anything. But we have to set the bits, because in case of
-            // enums a trivial store might assign a non-trivial enum.
-            // Example: store of Optional.none to an Optional<T> where T is not
-            // trivial.
             locations.setBits(bits, SI->getDest());
             break;
           case StoreOwnershipQualifier::Unqualified:
@@ -814,16 +889,16 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         if (CAI->isTakeOfSrc())
           locations.clearBits(bits, CAI->getSrc());
         if (CAI->isInitializationOfDest()) {
-          requireBitsClear(bits, CAI->getDest(), &I);
-          locations.setBits(bits, CAI->getDest());
+          requireBitsClear(bits & nonTrivialLocations, CAI->getDest(), &I);
         } else {
-          requireBitsSet(bits, CAI->getDest(), &I);
+          requireBitsSet(bits | ~nonTrivialLocations, CAI->getDest(), &I);
         }
+        locations.setBits(bits, CAI->getDest());
         break;
       }
       case SILInstructionKind::DestroyAddrInst: {
         SILValue opVal = cast<DestroyAddrInst>(&I)->getOperand();
-        requireBitsSet(bits, opVal, &I);
+        requireBitsSet(bits | ~nonTrivialLocations, opVal, &I);
         locations.clearBits(bits, opVal);
         break;
       }
@@ -852,9 +927,14 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::DebugValueAddrInst:
         requireBitsSet(bits, cast<DebugValueAddrInst>(&I)->getOperand(), &I);
         break;
-      case SILInstructionKind::DeallocStackInst:
-        requireBitsClear(bits, cast<DeallocStackInst>(&I)->getOperand(), &I);
+      case SILInstructionKind::DeallocStackInst: {
+        SILValue opVal = cast<DeallocStackInst>(&I)->getOperand();
+        requireBitsClear(bits & nonTrivialLocations, opVal, &I);
+        // Needed to clear any bits of trivial locations (which are not required
+        // to be zero).
+        locations.clearBits(bits, opVal);
         break;
+      }
       default:
         break;
     }
@@ -871,7 +951,8 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       locations.clearBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
-      requireBitsClear(bits, argumentOp.get(), applyInst);
+      requireBitsClear(bits & locations.getNonTrivialLocations(),
+                       argumentOp.get(), applyInst);
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
@@ -894,15 +975,15 @@ void MemoryLifetimeVerifier::verify() {
   if (locations.getNumLocations() > 0) {
     MemoryDataflow dataFlow(function, locations.getNumLocations());
     dataFlow.entryReachabilityAnalysis();
+    dataFlow.exitReachableAnalysis();
     initDataflow(dataFlow);
-    dataFlow.solveDataflowForward();
+    dataFlow.solveForwardWithIntersect();
     checkFunction(dataFlow);
   }
   // Second step: handle single-block locations.
   locations.handleSingleBlockLocations([this](SILBasicBlock *block) {
     Bits bits(locations.getNumLocations());
     checkBlock(block, bits);
-    assert(bits.none() || DontAbortOnMemoryLifetimeErrors);
   });
 }
 

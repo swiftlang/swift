@@ -306,5 +306,27 @@ enum FooEnum {
 }
 // CHECK: }</enum>
 
+firstCall("\(1)", 1)
+// CHECK: <call><name>firstCall</name>(<arg>"\(1)"</arg>, <arg>1</arg>)</call>
+
+secondCall("\(a: {struct Foo {let x = 10}; return Foo().x}())", 1)
+// CHECK: <call><name>secondCall</name>(<arg>"\(a: <call><name><closure><brace>{<struct>struct <name>Foo</name> {<property>let <name>x</name> = 10</property>}</struct>; return <call><name>Foo</name>()</call>.x}</brace></closure></name>()</call>)"</arg>, <arg>1</arg>)</call>
+
+thirdCall("""
+\("""
+  \({
+  return a()
+  }())
+  """)
+""")
+// CHECK: <call><name>thirdCall</name>("""
+// CHECK-NEXT: \("""
+// CHECK-NEXT:   \(<call><name><closure>{
+// CHECK-NEXT:   return <call><name>a</name>()</call>
+// CHECK-NEXT:   }</closure></name>()</call>)
+// CHECK-NEXT:   """)
+// CHECK-NEXT: """)</call>
+
 fourthCall(a: @escaping () -> Int)
 // CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>
+

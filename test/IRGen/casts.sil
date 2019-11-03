@@ -359,3 +359,51 @@ entry(%a : $OA):
   %b = unconditional_checked_cast %a : $OA to $OB
   return %b : $OB
 }
+
+protocol P {}
+protocol PAnyObject: AnyObject {}
+class C {}
+sil_vtable C {}
+
+// CHECK-LABEL: define{{.*}} @cast_protocol_composition_with_anyobject
+// CHECK: [[C:%.*]] = call swiftcc %swift.metadata_response @"$s5casts1CCMa"
+// CHECK: [[C_META:%.*]] = extractvalue %swift.metadata_response [[C]], 0
+// CHECK: call { i8*, i8** } @dynamic_cast_existential_1_superclass_conditional({{.*}}, %swift.type* [[C_META]], %swift.protocol* {{.*}}@"$s5casts1PMp"
+
+sil @cast_protocol_composition_with_anyobject : $@convention(thin) (@owned P & AnyObject ) -> @owned Optional<C & P> {
+bb0(%0: $P & AnyObject):
+  checked_cast_br %0 : $P & AnyObject to $C & P, bb1, bb2
+
+bb1(%2 : $C & P):
+  %3 = enum $Optional<C & P>, #Optional.some!enumelt.1, %2 : $C & P
+  br bb3(%3 : $Optional<C & P>)
+
+bb2:
+  strong_release %0 : $P & AnyObject
+  %6 = enum $Optional<C & P>, #Optional.none!enumelt
+  br bb3(%6 : $Optional<C & P>)
+
+bb3(%11 : $Optional<C & P>):
+  return %11 : $Optional<C & P>
+}
+
+// CHECK-LABEL: define{{.*}} @cast_protocol_with_anyobject
+// CHECK: [[C:%.*]] = call swiftcc %swift.metadata_response @"$s5casts1CCMa"
+// CHECK: [[C_META:%.*]] = extractvalue %swift.metadata_response [[C]], 0
+// CHECK: call { i8*, i8** } @dynamic_cast_existential_1_superclass_conditional({{.*}}, %swift.type* [[C_META]], %swift.protocol* {{.*}}@"$s5casts10PAnyObjectMp"
+sil @cast_protocol_with_anyobject : $@convention(thin) (@owned PAnyObject ) -> @owned Optional<C & PAnyObject> {
+bb0(%0: $PAnyObject):
+  checked_cast_br %0 : $PAnyObject to $C & PAnyObject, bb1, bb2
+
+bb1(%2 : $C & PAnyObject):
+  %3 = enum $Optional<C & PAnyObject>, #Optional.some!enumelt.1, %2 : $C & PAnyObject
+  br bb3(%3 : $Optional<C & PAnyObject>)
+
+bb2:
+  strong_release %0 : $PAnyObject
+  %6 = enum $Optional<C & PAnyObject>, #Optional.none!enumelt
+  br bb3(%6 : $Optional<C & PAnyObject>)
+
+bb3(%11 : $Optional<C & PAnyObject>):
+  return %11 : $Optional<C & PAnyObject>
+}

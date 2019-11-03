@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -725,6 +726,7 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
+  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
@@ -811,7 +813,8 @@ public:
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
-  clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
+  clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
+                                           CanSILFunctionType funcTy);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -823,7 +826,7 @@ public:
   
   CanType getRuntimeReifiedType(CanType type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
-  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
   std::pair<CanType, ProtocolConformanceRef>
   substOpaqueTypesWithUnderlyingTypes(CanType type,
                                       ProtocolConformanceRef conformance);
@@ -1067,14 +1070,18 @@ public:
   llvm::SetVector<CanType> BuiltinTypes;
 
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  getTypeRef(Type type, GenericSignature genericSig, MangledTypeRefRole role);
   
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(CanType type, MangledTypeRefRole role);
-  
+  getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
+
+  std::pair<llvm::Constant *, unsigned>
+  getLoweredTypeRef(SILType loweredType, CanGenericSignature genericSig,
+                    MangledTypeRefRole role);
+
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
-                                            GenericSignature *genericSig,
+                                            GenericSignature genericSig,
                                             bool shouldSetLowBit);
   llvm::Constant *getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
@@ -1109,7 +1116,8 @@ public:
                                              CanSILFunctionType substCalleeType,
                                              SubstitutionMap subs,
                                              const HeapLayout &layout);
-  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+  llvm::Constant *getAddrOfBoxDescriptor(SILType boxedType,
+                                         CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
   llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);

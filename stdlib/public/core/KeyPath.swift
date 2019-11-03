@@ -357,7 +357,7 @@ public class ReferenceWritableKeyPath<
   internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
-    var address: UnsafeMutablePointer<Value> = withBuffer {
+    let address: UnsafeMutablePointer<Value> = withBuffer {
       var buffer = $0
       // Project out the reference prefix.
       var base: Any = origBase

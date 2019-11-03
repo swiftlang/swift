@@ -15,16 +15,16 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/StringSwitch.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -899,7 +899,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingReleases(
   // release.
   bool isTrackingInArgs = isOneOfConventions(SILArgumentConvention::Indirect_In,
                                              ArgumentConventions);
-  for (auto &inst : reversed(*block)) {
+  for (auto &inst : llvm::reverse(*block)) {
     if (isTrackingInArgs && isa<DestroyAddrInst>(inst)) {
       // It is probably a destroy addr for an @in argument.
       continue;

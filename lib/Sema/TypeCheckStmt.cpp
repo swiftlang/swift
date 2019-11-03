@@ -24,11 +24,13 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -518,19 +520,17 @@ public:
       }
     }
 
+    if (EndTypeCheckLoc.isValid()) {
+      assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+    }
+
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
-      }
-
-      // If we are performing code-completion inside a function builder body,
-      // suppress diagnostics to workaround typechecking performance problems.
-      if (func->getFunctionBuilderType() &&
-          TC.Context.SourceMgr.rangeContainsCodeCompletionLoc(
-              func->getBody()->getSourceRange())) {
-        options |= TypeCheckExprFlags::SuppressDiagnostics;
       }
     }
 
@@ -743,15 +743,15 @@ public:
 
 
     // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *sequenceProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
+    ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+        TC.Context, S->getForLoc(), KnownProtocolKind::Sequence);
     if (!sequenceProto) {
       return nullptr;
     }
 
     // Retrieve the 'Iterator' protocol.
-    ProtocolDecl *iteratorProto =
-        TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
+    ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
+        TC.Context, S->getForLoc(), KnownProtocolKind::IteratorProtocol);
     if (!iteratorProto) {
       return nullptr;
     }
@@ -767,17 +767,17 @@ public:
         TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
                                         ConformanceCheckFlags::InExpression,
                                         sequence->getLoc());
-      if (!conformance)
+      if (conformance.isInvalid())
         return nullptr;
       S->setSequenceConformance(conformance);
 
-      iteratorTy = conformance->getTypeWitnessByName(sequenceType,
-                                                     TC.Context.Id_Iterator);
-      if (!iteratorTy)
+      iteratorTy = conformance.getTypeWitnessByName(sequenceType,
+                                                    TC.Context.Id_Iterator);
+      if (iteratorTy->hasError())
         return nullptr;
 
-      auto witness = conformance->getWitnessByName(
-          sequenceType, TC.Context.Id_makeIterator);
+      auto witness = conformance.getWitnessByName(sequenceType,
+                                                  TC.Context.Id_makeIterator);
       if (!witness)
         return nullptr;
       S->setMakeIterator(witness);
@@ -792,7 +792,6 @@ public:
           /*IsStatic*/ false, VarDecl::Introducer::Var,
           /*IsCaptureList*/ false, S->getInLoc(),
           TC.Context.getIdentifier(name), DC);
-      iterator->setType(iteratorTy);
       iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
       iterator->setImplicit();
       S->setIteratorVar(iterator);
@@ -802,9 +801,8 @@ public:
 
       // TODO: test/DebugInfo/iteration.swift requires this extra info to
       // be around.
-      auto nextResultType =
-          OptionalType::get(conformance->getTypeWitnessByName(
-                                sequenceType, TC.Context.Id_Element));
+      auto nextResultType = OptionalType::get(conformance.getTypeWitnessByName(
+          sequenceType, TC.Context.Id_Element));
       PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
@@ -833,12 +831,12 @@ public:
     auto genConformance = TypeChecker::conformsToProtocol(
         iteratorTy, iteratorProto, DC, ConformanceCheckFlags::InExpression,
         sequence->getLoc());
-    if (!genConformance)
+    if (genConformance.isInvalid())
       return nullptr;
 
-    Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
-                                                        TC.Context.Id_Element);
-    if (!elementTy)
+    Type elementTy =
+        genConformance.getTypeWitnessByName(iteratorTy, TC.Context.Id_Element);
+    if (elementTy->hasError())
       return nullptr;
 
     auto *varRef =
@@ -850,7 +848,7 @@ public:
     S->setIteratorVarRef(varRef);
 
     auto witness =
-        genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
+        genConformance.getWitnessByName(iteratorTy, TC.Context.Id_next);
     S->setIteratorNext(witness);
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
@@ -1065,7 +1063,9 @@ public:
 
       // If that failed, mark any variables binding pieces of the pattern
       // as invalid to silence follow-on errors.
-      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+      pattern->forEachVariable([&](VarDecl *VD) {
+        VD->setInvalid();
+      });
     }
     labelItem.setPattern(pattern);
 
@@ -1136,13 +1136,13 @@ public:
         }
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        if (vd->hasType() && initialCaseVarDecl->hasType() &&
+        if (vd->getInterfaceType() && initialCaseVarDecl->getType() &&
             !initialCaseVarDecl->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
-          vd->markInvalid();
-          initialCaseVarDecl->markInvalid();
+          vd->setInvalid();
+          initialCaseVarDecl->setInvalid();
         }
 
         if (initialCaseVarDecl->isLet() == vd->isLet()) {
@@ -1162,8 +1162,8 @@ public:
         if (foundVP)
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-        vd->markInvalid();
-        initialCaseVarDecl->markInvalid();
+        vd->setInvalid();
+        initialCaseVarDecl->setInvalid();
       }
     });
 
@@ -1230,8 +1230,8 @@ public:
           TC.diagnose(previous->getLoc(),
                       diag::type_mismatch_fallthrough_pattern_list,
                       previous->getType(), expected->getType());
-          previous->markInvalid();
-          expected->markInvalid();
+          previous->setInvalid();
+          expected->setInvalid();
         }
 
         // Ok, we found our match. Make the previous fallthrough statement var
@@ -1322,8 +1322,6 @@ public:
           if (!prev->hasName() || expected->getName() != prev->getName()) {
             continue;
           }
-          if (prev->hasType())
-            expected->setType(prev->getType());
           if (prev->hasInterfaceType())
             expected->setInterfaceType(prev->getInterfaceType());
           break;
@@ -1468,7 +1466,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-        var->markInvalid();
+        var->setInvalid();
       });
     }
 
@@ -1760,9 +1758,9 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   // BraceStmt does not start a TopLevelDecl).
   if (IsBraceStmtFromTopLevelDecl) {
     IsBraceStmtFromTopLevelDecl = false;
-  } else if (BS->getNumElements() > 0) {
+  } else if (!BS->empty()) {
     if (auto stmt =
-            BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt *>()) {
+            BS->getLastElement().dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
         TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
             .fixItReplace(deferStmt->getStartLoc(), "do");
@@ -1784,6 +1782,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         && !TC.Context.LangOpts.DebuggerSupport;
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
+
+      if (EndTypeCheckLoc.isValid()) {
+        assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+               "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+        options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+      }
 
       auto resultTy =
           TC.typeCheckExpression(SubExpr, DC, TypeLoc(), CTP_Unused, options);
@@ -1829,84 +1833,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
-static Optional<unsigned>
-getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
-  ArrayRef<ParamDecl *> params = paramList->getArray();
-  for (unsigned i = 0; i < params.size(); ++i) {
-    if (params[i] == decl) return i;
-  }
-  return None;
-}
-
-static void
-checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
-  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
-    return;
-
-  auto *DC = PD->getInnermostDeclContext();
-  const SourceFile *SF = DC->getParentSourceFile();
-  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
-         "explicit inherited default argument outside of a module interface?");
-
-  // The containing decl should be a designated initializer.
-  auto ctor = dyn_cast<ConstructorDecl>(DC);
-  if (!ctor || ctor->isConvenienceInit()) {
-    TC.diagnose(
-        PD, diag::inherited_default_value_not_in_designated_constructor);
-    return;
-  }
-
-  // The decl it overrides should also be a designated initializer.
-  auto overridden = ctor->getOverriddenDecl();
-  if (!overridden || overridden->isConvenienceInit()) {
-    TC.diagnose(
-        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
-    if (overridden)
-      TC.diagnose(overridden, diag::overridden_here);
-    return;
-  }
-
-  // The corresponding parameter should have a default value.
-  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
-  assert(idx && "containing decl does not contain param?");
-  ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
-  if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
-    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
-    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
-  }
-}
-
-/// Check the default arguments that occur within this pattern.
-void TypeChecker::checkDefaultArguments(ParameterList *params,
-                                        ValueDecl *VD) {
-  for (auto *param : *params) {
-    checkInheritedDefaultValueRestrictions(*this, param);
-    if (!param->getDefaultValue() ||
-        !param->hasInterfaceType() ||
-        param->getInterfaceType()->hasError())
-      continue;
-
-    Expr *e = param->getDefaultValue();
-    auto *initContext = param->getDefaultArgumentInitContext();
-
-    auto resultTy =
-        typeCheckParameterDefault(e, initContext, param->getType(),
-                                  /*isAutoClosure=*/param->isAutoClosure());
-
-    if (resultTy) {
-      param->setDefaultValue(e);
-    } else {
-      param->setDefaultValue(nullptr);
-    }
-
-    checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)contextualizeInitializer(initContext, e);
-  }
-}
-
 static Type getFunctionBuilderType(FuncDecl *FD) {
   Type builderType = FD->getFunctionBuilderType();
 
@@ -1942,10 +1868,10 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   TypeChecker &tc = *static_cast<TypeChecker *>(Context.getLazyResolver());
+  DiagnosticSuppression suppression(tc.Diags);
   auto resultTy =
       tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded |
-                               TypeCheckExprFlags::SuppressDiagnostics);
+                             TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
@@ -1990,8 +1916,8 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
     lookupOptions -= NameLookupFlags::ProtocolMembers;
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    for (auto member : tc.lookupConstructors(fromCtor, superclassTy,
-                                             lookupOptions)) {
+    for (auto member : TypeChecker::lookupConstructors(fromCtor, superclassTy,
+                                                       lookupOptions)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member.getValueDecl());
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
@@ -2139,8 +2065,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
-  tc.validateDecl(AFD);
-  tc.checkDefaultArguments(AFD->getParameters(), AFD);
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)AFD->getInterfaceType();
 
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())
@@ -2158,12 +2084,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
       if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
         // The function returns void.  We don't need an explicit return, no matter
         // what the type of the expression is.  Take the inserted return back out.
-        body->setElement(0, expr);
+        body->setFirstElement(expr);
       }
     }
   } else if (isa<ConstructorDecl>(AFD) &&
-             (body->getNumElements() == 0 ||
-                !isKnownEndOfConstructor(body->getElements().back()))) {
+             (body->empty() ||
+                !isKnownEndOfConstructor(body->getLastElement()))) {
     // For constructors, we make sure that the body ends with a "return" stmt,
     // which we either implicitly synthesize, or the user can write.  This
     // simplifies SILGen.
@@ -2185,12 +2111,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   // that we have eagerly converted something like `{ fatalError() }`
   // into `{ return fatalError() }` that has to be corrected here.
   if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
-    if (auto *stmt = body->getElement(0).dyn_cast<Stmt *>()) {
+    if (auto *stmt = body->getFirstElement().dyn_cast<Stmt *>()) {
       if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
         if (retStmt->isImplicit() && retStmt->hasResult()) {
           auto returnType = retStmt->getResult()->getType();
           if (returnType && returnType->isUninhabited())
-            body->setElement(0, retStmt->getResult());
+            body->setFirstElement(retStmt->getResult());
         }
       }
     }

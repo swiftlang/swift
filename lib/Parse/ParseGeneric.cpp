@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Lexer.h"
@@ -273,17 +274,23 @@ ParserStatus Parser::parseGenericWhereClause(
                                       SyntaxKind::GenericRequirementList);
   bool HasNextReq;
   do {
-    SyntaxParsingContext ReqContext(SyntaxContext, SyntaxContextKind::Syntax);
+    SyntaxParsingContext ReqContext(SyntaxContext,
+                                    SyntaxKind::GenericRequirement);
+    Optional<SyntaxParsingContext> BodyContext;
+    BodyContext.emplace(SyntaxContext);
+
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
     ParserResult<TypeRepr> FirstType = parseType();
 
     if (FirstType.hasCodeCompletion()) {
+      BodyContext->setTransparent();
       Status.setHasCodeCompletion();
       FirstTypeInComplete = true;
     }
 
     if (FirstType.isNull()) {
+      BodyContext->setTransparent();
       Status.setIsParseError();
       break;
     }
@@ -291,7 +298,7 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
-      ReqContext.setCreateSyntax(SyntaxKind::ConformanceRequirement);
+      BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
@@ -331,7 +338,7 @@ ParserStatus Parser::parseGenericWhereClause(
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
-      ReqContext.setCreateSyntax(SyntaxKind::SameTypeRequirement);
+      BodyContext->setCreateSyntax(SyntaxKind::SameTypeRequirement);
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
@@ -353,10 +360,12 @@ ParserStatus Parser::parseGenericWhereClause(
                                                       EqualLoc,
                                                       SecondType.get()));
     } else {
+      BodyContext->setTransparent();
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();
       break;
     }
+    BodyContext.reset();
     HasNextReq = consumeIf(tok::comma);
     // If there's a comma, keep parsing the list.
   } while (HasNextReq);
@@ -371,7 +380,7 @@ ParserStatus Parser::parseGenericWhereClause(
 /// Parse a free-standing where clause attached to a declaration, adding it to
 /// a generic parameter list that may (or may not) already exist.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
+parseFreestandingGenericWhereClause(GenericParamList *genericParams,
                                     WhereClauseKind kind) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
   

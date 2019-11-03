@@ -46,20 +46,25 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
     // FIXME: Print location info if available.
-    switch (Kind) {
-      case DiagnosticKind::Error: OS << "error: "; break;
-      case DiagnosticKind::Warning: OS << "warning: "; break;
-      case DiagnosticKind::Note: OS << "note: "; break;
-      case DiagnosticKind::Remark: OS << "remark: "; break;
+    switch (Info.Kind) {
+    case DiagnosticKind::Error:
+      OS << "error: ";
+      break;
+    case DiagnosticKind::Warning:
+      OS << "warning: ";
+      break;
+    case DiagnosticKind::Note:
+      OS << "note: ";
+      break;
+    case DiagnosticKind::Remark:
+      OS << "remark: ";
+      break;
     }
-    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
+                                           Info.FormatArgs);
   }
 };
 } // end anonymous namespace
@@ -950,7 +955,6 @@ ASTUnitRef ASTProducer::createASTUnit(
 
   if (fileSystem != llvm::vfs::getRealFileSystem()) {
     CompIns.getSourceMgr().setFileSystem(fileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CompIns.setup(Invocation)) {
@@ -1000,7 +1004,8 @@ ASTUnitRef ASTProducer::createASTUnit(
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
       SILOptions SILOpts = Invocation.getSILOptions();
-      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
+      auto &TC = CompIns.getSILTypes();
+      std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, TC, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }
   }

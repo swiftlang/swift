@@ -37,18 +37,8 @@ namespace swift {
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-    /// The active os target (OSX, iOS, Linux, etc.)
-    OS,
-    /// The active arch target (x86_64, i386, arm, arm64, etc.)
-    Arch,
-    /// The active endianness target (big or little)
-    Endianness,
-    /// Runtime support (_ObjC or _Native)
-    Runtime,
-    /// Conditional import of module
-    CanImport,
-    /// Target Environment (currently just 'simulator' or absent)
-    TargetEnvironment,
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
+#include "swift/AST/PlatformConditionKinds.def"
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -212,9 +202,6 @@ namespace swift {
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
-    /// Enable one-way constraints in function builders.
-    bool FunctionBuilderOneWayConstraints = false;
-
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 
@@ -238,10 +225,6 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
-    /// Staging flag for treating inout parameters as Thread Sanitizer
-    /// accesses.
-    bool DisableTsanInoutInstrumentation = false;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -256,20 +239,23 @@ namespace swift {
     /// Default is in \c ParseLangArgs
     ///
     /// This is a staging flag; eventually it will be removed.
-    bool EnableASTScopeLookup = false;
+    bool EnableASTScopeLookup = true;
 
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
     /// Should  we compare to ASTScope-based resolution for debugging?
-    bool CompareToASTScopeLookup = false;
+    bool CrosscheckUnqualifiedLookup = false;
+
+    /// Should  we stress ASTScope-based resolution for debugging?
+    bool StressASTScopeLookup = false;
 
     /// Since some tests fail if the warning is output, use a flag to decide
     /// whether it is. The warning is useful for testing.
     bool WarnIfASTScopeLookup = false;
 
     /// Build the ASTScope tree lazily
-    bool LazyASTScopes = false;
+    bool LazyASTScopes = true;
 
     /// Whether to use the import as member inference system
     ///
@@ -331,6 +317,10 @@ namespace swift {
     /// To experiment with including file-private and private dependency info,
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+
+    /// Whether to enable experimental differentiable programming features:
+    /// `@differentiable` declaration attribute, etc.
+    bool EnableExperimentalDifferentiableProgramming = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -437,21 +427,21 @@ namespace swift {
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
-    /// \param suggestions Populated with suggested replacements
+    /// \param suggestedKind Populated with suggested replacement platform condition
+    /// \param suggestedValues Populated with suggested replacement values
     /// if a match is not found.
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
-      std::vector<StringRef> &suggestions);
+      PlatformConditionKind &suggestedKind,
+      std::vector<StringRef> &suggestedValues);
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {
-      auto code = llvm::hash_value(Target.str());
       SmallString<16> Scratch;
       llvm::raw_svector_ostream OS(Scratch);
       OS << EffectiveLanguageVersion;
-      code = llvm::hash_combine(code, OS.str());
-      return code;
+      return llvm::hash_combine(Target.str(), OS.str());
     }
 
   private:

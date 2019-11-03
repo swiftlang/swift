@@ -39,9 +39,17 @@ static std::string getCoverageSection(IRGenModule &IGM) {
 
 void IRGenModule::emitCoverageMapping() {
   std::vector<const SILCoverageMap *> Mappings;
-  for (const auto &M : getSILModule().getCoverageMaps())
-    if (M.second->hasSymtabEntry())
-      Mappings.push_back(M.second);
+  for (const auto &M : getSILModule().getCoverageMaps()) {
+    // Check whether this coverage mapping can reference its name data within
+    // the profile symbol table. If the name global is gone, this function has
+    // been optimized out.
+    StringRef PGOFuncName = M.second->getPGOFuncName();
+    std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
+        PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
+    if (!Module.getNamedGlobal(PGOFuncNameVar))
+      continue;
+    Mappings.push_back(M.second);
+  }
 
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
@@ -106,6 +114,7 @@ void IRGenModule::emitCoverageMapping() {
     StringRef CoverageMapping(OS.str().c_str() + PrevSize, MappingLen);
 
     StringRef NameValue = M->getPGOFuncName();
+    assert(!NameValue.empty() && "Expected a named record");
     uint64_t FuncHash = M->getHash();
 
     // Create a record for this function.

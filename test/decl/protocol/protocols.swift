@@ -511,3 +511,71 @@ extension LetThereBeCrash {
   init() { x = 1 }
   // expected-error@-1 {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
+
+// SR-11412
+// Offer fix-it to conform type of context to the missing protocols
+
+protocol SR_11412_P1 {}
+protocol SR_11412_P2 {}
+protocol SR_11412_P3 {}
+protocol SR_11412_P4: AnyObject {}
+
+class SR_11412_C0 {
+  var foo1: SR_11412_P1?
+  var foo2: (SR_11412_P1 & SR_11412_P2)?
+  weak var foo3: SR_11412_P4?
+}
+
+// Context has no inherited types and does not conform to protocol //
+
+class SR_11412_C1 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C1' to type 'SR_11412_P1?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1' to class 'SR_11412_C1'}}{{18-18=: SR_11412_P1}}
+  }
+}
+
+// Context has no inherited types and does not conform to protocol composition //
+
+class SR_11412_C2 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C2' to type '(SR_11412_P1 & SR_11412_P2)?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1 & SR_11412_P2' to class 'SR_11412_C2'}}{{18-18=: SR_11412_P1 & SR_11412_P2}}
+  }
+}
+
+// Context already has an inherited type, but does not conform to protocol //
+
+class SR_11412_C3: SR_11412_P3 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo1 = self // expected-error {{cannot assign value of type 'SR_11412_C3' to type 'SR_11412_P1?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1' to class 'SR_11412_C3'}}{{31-31=, SR_11412_P1}}
+  }
+}
+
+// Context conforms to only one protocol in the protocol composition //
+
+class SR_11412_C4: SR_11412_P1 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo2 = self // expected-error {{cannot assign value of type 'SR_11412_C4' to type '(SR_11412_P1 & SR_11412_P2)?'}}
+    // expected-note@-1 {{add missing conformance to 'SR_11412_P1 & SR_11412_P2' to class 'SR_11412_C4'}}{{31-31=, SR_11412_P2}}
+  }
+}
+
+// Context is a value type, but protocol requires class //
+
+struct SR_11412_S0 {
+  let c0 = SR_11412_C0()
+
+  func conform() {
+    c0.foo3 = self // expected-error {{cannot assign value of type 'SR_11412_S0' to type 'SR_11412_P4?'}}
+  }
+}

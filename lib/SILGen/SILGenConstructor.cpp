@@ -42,9 +42,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
-      new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                          AC.getIdentifier("$metatype"), SourceLoc(),
                          AC.getIdentifier("$metatype"), DC);
+  VD->setSpecifier(ParamSpecifier::Default);
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
@@ -69,11 +70,12 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                DC);
+  VD->setSpecifier(ParamSpecifier::Default);
   VD->setInterfaceType(interfaceType);
 
   auto argType = SGF.SGM.Types.getLoweredType(type,
@@ -99,33 +101,24 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 }
 
 /// If the field has a property wrapper for which we will need to call the
-/// wrapper type's init(wrapperValue:), set up that evaluation and call the
-/// \c body with the expression to form the property wrapper instance from
-/// the initial value type.
-///
-/// \returns true if this was such a wrapper, \c false otherwise.
-static bool maybeEmitPropertyWrapperInitFromValue(
+/// wrapper type's init(wrappedValue:, ...), call the function that performs
+/// that initialization and return the result. Otherwise, return \c arg.
+static RValue maybeEmitPropertyWrapperInitFromValue(
     SILGenFunction &SGF,
     SILLocation loc,
     VarDecl *field,
-    RValue &&arg,
-    llvm::function_ref<void(Expr *)> body) {
+    RValue &&arg) {
   auto originalProperty = field->getOriginalWrappedProperty();
   if (!originalProperty ||
       !originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
-    return false;
+    return std::move(arg);
 
   auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
   if (!wrapperInfo || !wrapperInfo.initializeFromOriginal)
-    return false;
+    return std::move(arg);
 
-  SILGenFunction::OpaqueValueRAII opaqueValue(
-      SGF,
-      wrapperInfo.underlyingValue,
-      std::move(arg).getAsSingleValue(SGF, loc));
-
-  body(wrapperInfo.initializeFromOriginal);
-  return true;
+  return SGF.emitApplyOfPropertyWrapperBackingInitializer(loc, originalProperty,
+                                                          std::move(arg));
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
@@ -142,12 +135,12 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   SILValue resultSlot;
   if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  ctor);
+    VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(selfIfaceTy);
     resultSlot = SGF.F.begin()->createFunctionArgument(selfTy.getAddressType(), VD);
   }
@@ -183,13 +176,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                "number of args does not match number of fields");
         (void)eltEnd;
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-        if (!maybeEmitPropertyWrapperInitFromValue(
-              SGF, Loc, field, std::move(*elti),
-              [&](Expr *expr) {
-                SGF.emitExprInto(expr, init.get());
-              })) {
-          std::move(*elti).forwardInto(SGF, Loc, init.get());
-        }
+        maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, std::move(*elti))
+          .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
 #ifndef NDEBUG
@@ -221,14 +209,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      if (!maybeEmitPropertyWrapperInitFromValue(
-            SGF, Loc, field, std::move(*elti),
-            [&](Expr *expr) {
-              v = SGF.emitRValue(expr)
-                .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
-            })) {
-        v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
-      }
+      v = maybeEmitPropertyWrapperInitFromValue(
+          SGF, Loc, field, std::move(*elti))
+        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
       ++elti;
     } else {
       // Otherwise, use its initializer.
@@ -288,7 +271,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   emitProlog(ctor->getParameters(),
              /*selfParam=*/nullptr,
              ctor->getResultInterfaceType(), ctor,
-             ctor->hasThrows());
+             ctor->hasThrows(),
+             ctor->getThrowsLoc());
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -443,12 +427,12 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+    auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"),
-                                 element->getDeclContext());
+                                 element->getDeclContext());  
+    VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =
         F.begin()->createFunctionArgument(enumTI.getLoweredType(), VD);
@@ -638,7 +622,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // FIXME: Handle self along with the other body patterns.
   uint16_t ArgNo = emitProlog(ctor->getParameters(), /*selfParam=*/nullptr,
                               TupleType::getEmpty(F.getASTContext()), ctor,
-                              ctor->hasThrows());
+                              ctor->hasThrows(), ctor->getThrowsLoc());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
@@ -930,12 +914,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
-      for (auto entry : pbd->getPatternList()) {
-        auto init = entry.getExecutableInit();
+      for (auto i : range(pbd->getNumPatternEntries())) {
+        auto init = pbd->getExecutableInit(i);
         if (!init) continue;
 
+        auto *varPattern = pbd->getPattern(i);
         // Cleanup after this initialization.
-        FullExpr scope(Cleanups, entry.getPattern());
+        FullExpr scope(Cleanups, varPattern);
 
         // We want a substitution list written in terms of the generic
         // signature of the type, with replacement archetypes from the
@@ -964,13 +949,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
         CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, entry.getPattern())->getCanonicalType();
+            pbd->getDeclContext(), dc, varPattern)->getCanonicalType();
         AbstractionPattern origResultType(resultType);
 
         // FIXME: Can emitMemberInit() share code with
         // InitializationForPattern in SILGenDecl.cpp?
         RValue result = emitApplyOfStoredPropertyInitializer(
-                                  init, entry, subs,
+                                  init, pbd->getAnchoringVarDecl(i), subs,
                                   resultType, origResultType,
                                   SGFContext());
 
@@ -981,15 +966,12 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           auto originalVar = singleVar->getOriginalWrappedProperty();
           if (originalVar &&
               originalVar->isPropertyWrapperInitializedWithInitialValue()) {
-            (void)maybeEmitPropertyWrapperInitFromValue(
-                *this, init, singleVar, std::move(result),
-                [&](Expr *expr) {
-                  result = emitRValue(expr);
-                });
+            result = maybeEmitPropertyWrapperInitFromValue(
+                *this, init, singleVar, std::move(result));
           }
         }
 
-        emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
+        emitMemberInit(*this, selfDecl, varPattern, std::move(result));
       }
     }
   }

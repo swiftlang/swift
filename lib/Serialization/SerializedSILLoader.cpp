@@ -13,7 +13,7 @@
 #define DEBUG_TYPE "serialized-sil-loader"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "DeserializeSIL.h"
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/ASTMangler.h"

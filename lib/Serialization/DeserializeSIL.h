@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILFormat.h"
+#include "ModuleFile.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"

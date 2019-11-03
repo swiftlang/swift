@@ -32,3 +32,33 @@ func testAnyObject(_ obj: AnyObject) {
   obj.protoMethod()
   _ = obj.protoProperty
 }
+
+consumeImplicitlyObjCClass(ImplicitlyObjCClass())
+
+consumeExplicitlyObjCClass(ExplicitlyObjCClass())
+
+consumeHasSameCustomNameClass(HasSameCustomNameClass())
+
+consumeNativeTypeHasDifferentCustomNameClass(SwiftNativeTypeHasDifferentCustomNameClass())
+consumeObjCNativeTypeHasDifferentCustomNameClass(NativeTypeHasDifferentCustomNameClass())
+consumeNativeTypeHasDifferentCustomNameClass(NativeTypeHasDifferentCustomNameClass()) // expected-error {{cannot convert value of type 'NativeTypeHasDifferentCustomNameClass' to expected argument type 'SwiftNativeTypeHasDifferentCustomNameClass'}}
+consumeObjCNativeTypeHasDifferentCustomNameClass(SwiftNativeTypeHasDifferentCustomNameClass()) // expected-error {{cannot convert value of type 'SwiftNativeTypeHasDifferentCustomNameClass' to expected argument type 'NativeTypeHasDifferentCustomNameClass'}}
+
+consumeNativeTypeIsNonObjCClass(SwiftNativeTypeIsNonObjCClass())
+consumeNativeTypeIsNonObjCClass(NativeTypeIsNonObjCClass()) // expected-error {{cannot convert value of type 'NativeTypeIsNonObjCClass' to expected argument type 'SwiftNativeTypeIsNonObjCClass'}}
+
+consumeForwardImplicitlyObjCClass(ForwardImplicitlyObjCClass())
+
+consumeForwardExplicitlyObjCClass(ForwardExplicitlyObjCClass())
+
+consumeForwardHasSameCustomNameClass(ForwardHasSameCustomNameClass())
+
+consumeForwardNativeTypeHasDifferentCustomNameClass(SwiftForwardNativeTypeHasDifferentCustomNameClass())
+consumeObjCForwardNativeTypeHasDifferentCustomNameClass(ForwardNativeTypeHasDifferentCustomNameClass())
+consumeForwardNativeTypeHasDifferentCustomNameClass(ForwardNativeTypeHasDifferentCustomNameClass()) // expected-error {{cannot convert value of type 'ForwardNativeTypeHasDifferentCustomNameClass' to expected argument type 'SwiftForwardNativeTypeHasDifferentCustomNameClass'}}
+consumeObjCForwardNativeTypeHasDifferentCustomNameClass(SwiftForwardNativeTypeHasDifferentCustomNameClass()) // expected-error {{cannot convert value of type 'SwiftForwardNativeTypeHasDifferentCustomNameClass' to expected argument type 'ForwardNativeTypeHasDifferentCustomNameClass'}}
+
+consumeForwardNativeTypeIsNonObjCClass(SwiftForwardNativeTypeIsNonObjCClass())
+consumeForwardNativeTypeIsNonObjCClass(ForwardNativeTypeIsNonObjCClass()) // expected-error {{cannot convert value of type 'ForwardNativeTypeIsNonObjCClass' to expected argument type 'SwiftForwardNativeTypeIsNonObjCClass'}}
+
+consumeForwardNativeTypeIsUnambiguouslyNonObjCClass(ForwardNativeTypeIsUnambiguouslyNonObjCClass())

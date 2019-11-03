@@ -1,6 +1,6 @@
 // Verify errors in this file to ensure that parse and type checker errors
 // occur where we expect them.
-// RUN: %target-typecheck-verify-swift -show-diagnostics-after-fatal %s
+// RUN: %target-typecheck-verify-swift -show-diagnostics-after-fatal
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
 // RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
@@ -109,11 +109,11 @@ class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooN
 //===--- Inheritance list in enums.
 //===---
 
-enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{raw type}} expected-error {{an enum with no cases}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance1 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance1 : FooNonExistentProtocol {{{$}}
 
-enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}} expected-error {{raw type}} expected-error {{an enum with no cases}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 

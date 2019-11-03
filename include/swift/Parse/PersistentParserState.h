@@ -26,11 +26,9 @@
 
 namespace swift {
   class AbstractFunctionDecl;
-  class LazyMemberParser;
-  class ASTContext;
 
 /// Parser state persistent across multiple parses.
-class PersistentParserState: public LazyMemberParser {
+class PersistentParserState {
 public:
   struct ParserPos {
     SourceLoc Loc;
@@ -84,34 +82,11 @@ public:
     {}
   };
 
-  class DelayedDeclListState {
-    friend class PersistentParserState;
-    friend class Parser;
-    unsigned Flags;
-    DeclContext *ParentContext;
-    ParserPos BodyPos;
-    SourceLoc BodyEnd;
-    SavedScope Scope;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    DelayedDeclListState(unsigned Flags,
-                     DeclContext *ParentContext, SourceRange BodyRange,
-                     SourceLoc PreviousLoc, SavedScope &&Scope)
-    : Flags(Flags), ParentContext(ParentContext), BodyPos{BodyRange.Start, PreviousLoc},
-      BodyEnd(BodyRange.End), Scope(std::move(Scope))
-    {}
-  };
-
   bool InPoundLineEnvironment = false;
   // FIXME: When condition evaluation moves to a later phase, remove this bit
   // and adjust the client call 'performParseOnly'.
   bool PerformConditionEvaluation = true;
 private:
-  ASTContext &Ctx;
   ScopeInfo ScopeInfo;
   using DelayedFunctionBodiesTy =
       llvm::DenseMap<AbstractFunctionDecl *,
@@ -123,37 +98,25 @@ private:
 
   std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
 
-  llvm::DenseMap<IterableDeclContext *, std::unique_ptr<DelayedDeclListState>>
-    DelayedDeclListStates;
+  std::vector<IterableDeclContext *> DelayedDeclLists;
 
   /// The local context for all top-level code.
   TopLevelContext TopLevelCode;
 
 public:
   swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
-  PersistentParserState(ASTContext &Ctx);
+  PersistentParserState();
+  PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
-
-  void delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
-                                SourceRange BodyRange,
-                                SourceLoc PreviousLoc);
-  std::unique_ptr<FunctionBodyState>
-  takeFunctionBodyState(AbstractFunctionDecl *AFD);
-
-  bool hasFunctionBodyState(AbstractFunctionDecl *AFD);
 
   void delayDecl(DelayedDeclKind Kind, unsigned Flags,
                  DeclContext *ParentContext,
                  SourceRange BodyRange, SourceLoc PreviousLoc);
 
-  void delayDeclList(IterableDeclContext *D, unsigned Flags,
-                     DeclContext *ParentContext,
-                     SourceRange BodyRange, SourceLoc PreviousLoc);
+  void delayDeclList(IterableDeclContext *D);
 
   void delayTopLevel(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
                      SourceLoc PreviousLoc);
-
-  void parseMembers(IterableDeclContext *IDC) override;
 
   bool hasDelayedDecl() {
     return CodeCompletionDelayedDeclState.get() != nullptr;
@@ -171,14 +134,7 @@ public:
     return std::move(CodeCompletionDelayedDeclState);
   }
 
-  std::unique_ptr<DelayedDeclListState>
-    takeDelayedDeclListState(IterableDeclContext *IDC);
-
-  bool hasUnparsedMembers(const IterableDeclContext *IDC) override {
-    return DelayedDeclListStates.find(IDC) != DelayedDeclListStates.end();
-  }
-
-  void parseAllDelayedDeclLists() override;
+  void parseAllDelayedDeclLists();
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;
