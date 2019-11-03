@@ -52,7 +52,9 @@ static bool rangeableIsIgnored(const Stmt *d) {
   return false; // ??
 }
 static bool rangeableIsIgnored(const ASTNode n) {
-  return n.is<Decl *>() && n.get<Decl *>()->isImplicit();
+  return (n.is<Decl *>() && rangeableIsIgnored(n.get<Decl *>())) ||
+         (n.is<Stmt *>() && rangeableIsIgnored(n.get<Stmt *>())) ||
+         (n.is<Expr *>() && rangeableIsIgnored(n.get<Expr *>()));
 }
 
 template <typename Rangeable>
@@ -600,25 +602,12 @@ private:
 
   template <typename Rangeable>
   bool isNotAfter(Rangeable n1, Rangeable n2) const {
-    auto cmpLoc = [&](const SourceLoc l1, const SourceLoc l2) {
-      return l1 == l2 ? 0 : ctx.SourceMgr.isBeforeInBuffer(l1, l2) ? -1 : 1;
-    };
     const auto r1 = getRangeableSourceRange(n1);
     const auto r2 = getRangeableSourceRange(n2);
-    const int startOrder = cmpLoc(r1.Start, r2.Start);
-    const int endOrder = cmpLoc(r1.End, r2.End);
 
-#ifndef NDEBUG
-    if (startOrder * endOrder == -1) {
-      llvm::errs() << "*** Start order contradicts end order between: ***\n";
-      dumpRangeable(n1, llvm::errs());
-      llvm::errs() << "\n*** and: ***\n";
-      dumpRangeable(n2, llvm::errs());
-    }
-#endif
-    ASTScopeAssert(startOrder * endOrder != -1,
-                   "Start order contradicts end order");
-    return startOrder + endOrder < 1;
+    const int signum = ASTScopeImpl::compare(r1, r2, ctx.SourceMgr,
+                                             /*ensureDisjoint=*/true);
+    return -1 == signum;
   }
 
   static bool isVarDeclInPatternBindingDecl(ASTNode n1, ASTNode n2) {
