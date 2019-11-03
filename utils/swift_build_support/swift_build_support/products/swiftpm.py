@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,72 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from . import product
+from .. import shell
 
 
 class SwiftPM(product.Product):
-    pass
+    @classmethod
+    def product_source_name(cls):
+        return "swiftpm"
+
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    def should_build(self, host_target):
+        return True
+
+    def run_bootstrap_script(self, action, host_target, additional_params=[]):
+        script_path = os.path.join(
+            self.source_dir, 'Utilities', 'bootstrap')
+        toolchain_path = self.install_toolchain_path()
+        swiftc = os.path.join(toolchain_path, "usr", "bin", "swiftc")
+        sbt = os.path.join(toolchain_path, "usr", "bin", "swift-build-tool")
+
+        llbuild_src = os.path.join(os.path.dirname(self.source_dir), "llbuild")
+
+        # FIXME: We require llbuild build directory in order to build. Is
+        # there a better way to get this?
+        build_root = os.path.dirname(self.build_dir)
+        llbuild_build_dir = os.path.join(
+            build_root, '%s-%s' % ("llbuild", host_target))
+
+        helper_cmd = [script_path]
+
+        if action != "build":
+            helper_cmd.append(action)
+
+        if self.is_release():
+            helper_cmd.append("--release")
+
+        helper_cmd += [
+            "--swiftc", swiftc,
+            "--sbt", sbt,
+            "--build", self.build_dir,
+            "--llbuild-source-dir", llbuild_src,
+            "--llbuild-build-dir", llbuild_build_dir,
+        ]
+        helper_cmd.extend(additional_params)
+
+        shell.call(helper_cmd)
+
+    def build(self, host_target):
+        self.run_bootstrap_script('build', host_target)
+
+    def should_test(self, host_target):
+        return self.args.test_swiftpm
+
+    def test(self, host_target):
+        self.run_bootstrap_script('test', host_target)
+
+    def should_install(self, host_target):
+        return self.args.install_swiftpm
+
+    def install(self, host_target):
+        install_prefix = self.args.install_destdir + self.args.install_prefix
+        self.run_bootstrap_script('install', host_target, [
+            '--prefix', install_prefix
+        ])
