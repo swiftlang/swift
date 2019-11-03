@@ -153,7 +153,13 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   SILCombineCanonicalize scCanonicalize(Worklist);
 
-  // match test program:
+  // Match test program:
+  //  func test(_x: Int) -> Int {
+  //      var x = _x
+  //      x += 1
+  //      x &= (x - 1)
+  //      return x - 1
+  //  }
   ReturnInst *retVal;
 
   for (auto &block : F) {
@@ -182,7 +188,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     std::tie(retVal) = matchedResult.getValue();
   }
-
+  // Check that we actually found something
   assert(retVal);
 
   // Process until we run out of items in our worklist.
