@@ -645,7 +645,7 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
 static void addWeightCorrection(FullApplySite FAS,
                         llvm::DenseMap<FullApplySite, int> &WeightCorrections) {
   SILFunction *Callee = FAS.getReferencedFunctionOrNull();
-  if (Callee && Callee->hasSemanticsAttr(ARRAY_UNINITIALIZED)) {
+  if (Callee && Callee->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
     // We want to inline the argument to an array.uninitialized call, because
     // this argument is most likely a call to a function which contains the
     // buffer allocation for the array. It is essential to inline it for stack

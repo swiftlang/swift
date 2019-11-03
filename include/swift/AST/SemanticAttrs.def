@@ -15,65 +15,69 @@
 //   NAME: the global name used in the compiler
 //   C_STR: the raw value used in swift
 //
-// SEMA_ATTR(NAME, C_STR)
+// SEMANTICS_ATTR(NAME, C_STR)
 //
 //===----------------------------------------------------------------------===//
 
-SEMA_ATTR(STRING_EQUALS, "string.equals")
-SEMA_ATTR(STRING_MAKE_UTF8, "string.makeUTF8")
-SEMA_ATTR(STRING_ESCAPE_PERCENT_GET, "string.escapePercent.get")
-SEMA_ATTR(STRING_CONCAT, "string.concat")
-SEMA_ATTR(STRING_APPEND, "string.append")
-SEMA_ATTR(STRING_INIT_EMPTY, "string.init_empty")
-SEMA_ATTR(STRING_PLUS_EQUALS, "string.plusequals")
-SEMA_ATTR(FIND_STRING_SWITCH_CASE, "findStringSwitchCase")
-SEMA_ATTR(FIND_STRING_SWITCH_CASE_WITH_CACHE, "findStringSwitchCaseWithCache")
+#ifndef SEMANTICS_ATTR
+#error SEMANTICS_ATTR not defined.
+#endif
 
-SEMA_ATTR(SWIFT_CONCURRENT_ASYNC, "swift.concurrent.async")
-SEMA_ATTR(SWIFT_CONCURRENT_SAFE, "swift.concurrent.safe")
-SEMA_ATTR(SWIFT_CONCURRENT, "swift.concurrent")
+SEMANTICS_ATTR(STRING_EQUALS, "string.equals")
+SEMANTICS_ATTR(STRING_MAKE_UTF8, "string.makeUTF8")
+SEMANTICS_ATTR(STRING_ESCAPE_PERCENT_GET, "string.escapePercent.get")
+SEMANTICS_ATTR(STRING_CONCAT, "string.concat")
+SEMANTICS_ATTR(STRING_APPEND, "string.append")
+SEMANTICS_ATTR(STRING_INIT_EMPTY, "string.init_empty")
+SEMANTICS_ATTR(STRING_PLUS_EQUALS, "string.plusequals")
+SEMANTICS_ATTR(FIND_STRING_SWITCH_CASE, "findStringSwitchCase")
+SEMANTICS_ATTR(FIND_STRING_SWITCH_CASE_WITH_CACHE, "findStringSwitchCaseWithCache")
 
-SEMA_ATTR(ARRAY_APPEND_CONTENTS_OF, "array.append_contentsOf")
-SEMA_ATTR(ARRAY_APPEND_ELEMENT, "array.append_element")
-SEMA_ATTR(ARRAY_CHECK_INDEX, "array.check_index")
-SEMA_ATTR(ARRAY_CHECK_SUBSCRIPT, "array.check_subscript")
-SEMA_ATTR(ARRAY_GET_CAPACITY, "array.get_capacity")
-SEMA_ATTR(ARRAY_GET_COUNT, "array.get_count")
-SEMA_ATTR(ARRAY_GET_ELEMENT, "array.get_element")
-SEMA_ATTR(ARRAY_GET_ELEMENT_ADDRESS, "array.get_element_address")
-SEMA_ATTR(ARRAY_INIT, "array.init")
-SEMA_ATTR(ARRAY_INIT_EMPTY, "array.init.empty")
-SEMA_ATTR(ARRAY_MAKE_MUTABLE, "array.make_mutable")
-SEMA_ATTR(ARRAY_MUTATE_UNKNOWN, "array.mutate_unknown")
-SEMA_ATTR(ARRAY_PROPS_IS_NATIVE_TYPE_CHECKED, "array.props.isNativeTypeChecked")
-SEMA_ATTR(ARRAY_RESERVE_CAPACITY_FOR_APPEND, "array.reserve_capacity_for_append")
-SEMA_ATTR(ARRAY_UNINITIALIZED, "array.uninitialized")
-SEMA_ATTR(ARRAY_WITH_UNSAFE_MUTABLE_BUFFER_POINTER, "array.withUnsafeMutableBufferPointer")
-SEMA_ATTR(ARRAY_COUNT, "array.count")
-SEMA_ATTR(ARRAY_DEALLOC_UNINITIALIZED, "array.dealloc_uninitialized")
-SEMA_ATTR(ARRAY_UNINITIALIZED_INTRINSIC, "array.uninitialized_intrinsic")
+SEMANTICS_ATTR(SWIFT_CONCURRENT_ASYNC, "swift.concurrent.async")
+SEMANTICS_ATTR(SWIFT_CONCURRENT_SAFE, "swift.concurrent.safe")
+SEMANTICS_ATTR(SWIFT_CONCURRENT, "swift.concurrent")
 
-SEMA_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER, "optimize.sil.specialize.generic.never")
-SEMA_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
+SEMANTICS_ATTR(ARRAY_APPEND_CONTENTS_OF, "array.append_contentsOf")
+SEMANTICS_ATTR(ARRAY_APPEND_ELEMENT, "array.append_element")
+SEMANTICS_ATTR(ARRAY_CHECK_INDEX, "array.check_index")
+SEMANTICS_ATTR(ARRAY_CHECK_SUBSCRIPT, "array.check_subscript")
+SEMANTICS_ATTR(ARRAY_GET_CAPACITY, "array.get_capacity")
+SEMANTICS_ATTR(ARRAY_GET_COUNT, "array.get_count")
+SEMANTICS_ATTR(ARRAY_GET_ELEMENT, "array.get_element")
+SEMANTICS_ATTR(ARRAY_GET_ELEMENT_ADDRESS, "array.get_element_address")
+SEMANTICS_ATTR(ARRAY_INIT, "array.init")
+SEMANTICS_ATTR(ARRAY_INIT_EMPTY, "array.init.empty")
+SEMANTICS_ATTR(ARRAY_MAKE_MUTABLE, "array.make_mutable")
+SEMANTICS_ATTR(ARRAY_MUTATE_UNKNOWN, "array.mutate_unknown")
+SEMANTICS_ATTR(ARRAY_PROPS_IS_NATIVE_TYPE_CHECKED, "array.props.isNativeTypeChecked")
+SEMANTICS_ATTR(ARRAY_RESERVE_CAPACITY_FOR_APPEND, "array.reserve_capacity_for_append")
+SEMANTICS_ATTR(ARRAY_UNINITIALIZED, "array.uninitialized")
+SEMANTICS_ATTR(ARRAY_WITH_UNSAFE_MUTABLE_BUFFER_POINTER, "array.withUnsafeMutableBufferPointer")
+SEMANTICS_ATTR(ARRAY_COUNT, "array.count")
+SEMANTICS_ATTR(ARRAY_DEALLOC_UNINITIALIZED, "array.dealloc_uninitialized")
+SEMANTICS_ATTR(ARRAY_UNINITIALIZED_INTRINSIC, "array.uninitialized_intrinsic")
+
+SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER, "optimize.sil.specialize.generic.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
           "optimize.sil.specialize.generic.partial.never")
-SEMA_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER, "optimize.sil.specialize.generic.size.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER, "optimize.sil.specialize.generic.size.never")
 
-SEMA_ATTR(OSLOG_INTERPOLATION_INIT, "oslog.interpolation.init")
-SEMA_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
-SEMA_ATTR(OSLOG_MESSAGE_INIT_STRING_LITERAL, "oslog.message.init_stringliteral")
+SEMANTICS_ATTR(OSLOG_INTERPOLATION_INIT, "oslog.interpolation.init")
+SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
+SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_STRING_LITERAL, "oslog.message.init_stringliteral")
 
-SEMA_ATTR(TYPE_CHECKER_OPEN_EXISTENTIAL, "typechecker._openExistential(_:do:)")
-SEMA_ATTR(TYPE_CHECKER_TYPE, "typechecker.type(of:)")
-SEMA_ATTR(TYPE_CHECKER_WITHOUT_ACTUALLY_ESCAPING, "typechecker.withoutActuallyEscaping(_:do:)")
+SEMANTICS_ATTR(TYPE_CHECKER_OPEN_EXISTENTIAL, "typechecker._openExistential(_:do:)")
+SEMANTICS_ATTR(TYPE_CHECKER_TYPE, "typechecker.type(of:)")
+SEMANTICS_ATTR(TYPE_CHECKER_WITHOUT_ACTUALLY_ESCAPING, "typechecker.withoutActuallyEscaping(_:do:)")
 
-SEMA_ATTR(AVAILABILITY_OSVERSION, "availability.osversion")
+SEMANTICS_ATTR(AVAILABILITY_OSVERSION, "availability.osversion")
 
-SEMA_ATTR(CONSTANT_EVALUABLE, "constant_evaluable")
-SEMA_ATTR(EXIT, "exit")
-SEMA_ATTR(FASTPATH, "fastpath")
-SEMA_ATTR(SLOWPATH, "slowpath")
-SEMA_ATTR(PROGRAMTERMINATION_POINT, "programtermination_point")
-SEMA_ATTR(CONVERT_TO_OBJECTIVE_C, "convertToObjectiveC")
+SEMANTICS_ATTR(CONSTANT_EVALUABLE, "constant_evaluable")
+SEMANTICS_ATTR(EXIT, "exit")
+SEMANTICS_ATTR(FASTPATH, "fastpath")
+SEMANTICS_ATTR(SLOWPATH, "slowpath")
+SEMANTICS_ATTR(PROGRAMTERMINATION_POINT, "programtermination_point")
+SEMANTICS_ATTR(CONVERT_TO_OBJECTIVE_C, "convertToObjectiveC")
 
-#undef SEMA_ATTR
+#undef SEMANTICS_ATTR
 

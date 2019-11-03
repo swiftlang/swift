@@ -350,7 +350,7 @@ bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
   auto *Apply = dyn_cast<ApplyInst>(I);
   if (!Apply)
     return false;
-  if (Apply->hasSemantics(AVAILABILITY_OSVERSION))
+  if (Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION))
     return true;
   auto *FunRef = Apply->getReferencedFunctionOrNull();
   if (!FunRef)

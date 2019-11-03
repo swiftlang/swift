@@ -9,10 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// Implementation of the matching definition file.
-// This file holds all semantics attributes as constant string literals.
-//
+///
+/// \file
+/// Implementation of the matching definition file.
+/// This file holds all semantics attributes as constant string literals.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SEMANTICS_H
@@ -21,8 +22,10 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-#define SEMA_ATTR(NAME, C_STR) constexpr static const StringLiteral NAME = #C_STR;
+namespace semantics {
+#define SEMANTICS_ATTR(NAME, C_STR) constexpr static const StringLiteral NAME = #C_STR;
 #include "SemanticAttrs.def"
+}
 }
 
 #endif

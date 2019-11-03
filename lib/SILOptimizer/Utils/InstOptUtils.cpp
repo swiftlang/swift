@@ -726,7 +726,7 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr(STRING_CONCAT))
+  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr(semantics::STRING_CONCAT))
     return false;
 
   // Left and right operands of a string concatenation operation.
@@ -757,9 +757,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
 
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((friLeftFun->hasSemanticsAttr(STRING_MAKE_UTF8)
+  if (!((friLeftFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
          && aiLeftOperandsNum == 5)
-        || (friRightFun->hasSemanticsAttr(STRING_MAKE_UTF8)
+        || (friRightFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
             && aiRightOperandsNum == 5)))
     return false;
 

@@ -149,7 +149,7 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
     // There should only be a single call to findStringSwitchCase. But even
     // if there are multiple calls, it's not problem - we'll just optimize the
     // last one we find.
-    if (cast<ApplyInst>(I)->hasSemantics(FIND_STRING_SWITCH_CASE))
+    if (cast<ApplyInst>(I)->hasSemantics(semantics::FIND_STRING_SWITCH_CASE))
       *FindStringCall = cast<ApplyInst>(I);
     return true;
 

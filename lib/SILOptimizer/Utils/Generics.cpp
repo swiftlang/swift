@@ -373,18 +373,18 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 
 static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
                                 SubstitutionMap Subs = {}) {
-  if (Callee->hasSemanticsAttr(OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER))
+  if (Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER))
     return true;
 
   if (Caller &&
       Caller->getEffectiveOptimizationMode() == OptimizationMode::ForSize &&
-      Callee->hasSemanticsAttr(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER)) {
+      Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER)) {
     return true;
   }
 
 
   if (Subs.hasAnySubstitutableParams() &&
-      Callee->hasSemanticsAttr(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
+      Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
     return true;
 
   return false;

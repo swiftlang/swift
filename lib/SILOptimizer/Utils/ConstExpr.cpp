@@ -63,24 +63,24 @@ enum class WellKnownFunction {
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
-  if (fn->hasSemanticsAttr(ARRAY_INIT_EMPTY))
+  if (fn->hasSemanticsAttr(semantics::ARRAY_INIT_EMPTY))
     return WellKnownFunction::ArrayInitEmpty;
-  if (fn->hasSemanticsAttr(ARRAY_UNINITIALIZED_INTRINSIC))
+  if (fn->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return WellKnownFunction::AllocateUninitializedArray;
-  if (fn->hasSemanticsAttr(ARRAY_APPEND_ELEMENT))
+  if (fn->hasSemanticsAttr(semantics::ARRAY_APPEND_ELEMENT))
     return WellKnownFunction::ArrayAppendElement;
-  if (fn->hasSemanticsAttr(STRING_INIT_EMPTY))
+  if (fn->hasSemanticsAttr(semantics::STRING_INIT_EMPTY))
     return WellKnownFunction::StringInitEmpty;
   // There are two string initializers in the standard library with the
   // semantics "string.makeUTF8". They are identical from the perspective of
   // the interpreter. One of those functions is probably redundant and not used.
-  if (fn->hasSemanticsAttr(STRING_MAKE_UTF8))
+  if (fn->hasSemanticsAttr(semantics::STRING_MAKE_UTF8))
     return WellKnownFunction::StringMakeUTF8;
-  if (fn->hasSemanticsAttr(STRING_APPEND))
+  if (fn->hasSemanticsAttr(semantics::STRING_APPEND))
     return WellKnownFunction::StringAppend;
-  if (fn->hasSemanticsAttr(STRING_EQUALS))
+  if (fn->hasSemanticsAttr(semantics::STRING_EQUALS))
     return WellKnownFunction::StringEquals;
-  if (fn->hasSemanticsAttr(STRING_ESCAPE_PERCENT_GET))
+  if (fn->hasSemanticsAttr(semantics::STRING_ESCAPE_PERCENT_GET))
     return WellKnownFunction::StringEscapePercent;
   if (fn->hasSemanticsAttrThatStartsWith("programtermination_point"))
     return WellKnownFunction::AssertionFailure;

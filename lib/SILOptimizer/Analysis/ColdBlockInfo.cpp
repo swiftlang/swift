@@ -84,9 +84,9 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
     if (F->hasSemanticsAttrs()) {
       // fastpath/slowpath attrs are untested because the inliner luckily
       // inlines them before the downstream calls.
-      if (F->hasSemanticsAttr(SLOWPATH))
+      if (F->hasSemanticsAttr(semantics::SLOWPATH))
         return BranchHint::LikelyFalse;
-      else if (F->hasSemanticsAttr(FASTPATH))
+      else if (F->hasSemanticsAttr(semantics::FASTPATH))
         return BranchHint::LikelyTrue;
     }
   }

@@ -1649,7 +1649,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         return I;
       }
     }
-    if (SF->hasSemanticsAttr(ARRAY_UNINITIALIZED)) {
+    if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
       if (recursivelyCollectARCUsers(Users, AI)) {
