@@ -107,7 +107,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
                                         ForDefinition_t forDefinition,
                                         ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
-  auto constantType = mod.Types.getConstantFunctionType(constant);
+  auto constantType = mod.Types.getConstantFunctionType(
+      TypeExpansionContext::minimal(), constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {

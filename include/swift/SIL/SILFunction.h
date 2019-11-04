@@ -515,6 +515,8 @@ public:
 
   SILType getLoweredLoadableType(Type t) const;
 
+  SILType getLoweredType(SILType t) const;
+
   const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   bool isTypeABIAccessible(SILType type) const;

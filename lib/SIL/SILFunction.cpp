@@ -261,6 +261,9 @@ const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
   return getModule().Types.getTypeLowering(type, TypeExpansionContext(*this));
 }
 
+SILType SILFunction::getLoweredType(SILType t) const {
+  return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
+}
 bool SILFunction::isTypeABIAccessible(SILType type) const {
   return getModule().isTypeABIAccessible(type, TypeExpansionContext(*this));
 }

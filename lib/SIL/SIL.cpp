@@ -186,7 +186,7 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 /// ABI-private, we can always at least fetch its metadata and use the
 /// value witness table stored there.
 bool SILModule::isTypeABIAccessible(SILType type,
-                                    ResilienceExpansion forExpansion) {
+                                    TypeExpansionContext forExpansion) {
   // Fixed-ABI types can have value operations done without metadata.
   if (Types.getTypeLowering(type, forExpansion).isFixedABI())
     return true;
