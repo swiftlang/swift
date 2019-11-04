@@ -291,7 +291,6 @@ private:
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
-  bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
 
   bool visitSubscriptExpr(SubscriptExpr *SE);
@@ -3318,24 +3317,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
           decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
   }
 
-  return false;
-}
-
-bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
-  auto argExpr = typeCheckChildIndependently(FVE->getSubExpr());
-  if (!argExpr) return true;
-  auto argType = CS.getType(argExpr);
-
-  // If the subexpression type checks as a non-optional type, then that is the
-  // error.  Produce a specific diagnostic about this.
-  if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getOptionalObjectType().isNull()) {
-    diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
-      .fixItRemove(FVE->getExclaimLoc())
-      .highlight(FVE->getSourceRange());
-    return true;
-  }
-  
   return false;
 }
 
