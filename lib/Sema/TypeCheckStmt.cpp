@@ -2065,9 +2065,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)AFD->getInterfaceType();
-
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())
     return false;

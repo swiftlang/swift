@@ -1071,8 +1071,6 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)decl->getInterfaceType();
   auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
@@ -1242,8 +1240,6 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto oneCandidate = candidates.front().getValueDecl();
     candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)cand->getInterfaceType();
       return isValidDynamicMemberLookupSubscript(cand, decl);
     });
 
@@ -1266,8 +1262,6 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)cand->getInterfaceType();
     return isValidDynamicMemberLookupSubscript(cand, decl,
                                                /*ignoreLabel*/ true);
   });
@@ -2111,9 +2105,6 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   }
 
   auto interfaceType = value->getInterfaceType();
-  if (!interfaceType)
-    return ErrorType::get(value->getASTContext());
-
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
@@ -2177,8 +2168,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
 
   assert(!isa<FuncDecl>(results[0]));
   
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)results[0]->getInterfaceType();
   auto *origStorage = cast<AbstractStorageDecl>(results[0]);
   if (!origStorage->isDynamic()) {
     Diags.diagnose(attr->getLocation(),
@@ -2194,8 +2183,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   if (!origAccessor)
     return nullptr;
 
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)origAccessor->getInterfaceType();
   if (origAccessor->isImplicit() &&
       !(origStorage->getReadImpl() == ReadImplKind::Stored &&
         origStorage->getWriteImpl() == WriteImplKind::Stored)) {
@@ -2348,8 +2335,6 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
       if (attr->isInvalid())
         return;
 
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)accessor->getInterfaceType();
        auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
                                          accessor, attr, Ctx);
        if (!orig)

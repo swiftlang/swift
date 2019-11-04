@@ -229,7 +229,7 @@ static bool containsDeclRefKind(LookupResult &lookupResult,
                                 DeclRefKind refKind) {
   for (auto candidate : lookupResult) {
     ValueDecl *D = candidate.getValueDecl();
-    if (!D || !D->hasInterfaceType())
+    if (!D)
       continue;
     if (matchesDeclRefKind(D, refKind))
       return true;

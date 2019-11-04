@@ -4041,9 +4041,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
 
-  // Assign DD the interface type (Self) -> () -> ()
-  (void)DD->getInterfaceType();
-
   return DD;
 }
 
