@@ -3515,10 +3515,6 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
                                          conformedProtocol);
 }
 
-LazyResolver *GenericSignatureBuilder::getLazyResolver() const { 
-  return Context.getLazyResolver();
-}
-
 /// Resolve any unresolved dependent member types using the given builder.
 static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
                                         Type type) {
