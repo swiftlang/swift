@@ -1926,6 +1926,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
+                cmake_options+=(
+                  -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
+                )
+
                 if [[ ! -z "${CLANG_TOOLS_EXTRA_SOURCE_DIR}" ]] ; then
                   cmake_options+=(
                     -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
