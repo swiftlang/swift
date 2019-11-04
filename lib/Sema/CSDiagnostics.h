@@ -212,6 +212,7 @@ private:
 /// Provides information about the application of a function argument to a
 /// parameter.
 class FunctionArgApplyInfo {
+  ConstraintSystem &CS;
   Expr *ArgExpr;
   unsigned ArgIdx;
   Type ArgType;
@@ -223,11 +224,12 @@ class FunctionArgApplyInfo {
   const ValueDecl *Callee;
 
 public:
-  FunctionArgApplyInfo(Expr *argExpr, unsigned argIdx, Type argType,
-                       unsigned paramIdx, Type fnInterfaceType,
+  FunctionArgApplyInfo(ConstraintSystem &cs, Expr *argExpr, unsigned argIdx,
+                       Type argType, unsigned paramIdx, Type fnInterfaceType,
                        FunctionType *fnType, const ValueDecl *callee)
-      : ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType), ParamIdx(paramIdx),
-        FnInterfaceType(fnInterfaceType), FnType(fnType), Callee(callee) {}
+      : CS(cs), ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType),
+        ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType), FnType(fnType),
+        Callee(callee) {}
 
   /// \returns The argument being applied.
   Expr *getArgExpr() const { return ArgExpr; }
@@ -245,6 +247,45 @@ public:
   /// the argument, if any.
   Type getArgType(bool withSpecifier = false) const {
     return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The label for the argument being applied.
+  Identifier getArgLabel() const {
+    auto *parent = CS.getParentExpr(ArgExpr);
+    if (auto *te = dyn_cast<TupleExpr>(parent))
+      return te->getElementName(ArgIdx);
+
+    assert(isa<ParenExpr>(parent));
+    return Identifier();
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    llvm::raw_svector_ostream stream(scratch);
+
+    // Use the argument label only if it's unique within the argument list.
+    auto argLabel = getArgLabel();
+    auto useArgLabel = [&]() -> bool {
+      if (argLabel.empty())
+        return false;
+
+      if (auto *te = dyn_cast<TupleExpr>(CS.getParentExpr(ArgExpr)))
+        return llvm::count(te->getElementNames(), argLabel) == 1;
+
+      return false;
+    };
+
+    if (useArgLabel()) {
+      stream << "'";
+      stream << argLabel;
+      stream << "'";
+    } else {
+      stream << "#";
+      stream << getArgPosition();
+    }
+    return StringRef(scratch.data(), scratch.size());
   }
 
   /// \returns The interface type for the function being applied. Note that this
@@ -1845,6 +1886,13 @@ protected:
   /// will return T.
   Type getArgType(bool withSpecifier = false) const {
     return Info->getArgType(withSpecifier);
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    return Info->getArgDescription(scratch);
   }
 
   /// \returns The interface type for the function being applied.

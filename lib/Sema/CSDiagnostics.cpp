@@ -286,8 +286,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
-                              fnInterfaceType, fnType, callee);
+  return FunctionArgApplyInfo(cs, argExpr, argIdx, getType(argExpr),
+                              paramIdx, fnInterfaceType, fnType, callee);
 }
 
 Type FailureDiagnostic::restoreGenericParameters(
