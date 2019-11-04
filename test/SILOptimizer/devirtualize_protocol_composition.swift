@@ -14,6 +14,30 @@ protocol ProtocolB {
   func bar() -> Int
 }
 
+protocol ProtocolC {
+  func foo() -> Int
+}
+
+protocol ProtocolD {
+  func foo() -> Int
+}
+
+protocol ProtocolE {
+  func foo() -> Int
+}
+
+protocol ProtocolF {
+  func foo() -> Int
+}
+
+protocol ProtocolG {
+  func bar() -> Int
+}
+
+protocol ProtocolH {
+  func bar() -> Int
+}
+
 public class ClassB: ClassA<String> {
   func foo() -> Int {
     return 10
@@ -28,7 +52,7 @@ public class ClassC<T>: ClassA<T> {
   }
 }
 
-extension ClassC: ProtocolA { }
+extension ClassC: ProtocolC { }
 
 public class ClassD { }
 public class ClassE : ClassD {
@@ -37,7 +61,7 @@ public class ClassE : ClassD {
   }
 }
 
-extension ClassE: ProtocolA { }
+extension ClassE: ProtocolD { }
 
 public class ClassF {
   func foo() -> Int {
@@ -49,7 +73,7 @@ public class ClassF {
   }
 }
 
-extension ClassF: ProtocolA, ProtocolB { }
+extension ClassF: ProtocolE, ProtocolG { }
 
 public class ClassG <T> {
   func foo() -> Int {
@@ -61,7 +85,7 @@ public class ClassG <T> {
   }
 }
 
-extension ClassG: ProtocolA, ProtocolB { }
+extension ClassG: ProtocolF, ProtocolH { }
 
 public class ClassH {
   typealias type = ClassD
@@ -71,15 +95,19 @@ func shouldOptimize1<T>(_ x: ClassA<T> & ProtocolA) -> Int {
   return x.foo()
 }
 
-func shouldOptimize2(_ x: ClassD & ProtocolA) -> Int {
+func shouldOptimize2(_ x: ClassD & ProtocolD) -> Int {
   return x.foo()
 }
 
-func shouldOptimize3(_ x: ProtocolA & ProtocolB) -> Int {
+func shouldOptimize3(_ x: ProtocolE & ProtocolG) -> Int {
   return x.foo() + x.bar()
 }
 
-func shouldOptimize4(_ x: ClassH.type & ProtocolA) -> Int {
+func shouldOptimize4(_ x: ProtocolF & ProtocolH) -> Int {
+  return x.foo() + x.bar()
+}
+
+func shouldOptimize5(_ x: ClassH.type & ProtocolD) -> Int {
   return x.foo()
 }
 
@@ -121,7 +149,7 @@ public func entryPoint4(c: ClassF) -> Int {
 //CHECK-NOT: witness_method
 //CHECK: return
 public func entryPoint5<T>(c: ClassG<T>) -> Int {
-  return shouldOptimize3(c)
+  return shouldOptimize4(c)
 }
 
 //CHECK: entryPoint6
@@ -130,5 +158,5 @@ public func entryPoint5<T>(c: ClassG<T>) -> Int {
 //CHECK-NOT: witness_method
 //CHECK: return
 public func entryPoint6(c: ClassE) -> Int {
-  return shouldOptimize4(c)
+  return shouldOptimize5(c)
 }

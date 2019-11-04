@@ -219,10 +219,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     //   %5 = alloc_stack
     //   store %4 to %5
     auto firstUse = *instance->getUses().begin();
-    if (auto stackInitVal =
-            getAddressOfStackInit(instance, firstUse->getUser(), isOpenedValueCopied)) {
-      openedVal = stackInitVal;
+    if (auto *store = dyn_cast<StoreInst>(firstUse->getUser())) {
+      openedVal = store->getSrc();
     }
+//    if (auto stackInitVal =
+//            getAddressOfStackInit(instance, firstUse->getUser(), isOpenedValueCopied)) {
+//      openedVal = stackInitVal;
+//    }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ArchetypeType>();
