@@ -1489,6 +1489,9 @@ public:
   bool tryToRemoveDeadAllocation();
 
 private:
+  Optional<std::pair<SILType, unsigned>>
+  computeAvailableValues(SILValue SrcAddr, SILInstruction *Inst,
+                         SmallVectorImpl<AvailableValue> &AvailableValues);
   bool promoteLoadCopy(LoadInst *Inst);
   bool promoteLoadBorrow(LoadBorrowInst *Inst);
   bool promoteCopyAddr(CopyAddrInst *CAI);
@@ -1501,6 +1504,43 @@ private:
 
 } // end anonymous namespace
 
+Optional<std::pair<SILType, unsigned>> AllocOptimize::computeAvailableValues(
+    SILValue SrcAddr, SILInstruction *Inst,
+    SmallVectorImpl<AvailableValue> &AvailableValues) {
+  // If the box has escaped at this instruction, we can't safely promote the
+  // load.
+  if (DataflowContext.hasEscapedAt(Inst))
+    return None;
+
+  SILType LoadTy = SrcAddr->getType().getObjectType();
+
+  // If this is a load/copy_addr from a struct field that we want to promote,
+  // compute the access path down to the field so we can determine precise
+  // def/use behavior.
+  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
+
+  // If this is a load from within an enum projection, we can't promote it since
+  // we don't track subelements in a type that could be changing.
+  if (FirstElt == ~0U)
+    return None;
+
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
+
+  // Set up the bitvector of elements being demanded by the load.
+  SmallBitVector RequiredElts(NumMemorySubElements);
+  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
+
+  AvailableValues.resize(NumMemorySubElements);
+
+  // Find out if we have any available values.  If no bits are demanded, we
+  // trivially succeed. This can happen when there is a load of an empty struct.
+  if (NumLoadSubElements != 0 &&
+      !DataflowContext.computeAvailableValues(
+          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
+    return None;
+
+  return std::make_pair(LoadTy, FirstElt);
+}
 
 /// If we are able to optimize \p Inst, return the source address that
 /// instruction is loading from. If we can not optimize \p Inst, then just
@@ -1543,38 +1583,13 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *Inst) {
   if (!SrcAddr)
     return false;
 
-  // If the box has escaped at this instruction, we can't safely promote the
-  // load.
-  if (DataflowContext.hasEscapedAt(Inst))
-    return false;
-
-  SILType LoadTy = SrcAddr->getType().getObjectType();
-
-  // If this is a load/copy_addr from a struct field that we want to promote,
-  // compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
-
-  // If this is a load from within an enum projection, we can't promote it since
-  // we don't track subelements in a type that could be changing.
-  if (FirstElt == ~0U)
-    return false;
-
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
-
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
-
   SmallVector<AvailableValue, 8> AvailableValues;
-  AvailableValues.resize(NumMemorySubElements);
-
-  // Find out if we have any available values.  If no bits are demanded, we
-  // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0 &&
-      !DataflowContext.computeAvailableValues(
-          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
+  auto Result = computeAvailableValues(SrcAddr, Inst, AvailableValues);
+  if (!Result.hasValue())
     return false;
+
+  SILType LoadTy = Result->first;
+  unsigned FirstElt = Result->second;
 
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller loads for any subelements that were
@@ -1625,37 +1640,9 @@ bool AllocOptimize::promoteCopyAddr(CopyAddrInst *Inst) {
   if (!SrcAddr)
     return false;
 
-  // If the box has escaped at this instruction, we can't safely promote the
-  // load.
-  if (DataflowContext.hasEscapedAt(Inst))
-    return false;
-
-  SILType LoadTy = SrcAddr->getType().getObjectType();
-
-  // If this is a load/copy_addr from a struct field that we want to promote,
-  // compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
-
-  // If this is a load from within an enum projection, we can't promote it since
-  // we don't track subelements in a type that could be changing.
-  if (FirstElt == ~0U)
-    return false;
-  
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
-  
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
-
   SmallVector<AvailableValue, 8> AvailableValues;
-  AvailableValues.resize(NumMemorySubElements);
-  
-  // Find out if we have any available values.  If no bits are demanded, we
-  // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0 &&
-      !DataflowContext.computeAvailableValues(
-          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
+  auto Result = computeAvailableValues(SrcAddr, Inst, AvailableValues);
+  if (!Result.hasValue())
     return false;
 
   // Ok, we have some available values.  If we have a copy_addr, explode it now,
@@ -1687,38 +1674,13 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *Inst) {
   if (!SrcAddr)
     return false;
 
-  // If the box has escaped at this instruction, we can't safely promote the
-  // load.
-  if (DataflowContext.hasEscapedAt(Inst))
-    return false;
-
-  SILType LoadTy = SrcAddr->getType().getObjectType();
-
-  // If this is a load/copy_addr from a struct field that we want to promote,
-  // compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
-
-  // If this is a load from within an enum projection, we can't promote it since
-  // we don't track subelements in a type that could be changing.
-  if (FirstElt == ~0U)
-    return false;
-
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
-
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
-
   SmallVector<AvailableValue, 8> AvailableValues;
-  AvailableValues.resize(NumMemorySubElements);
-
-  // Find out if we have any available values.  If no bits are demanded, we
-  // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0 &&
-      !DataflowContext.computeAvailableValues(
-          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
+  auto Result = computeAvailableValues(SrcAddr, Inst, AvailableValues);
+  if (!Result.hasValue())
     return false;
+
+  SILType LoadTy = Result->first;
+  unsigned FirstElt = Result->second;
 
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller loads for any subelements that were
