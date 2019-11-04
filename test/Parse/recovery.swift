@@ -849,3 +849,7 @@ func f() {
 // <rdar://problem/22478168> | SR-11006
 // expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
 func SR11006(a: Int == 0) {}
+
+// rdar://38225184
+extension Collection where Element == Int && Index == Int {}
+// expected-error@-1 {{expected ',' to separate the requirements of this 'where' clause}} {{43-45=,}}
