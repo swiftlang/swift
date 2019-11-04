@@ -282,8 +282,6 @@ private:
 
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
-  bool visitAssignExpr(AssignExpr *AE);
-  bool visitInOutExpr(InOutExpr *IOE);
   bool visitCoerceExpr(CoerceExpr *CE);
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
@@ -3130,113 +3128,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   return true;
 }
 
-bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(assignExpr->getDest()->getValueProvidingExpr())) {
-    diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
-    return true;
-  }
-
-  // Situation like `var foo = &bar` didn't get diagnosed early
-  // because originally its parent is a `SequenceExpr` which hasn't
-  // been folded yet, and could represent an operator which accepts
-  // `inout` arguments.
-  if (auto *AddrOf = dyn_cast<InOutExpr>(assignExpr->getSrc())) {
-    diagnose(AddrOf->getLoc(), diag::extraneous_address_of);
-    return true;
-  }
-
-  if (CS.TC.diagnoseSelfAssignment(assignExpr))
-    return true;
-
-  // Type check the destination first, so we can coerce the source to it.
-  auto destExpr = typeCheckChildIndependently(assignExpr->getDest(),
-                                              TCC_AllowLValue);
-  if (!destExpr) return true;
-
-  auto destType = CS.getType(destExpr);
-  if (destType->is<UnresolvedType>() || destType->hasTypeVariable()) {
-    // Look closer into why destination has unresolved types since such
-    // means that destination has diagnosable structural problems, and it's
-    // better to diagnose destination (if possible) before moving on to
-    // the source of the assignment.
-    destExpr = typeCheckChildIndependently(
-        destExpr, TCC_AllowLValue | TCC_ForceRecheck, false);
-    if (!destExpr)
-      return true;
-
-    // If re-checking destination didn't produce diagnostic, let's just type
-    // check the source without contextual information.  If it succeeds, then we
-    // win, but if it fails, we'll have to diagnose this another way.
-    return !typeCheckChildIndependently(assignExpr->getSrc());
-  }
-
-  // If the result type is a non-lvalue, then we are failing because it is
-  // immutable and that's not a great thing to assign to.
-  if (!destType->hasLValueType()) {
-    // If the destination is a subscript, the problem may actually be that we
-    // incorrectly decided on a get-only subscript overload, and we may be able
-    // to come up with a better diagnosis by looking only at subscript candidates
-    // that are set-able.
-    if (auto subscriptExpr = dyn_cast<SubscriptExpr>(destExpr)) {
-      if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
-        return true;
-    }
-    // Member ref assignment errors detected elsewhere, so not an assignment issue if found here.
-    // The remaining exception involves mutable pointer conversions which aren't always caught elsewhere.
-    PointerTypeKind ptk;
-    if (!isa<MemberRefExpr>(destExpr) || CS.getType(destExpr)
-                                             ->lookThroughAllOptionalTypes()
-                                             ->getAnyPointerElementType(ptk)) {
-      AssignmentFailure failure(destExpr, CS, assignExpr->getLoc());
-      if (failure.diagnoseAsError())
-        return true;
-    }
-  }
-
-  auto *srcExpr = assignExpr->getSrc();
-  auto contextualType = destType->getRValueType();
-  auto contextualTypePurpose = isa<SubscriptExpr>(destExpr)
-                                   ? CTP_SubscriptAssignSource
-                                   : CTP_AssignSource;
-  // Let's try to type-check assignment source expression without using
-  // destination as a contextual type, that allows us to diagnose
-  // contextual problems related to source much easier.
-  //
-  // If source expression requires contextual type to be present,
-  // let's avoid this step because it's always going to fail.
-  {
-    auto *srcExpr = assignExpr->getSrc();
-    ExprTypeSaverAndEraser eraser(srcExpr);
-
-    ConcreteDeclRef ref = nullptr;
-    auto type = getTypeOfExpressionWithoutApplying(srcExpr, CS.DC, ref);
-
-    if (type && !type->isEqual(contextualType))
-      return diagnoseContextualConversionError(
-          assignExpr->getSrc(), contextualType, contextualTypePurpose);
-  }
-
-  srcExpr = typeCheckChildIndependently(assignExpr->getSrc(), contextualType,
-                                        contextualTypePurpose);
-  if (!srcExpr)
-    return true;
-
-  // If we are assigning to _ and have unresolved types on the RHS, then we have
-  // an ambiguity problem.
-  if (isa<DiscardAssignmentExpr>(destExpr->getSemanticsProvidingExpr()) &&
-      CS.getType(srcExpr)->hasUnresolvedType()) {
-    diagnoseAmbiguity(srcExpr);
-    return true;
-  }
-
-  return false;
-}
-
-bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  return false;
-}
-
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   // Coerce the input to whatever type is specified by the CoerceExpr.
   auto expr = typeCheckChildIndependently(CE->getSubExpr(),
@@ -4471,6 +4362,30 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
 
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
+  if (auto *assignment = dyn_cast<AssignExpr>(E)) {
+    if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
+      auto *srcExpr = assignment->getSrc();
+
+      bool diagnosedInvalidUseOfDiscardExpr = false;
+      srcExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
+        if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
+          diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment)
+              .highlight(srcExpr->getSourceRange());
+          diagnosedInvalidUseOfDiscardExpr = true;
+          return nullptr;
+        }
+
+        return expr;
+      });
+
+      if (diagnosedInvalidUseOfDiscardExpr)
+        return;
+
+      diagnoseAmbiguity(srcExpr);
+      return;
+    }
+  }
+
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
