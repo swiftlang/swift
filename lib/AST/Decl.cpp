@@ -2885,12 +2885,10 @@ bool ValueDecl::isRecursiveValidation() const {
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
 
-  // Our clients that don't register the lazy resolver are relying on the
-  // fact that they can't pull an interface type out to avoid doing work.
-  // This is a necessary evil until we can wean them off.
-  if (!ctx.getLazyResolver()) {
-    return TypeAndAccess.getPointer();
-  }
+  // N.B. This assertion exists to catch new broken callers. It can be removed
+  // with the LazyResolver when the time comes.
+  assert(ctx.getLazyResolver()
+         && "The lazy resolver must be registered to make semantic queries!");
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
