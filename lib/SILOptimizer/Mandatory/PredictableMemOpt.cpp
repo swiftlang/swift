@@ -753,11 +753,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 SingleValueInstruction *
 AvailableValueAggregator::addMissingDestroysForCopiedValues(
     SingleValueInstruction *svi, SILValue newVal) {
-  // If ownership is not enabled... bail. We do not need to do this since we do
-  // not need to insert an extra copy unless we have ownership since without
-  // ownership stores do not consume.
-  if (!B.hasOwnership())
-    return svi;
+  assert(B.hasOwnership() &&
+         "We assume this is only called if we have ownership");
 
   assert((isa<LoadBorrowInst>(svi) || isa<LoadInst>(svi)) &&
          "Expected to have a /real/ load here since we assume that we have a "
@@ -1601,6 +1598,18 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
 
   LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *li << "\n");
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
+  ++NumLoadPromoted;
+
+  // If we did not have ownership, we did not insert extra copies at our stores,
+  // so we can just RAUW and return.
+  if (!li->getFunction()->hasOwnership()) {
+    li->replaceAllUsesWith(newVal);
+    SILValue addr = li->getOperand();
+    li->eraseFromParent();
+    if (auto *addrI = addr->getDefiningInstruction())
+      recursivelyDeleteTriviallyDeadInstructions(addrI);
+    return true;
+  }
 
   // If we inserted any copies, we created the copies at our stores. We know
   // that in our load block, we will reform the aggregate as appropriate at the
@@ -1610,8 +1619,6 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   // over all copies that we found using the load as the "consuming uses" (just
   // for the purposes of identifying the consuming block).
   auto *oldLoad = agg.addMissingDestroysForCopiedValues(li, newVal);
-
-  ++NumLoadPromoted;
 
   // If we are returned the load, eliminate it. Otherwise, it was already
   // handled for us... so return true.
