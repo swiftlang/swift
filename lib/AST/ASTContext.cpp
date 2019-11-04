@@ -925,13 +925,8 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
                                       StringRef name) {
   SmallVector<ValueDecl *, 1> results;
   ctx.lookupInSwiftModule(name, results);
-  if (results.size() == 1) {
-    if (auto FD = dyn_cast<FuncDecl>(results.front())) {
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)FD->getInterfaceType();
-      return FD;
-    }
-  }
+  if (results.size() == 1)
+    return dyn_cast_or_null<FuncDecl>(results.front());
   return nullptr;
 }
 

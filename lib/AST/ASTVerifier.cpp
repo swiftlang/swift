@@ -2969,15 +2969,8 @@ public:
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
-      if (!AFD->hasInterfaceType()) {
-        if (isa<AccessorDecl>(AFD) && AFD->isImplicit())
-          return;
-
-        Out << "All functions except implicit accessors should be "
-               "validated by now\n";
-        AFD->dump(Out);
-        abort();
-      }
+      if (!AFD->hasInterfaceType())
+        return;
 
       // If this function is generic or is within a generic context, it should
       // have an interface type.

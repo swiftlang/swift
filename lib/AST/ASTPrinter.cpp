@@ -2520,13 +2520,13 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     [&]{
       Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
     });
-  if (decl->hasInterfaceType()) {
+  if (auto type = decl->getInterfaceType()) {
     Printer << ": ";
     TypeLoc tyLoc;
     if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr())
-      tyLoc = TypeLoc(repr, decl->getInterfaceType());
+      tyLoc = TypeLoc(repr, type);
     else
-      tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
+      tyLoc = TypeLoc::withoutLoc(type);
 
     Printer.printDeclResultTypePre(decl, tyLoc);
 
@@ -2665,7 +2665,7 @@ void PrintAST::printParameterList(ParameterList *PL,
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyParams = AFD->getParameters();
-  auto curTy = AFD->hasInterfaceType() ? AFD->getInterfaceType() : nullptr;
+  auto curTy = AFD->getInterfaceType();
 
   // Skip over the implicit 'self'.
   if (AFD->hasImplicitSelfDecl()) {
@@ -2872,13 +2872,15 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
 
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (elt->hasInterfaceType() && !elt->isInvalid()) {
-      // Walk to the params of the associated values.
-      // (EnumMetaType) -> (AssocValues) -> Enum
-      params = elt->getInterfaceType()->castTo<AnyFunctionType>()
-                                      ->getResult()
-                                      ->castTo<AnyFunctionType>()
-                                      ->getParams();
+    if (auto type = elt->getInterfaceType()) {
+      if (!elt->isInvalid()) {
+        // Walk to the params of the associated values.
+        // (EnumMetaType) -> (AssocValues) -> Enum
+        params = type->castTo<AnyFunctionType>()
+                     ->getResult()
+                     ->castTo<AnyFunctionType>()
+                     ->getParams();
+      }
     }
 
     // @escaping is not valid in enum element position, even though the
@@ -2969,9 +2971,11 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   }, [&] { // Parameters
     printGenericDeclGenericParams(decl);
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (decl->hasInterfaceType() && !decl->isInvalid()) {
-      // Walk to the params of the subscript's indices.
-      params = decl->getInterfaceType()->castTo<AnyFunctionType>()->getParams();
+    if (auto type = decl->getInterfaceType()) {
+      if (!decl->isInvalid()) {
+        // Walk to the params of the subscript's indices.
+        params = type->castTo<AnyFunctionType>()->getParams();
+      }
     }
     printParameterList(decl->getIndices(), params,
                        /*isAPINameByDefault*/false);

@@ -685,7 +685,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Set the interface type of the initializer.
   ctor->setGenericSignature(genericSig);
-  (void)ctor->getInterfaceType();
 
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());

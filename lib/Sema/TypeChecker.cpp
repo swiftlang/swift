@@ -424,10 +424,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // to work.
     bindExtensions(SF);
 
-    // Look for bridging functions. This only matters when
-    // -enable-source-import is provided.
-    checkBridgedFunctions(TC.Context);
-
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {

@@ -282,9 +282,6 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->isRecursiveValidation())
         return;
 
-      // FIXME: This is used to compute isInvalid() below.
-      (void) D->getInterfaceType();
-
       switch (D->getKind()) {
 #define DECL(ID, SUPER) \
       case DeclKind::ID:
@@ -430,8 +427,6 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-          // FIXME(InterfaceTypeRequest): Remove this.
-          (void)VD->getInterfaceType();
           if (auto *TypeResolver = VD->getASTContext().getLazyResolver()) {
             if (!NormalConformance->hasWitness(VD) &&
                 (Conformance->getDeclContext()->getParentSourceFile() !=
