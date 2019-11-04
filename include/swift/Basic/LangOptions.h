@@ -211,6 +211,9 @@ namespace swift {
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
 
+    /// Enable SIL type lowering
+    bool EnableSubstSILFunctionTypesForFunctionValues = false;
+
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
