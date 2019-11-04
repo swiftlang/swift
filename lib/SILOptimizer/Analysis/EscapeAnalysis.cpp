@@ -70,7 +70,9 @@ static bool findRecursiveRefType(SILType Ty, const SILFunction &F,
 
   if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
     for (auto *Field : Str->getStoredProperties()) {
-      if (findRecursiveRefType(Ty.getFieldType(Field, Mod), F, mustBeRef))
+      if (findRecursiveRefType(
+              Ty.getFieldType(Field, Mod, F.getTypeExpansionContext()), F,
+              mustBeRef))
         return true;
     }
     return false;
@@ -84,9 +86,10 @@ static bool findRecursiveRefType(SILType Ty, const SILFunction &F,
   }
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->hasAssociatedValues()
-          && findRecursiveRefType(Ty.getEnumElementType(ElemDecl, Mod), F,
-                                  mustBeRef))
+      if (ElemDecl->hasAssociatedValues() &&
+          findRecursiveRefType(
+              Ty.getEnumElementType(ElemDecl, Mod, F.getTypeExpansionContext()),
+              F, mustBeRef))
         return true;
     }
     return false;

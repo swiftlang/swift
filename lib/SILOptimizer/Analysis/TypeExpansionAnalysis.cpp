@@ -24,10 +24,14 @@ using namespace swift;
 // memory usage of this cache.
 static const int TypeExpansionAnalysisMaxCacheSize = 4096;
 
-const ProjectionPathList&
-TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod) {
+const ProjectionPathList &
+TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod,
+                                        TypeExpansionContext context) {
   // Check whether we have the type expansion.
   auto Iter = ExpansionCache.find(B);
+  // TODO: FIXME: ExpansionCache.find((B,context))
+  //
+  //
   if (Iter != ExpansionCache.end()) {
     return Iter->second;
   }
@@ -46,7 +50,8 @@ TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod) {
   }
 
   // Build the type expansion for the leaf nodes.
-  ProjectionPath::expandTypeIntoLeafProjectionPaths(B, Mod, ExpansionCache[B]);
+  ProjectionPath::expandTypeIntoLeafProjectionPaths(B, Mod, context,
+                                                    ExpansionCache[B]);
   return ExpansionCache[B];
 }
 
