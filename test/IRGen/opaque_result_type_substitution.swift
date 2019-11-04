@@ -1,21 +1,22 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -disable-availability-checking -emit-ir -primary-file %s | %FileCheck %s
 
-protocol E {}
+public protocol E {}
 
-struct Pair<T, V> : E {
+public struct Pair<T, V> : E {
   var fst : T
   var snd : V
 
-  init(_ f: T, _ s: V) {
+  public init(_ f: T, _ s: V) {
     self.fst = f
     self.snd = s
   }
 
-  func foobar() -> some E {
+  public func foobar() -> some E {
     return self
   }
 }
 
+@inlinable
 public func usePair<T, V>(_ t: T, _ v: V) {
   var x = Pair(t, v)
   let q = x.foobar()
