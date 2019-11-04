@@ -760,6 +760,41 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
          "Expected to have a /real/ load here since we assume that we have a "
          "unary operand instruction");
 
+  // As an invariant, we know that any of our copy_values provide an entire
+  // available value that we are promoting if and only if all other copy_values
+  // have this property.
+  //
+  // This follows since our algorithm assumes:
+  //
+  // 1. We only handle structs, tuples, not enums (i.e. sum types) (implying no
+  // recursive types).
+  //
+  // 2. If we have any copy_value subtypes the subtypes must be formed at the
+  // load point. Thus if one of the copy_values we inserted matches the entire
+  // type, coming into that the load block, all incoming values must be that
+  // type implying we could not form a tuple or a struct.
+  //
+  // 3. Our algorithm does not allow for available values from split store
+  // initializations of memory to be merged with available values that
+  // initialize the entire memory location.
+#ifndef NDEBUG
+  {
+    SILType fullType = newVal->getType();
+    Optional<bool> foundEntireTypeCopyValue = None;
+    for (auto *inst : insertedInsts) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
+        if (cvi->getType() == fullType) {
+          assert(foundEntireTypeCopyValue.getValueOr(true));
+          foundEntireTypeCopyValue = true;
+        } else {
+          assert(!foundEntireTypeCopyValue.getValueOr(false));
+          foundEntireTypeCopyValue = false;
+        }
+      }
+    }
+  }
+#endif
+
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
   bool foundLoop = false;
