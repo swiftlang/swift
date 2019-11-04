@@ -10,9 +10,6 @@
 //
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 // Test that the functions defined in the OSLogPrototype overlay annotated as
 // constant evaluable are so (with the constexpr-limit defined above).
 // This test is meant to catch regressions in the OSLog overlay implementation

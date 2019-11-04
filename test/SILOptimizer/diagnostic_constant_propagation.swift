@@ -9,6 +9,7 @@
 // References: <rdar://problem/29937936>,
 // <https://bugs.swift.org/browse/SR-5964>
 
+// SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-799): Re-enable RUN lines after SR-11336 is fixed.
 // XFAIL: *
 

@@ -1,8 +1,10 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
+// RUN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
+// REQUIRES: asserts
+
 // SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-799): Re-enable RUN line after SR-11336 is fixed.
-// UN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
-// REQUIRES: asserts
+// XFAIL: *
 
 //===----------------------------------------------------------------------===//
 // Basic function calls and control flow

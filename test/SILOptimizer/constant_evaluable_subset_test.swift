@@ -18,6 +18,7 @@
 //
 // RUN: %FileCheck %s < %t/error-output-mandatory
 
+// SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-799): Re-enable test after SR-11336 is fixed.
 // XFAIL: *
 

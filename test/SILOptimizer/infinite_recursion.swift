@@ -1,6 +1,10 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify -enable-ownership-stripping-after-serialization
 
+// SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-799): Re-enable test after SR-11336 is fixed.
+// XFAIL: *
+
 func a() {  // expected-warning {{all paths through this function will call itself}}
   a()
 }
