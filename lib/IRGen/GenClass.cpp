@@ -297,7 +297,8 @@ namespace {
                                   SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = classType.getFieldType(var, IGM.getSILModule());
+        SILType type = classType.getFieldType(var, IGM.getSILModule(),
+                                              TypeExpansionContext::minimal());
 
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
@@ -500,23 +501,21 @@ Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
 }
 
 /// Emit a field l-value by applying the given offset to the given base.
-static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
-                                        SILType baseType,
-                                        llvm::Value *base,
-                                        llvm::Value *offset,
+static OwnedAddress emitAddressAtOffset(TypeExpansionContext context,
+                                        IRGenFunction &IGF, SILType baseType,
+                                        llvm::Value *base, llvm::Value *offset,
                                         VarDecl *field) {
-  auto &fieldTI =
-    IGF.getTypeInfo(baseType.getFieldType(field, IGF.getSILModule()));
+  auto &fieldTI = IGF.getTypeInfo(
+      baseType.getFieldType(field, IGF.getSILModule(), context));
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
 }
 
-llvm::Constant *
-irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
-                                                       SILType baseType,
-                                                       VarDecl *field) {
-  auto fieldType = baseType.getFieldType(field, IGM.getSILModule());
+llvm::Constant *irgen::tryEmitConstantClassFragilePhysicalMemberOffset(
+    TypeExpansionContext context, IRGenModule &IGM, SILType baseType,
+    VarDecl *field) {
+  auto fieldType = baseType.getFieldType(field, IGM.getSILModule(), context);
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGM.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -572,11 +571,9 @@ irgen::getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
   return ClassTI.createLayoutWithTailElems(IGM, classType, tailTypes);
 }
 
-OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
-                                                      llvm::Value *base,
-                                                      SILType baseType,
-                                                      SILType fieldType,
-                                                      VarDecl *field) {
+OwnedAddress irgen::projectPhysicalClassMemberAddress(
+    TypeExpansionContext context, IRGenFunction &IGF, llvm::Value *base,
+    SILType baseType, SILType fieldType, VarDecl *field) {
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGF.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -606,13 +603,13 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   case FieldAccess::NonConstantDirect: {
     Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, NotForDefinition);
     auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
-    return emitAddressAtOffset(IGF, baseType, base, offset, field);
+    return emitAddressAtOffset(context, IGF, baseType, base, offset, field);
   }
     
   case FieldAccess::ConstantIndirect: {
     auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
     auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
-    return emitAddressAtOffset(IGF, baseType, base, offset, field);
+    return emitAddressAtOffset(context, IGF, baseType, base, offset, field);
   }
   }
   llvm_unreachable("bad field-access strategy");
@@ -2423,12 +2420,13 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   return FunctionPointer(fnPtr, signature);
 }
 
-FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                                              llvm::Value *base,
-                                              SILType baseType,
-                                              SILDeclRef method,
-                                              CanSILFunctionType methodType,
-                                              bool useSuperVTable) {
+FunctionPointer
+irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                              llvm::Value *base,
+                              SILType baseType,
+                              SILDeclRef method,
+                              CanSILFunctionType methodType,
+                              bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
