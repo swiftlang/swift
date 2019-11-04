@@ -291,8 +291,6 @@ private:
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
-  bool visitBindOptionalExpr(BindOptionalExpr *BOE);
-
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitAssignExpr(AssignExpr *AE);
@@ -3315,24 +3313,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
     if (AvailableAttr::isUnavailable(decl))
       return diagnoseExplicitUnavailability(
           decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
-  }
-
-  return false;
-}
-
-bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
-  auto argExpr = typeCheckChildIndependently(BOE->getSubExpr());
-  if (!argExpr) return true;
-  auto argType = CS.getType(argExpr);
-
-  // If the subexpression type checks as a non-optional type, then that is the
-  // error.  Produce a specific diagnostic about this.
-  if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getOptionalObjectType().isNull()) {
-    diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
-      .highlight(BOE->getSourceRange())
-      .fixItRemove(BOE->getQuestionLoc());
-    return true;
   }
 
   return false;
