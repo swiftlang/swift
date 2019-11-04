@@ -1,5 +1,14 @@
 // RUN: %target-typecheck-verify-swift -typecheck %s -verify -swift-version 4
 
+// Make sure Self: ... is correctly diagnosed in classes
+
+class SelfInGenericClass<T> {
+  // expected-error@+1 {{type 'Self' in conformance requirement does not refer to a generic parameter or associated type}}
+  func foo() where Self: Equatable { }
+  // expected-error@+1 {{generic signature requires types 'Self' and 'Bool' to be the same}}
+  func bar() where Self == Bool { }
+}
+
 protocol Whereable {
   associatedtype Assoc
   associatedtype Bssoc
