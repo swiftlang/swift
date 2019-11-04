@@ -472,9 +472,6 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *builder,
   if (srcTy == destTy)
     return value;
 
-  if (srcTy.isAddress() == destTy.isAddress())
-    return nullptr;
-
   if (srcTy.isAddress() && destTy.isAddress()) {
     // Cast between two addresses and that's it.
     return builder->createUncheckedAddrCast(loc, value, destTy);
