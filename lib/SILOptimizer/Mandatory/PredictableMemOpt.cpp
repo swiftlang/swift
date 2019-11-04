@@ -753,11 +753,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 SingleValueInstruction *
 AvailableValueAggregator::addMissingDestroysForCopiedValues(
     SingleValueInstruction *svi, SILValue newVal) {
-  // If ownership is not enabled... bail. We do not need to do this since we do
-  // not need to insert an extra copy unless we have ownership since without
-  // ownership stores do not consume.
-  if (!B.hasOwnership())
-    return svi;
+  assert(B.hasOwnership() &&
+         "We assume this is only called if we have ownership");
 
   assert((isa<LoadBorrowInst>(svi) || isa<LoadInst>(svi)) &&
          "Expected to have a /real/ load here since we assume that we have a "
@@ -1492,9 +1489,9 @@ private:
   Optional<std::pair<SILType, unsigned>>
   computeAvailableValues(SILValue SrcAddr, SILInstruction *Inst,
                          SmallVectorImpl<AvailableValue> &AvailableValues);
-  bool promoteLoadCopy(LoadInst *Inst);
-  bool promoteLoadBorrow(LoadBorrowInst *Inst);
-  bool promoteCopyAddr(CopyAddrInst *CAI);
+  bool promoteLoadCopy(LoadInst *li);
+  bool promoteLoadBorrow(LoadBorrowInst *lbi);
+  bool promoteCopyAddr(CopyAddrInst *cai);
   void promoteLoadTake(LoadInst *Inst, MutableArrayRef<AvailableValue> values);
   void promoteDestroyAddr(DestroyAddrInst *dai,
                           MutableArrayRef<AvailableValue> values);
@@ -1570,7 +1567,7 @@ static SILValue tryFindSrcAddrForLoad(SILInstruction *i) {
 /// cross element accesses have been scalarized.
 ///
 /// This returns true if the load has been removed from the program.
-bool AllocOptimize::promoteLoadCopy(LoadInst *Inst) {
+bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
   // have to prove that something in this function is holding the weak value
@@ -1579,29 +1576,40 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *Inst) {
 
   // First attempt to find a source addr for our "load" instruction. If we fail
   // to find a valid value, just return.
-  SILValue SrcAddr = tryFindSrcAddrForLoad(Inst);
-  if (!SrcAddr)
+  SILValue srcAddr = tryFindSrcAddrForLoad(li);
+  if (!srcAddr)
     return false;
 
-  SmallVector<AvailableValue, 8> AvailableValues;
-  auto Result = computeAvailableValues(SrcAddr, Inst, AvailableValues);
-  if (!Result.hasValue())
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result = computeAvailableValues(srcAddr, li, availableValues);
+  if (!result.hasValue())
     return false;
 
-  SILType LoadTy = Result->first;
-  unsigned FirstElt = Result->second;
+  SILType loadTy = result->first;
+  unsigned firstElt = result->second;
 
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller loads for any subelements that were
   // not available. We are "propagating" a +1 available value from the store
   // points.
-  auto *load = dyn_cast<SingleValueInstruction>(Inst);
-  AvailableValueAggregator agg(load, AvailableValues, Uses, deadEndBlocks,
+  AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
                                false /*isTake*/);
-  SILValue newVal = agg.aggregateValues(LoadTy, load->getOperand(0), FirstElt);
+  SILValue newVal = agg.aggregateValues(loadTy, li->getOperand(), firstElt);
 
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *load << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *li << "\n");
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
+  ++NumLoadPromoted;
+
+  // If we did not have ownership, we did not insert extra copies at our stores,
+  // so we can just RAUW and return.
+  if (!li->getFunction()->hasOwnership()) {
+    li->replaceAllUsesWith(newVal);
+    SILValue addr = li->getOperand();
+    li->eraseFromParent();
+    if (auto *addrI = addr->getDefiningInstruction())
+      recursivelyDeleteTriviallyDeadInstructions(addrI);
+    return true;
+  }
 
   // If we inserted any copies, we created the copies at our stores. We know
   // that in our load block, we will reform the aggregate as appropriate at the
@@ -1610,9 +1618,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *Inst) {
   // blocks that we may have can be found by performing a linear lifetime check
   // over all copies that we found using the load as the "consuming uses" (just
   // for the purposes of identifying the consuming block).
-  auto *oldLoad = agg.addMissingDestroysForCopiedValues(load, newVal);
-
-  ++NumLoadPromoted;
+  auto *oldLoad = agg.addMissingDestroysForCopiedValues(li, newVal);
 
   // If we are returned the load, eliminate it. Otherwise, it was already
   // handled for us... so return true.
@@ -1627,7 +1633,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *Inst) {
   return true;
 }
 
-bool AllocOptimize::promoteCopyAddr(CopyAddrInst *Inst) {
+bool AllocOptimize::promoteCopyAddr(CopyAddrInst *cai) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
   // have to prove that something in this function is holding the weak value
@@ -1636,19 +1642,19 @@ bool AllocOptimize::promoteCopyAddr(CopyAddrInst *Inst) {
 
   // First attempt to find a source addr for our "load" instruction. If we fail
   // to find a valid value, just return.
-  SILValue SrcAddr = tryFindSrcAddrForLoad(Inst);
-  if (!SrcAddr)
+  SILValue srcAddr = tryFindSrcAddrForLoad(cai);
+  if (!srcAddr)
     return false;
 
-  SmallVector<AvailableValue, 8> AvailableValues;
-  auto Result = computeAvailableValues(SrcAddr, Inst, AvailableValues);
-  if (!Result.hasValue())
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result = computeAvailableValues(srcAddr, cai, availableValues);
+  if (!result.hasValue())
     return false;
 
   // Ok, we have some available values.  If we have a copy_addr, explode it now,
   // exposing the load operation within it.  Subsequent optimization passes will
   // see the load and propagate the available values into it.
-  DataflowContext.explodeCopyAddr(Inst);
+  DataflowContext.explodeCopyAddr(cai);
 
   // This is removing the copy_addr, but explodeCopyAddr takes care of
   // removing the instruction from Uses for us, so we return false.
@@ -1661,7 +1667,7 @@ bool AllocOptimize::promoteCopyAddr(CopyAddrInst *Inst) {
 /// cross element accesses have been scalarized.
 ///
 /// This returns true if the load has been removed from the program.
-bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *Inst) {
+bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
   // have to prove that something in this function is holding the weak value
@@ -1670,28 +1676,27 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *Inst) {
 
   // First attempt to find a source addr for our "load" instruction. If we fail
   // to find a valid value, just return.
-  SILValue SrcAddr = tryFindSrcAddrForLoad(Inst);
-  if (!SrcAddr)
+  SILValue srcAddr = tryFindSrcAddrForLoad(lbi);
+  if (!srcAddr)
     return false;
 
-  SmallVector<AvailableValue, 8> AvailableValues;
-  auto Result = computeAvailableValues(SrcAddr, Inst, AvailableValues);
-  if (!Result.hasValue())
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result = computeAvailableValues(srcAddr, lbi, availableValues);
+  if (!result.hasValue())
     return false;
 
-  SILType LoadTy = Result->first;
-  unsigned FirstElt = Result->second;
+  SILType loadTy = result->first;
+  unsigned firstElt = result->second;
 
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller loads for any subelements that were
   // not available. We are "propagating" a +1 available value from the store
   // points.
-  auto *load = dyn_cast<SingleValueInstruction>(Inst);
-  AvailableValueAggregator agg(load, AvailableValues, Uses, deadEndBlocks,
+  AvailableValueAggregator agg(lbi, availableValues, Uses, deadEndBlocks,
                                false /*isTake*/);
-  SILValue newVal = agg.aggregateValues(LoadTy, load->getOperand(0), FirstElt);
+  SILValue newVal = agg.aggregateValues(loadTy, lbi->getOperand(), firstElt);
 
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *load << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *lbi << "\n");
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
 
   // If we inserted any copies, we created the copies at our stores. We know
@@ -1701,7 +1706,7 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *Inst) {
   // blocks that we may have can be found by performing a linear lifetime check
   // over all copies that we found using the load as the "consuming uses" (just
   // for the purposes of identifying the consuming block).
-  auto *oldLoad = agg.addMissingDestroysForCopiedValues(load, newVal);
+  auto *oldLoad = agg.addMissingDestroysForCopiedValues(lbi, newVal);
 
   ++NumLoadPromoted;
 
