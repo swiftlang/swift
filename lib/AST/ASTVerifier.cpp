@@ -3639,17 +3639,7 @@ public:
     void checkErrors(Stmt *S) {}
     void checkErrors(Pattern *P) {}
     void checkErrors(Decl *D) {}
-    void checkErrors(ValueDecl *D) {
-      PrettyStackTraceDecl debugStack("verifying errors", D);
-
-      if (!D->hasInterfaceType())
-        return;
-      if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
-        Out << "Valid decl has error type!\n";
-        D->dump(Out);
-        abort();
-      }
-    }
+    void checkErrors(ValueDecl *D) {}
   };
 } // end anonymous namespace
 
