@@ -34,7 +34,7 @@ using namespace swift;
 /// This requires the getter's body to have a certain syntactic form. It should
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
 static EnumElementDecl *
-extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
+extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
   diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
@@ -73,7 +73,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
 /// If there are no enum elements but there are properties, attempts to map
 /// an arbitrary property to an enum element using extractEnumElement.
 static EnumElementDecl *
-filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
+filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
                      bool unqualifiedLookup, LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
@@ -106,26 +106,26 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
   }
 
   if (!foundElement && foundConstant && foundConstant->hasClangNode())
-    foundElement = extractEnumElement(TC, DC, UseLoc, foundConstant);
+    foundElement = extractEnumElement(DC, UseLoc, foundConstant);
 
   return foundElement;
 }
 
 /// Find an unqualified enum element.
 static EnumElementDecl *
-lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
+lookupUnqualifiedEnumMemberElement(DeclContext *DC,
                                    Identifier name, SourceLoc UseLoc) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup =
       TypeChecker::lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc,
+  return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/true, lookup);
 }
 
 /// Find an enum element in an enum type.
 static EnumElementDecl *
-lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
+lookupEnumMemberElement(DeclContext *DC, Type ty,
                         Identifier name, SourceLoc UseLoc) {
   if (!ty->mayHaveMembers())
     return nullptr;
@@ -135,7 +135,7 @@ lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   LookupResult foundElements =
       TypeChecker::lookupMember(DC, ty, name, lookupOptions);
-  return filterForEnumElement(TC, DC, UseLoc,
+  return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/false, foundElements);
 }
 
@@ -473,7 +473,7 @@ public:
 
     // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseIdentifier(),
+      = lookupEnumMemberElement(DC, ty, ude->getName().getBaseIdentifier(),
                                 ude->getLoc());
     if (!referencedElement)
       return nullptr;
@@ -514,7 +514,7 @@ public:
     //
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC,
+        = lookupUnqualifiedEnumMemberElement(DC,
                                              ude->getName().getBaseIdentifier(),
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
@@ -561,7 +561,7 @@ public:
     if (components.empty()) {
       // Only one component. Try looking up an enum element in context.
       referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC,
+        = lookupUnqualifiedEnumMemberElement(DC,
                                              tailComponent->getIdentifier(),
                                              tailComponent->getLoc());
       if (!referencedElement)
@@ -579,13 +579,13 @@ public:
       auto *prefixRepr = IdentTypeRepr::create(TC.Context, components);
 
       // See first if the entire repr resolves to a type.
-      Type enumTy = TC.resolveIdentifierType(TypeResolution::forContextual(DC),
-                                             prefixRepr, options);
+      Type enumTy = TypeChecker::resolveIdentifierType(TypeResolution::forContextual(DC),
+                                                       prefixRepr, options);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
       referencedElement
-        = lookupEnumMemberElement(TC, DC, enumTy,
+        = lookupEnumMemberElement(DC, enumTy,
                                   tailComponent->getIdentifier(),
                                   tailComponent->getLoc());
       if (!referencedElement)
@@ -679,8 +679,7 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
-static bool validateTypedPattern(TypeChecker &TC,
-                                 TypeResolution resolution,
+static bool validateTypedPattern(TypeResolution resolution,
                                  TypedPattern *TP,
                                  TypeResolutionOptions options) {
   if (TP->hasType())
@@ -693,6 +692,7 @@ static bool validateTypedPattern(TypeChecker &TC,
   // If the pattern declares an opaque type, and applies to a single
   // variable binding, then we can bind the opaque return type from the
   // property definition.
+  auto &Context = resolution.getASTContext();
   if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(TL.getTypeRepr())) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
@@ -701,20 +701,20 @@ static bool validateTypedPattern(TypeChecker &TC,
       auto opaqueDecl = var->getOpaqueResultTypeDecl();
       auto opaqueTy = (opaqueDecl
                        ? opaqueDecl->getDeclaredInterfaceType()
-                       : ErrorType::get(TC.Context));
+                       : ErrorType::get(Context));
       TL.setType(named->getDecl()->getDeclContext()
                                  ->mapTypeIntoContext(opaqueTy));
       hadError = opaqueTy->hasError();
     } else {
-      TC.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
+      Context.Diags.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
       hadError = true;
     }
   } else {
-    hadError = TypeChecker::validateType(TC.Context, TL, resolution, options);
+    hadError = TypeChecker::validateType(Context, TL, resolution, options);
   }
 
   if (hadError) {
-    TP->setType(ErrorType::get(TC.Context));
+    TP->setType(ErrorType::get(Context));
     return hadError;
   }
 
@@ -755,7 +755,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Typed: {
     auto resolution = TypeResolution::forContextual(dc);
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, resolution, TP, options);
+    bool hadError = validateTypedPattern(resolution, TP, options);
 
     // If we have unbound generic types, don't apply them below; instead,
     // the caller will call typeCheckBinding() later.
@@ -950,7 +950,7 @@ recur:
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, resolution, TP, options);
+    bool hadError = validateTypedPattern(resolution, TP, options);
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
@@ -1249,7 +1249,7 @@ recur:
     
     Type enumTy;
     if (!elt) {
-      elt = lookupEnumMemberElement(*this, dc, type, EEP->getName(),
+      elt = lookupEnumMemberElement(dc, type, EEP->getName(),
                                     EEP->getLoc());
       if (!elt) {
         if (!type->hasError()) {
@@ -1287,7 +1287,7 @@ recur:
           // to add multiple levels of OptionalSomePattern if the optional
           // is nested.
           if (auto baseType = type->getOptionalObjectType()) {
-            if (lookupEnumMemberElement(*this, dc,
+            if (lookupEnumMemberElement(dc,
                                         baseType->lookThroughAllOptionalTypes(),
                                         EEP->getName(), EEP->getLoc())) {
               P = new (Context)
