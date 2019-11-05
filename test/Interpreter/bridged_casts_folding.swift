@@ -5,6 +5,9 @@
 // the correct reason in the test. We want to separate a memory management error
 // from a cast error which prints a nice error message.
 
+// FIXME: we should run this test if the OS-provided stdlib is recent enough.
+// UNSUPPORTED: use_os_stdlib
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 

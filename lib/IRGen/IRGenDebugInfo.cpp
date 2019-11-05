@@ -1328,9 +1328,9 @@ private:
       auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, L.Line, SizeInBits, AlignInBits, Flags,
-                                MangledName);
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl ? Decl->getNameStr() : "", File, L.Line, SizeInBits,
+          AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::BoundGenericClass: {
