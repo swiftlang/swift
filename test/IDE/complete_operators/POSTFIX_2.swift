@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename=%S/Inputs/input.swift -code-completion-token=POSTFIX_2 | %FileCheck %S/Inputs/input.swift -check-prefix=POSTFIX_2 -check-prefix=NEGATIVE_POSTFIX_2

@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename=%S/Inputs/input.swift -code-completion-token=INFIX_2 | %FileCheck %S/Inputs/input.swift -check-prefix=S2_INFIX_LVALUE -check-prefix=NEGATIVE_S2_INFIX_LVALUE
