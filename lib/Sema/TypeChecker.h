@@ -1131,7 +1131,7 @@ private:
 public:
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
-  Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
+  static Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
 
   /// Type check the given expression.
   ///

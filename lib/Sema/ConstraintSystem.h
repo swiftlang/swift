@@ -4429,22 +4429,20 @@ public:
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
-bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
-                                              DeclContext *DC,
+bool exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
                                               Expr *expr);
 
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around the new expression in order to maintain the correct
 // precedence.
-bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
-                                             DeclContext *DC,
+bool exprNeedsParensAfterAddingNilCoalescing(DeclContext *DC,
                                              Expr *expr,
                                              Expr *rootExpr);
 
 /// Return true if, when replacing "<expr>" with "<expr> op <something>",
 /// parentheses must be added around "<expr>" to allow the new operator
 /// to bind correctly.
-bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC, DeclContext *DC,
+bool exprNeedsParensInsideFollowingOperator(DeclContext *DC,
                                             Expr *expr,
                                             PrecedenceGroupDecl *followingPG);
 
@@ -4453,7 +4451,7 @@ bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC, DeclContext *DC,
 /// the new operator to prevent it from binding incorrectly in the
 /// surrounding context.
 bool exprNeedsParensOutsideFollowingOperator(
-    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    DeclContext *DC, Expr *expr, Expr *rootExpr,
     PrecedenceGroupDecl *followingPG);
 
 /// Determine whether this is a SIMD operator.

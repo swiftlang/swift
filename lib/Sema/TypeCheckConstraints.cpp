@@ -1192,7 +1192,7 @@ namespace {
 
       // Fold sequence expressions.
       if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
-        auto result = TC.foldSequence(seqExpr, DC);
+        auto result = TypeChecker::foldSequence(seqExpr, DC);
         return result->walk(*this);
       }
 

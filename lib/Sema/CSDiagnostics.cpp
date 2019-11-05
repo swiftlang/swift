@@ -1130,12 +1130,11 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
 
   auto diag = emitDiagnostic(expr->getLoc(), diag::unwrap_with_default_value);
 
-  auto &TC = getTypeChecker();
   // Figure out what we need to parenthesize.
   bool needsParensInside =
-      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+      exprNeedsParensBeforeAddingNilCoalescing(DC, expr);
   bool needsParensOutside =
-      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, getParentExpr());
+      exprNeedsParensAfterAddingNilCoalescing(DC, expr, getParentExpr());
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
