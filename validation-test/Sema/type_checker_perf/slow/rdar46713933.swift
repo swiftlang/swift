@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: tools-release,no_asserts
 
 func wrap<T>(_ key: String, _ value: T) -> T { return value }
 func wrap<T: ExpressibleByIntegerLiteral>(_ key: String, _ value: T) -> T { return value }
