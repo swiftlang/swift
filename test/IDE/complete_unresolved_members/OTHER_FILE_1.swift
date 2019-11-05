@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=OTHER_FILE_1 %S/Inputs/EnumFromOtherFile.swift | %FileCheck %S/Inputs/input.swift -check-prefix=OTHER_FILE_1

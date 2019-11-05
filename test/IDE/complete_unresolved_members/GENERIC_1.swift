@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=GENERIC_1 | %FileCheck %S/Inputs/input.swift -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
