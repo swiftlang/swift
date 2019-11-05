@@ -1911,54 +1911,50 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-extension Array where Element : Differentiable {
+// TODO(TF-938): Add 'Element : Differentiable' constraint.
+extension Array {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
   @frozen
-  public struct DifferentiableView : Differentiable {
-    private var _base: [Element]
+  public struct DifferentiableView {
+    var _base: [Element]
+  }
+}
 
-    /// The viewed array.
-    // I'm implementing this as a computed property instead of directly
-    // exposing `_base` because the `@differentiable` annotation does not make
-    // the stored property actually differentiable. I think this is a bug.
-    // Maybe it's related to `@frozen`?
-    // TODO: Determine if that is a bug, and fix.
-    public var base: [Element] {
-      @differentiable(wrt: self, vjp: _vjpBase)
-      get { return _base }
-      _modify { yield &_base }
-    }
+extension Array.DifferentiableView : Differentiable where Element : Differentiable {
+  /// The viewed array.
+  public var base: [Element] {
+    @differentiable(wrt: self, vjp: _vjpBase)
+    get { return _base }
+    _modify { yield &_base }
+  }
 
-    @usableFromInline
-    func _vjpBase() ->
-      ([Element], (Array<Element>.TangentVector) -> TangentVector) {
-      return (base, { $0 })
-    }
+  @usableFromInline
+  func _vjpBase() ->
+    ([Element], (Array<Element>.TangentVector) -> TangentVector) {
+    return (base, { $0 })
+  }
 
-    /// Creates a differentiable view of the given array.
-    @differentiable(wrt: base, vjp: _vjpInit)
-    public init(_ base: [Element]) { self._base = base }
+  /// Creates a differentiable view of the given array.
+  @differentiable(wrt: base, vjp: _vjpInit)
+  public init(_ base: [Element]) { self._base = base }
 
-    @usableFromInline
-    static func _vjpInit(_ base: [Element]) ->
-      (Array.DifferentiableView, (TangentVector) -> TangentVector) {
-      return (Array.DifferentiableView(base), { $0 })
-    }
+  @usableFromInline
+  static func _vjpInit(_ base: [Element]) ->
+    (Array.DifferentiableView, (TangentVector) -> TangentVector) {
+    return (Array.DifferentiableView(base), { $0 })
+  }
 
-    // MARK: - Differentiable conformance.
+  public typealias TangentVector =
+    Array<Element.TangentVector>.DifferentiableView
 
-    public typealias TangentVector =
-      Array<Element.TangentVector>.DifferentiableView
-
-    public mutating func move(along direction: TangentVector) {
-      precondition(
-        base.count == direction.base.count,
-        "cannot move Array.DifferentiableView with count \(base.count) along " +
-          "direction with different count \(direction.base.count)")
-      for i in base.indices {
-        base[i].move(along: direction.base[i])
-      }
+  public mutating func move(along direction: TangentVector) {
+    precondition(
+      base.count == direction.base.count,
+      "cannot move Array.DifferentiableView with count \(base.count) along " +
+        "direction with different count \(direction.base.count)")
+    for i in base.indices {
+      base[i].move(along: direction.base[i])
     }
   }
 }
