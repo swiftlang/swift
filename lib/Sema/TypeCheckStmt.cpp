@@ -839,9 +839,9 @@ public:
     if (elementTy->hasError())
       return nullptr;
 
-    auto *varRef =
-        TC.buildCheckedRefExpr(iterator, DC, DeclNameLoc(S->getInLoc()),
-                               /*implicit*/ true);
+    auto *varRef = TypeChecker::buildCheckedRefExpr(iterator, DC,
+                                                    DeclNameLoc(S->getInLoc()),
+                                                    /*implicit*/ true);
     if (!varRef)
       return nullptr;
 

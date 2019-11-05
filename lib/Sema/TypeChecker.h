@@ -753,7 +753,8 @@ public:
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
   /// for the lookup.
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+  static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                  DeclContext *Context);
 
   /// Validate the given type.
   ///
@@ -1374,11 +1375,11 @@ public:
   /// \param wantInterfaceType Whether we want the interface type, if available.
   ///
   /// \param getType Optional callback to extract a type for given declaration.
-  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
-                                  llvm::function_ref<Type(VarDecl *)> getType,
-                                  const DeclRefExpr *base = nullptr,
-                                  bool wantInterfaceType = false);
+  static Type
+  getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
+                             llvm::function_ref<Type(VarDecl *)> getType,
+                             const DeclRefExpr *base = nullptr,
+                             bool wantInterfaceType = false);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -1391,16 +1392,13 @@ public:
   /// \param base The optional base expression of this value reference
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
-  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
-                                  const DeclRefExpr *base = nullptr,
-                                  bool wantInterfaceType = false) {
+  static Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                         DeclContext *UseDC,
+                                         const DeclRefExpr *base = nullptr,
+                                         bool wantInterfaceType = false) {
     return getUnopenedTypeOfReference(
         value, baseType, UseDC,
         [&](VarDecl *var) -> Type {
-          if (var->isInvalid())
-            return ErrorType::get(Context);
-
           return wantInterfaceType ? value->getInterfaceType()
                                    : value->getType();
         },
@@ -1636,14 +1634,14 @@ public:
                                         ValueDecl *decl2);
 
   /// Build a type-checked reference to the given value.
-  Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
-                            DeclNameLoc nameLoc, bool Implicit);
+  static Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
+                                   DeclNameLoc nameLoc, bool Implicit);
 
   /// Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
-  Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
-                     DeclNameLoc NameLoc, bool Implicit,
-                     FunctionRefKind functionRefKind);
+  static Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
+                            DeclNameLoc NameLoc, bool Implicit,
+                            FunctionRefKind functionRefKind);
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.

@@ -815,7 +815,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   DeclContext *UseDC,
                                                   const DeclRefExpr *base,
                                                   bool wantInterfaceType) {
-  return TC.getUnopenedTypeOfReference(
+  return TypeChecker::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
         if (auto *param = dyn_cast<ParamDecl>(var))
@@ -1289,8 +1289,9 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       refType = FunctionType::get(indices, elementTy);
     } else {
-      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
-                                           base, /*wantInterfaceType=*/true);
+      refType = TypeChecker::getUnopenedTypeOfReference(
+          cast<VarDecl>(value), baseTy, useDC, base,
+          /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();

@@ -531,7 +531,7 @@ public:
       
     
     // Perform unqualified name lookup to find out what the UDRE is.
-    return getSubExprPattern(TC.resolveDeclRefExpr(ude, DC));
+    return getSubExprPattern(TypeChecker::resolveDeclRefExpr(ude, DC));
   }
   
   // Call syntax forms a pattern if:
