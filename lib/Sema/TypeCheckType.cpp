@@ -174,13 +174,12 @@ Type TypeResolution::resolveDependentMemberType(
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
     TypoCorrectionResults corrections(ref->getIdentifier(),
                                       DeclNameLoc(ref->getIdLoc()));
-    tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
-                             MetatypeType::get(baseTy),
-                             NameLookupFlags::ProtocolMembers,
-                             corrections, builder);
+    TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
+                                       MetatypeType::get(baseTy),
+                                       NameLookupFlags::ProtocolMembers,
+                                       corrections, builder);
 
     // Check whether we have a single type result.
     auto singleType = cast_or_null<TypeDecl>(

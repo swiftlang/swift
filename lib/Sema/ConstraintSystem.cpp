@@ -895,7 +895,7 @@ void ConstraintSystem::recordOpenedTypes(
 
 /// Determine how many levels of argument labels should be removed from the
 /// function type when referencing the given declaration.
-static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
+static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
   unsigned numParameterLists = decl->getNumCurryLevels();
@@ -964,8 +964,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
-        TC, funcDecl,
-        /*isCurriedInstanceReference=*/false, functionRefKind);
+        funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -1257,8 +1256,7 @@ ConstraintSystem::getTypeOfMemberReference(
   OpenedTypeMap localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
-      TC, value, /*isCurriedInstanceReference*/ !hasAppliedSelf,
-      functionRefKind);
+      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
   AnyFunctionType *funcType;
 
