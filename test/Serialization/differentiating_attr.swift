@@ -35,7 +35,7 @@ func vjpLin(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, F
   return (x + y, { ($0, $0) })
 }
 
-// CHECK: @differentiable(wrt: x, vjp: vjpGeneric where T : _Differentiable)
+// CHECK: @differentiable(wrt: x, vjp: vjpGeneric where T : Differentiable)
 func generic<T : Numeric>(x: T) -> T {
   return x
 }

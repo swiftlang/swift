@@ -30,7 +30,7 @@ public func foo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> T {
   return y
 }
 
-// CHECK-SIL-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @AD__foo_indir_ret__vjp_src_0_wrt_0_1] [ossa] @foo_indir_ret : $@convention(thin) <T where T : _Differentiable> (Float, @in_guaranteed T) -> @out T {
+// CHECK-SIL-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @AD__foo_indir_ret__vjp_src_0_wrt_0_1] [ossa] @foo_indir_ret : $@convention(thin) <T where T : Differentiable> (Float, @in_guaranteed T) -> @out T {
 // CHECK-SIL: bb0(%0 : $*T, %1 : $Float, %2 : $*T):
 
 @_silgen_name("dfoo_indir_ret")
@@ -101,7 +101,7 @@ struct DiffComputedProp : Differentiable & AdditiveArithmetic {
 // Check that `@differentiable` attribute is transferred from computed property
 // storage declaration to getter accessor.
 
-// CHECK-AST: struct DiffComputedProp : _Differentiable & AdditiveArithmetic {
+// CHECK-AST: struct DiffComputedProp : AdditiveArithmetic & Differentiable {
 // CHECK-AST-NEXT:   var computedProp: Float { get }
 // CHECK-AST: }
 
