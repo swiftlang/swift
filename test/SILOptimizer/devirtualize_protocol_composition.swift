@@ -14,30 +14,6 @@ protocol ProtocolB {
   func bar() -> Int
 }
 
-protocol ProtocolC {
-  func foo() -> Int
-}
-
-protocol ProtocolD {
-  func foo() -> Int
-}
-
-protocol ProtocolE {
-  func foo() -> Int
-}
-
-protocol ProtocolF {
-  func foo() -> Int
-}
-
-protocol ProtocolG {
-  func bar() -> Int
-}
-
-protocol ProtocolH {
-  func bar() -> Int
-}
-
 public class ClassB: ClassA<String> {
   func foo() -> Int {
     return 10
@@ -52,7 +28,7 @@ public class ClassC<T>: ClassA<T> {
   }
 }
 
-extension ClassC: ProtocolC { }
+extension ClassC: ProtocolA { }
 
 public class ClassD { }
 public class ClassE : ClassD {
@@ -61,7 +37,7 @@ public class ClassE : ClassD {
   }
 }
 
-extension ClassE: ProtocolD { }
+extension ClassE: ProtocolA { }
 
 public class ClassF {
   func foo() -> Int {
@@ -73,7 +49,7 @@ public class ClassF {
   }
 }
 
-extension ClassF: ProtocolE, ProtocolG { }
+extension ClassF: ProtocolA, ProtocolB { }
 
 public class ClassG <T> {
   func foo() -> Int {
@@ -85,7 +61,7 @@ public class ClassG <T> {
   }
 }
 
-extension ClassG: ProtocolF, ProtocolH { }
+extension ClassG: ProtocolA, ProtocolB { }
 
 public class ClassH {
   typealias type = ClassD
@@ -95,19 +71,19 @@ func shouldOptimize1<T>(_ x: ClassA<T> & ProtocolA) -> Int {
   return x.foo()
 }
 
-func shouldOptimize2(_ x: ClassD & ProtocolD) -> Int {
+func shouldOptimize2(_ x: ClassD & ProtocolA) -> Int {
   return x.foo()
 }
 
-func shouldOptimize3(_ x: ProtocolE & ProtocolG) -> Int {
+func shouldOptimize3(_ x: ProtocolA & ProtocolB) -> Int {
   return x.foo() + x.bar()
 }
 
-func shouldOptimize4(_ x: ProtocolF & ProtocolH) -> Int {
+func shouldOptimize4(_ x: ProtocolA & ProtocolB) -> Int {
   return x.foo() + x.bar()
 }
 
-func shouldOptimize5(_ x: ClassH.type & ProtocolD) -> Int {
+func shouldOptimize5(_ x: ClassH.type & ProtocolA) -> Int {
   return x.foo()
 }
 
