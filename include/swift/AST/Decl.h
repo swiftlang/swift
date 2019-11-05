@@ -5337,6 +5337,37 @@ public:
                                       : flags - Flags::IsAutoClosure);
   }
 
+  /// Does this parameter reject temporary pointer conversions?
+  bool isNonEphemeral() const {
+    if (getAttrs().hasAttribute<NonEphemeralAttr>())
+      return true;
+
+    // Only pointer parameters can be non-ephemeral.
+    auto ty = getInterfaceType();
+    if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
+      return false;
+
+    // Enum element pointer parameters are always non-ephemeral.
+    auto *parentDecl = getDeclContext()->getAsDecl();
+    if (parentDecl && isa<EnumElementDecl>(parentDecl))
+      return true;
+
+    return false;
+  }
+
+  /// Attempt to apply an implicit `@_nonEphemeral` attribute to this parameter.
+  void setNonEphemeralIfPossible() {
+    // Don't apply the attribute if this isn't a pointer param.
+    auto type = getInterfaceType();
+    if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
+      return;
+
+    if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
+      auto &ctx = getASTContext();
+      getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+    }
+  }
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".

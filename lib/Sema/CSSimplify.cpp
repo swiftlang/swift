@@ -2980,6 +2980,16 @@ bool ConstraintSystem::repairFailures(
                        locator);
     }
 
+    // Let's not complain about argument type mismatch if we have a synthesized
+    // wrappedValue initializer, because we already emit a diagnostic for a
+    // type mismatch between the property's type and the wrappedValue type.
+    if (auto CE = dyn_cast<CallExpr>(loc->getAnchor())) {
+      if (CE->isImplicit() && !CE->getArgumentLabels().empty() &&
+          CE->getArgumentLabels().front() == getASTContext().Id_wrappedValue) {
+        break;
+      }
+    }
+
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
@@ -7881,10 +7891,27 @@ ConstraintSystem::simplifyRestrictedConstraint(
                                        ConstraintLocatorBuilder locator) {
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
-  case SolutionKind::Solved:
+  case SolutionKind::Solved: {
+    // If we have an application of a non-ephemeral parameter, then record a
+    // fix if we have to treat an ephemeral conversion as non-ephemeral. It's
+    // important that this is solved as an independant constraint, as the
+    // solving of this restriction may be required in order to evaluate it. For
+    // example, when solving `foo(&.x)`, we need to first match types for the
+    // inout-to-pointer conversion, which then allows us to resolve the overload
+    // of `x`, which may or may not produce an ephemeral pointer.
+    if (locator.isNonEphemeralParameterApplication()) {
+      bool downgradeToWarning =
+          !getASTContext().LangOpts.DiagnoseInvalidEphemeralnessAsError;
+
+      auto *fix = TreatEphemeralAsNonEphemeral::create(
+          *this, getConstraintLocator(locator), type1, type2, restriction,
+          downgradeToWarning);
+      addFixConstraint(fix, matchKind, type1, type2, locator);
+    }
+
     ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
-
+  }
   case SolutionKind::Unsolved:
     return SolutionKind::Unsolved;
 
@@ -7916,14 +7943,15 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning it's shouldn't affect the solver.
-  if (!fix->isWarning()) {
-    // Otherswise increase the score. If this would make the current
-    // solution worse than the best solution we've seen already, stop now.
+  // If this is just a warning, it shouldn't affect the solver. Otherwise,
+  // increase the score.
+  if (!fix->isWarning())
     increaseScore(SK_Fix, impact);
-    if (worseThanBestSolution())
-      return true;
-  }
+
+  // If we've made the current solution worse than the best solution we've seen
+  // already, stop now.
+  if (worseThanBestSolution())
+    return true;
 
   if (isAugmentingFix(fix)) {
     // Always useful, unless duplicate of exactly the same fix and location.
@@ -7961,6 +7989,17 @@ void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::createFixed(
+          *this, matchKind, fix, type1, type2, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
@@ -8048,6 +8087,29 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
+  }
+
+  case FixKind::TreatEphemeralAsNonEphemeral: {
+    auto *theFix = static_cast<TreatEphemeralAsNonEphemeral *>(fix);
+    // If we have a non-ephemeral locator for an ephemeral conversion, make a
+    // note of the fix.
+    auto conversion = theFix->getConversionKind();
+    switch (isConversionEphemeral(conversion, locator)) {
+    case ConversionEphemeralness::Ephemeral:
+      // Record the fix with an impact of zero. This ensures that non-ephemeral
+      // diagnostics don't impact solver behavior.
+      if (recordFix(fix, /*impact*/ 0))
+        return SolutionKind::Error;
+
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::NonEphemeral:
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::Unresolved:
+      // It's possible we don't yet have enough information to know whether
+      // the conversion is ephemeral or not, for example if we're dealing with
+      // an overload that hasn't yet been resolved.
+      return formUnsolved();
+    }
   }
 
   case FixKind::InsertCall:

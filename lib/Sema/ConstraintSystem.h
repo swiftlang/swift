@@ -3065,6 +3065,14 @@ public:
                                          bool includeInaccessibleMembers);
 
 private:
+  /// Determines whether or not a given conversion at a given locator requires
+  /// the creation of a temporary value that's only valid for a limited scope.
+  /// Such ephemeral conversions, such as array-to-pointer, cannot be passed to
+  /// non-ephemeral parameters.
+  ConversionEphemeralness
+  isConversionEphemeral(ConversionRestrictionKind conversion,
+                        ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.

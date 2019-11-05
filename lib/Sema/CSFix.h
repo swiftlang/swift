@@ -42,6 +42,7 @@ class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
 class ConstraintLocatorBuilder;
+enum class ConversionRestrictionKind;
 class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -218,6 +219,10 @@ enum class FixKind : uint8_t {
   RemoveCall,
 
   AllowInvalidUseOfTrailingClosure,
+
+  /// Allow an ephemeral argument conversion for a parameter marked as being
+  /// non-ephemeral.
+  TreatEphemeralAsNonEphemeral,
 };
 
 class ConstraintFix {
@@ -1505,6 +1510,29 @@ public:
   static AllowInvalidUseOfTrailingClosure *create(ConstraintSystem &cs,
                                                   Type argType, Type paramType,
                                                   ConstraintLocator *locator);
+};
+
+class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
+  ConversionRestrictionKind ConversionKind;
+
+  TreatEphemeralAsNonEphemeral(ConstraintSystem &cs, ConstraintLocator *locator,
+                               Type srcType, Type dstType,
+                               ConversionRestrictionKind conversionKind,
+                               bool downgradeToWarning)
+      : AllowArgumentMismatch(cs, FixKind::TreatEphemeralAsNonEphemeral,
+                              srcType, dstType, locator, downgradeToWarning),
+        ConversionKind(conversionKind) {}
+
+public:
+  ConversionRestrictionKind getConversionKind() const { return ConversionKind; }
+  std::string getName() const override;
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static TreatEphemeralAsNonEphemeral *
+  create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
+         Type dstType, ConversionRestrictionKind conversionKind,
+         bool downgradeToWarning);
 };
 
 } // end namespace constraints

@@ -276,7 +276,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
-  
+
+  Opts.DiagnoseInvalidEphemeralnessAsError |=
+      Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
+
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 

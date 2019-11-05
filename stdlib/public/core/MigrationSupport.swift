@@ -390,16 +390,16 @@ extension UnsafeMutablePointer {
 
 extension UnsafeMutableRawPointer {
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init(_ from: UnsafeRawPointer) { Builtin.unreachable() }
+  public init(@_nonEphemeral _ from: UnsafeRawPointer) { Builtin.unreachable() }
 
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init?(_ from: UnsafeRawPointer?) { Builtin.unreachable() }
+  public init?(@_nonEphemeral _ from: UnsafeRawPointer?) { Builtin.unreachable() }
 
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init<T>(_ from: UnsafePointer<T>) { Builtin.unreachable() }
+  public init<T>(@_nonEphemeral _ from: UnsafePointer<T>) { Builtin.unreachable() }
 
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init?<T>(_ from: UnsafePointer<T>?) { Builtin.unreachable() }
+  public init?<T>(@_nonEphemeral _ from: UnsafePointer<T>?) { Builtin.unreachable() }
 }
 
 extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
