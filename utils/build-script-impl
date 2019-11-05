@@ -3245,6 +3245,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--install-destdir is required to install products."
                     exit 1
                 fi
+                INSTALL_TARGETS="install-distribution"
                 ;;
             swiftpm)
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
