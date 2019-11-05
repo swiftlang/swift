@@ -146,7 +146,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>( // expected-note {{in call to function 'myMap'}}
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -159,7 +159,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{'myMap' is unavailable: call the 'map()' method on the sequence}}
+  myMap(0..<10, { x in // expected-error{{generic parameter 'T' could not be inferred}}
     ()
     return x
   })
@@ -552,7 +552,7 @@ protocol r22020088P {}
 func r22020088Foo<T>(_ t: T) {}
 
 func r22020088bar(_ p: r22020088P?) {
-  r22020088Foo(p.fdafs)  // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+  r22020088Foo(p.fdafs) // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
 }
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
@@ -1296,7 +1296,7 @@ func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
 
 struct Array {}
-let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Any>'}}
+let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Element>'}}
 
 struct Error {}
 let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
@@ -1317,16 +1317,16 @@ takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of ty
 func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
 takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int?]'}}
 func takesGenericDictionary<T, U>(_ x: [T : U]) {}  // expected-note {{in call to function 'takesGenericDictionary'}}
-takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Any]'}}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : U]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 // expected-error@-2 {{generic parameter 'U' could not be inferred}}
 typealias Z = Int
 func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {} // expected-note {{in call to function 'takesGenericDictionaryWithTypealias'}}
-takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Z]' (aka 'Dictionary<Any, Int>'}}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : Z]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesGenericFunction<T>(_ x: ([T]) -> Void) {} // expected-note {{in call to function 'takesGenericFunction'}}
-takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any]) -> Void'}}
+takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T]) -> Void'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
-takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any], [Any])'}}
+takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}

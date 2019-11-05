@@ -79,11 +79,7 @@ void SavedTypeVariableBinding::restore() {
 
 GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
-  // Check whether we have a path that terminates at a generic parameter
-  // locator.
-  return locator && locator->isForGenericParameter()
-             ? locator->getGenericParameter()
-             : nullptr;
+  return locator ? locator->getGenericParameter() : nullptr;
 }
 
 // Only allow allocation of resolved overload set list items using the

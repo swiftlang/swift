@@ -241,6 +241,11 @@ public:
 
   virtual ~ConstraintFix();
 
+  template <typename Fix>
+  const Fix *getAs() const {
+    return Fix::classof(this) ? static_cast<const Fix *>(this) : nullptr;
+  }
+
   FixKind getKind() const { return Kind; }
 
   bool isWarning() const { return IsWarning; }
@@ -250,6 +255,10 @@ public:
   /// Diagnose a failure associated with this fix given
   /// root expression and information from constraint system.
   virtual bool diagnose(Expr *root, bool asNote = false) const = 0;
+
+  virtual ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) {
+    return this;
+  }
 
   void print(llvm::raw_ostream &Out) const;
 
@@ -1259,6 +1268,10 @@ class ExplicitlySpecifyGenericArguments final
   }
 
 public:
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ExplicitlySpecifyGenericArguments;
+  }
+
   std::string getName() const override {
     return "default missing generic arguments to `Any`";
   }
@@ -1268,6 +1281,8 @@ public:
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
+
+  ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) override;
 
   static ExplicitlySpecifyGenericArguments *
   create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,

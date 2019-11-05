@@ -36,8 +36,8 @@ func variadic() {
 
   // TODO(diagnostics): This requires special handling - variadic vs. array
   takesVariadicGeneric({takesIntArray($0)})
-  // expected-error@-1 {{cannot convert value of type 'Array<Element>' to expected argument type '[Int]'}}
-  // expected-note@-2 {{arguments to generic parameter 'Element' ('Element' and 'Int') are expected to be equal}}
+  // expected-error@-1 {{cannot convert value of type 'Array<_>' to expected argument type '[Int]'}}
+  // expected-note@-2 {{arguments to generic parameter 'Element' ('_' and 'Int') are expected to be equal}}
 
   takesVariadicGeneric({let _: [Int] = $0})
   // expected-error@-1 {{cannot convert value of type '(_) -> ()' to expected argument type '(_...) -> ()'}}

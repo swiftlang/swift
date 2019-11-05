@@ -98,12 +98,23 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    auto resolvedType = CS.simplifyType(rawType);
+    if (!rawType->hasTypeVariable()) {
+      if (reconstituteSugar)
+        rawType = rawType->reconstituteSugar(/*recursive*/ true);
+      return wantRValue ? rawType->getRValueType() : rawType;
+    }
 
-    if (reconstituteSugar)
-      resolvedType = resolvedType->reconstituteSugar(/*recursive*/ true);
-
-    return wantRValue ? resolvedType->getRValueType() : resolvedType;
+    auto &cs = getConstraintSystem();
+    return cs.simplifyTypeImpl(rawType,
+        [&](TypeVariableType *typeVar) -> Type {
+          if (auto fixed = cs.getFixedType(typeVar)) {
+            auto *genericParam = typeVar->getImpl().getGenericParameter();
+            if (fixed->isHole() && genericParam)
+                return genericParam;
+            return resolveType(fixed, reconstituteSugar, wantRValue);
+          }
+          return cs.getRepresentative(typeVar);
+        });
   }
 
   /// Resolve type variables present in the raw type, using generic parameter
@@ -782,12 +793,7 @@ protected:
 
 private:
   Type resolve(Type rawType) {
-    auto type = resolveType(rawType)->getWithoutSpecifierType();
-    if (auto *BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->hasUnresolvedType())
-        return BGT->getDecl()->getDeclaredInterfaceType();
-    }
-    return type;
+    return resolveType(rawType)->getWithoutSpecifierType();
   }
 
   /// Try to add a fix-it to convert a stored property into a computed

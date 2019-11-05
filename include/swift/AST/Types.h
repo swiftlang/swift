@@ -530,6 +530,8 @@ public:
   /// Is this the 'Any' type?
   bool isAny();
 
+  bool isHole();
+
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
