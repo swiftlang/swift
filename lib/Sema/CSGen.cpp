@@ -2674,6 +2674,25 @@ namespace {
       if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
         return nullptr;
 
+      std::function<Expr *(Expr *)> nilLiteralExpr = [&](Expr *expr) -> Expr * {
+        expr = expr->getSemanticsProvidingExpr();
+        if (expr->getKind() == ExprKind::NilLiteral)
+          return expr;
+
+        if (auto *optionalEvalExpr = dyn_cast<OptionalEvaluationExpr>(expr))
+          return nilLiteralExpr(optionalEvalExpr->getSubExpr());
+
+        if (auto *bindOptionalExpr = dyn_cast<BindOptionalExpr>(expr))
+          return nilLiteralExpr(bindOptionalExpr->getSubExpr());
+
+        return nullptr;
+      };
+
+      if (auto nilLiteral = nilLiteralExpr(fromExpr)) {
+        tc.diagnose(nilLiteral->getLoc(), diag::conditional_cast_from_nil);
+        return nullptr;
+      }
+
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;

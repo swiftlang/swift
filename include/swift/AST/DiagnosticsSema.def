@@ -243,6 +243,8 @@ ERROR(cannot_subscript_ambiguous_base,none,
 
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
+ERROR(conditional_cast_from_nil,none,
+      "nil literal cannot be the source of a conditional cast", ())
 
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
