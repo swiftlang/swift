@@ -50,7 +50,7 @@ sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thi
 // ROUNDTRIP:   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // ROUNDTRIP: }
 
-// IRGEN-LABEL: @AD__foo_PSRS = protected global { i8*, i8* } {
+// IRGEN-LABEL: @AD__foo_PSRS ={{( protected)?}} global { i8*, i8* } {
 // IRGEN-SAME: @AD__foo__jvp_src_0_wrt_0
 // IRGEN-SAME: @AD__foo__vjp_src_0_wrt_0
 // IRGEN-SAME: }
@@ -118,7 +118,7 @@ sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@conven
 // ROUNDTRIP:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // ROUNDTRIP: }
 
-// IRGEN-LABEL: @AD__externalFn1_PSRS = protected global { i8*, i8* } {
+// IRGEN-LABEL: @AD__externalFn1_PSRS ={{( protected)?}} global { i8*, i8* } {
 // IRGEN-SAME: @AD__externalFn1__jvp_src_0_wrt_0
 // IRGEN-SAME: @AD__externalFn1__vjp_src_0_wrt_0
 // IRGEN-SAME: }
@@ -142,7 +142,7 @@ sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@conven
 // ROUNDTRIP:   vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // ROUNDTRIP: }
 
-// IRGEN-LABEL: @AD__externalFn2_PSRS = protected global { i8*, i8* } {
+// IRGEN-LABEL: @AD__externalFn2_PSRS ={{( protected)?}} global { i8*, i8* } {
 // IRGEN-SAME: @AD__externalFn2__jvp_src_0_wrt_0
 // IRGEN-SAME: @AD__externalFn2__vjp_src_0_wrt_0
 // IRGEN-SAME: }
