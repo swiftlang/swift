@@ -477,13 +477,16 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
-    HasLazyConformances : 1
+    HasLazyConformances : 1,
+
+    /// Whether this nominal type is having its semantic members resolved.
+    IsComputingSemanticMembers : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
@@ -3328,6 +3331,7 @@ protected:
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
+    Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
   }
 
   friend class ProtocolType;
@@ -3474,6 +3478,8 @@ public:
   /// Retrieves the synthesized zero parameter default initializer for this
   /// declaration, or \c nullptr if it doesn't have one.
   ConstructorDecl *getDefaultInitializer() const;
+
+  void synthesizeSemanticMembersIfNeeded(DeclName member);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

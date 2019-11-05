@@ -3956,6 +3956,48 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
 }
 
+void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
+  // Silently break cycles here because we can't be sure when and where a
+  // request to synthesize will come from yet.
+  // FIXME: rdar://56844567
+  if (Bits.NominalTypeDecl.IsComputingSemanticMembers)
+    return;
+    
+  Bits.NominalTypeDecl.IsComputingSemanticMembers = true;
+  SWIFT_DEFER { Bits.NominalTypeDecl.IsComputingSemanticMembers = false; };
+
+  auto baseName = member.getBaseName();
+  auto &Context = getASTContext();
+  Optional<ImplicitMemberAction> action = None;
+  if (baseName == DeclBaseName::createConstructor())
+    action.emplace(ImplicitMemberAction::ResolveImplicitInit);
+
+  if (member.isSimpleName() && !baseName.isSpecial()) {
+    if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
+      action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+    }
+  } else {
+    auto argumentNames = member.getArgumentNames();
+    if (member.isCompoundName() && argumentNames.size() != 1)
+      return;
+
+    if (baseName == DeclBaseName::createConstructor() &&
+        (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+      action.emplace(ImplicitMemberAction::ResolveDecodable);
+    } else if (!baseName.isSpecial() &&
+               baseName.getIdentifier() == Context.Id_encode &&
+               (member.isSimpleName() ||
+                argumentNames.front() == Context.Id_to)) {
+      action.emplace(ImplicitMemberAction::ResolveEncodable);
+    }
+  }
+
+  if (auto actionToTake = action) {
+    (void)evaluateOrDefault(Context.evaluator,
+        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, false);
+  }
+}
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
