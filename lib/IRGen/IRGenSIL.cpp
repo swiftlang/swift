@@ -1925,9 +1925,30 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
 }
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
-DifferentiabilityWitnessFunctionInst *i) {
-  // TODO(TF-916): Implement IRGen for `differentiability_witness_function`.
-  llvm_unreachable("unimplemented");
+    DifferentiabilityWitnessFunctionInst *i) {
+  llvm::Value *diffWitness =
+      IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
+  unsigned offset = 0;
+  switch (i->getWitnessKind()) {
+  case DifferentiabilityWitnessFunctionKind::JVP:
+    offset = 0;
+    break;
+  case DifferentiabilityWitnessFunctionKind::VJP:
+    offset = 1;
+    break;
+  case DifferentiabilityWitnessFunctionKind::Transpose:
+    llvm_unreachable("Not yet implemented");
+  }
+
+  diffWitness = Builder.CreateStructGEP(diffWitness, offset);
+  diffWitness = Builder.CreateLoad(diffWitness, IGM.getPointerAlignment());
+
+  auto fnType = cast<SILFunctionType>(i->getType().getASTType());
+  Signature signature = IGM.getSignature(fnType);
+  diffWitness =
+      Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
+
+  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
