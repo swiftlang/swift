@@ -36,9 +36,10 @@ class ASTPrinter;
 enum class LayoutConstraintKind : uint8_t {
   // It is not a known layout constraint.
   UnknownLayout,
-  // It is a layout constraint representing a trivial type of an unknown size.
+  // It is a layout constraint representing a trivial type of a known size.
   TrivialOfExactSize,
-  // It is a layout constraint representing a trivial type of an unknown size.
+  // It is a layout constraint representing a trivial type of a size known to
+  // be no larger than a given size.
   TrivialOfAtMostSize,
   // It is a layout constraint representing a trivial type of an unknown size.
   Trivial,
