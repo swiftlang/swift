@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=DOT_EXPR_NON_NOMINAL_1 | %FileCheck %S/Inputs/input.swift -check-prefix=DOT_EXPR_NON_NOMINAL_1

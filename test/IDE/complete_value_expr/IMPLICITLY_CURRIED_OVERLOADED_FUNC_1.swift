@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1 | %FileCheck %S/Inputs/input.swift -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1

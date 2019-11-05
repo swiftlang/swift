@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=FUNC_PAREN_PATTERN_3 | %FileCheck %S/Inputs/input.swift -check-prefix=FUNC_PAREN_PATTERN_3

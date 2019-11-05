@@ -1,0 +1,2 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=INSIDE_FUNCTION_CALL_12 -code-complete-call-pattern-heuristics | %FileCheck %S/Inputs/input.swift -check-prefix=INSIDE_FUNCTION_CALL_12
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/input.swift -code-completion-token=INSIDE_FUNCTION_CALL_12 | %FileCheck %S/Inputs/input.swift -check-prefix=INSIDE_FUNCTION_CALL_4
