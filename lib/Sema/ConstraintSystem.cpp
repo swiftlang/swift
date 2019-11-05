@@ -3245,3 +3245,147 @@ bool constraints::isArgumentOfReferenceEqualityOperator(
   return isOperatorArgument(locator, "===") ||
          isOperatorArgument(locator, "!==");
 }
+
+ConversionEphemeralness
+ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
+                                        ConstraintLocatorBuilder locator) {
+  switch (conversion) {
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::StringToPointer:
+    // Always ephemeral.
+    return ConversionEphemeralness::Ephemeral;
+  case ConversionRestrictionKind::InoutToPointer: {
+
+    // Ephemeral, except if the expression is a reference to a global or
+    // static stored variable, or a directly accessed stored property on such a
+    // variable.
+
+    auto isDirectlyAccessedStoredVar = [&](ValueDecl *decl) -> bool {
+      auto *asd = dyn_cast_or_null<AbstractStorageDecl>(decl);
+      if (!asd)
+        return false;
+
+      // Check what access strategy is used for a read-write access. It must be
+      // direct-to-storage in order for the conversion to be non-ephemeral.
+      auto access = asd->getAccessStrategy(
+          AccessSemantics::Ordinary, AccessKind::ReadWrite,
+          DC->getParentModule(), DC->getResilienceExpansion());
+      return access.getKind() == AccessStrategy::Storage;
+    };
+
+    SourceRange range;
+    auto *argLoc = simplifyLocator(*this, getConstraintLocator(locator), range);
+    auto *subExpr = argLoc->getAnchor()->getSemanticsProvidingExpr();
+
+    // Look through an InOutExpr if we have one. This is usually the case, but
+    // might not be if e.g we're applying an 'add missing &' fix.
+    if (auto *ioe = dyn_cast<InOutExpr>(subExpr))
+      subExpr = ioe->getSubExpr();
+
+    while (true) {
+      subExpr = subExpr->getSemanticsProvidingExpr();
+
+      // Look through force unwraps, which can be modelled as physical lvalue
+      // components.
+      if (auto *fve = dyn_cast<ForceValueExpr>(subExpr)) {
+        subExpr = fve->getSubExpr();
+        continue;
+      }
+
+      // Look through a member reference if it's directly accessed.
+      if (auto *ude = dyn_cast<UnresolvedDotExpr>(subExpr)) {
+        // FIXME: This is an O(N) search.
+        auto overload = findSelectedOverloadFor(ude);
+
+        // If we didn't find an overload, it hasn't been resolved yet.
+        if (!overload)
+          return ConversionEphemeralness::Unresolved;
+
+        // Tuple indices are always non-ephemeral.
+        auto *base = ude->getBase();
+        if (overload->Choice.getKind() == OverloadChoiceKind::TupleIndex) {
+          subExpr = base;
+          continue;
+        }
+
+        // If we don't have a directly accessed declaration associated with the
+        // choice, it's ephemeral.
+        auto *member = overload->Choice.getDeclOrNull();
+        if (!isDirectlyAccessedStoredVar(member))
+          return ConversionEphemeralness::Ephemeral;
+
+        // If we found a static member, the conversion is non-ephemeral. We can
+        // stop iterating as there's nothing interesting about the base.
+        if (member->isStatic())
+          return ConversionEphemeralness::NonEphemeral;
+
+        // For an instance member, the base must be an @lvalue struct type.
+        if (auto *lvt = simplifyType(getType(base))->getAs<LValueType>()) {
+          auto *nominal = lvt->getObjectType()->getAnyNominal();
+          if (nominal && isa<StructDecl>(nominal)) {
+            subExpr = base;
+            continue;
+          }
+        }
+        return ConversionEphemeralness::Ephemeral;
+      }
+
+      break;
+    }
+
+    auto getBaseEphemeralness =
+        [&](ValueDecl *base) -> ConversionEphemeralness {
+      // We must have a base decl that's directly accessed.
+      if (!isDirectlyAccessedStoredVar(base))
+        return ConversionEphemeralness::Ephemeral;
+
+      // The base decl must either be static or global in order for it to be
+      // non-ephemeral.
+      if (base->isStatic() || base->getDeclContext()->isModuleScopeContext()) {
+        return ConversionEphemeralness::NonEphemeral;
+      } else {
+        return ConversionEphemeralness::Ephemeral;
+      }
+    };
+
+    // Fast path: We have a direct decl ref.
+    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr))
+      return getBaseEphemeralness(dre->getDecl());
+
+    // Otherwise, try to find an overload for the base.
+    // FIXME: This is an O(N) search.
+    if (auto baseOverload = findSelectedOverloadFor(subExpr))
+      return getBaseEphemeralness(baseOverload->Choice.getDeclOrNull());
+
+    // If we didn't find a base overload for a unresolved member or overloaded
+    // decl, it hasn't been resolved yet.
+    if (isa<UnresolvedMemberExpr>(subExpr) ||
+        isa<OverloadedDeclRefExpr>(subExpr))
+      return ConversionEphemeralness::Unresolved;
+
+    // Otherwise, we don't know what we're dealing with. Default to ephemeral.
+    return ConversionEphemeralness::Ephemeral;
+  }
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    // @_nonEphemeral has no effect on these conversions, so treat them as all
+    // being non-ephemeral in order to allow their passing to an @_nonEphemeral
+    // parameter.
+    return ConversionEphemeralness::NonEphemeral;
+  }
+}

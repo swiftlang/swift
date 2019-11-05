@@ -5508,3 +5508,196 @@ bool InvalidUseOfTrailingClosure::diagnoseAsError() {
 
   return true;
 }
+
+void NonEphemeralConversionFailure::emitSuggestionNotes() const {
+  auto getPointerKind = [](Type ty) -> PointerTypeKind {
+    PointerTypeKind pointerKind;
+    auto pointeeType = ty->lookThroughSingleOptionalType()
+                         ->getAnyPointerElementType(pointerKind);
+    assert(pointeeType && "Expected a pointer!");
+    (void)pointeeType;
+
+    return pointerKind;
+  };
+
+  // This must stay in sync with diag::ephemeral_use_array_with_unsafe_buffer
+  // and diag::ephemeral_use_with_unsafe_pointer.
+  enum AlternativeKind {
+    AK_Raw = 0,
+    AK_MutableRaw,
+    AK_Typed,
+    AK_MutableTyped,
+  };
+
+  auto getAlternativeKind = [&]() -> Optional<AlternativeKind> {
+    switch (getPointerKind(getParamType())) {
+    case PTK_UnsafeRawPointer:
+      return AK_Raw;
+    case PTK_UnsafeMutableRawPointer:
+      return AK_MutableRaw;
+    case PTK_UnsafePointer:
+      return AK_Typed;
+    case PTK_UnsafeMutablePointer:
+      return AK_MutableTyped;
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return None;
+    }
+  };
+
+  // First emit a note about the implicit conversion only lasting for the
+  // duration of the call.
+  auto *argExpr = getArgExpr();
+  emitDiagnostic(argExpr->getLoc(),
+                 diag::ephemeral_pointer_argument_conversion_note,
+                 getArgType(), getParamType(), getCallee(), getCalleeFullName())
+      .highlight(argExpr->getSourceRange());
+
+  // Then try to find a suitable alternative.
+  switch (ConversionKind) {
+  case ConversionRestrictionKind::ArrayToPointer: {
+    // Don't suggest anything for optional arrays, as there's currently no
+    // direct alternative.
+    if (getArgType()->getOptionalObjectType())
+      break;
+
+    // We can suggest using withUnsafe[Mutable][Bytes/BufferPointer].
+    if (auto alternative = getAlternativeKind())
+      emitDiagnostic(argExpr->getLoc(),
+                     diag::ephemeral_use_array_with_unsafe_buffer,
+                     *alternative);
+    break;
+  }
+  case ConversionRestrictionKind::StringToPointer: {
+    // Don't suggest anything for optional strings, as there's currently no
+    // direct alternative.
+    if (getArgType()->getOptionalObjectType())
+      break;
+
+    // We can suggest withCString as long as the resulting pointer is
+    // immutable.
+    switch (getPointerKind(getParamType())) {
+    case PTK_UnsafePointer:
+    case PTK_UnsafeRawPointer:
+      emitDiagnostic(argExpr->getLoc(),
+                     diag::ephemeral_use_string_with_c_string);
+      break;
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeMutablePointer:
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      // There's nothing really sensible we can suggest for a mutable pointer.
+      break;
+    }
+    break;
+  }
+  case ConversionRestrictionKind::InoutToPointer:
+    // For an arbitrary inout-to-pointer, we can suggest
+    // withUnsafe[Mutable][Bytes/Pointer].
+    if (auto alternative = getAlternativeKind())
+      emitDiagnostic(argExpr->getLoc(), diag::ephemeral_use_with_unsafe_pointer,
+                     *alternative);
+    break;
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    llvm_unreachable("Expected an ephemeral conversion!");
+  }
+}
+
+bool NonEphemeralConversionFailure::diagnosePointerInit() const {
+  auto *constructor = dyn_cast_or_null<ConstructorDecl>(getCallee());
+  if (!constructor)
+    return false;
+
+  auto constructedTy = getFnType()->getResult();
+
+  // Strip off a level of optionality if we have a failable initializer.
+  if (constructor->isFailable())
+    constructedTy = constructedTy->getOptionalObjectType();
+
+  // This must stay in sync with diag::cannot_construct_dangling_pointer.
+  enum ConstructorKind {
+    CK_Pointer = 0,
+    CK_BufferPointer,
+  };
+
+  // Consider OpaquePointer as well as the other kinds of pointers.
+  auto isConstructingPointer =
+      constructedTy->getAnyPointerElementType() ||
+      constructedTy->getAnyNominal() == getASTContext().getOpaquePointerDecl();
+
+  ConstructorKind constructorKind;
+  auto parameterCount = constructor->getParameters()->size();
+  if (isConstructingPointer && parameterCount == 1) {
+    constructorKind = CK_Pointer;
+  } else if (constructedTy->getAnyBufferPointerElementType() &&
+             parameterCount == 2) {
+    constructorKind = CK_BufferPointer;
+  } else {
+    return false;
+  }
+
+  auto diagID = DowngradeToWarning
+                    ? diag::cannot_construct_dangling_pointer_warning
+                    : diag::cannot_construct_dangling_pointer;
+
+  auto *anchor = getRawAnchor();
+  emitDiagnostic(anchor->getLoc(), diagID, constructedTy, constructorKind)
+      .highlight(anchor->getSourceRange());
+
+  emitSuggestionNotes();
+  return true;
+}
+
+bool NonEphemeralConversionFailure::diagnoseAsNote() {
+  // We can only emit a useful note if we have a callee.
+  if (auto *callee = getCallee()) {
+    emitDiagnostic(callee, diag::candidate_performs_illegal_ephemeral_conv,
+                   getParamPosition());
+    return true;
+  }
+  return false;
+}
+
+bool NonEphemeralConversionFailure::diagnoseAsError() {
+  // Emit a specialized diagnostic for
+  // Unsafe[Mutable][Raw]Pointer.init([mutating]:) &
+  // Unsafe[Mutable][Raw]BufferPointer.init(start:count:).
+  if (diagnosePointerInit())
+    return true;
+
+  // Otherwise, emit a more general diagnostic.
+  auto *argExpr = getArgExpr();
+  if (isa<InOutExpr>(argExpr)) {
+    auto diagID = DowngradeToWarning
+                      ? diag::cannot_use_inout_non_ephemeral_warning
+                      : diag::cannot_use_inout_non_ephemeral;
+
+    emitDiagnostic(argExpr->getLoc(), diagID, getArgPosition(), getCallee(),
+                   getCalleeFullName())
+        .highlight(argExpr->getSourceRange());
+  } else {
+    auto diagID = DowngradeToWarning
+                      ? diag::cannot_pass_type_to_non_ephemeral_warning
+                      : diag::cannot_pass_type_to_non_ephemeral;
+
+    emitDiagnostic(argExpr->getLoc(), diagID, getArgType(), getArgPosition(),
+                   getCallee(), getCalleeFullName())
+        .highlight(argExpr->getSourceRange());
+  }
+  emitSuggestionNotes();
+  return true;
+}

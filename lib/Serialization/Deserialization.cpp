@@ -4624,10 +4624,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure;
+      bool isVariadic, isAutoClosure, isNonEphemeral;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
+                                                   isNonEphemeral,
                                                    rawOwnership);
 
       auto ownership =
@@ -4642,7 +4643,7 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             *ownership));
+                                             isNonEphemeral, *ownership));
     }
 
     if (!isGeneric) {
