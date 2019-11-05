@@ -543,7 +543,7 @@ enum class FunctionBuilderClosurePreCheck : uint8_t {
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
-class TypeChecker final : public LazyResolver {
+class TypeChecker final {
 public:
   ASTContext &Context;
   DiagnosticEngine &Diags;
@@ -625,14 +625,15 @@ private:
   friend class ASTContext;
   friend class constraints::ConstraintSystem;
   friend class TypeCheckFunctionBodyUntilRequest;
-  
+
 public:
   /// Create a new type checker instance for the given ASTContext, if it
   /// doesn't already have one.
   ///
-  /// \returns a reference to the type vchecker.
+  /// \returns a reference to the type checker.
   static TypeChecker &createForContext(ASTContext &ctx);
 
+public:
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();

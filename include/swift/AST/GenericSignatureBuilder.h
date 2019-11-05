@@ -49,7 +49,6 @@ class DependentMemberType;
 class GenericParamList;
 class GenericSignatureBuilder;
 class GenericTypeParamType;
-class LazyResolver;
 class ModuleDecl;
 class Pattern;
 class ProtocolConformance;

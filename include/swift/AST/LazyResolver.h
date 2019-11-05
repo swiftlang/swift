@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the LazyResolver abstract interface.
+// This file defines the abstract interfaces for lazily resolving declarations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,13 +36,6 @@ class ProtocolDecl;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
-
-/// Abstract interface used to lazily resolve aspects of the AST, such as the
-/// types of declarations or protocol conformance structures.
-class LazyResolver {
-public:
-  virtual ~LazyResolver();
-};
 
 class LazyMemberLoader;
 

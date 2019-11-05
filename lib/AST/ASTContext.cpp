@@ -74,7 +74,6 @@ STATISTIC(NumCollapsedSpecializedProtocolConformances,
 /// GenericSignatureBuilder.
 #define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
-LazyResolver::~LazyResolver() = default;
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
 
@@ -627,14 +626,10 @@ RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
 }
 
-LazyResolver *ASTContext::getLazyResolver() const {
-  return getImpl().Resolver;
+TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
+  return getImpl().Checker;
 }
 
-/// Set the lazy resolver for this context.
-void ASTContext::setLazyResolver(LazyResolver *resolver) {
-  if (auto existing = getImpl().Resolver)
-    delete existing;
 
   getImpl().Resolver = resolver;
 }
