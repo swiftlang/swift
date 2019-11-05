@@ -15,13 +15,9 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    switch (Kind) {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    switch (Info.Kind) {
     case DiagnosticKind::Error:
       OS << "error: ";
       break;
@@ -35,7 +31,8 @@ public:
       OS << "remark: ";
       break;
     }
-    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
+                                           Info.FormatArgs);
   }
 };
 
