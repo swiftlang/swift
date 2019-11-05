@@ -736,12 +736,13 @@ bool ASTScope::areInactiveIfConfigClausesSupported() {
 }
 
 void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
-auto *const SF = AFD->getParentSourceFile();
-SF->getScope().expandFunctionBodyImpl(AFD);
+  auto *const SF = AFD->getParentSourceFile();
+  if (SF->isSuitableForASTScopes())
+    SF->getScope().expandFunctionBodyImpl(AFD);
 }
 
 void ASTScope::expandFunctionBodyImpl(AbstractFunctionDecl *AFD) {
-impl->expandFunctionBody(AFD);
+  impl->expandFunctionBody(AFD);
 }
 
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
