@@ -3792,7 +3792,6 @@ bool swift::areGenericRequirementsSatisfied(
 
 bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
                        ConstraintKind kind, DeclContext *dc) {
-  std::unique_ptr<TypeChecker> CreatedTC;
   auto *TC = dc->getASTContext().getLegacyGlobalTypeChecker();
   assert(TC && "Must have type checker to make semantic query!");
   return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
@@ -3840,7 +3839,6 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
   assert(TC && "Must have type checker to make global query!");
