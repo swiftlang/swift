@@ -240,7 +240,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
-      
+
+      // Don't allow the parameter to accept temporary pointer conversions.
+      arg->setNonEphemeralIfPossible();
+
       maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
       
       params.push_back(arg);
@@ -685,7 +688,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Set the interface type of the initializer.
   ctor->setGenericSignature(genericSig);
-  (void)ctor->getInterfaceType();
 
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
@@ -1077,6 +1079,9 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                                             DeclName member) {
   auto baseName = member.getBaseName();
 
+  if (baseName == DeclBaseName::createConstructor())
+    addImplicitConstructors(target);
+
   // Checks whether the target conforms to the given protocol. If the
   // conformance is incomplete, force the conformance.
   //
@@ -1097,7 +1102,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref.getConcrete()->getRootConformance())) {
       if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-        checkConformance(conformance);
+        TypeChecker::checkConformance(conformance);
       }
     }
 

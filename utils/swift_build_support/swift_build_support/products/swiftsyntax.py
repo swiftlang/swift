@@ -13,6 +13,7 @@
 import os
 
 from . import product
+from .. import multiroot_data_file
 from .. import shell
 from .. import targets
 
@@ -26,6 +27,14 @@ class SwiftSyntax(product.Product):
         """
         return "swift-syntax"
 
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        return True
+
     def run_swiftsyntax_build_script(self, target, additional_params=[]):
         llvm_build_dir = os.path.join(self.build_dir, '..', 'llvm-' + target)
         llvm_build_dir = os.path.realpath(llvm_build_dir)
@@ -35,6 +44,7 @@ class SwiftSyntax(product.Product):
         build_cmd = [
             script_path,
             '--build-dir', self.build_dir,
+            '--multiroot-data-file', multiroot_data_file.path(),
             '--toolchain', self.install_toolchain_path(),
             '--filecheck-exec', os.path.join(llvm_build_dir, 'bin',
                                              'FileCheck'),
@@ -52,10 +62,6 @@ class SwiftSyntax(product.Product):
             build_cmd.append('--verbose')
 
         shell.call(build_cmd)
-
-    @classmethod
-    def is_build_script_impl_product(cls):
-        return False
 
     def should_build(self, host_target):
         return True

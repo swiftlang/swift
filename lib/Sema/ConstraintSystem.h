@@ -2094,10 +2094,15 @@ public:
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
-  bool hasFixFor(ConstraintLocator *locator) const {
-    return llvm::any_of(Fixes, [&locator](const ConstraintFix *fix) {
-      return fix->getLocator() == locator;
-    });
+  bool hasFixFor(ConstraintLocator *locator,
+                 Optional<FixKind> expectedKind = None) const {
+    return llvm::any_of(
+        Fixes, [&locator, &expectedKind](const ConstraintFix *fix) {
+          if (fix->getLocator() == locator) {
+            return !expectedKind || fix->getKind() == *expectedKind;
+          }
+          return false;
+        });
   }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
@@ -3060,6 +3065,14 @@ public:
                                          bool includeInaccessibleMembers);
 
 private:
+  /// Determines whether or not a given conversion at a given locator requires
+  /// the creation of a temporary value that's only valid for a limited scope.
+  /// Such ephemeral conversions, such as array-to-pointer, cannot be passed to
+  /// non-ephemeral parameters.
+  ConversionEphemeralness
+  isConversionEphemeral(ConversionRestrictionKind conversion,
+                        ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.

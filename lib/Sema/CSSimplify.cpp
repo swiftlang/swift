@@ -430,17 +430,56 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have a trailing closure, it maps to the last parameter.
   if (hasTrailingClosure && numParams > 0) {
+    unsigned lastParamIdx = numParams - 1;
+    bool lastAcceptsTrailingClosure =
+        acceptsTrailingClosure(params[lastParamIdx]);
+
+    // If the last parameter is defaulted, this might be
+    // an attempt to use a trailing closure with previous
+    // parameter that accepts a function type e.g.
+    //
+    // func foo(_: () -> Int, _ x: Int = 0) {}
+    // foo { 42 }
+    if (!lastAcceptsTrailingClosure && numParams > 1 &&
+        paramInfo.hasDefaultArgument(lastParamIdx)) {
+      auto paramType = params[lastParamIdx - 1].getPlainType();
+      // If the parameter before defaulted last accepts.
+      if (paramType->is<AnyFunctionType>()) {
+        lastAcceptsTrailingClosure = true;
+        lastParamIdx -= 1;
+      }
+    }
+
+    bool isExtraClosure = false;
     // If there is no suitable last parameter to accept the trailing closure,
     // notify the listener and bail if we need to.
-    if (!acceptsTrailingClosure(params[numParams - 1])) {
-      if (listener.trailingClosureMismatch(numParams - 1, numArgs - 1))
+    if (!lastAcceptsTrailingClosure) {
+      if (numArgs > numParams) {
+        // Argument before the trailing closure.
+        unsigned prevArg = numArgs - 2;
+        auto &arg = args[prevArg];
+        // If the argument before trailing closure matches
+        // last parameter, this is just a special case of
+        // an extraneous argument.
+        const auto param = params[numParams - 1];
+        if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
+          isExtraClosure = true;
+          if (listener.extraArgument(numArgs - 1))
+            return true;
+        }
+      }
+
+      if (!isExtraClosure &&
+          listener.trailingClosureMismatch(lastParamIdx, numArgs - 1))
         return true;
     }
 
     // Claim the parameter/argument pair.
     claimedArgs[numArgs-1] = true;
     ++numClaimedArgs;
-    parameterBindings[numParams-1].push_back(numArgs-1);
+    // Let's claim the trailing closure unless it's an extra argument.
+    if (!isExtraClosure)
+      parameterBindings[lastParamIdx].push_back(numArgs - 1);
   }
 
   // Mark through the parameters, binding them to their arguments.
@@ -921,6 +960,27 @@ public:
     // where labels did line up correctly.
     CS.recordFix(fix, /*impact=*/1 + numExtraneous * 2 + numRenames * 3);
     return false;
+  }
+
+  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    auto argType = Arguments[argIdx].getPlainType();
+    argType.visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        CS.recordHole(typeVar);
+    });
+
+    const auto &param = Parameters[paramIdx];
+
+    auto *argLoc = CS.getConstraintLocator(
+        Locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+            argIdx, paramIdx, param.getParameterFlags())));
+
+    auto *fix = AllowInvalidUseOfTrailingClosure::create(
+        CS, argType, param.getPlainType(), argLoc);
+    return CS.recordFix(fix, /*impact=*/3);
   }
 
   ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
@@ -2696,6 +2756,10 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ApplyArgToParam: {
     auto loc = getConstraintLocator(locator);
+
+    if (hasFixFor(loc, FixKind::AllowInvalidUseOfTrailingClosure))
+      return true;
+
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
@@ -2914,6 +2978,16 @@ bool ConstraintSystem::repairFailures(
       auto rhsEltTy = getArrayOrSetType(rhs)->lookThroughAllOptionalTypes();
       (void)matchTypes(lhs, rhsEltTy, ConstraintKind::Equal, TMF_ApplyingFix,
                        locator);
+    }
+
+    // Let's not complain about argument type mismatch if we have a synthesized
+    // wrappedValue initializer, because we already emit a diagnostic for a
+    // type mismatch between the property's type and the wrappedValue type.
+    if (auto CE = dyn_cast<CallExpr>(loc->getAnchor())) {
+      if (CE->isImplicit() && !CE->getArgumentLabels().empty() &&
+          CE->getArgumentLabels().front() == getASTContext().Id_wrappedValue) {
+        break;
+      }
     }
 
     conversionsOrFixes.push_back(
@@ -7817,10 +7891,27 @@ ConstraintSystem::simplifyRestrictedConstraint(
                                        ConstraintLocatorBuilder locator) {
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
-  case SolutionKind::Solved:
+  case SolutionKind::Solved: {
+    // If we have an application of a non-ephemeral parameter, then record a
+    // fix if we have to treat an ephemeral conversion as non-ephemeral. It's
+    // important that this is solved as an independant constraint, as the
+    // solving of this restriction may be required in order to evaluate it. For
+    // example, when solving `foo(&.x)`, we need to first match types for the
+    // inout-to-pointer conversion, which then allows us to resolve the overload
+    // of `x`, which may or may not produce an ephemeral pointer.
+    if (locator.isNonEphemeralParameterApplication()) {
+      bool downgradeToWarning =
+          !getASTContext().LangOpts.DiagnoseInvalidEphemeralnessAsError;
+
+      auto *fix = TreatEphemeralAsNonEphemeral::create(
+          *this, getConstraintLocator(locator), type1, type2, restriction,
+          downgradeToWarning);
+      addFixConstraint(fix, matchKind, type1, type2, locator);
+    }
+
     ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
-
+  }
   case SolutionKind::Unsolved:
     return SolutionKind::Unsolved;
 
@@ -7852,14 +7943,15 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning it's shouldn't affect the solver.
-  if (!fix->isWarning()) {
-    // Otherswise increase the score. If this would make the current
-    // solution worse than the best solution we've seen already, stop now.
+  // If this is just a warning, it shouldn't affect the solver. Otherwise,
+  // increase the score.
+  if (!fix->isWarning())
     increaseScore(SK_Fix, impact);
-    if (worseThanBestSolution())
-      return true;
-  }
+
+  // If we've made the current solution worse than the best solution we've seen
+  // already, stop now.
+  if (worseThanBestSolution())
+    return true;
 
   if (isAugmentingFix(fix)) {
     // Always useful, unless duplicate of exactly the same fix and location.
@@ -7897,6 +7989,17 @@ void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::createFixed(
+          *this, matchKind, fix, type1, type2, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
@@ -7986,6 +8089,29 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
   }
 
+  case FixKind::TreatEphemeralAsNonEphemeral: {
+    auto *theFix = static_cast<TreatEphemeralAsNonEphemeral *>(fix);
+    // If we have a non-ephemeral locator for an ephemeral conversion, make a
+    // note of the fix.
+    auto conversion = theFix->getConversionKind();
+    switch (isConversionEphemeral(conversion, locator)) {
+    case ConversionEphemeralness::Ephemeral:
+      // Record the fix with an impact of zero. This ensures that non-ephemeral
+      // diagnostics don't impact solver behavior.
+      if (recordFix(fix, /*impact*/ 0))
+        return SolutionKind::Error;
+
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::NonEphemeral:
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::Unresolved:
+      // It's possible we don't yet have enough information to know whether
+      // the conversion is ephemeral or not, for example if we're dealing with
+      // an overload that hasn't yet been resolved.
+      return formUnsolved();
+    }
+  }
+
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
@@ -8054,6 +8180,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
+  case FixKind::AllowInvalidUseOfTrailingClosure:
     llvm_unreachable("handled elsewhere");
   }
 

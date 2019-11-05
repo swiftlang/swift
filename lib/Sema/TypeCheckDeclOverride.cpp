@@ -1295,6 +1295,7 @@ namespace  {
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
+    UNINTERESTING_ATTR(NonEphemeral)
     UNINTERESTING_ATTR(NonObjC)
     UNINTERESTING_ATTR(NonOverride)
     UNINTERESTING_ATTR(NSApplicationMain)

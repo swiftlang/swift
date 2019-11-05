@@ -370,10 +370,7 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     return nullptr;
 
   // Forcibly derive conformance to CodingKey.
-  //
-  // FIXME: Drop the dependency on the type checker.
-  auto *tc = static_cast<TypeChecker *>(C.getLazyResolver());
-  tc->checkConformancesInContext(enumDecl, enumDecl);
+  TypeChecker::checkConformancesInContext(enumDecl, enumDecl);
 
   // Add to the type.
   target->addMember(enumDecl);
@@ -741,8 +738,6 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  (void)encodeDecl->getInterfaceType();
-
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -1020,8 +1015,6 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }
-
-  (void)initDecl->getInterfaceType();
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);

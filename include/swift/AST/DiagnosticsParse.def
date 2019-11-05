@@ -1524,6 +1524,8 @@ ERROR(expected_generics_type_restriction,none,
       (Identifier))
 ERROR(requires_single_equal,none,
       "use '==' for same-type requirements rather than '='", ())
+ERROR(requires_comma,none,
+      "expected ',' to separate the requirements of this 'where' clause", ())
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())

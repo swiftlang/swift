@@ -141,7 +141,7 @@ public struct OpaquePointer {
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ from: UnsafePointer<T>) {
+  public init<T>(@_nonEphemeral _ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -149,14 +149,14 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(_ from: UnsafePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
-  public init<T>(_ from: UnsafeMutablePointer<T>) {
+  public init<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
   }
 
@@ -164,7 +164,7 @@ public struct OpaquePointer {
   ///
   /// The result is `nil` if `from` is `nil`.
   @_transparent
-  public init?<T>(_ from: UnsafeMutablePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }

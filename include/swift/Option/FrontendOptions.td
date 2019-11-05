@@ -431,6 +431,14 @@ def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
 
+def enable_invalid_ephemeralness_as_error :
+  Flag<["-"], "enable-invalid-ephemeralness-as-error">,
+  HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as errors">;
+
+def disable_invalid_ephemeralness_as_error :
+  Flag<["-"], "disable-invalid-ephemeralness-as-error">,
+  HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as warnings">;
+
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 

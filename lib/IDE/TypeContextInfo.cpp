@@ -130,7 +130,6 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   class LocalConsumer : public VisibleDeclConsumer {
     DeclContext *DC;
-    LazyResolver *TypeResolver;
     ModuleDecl *CurModule;
     Type T;
     SmallVectorImpl<ValueDecl *> &Result;
@@ -157,8 +156,7 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   public:
     LocalConsumer(DeclContext *DC, Type T, SmallVectorImpl<ValueDecl *> &Result)
-        : DC(DC), TypeResolver(DC->getASTContext().getLazyResolver()),
-          CurModule(DC->getParentModule()), T(T), Result(Result) {}
+        : DC(DC), CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                    DynamicLookupInfo) {

@@ -53,9 +53,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve any implicitly-declared constructors within the given nominal.
-  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
-
   /// Resolve an implicitly-generated member with the given name.
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
 };

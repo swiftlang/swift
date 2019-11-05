@@ -1256,9 +1256,11 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
       
 Type ExtensionDecl::getExtendedType() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
-    ErrorType::get(ctx));
+  if (auto type = evaluateOrDefault(ctx.evaluator,
+          ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
+          Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 /// Clone the given generic parameters in the given list. We don't need any
@@ -2606,7 +2608,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   SmallVector<AnyFunctionType::Param, 4> newParams;
   for (const auto &param : funcTy->getParams()) {
     auto newParamType = mapSignatureParamType(ctx, param.getPlainType());
-    ParameterTypeFlags newFlags = param.getParameterFlags();
+
+    // Don't allow overloading by @_nonEphemeral.
+    auto newFlags = param.getParameterFlags().withNonEphemeral(false);
 
     // For the 'self' of a method, strip off 'inout'.
     if (isMethod) {
@@ -2881,19 +2885,19 @@ bool ValueDecl::isRecursiveValidation() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  // Our clients that don't register the lazy resolver are relying on the
-  // fact that they can't pull an interface type out to avoid doing work.
-  // This is a necessary evil until we can wean them off.
-  if (!getASTContext().getLazyResolver()) {
-    return TypeAndAccess.getPointer();
-  }
+  auto &ctx = getASTContext();
 
-  if (auto Ty =
-          evaluateOrDefault(getASTContext().evaluator,
+  // N.B. This assertion exists to catch new broken callers. It can be removed
+  // with the LazyResolver when the time comes.
+  assert(ctx.getLazyResolver()
+         && "The lazy resolver must be registered to make semantic queries!");
+
+  if (auto type =
+          evaluateOrDefault(ctx.evaluator,
                             InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
-                            ErrorType::get(getASTContext())))
-    return Ty;
-  return ErrorType::get(getASTContext());
+                            Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -3695,9 +3699,11 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 
 Type TypeAliasDecl::getUnderlyingType() const {
   auto &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto type = evaluateOrDefault(ctx.evaluator,
            UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
-           ErrorType::get(ctx));
+           Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
       
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
@@ -3728,10 +3734,12 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 
 Type TypeAliasDecl::getStructuralType() const {
   auto &ctx = getASTContext();
-  return evaluateOrDefault(
+  if (auto type = evaluateOrDefault(
       ctx.evaluator,
       StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
-      ErrorType::get(ctx));
+      Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -4034,9 +4042,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
-
-  // Assign DD the interface type (Self) -> () -> ()
-  (void)DD->getInterfaceType();
 
   return DD;
 }
@@ -5979,6 +5984,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(type,
                                                      isVariadic(),
                                                      isAutoClosure(),
+                                                     isNonEphemeral(),
                                                      getValueOwnership());
   return AnyFunctionType::Param(type, label, flags);
 }
@@ -6313,9 +6319,11 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 Type SubscriptDecl::getElementInterfaceType() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<SubscriptDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto type = evaluateOrDefault(ctx.evaluator,
                            ResultTypeRequest{mutableThis},
-                           ErrorType::get(ctx));
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6943,9 +6951,11 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 Type FuncDecl::getResultInterfaceType() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<FuncDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto type = evaluateOrDefault(ctx.evaluator,
                            ResultTypeRequest{mutableThis},
-                           ErrorType::get(ctx));
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 bool FuncDecl::isUnaryOperator() const {

@@ -546,8 +546,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   }
 
   // Compute the type of the property to plug in to the wrapper type.
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)var->getInterfaceType();
   Type propertyType = var->getType();
   if (!propertyType || propertyType->hasError())
     return Type();
@@ -596,6 +594,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
     var->diagnose(diag::property_wrapper_incompatible_property,
                   propertyType, rawType);
+    var->setInvalid();
     if (auto nominalWrapper = rawType->getAnyNominal()) {
       nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                nominalWrapper->getFullName());

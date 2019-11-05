@@ -536,9 +536,6 @@ public:
                                            Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol);
 
-  /// Retrieve the lazy resolver, if there is one.
-  LazyResolver *getLazyResolver() const;
-
   /// Enumerate the requirements that describe the signature of this
   /// generic signature builder.
   ///

@@ -291,9 +291,6 @@ private:
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
-  bool visitForceValueExpr(ForceValueExpr *FVE);
-  bool visitBindOptionalExpr(BindOptionalExpr *BOE);
-
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitAssignExpr(AssignExpr *AE);
@@ -2021,32 +2018,6 @@ public:
     return true;
   }
 
-  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-    Expr *arg = ArgExpr;
-
-    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
-    if (tuple)
-      arg = tuple->getElement(argIdx);
-
-    if (argIdx >= Parameters.size()) {
-      TC.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
-          .highlight(arg->getSourceRange());
-    } else {
-      auto &param = Parameters[paramIdx];
-      TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
-                  param.getPlainType())
-          .highlight(arg->getSourceRange());
-
-      auto candidate = CandidateInfo[0];
-      if (candidate.getDecl())
-        TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                    candidate.getDecl()->getFullName());
-    }
-    Diagnosed = true;
-
-    return true;
-  }
-
   bool diagnose() {
     // Use matchCallArguments to determine how close the argument list is (in
     // shape) to the specified candidates parameters.  This ignores the
@@ -3342,42 +3313,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
     if (AvailableAttr::isUnavailable(decl))
       return diagnoseExplicitUnavailability(
           decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
-  }
-
-  return false;
-}
-
-bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
-  auto argExpr = typeCheckChildIndependently(FVE->getSubExpr());
-  if (!argExpr) return true;
-  auto argType = CS.getType(argExpr);
-
-  // If the subexpression type checks as a non-optional type, then that is the
-  // error.  Produce a specific diagnostic about this.
-  if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getOptionalObjectType().isNull()) {
-    diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
-      .fixItRemove(FVE->getExclaimLoc())
-      .highlight(FVE->getSourceRange());
-    return true;
-  }
-  
-  return false;
-}
-
-bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
-  auto argExpr = typeCheckChildIndependently(BOE->getSubExpr());
-  if (!argExpr) return true;
-  auto argType = CS.getType(argExpr);
-
-  // If the subexpression type checks as a non-optional type, then that is the
-  // error.  Produce a specific diagnostic about this.
-  if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getOptionalObjectType().isNull()) {
-    diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
-      .highlight(BOE->getSourceRange())
-      .fixItRemove(BOE->getQuestionLoc());
-    return true;
   }
 
   return false;

@@ -1921,6 +1921,51 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
+public:
+  InvalidUseOfTrailingClosure(Expr *root, ConstraintSystem &cs, Type argType,
+                              Type paramType, ConstraintLocator *locator)
+      : ArgumentMismatchFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose the invalid conversion of a temporary pointer argument generated
+/// from an X-to-pointer conversion to an @_nonEphemeral parameter.
+///
+/// ```swift
+/// func foo(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
+///
+/// foo([1, 2, 3])
+/// ```
+class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
+  ConversionRestrictionKind ConversionKind;
+  bool DowngradeToWarning;
+
+public:
+  NonEphemeralConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                ConstraintLocator *locator,
+                                Type fromType, Type toType,
+                                ConversionRestrictionKind conversionKind,
+                                bool downgradeToWarning)
+      : ArgumentMismatchFailure(expr, cs, fromType, toType, locator),
+        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+  }
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  /// Attempts to emit a specialized diagnostic for
+  /// Unsafe[Mutable][Raw]Pointer.init([mutating]:) &
+  /// Unsafe[Mutable][Raw]BufferPointer.init(start:count:).
+  bool diagnosePointerInit() const;
+
+  /// Emits a note explaining to the user that an ephemeral conversion is only
+  /// valid for the duration of the call, and suggests an alternative to use.
+  void emitSuggestionNotes() const;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

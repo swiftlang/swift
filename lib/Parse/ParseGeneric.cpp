@@ -368,6 +368,13 @@ ParserStatus Parser::parseGenericWhereClause(
     BodyContext.reset();
     HasNextReq = consumeIf(tok::comma);
     // If there's a comma, keep parsing the list.
+    // If there's a "&&", diagnose replace with a comma and keep parsing
+    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasNextReq) {
+      diagnose(Tok, diag::requires_comma)
+        .fixItReplace(SourceRange(Tok.getLoc()), ",");
+      consumeToken();
+      HasNextReq = true;
+    }
   } while (HasNextReq);
 
   if (Requirements.empty())

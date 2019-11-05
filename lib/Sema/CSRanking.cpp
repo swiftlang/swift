@@ -35,7 +35,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
   CurrentScore.Data[index] += value;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver && value > 0) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
       log.indent(solverState->depth * 2);
