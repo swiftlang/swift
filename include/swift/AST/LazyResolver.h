@@ -52,9 +52,6 @@ public:
   /// the given protocol conformance.
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
-
-  /// Resolve an implicitly-generated member with the given name.
-  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
 };
 
 class LazyMemberLoader;

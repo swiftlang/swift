@@ -1668,6 +1668,35 @@ public:
   void cacheResult(bool value) const;
 };
 
+// The actions this request takes are all huge layering violations.
+//
+// Please do not add any more.
+enum class ImplicitMemberAction : uint8_t {
+  ResolveImplicitInit,
+  ResolveCodingKeys,
+  ResolveEncodable,
+  ResolveDecodable,
+};
+
+class ResolveImplicitMemberRequest
+    : public SimpleRequest<ResolveImplicitMemberRequest,
+                           bool(NominalTypeDecl *, ImplicitMemberAction),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
+                                ImplicitMemberAction action) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1689,6 +1718,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
+void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

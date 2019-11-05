@@ -1015,10 +1015,6 @@ public:
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
 
-  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
-    synthesizeMemberForLookup(nominal, member);
-  }
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -1107,11 +1103,6 @@ public:
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// Synthesize the member with the given name on the target if applicable,
-  /// i.e. if the member is synthesizable and has not yet been added to the
-  /// target.
-  void synthesizeMemberForLookup(NominalTypeDecl *target, DeclName member);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.

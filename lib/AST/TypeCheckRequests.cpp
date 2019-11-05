@@ -1071,3 +1071,26 @@ void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setInheritsSuperclassInitializers(value);
 }
+
+//----------------------------------------------------------------------------//
+// ResolveImplicitMemberRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ImplicitMemberAction action) {
+  switch (action) {
+  case ImplicitMemberAction::ResolveImplicitInit:
+    out << "resolve implicit initializer";
+    break;
+  case ImplicitMemberAction::ResolveCodingKeys:
+    out << "resolve CodingKeys";
+    break;
+  case ImplicitMemberAction::ResolveEncodable:
+    out << "resolve Encodable.encode(to:)";
+    break;
+  case ImplicitMemberAction::ResolveDecodable:
+    out << "resolve Decodable.init(from:)";
+    break;
+  }
+}
+
