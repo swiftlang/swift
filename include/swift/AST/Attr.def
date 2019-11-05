@@ -51,6 +51,7 @@ TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
 TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
+TYPE_ATTR(differentiable)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
