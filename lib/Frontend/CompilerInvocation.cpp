@@ -596,6 +596,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
+  else if (Args.hasArg(OPT_emit_pcm) || Args.hasArg(OPT_dump_pcm))
+    Opts.Mode = ClangImporterOptions::Modes::PrecompiledModule;
+
   if (auto *A = Args.getLastArg(OPT_import_objc_header))
     Opts.BridgingHeader = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);

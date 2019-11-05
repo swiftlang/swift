@@ -393,6 +393,10 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
+  if (Opt.matches(OPT_emit_pcm))
+    return FrontendOptions::ActionType::EmitPCM;
+  if (Opt.matches(OPT_dump_pcm))
+    return FrontendOptions::ActionType::DumpPCM;
 
   if (Opt.matches(OPT_repl) || Opt.matches(OPT_deprecated_integrated_repl))
     return FrontendOptions::ActionType::REPL;
