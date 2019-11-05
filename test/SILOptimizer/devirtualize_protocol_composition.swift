@@ -120,7 +120,7 @@ public func entryPoint1(c: ClassB) -> Int {
   return shouldOptimize1(c)
 }
 
-// TODO: is this broken on master too?
+// TODO: create SR -- this causes a crash on master too
 //public func entryPoint2<T>(c: ClassC<T>) -> Int {
 //  return shouldOptimize1(c)
 //}
