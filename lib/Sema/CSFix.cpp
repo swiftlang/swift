@@ -714,6 +714,25 @@ bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
   return failure.diagnose(asNote);
 }
 
+ConstraintFix *
+ExplicitlySpecifyGenericArguments::coalescedWith(ArrayRef<ConstraintFix *> fixes) {
+  if (fixes.empty())
+    return this;
+
+  auto params = getParameters();
+  llvm::SmallVector<GenericTypeParamType *, 4> missingParams{params.begin(),
+                                                             params.end()};
+  for (auto *otherFix : fixes) {
+    if (auto *fix = otherFix->getAs<ExplicitlySpecifyGenericArguments>()) {
+      auto additionalParams = fix->getParameters();
+      missingParams.append(additionalParams.begin(), additionalParams.end());
+    }
+  }
+
+  return ExplicitlySpecifyGenericArguments::create(getConstraintSystem(),
+                                                   missingParams, getLocator());
+}
+
 ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
     ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
     ConstraintLocator *locator) {

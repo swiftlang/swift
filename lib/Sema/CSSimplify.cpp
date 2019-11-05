@@ -869,10 +869,7 @@ public:
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
                                           TVO_CanBindToNoEscape);
 
-    CS.recordHole(argType);
-    CS.addUnsolvedConstraint(
-        Constraint::create(CS, ConstraintKind::Defaultable, argType,
-                           CS.getASTContext().TheAnyType, argLoc));
+    CS.recordPotentialHole(argType);
 
     Arguments.push_back(param.withType(argType));
     ++NumSynthesizedArgs;
@@ -969,7 +966,7 @@ public:
     auto argType = Arguments[argIdx].getPlainType();
     argType.visit([&](Type type) {
       if (auto *typeVar = type->getAs<TypeVariableType>())
-        CS.recordHole(typeVar);
+        CS.recordPotentialHole(typeVar);
     });
 
     const auto &param = Parameters[paramIdx];
@@ -1497,19 +1494,12 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
                                    ArrayRef<AnyFunctionType::Param> args,
                                    int numExtraneous,
                                    ConstraintLocatorBuilder locator) {
-  auto AnyType = cs.getASTContext().TheAnyType;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> extraneous;
-
-  auto argumentLocator =
-      locator.withPathElement(ConstraintLocator::FunctionArgument);
 
   for (unsigned i = args.size() - numExtraneous, n = args.size(); i != n; ++i) {
     extraneous.push_back({i, args[i]});
     if (auto *typeVar = args[i].getPlainType()->getAs<TypeVariableType>()) {
-      cs.recordHole(typeVar);
-      cs.addConstraint(
-          ConstraintKind::Defaultable, typeVar, AnyType,
-          argumentLocator.withPathElement(LocatorPathElt::TupleElement(i)));
+      cs.recordPotentialHole(typeVar);
     }
   }
 
@@ -2065,15 +2055,14 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         if (!type1->satisfiesClassConstraint()) {
           if (shouldAttemptFixes()) {
             if (auto last = locator.last()) {
-              // If solver is in diagnostic mode and this is a
-              // superclass requirement, let's consider conformance
-              // to `AnyObject` as solved since actual superclass
-              // requirement is going to fail too (because type can't
-              // satisfy it), and it's more interesting from diagnostics
-              // perspective.
+              // If solver is in diagnostic mode and type1 is a hole, or if this
+              // is a superclass requirement, let's consider `AnyObject`
+              // conformance solved. The actual superclass requirement
+              // will also fail (because type can't satisfy it), and it's
+              // more interesting for diagnostics.
               auto req = last->getAs<LocatorPathElt::AnyRequirement>();
-              if (req &&
-                  req->getRequirementKind() == RequirementKind::Superclass)
+              if (type1->isHole() || (req &&
+                  req->getRequirementKind() == RequirementKind::Superclass))
                 return getTypeMatchSuccess();
 
               auto *fix = fixRequirementFailure(*this, type1, type2, locator);
@@ -2990,6 +2979,10 @@ bool ConstraintSystem::repairFailures(
       }
     }
 
+    // If either type has a hole, consider this fixed.
+    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+      return true;
+
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
@@ -3052,6 +3045,10 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
+    // If either type has a hole, consider this fixed.
+    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+      return true;
+
     // If dependent members are present here it's because
     // base doesn't conform to associated type's protocol.
     if (lhs->hasDependentMember() || rhs->hasDependentMember())
@@ -3090,6 +3087,10 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
+    // If either type is a hole, consider this fixed
+    if (lhs->isHole() || rhs->isHole())
+      return true;
+
     auto purpose = getContextualTypePurpose();
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
@@ -3450,7 +3451,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           if (last->is<LocatorPathElt::SequenceElementType>() &&
               desugar1->is<DependentMemberType>() &&
               !desugar1->hasTypeVariable()) {
-            recordHole(typeVar2);
+            recordPotentialHole(typeVar2);
             return getTypeMatchSuccess();
           }
         }
@@ -4361,24 +4362,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
   auto *typeVar = type->getAs<TypeVariableType>();
-  if (shouldAttemptFixes()) {
-    // If type variable, associated with this conformance check,
-    // has been determined to be a "hole" in constraint system,
-    // let's consider this check a success without recording
-    // a fix, because it's just a consequence of other failure
-    // e.g.
+
+  // Dig out the fixed type to which this type refers.
+  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
+  if (shouldAttemptFixes() && type->isHole()) {
+    // If the type associated with this conformance check is a "hole" in the
+    // constraint system, let's consider this check a success without recording
+    // a fix, because it's just a consequence of the other failure, e.g.
     //
     // func foo<T: BinaryInteger>(_: T) {}
     // foo(Foo.bar) <- if `Foo` doesn't have `bar` there is
     //                 no reason to complain about missing conformance.
-    if (typeVar && isHole(typeVar)) {
-      increaseScore(SK_Fix);
-      return SolutionKind::Solved;
-    }
+    increaseScore(SK_Fix);
+    return SolutionKind::Solved;
   }
-
-  // Dig out the fixed type to which this type refers.
-  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
@@ -4718,6 +4715,9 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   if (!objectTy) {
     // Let's see if we can apply a specific fix here.
     if (shouldAttemptFixes()) {
+      if (optTy->isHole())
+        return SolutionKind::Solved;
+
       auto *fix =
           RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
 
@@ -5804,14 +5804,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   if (shouldAttemptFixes()) {
     auto fixMissingMember = [&](Type baseTy, Type memberTy,
                                 ConstraintLocator *locator) -> SolutionKind {
-      // Let's check whether there are any generic parameters
-      // associated with base type, we'd have to default them
-      // to `Any` and record as potential holes if so.
-      baseTy.transform([&](Type type) -> Type {
+      // Let's check whether there are any generic parameters associated with
+      // base type, and record potential holes if so.
+      simplifyType(baseTy).transform([&](Type type) -> Type {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
           if (typeVar->getImpl().hasRepresentativeOrFixed())
             return type;
-          recordHole(typeVar);
+          recordPotentialHole(typeVar);
         }
         return type;
       });
@@ -5830,7 +5829,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // solutions when contextual type of the result cannot be deduced e.g.
       // `let _ = x.foo`.
       if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
-        recordHole(memberTypeVar);
+        recordPotentialHole(memberTypeVar);
 
       return SolutionKind::Solved;
     };
@@ -5983,15 +5982,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     // If base type is a "hole" there is no reason to record any
     // more "member not found" fixes for chained member references.
-    if (auto *baseType = origBaseTy->getMetatypeInstanceType()
-                             ->getRValueType()
-                             ->getAs<TypeVariableType>()) {
-      if (isHole(baseType)) {
-        increaseScore(SK_Fix);
-        if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
-          recordHole(memberTypeVar);
-        return SolutionKind::Solved;
-      }
+    if (baseTy->isHole()) {
+      increaseScore(SK_Fix);
+      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
+        recordPotentialHole(memberTypeVar);
+      return SolutionKind::Solved;
     }
 
     return fixMissingMember(origBaseTy, memberTy, locator);
@@ -6560,7 +6555,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
           //
           // This helps to, for example, diagnose problems with missing
           // members used as part of a key path.
-          if (isHoleAt(componentLoc)) {
+          if (isPotentialHoleAt(componentLoc)) {
             anyComponentsUnresolved = true;
             capability = ReadOnly;
             continue;
@@ -6961,7 +6956,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Let's check if this member couldn't be found and is fixed
   // to exist based on its usage.
   if (auto *memberTy = type2->getAs<TypeVariableType>()) {
-    if (isHole(memberTy)) {
+    if (isPotentialHole(memberTy)) {
       auto *funcTy = type1->castTo<FunctionType>();
       auto *locator = memberTy->getImpl().getLocator();
       // Bind type variable associated with member to a type of argument
@@ -6969,11 +6964,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // types of the parameters matching argument types exactly.
       addConstraint(ConstraintKind::Bind, memberTy, funcTy, locator);
       // There might be no contextual type for result of the application,
-      // in cases like `let _ = x.foo()`, so let's default result to `Any`
-      // to make expressions like that type-check.
+      // in cases like `let _ = x.foo()`, so let's record a potential hole.
       auto resultTy = funcTy->getResult();
       if (auto *typeVar = resultTy->getAs<TypeVariableType>())
-        recordHole(typeVar);
+        recordPotentialHole(typeVar);
       return SolutionKind::Solved;
     }
   }
@@ -7187,8 +7181,11 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // they have to be marked as "holes".
     type1.visit([&](Type subType) {
       if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordHole(typeVar);
+        recordPotentialHole(typeVar);
     });
+
+    if (desugar2->isHole())
+      return SolutionKind::Solved;
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
     // Let's make this fix as high impact so if there is a function or member
@@ -7954,12 +7951,6 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     return true;
 
   if (isAugmentingFix(fix)) {
-    // Always useful, unless duplicate of exactly the same fix and location.
-    // This situation might happen when the same fix kind is applicable to
-    // different overload choices.
-    if (hasFixFor(fix->getLocator()))
-      return false;
-
     Fixes.push_back(fix);
   } else {
     // Only useful to record if no pre-existing fix in the subexpr tree.
@@ -7977,13 +7968,9 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   return false;
 }
 
-void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
+void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
   assert(typeVar);
-  auto *locator = typeVar->getImpl().getLocator();
-  if (Holes.insert(locator)) {
-    addConstraint(ConstraintKind::Defaultable, typeVar,
-                  getASTContext().TheAnyType, locator);
-  }
+  Holes.insert(typeVar->getImpl().getLocator());
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
@@ -8077,9 +8064,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           newTupleTypes.push_back(smallerElt);
       } else {
         if (largerElt.getType()->isTypeVariableOrMember())
-          addConstraint(ConstraintKind::Defaultable, largerElt.getType(),
-                        getASTContext().TheAnyType,
-                        getConstraintLocator(locator));
+          recordPotentialHole(largerElt.getType()->getAs<TypeVariableType>());
       }
     }
     auto matchingType =

@@ -236,17 +236,6 @@ private:
   /// true.
   bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
 
-  /// Check the associated constraint system to see if it has any opened generic
-  /// parameters that were not bound to a fixed type. If so, diagnose the
-  /// problem with an error and return true.
-  bool diagnoseAmbiguousGenericParameters();
-
-  /// Emit an error message about an unbound generic parameter, and emit notes
-  /// referring to the target of a diagnostic, e.g., the function or parameter
-  /// being used.
-  void diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
-                                         Expr *anchor);
-
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
@@ -4529,122 +4518,8 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
   return true;
 }
 
-/// Check the associated constraint system to see if it has any archetypes
-/// not properly resolved or missing. If so, diagnose the problem with
-/// an error and return true.
-bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
-  using GenericParameter = std::tuple<GenericTypeParamType *,
-                                      ConstraintLocator *,
-                                      unsigned>;
-
-  llvm::SmallVector<GenericParameter, 2> unboundParams;
-  // Check out all of the type variables lurking in the system.  If any free
-  // type variables were created when opening generic parameters, diagnose
-  // that the generic parameter could not be inferred.
-  for (auto tv : CS.getTypeVariables()) {
-    auto &impl = tv->getImpl();
-
-    if (impl.hasRepresentativeOrFixed())
-      continue;
-
-    auto *paramTy = impl.getGenericParameter();
-    if (!paramTy)
-      continue;
-
-    // Number of constraints related to particular unbound parameter
-    // is significant indicator of the problem, because if there are
-    // no constraints associated with it, that means it can't ever be resolved,
-    // such helps to diagnose situations like: struct S<A, B> { init(_ a: A) {}}
-    // because type B would have no constraints associated with it.
-    unsigned numConstraints = 0;
-    {
-      auto constraints = CS.getConstraintGraph().gatherConstraints(
-          tv, ConstraintGraph::GatheringKind::EquivalenceClass,
-          [&](Constraint *constraint) -> bool {
-            // We are not interested in ConformsTo constraints because
-            // we can't derive any concrete type information from them.
-            if (constraint->getKind() == ConstraintKind::ConformsTo)
-              return false;
-
-            if (constraint->getKind() == ConstraintKind::Bind) {
-              if (auto locator = constraint->getLocator()) {
-                auto anchor = locator->getAnchor();
-                if (anchor && isa<UnresolvedDotExpr>(anchor))
-                  return false;
-              }
-            }
-
-            return true;
-          });
-
-      numConstraints = constraints.size();
-    }
-
-    auto locator = impl.getLocator();
-    unboundParams.emplace_back(paramTy, locator, numConstraints);
-  }
-
-  // We've found unbound generic parameters, let's diagnose
-  // based on the number of constraints each one is related to.
-  if (!unboundParams.empty()) {
-    // Let's prioritize generic parameters that don't have any constraints
-    // associated.
-    std::stable_sort(unboundParams.begin(), unboundParams.end(),
-                     [](GenericParameter a, GenericParameter b) {
-                       return std::get<2>(a) < std::get<2>(b);
-                     });
-
-    auto param = unboundParams.front();
-    diagnoseAmbiguousGenericParameter(std::get<0>(param),
-                                      std::get<1>(param)->getAnchor());
-    return true;
-  }
-
-  return false;
-}
-
-/// Emit an error message about an unbound generic parameter existing, and
-/// emit notes referring to the target of a diagnostic, e.g., the function
-/// or parameter being used.
-void FailureDiagnosis::
-diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
-                                  Expr *anchor) {
-  // A very common cause of this diagnostic is a situation where a closure expr
-  // has no inferred type, due to being a multiline closure.  Check to see if
-  // this is the case and (if so), speculatively diagnose that as the problem.
-  bool didDiagnose = false;
-  expr->forEachChildExpr([&](Expr *subExpr) -> Expr*{
-    auto closure = dyn_cast<ClosureExpr>(subExpr);
-    if (!didDiagnose && closure)
-      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
-    
-    return subExpr;
-  });
-
-  if (didDiagnose) return;
-
-  
-  // Otherwise, emit an error message on the expr we have, and emit a note
-  // about where the generic parameter came from.
-  if (!anchor) {
-    auto &tc = CS.getTypeChecker();
-    tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, paramTy);
-    return;
-  }
-
-  MissingGenericArgumentsFailure failure(expr, CS, {paramTy},
-                                         CS.getConstraintLocator(anchor));
-  failure.diagnoseAsError();
-}
-
-
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
-  // First, let's try to diagnose any problems related to ambiguous
-  // generic parameters present in the constraint system.
-  if (diagnoseAmbiguousGenericParameters())
-    return;
-
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {

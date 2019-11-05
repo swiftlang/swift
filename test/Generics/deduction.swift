@@ -266,7 +266,7 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
 
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<Any>'}}
+  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<T>'}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   var x : X, y : Y

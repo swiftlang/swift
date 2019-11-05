@@ -986,7 +986,8 @@ public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
   Optional<ExpressionTimer> Timer;
-  
+
+  friend class Solution;
   friend class ConstraintFix;
   friend class OverloadChoice;
   friend class ConstraintGraph;
@@ -2082,13 +2083,13 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
-  void recordHole(TypeVariableType *typeVar);
+  void recordPotentialHole(TypeVariableType *typeVar);
 
-  bool isHole(TypeVariableType *typeVar) const {
-    return isHoleAt(typeVar->getImpl().getLocator());
+  bool isPotentialHole(TypeVariableType *typeVar) const {
+    return isPotentialHoleAt(typeVar->getImpl().getLocator());
   }
 
-  bool isHoleAt(ConstraintLocator *locator) const {
+  bool isPotentialHoleAt(ConstraintLocator *locator) const {
     return bool(Holes.count(locator));
   }
 
@@ -3073,6 +3074,11 @@ private:
   isConversionEphemeral(ConversionRestrictionKind conversion,
                         ConstraintLocatorBuilder locator);
 
+  /// Simplifies a type by replacing type variables with the result of
+  /// \c getFixedTypeFn and performing lookup on dependent member types.
+  Type simplifyTypeImpl(Type type,
+      llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const;
+
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -3321,7 +3327,8 @@ private:
   };
 
   struct PotentialBindings {
-    using BindingScore = std::tuple<bool, bool, bool, bool, unsigned char, int>;
+    using BindingScore =
+        std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
 
     TypeVariableType *TypeVar;
 
@@ -3333,6 +3340,9 @@ private:
 
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
+
+    /// Whether this type variable is considered a hole in the constraint system.
+    bool IsHole = false;
 
     /// Whether the bindings represent (potentially) incomplete set,
     /// there is no way to say with absolute certainty if that's the
@@ -3367,7 +3377,8 @@ private:
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
-      return std::make_tuple(!b.hasNonDefaultableBindings(),
+      return std::make_tuple(b.IsHole,
+                             !b.hasNonDefaultableBindings(),
                              b.FullyBound,
                              b.SubtypeOfExistentialType,
                              b.InvolvesTypeVariables,

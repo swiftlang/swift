@@ -206,14 +206,11 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
-  // Gather the constraints affected by a change to this type variable.
-  auto inactiveConstraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::AllMentions,
-      [](Constraint *constraint) { return !constraint->isActive(); });
-
-  // Add any constraints that aren't already active to the worklist.
-  for (auto *constraint : inactiveConstraints)
-    activateConstraint(constraint);
+  // Activate the constraints affected by a change to this type variable.
+  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
+  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
+    if (!constraint->isActive())
+      activateConstraint(constraint);
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -2253,9 +2250,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-template <typename Fn>
-Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
-                      Fn getFixedTypeFn) {
+Type ConstraintSystem::simplifyTypeImpl(Type type,
+    llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
       return getFixedTypeFn(tvt);
@@ -2264,7 +2260,7 @@ Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
-      Type newBase = simplifyTypeImpl(cs, depMemTy->getBase(), getFixedTypeFn);
+      Type newBase = simplifyTypeImpl(depMemTy->getBase(), getFixedTypeFn);
 
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
@@ -2282,7 +2278,7 @@ Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
 
       if (lookupBaseType->mayHaveMembers()) {
         auto *proto = assocType->getProtocol();
-        auto conformance = cs.DC->getParentModule()->lookupConformance(
+        auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance)
           return DependentMemberType::get(lookupBaseType, assocType);
@@ -2306,8 +2302,7 @@ Type ConstraintSystem::simplifyType(Type type) const {
     return type;
 
   // Map type variables down to the fixed types of their representatives.
-  return simplifyTypeImpl(
-      *this, type,
+  return simplifyTypeImpl(type,
       [&](TypeVariableType *tvt) -> Type {
         if (auto fixed = getFixedType(tvt))
           return simplifyType(fixed);
@@ -2321,8 +2316,7 @@ Type Solution::simplifyType(Type type) const {
     return type;
 
   // Map type variables to fixed types from bindings.
-  return simplifyTypeImpl(
-      getConstraintSystem(), type,
+  return getConstraintSystem().simplifyTypeImpl(type,
       [&](TypeVariableType *tvt) -> Type {
         auto known = typeBindings.find(tvt);
         assert(known != typeBindings.end());
