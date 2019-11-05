@@ -368,8 +368,8 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   }
 }
 
-static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
-                                          TypeChecker &TC) {
+static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
+                                          UnresolvedDeclRefExpr *UDRE) {
   auto name = UDRE->getName().getBaseIdentifier();
   if (!name.isOperator())
     return false;
@@ -383,18 +383,19 @@ static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
     corrected = "..<";
 
   if (!corrected.empty()) {
-    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
-                name, true, corrected)
-      .highlight(UDRE->getSourceRange())
-      .fixItReplace(UDRE->getSourceRange(), corrected);
+    Diags
+        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                  name, true, corrected)
+        .highlight(UDRE->getSourceRange())
+        .fixItReplace(UDRE->getSourceRange(), corrected);
 
     return true;
   }
   return false;
 }
 
-static bool diagnoseIncDecOperator(UnresolvedDeclRefExpr *UDRE,
-                                   TypeChecker &TC) {
+static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
+                                   UnresolvedDeclRefExpr *UDRE) {
   auto name = UDRE->getName().getBaseIdentifier();
   if (!name.isOperator())
     return false;
@@ -406,17 +407,17 @@ static bool diagnoseIncDecOperator(UnresolvedDeclRefExpr *UDRE,
     corrected = "-= 1";
 
   if (!corrected.empty()) {
-    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
-                name, true, corrected)
-      .highlight(UDRE->getSourceRange());
+    Diags
+        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                  name, true, corrected)
+        .highlight(UDRE->getSourceRange());
 
     return true;
   }
   return false;
 }
 
-static bool findNonMembers(TypeChecker &TC,
-                           ArrayRef<LookupResultEntry> lookupResults,
+static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
                            DeclRefKind refKind, bool breakOnMember,
                            SmallVectorImpl<ValueDecl *> &ResultValues,
                            llvm::function_ref<bool(ValueDecl *)> isValid) {
@@ -460,8 +461,8 @@ static bool shouldConsiderOuterResultsFor(DeclName name) {
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
-Expr *TypeChecker::
-resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
+Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                      DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -473,14 +474,15 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (shouldConsiderOuterResultsFor(Name))
     lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
-  auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
+  auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
 
+  auto &Context = DC->getASTContext();
   if (!Lookup) {
     // If we failed lookup of an operator, check to see if this is a range
     // operator misspelling. Otherwise try to diagnose a juxtaposition
     // e.g. (x*-4) that needs whitespace.
-    if (diagnoseRangeOperatorMisspell(UDRE, *this) ||
-        diagnoseIncDecOperator(UDRE, *this) ||
+    if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
+        diagnoseIncDecOperator(Context.Diags, UDRE) ||
         diagnoseOperatorJuxtaposition(UDRE, DC)) {
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
@@ -489,19 +491,20 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    LookupResult inaccessibleResults = lookupUnqualified(DC, Name, Loc,
-                                                         relookupOptions);
+    auto inaccessibleResults =
+        TypeChecker::lookupUnqualified(DC, Name, Loc, relookupOptions);
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
-      diagnose(Loc, diag::candidate_inaccessible, Name,
-               first->getFormalAccessScope().accessLevelForDiagnostics());
+      Context.Diags.diagnose(
+          Loc, diag::candidate_inaccessible, Name,
+          first->getFormalAccessScope().accessLevelForDiagnostics());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults) {
-        diagnose(lookupResult.getValueDecl(), diag::decl_declared_here,
-                 lookupResult.getValueDecl()->getFullName());
+        auto *VD = lookupResult.getValueDecl();
+        VD->diagnose(diag::decl_declared_here, VD->getFullName());
       }
 
       // Don't try to recover here; we'll get more access-related diagnostics
@@ -536,8 +539,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     auto emitBasicError = [&] {
-      diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
-        .highlight(UDRE->getSourceRange());
+      Context.Diags
+          .diagnose(Loc, diag::use_unresolved_identifier, Name,
+                    Name.isOperator())
+          .highlight(UDRE->getSourceRange());
     };
 
     if (!isConfused) {
@@ -558,9 +563,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                          lookupOptions, corrections);
 
       if (auto typo = corrections.claimUniqueCorrection()) {
-        auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
-                             Name, Name.isOperator(),
-                             typo->CorrectedName.getBaseIdentifier().str());
+        auto diag = Context.Diags.diagnose(
+            Loc, diag::use_unresolved_identifier_corrected, Name,
+            Name.isOperator(), typo->CorrectedName.getBaseIdentifier().str());
         diag.highlight(UDRE->getSourceRange());
         typo->addFixits(diag);
       } else {
@@ -571,10 +576,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     } else {
       emitBasicError();
 
-      diagnose(Loc, diag::confusable_character,
-               UDRE->getName().isOperator(), simpleName.str(),
-               expectedIdentifier)
-        .fixItReplace(Loc, expectedIdentifier);
+      Context.Diags
+          .diagnose(Loc, diag::confusable_character,
+                    UDRE->getName().isOperator(), simpleName.str(),
+                    expectedIdentifier)
+          .fixItReplace(Loc, expectedIdentifier);
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
@@ -603,9 +609,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
     return true;
   };
-  bool AllDeclRefs = findNonMembers(
-      *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
-      ResultValues, isValid);
+  bool AllDeclRefs =
+      findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
+                     /*breakOnMember=*/true, ResultValues, isValid);
 
   // If local declaration after use is found, check outer results for
   // better matching candidates.
@@ -621,8 +627,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     while (localDeclAfterUse) {
       if (Lookup.outerResults().empty()) {
-        diagnose(Loc, diag::use_local_before_declaration, Name);
-        diagnose(innerDecl, diag::decl_declared_here, Name);
+        Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
+        Context.Diags.diagnose(innerDecl, diag::decl_declared_here, Name);
         Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
         return error;
       }
@@ -630,9 +636,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       Lookup.shiftDownResults();
       ResultValues.clear();
       localDeclAfterUse = nullptr;
-      AllDeclRefs = findNonMembers(
-          *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
-          ResultValues, isValid);
+      AllDeclRefs =
+          findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
+                         /*breakOnMember=*/true, ResultValues, isValid);
     }
 
     // Drop outer results if they are not supposed to be included.
@@ -664,10 +670,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
-      diagnose(Loc, diag::use_nonmatching_operator,
-               Name,
-               UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
-               UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
+      Context.Diags.diagnose(
+          Loc, diag::use_nonmatching_operator, Name,
+          UDRE->getRefKind() == DeclRefKind::BinaryOperator
+              ? 0
+              : UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
@@ -769,7 +776,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // 'clamp').
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
     if (AllConditionalConformances) {
-      (void)findNonMembers(*this, Lookup.outerResults(), UDRE->getRefKind(),
+      (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
                            /*breakOnMember=*/false, outerAlternatives,
                            /*isValid=*/[&](ValueDecl *) { return true; });
     }
@@ -787,10 +794,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   //
   // Make sure we emit a diagnostic, since returning an ErrorExpr without
   // producing one will break things downstream.
-  diagnose(Loc, diag::ambiguous_decl_ref, Name);
+  Context.Diags.diagnose(Loc, diag::ambiguous_decl_ref, Name);
   for (auto Result : Lookup) {
     auto *Decl = Result.getValueDecl();
-    diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
+    Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
   }
   return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
@@ -1126,7 +1133,7 @@ namespace {
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TypeChecker::checkForForbiddenPrefix(
             getASTContext(), unresolved->getName().getBaseName());
-        return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
+        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
       }
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
@@ -2518,7 +2525,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
   UnresolvedDeclRefExpr UDRE(opName, refKind, DeclNameLoc(Loc));
-  auto *opExpr = resolveDeclRefExpr(&UDRE, DC);
+  auto *opExpr = TypeChecker::resolveDeclRefExpr(&UDRE, DC);
 
   switch (refKind) {
 
@@ -2907,7 +2914,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
           cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // The expression type must conform to the Sequence.
-      auto &tc = cs.getTypeChecker();
       ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
           cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
@@ -3118,8 +3124,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   // Build the 'expr ~= var' expression.
   // FIXME: Compound name locations.
-  auto *matchOp = buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
-                               /*Implicit=*/true, FunctionRefKind::Compound);
+  auto *matchOp =
+      TypeChecker::buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
+                                /*Implicit=*/true, FunctionRefKind::Compound);
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
                                                 DeclNameLoc(EP->getLoc()),
                                                 /*Implicit=*/true);
