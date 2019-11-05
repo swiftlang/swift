@@ -4006,54 +4006,79 @@ public:
     printFunctionExtInfo(T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
-    if (auto sig = T->getSubstGenericSignature()) {
-      printGenericSignature(sig,
-                            PrintAST::PrintParams |
-                            PrintAST::PrintRequirements);
-      Printer << " ";
-      if (T->isGenericSignatureImplied()) {
-        Printer << "in ";
-      }
-    }
-
-    Printer << "(";
-    bool first = true;
-    for (auto param : T->getParameters()) {
-      Printer.printSeparator(first, ", ");
-      param.print(Printer, Options);
-    }
-    Printer << ") -> ";
-
-    unsigned totalResults =
-      T->getNumYields() + T->getNumResults() + unsigned(T->hasErrorResult());
-
-    if (totalResults != 1) Printer << "(";
-
-    first = true;
-
-    for (auto yield : T->getYields()) {
-      Printer.printSeparator(first, ", ");
-      Printer << "@yields ";
-      yield.print(Printer, Options);
-    }
-
-    for (auto result : T->getResults()) {
-      Printer.printSeparator(first, ", ");
-      result.print(Printer, Options);
-    }
-
-    if (T->hasErrorResult()) {
-      // The error result is implicitly @owned; don't print that.
-      assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
-      Printer.printSeparator(first, ", ");
-      Printer << "@error ";
-      T->getErrorResult().getInterfaceType().print(Printer, Options);
-    }
-
-    if (totalResults != 1) Printer << ")";
   
+    // If this is a substituted function type, then its generic signature is
+    // independent of the enclosing context, and defines the parameters active
+    // in the interface params and results. Unsubstituted types use the existing
+    // environment, which may be a sil decl's generic environment.
+    //
+    // Yeah, this is fiddly. In the end, we probably want all decls to have
+    // substituted types in terms of a generic signature declared on the decl,
+    // which would make this logic more uniform.
+    TypePrinter *sub = this;
+    Optional<TypePrinter> subBuffer;
+    PrintOptions subOptions = Options;
+    if (T->getSubstitutions()) {
+      subOptions.GenericEnv = nullptr;
+      subBuffer.emplace(Printer, subOptions);
+      sub = &*subBuffer;
+    }
+  
+    // Capture list used here to ensure we don't print anything using `this`
+    // printer, but only the sub-Printer.
+    [T, sub, &subOptions]{
+      if (auto sig = T->getSubstGenericSignature()) {
+        sub->printGenericSignature(sig,
+                              PrintAST::PrintParams |
+                              PrintAST::PrintRequirements);
+        sub->Printer << " ";
+        if (T->isGenericSignatureImplied()) {
+          sub->Printer << "in ";
+        }
+      }
+
+      sub->Printer << "(";
+      bool first = true;
+      for (auto param : T->getParameters()) {
+        sub->Printer.printSeparator(first, ", ");
+        param.print(sub->Printer, subOptions);
+      }
+      sub->Printer << ") -> ";
+
+      unsigned totalResults =
+        T->getNumYields() + T->getNumResults() + unsigned(T->hasErrorResult());
+
+      if (totalResults != 1)
+        sub->Printer << "(";
+
+      first = true;
+
+      for (auto yield : T->getYields()) {
+        sub->Printer.printSeparator(first, ", ");
+        sub->Printer << "@yields ";
+        yield.print(sub->Printer, subOptions);
+      }
+
+      for (auto result : T->getResults()) {
+        sub->Printer.printSeparator(first, ", ");
+        result.print(sub->Printer, subOptions);
+      }
+
+      if (T->hasErrorResult()) {
+        // The error result is implicitly @owned; don't print that.
+        assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
+        sub->Printer.printSeparator(first, ", ");
+        sub->Printer << "@error ";
+        T->getErrorResult().getInterfaceType().print(sub->Printer, subOptions);
+      }
+
+      if (totalResults != 1)
+        sub->Printer << ")";
+    }();
+  
+    // The substitution types are always in terms of the outer environment.
     if (auto substitutions = T->getSubstitutions()) {
-      Printer << " for ";
+      Printer << " for";
       printSubstitutions(substitutions);
     }
   }
@@ -4076,7 +4101,7 @@ public:
       [&sub, T]{
         if (auto sig = T->getLayout()->getGenericSignature()) {
           sub.printGenericSignature(sig,
-                            PrintAST::PrintParams | PrintAST::PrintRequirements);
+                          PrintAST::PrintParams | PrintAST::PrintRequirements);
           sub.Printer << " ";
         }
         sub.Printer << "{";

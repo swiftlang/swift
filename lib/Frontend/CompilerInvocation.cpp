@@ -274,6 +274,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
 
+  Opts.EnableSubstSILFunctionTypesForFunctionValues |=
+    Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
+
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 
