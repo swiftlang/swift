@@ -218,14 +218,27 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     //   %4 = open_existential_ref
     //   %5 = alloc_stack
     //   store %4 to %5
-    auto firstUse = *instance->getUses().begin();
-    if (auto *store = dyn_cast<StoreInst>(firstUse->getUser())) {
+    //   apply <fn>(%5)
+    // It's important that the only uses of %5 (instance) are in
+    // a store and an apply.
+    StoreInst *store;
+    ApplyInst *apply;
+    bool shouldOptimize = true;
+
+    for (auto *use : instance->getUses()) {
+      if (auto *foundStore = dyn_cast<StoreInst>(use->getUser())) { store = foundStore; }
+      else if (auto *foundApply = dyn_cast<ApplyInst>(use->getUser())) { apply = foundApply; }
+      else if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
+        shouldOptimize = store && apply;
+      } else {
+        // TODO: this may be too harsh
+        shouldOptimize = false;
+      }
+    }
+
+    if (shouldOptimize) {
       openedVal = store->getSrc();
     }
-//    if (auto stackInitVal =
-//            getAddressOfStackInit(instance, firstUse->getUser(), isOpenedValueCopied)) {
-//      openedVal = stackInitVal;
-//    }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ArchetypeType>();
