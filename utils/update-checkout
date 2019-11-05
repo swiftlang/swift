@@ -2,7 +2,7 @@
 
 import sys
 
-import update_checkout
+from update_checkout.update_checkout import update_checkout
 
 # The internal Windows implementation tries to import the current module using
 # sys.modules[__name__]. This file (called 'update-checkout') is not a valid
