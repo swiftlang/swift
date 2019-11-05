@@ -291,22 +291,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   unsigned currentFunctionIdx = 0;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
-    // Type check conformance contexts.
-    for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
-      auto decl = TC.ConformanceContexts[i];
-      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-        TypeChecker::checkConformancesInContext(ext, ext);
-      else {
-        auto *ntd = cast<NominalTypeDecl>(decl);
-        TypeChecker::checkConformancesInContext(ntd, ntd);
-
-        // Finally, we can check classes for missing initializers.
-        if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
-          TypeChecker::maybeDiagnoseClassWithoutInitializers(classDecl);
-      }
-    }
-    TC.ConformanceContexts.clear();
-
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
@@ -327,8 +311,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     }
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           !TC.ConformanceContexts.empty());
+           currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
