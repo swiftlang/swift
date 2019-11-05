@@ -559,10 +559,6 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
-  /// The # of times we have performed typo correction.
-  unsigned NumTypoCorrections = 0;
-
-private:
   Type MaxIntegerType;
   Type NSObjectType;
   Type NSNumberType;
@@ -1911,13 +1907,13 @@ public:
   };
 
   /// Check for a typo correction.
-  void performTypoCorrection(DeclContext *DC,
-                             DeclRefKind refKind,
-                             Type baseTypeOrNull,
-                             NameLookupOptions lookupOptions,
-                             TypoCorrectionResults &corrections,
-                             GenericSignatureBuilder *gsb = nullptr,
-                             unsigned maxResults = 4);
+  static void performTypoCorrection(DeclContext *DC,
+                                    DeclRefKind refKind,
+                                    Type baseTypeOrNull,
+                                    NameLookupOptions lookupOptions,
+                                    TypoCorrectionResults &corrections,
+                                    GenericSignatureBuilder *gsb = nullptr,
+                                    unsigned maxResults = 4);
 
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.

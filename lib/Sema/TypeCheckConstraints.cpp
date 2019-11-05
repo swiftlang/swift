@@ -553,9 +553,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         }
       }
 
-      TypoCorrectionResults corrections(*this, Name, nameLoc);
-      performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                            lookupOptions, corrections);
+      TypoCorrectionResults corrections(Name, nameLoc);
+      TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
+                                         lookupOptions, corrections);
 
       if (auto typo = corrections.claimUniqueCorrection()) {
         auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,

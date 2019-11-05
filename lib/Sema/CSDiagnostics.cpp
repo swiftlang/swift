@@ -3013,7 +3013,6 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
 }
 
 bool MissingMemberFailure::diagnoseAsError() {
-  auto &TC = getTypeChecker();
   auto *anchor = getRawAnchor();
   auto *baseExpr = getAnchor();
 
@@ -3045,10 +3044,10 @@ bool MissingMemberFailure::diagnoseAsError() {
         .highlight(nameLoc.getSourceRange());
   };
 
-  TypoCorrectionResults corrections(TC, getName(), nameLoc);
+  TypoCorrectionResults corrections(getName(), nameLoc);
   auto tryTypoCorrection = [&] (Type type) {
-    TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, type,
-                             defaultMemberLookupOptions, corrections);
+    TypeChecker::performTypoCorrection(getDC(), DeclRefKind::Ordinary, type,
+                                       defaultMemberLookupOptions, corrections);
   };
 
   if (getName().getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
