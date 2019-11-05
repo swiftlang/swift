@@ -1685,8 +1685,8 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     
     {
-      auto *TC = static_cast<TypeChecker *>(ED->getASTContext().getLazyResolver());
-      assert(TC && "Must have a lazy resolver set");
+      auto *TC = ED->getASTContext().getLegacyGlobalTypeChecker();
+      assert(TC && "Must have a global type checker set");
       Expr *exprToCheck = prevValue;
       if (TC->typeCheckExpression(exprToCheck, ED, TypeLoc::withoutLoc(rawTy),
                                   CTP_EnumCaseRawValue)) {

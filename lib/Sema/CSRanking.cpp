@@ -390,8 +390,8 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *tc = static_cast<TypeChecker *>(C.getLazyResolver());
+  // FIXME: Remove dependency on the global type checker.
+      auto *tc = C.getLegacyGlobalTypeChecker();
 
   if (C.LangOpts.DebugConstraintSolver) {
     auto &log = C.TypeCheckerDebug->getStream();

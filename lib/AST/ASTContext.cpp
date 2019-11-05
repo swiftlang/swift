@@ -159,8 +159,8 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
-  /// The last resolver.
-  LazyResolver *Resolver = nullptr;
+  /// A global type checker instance..
+  TypeChecker *Checker = nullptr;
 
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
@@ -479,8 +479,6 @@ ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
       TheSyntaxArena(new syntax::SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
-  delete Resolver;
-
   for (auto &cleanup : Cleanups)
     cleanup();
 }
@@ -630,8 +628,9 @@ TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
   return getImpl().Checker;
 }
 
-
-  getImpl().Resolver = resolver;
+void ASTContext::installGlobalTypeChecker(TypeChecker *TC) {
+  assert(!getImpl().Checker);
+  getImpl().Checker = TC;
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the

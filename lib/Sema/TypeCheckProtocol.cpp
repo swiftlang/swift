@@ -982,9 +982,8 @@ bool WitnessChecker::findBestWitness(
   bool anyFromUnconstrainedExtension;
   numViable = 0;
 
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *TC = static_cast<TypeChecker *>(
-      requirement->getASTContext().getLazyResolver());
+  // FIXME: Remove dependency on the global type checker.
+  auto *TC = requirement->getASTContext().getLegacyGlobalTypeChecker();
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
     SmallVector<ValueDecl *, 4> witnesses;
@@ -3372,7 +3371,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto *TC = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
+  auto *TC = getASTContext().getLegacyGlobalTypeChecker();
   auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, Conformance, DC,
                             requirement, derived);
   if (match.isViable()) {
@@ -4541,8 +4540,8 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   // Describe why the witness didn't satisfy the requirement.
   WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *TC = static_cast<TypeChecker *>(req->getASTContext().getLazyResolver());
+  // FIXME: Remove dependency on the global type checker.
+  auto *TC = req->getASTContext().getLegacyGlobalTypeChecker();
   auto match = matchWitness(*TC, oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
   if (match.Kind == MatchKind::ExactMatch &&
@@ -5173,10 +5172,9 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        auto lazyResolver = ctx.getLazyResolver();
-        assert(lazyResolver && "Need a type checker to match witnesses");
-        auto &tc = *static_cast<TypeChecker *>(lazyResolver);
-        if (matchWitness(tc, reqEnvCache, proto, *conformance,
+        auto *TC = ctx.getLegacyGlobalTypeChecker();
+        assert(TC && "Need a type checker to match witnesses");
+        if (matchWitness(*TC, reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {
