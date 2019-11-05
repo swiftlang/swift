@@ -4697,7 +4697,7 @@ namespace {
       return result;
     }
 
-    void finalize(Expr *&result) {
+    void finalize() {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
 
@@ -4722,9 +4722,6 @@ namespace {
           .fixItInsert(cast->getStartLoc(), "(")
           .fixItInsertAfter(cast->getEndLoc(), ")");
       }
-      
-      // Set the final types on the expression.
-      cs.setExprTypes(result);
     }
 
     /// Diagnose an optional injection that is probably not what the
@@ -7561,7 +7558,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   }
 
   if (result)
-    rewriter.finalize(result);
+    setExprTypes(result);
+
+  rewriter.finalize();
 
   return result;
 }
@@ -7575,6 +7574,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   if (!result)
     return nullptr;
 
-  rewriter.finalize(result);
+  cs.setExprTypes(result);
+  rewriter.finalize();
   return result;
 }
