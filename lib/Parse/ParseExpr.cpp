@@ -2755,8 +2755,11 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the closing '}'.
   SourceLoc rightBrace;
-  parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
-                     leftBrace);
+  bool missingRBrace = parseMatchingToken(tok::r_brace, rightBrace,
+                                          diag::expected_closure_rbrace,
+                                          leftBrace);
+  if (missingRBrace)
+    Status.setIsParseError();
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.
@@ -2784,7 +2787,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (!Status.hasCodeCompletion() && bodyElements.size() == 1) {
+  if (!missingRBrace && !Status.hasCodeCompletion() &&
+      bodyElements.size() == 1) {
     // If the closure's only body element is a single return statement,
     // use that instead of creating a new wrapping return expression.
     Expr *returnExpr = nullptr;
