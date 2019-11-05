@@ -66,6 +66,10 @@ public:
   Optional<StringRef> convention = None;
   Optional<StringRef> conventionWitnessMethodProtocol = None;
 
+  // Indicates whether the type's '@differentiable' attribute has a 'linear'
+  // argument.
+  bool linear = false;
+
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
   
@@ -80,7 +84,15 @@ public:
   TypeAttributes() {}
   
   bool isValid() const { return AtLoc.isValid(); }
-  
+
+  bool isLinear() const {
+    assert(
+        !linear ||
+        (linear && has(TAK_differentiable)) &&
+            "Linear shouldn't have been true if there's no `@differentiable`");
+    return linear;
+  }
+
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
   }
