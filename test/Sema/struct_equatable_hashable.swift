@@ -120,7 +120,7 @@ func structWithoutExplicitConformance() {
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.
 struct NotHashable {}
-struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}} expected-note {{do you want to add protocol stubs?}}
+struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
   let a: NotHashable // expected-note {{stored property type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'StructWithNonHashablePayload' to 'Hashable'}}
   // expected-note@-1 {{stored property type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'StructWithNonHashablePayload' to 'Equatable'}}
 }
@@ -182,7 +182,7 @@ struct NotExplicitlyHashableAndCannotDerive {
   let v: NotHashable // expected-note {{stored property type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Hashable'}}
   // expected-note@-1 {{stored property type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Equatable'}}
 }
-extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}} expected-note {{do you want to add protocol stubs?}}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}}
 
 // A struct with no stored properties trivially derives conformance.
 struct NoStoredProperties: Hashable {}
@@ -240,7 +240,6 @@ struct BadGenericDeriveExtension<T> {
 }
 extension BadGenericDeriveExtension: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
-// expected-note@-2 {{do you want to add protocol stubs?}}
 extension BadGenericDeriveExtension: Hashable where T: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
 
