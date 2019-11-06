@@ -190,7 +190,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
     // If the protocol has a default type, check it.
     if (literalProtocol) {
-      if (auto defaultType = TC.getDefaultType(literalProtocol, DC)) {
+      if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
         if (defaultType->getAnyNominal() != type->getAnyNominal())
@@ -350,7 +350,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
     // Integer literals can be treated as floating point literals.
     if (auto floatProto = TC.Context.getProtocol(
                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      if (auto defaultType = TC.getDefaultType(floatProto, DC)) {
+      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC)) {
         types.push_back(defaultType);
       }
     }
@@ -815,7 +815,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   DeclContext *UseDC,
                                                   const DeclRefExpr *base,
                                                   bool wantInterfaceType) {
-  return TC.getUnopenedTypeOfReference(
+  return TypeChecker::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
         if (auto *param = dyn_cast<ParamDecl>(var))
@@ -895,7 +895,7 @@ void ConstraintSystem::recordOpenedTypes(
 
 /// Determine how many levels of argument labels should be removed from the
 /// function type when referencing the given declaration.
-static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
+static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
   unsigned numParameterLists = decl->getNumCurryLevels();
@@ -964,8 +964,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
-        TC, funcDecl,
-        /*isCurriedInstanceReference=*/false, functionRefKind);
+        funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -1257,8 +1256,7 @@ ConstraintSystem::getTypeOfMemberReference(
   OpenedTypeMap localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
-      TC, value, /*isCurriedInstanceReference*/ !hasAppliedSelf,
-      functionRefKind);
+      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
   AnyFunctionType *funcType;
 
@@ -1291,8 +1289,9 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       refType = FunctionType::get(indices, elementTy);
     } else {
-      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
-                                           base, /*wantInterfaceType=*/true);
+      refType = TypeChecker::getUnopenedTypeOfReference(
+          cast<VarDecl>(value), baseTy, useDC, base,
+          /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();

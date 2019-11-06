@@ -251,9 +251,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // If we didn't find anything, try to apply typo-correction.
     bool resultsAreFromTypoCorrection = false;
     if (!lookup) {
-      TypoCorrectionResults corrections(*this, componentName,
+      TypoCorrectionResults corrections(componentName,
                                         DeclNameLoc(componentNameLoc));
-      performTypoCorrection(dc, DeclRefKind::Ordinary, lookupType,
+      TypeChecker::performTypoCorrection(dc, DeclRefKind::Ordinary, lookupType,
                             (lookupType ? defaultMemberTypeLookupOptions
                                         : defaultUnqualifiedLookupOptions),
                             corrections);

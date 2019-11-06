@@ -69,18 +69,17 @@ struct REPLContext {
 
 class StmtBuilder {
   REPLContext &C;
-  TypeChecker &TC;
   ASTContext &Context;
   DeclContext *DC;
   SmallVector<ASTNode, 8> Body;
 
 public:
   StmtBuilder(REPLContext &C, DeclContext *DC)
-      : C(C), TC(C.TC), Context(C.Context), DC(DC) {
+      : C(C), Context(C.Context), DC(DC) {
     assert(DC);
   }
   StmtBuilder(StmtBuilder &parent)
-      : C(parent.C), TC(C.TC), Context(C.Context), DC(parent.DC) {}
+      : C(parent.C), Context(C.Context), DC(parent.DC) {}
 
   ~StmtBuilder() { assert(Body.empty() && "statements remain in builder?"); }
 
@@ -97,14 +96,16 @@ public:
 
   Expr *buildPrintRefExpr(SourceLoc loc) {
     assert(!C.PrintDecls.empty());
-    return TC.buildRefExpr(C.PrintDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true, FunctionRefKind::Compound);
+    return TypeChecker::buildRefExpr(C.PrintDecls, DC, DeclNameLoc(loc),
+                                     /*Implicit=*/true,
+                                     FunctionRefKind::Compound);
   }
 
   Expr *buildDebugPrintlnRefExpr(SourceLoc loc) {
     assert(!C.DebugPrintlnDecls.empty());
-    return TC.buildRefExpr(C.DebugPrintlnDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true, FunctionRefKind::Compound);
+    return TypeChecker::buildRefExpr(C.DebugPrintlnDecls, DC, DeclNameLoc(loc),
+                                     /*Implicit=*/true,
+                                     FunctionRefKind::Compound);
   }
 };
 } // unnamed namespace
@@ -117,8 +118,8 @@ void StmtBuilder::printLiteralString(StringRef Str, SourceLoc Loc) {
 
 void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
   Expr *DebugPrintlnFn = buildDebugPrintlnRefExpr(Loc);
-  Expr *ArgRef = TC.buildRefExpr(Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true,
-                                 FunctionRefKind::Compound);
+  Expr *ArgRef = TypeChecker::buildRefExpr(
+      Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true, FunctionRefKind::Compound);
   addToBody(CallExpr::createImplicit(Context, DebugPrintlnFn, { ArgRef }, { }));
 }
 
@@ -334,8 +335,8 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
                                   /*implicit*/true));
 
   // Finally, print the variable's value.
-  E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(E->getStartLoc()),
-                             /*Implicit=*/true);
+  E = TypeChecker::buildCheckedRefExpr(vd, &SF, DeclNameLoc(E->getStartLoc()),
+                                       /*Implicit=*/true);
   generatePrintOfExpression(vd->getName().str(), E);
 }
 
@@ -362,9 +363,9 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     // underlying Decl to print it.
     if (auto *NP = dyn_cast<NamedPattern>(pattern->
                                           getSemanticsProvidingPattern())) {
-      Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), &SF,
-                                       DeclNameLoc(PBD->getStartLoc()),
-                                       /*Implicit=*/true);
+      Expr *E = TypeChecker::buildCheckedRefExpr(
+          NP->getDecl(), &SF, DeclNameLoc(PBD->getStartLoc()),
+          /*Implicit=*/true);
       generatePrintOfExpression(PatternString, E);
       continue;
     }

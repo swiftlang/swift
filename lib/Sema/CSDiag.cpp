@@ -3702,7 +3702,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
 
   // Conditions for showing this diagnostic:
   // * The object literal protocol's default type is unimplemented
-  if (TC.getDefaultType(protocol, CS.DC))
+  if (TypeChecker::getDefaultType(protocol, CS.DC))
     return false;
   // * The object literal has no contextual type
   if (CS.getContextualType())

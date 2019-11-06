@@ -718,8 +718,8 @@ public:
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-    if (auto *P = TC.resolvePattern(S->getPattern(), DC,
-                                    /*isStmtCondition*/false)) {
+    if (auto *P = TypeChecker::resolvePattern(S->getPattern(), DC,
+                                              /*isStmtCondition*/false)) {
       S->setPattern(P);
     } else {
       S->getPattern()->setType(ErrorType::get(TC.Context));
@@ -839,9 +839,9 @@ public:
     if (elementTy->hasError())
       return nullptr;
 
-    auto *varRef =
-        TC.buildCheckedRefExpr(iterator, DC, DeclNameLoc(S->getInLoc()),
-                               /*implicit*/ true);
+    auto *varRef = TypeChecker::buildCheckedRefExpr(iterator, DC,
+                                                    DeclNameLoc(S->getInLoc()),
+                                                    /*implicit*/ true);
     if (!varRef)
       return nullptr;
 
@@ -1045,8 +1045,8 @@ public:
                                  SmallVectorImpl<VarDecl *> **prevCaseDecls,
                                  SmallVectorImpl<VarDecl *> **nextCaseDecls) {
     Pattern *pattern = labelItem.getPattern();
-    auto *newPattern = TC.resolvePattern(pattern, DC,
-                                         /*isStmtCondition*/ false);
+    auto *newPattern = TypeChecker::resolvePattern(pattern, DC,
+                                                   /*isStmtCondition*/ false);
     if (!newPattern) {
       pattern->collectVariables(**nextCaseDecls);
       std::swap(*prevCaseDecls, *nextCaseDecls);
@@ -1453,7 +1453,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
   Type exnType = getExceptionType(DC, S->getCatchLoc());
 
   Pattern *pattern = S->getErrorPattern();
-  if (Pattern *newPattern = resolvePattern(pattern, DC,
+  if (Pattern *newPattern = TypeChecker::resolvePattern(pattern, DC,
                                            /*isStmtCondition*/false)) {
     pattern = newPattern;
 

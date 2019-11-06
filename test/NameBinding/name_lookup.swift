@@ -627,7 +627,12 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 // expected-note@-6 {{through reference here}}
 // expected-note@-7 {{through reference here}}
 // expected-note@-8 {{through reference here}}
-
+// expected-error@-9 {{circular reference}}
+// expected-note@-10 {{through reference here}}
+// expected-note@-11 {{through reference here}}
+// expected-note@-12 {{through reference here}}
+// expected-note@-13 {{through reference here}}
+// expected-note@-14 {{through reference here}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {

@@ -403,7 +403,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   SmallVector<Constraint *, 2> defaultableConstraints;
   SmallVector<PotentialBinding, 4> literalBindings;
   bool addOptionalSupertypeBindings = false;
-  auto &tc = getTypeChecker();
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
@@ -523,7 +522,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     case ConstraintKind::SelfObjectOfProtocol:
       // Swift 3 allowed the use of default types for normal conformances
       // to expressible-by-literal protocols.
-      if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+      if (getASTContext().LangOpts.EffectiveLanguageVersion[0] >= 4)
         continue;
 
       if (!constraint->getSecondType()->is<ProtocolType>())
@@ -541,7 +540,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
-      auto defaultType = tc.getDefaultType(constraint->getProtocol(), DC);
+      auto defaultType = TypeChecker::getDefaultType(constraint->getProtocol(), DC);
       if (!defaultType)
         continue;
 

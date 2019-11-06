@@ -480,7 +480,7 @@ namespace {
     if (lti.haveFloatLiteral) {
       if (auto floatProto = CS.getASTContext().getProtocol(
               KnownProtocolKind::ExpressibleByFloatLiteral)) {
-        if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
+        if (auto defaultType = TypeChecker::getDefaultType(floatProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
           }
@@ -547,7 +547,6 @@ namespace {
     if (otherArgTy)
       otherArgTy = otherArgTy->getWithoutSpecifierType();
 
-    auto &tc = CS.getTypeChecker();
     for (auto literalProto : literalProtos) {
       // If there is another, concrete argument, check whether it's type
       // conforms to the literal protocol and test against it directly.
@@ -559,7 +558,7 @@ namespace {
                 otherArgTy, literalProto, CS.DC,
                 ConformanceCheckFlags::InExpression))
           return true;
-      } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
+      } else if (Type defaultType = TypeChecker::getDefaultType(literalProto, CS.DC)) {
         // If there is a default type for the literal protocol, check whether
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
@@ -2267,8 +2266,8 @@ namespace {
 
           // Okay, resolve the pattern.
           Pattern *pattern = clause->getErrorPattern();
-          pattern = CS.TC.resolvePattern(pattern, CS.DC,
-                                         /*isStmtCondition*/false);
+          pattern = TypeChecker::resolvePattern(pattern, CS.DC,
+                                                /*isStmtCondition*/false);
           if (!pattern) return false;
 
           // Save that aside while we explore the type.
@@ -3792,7 +3791,6 @@ bool swift::areGenericRequirementsSatisfied(
 
 bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
                        ConstraintKind kind, DeclContext *dc) {
-  std::unique_ptr<TypeChecker> CreatedTC;
   auto *TC = dc->getASTContext().getLegacyGlobalTypeChecker();
   assert(TC && "Must have type checker to make semantic query!");
   return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
@@ -3840,7 +3838,6 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
   assert(TC && "Must have type checker to make global query!");

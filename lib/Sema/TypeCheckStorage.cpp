@@ -170,10 +170,9 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   auto &Context = binding->getASTContext();
 
   // Resolve the pattern.
-  auto *TC = binding->getASTContext().getLegacyGlobalTypeChecker();
-  auto *pattern = TC->resolvePattern(binding->getPattern(entryNumber),
-                                     binding->getDeclContext(),
-                                     /*isStmtCondition*/ true);
+  auto *pattern = TypeChecker::resolvePattern(binding->getPattern(entryNumber),
+                                              binding->getDeclContext(),
+                                              /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
@@ -213,6 +212,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
+  auto *TC = binding->getASTContext().getLegacyGlobalTypeChecker();
   if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
