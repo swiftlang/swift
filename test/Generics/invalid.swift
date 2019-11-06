@@ -132,7 +132,7 @@ struct X<A> : Hashable {
   class Bar {}
 }
 // expected-note@-4 3 {{arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
-// expected-note@-5 2 {{arguments to generic parameter 'A' ('Bool' and 'Int') are expected to be equal}}
+// expected-note@-5 1 {{arguments to generic parameter 'A' ('Bool' and 'Int') are expected to be equal}}
 // expected-note@-6 4 {{arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
 
 struct Y<A, B, C>{} // expected-note {{arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
@@ -153,7 +153,7 @@ func multipleArguments(y: Y<Int, Int, Int>) {
 func errorMessageVariants(x: X<Int>, x2: X<Bool> = X<Int>()) -> X<Bool> {
   // expected-error@-1 {{default argument value of type 'X<Int>' cannot be converted to type 'X<Bool>'}}
   let _: X<Bool> = x // expected-error {{cannot assign value of type 'X<Int>' to type 'X<Bool>'}}
-  errorMessageVariants(x: x2, x2: x2) // expected-error {{cannot convert value of type 'X<Bool>' to expected argument type 'X<Int>'}}
+  errorMessageVariants(x: x2, x2: x2) // no call site error because the decl is invalid
   let _: X<Bool> = { return x }() // expected-error {{cannot convert value of type 'X<Int>' to closure result type 'X<Bool>'}}
   let _: [X<Bool>] = [x] // expected-error {{cannot convert value of type 'X<Int>' to expected element type 'X<Bool>'}}
   let _ = x as X<Bool> // expected-error {{cannot convert value of type 'X<Int>' to type 'X<Bool>' in coercion}}
