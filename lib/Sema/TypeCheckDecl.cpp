@@ -2735,7 +2735,12 @@ public:
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
-    TC.diagnoseInlinableLocalType(NTD);
+    auto *DC = NTD->getDeclContext();
+    if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      auto kind = TypeChecker::getFragileFunctionKind(DC);
+      NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getFullName(),
+                    static_cast<unsigned>(kind.first));
+    }
 
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&

@@ -1678,8 +1678,6 @@ public:
 
   /// \name Resilience diagnostics
 
-  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
-
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
