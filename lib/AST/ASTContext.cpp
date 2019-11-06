@@ -4646,6 +4646,30 @@ bool ASTContext::requireArrayLiteralIntrinsics(SourceLoc loc) {
   return true;
 }
 
+/// If an expression references 'self.init' or 'super.init' in an
+/// initializer context, returns the implicit 'self' decl of the constructor.
+/// Otherwise, return nil.
+VarDecl *
+ASTContext::getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                                  UnresolvedDotExpr *ctorRef) {
+  // If the reference isn't to a constructor, we're done.
+  if (ctorRef->getName().getBaseName() != DeclBaseName::createConstructor())
+    return nullptr;
+
+  if (auto ctorContext
+        = dyn_cast_or_null<ConstructorDecl>(DC->getInnermostMethodContext())) {
+    auto nestedArg = ctorRef->getBase();
+    if (auto inout = dyn_cast<InOutExpr>(nestedArg))
+      nestedArg = inout->getSubExpr();
+    if (nestedArg->isSuperExpr())
+      return ctorContext->getImplicitSelfDecl();
+    if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
+      if (declRef->getDecl()->getFullName() == Id_self)
+        return ctorContext->getImplicitSelfDecl();
+  }
+  return nullptr;
+}
+
 VarDecl *VarDecl::getOriginalWrappedProperty(
     Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)

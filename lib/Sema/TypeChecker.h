@@ -1840,12 +1840,6 @@ public:
     return DiagnosedExprs[E];
   }
 
-  /// If an expression references 'self.init' or 'super.init' in an
-  /// initializer context, returns the implicit 'self' decl of the constructor.
-  /// Otherwise, return nil.
-  VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                                 UnresolvedDotExpr *ctorRef);
-
   /// Diagnose assigning variable to itself.
   bool diagnoseSelfAssignment(const Expr *E);
 

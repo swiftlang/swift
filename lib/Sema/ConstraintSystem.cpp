@@ -482,7 +482,7 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
 
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     return getConstraintLocator(
-        anchor, TC.getSelfForInitDelegationInConstructor(DC, UDE)
+        anchor, getASTContext().getSelfForInitDelegationInConstructor(DC, UDE)
                   ? ConstraintLocator::ConstructorMember
                   : ConstraintLocator::Member);
   }
