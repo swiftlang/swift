@@ -291,9 +291,6 @@ private:
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
-  bool visitForceValueExpr(ForceValueExpr *FVE);
-  bool visitBindOptionalExpr(BindOptionalExpr *BOE);
-
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitAssignExpr(AssignExpr *AE);
@@ -795,11 +792,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     }
 
     // Emit a conformance error through conformsToProtocol.
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            fromType, PT->getDecl(), CS.DC, ConformanceCheckFlags::InExpression,
-            expr->getLoc())) {
-      if (conformance->isAbstract() ||
-          !conformance->getConcrete()->isInvalid())
+    auto conformance = TypeChecker::conformsToProtocol(
+        fromType, PT->getDecl(), CS.DC, ConformanceCheckFlags::InExpression,
+        expr->getLoc());
+    if (conformance) {
+      if (conformance.isAbstract() || !conformance.getConcrete()->isInvalid())
         return false;
     }
 
@@ -811,8 +808,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // tries to add a specific diagnosis/fixit to explicitly invoke 'boolValue'.
   if (toType->isBool() &&
       fromType->mayHaveMembers()) {
-    auto LookupResult = CS.TC.lookupMember(
-        CS.DC, fromType, DeclName(CS.TC.Context.getIdentifier("boolValue")));
+    auto LookupResult = TypeChecker::lookupMember(
+        CS.DC, fromType,
+        DeclName(CS.getASTContext().getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
       if (isa<VarDecl>(LookupResult.begin()->getValueDecl())) {
         if (anchor->canAppendPostfixExpression())
@@ -859,7 +857,6 @@ namespace {
     llvm::DenseMap<TypeLoc*, Type> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
-    llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
@@ -908,10 +905,6 @@ namespace {
                 TS->ParamDeclInterfaceTypes[P] = P->getInterfaceType();
                 P->setInterfaceType(Type());
               }
-              TS->PossiblyInvalidDecls.insert(P);
-              
-              if (P->isInvalid())
-                P->setInvalid(false);
             }
           
           expr->setType(nullptr);
@@ -962,16 +955,10 @@ namespace {
         paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
       }
       
-      if (!PossiblyInvalidDecls.empty())
-        for (auto D : PossiblyInvalidDecls)
-          if (D->hasInterfaceType())
-            D->setInvalid(D->getInterfaceType()->hasError());
-      
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
       TypeLocTypes.clear();
       PatternTypes.clear();
-      PossiblyInvalidDecls.clear();
     }
     
     // On destruction, if a type got wiped out, reset it from null to its
@@ -999,11 +986,6 @@ namespace {
           paramDeclIfaceElt.first->setInterfaceType(
               getParamBaseType(paramDeclIfaceElt));
         }
-
-      if (!PossiblyInvalidDecls.empty())
-        for (auto D : PossiblyInvalidDecls)
-          if (D->hasInterfaceType())
-            D->setInvalid(D->getInterfaceType()->hasError());
     }
 
   private:
@@ -1740,7 +1722,8 @@ static void emitFixItForExplicitlyQualifiedReference(
 
 void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
     UnresolvedDotExpr *UDE, ValueDecl *choice) {
-  auto result = TC.lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
+  auto result =
+      TypeChecker::lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
   assert(result && "names can't just disappear");
   // These should all come from the same place.
   auto exampleInner = result.front();
@@ -1939,7 +1922,8 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   // For each of the parent contexts, let's try to find any candidates
   // which have the same name and the same number of arguments as callee.
   while (context->getParent()) {
-    auto result = TC.lookupUnqualified(context, UDE->getName(), UDE->getLoc());
+    auto result =
+        TypeChecker::lookupUnqualified(context, UDE->getName(), UDE->getLoc());
     context = context->getParent();
 
     if (!result || result.empty())
@@ -2030,32 +2014,6 @@ public:
     // Let's diagnose labeling problem but only related to corrected ones.
     if (diagnoseArgumentLabelError(TC.Context, ArgExpr, newNames, IsSubscript))
       Diagnosed = true;
-
-    return true;
-  }
-
-  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-    Expr *arg = ArgExpr;
-
-    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
-    if (tuple)
-      arg = tuple->getElement(argIdx);
-
-    if (argIdx >= Parameters.size()) {
-      TC.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
-          .highlight(arg->getSourceRange());
-    } else {
-      auto &param = Parameters[paramIdx];
-      TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
-                  param.getPlainType())
-          .highlight(arg->getSourceRange());
-
-      auto candidate = CandidateInfo[0];
-      if (candidate.getDecl())
-        TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                    candidate.getDecl()->getFullName());
-    }
-    Diagnosed = true;
 
     return true;
   }
@@ -3360,42 +3318,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   return false;
 }
 
-bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
-  auto argExpr = typeCheckChildIndependently(FVE->getSubExpr());
-  if (!argExpr) return true;
-  auto argType = CS.getType(argExpr);
-
-  // If the subexpression type checks as a non-optional type, then that is the
-  // error.  Produce a specific diagnostic about this.
-  if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getOptionalObjectType().isNull()) {
-    diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
-      .fixItRemove(FVE->getExclaimLoc())
-      .highlight(FVE->getSourceRange());
-    return true;
-  }
-  
-  return false;
-}
-
-bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
-  auto argExpr = typeCheckChildIndependently(BOE->getSubExpr());
-  if (!argExpr) return true;
-  auto argType = CS.getType(argExpr);
-
-  // If the subexpression type checks as a non-optional type, then that is the
-  // error.  Produce a specific diagnostic about this.
-  if (!isUnresolvedOrTypeVarType(argType) &&
-      argType->getOptionalObjectType().isNull()) {
-    diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
-      .highlight(BOE->getSourceRange())
-      .fixItRemove(BOE->getQuestionLoc());
-    return true;
-  }
-
-  return false;
-}
-
 bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   auto typeCheckClauseExpr = [&](Expr *clause, Type contextType = Type(),
                                  ContextualTypePurpose convertPurpose =
@@ -3662,18 +3584,20 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
   // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
   // figure out what the contextual element type is in place.
-  auto ALC = CS.TC.getProtocol(E->getLoc(),
+  auto ALC =
+      TypeChecker::getProtocol(CS.getASTContext(), E->getLoc(),
                                KnownProtocolKind::ExpressibleByArrayLiteral);
   if (!ALC)
     return visitExpr(E);
 
   // Check to see if the contextual type conforms.
-  if (auto Conformance
-        = TypeChecker::conformsToProtocol(contextualType, ALC, CS.DC,
-                                          ConformanceCheckFlags::InExpression)) {
+  auto Conformance = TypeChecker::conformsToProtocol(
+      contextualType, ALC, CS.DC, ConformanceCheckFlags::InExpression);
+  if (Conformance) {
     Type contextualElementType =
-        Conformance->getTypeWitnessByName(
-          contextualType, CS.getASTContext().Id_ArrayLiteralElement)
+        Conformance
+            .getTypeWitnessByName(contextualType,
+                                  CS.getASTContext().Id_ArrayLiteralElement)
             ->getDesugaredType();
 
     // Type check each of the subexpressions in place, passing down the contextual
@@ -3711,28 +3635,29 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     // surely initializing whatever is inside.
     contextualType = contextualType->lookThroughAllOptionalTypes();
 
-    auto DLC = CS.TC.getProtocol(
-        E->getLoc(), KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    auto DLC = TypeChecker::getProtocol(
+        CS.getASTContext(), E->getLoc(),
+        KnownProtocolKind::ExpressibleByDictionaryLiteral);
     if (!DLC) return visitExpr(E);
 
     // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
     // and figure out what the contextual Key/Value types are in place.
     auto Conformance = TypeChecker::conformsToProtocol(
         contextualType, DLC, CS.DC, ConformanceCheckFlags::InExpression);
-    if (!Conformance) {
+    if (Conformance.isInvalid()) {
       diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
         .highlight(E->getSourceRange());
       return true;
     }
 
     contextualKeyType =
-        Conformance->getTypeWitnessByName(
-          contextualType, CS.getASTContext().Id_Key)
+        Conformance
+            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Key)
             ->getDesugaredType();
 
     contextualValueType =
-        Conformance->getTypeWitnessByName(
-          contextualType, CS.getASTContext().Id_Value)
+        Conformance
+            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Value)
             ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&
@@ -3772,7 +3697,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   auto &TC = CS.getTypeChecker();
 
   // Type check the argument first.
-  auto protocol = TC.getLiteralProtocol(E);
+  auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), E);
   if (!protocol)
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
@@ -4150,7 +4075,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
   // Since the lookup was allowing inaccessible members, let's check
   // if it found anything of that sort, which is easy to diagnose.
-  bool allUnavailable = !CS.TC.getLangOpts().DisableAvailabilityChecking;
+  bool allUnavailable =
+      !CS.getASTContext().LangOpts.DisableAvailabilityChecking;
   bool allInaccessible = true;
   for (auto &member : viableCandidatesToReport) {
     if (!member.isDecl()) {

@@ -753,7 +753,7 @@ Time,Live,IsEntry,EventName,CounterName,CounterDelta,CounterValue,EntityName,Ent
 40032,0,"entry","typecheck-decl","Sema.NumLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumTypesDeserialized",106,106,"foo","[test.swift:1:1 - line:1:32]"
 40032,0,"entry","typecheck-decl","Sema.NumUnloadedLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
-40135,0,"entry","typecheck-decl","Sema.NumDeclsValidated",1,1,"","[test.swift:1:13 - line:1:29]"
+40135,0,"entry","typecheck-decl","Sema.InterfaceTypeRequest",1,1,"","[test.swift:1:13 - line:1:29]"
 ...
 ```
 

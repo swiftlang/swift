@@ -100,3 +100,77 @@ bb3:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: Function: 'parent_borrow_scope_end_before_end_borrow_coroutine'
+// CHECK: Found use after free?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_apply %3
+// CHECK: Block: bb0
+sil [ossa] @parent_borrow_scope_end_before_end_borrow_coroutine : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 : $Builtin.NativeObject
+  end_apply %token
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_2'
+// CHECK: Found use after free?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   abort_apply %3
+// CHECK: Block: bb0
+sil [ossa] @parent_borrow_scope_end_before_end_borrow_coroutine_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 : $Builtin.NativeObject
+  abort_apply %token
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_3'
+// CHECK: Found use after free?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   abort_apply %3
+// CHECK: Block: bb1
+
+// CHECK-LABEL: Function: 'parent_borrow_scope_end_before_end_borrow_coroutine_3'
+// CHECK: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK:     Remaining Users:
+// CHECK: User:  abort_apply %3
+// CHECK: Block: bb1
+
+sil [ossa] @parent_borrow_scope_end_before_end_borrow_coroutine_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %1 : $Builtin.NativeObject
+  abort_apply %token
+  br bb3
+
+bb2:
+  end_apply %token
+  end_borrow %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+

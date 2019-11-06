@@ -10,9 +10,9 @@
 import Repo1
 #endif
 
-// SINGLEMODULE: s37opaque_result_type_private_underlying18UsePublicInlinableVAA1AAAMA" = internal constant { {{.*}}symbolic _____ 37opaque_result_type_private_underlying7PublicSV
-// NONRESILIENT: s37opaque_result_type_private_underlying18UsePublicInlinableV5Repo11AAAMA" = internal constant { {{.*}}symbolic _____ 5Repo17PublicSV
-// RESILIENT: s37opaque_result_type_private_underlying18UsePublicInlinableV5Repo11AAAMA" = internal constant { {{.*}}symbolic _____ 5Repo17PublicSV
+// SINGLEMODULE: s37opaque_result_type_private_underlying18UsePublicInlinableVAA1AAAMA" = internal constant { {{.*}}symbolic {{(_____ )?}}37opaque_result_type_private_underlying7PublicSV
+// NONRESILIENT: s37opaque_result_type_private_underlying18UsePublicInlinableV5Repo11AAAMA" = internal constant { {{.*}}symbolic {{(_____ )?}}5Repo17PublicSV
+// RESILIENT: s37opaque_result_type_private_underlying18UsePublicInlinableV5Repo11AAAMA" = internal constant { {{.*}}symbolic {{(_____ )?}}5Repo17PublicSV
 public struct UsePublicInlinable : A {
   public init() {}
   public func bindAssoc() -> some Q {
@@ -20,8 +20,8 @@ public struct UsePublicInlinable : A {
   }
 }
 
-// SINGLEMODULE: s37opaque_result_type_private_underlying9UsePublicVAA1AAAMA" = internal constant { {{.*}}symbolic _____ 37opaque_result_type_private_underlying7PublicSV
-// NONRESILIENT: s37opaque_result_type_private_underlying9UsePublicV5Repo11AAAMA" = internal constant { {{.*}}symbolic _____ 5Repo17PublicSV
+// SINGLEMODULE: s37opaque_result_type_private_underlying9UsePublicVAA1AAAMA" = internal constant { {{.*}}symbolic {{(_____ )?}}37opaque_result_type_private_underlying7PublicSV
+// NONRESILIENT: s37opaque_result_type_private_underlying9UsePublicV5Repo11AAAMA" = internal constant { {{.*}}symbolic {{(_____ )?}}5Repo17PublicSV
 // RESILIENT: s37opaque_result_type_private_underlying9UsePublicV5Repo11AAAMA" = internal constant {  {{.*}}symbolic _____y_Qo_ 5Repo116PublicUnderlyingV9bindAssocQryFQO
 public struct UsePublic : A {
   public init() {}
@@ -30,7 +30,7 @@ public struct UsePublic : A {
   }
 }
 
-// SINGLEMODULE: s37opaque_result_type_private_underlying11UseInternalVAA1AAAMA" = internal constant { {{.*}}symbolic _____ 37opaque_result_type_private_underlying9InternalSV
+// SINGLEMODULE: s37opaque_result_type_private_underlying11UseInternalVAA1AAAMA" = internal constant { {{.*}}symbolic {{(_____ )?}}37opaque_result_type_private_underlying9InternalSV
 // NONRESILIENT: s37opaque_result_type_private_underlying11UseInternalV5Repo11AAAMA" = internal constant { {{.*}}symbolic _____y_Qo_ 5Repo118InternalUnderlyingV9bindAssocQryFQO
 // RESILIENT: s37opaque_result_type_private_underlying11UseInternalV5Repo11AAAMA" = internal constant { {{.*}}symbolic _____y_Qo_ 5Repo118InternalUnderlyingV9bindAssocQryFQO
 public struct UseInternal: A {

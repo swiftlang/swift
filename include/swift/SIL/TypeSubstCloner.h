@@ -76,7 +76,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
           // are the same.
           auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
           auto RecursiveSubstCalleeSILType = LoweredFnTy;
-          auto GenSig = LoweredFnTy->getGenericSignature();
+          auto GenSig = LoweredFnTy->getInvocationGenericSignature();
           if (GenSig) {
             // Compute substitutions for the specialized function. These
             // substitutions may be different from the original ones, e.g.
@@ -84,7 +84,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             RecursiveSubs = SubstitutionMap::get(
               AI.getFunction()
                 ->getLoweredFunctionType()
-                ->getGenericSignature(),
+                ->getInvocationGenericSignature(),
               Subs);
 
             // Use the new set of substitutions to compute the new

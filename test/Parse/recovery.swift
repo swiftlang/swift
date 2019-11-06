@@ -152,7 +152,7 @@ func missingControllingExprInFor() {
   for ; true { // expected-error {{C-style for statement has been removed in Swift 3}}
   }
 
-  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}} expected-error{{variable 'i' is not bound by any pattern}}
+  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}}
     i += 1
   }
 }
@@ -174,13 +174,11 @@ func missingControllingExprInForEach() {
   {
   }
 
-  // expected-error @+3 {{variable 'i' is not bound by any pattern}}
   // expected-error @+2 {{expected 'in' after for-each pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
   for i {
   }
 
-  // expected-error @+3 {{variable 'i' is not bound by any pattern}}
   // expected-error @+2 {{expected 'in' after for-each pattern}}
   // expected-error @+1 {{expected Sequence expression for for-each loop}}
   for var i {
@@ -201,7 +199,6 @@ func missingControllingExprInForEach() {
   for for in {
   }
 
-  // expected-error @+1 {{variable 'i' is not bound by any pattern}}
   for i in { // expected-error {{expected Sequence expression for for-each loop}}
   }
 
@@ -852,3 +849,7 @@ func f() {
 // <rdar://problem/22478168> | SR-11006
 // expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
 func SR11006(a: Int == 0) {}
+
+// rdar://38225184
+extension Collection where Element == Int && Index == Int {}
+// expected-error@-1 {{expected ',' to separate the requirements of this 'where' clause}} {{43-45=,}}

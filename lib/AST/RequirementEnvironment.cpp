@@ -111,7 +111,7 @@ RequirementEnvironment::RequirementEnvironment(
     },
     [selfType, substConcreteType, conformance, conformanceDC, &ctx](
         CanType type, Type replacement, ProtocolDecl *proto)
-          -> Optional<ProtocolConformanceRef> {
+          -> ProtocolConformanceRef {
       // The protocol 'Self' conforms concretely to the conforming type.
       if (type->isEqual(selfType)) {
         ProtocolConformance *specialized = conformance;

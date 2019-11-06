@@ -133,9 +133,9 @@ bool SourceFileDepGraph::verify() const {
     auto iterInserted = nodesSeen.insert(std::make_pair(n->getKey(), n));
     if (!iterInserted.second) {
       llvm::errs() << "Duplicate frontend keys: ";
-      iterInserted.first->second->dump();
+      iterInserted.first->second->dump(llvm::errs());
       llvm::errs() << " and ";
-      n->dump();
+      n->dump(llvm::errs());
       llvm::errs() << "\n";
       llvm_unreachable("duplicate frontend keys");
     }
@@ -231,7 +231,11 @@ void DependencyKey::verifyDeclAspectNames() {
 }
 
 void DepGraphNode::dump() const {
-  key.dump();
+  dump(llvm::errs());
+}
+
+void DepGraphNode::dump(raw_ostream &os) const {
+  key.dump(os);
   if (fingerprint.hasValue())
     llvm::errs() << "fingerprint: " << fingerprint.getValue() << "";
   else

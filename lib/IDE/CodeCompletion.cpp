@@ -1317,8 +1317,21 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    return !performTypeLocChecking(P.Context, ParsedTypeLoc,
-                                   CurDeclContext, false);
+    if (!performTypeLocChecking(P.Context, ParsedTypeLoc,
+                                   CurDeclContext, false))
+      return true;
+
+    // It doesn't type check as a type, so see if it's a qualifying module name.
+    if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
+      SmallVector<ImportDecl::AccessPathElement, 4> AccessPath;
+      for (auto Component : ITR->getComponentRange())
+        AccessPath.push_back({ Component->getIdentifier(),
+                               Component->getIdLoc() });
+      if (auto Module = Context.getLoadedModule(AccessPath))
+        ParsedTypeLoc.setType(ModuleType::get(Module));
+        return true;
+    }
+    return false;
   }
 
 public:
@@ -1583,26 +1596,37 @@ public:
     bool OnlyTypes;
     bool OnlyPrecedenceGroups;
     bool NeedLeadingDot;
+    bool IncludeModuleQualifier;
 
     static RequestedResultsTy fromModule(const ModuleDecl *TheModule) {
-      return { TheModule, false, false, false };
+      return { TheModule, false, false, false, true };
     }
 
     RequestedResultsTy onlyTypes() const {
-      return { TheModule, true, false, NeedLeadingDot };
+      return { TheModule, true, false, NeedLeadingDot, IncludeModuleQualifier };
     }
 
     RequestedResultsTy onlyPrecedenceGroups() const {
       assert(!OnlyTypes && "onlyTypes() already includes precedence groups");
-      return { TheModule, false, true, false };
+      return { TheModule, false, true, false, true };
     }
 
     RequestedResultsTy needLeadingDot(bool NeedDot) const {
-      return { TheModule, OnlyTypes, OnlyPrecedenceGroups, NeedDot };
+      return {
+          TheModule, OnlyTypes, OnlyPrecedenceGroups, NeedDot,
+          IncludeModuleQualifier
+      };
+    }
+
+    RequestedResultsTy withModuleQualifier(bool IncludeModule) const {
+        return {
+            TheModule, OnlyTypes, OnlyPrecedenceGroups, NeedLeadingDot,
+            IncludeModule
+        };
     }
 
     static RequestedResultsTy toplevelResults() {
-      return { nullptr, false, false, false };
+      return { nullptr, false, false, false, true };
     }
   };
 
@@ -1704,7 +1728,7 @@ public:
       CodeCompletionResultBuilder Builder(Sink,
                                           CodeCompletionResult::ResultKind::
                                           Declaration,
-                                          SemanticContextKind::OtherModule,
+                                          SemanticContextKind::None,
                                           expectedTypeContext);
       auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
       Builder.setAssociatedDecl(MD);
@@ -1741,6 +1765,21 @@ public:
     }
   }
 
+  void addModuleName(
+      const ModuleDecl *MD,
+      Optional<CodeCompletionResult::NotRecommendedReason> R = None) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Declaration,
+        SemanticContextKind::None,
+        expectedTypeContext);
+    Builder.setAssociatedDecl(MD);
+    Builder.addTextChunk(MD->getNameStr());
+    Builder.addTypeAnnotation("Module");
+    if (R)
+      Builder.setNotRecommended(*R);
+  }
+
   void addImportModuleNames() {
     SmallVector<Identifier, 0> ModuleNames;
     Ctx.getVisibleTopLevelModuleNames(ModuleNames);
@@ -1757,19 +1796,13 @@ public:
         continue;
 
       auto MD = ModuleDecl::create(ModuleName, Ctx);
-      CodeCompletionResultBuilder Builder(
-          Sink,
-          CodeCompletionResult::ResultKind::Declaration,
-          SemanticContextKind::OtherModule,
-          expectedTypeContext);
-      Builder.setAssociatedDecl(MD);
-      Builder.addTextChunk(MD->getNameStr());
-      Builder.addTypeAnnotation("Module");
+      Optional<CodeCompletionResult::NotRecommendedReason> Reason = None;
 
       // Imported modules are not recommended.
       if (ImportedModules.count(MD->getNameStr()) != 0)
-        Builder.setNotRecommended(
-            CodeCompletionResult::NotRecommendedReason::Redundant);
+        Reason = CodeCompletionResult::NotRecommendedReason::Redundant;
+
+      addModuleName(MD, Reason);
     }
   }
 
@@ -2107,9 +2140,9 @@ public:
         auto *Module = NTD->getParentModule();
         auto Conformance = Module->lookupConformance(
             BaseTy, ATD->getProtocol());
-        if (Conformance && Conformance->isConcrete()) {
-          return Conformance->getConcrete()
-              ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD));
+        if (Conformance.isConcrete()) {
+          return Conformance.getConcrete()->getTypeWitness(
+              const_cast<AssociatedTypeDecl *>(ATD));
         }
       }
     }
@@ -2431,8 +2464,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (!AFD || !AFD->getInterfaceType() ||
-        !AFD->getInterfaceType()->is<AnyFunctionType>()) {
+    if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
       // Probably, calling closure type expression.
       foundFunction(AFT);
       addPattern();
@@ -3026,10 +3058,15 @@ public:
           auto CDC = dyn_cast<ConstructorDecl>(CurrDeclContext);
           if (!CDC)
             return;
-          // We do not want 'init' completions for 'self' in non-convenience
-          // initializers and for 'super' in convenience initializers.
-          if ((IsSelfRefExpr && CDC->isConvenienceInit()) ||
-              ((IsSuperRefExpr && !CDC->isConvenienceInit())))
+
+          // For classes, we do not want 'init' completions for 'self' in
+          // non-convenience initializers and for 'super' in convenience initializers.
+          if (ExprType->is<ClassType>()) {
+            if ((IsSelfRefExpr && !CDC->isConvenienceInit()) ||
+                (IsSuperRefExpr && CDC->isConvenienceInit()))
+              return;
+          }
+          if (IsSelfRefExpr || IsSuperRefExpr)
             addConstructorCall(CD, Reason, dynamicLookupInfo, None, None,
                                /*IsOnType=*/false);
         }
@@ -3199,13 +3236,17 @@ public:
     return false;
   }
 
-  bool tryModuleCompletions(Type ExprType) {
+  bool tryModuleCompletions(Type ExprType, bool TypesOnly = false) {
     if (auto MT = ExprType->getAs<ModuleType>()) {
       ModuleDecl *M = MT->getModule();
       if (CurrModule != M) {
         // Only use the cache if it is not the current module.
-        RequestedCachedResults.push_back(
-          RequestedResultsTy::fromModule(M).needLeadingDot(needDot()));
+        RequestedResultsTy Request = RequestedResultsTy::fromModule(M)
+            .needLeadingDot(needDot())
+            .withModuleQualifier(false);
+        if (TypesOnly)
+          Request = Request.onlyTypes();
+        RequestedCachedResults.push_back(Request);
         return true;
       }
     }
@@ -3763,17 +3804,16 @@ public:
 
   void getValueCompletionsInDeclContext(SourceLoc Loc,
                                         DeclFilter Filter = DefaultFilter,
-                                        bool IncludeTopLevel = false,
-                                        bool RequestCache = true,
-                                        bool LiteralCompletions = true) {
+                                        bool LiteralCompletions = true,
+                                        bool ModuleQualifier = true) {
     ExprType = Type();
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     FilteredDeclConsumer Consumer(*this, Filter);
     lookupVisibleDecls(Consumer, CurrDeclContext,
-                       /*IncludeTopLevel=*/IncludeTopLevel, Loc);
-    if (RequestCache)
-      RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults());
+                       /*IncludeTopLevel=*/false, Loc);
+    RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults()
+                                         .withModuleQualifier(ModuleQualifier));
 
     // Manually add any expected nominal types from imported modules so that
     // they get their expected type relation. Don't include protocols, since
@@ -3871,6 +3911,8 @@ public:
   }
 
   void getTypeCompletions(Type BaseType) {
+    if (tryModuleCompletions(BaseType, /*OnlyTypes=*/true))
+      return;
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
@@ -3880,7 +3922,7 @@ public:
     if (BaseType->isAnyExistentialType()) {
       addKeyword("Protocol", MetatypeType::get(BaseType));
       addKeyword("Type", ExistentialMetatypeType::get(BaseType));
-    } else {
+    } else if (!BaseType->is<ModuleType>()) {
       addKeyword("Type", MetatypeType::get(BaseType));
     }
   }
@@ -3958,8 +4000,9 @@ public:
       if (Module == CurrModule)
         continue;
 
-      RequestedCachedResults.push_back(
-        RequestedResultsTy::fromModule(Module).onlyPrecedenceGroups());
+      RequestedCachedResults.push_back(RequestedResultsTy::fromModule(Module)
+                                           .onlyPrecedenceGroups()
+                                           .withModuleQualifier(false));
     }
   }
 
@@ -3996,13 +4039,16 @@ public:
     getAttributeDeclParamCompletions(DAK_Available, 0);
   }
 
-  void getTypeCompletionsInDeclContext(SourceLoc Loc) {
+  void getTypeCompletionsInDeclContext(SourceLoc Loc,
+                                       bool ModuleQualifier = true) {
     Kind = LookupKind::TypeInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults.push_back(
-      RequestedResultsTy::toplevelResults().onlyTypes());
+      RequestedResultsTy::toplevelResults()
+        .onlyTypes()
+        .withModuleQualifier(ModuleQualifier));
   }
 
   void getToplevelCompletions(bool OnlyTypes) {
@@ -5269,7 +5315,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     } else {
       SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
       Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
-                                              false, true, false);
+                                              /*LiteralCompletions=*/false);
     }
     break;
   }
@@ -5504,6 +5550,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           return; // already handled.
         RequestedModules.push_back({std::move(K), TheModule,
           Request.OnlyTypes, Request.OnlyPrecedenceGroups});
+        if (Request.IncludeModuleQualifier)
+          Lookup.addModuleName(TheModule);
       }
     };
 
@@ -5515,6 +5563,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
+
+      // Add the qualifying module name
+      if (Request.IncludeModuleQualifier)
+        Lookup.addModuleName(CurDeclContext->getParentModule());
 
       // Add results for all imported modules.
       ModuleDecl::ImportFilter ImportFilter;

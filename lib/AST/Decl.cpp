@@ -376,6 +376,77 @@ DeclContext *Decl::getInnermostDeclContext() const {
   return getDeclContext();
 }
 
+bool Decl::isInvalid() const {
+  switch (getKind()) {
+#define VALUE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    return Bits.Decl.Invalid;
+  case DeclKind::Param: {
+    // Parameters are special because closure parameters may not have type
+    // annotations. In which case, the interface type request returns
+    // ErrorType. Therefore, consider parameters with implicit types to always
+    // be valid.
+    auto *PD = cast<ParamDecl>(this);
+    if (!PD->getTypeRepr() && !PD->hasInterfaceType())
+      return false;
+  }
+    LLVM_FALLTHROUGH;
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::OpaqueType:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Module:
+  case DeclKind::Var:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::EnumElement:
+    return cast<ValueDecl>(this)->getInterfaceType()->hasError();
+  }
+
+  llvm_unreachable("Unknown decl kind");
+}
+
+void Decl::setInvalid() {
+  switch (getKind()) {
+#define VALUE_DECL(ID, PARENT)
+#define DECL(ID, PARENT) \
+  case DeclKind::ID:
+#include "swift/AST/DeclNodes.def"
+    Bits.Decl.Invalid = true;
+    return;
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::OpaqueType:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Module:
+  case DeclKind::Var:
+  case DeclKind::Param:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::EnumElement:
+    cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
+    return;
+  }
+
+  llvm_unreachable("Unknown decl kind");
+}
+
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
 }
@@ -538,7 +609,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto braceStmt = getBody();
   assert(braceStmt != nullptr && "No body currently available.");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getFirstElement();
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       return returnStmt->getResult();
@@ -555,7 +626,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
 
 void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getFirstElement();
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
@@ -571,7 +642,7 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
       return;
     }
   }
-  getBody()->setElement(0, NewBody);
+  getBody()->setFirstElement(NewBody);
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -1185,9 +1256,11 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
       
 Type ExtensionDecl::getExtendedType() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
-    ErrorType::get(ctx));
+  if (auto type = evaluateOrDefault(ctx.evaluator,
+          ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
+          Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 /// Clone the given generic parameters in the given list. We don't need any
@@ -2535,7 +2608,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   SmallVector<AnyFunctionType::Param, 4> newParams;
   for (const auto &param : funcTy->getParams()) {
     auto newParamType = mapSignatureParamType(ctx, param.getPlainType());
-    ParameterTypeFlags newFlags = param.getParameterFlags();
+
+    // Don't allow overloading by @_nonEphemeral.
+    auto newFlags = param.getParameterFlags().withNonEphemeral(false);
 
     // For the 'self' of a method, strip off 'inout'.
     if (isMethod) {
@@ -2810,19 +2885,19 @@ bool ValueDecl::isRecursiveValidation() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  // Our clients that don't register the lazy resolver are relying on the
-  // fact that they can't pull an interface type out to avoid doing work.
-  // This is a necessary evil until we can wean them off.
-  if (!getASTContext().getLazyResolver()) {
-    return TypeAndAccess.getPointer();
-  }
+  auto &ctx = getASTContext();
 
-  if (auto Ty =
-          evaluateOrDefault(getASTContext().evaluator,
+  // N.B. This assertion exists to catch new broken callers. It can be removed
+  // with the LazyResolver when the time comes.
+  assert(ctx.getLazyResolver()
+         && "The lazy resolver must be registered to make semantic queries!");
+
+  if (auto type =
+          evaluateOrDefault(ctx.evaluator,
                             InterfaceTypeRequest{const_cast<ValueDecl *>(this)},
-                            ErrorType::get(getASTContext())))
-    return Ty;
-  return ErrorType::get(getASTContext());
+                            Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -3624,9 +3699,11 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 
 Type TypeAliasDecl::getUnderlyingType() const {
   auto &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto type = evaluateOrDefault(ctx.evaluator,
            UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
-           ErrorType::get(ctx));
+           Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
       
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
@@ -3657,10 +3734,12 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 
 Type TypeAliasDecl::getStructuralType() const {
   auto &ctx = getASTContext();
-  return evaluateOrDefault(
+  if (auto type = evaluateOrDefault(
       ctx.evaluator,
       StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
-      ErrorType::get(ctx));
+      Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -3834,6 +3913,49 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   Bits.StructDecl.HasUnreferenceableStorage = false;
 }
 
+bool NominalTypeDecl::hasMemberwiseInitializer() const {
+  // Currently only structs can have memberwise initializers.
+  auto *sd = dyn_cast<StructDecl>(this);
+  if (!sd)
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<StructDecl *>(sd);
+  return evaluateOrDefault(ctx.evaluator, HasMemberwiseInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
+  if (!hasMemberwiseInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
+}
+
+bool NominalTypeDecl::hasDefaultInitializer() const {
+  // Currently only structs and classes can have default initializers.
+  if (!isa<StructDecl>(this) && !isa<ClassDecl>(this))
+    return false;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, HasDefaultInitRequest{mutableThis},
+                           false);
+}
+
+ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
+  if (!hasDefaultInitializer())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           SynthesizeDefaultInitRequest{mutableThis}, nullptr);
+}
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
@@ -3843,6 +3965,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.ClassDecl.InheritsSuperclassInits = 0;
+  Bits.ClassDecl.ComputedInheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 0;
@@ -3920,9 +4043,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   if (ctx.LangOpts.EnableObjCInterop)
     CD->recordObjCMethod(DD, DD->getObjCSelector());
 
-  // Assign DD the interface type (Self) -> () -> ()
-  (void)DD->getInterfaceType();
-
   return DD;
 }
 
@@ -3958,30 +4078,15 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
 }
 
 bool ClassDecl::inheritsSuperclassInitializers() {
-  // Check whether we already have a cached answer.
-  if (addedImplicitInitializers())
-    return Bits.ClassDecl.InheritsSuperclassInits;
-
   // If there's no superclass, there's nothing to inherit.
-  ClassDecl *superclassDecl;
-  if (!(superclassDecl = getSuperclassDecl())) {
-    setAddedImplicitInitializers();
-    return false;
-  }
-
-  // If the superclass has known-missing designated initializers, inheriting
-  // is unsafe.
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (!getSuperclass())
     return false;
 
-  // Otherwise, do all the work of resolving constructors, which will also
-  // calculate the right answer.
-  if (auto *resolver = getASTContext().getLazyResolver())
-    resolver->resolveImplicitConstructors(this);
-
-  return Bits.ClassDecl.InheritsSuperclassInits;
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, InheritsSuperclassInitializersRequest{mutableThis}, false);
 }
-
 
 AncestryOptions ClassDecl::checkAncestry() const {
   return AncestryOptions(evaluateOrDefault(getASTContext().evaluator,
@@ -5879,6 +5984,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(type,
                                                      isVariadic(),
                                                      isAutoClosure(),
+                                                     isNonEphemeral(),
                                                      getValueOwnership());
   return AnyFunctionType::Param(type, label, flags);
 }
@@ -6213,9 +6319,11 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 Type SubscriptDecl::getElementInterfaceType() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<SubscriptDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto type = evaluateOrDefault(ctx.evaluator,
                            ResultTypeRequest{mutableThis},
-                           ErrorType::get(ctx));
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6843,9 +6951,11 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 Type FuncDecl::getResultInterfaceType() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<FuncDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto type = evaluateOrDefault(ctx.evaluator,
                            ResultTypeRequest{mutableThis},
-                           ErrorType::get(ctx));
+                           Type()))
+    return type;
+  return ErrorType::get(ctx);
 }
 
 bool FuncDecl::isUnaryOperator() const {

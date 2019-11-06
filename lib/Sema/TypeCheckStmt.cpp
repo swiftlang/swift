@@ -743,15 +743,15 @@ public:
 
 
     // Retrieve the 'Sequence' protocol.
-    ProtocolDecl *sequenceProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Sequence);
+    ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+        TC.Context, S->getForLoc(), KnownProtocolKind::Sequence);
     if (!sequenceProto) {
       return nullptr;
     }
 
     // Retrieve the 'Iterator' protocol.
-    ProtocolDecl *iteratorProto =
-        TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
+    ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
+        TC.Context, S->getForLoc(), KnownProtocolKind::IteratorProtocol);
     if (!iteratorProto) {
       return nullptr;
     }
@@ -767,17 +767,17 @@ public:
         TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
                                         ConformanceCheckFlags::InExpression,
                                         sequence->getLoc());
-      if (!conformance)
+      if (conformance.isInvalid())
         return nullptr;
       S->setSequenceConformance(conformance);
 
-      iteratorTy = conformance->getTypeWitnessByName(sequenceType,
-                                                     TC.Context.Id_Iterator);
+      iteratorTy = conformance.getTypeWitnessByName(sequenceType,
+                                                    TC.Context.Id_Iterator);
       if (iteratorTy->hasError())
         return nullptr;
 
-      auto witness = conformance->getWitnessByName(
-          sequenceType, TC.Context.Id_makeIterator);
+      auto witness = conformance.getWitnessByName(sequenceType,
+                                                  TC.Context.Id_makeIterator);
       if (!witness)
         return nullptr;
       S->setMakeIterator(witness);
@@ -801,9 +801,8 @@ public:
 
       // TODO: test/DebugInfo/iteration.swift requires this extra info to
       // be around.
-      auto nextResultType =
-          OptionalType::get(conformance->getTypeWitnessByName(
-                                sequenceType, TC.Context.Id_Element));
+      auto nextResultType = OptionalType::get(conformance.getTypeWitnessByName(
+          sequenceType, TC.Context.Id_Element));
       PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
@@ -832,11 +831,11 @@ public:
     auto genConformance = TypeChecker::conformsToProtocol(
         iteratorTy, iteratorProto, DC, ConformanceCheckFlags::InExpression,
         sequence->getLoc());
-    if (!genConformance)
+    if (genConformance.isInvalid())
       return nullptr;
 
-    Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
-                                                        TC.Context.Id_Element);
+    Type elementTy =
+        genConformance.getTypeWitnessByName(iteratorTy, TC.Context.Id_Element);
     if (elementTy->hasError())
       return nullptr;
 
@@ -849,7 +848,7 @@ public:
     S->setIteratorVarRef(varRef);
 
     auto witness =
-        genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
+        genConformance.getWitnessByName(iteratorTy, TC.Context.Id_next);
     S->setIteratorNext(witness);
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
@@ -1065,7 +1064,6 @@ public:
       // If that failed, mark any variables binding pieces of the pattern
       // as invalid to silence follow-on errors.
       pattern->forEachVariable([&](VarDecl *VD) {
-        VD->setInterfaceType(ErrorType::get(TC.Context));
         VD->setInvalid();
       });
     }
@@ -1143,10 +1141,7 @@ public:
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
-          vd->setInterfaceType(ErrorType::get(TC.Context));
           vd->setInvalid();
-
-          initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
           initialCaseVarDecl->setInvalid();
         }
 
@@ -1167,10 +1162,7 @@ public:
         if (foundVP)
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-        vd->setInterfaceType(ErrorType::get(TC.Context));
         vd->setInvalid();
-
-        initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
         initialCaseVarDecl->setInvalid();
       }
     });
@@ -1238,10 +1230,7 @@ public:
           TC.diagnose(previous->getLoc(),
                       diag::type_mismatch_fallthrough_pattern_list,
                       previous->getType(), expected->getType());
-          previous->setInterfaceType(ErrorType::get(TC.Context));
           previous->setInvalid();
-
-          expected->setInterfaceType(ErrorType::get(TC.Context));
           expected->setInvalid();
         }
 
@@ -1477,7 +1466,6 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-        var->setInterfaceType(ErrorType::get(Context));
         var->setInvalid();
       });
     }
@@ -1770,9 +1758,9 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   // BraceStmt does not start a TopLevelDecl).
   if (IsBraceStmtFromTopLevelDecl) {
     IsBraceStmtFromTopLevelDecl = false;
-  } else if (BS->getNumElements() > 0) {
+  } else if (!BS->empty()) {
     if (auto stmt =
-            BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt *>()) {
+            BS->getLastElement().dyn_cast<Stmt *>()) {
       if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
         TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
             .fixItReplace(deferStmt->getStartLoc(), "do");
@@ -2077,9 +2065,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)AFD->getInterfaceType();
-
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())
     return false;
@@ -2096,12 +2081,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
       if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
         // The function returns void.  We don't need an explicit return, no matter
         // what the type of the expression is.  Take the inserted return back out.
-        body->setElement(0, expr);
+        body->setFirstElement(expr);
       }
     }
   } else if (isa<ConstructorDecl>(AFD) &&
-             (body->getNumElements() == 0 ||
-                !isKnownEndOfConstructor(body->getElements().back()))) {
+             (body->empty() ||
+                !isKnownEndOfConstructor(body->getLastElement()))) {
     // For constructors, we make sure that the body ends with a "return" stmt,
     // which we either implicitly synthesize, or the user can write.  This
     // simplifies SILGen.
@@ -2123,12 +2108,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   // that we have eagerly converted something like `{ fatalError() }`
   // into `{ return fatalError() }` that has to be corrected here.
   if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
-    if (auto *stmt = body->getElement(0).dyn_cast<Stmt *>()) {
+    if (auto *stmt = body->getFirstElement().dyn_cast<Stmt *>()) {
       if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
         if (retStmt->isImplicit() && retStmt->hasResult()) {
           auto returnType = retStmt->getResult()->getType();
           if (returnType && returnType->isUninhabited())
-            body->setElement(0, retStmt->getResult());
+            body->setFirstElement(retStmt->getResult());
         }
       }
     }

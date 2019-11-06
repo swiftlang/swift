@@ -77,8 +77,8 @@ Solution::computeSubstitutions(GenericSignature sig,
     subs[opened.first] = getFixedType(opened.second);
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolDecl *protoType)
-          -> Optional<ProtocolConformanceRef> {
+      [&](CanType original, Type replacement,
+          ProtocolDecl *protoType) -> ProtocolConformanceRef {
     if (replacement->hasError() ||
         isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
@@ -272,7 +272,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
 static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
                                                DeclContext *dc,
                                                ConstraintSystem &cs) {
-  auto &ctx = cs.TC.Context;
+  auto &ctx = cs.getASTContext();
 
   auto *stringDecl = ctx.getStringDecl();
   auto stringType = stringDecl->getDeclaredType();
@@ -436,9 +436,9 @@ namespace {
               TypeChecker::conformsToProtocol(
                         baseTy, proto, cs.DC,
                         ConformanceCheckFlags::InExpression);
-            if (conformance && conformance->isConcrete()) {
+            if (conformance.isConcrete()) {
               if (auto witness =
-                      conformance->getConcrete()->getWitnessDecl(decl)) {
+                      conformance.getConcrete()->getWitnessDecl(decl)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
                 // FIXME: the hop through 'getDecl()' is because
@@ -1739,7 +1739,7 @@ namespace {
       FuncDecl *fn = nullptr;
 
       if (bridgedToObjectiveCConformance) {
-        assert(bridgedToObjectiveCConformance->getConditionalRequirements()
+        assert(bridgedToObjectiveCConformance.getConditionalRequirements()
                    .empty() &&
                "cannot conditionally conform to _BridgedToObjectiveC");
         // The conformance to _BridgedToObjectiveC is statically known.
@@ -1766,16 +1766,16 @@ namespace {
       auto genericSig = fn->getGenericSignature();
 
       auto subMap = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) -> Type {
-          assert(type->isEqual(genericSig->getGenericParams()[0]));
-          return valueType;
-        },
-        [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
-          -> ProtocolConformanceRef {
-          assert(bridgedToObjectiveCConformance);
-          return *bridgedToObjectiveCConformance;
-        });
+          genericSig,
+          [&](SubstitutableType *type) -> Type {
+            assert(type->isEqual(genericSig->getGenericParams()[0]));
+            return valueType;
+          },
+          [&](CanType origType, Type replacementType,
+              ProtocolDecl *protoType) -> ProtocolConformanceRef {
+            assert(bridgedToObjectiveCConformance);
+            return bridgedToObjectiveCConformance;
+          });
 
       ConcreteDeclRef fnSpecRef(fn, subMap);
 
@@ -1837,12 +1837,12 @@ namespace {
         return expr;
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByIntegerLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1851,9 +1851,9 @@ namespace {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-      if (auto floatProtocol
-            = tc.getProtocol(expr->getLoc(),
-                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
+      if (auto floatProtocol = TypeChecker::getProtocol(
+              cs.getASTContext(), expr->getLoc(),
+              KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultFloatType = tc.getDefaultType(floatProtocol, dc)) {
           if (defaultFloatType->isEqual(type))
             type = defaultFloatType;
@@ -1888,8 +1888,9 @@ namespace {
       }
 
       auto &tc = cs.getTypeChecker();
-      auto *protocol = tc.getProtocol(expr->getLoc(),
-                                      KnownProtocolKind::ExpressibleByNilLiteral);
+      auto *protocol =
+          TypeChecker::getProtocol(cs.getASTContext(), expr->getLoc(),
+                                   KnownProtocolKind::ExpressibleByNilLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1920,12 +1921,12 @@ namespace {
         return expr;
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByFloatLiteral);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByFloatLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1939,7 +1940,6 @@ namespace {
       auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
 
       if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->getInterfaceType() ||
           !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
@@ -1964,12 +1964,12 @@ namespace {
         return expr;
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBooleanLiteral);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBooleanLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral);
       if (!protocol || !builtinProtocol)
         return nullptr;
 
@@ -2001,24 +2001,25 @@ namespace {
 
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
-      ProtocolDecl *protocol = tc.getProtocol(
-          expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC,
-                                           ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(
+              type, protocol, cs.DC, ConformanceCheckFlags::InExpression)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
-        protocol = tc.getProtocol(
-            expr->getLoc(),
+        protocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC,
-                                           ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(
+              type, protocol, cs.DC, ConformanceCheckFlags::InExpression)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
-        protocol = tc.getProtocol(
-            expr->getLoc(),
+        protocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = false;
@@ -2044,8 +2045,8 @@ namespace {
         literalFuncName = DeclName(tc.Context, DeclBaseName::createConstructor(),
                                    { tc.Context.Id_stringLiteral });
 
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
+        builtinProtocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
         builtinLiteralFuncName
           = DeclName(tc.Context, DeclBaseName::createConstructor(),
@@ -2070,9 +2071,10 @@ namespace {
                        tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
 
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
+        builtinProtocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
+            KnownProtocolKind::
+                ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
         brokenProtocolDiag =
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
@@ -2088,8 +2090,8 @@ namespace {
           = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_builtinUnicodeScalarLiteral});
 
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
+        builtinProtocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
 
         brokenProtocolDiag = diag::unicode_scalar_literal_broken_proto;
@@ -2125,10 +2127,10 @@ namespace {
       auto loc = expr->getStartLoc();
 
       auto fetchProtocolInitWitness =
-        [&](KnownProtocolKind protocolKind, Type type,
-            ArrayRef<Identifier> argLabels) -> ConcreteDeclRef {
-
-        auto proto = tc.getProtocol(loc, protocolKind);
+          [&](KnownProtocolKind protocolKind, Type type,
+              ArrayRef<Identifier> argLabels) -> ConcreteDeclRef {
+        auto proto =
+            TypeChecker::getProtocol(cs.getASTContext(), loc, protocolKind);
         assert(proto && "Missing string interpolation protocol?");
 
         auto conformance =
@@ -2139,15 +2141,15 @@ namespace {
         DeclName constrName(tc.Context, DeclBaseName::createConstructor(), argLabels);
 
         ConcreteDeclRef witness =
-            conformance->getWitnessByName(type->getRValueType(), constrName);
+            conformance.getWitnessByName(type->getRValueType(), constrName);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         return witness;
       };
 
-      auto *interpolationProto = 
-        tc.getProtocol(expr->getLoc(),
-             KnownProtocolKind::ExpressibleByStringInterpolation);
+      auto *interpolationProto = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringInterpolation);
       auto associatedTypeDecl = interpolationProto->getAssociatedType(
           tc.Context.Id_StringInterpolation);
       if (associatedTypeDecl == nullptr) {
@@ -2235,7 +2237,7 @@ namespace {
       }
 
       // Find the appropriate object literal protocol.
-      auto proto = tc.getLiteralProtocol(expr);
+      auto proto = TypeChecker::getLiteralProtocol(cs.getASTContext(), expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
         TypeChecker::conformsToProtocol(conformingType, proto, cs.DC,
@@ -2244,9 +2246,8 @@ namespace {
 
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
 
-      ConcreteDeclRef witness =
-        conformance->getWitnessByName(conformingType->getRValueType(),
-                                      constrName);
+      ConcreteDeclRef witness = conformance.getWitnessByName(
+          conformingType->getRValueType(), constrName);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -2495,10 +2496,9 @@ namespace {
           auto baseTyNominalDecl = baseTyUnwrapped
                                    ->getNominalOrBoundGenericNominal();
           auto &tc = cs.getTypeChecker();
-          auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
-                                         baseTyUnwrapped,
-                                         memberName,
-                                         defaultMemberLookupOptions);
+          auto results = TypeChecker::lookupMember(
+              baseTyNominalDecl->getModuleContext(), baseTyUnwrapped,
+              memberName, defaultMemberLookupOptions);
 
           // Filter out any functions, instance members, enum cases with
           // associated values or variables whose type does not match the
@@ -2893,9 +2893,9 @@ namespace {
       Type arrayTy = cs.getType(expr);
       auto &tc = cs.getTypeChecker();
 
-      ProtocolDecl *arrayProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByArrayLiteral);
+      ProtocolDecl *arrayProto = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByArrayLiteral);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       auto conformance =
@@ -2906,7 +2906,7 @@ namespace {
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
       ConcreteDeclRef witness =
-        conformance->getWitnessByName(arrayTy->getRValueType(), name);
+          conformance.getWitnessByName(arrayTy->getRValueType(), name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -2939,20 +2939,20 @@ namespace {
       Type dictionaryTy = cs.getType(expr);
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *dictionaryProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      ProtocolDecl *dictionaryProto = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       auto conformance =
         TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC,
                                         ConformanceCheckFlags::InExpression);
-      if (!conformance)
+      if (conformance.isInvalid())
         return nullptr;
 
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_dictionaryLiteral });
       ConcreteDeclRef witness =
-        conformance->getWitnessByName(dictionaryTy->getRValueType(), name);
+          conformance.getWitnessByName(dictionaryTy->getRValueType(), name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -4586,7 +4586,7 @@ namespace {
       auto dc = subscript->getInnermostDeclContext();
 
       auto indexType = AnyFunctionType::composeInput(
-          cs.TC.Context,
+          cs.getASTContext(),
           subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
           /*canonicalVararg=*/false);
 
@@ -4652,9 +4652,9 @@ namespace {
         auto hashableConformance =
           TypeChecker::conformsToProtocol(indexType, hashable, cs.DC,
                                           ConformanceCheckFlags::InExpression);
-        assert(hashableConformance.hasValue());
+        assert(hashableConformance);
 
-        conformances.push_back(*hashableConformance);
+        conformances.push_back(hashableConformance);
       }
 
       component.setSubscriptIndexHashableConformances(conformances);
@@ -5022,9 +5022,8 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
-    conformances.push_back(
-      *tc.containsProtocol(fromType, proto->getDecl(), DC,
-                           ConformanceCheckFlags::InExpression));
+    conformances.push_back(tc.containsProtocol(
+        fromType, proto->getDecl(), DC, ConformanceCheckFlags::InExpression));
   }
 
   return tc.Context.AllocateCopy(conformances);
@@ -5597,7 +5596,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
 
   // A single-expression body contains a single return statement
   // prior to this transformation.
-  auto member = closureExpr->getBody()->getElement(0);
+  auto member = closureExpr->getBody()->getFirstElement();
  
   if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
@@ -5649,7 +5648,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
 
   // A single-expression body contains a single return statement
   // prior to this transformation.
-  auto member = closureExpr->getBody()->getElement(0);
+  auto member = closureExpr->getBody()->getFirstElement();
 
   if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
@@ -6125,7 +6124,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
-          new (tc.Context) AnyHashableErasureExpr(expr, toType, *conformance));
+          new (tc.Context) AnyHashableErasureExpr(expr, toType, conformance));
     }
 
     case ConversionRestrictionKind::DictionaryUpcast: {
@@ -6605,37 +6604,36 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
-  Optional<ProtocolConformanceRef> builtinConformance;
-  if (builtinProtocol &&
-      (builtinConformance =
-         TypeChecker::conformsToProtocol(type, builtinProtocol, cs.DC,
-                                         ConformanceCheckFlags::InExpression))) {
+  if (builtinProtocol) {
+    auto builtinConformance = TypeChecker::conformsToProtocol(
+        type, builtinProtocol, cs.DC, ConformanceCheckFlags::InExpression);
+    if (builtinConformance) {
+      // Find the witness that we'll use to initialize the type via a builtin
+      // literal.
+      auto witness = builtinConformance.getWitnessByName(
+          type->getRValueType(), builtinLiteralFuncName);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+        return nullptr;
 
-    // Find the witness that we'll use to initialize the type via a builtin
-    // literal.
-    auto witness = builtinConformance->getWitnessByName(type->getRValueType(),
-                                                        builtinLiteralFuncName);
-    if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
-      return nullptr;
+      // Form a reference to the builtin conversion function.
 
-    // Form a reference to the builtin conversion function.
+      // Set the builtin initializer.
+      if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
+        stringLiteral->setBuiltinInitializer(witness);
+      else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+        booleanLiteral->setBuiltinInitializer(witness);
+      else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+        numberLiteral->setBuiltinInitializer(witness);
+      else {
+        cast<MagicIdentifierLiteralExpr>(literal)->setBuiltinInitializer(
+            witness);
+      }
 
-    // Set the builtin initializer.
-    if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
-      stringLiteral->setBuiltinInitializer(witness);
-    else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
-      booleanLiteral->setBuiltinInitializer(witness);
-    else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
-      numberLiteral->setBuiltinInitializer(witness);
-    else {
-      cast<MagicIdentifierLiteralExpr>(literal)
-        ->setBuiltinInitializer(witness);
+      // The literal expression has this type.
+      cs.setType(literal, type);
+
+      return literal;
     }
-
-    // The literal expression has this type.
-    cs.setType(literal, type);
-
-    return literal;
   }
 
   // This literal type must conform to the (non-builtin) protocol.
@@ -6648,7 +6646,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   if (!literalType.empty()) {
     // Extract the literal type.
     Type builtinLiteralType =
-        conformance->getTypeWitnessByName(type, literalType);
+        conformance.getTypeWitnessByName(type, literalType);
     if (builtinLiteralType->hasError())
       return nullptr;
 
@@ -6661,8 +6659,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   }
 
   // Find the witness that we'll use to initialize the literal value.
-  auto witness = conformance->getWitnessByName(type->getRValueType(),
-                                               literalFuncName);
+  auto witness =
+      conformance.getWitnessByName(type->getRValueType(), literalFuncName);
   if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
     return nullptr;
 
@@ -6781,11 +6779,11 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        cs.TC.conformsToProtocol(argumentType, dictLitProto, cs.DC,
-                                 ConformanceCheckFlags::InExpression);
-    auto keyType = conformance->getTypeWitnessByName(argumentType, ctx.Id_Key);
-    auto valueType = conformance->getTypeWitnessByName(argumentType,
-                                                       ctx.Id_Value);
+        TypeChecker::conformsToProtocol(argumentType, dictLitProto, cs.DC,
+                                        ConformanceCheckFlags::InExpression);
+    auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
+    auto valueType =
+        conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
@@ -6835,7 +6833,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     = [&](ApplyExpr *apply,
           ConcreteDeclRef declRef,
           Type openedType) -> Expr* {
-      switch (cs.TC.getDeclTypeCheckingSemantics(declRef.getDecl())) {
+      switch (TypeChecker::getDeclTypeCheckingSemantics(declRef.getDecl())) {
       case DeclTypeCheckingSemantics::TypeOf: {
         // Resolve into a DynamicTypeExpr.
         auto arg = apply->getArg();
@@ -7053,7 +7051,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     apply->setIsSuper(isSuper);
 
     cs.setExprTypes(apply);
-    Expr *result = tc.substituteInputSugarTypeForResult(apply);
+    Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
 
     // If we have a covariant result type, perform the conversion now.

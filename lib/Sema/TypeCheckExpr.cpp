@@ -652,9 +652,6 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   if (!TD)
     return Type();
   
-  // FIXME: Make isInvalid ask for the interface type.
-  (void)TD->getInterfaceType();
-  
   if (TD->isInvalid())
     return Type();
 
@@ -665,10 +662,10 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
 
 static Optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
-  TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
-
 #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
-  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))          \
+  if (protocol == TypeChecker::getProtocol(protocol->getASTContext(),          \
+                                           SourceLoc(),                        \
+                                           KnownProtocolKind::Id))             \
     return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME

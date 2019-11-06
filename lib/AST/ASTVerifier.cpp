@@ -512,8 +512,8 @@ public:
       if (auto *DC = dyn_cast<DeclContext>(D)) {
         if (D->getDeclContext() != DC->getParent()) {
           Out << "Decl's DeclContext not in sync with DeclContext's parent\n";
-          D->getDeclContext()->dumpContext();
-          DC->getParent()->dumpContext();
+          D->getDeclContext()->printContext(Out);
+          DC->getParent()->printContext(Out);
           abort();
         }
       }
@@ -1652,7 +1652,7 @@ public:
 
       if (E->getConformance().getRequirement() != hashableDecl) {
         Out << "conformance on AnyHashableErasureExpr was not for Hashable\n";
-        E->getConformance().dump();
+        E->getConformance().dump(Out);
         abort();
       }
 
@@ -2969,15 +2969,8 @@ public:
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
-      if (!AFD->hasInterfaceType()) {
-        if (isa<AccessorDecl>(AFD) && AFD->isImplicit())
-          return;
-
-        Out << "All functions except implicit accessors should be "
-               "validated by now\n";
-        AFD->dump(Out);
-        abort();
-      }
+      if (!AFD->hasInterfaceType())
+        return;
 
       // If this function is generic or is within a generic context, it should
       // have an interface type.
@@ -3639,17 +3632,7 @@ public:
     void checkErrors(Stmt *S) {}
     void checkErrors(Pattern *P) {}
     void checkErrors(Decl *D) {}
-    void checkErrors(ValueDecl *D) {
-      PrettyStackTraceDecl debugStack("verifying errors", D);
-
-      if (!D->hasInterfaceType())
-        return;
-      if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
-        Out << "Valid decl has error type!\n";
-        D->dump(Out);
-        abort();
-      }
-    }
+    void checkErrors(ValueDecl *D) {}
   };
 } // end anonymous namespace
 

@@ -46,8 +46,8 @@ struct REPLContext {
 
     {
       Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
-      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id, SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
+                                                   SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -55,8 +55,8 @@ struct REPLContext {
     }
     {
       Identifier Id(Context.getIdentifier("_replDebugPrintln"));
-      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id, SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
+                                                   SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -443,7 +443,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
     if (!TLCD || TLCD->getBody()->getElements().empty())
       continue;
 
-    auto Entry = TLCD->getBody()->getElement(0);
+    auto Entry = TLCD->getBody()->getFirstElement();
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (auto *E = Entry.dyn_cast<Expr*>())

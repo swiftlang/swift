@@ -284,8 +284,10 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
 
   // Find the conformance to _ObjectiveCBridgeable.
   auto result = SwiftModule->lookupConformance(type, proto);
-  if (result) return result->getConcrete();
-  return nullptr;
+  if (result.isInvalid())
+    return nullptr;
+
+  return result.getConcrete();
 }
 
 ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
@@ -319,10 +321,11 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   return found;
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return None;
+  if (!proto)
+    return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
   return SwiftModule->lookupConformance(type, proto);
@@ -349,8 +352,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
                                    cast<ProtocolDecl>(error));
 
-  if (conformance && conformance->isConcrete())
-    NSErrorConformanceToError = conformance->getConcrete();
+  if (conformance.isConcrete())
+    NSErrorConformanceToError = conformance.getConcrete();
   else
     NSErrorConformanceToError = nullptr;
   return *NSErrorConformanceToError;
@@ -425,6 +428,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
+                                         SubstitutionMap(), false,
                                          getASTContext());
 
   auto env = sig->getGenericEnvironment();
@@ -485,6 +489,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
+                                   SubstitutionMap(), false,
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -977,7 +982,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && !dd->getBody()->empty())
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.

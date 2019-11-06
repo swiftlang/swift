@@ -72,7 +72,8 @@ bool SILInliner::canInlineApplySite(FullApplySite apply) {
   return true;
 }
 
-namespace swift {
+namespace {
+
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
   SILLocation Loc;
@@ -101,15 +102,20 @@ public:
     return BeginApplySite(BeginApply, Loc, Builder);
   }
 
-  void preprocess(SILBasicBlock *returnToBB) {
-    // Get the end_apply, abort_apply instructions.
-    auto Token = BeginApply->getTokenResult();
-    for (auto *TokenUse : Token->getUses()) {
-      if (auto End = dyn_cast<EndApplyInst>(TokenUse->getUser())) {
-        collectEndApply(End);
-      } else {
-        collectAbortApply(cast<AbortApplyInst>(TokenUse->getUser()));
-      }
+  void preprocess(SILBasicBlock *returnToBB,
+                  SmallVectorImpl<SILInstruction *> &endBorrowInsertPts) {
+    SmallVector<EndApplyInst *, 1> endApplyInsts;
+    SmallVector<AbortApplyInst *, 1> abortApplyInsts;
+    BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts);
+    while (!endApplyInsts.empty()) {
+      auto *endApply = endApplyInsts.pop_back_val();
+      collectEndApply(endApply);
+      endBorrowInsertPts.push_back(&*std::next(endApply->getIterator()));
+    }
+    while (!abortApplyInsts.empty()) {
+      auto *abortApply = abortApplyInsts.pop_back_val();
+      collectAbortApply(abortApply);
+      endBorrowInsertPts.push_back(&*std::next(abortApply->getIterator()));
     }
   }
 
@@ -228,7 +234,8 @@ public:
     assert(!BeginApply->hasUsesOfAnyResult());
   }
 };
-} // namespace swift
+
+} // end anonymous namespace
 
 namespace swift {
 class SILInlineCloner
@@ -425,21 +432,29 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 
   SmallVector<SILValue, 4> entryArgs;
   entryArgs.reserve(AppliedArgs.size());
+  SmallBitVector borrowedArgs(AppliedArgs.size());
+
   auto calleeConv = getCalleeFunction()->getConventions();
-  for (unsigned argIdx = 0, endIdx = AppliedArgs.size(); argIdx < endIdx;
-       ++argIdx) {
-    SILValue callArg = AppliedArgs[argIdx];
+  for (auto p : llvm::enumerate(AppliedArgs)) {
+    SILValue callArg = p.value();
+    unsigned idx = p.index();
     // Insert begin/end borrow for guaranteed arguments.
-    if (argIdx >= calleeConv.getSILArgIndexOfFirstParam()
-        && calleeConv.getParamInfoForSILArg(argIdx).isGuaranteed()) {
-      callArg = borrowFunctionArgument(callArg, Apply);
+    if (idx >= calleeConv.getSILArgIndexOfFirstParam() &&
+        calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
+      if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
+        callArg = newValue;
+        borrowedArgs[idx] = true;
+      }
     }
     entryArgs.push_back(callArg);
   }
 
   // Create the return block and set ReturnToBB for use in visitTerminator
   // callbacks.
-  SILBasicBlock *callerBB = Apply.getParent();
+  SILBasicBlock *callerBlock = Apply.getParent();
+  SILBasicBlock *throwBlock = nullptr;
+  SmallVector<SILInstruction *, 1> endBorrowInsertPts;
+
   switch (Apply.getKind()) {
   case FullApplySiteKind::ApplyInst: {
     auto *AI = dyn_cast<ApplyInst>(Apply);
@@ -447,7 +462,8 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
     ReturnToBB =
-      callerBB->split(std::next(Apply.getInstruction()->getIterator()));
+        callerBlock->split(std::next(Apply.getInstruction()->getIterator()));
+    endBorrowInsertPts.push_back(&*ReturnToBB->begin());
 
     // Create an argument on the return-to BB representing the returned value.
     auto *retArg =
@@ -456,22 +472,49 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     AI->replaceAllUsesWith(retArg);
     break;
   }
-  case FullApplySiteKind::BeginApplyInst:
+  case FullApplySiteKind::BeginApplyInst: {
     ReturnToBB =
-      callerBB->split(std::next(Apply.getInstruction()->getIterator()));
-    BeginApply->preprocess(ReturnToBB);
+        callerBlock->split(std::next(Apply.getInstruction()->getIterator()));
+    // For begin_apply, we insert the end_borrow in the end_apply, abort_apply
+    // blocks to ensure that our borrowed values live over both the body and
+    // resume block of our coroutine.
+    BeginApply->preprocess(ReturnToBB, endBorrowInsertPts);
     break;
+  }
+  case FullApplySiteKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(Apply);
+    ReturnToBB = tai->getNormalBB();
+    endBorrowInsertPts.push_back(&*ReturnToBB->begin());
+    throwBlock = tai->getErrorBB();
+    break;
+  }
+  }
 
-  case FullApplySiteKind::TryApplyInst:
-    ReturnToBB = cast<TryApplyInst>(Apply)->getNormalBB();
-    break;
+  // Then insert end_borrow in our end borrow block and in the throw
+  // block if we have one.
+  if (borrowedArgs.any()) {
+    for (unsigned i : indices(AppliedArgs)) {
+      if (!borrowedArgs.test(i)) {
+        continue;
+      }
+
+      for (auto *insertPt : endBorrowInsertPts) {
+        SILBuilderWithScope returnBuilder(insertPt, getBuilder());
+        returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+      }
+
+      if (throwBlock) {
+        SILBuilderWithScope throwBuilder(throwBlock->begin(), getBuilder());
+        throwBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+      }
+    }
   }
 
   // Visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions and terminators.
   //
   // NextIter is initialized during `fixUp`.
-  cloneFunctionBody(getCalleeFunction(), callerBB, entryArgs);
+  cloneFunctionBody(getCalleeFunction(), callerBlock, entryArgs);
 
   // For non-throwing applies, the inlined body now unconditionally branches to
   // the returned-to-code, which was previously part of the call site's basic
@@ -557,25 +600,11 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
   if (!AI.getFunction()->hasOwnership()
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
-    return callArg;
+    return SILValue();
   }
 
   SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
-  auto *borrow = beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
-  if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin(),
-                                      getBuilder());
-    returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
-
-    SILBuilderWithScope throwBuilder(tryAI->getErrorBB()->begin(),
-                                     getBuilder());
-    throwBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
-  } else {
-    SILBuilderWithScope returnBuilder(
-        std::next(AI.getInstruction()->getIterator()), getBuilder());
-    returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
-  }
-  return borrow;
+  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
@@ -609,7 +638,8 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
-        getCalleeFunction()->getLoweredFunctionType()->getGenericSignature(),
+        getCalleeFunction()->getLoweredFunctionType()
+                           ->getInvocationGenericSignature(),
         ForInlining);
 
   auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
@@ -848,7 +878,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst: \
   case SILInstructionKind::Store##Name##Inst:

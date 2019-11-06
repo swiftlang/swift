@@ -430,17 +430,56 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
 
   // If we have a trailing closure, it maps to the last parameter.
   if (hasTrailingClosure && numParams > 0) {
+    unsigned lastParamIdx = numParams - 1;
+    bool lastAcceptsTrailingClosure =
+        acceptsTrailingClosure(params[lastParamIdx]);
+
+    // If the last parameter is defaulted, this might be
+    // an attempt to use a trailing closure with previous
+    // parameter that accepts a function type e.g.
+    //
+    // func foo(_: () -> Int, _ x: Int = 0) {}
+    // foo { 42 }
+    if (!lastAcceptsTrailingClosure && numParams > 1 &&
+        paramInfo.hasDefaultArgument(lastParamIdx)) {
+      auto paramType = params[lastParamIdx - 1].getPlainType();
+      // If the parameter before defaulted last accepts.
+      if (paramType->is<AnyFunctionType>()) {
+        lastAcceptsTrailingClosure = true;
+        lastParamIdx -= 1;
+      }
+    }
+
+    bool isExtraClosure = false;
     // If there is no suitable last parameter to accept the trailing closure,
     // notify the listener and bail if we need to.
-    if (!acceptsTrailingClosure(params[numParams - 1])) {
-      if (listener.trailingClosureMismatch(numParams - 1, numArgs - 1))
+    if (!lastAcceptsTrailingClosure) {
+      if (numArgs > numParams) {
+        // Argument before the trailing closure.
+        unsigned prevArg = numArgs - 2;
+        auto &arg = args[prevArg];
+        // If the argument before trailing closure matches
+        // last parameter, this is just a special case of
+        // an extraneous argument.
+        const auto param = params[numParams - 1];
+        if (param.hasLabel() && param.getLabel() == arg.getLabel()) {
+          isExtraClosure = true;
+          if (listener.extraArgument(numArgs - 1))
+            return true;
+        }
+      }
+
+      if (!isExtraClosure &&
+          listener.trailingClosureMismatch(lastParamIdx, numArgs - 1))
         return true;
     }
 
     // Claim the parameter/argument pair.
     claimedArgs[numArgs-1] = true;
     ++numClaimedArgs;
-    parameterBindings[numParams-1].push_back(numArgs-1);
+    // Let's claim the trailing closure unless it's an extra argument.
+    if (!isExtraClosure)
+      parameterBindings[lastParamIdx].push_back(numArgs - 1);
   }
 
   // Mark through the parameters, binding them to their arguments.
@@ -921,6 +960,27 @@ public:
     // where labels did line up correctly.
     CS.recordFix(fix, /*impact=*/1 + numExtraneous * 2 + numRenames * 3);
     return false;
+  }
+
+  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+    if (!CS.shouldAttemptFixes())
+      return true;
+
+    auto argType = Arguments[argIdx].getPlainType();
+    argType.visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        CS.recordHole(typeVar);
+    });
+
+    const auto &param = Parameters[paramIdx];
+
+    auto *argLoc = CS.getConstraintLocator(
+        Locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+            argIdx, paramIdx, param.getParameterFlags())));
+
+    auto *fix = AllowInvalidUseOfTrailingClosure::create(
+        CS, argType, param.getPlainType(), argLoc);
+    return CS.recordFix(fix, /*impact=*/3);
   }
 
   ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
@@ -2587,8 +2647,7 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
-  if (path.empty() ||
-      path.back().is<LocatorPathElt::ExplicitTypeCoercion>()) {
+  if (path.empty()) {
     if (!anchor)
       return false;
 
@@ -2697,6 +2756,10 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ApplyArgToParam: {
     auto loc = getConstraintLocator(locator);
+
+    if (hasFixFor(loc, FixKind::AllowInvalidUseOfTrailingClosure))
+      return true;
+
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
@@ -2915,6 +2978,16 @@ bool ConstraintSystem::repairFailures(
       auto rhsEltTy = getArrayOrSetType(rhs)->lookThroughAllOptionalTypes();
       (void)matchTypes(lhs, rhsEltTy, ConstraintKind::Equal, TMF_ApplyingFix,
                        locator);
+    }
+
+    // Let's not complain about argument type mismatch if we have a synthesized
+    // wrappedValue initializer, because we already emit a diagnostic for a
+    // type mismatch between the property's type and the wrappedValue type.
+    if (auto CE = dyn_cast<CallExpr>(loc->getAnchor())) {
+      if (CE->isImplicit() && !CE->getArgumentLabels().empty() &&
+          CE->getArgumentLabels().front() == getASTContext().Id_wrappedValue) {
+        break;
+      }
     }
 
     conversionsOrFixes.push_back(
@@ -3219,16 +3292,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // let's defer it until later proper check.
   if (!(desugar1->is<DependentMemberType>() &&
         desugar2->is<DependentMemberType>())) {
-    if (desugar1->isEqual(desugar2)) {
-      if (kind >= ConstraintKind::Conversion &&
-          !flags.contains(TMF_ApplyingFix)) {
-        if (RemoveUnnecessaryCoercion::attempt(*this, type1, type2,
-                                               getConstraintLocator(locator))) {
-          return getTypeMatchFailure(locator);
-        }
-      }
-      if (!isa<InOutType>(desugar2))
-        return getTypeMatchSuccess();
+    // If the types are obviously equivalent, we're done.
+    if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2)) {
+      return getTypeMatchSuccess();
     }
   }
 
@@ -3750,8 +3816,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     //
     // Class and protocol metatypes are interoperable with certain Objective-C
     // runtime classes, but only when ObjC interop is enabled.
-    
-    if (TC.getLangOpts().EnableObjCInterop) {
+
+    if (getASTContext().LangOpts.EnableObjCInterop) {
       // These conversions are between concrete types that don't need further
       // resolution, so we can consider them immediately solved.
       auto addSolvedRestrictedConstraint
@@ -3798,7 +3864,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
     }
-    
+
     // Special implicit nominal conversions.
     if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
       // Array -> Array.
@@ -4028,7 +4094,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (auto optTryExpr =
           dyn_cast_or_null<OptionalTryExpr>(locator.trySimplifyToExpr())) {
         auto subExprType = getType(optTryExpr->getSubExpr());
-        bool isSwift5OrGreater = TC.getLangOpts().isSwiftVersionAtLeast(5);
+        const bool isSwift5OrGreater =
+            getASTContext().LangOpts.isSwiftVersionAtLeast(5);
         if (isSwift5OrGreater && (bool)subExprType->getOptionalObjectType()) {
           // For 'try?' expressions, a ForceOptional fix converts 'try?'
           // to 'try!'. If the sub-expression is optional, then a force-unwrap
@@ -4352,26 +4419,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // conform -- they only need to contain the protocol, so check that
   // separately.
   switch (kind) {
-  case ConstraintKind::SelfObjectOfProtocol:
-    if (auto conformance =
-          TC.containsProtocol(type, protocol, DC,
-                              (ConformanceCheckFlags::InExpression|
-                               ConformanceCheckFlags::SkipConditionalRequirements))) {
-      return recordConformance(*conformance);
+  case ConstraintKind::SelfObjectOfProtocol: {
+    auto conformance = TC.containsProtocol(
+        type, protocol, DC,
+        (ConformanceCheckFlags::InExpression |
+         ConformanceCheckFlags::SkipConditionalRequirements));
+    if (conformance) {
+      return recordConformance(conformance);
     }
-    break;
+  } break;
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
-    if (auto conformance =
-          TypeChecker::conformsToProtocol(
-                      type, protocol, DC,
-                      (ConformanceCheckFlags::InExpression|
-                       ConformanceCheckFlags::SkipConditionalRequirements))) {
-      return recordConformance(*conformance);
+    auto conformance = TypeChecker::conformsToProtocol(
+        type, protocol, DC,
+        (ConformanceCheckFlags::InExpression |
+         ConformanceCheckFlags::SkipConditionalRequirements));
+    if (conformance) {
+      return recordConformance(conformance);
     }
-    break;
-  }
+  } break;
 
   default:
     llvm_unreachable("bad constraint kind");
@@ -5016,8 +5083,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
 
     // If the result is invalid, skip it.
-    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-    (void)decl->getInterfaceType();
     if (decl->isInvalid()) {
       result.markErrorAlreadyDiagnosed();
       return;
@@ -5386,15 +5451,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     lookupOptions |= NameLookupFlags::IgnoreAccessControl;
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
-    
-    auto lookup = TC.lookupMember(DC, instanceTy,
-                                  memberName, lookupOptions);
+
+    auto lookup =
+        TypeChecker::lookupMember(DC, instanceTy, memberName, lookupOptions);
     for (auto entry : lookup) {
       auto *cand = entry.getValueDecl();
 
       // If the result is invalid, skip it.
-      // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-      (void)cand->getInterfaceType();
       if (cand->isInvalid()) {
         result.markErrorAlreadyDiagnosed();
         return result;
@@ -7105,8 +7168,37 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // Handle applications of @dynamicCallable types.
-  return simplifyDynamicCallableApplicableFnConstraint(type1, origType2,
-                                                       subflags, locator);
+  auto result = simplifyDynamicCallableApplicableFnConstraint(
+      type1, origType2, subflags, locator);
+
+  if (shouldAttemptFixes() && result == SolutionKind::Error) {
+    // Skip this fix if the type is not yet resolved or
+    // it's a function type/metatype which points to argument mismatches.
+    if (desugar2->is<TypeVariableType>() || desugar2->is<FunctionType>() ||
+        desugar2->is<AnyMetatypeType>())
+      return SolutionKind::Error;
+
+    if (auto objectTy = desugar2->lookThroughAllOptionalTypes()) {
+      if (objectTy->isAny() || objectTy->isAnyObject())
+        return SolutionKind::Error;
+    }
+
+    // If there are any type variables associated with arguments/result
+    // they have to be marked as "holes".
+    type1.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordHole(typeVar);
+    });
+
+    auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
+    // Let's make this fix as high impact so if there is a function or member
+    // overload with e.g. argument-to-parameter type mismatches it would take
+    // a higher priority.
+    return recordFix(fix, /*impact=*/10) ? SolutionKind::Error
+                                         : SolutionKind::Solved;
+  }
+
+  return result;
 }
 
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
@@ -7344,8 +7436,6 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Record the 'dynamicallyCall` method overload set.
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
-    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-    (void)candidate->getInterfaceType();
     if (candidate->isInvalid()) continue;
     choices.push_back(
       OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
@@ -7801,10 +7891,27 @@ ConstraintSystem::simplifyRestrictedConstraint(
                                        ConstraintLocatorBuilder locator) {
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
-  case SolutionKind::Solved:
+  case SolutionKind::Solved: {
+    // If we have an application of a non-ephemeral parameter, then record a
+    // fix if we have to treat an ephemeral conversion as non-ephemeral. It's
+    // important that this is solved as an independant constraint, as the
+    // solving of this restriction may be required in order to evaluate it. For
+    // example, when solving `foo(&.x)`, we need to first match types for the
+    // inout-to-pointer conversion, which then allows us to resolve the overload
+    // of `x`, which may or may not produce an ephemeral pointer.
+    if (locator.isNonEphemeralParameterApplication()) {
+      bool downgradeToWarning =
+          !getASTContext().LangOpts.DiagnoseInvalidEphemeralnessAsError;
+
+      auto *fix = TreatEphemeralAsNonEphemeral::create(
+          *this, getConstraintLocator(locator), type1, type2, restriction,
+          downgradeToWarning);
+      addFixConstraint(fix, matchKind, type1, type2, locator);
+    }
+
     ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
-
+  }
   case SolutionKind::Unsolved:
     return SolutionKind::Unsolved;
 
@@ -7836,14 +7943,15 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   // Record the fix.
 
-  // If this is just a warning it's shouldn't affect the solver.
-  if (!fix->isWarning()) {
-    // Otherswise increase the score. If this would make the current
-    // solution worse than the best solution we've seen already, stop now.
+  // If this is just a warning, it shouldn't affect the solver. Otherwise,
+  // increase the score.
+  if (!fix->isWarning())
     increaseScore(SK_Fix, impact);
-    if (worseThanBestSolution())
-      return true;
-  }
+
+  // If we've made the current solution worse than the best solution we've seen
+  // already, stop now.
+  if (worseThanBestSolution())
+    return true;
 
   if (isAugmentingFix(fix)) {
     // Always useful, unless duplicate of exactly the same fix and location.
@@ -7881,6 +7989,17 @@ void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::createFixed(
+          *this, matchKind, fix, type1, type2, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
@@ -7970,6 +8089,29 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
   }
 
+  case FixKind::TreatEphemeralAsNonEphemeral: {
+    auto *theFix = static_cast<TreatEphemeralAsNonEphemeral *>(fix);
+    // If we have a non-ephemeral locator for an ephemeral conversion, make a
+    // note of the fix.
+    auto conversion = theFix->getConversionKind();
+    switch (isConversionEphemeral(conversion, locator)) {
+    case ConversionEphemeralness::Ephemeral:
+      // Record the fix with an impact of zero. This ensures that non-ephemeral
+      // diagnostics don't impact solver behavior.
+      if (recordFix(fix, /*impact*/ 0))
+        return SolutionKind::Error;
+
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::NonEphemeral:
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::Unresolved:
+      // It's possible we don't yet have enough information to know whether
+      // the conversion is ephemeral or not, for example if we're dealing with
+      // an overload that hasn't yet been resolved.
+      return formUnsolved();
+    }
+  }
+
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
@@ -8020,6 +8162,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
   case FixKind::RelabelArguments:
+  case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowMemberRefOnExistential:
@@ -8037,7 +8180,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
-  case FixKind::RemoveUnnecessaryCoercion:
+  case FixKind::AllowInvalidUseOfTrailingClosure:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -8344,20 +8487,11 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
-  ConstraintLocator *coerceLocator = locatorPtr;
-
-  if (allowFixes && shouldAttemptFixes()) {
-    auto *anchor = locator.getAnchor();
-    if (isa<CoerceExpr>(anchor) && !anchor->isImplicit()) {
-      coerceLocator =
-          getConstraintLocator(anchor, LocatorPathElt::ExplicitTypeCoercion());
-    }
-  }
 
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, coerceLocator);
+                       fromType, toType, locatorPtr);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 

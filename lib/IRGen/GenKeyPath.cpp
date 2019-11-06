@@ -857,10 +857,10 @@ emitKeyPathComponent(IRGenModule &IGM,
               // Protocol requirement.
               auto conformance = subs.lookupConformance(
                            reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
-              externalSubArgs.push_back(
-                IGM.emitWitnessTableRefString(substType, *conformance,
-                      genericEnv ? genericEnv->getGenericSignature() : nullptr,
-                      /*shouldSetLowBit*/ true));
+              externalSubArgs.push_back(IGM.emitWitnessTableRefString(
+                  substType, conformance,
+                  genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                  /*shouldSetLowBit*/ true));
             }
           });
       }

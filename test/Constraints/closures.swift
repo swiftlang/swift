@@ -100,8 +100,8 @@ func r21544303() {
   inSubcall = false
 
   var v2 : Bool = false
-  v2 = inSubcall
-  {  // expected-error {{cannot call value of non-function type 'Bool'}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
+  v2 = inSubcall // expected-error {{cannot call value of non-function type 'Bool'}}
+  {
   }
 }
 
@@ -114,56 +114,56 @@ func SR3671() {
   { consume($0) }(42)
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }} expected-error {{cannot call value of non-function type '()'}}
+  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
   // This is technically a valid call, so nothing goes wrong until (42)
 
-  { $0(3) }
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { $0(3) } // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   ;
-  ({ $0(42) })
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ({ $0(42) }) // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   ;
-  { $0(3) }
-  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { $0(3) } // expected-error {{cannot call value of non-function type '()'}}
+  { [n] in consume($0) }(42)
   ;
-  ({ $0(42) })
-  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ({ $0(42) }) // expected-error {{cannot call value of non-function type '()'}}
+  { [n] in consume($0) }(42)
   ;
 
   // Equivalent but more obviously unintended.
 
-  { $0(3) }  // expected-note {{callee is here}}
+  { $0(3) }  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
 
-  ({ $0(3) })  // expected-note {{callee is here}}
+  ({ $0(3) })  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
@@ -407,6 +407,7 @@ func r20789423() {
   
   let p: C
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
+  // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
   let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> String }}
     print("a")
@@ -906,3 +907,10 @@ do {
 // via the 'T -> U => T -> ()' implicit conversion.
 let badResult = { (fn: () -> ()) in fn }
 // expected-error@-1 {{expression resolves to an unused function}}
+
+// rdar://problem/55102498 - closure's result type can't be inferred if the last parameter has a default value
+func test_trailing_closure_with_defaulted_last() {
+  func foo<T>(fn: () -> T, value: Int = 0) {}
+  foo { 42 } // Ok
+  foo(fn: { 42 }) // Ok
+}

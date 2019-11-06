@@ -1,3 +1,4 @@
+
 # swift_build_support/products/skstresstester.py -----------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -14,8 +15,8 @@ import os
 import platform
 
 from . import product
+from .. import multiroot_data_file
 from .. import shell
-from .. import targets
 
 
 class SKStressTester(product.Product):
@@ -27,6 +28,14 @@ class SKStressTester(product.Product):
         """
         return "swift-stress-tester"
 
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        return True
+
     def package_name(self):
         return 'SourceKitStressTester'
 
@@ -34,29 +43,26 @@ class SKStressTester(product.Product):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
-        toolchain_path = targets.toolchain_path(self.args.install_destdir,
-                                                self.args.install_prefix)
-
-        configuration = 'debug' if self.args.build_variant == 'Debug' else \
-            'release'
+        configuration = 'release' if self.is_release() else 'debug'
 
         helper_cmd = [
             script_path,
             action,
             '--package-dir', self.package_name(),
-            '--toolchain', toolchain_path,
+            '--toolchain', self.install_toolchain_path(),
             '--config', configuration,
             '--build-dir', self.build_dir,
+            '--multiroot-data-file', multiroot_data_file.path(),
+            # There might have been a Package.resolved created by other builds
+            # or by the package being opened using Xcode. Discard that and
+            # reset the dependencies to be local.
+            '--update'
         ]
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
         helper_cmd.extend(additional_params)
 
         shell.call(helper_cmd)
-
-    @classmethod
-    def is_build_script_impl_product(cls):
-        return False
 
     def should_build(self, host_target):
         return True

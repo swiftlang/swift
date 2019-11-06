@@ -24,15 +24,13 @@ func osLogMessageStringLiteralInitTest() -> OSLogMessage {
   return "A string literal"
 }
 
-// CHECK-LABEL: @isPrivate(Privacy) -> Bool
+// CHECK-LABEL: @init(literalCapacity: Int, interpolationCount: Int) -> OSLogInterpolation
 // CHECK-NOT: error:
-// CHECK-LABEL: @getIntegerFormatSpecifier<A where A: FixedWidthInteger>(A.Type, IntFormat, Bool) -> String
+// CHECK-LABEL: @appendLiteral(String) -> ()
 // CHECK-NOT: error:
-// CHECK-LABEL: @sizeForEncoding<A where A: FixedWidthInteger>(A.Type) -> Int
+// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> Int, format: IntFormat, privacy: Privacy) -> ()
 // CHECK-NOT: error:
-// CHECK-LABEL: @getArgumentHeader(isPrivate: Bool, type: ArgumentType) -> UInt8
-// CHECK-NOT: error:
-// CHECK-LABEL: @getUpdatedPreamble(isPrivate: Bool, isScalar: Bool) -> UInt8
+// CHECK-LABEL: @appendLiteral(String) -> ()
 // CHECK-NOT: error:
 // CHECK-LABEL: @init(stringInterpolation: OSLogInterpolation) -> OSLogMessage
 // CHECK-NOT: error:
@@ -41,9 +39,9 @@ func intValueInterpolationTest() -> OSLogMessage {
   return "An integer value \(10)"
 }
 
-// CHECK-LABEL: @getStringFormatSpecifier(Bool) -> String
+// CHECK-LABEL: @init(literalCapacity: Int, interpolationCount: Int) -> OSLogInterpolation
 // CHECK-NOT: error:
-// CHECK-LABEL: @sizeForEncoding() -> Int
+// CHECK-LABEL: @appendInterpolation(_: @autoclosure () -> String, privacy: Privacy) -> ()
 // CHECK-NOT: error:
 @_semantics("test_driver")
 func stringValueInterpolationTest() -> OSLogMessage {

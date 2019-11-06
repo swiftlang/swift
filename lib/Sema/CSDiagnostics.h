@@ -709,8 +709,8 @@ public:
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
-  /// If we're trying to convert something of type "() -> T" to T,
-  /// then we probably meant to call the value.
+  // If we're trying to convert something of type "() -> T" to T,
+  // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
@@ -1462,11 +1462,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-///
-/// ```swift
-/// let keyPath = \AnyObject.bar
-/// ```
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1776,27 +1776,6 @@ public:
   void tryDropArrayBracketsFixIt(Expr *anchor) const;
 };
 
-/// Diagnose a situation where there is an explicit type coercion
-/// to the same type e.g.:
-///
-/// ```swift
-/// Double(1) as Double // redundant cast to 'Double' has no effect
-/// 1 as Double as Double // redundant cast to 'Double' has no effect
-/// let string = "String"
-/// let s = string as String // redundant cast to 'String' has no effect
-/// ```
-class UnnecessaryCoercionFailure final
-    : public ContextualFailure {
-      
-public:
-  UnnecessaryCoercionFailure(Expr *root, ConstraintSystem &cs,
-                             Type fromType, Type toType,
-                             ConstraintLocator *locator)
-      : ContextualFailure(root, cs, fromType, toType, locator) {}
-  
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose a situation there is a mismatch between argument and parameter
 /// types e.g.:
 ///
@@ -1931,6 +1910,60 @@ public:
       : ContextualFailure(expr, cs, fromType, toType, locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class ExtraneousCallFailure final : public FailureDiagnostic {
+public:
+  ExtraneousCallFailure(Expr *expr, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
+public:
+  InvalidUseOfTrailingClosure(Expr *root, ConstraintSystem &cs, Type argType,
+                              Type paramType, ConstraintLocator *locator)
+      : ArgumentMismatchFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose the invalid conversion of a temporary pointer argument generated
+/// from an X-to-pointer conversion to an @_nonEphemeral parameter.
+///
+/// ```swift
+/// func foo(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
+///
+/// foo([1, 2, 3])
+/// ```
+class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
+  ConversionRestrictionKind ConversionKind;
+  bool DowngradeToWarning;
+
+public:
+  NonEphemeralConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                ConstraintLocator *locator,
+                                Type fromType, Type toType,
+                                ConversionRestrictionKind conversionKind,
+                                bool downgradeToWarning)
+      : ArgumentMismatchFailure(expr, cs, fromType, toType, locator),
+        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+  }
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  /// Attempts to emit a specialized diagnostic for
+  /// Unsafe[Mutable][Raw]Pointer.init([mutating]:) &
+  /// Unsafe[Mutable][Raw]BufferPointer.init(start:count:).
+  bool diagnosePointerInit() const;
+
+  /// Emits a note explaining to the user that an ephemeral conversion is only
+  /// valid for the duration of the call, and suggests an alternative to use.
+  void emitSuggestionNotes() const;
 };
 
 } // end namespace constraints

@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -93,7 +94,7 @@ struct QueryTypeSubstitutionMapOrIdentity {
 using GenericFunction = auto(CanType dependentType,
                              Type conformingReplacementType,
                              ProtocolDecl *conformedProtocol)
-  -> Optional<ProtocolConformanceRef>;
+                            -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -103,11 +104,10 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule(ModuleDecl *M)
     : M(M) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -115,10 +115,9 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
@@ -130,11 +129,10 @@ public:
     : Sig(Sig) {
       assert(Sig && "Cannot lookup conformance in null signature!");
     }
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.
@@ -317,7 +315,7 @@ public:
   
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;

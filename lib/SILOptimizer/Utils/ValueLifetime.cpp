@@ -18,6 +18,7 @@ using namespace swift;
 
 void ValueLifetimeAnalysis::propagateLiveness() {
   assert(liveBlocks.empty() && "frontier computed twice");
+  assert(!userSet.count(defValue) && "definition cannot be its own use");
 
   auto defBB = defValue->getParentBlock();
   llvm::SmallVector<SILBasicBlock *, 64> worklist;
@@ -42,13 +43,16 @@ void ValueLifetimeAnalysis::propagateLiveness() {
       numUsersBeforeDef--;
   }
 
+  // Initialize the hasUsersBeforeDef field.
+  hasUsersBeforeDef = numUsersBeforeDef > 0;
+
   // Now propagate liveness backwards until we hit the block that defines the
   // value.
   while (!worklist.empty()) {
     auto *bb = worklist.pop_back_val();
 
     // Don't go beyond the definition.
-    if (bb == defBB && numUsersBeforeDef == 0)
+    if (bb == defBB && !hasUsersBeforeDef)
       continue;
 
     for (SILBasicBlock *Pred : bb->getPredecessorBlocks()) {
@@ -93,12 +97,33 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &frontier, Mode mode,
 
     bool liveInSucc = false;
     bool deadInSucc = false;
+    bool usedAndRedefinedInSucc = false;
     for (const SILSuccessor &succ : bb->getSuccessors()) {
       if (isAliveAtBeginOfBlock(succ)) {
         liveInSucc = true;
+        if (succ == defValue->getParent()) {
+          // Here, the basic block bb uses the value but also redefines the
+          // value inside bb. The new value could be used by the successors
+          // of succ and therefore could be live at the end of succ as well.
+          usedAndRedefinedInSucc = true;
+        }
       } else if (!deBlocks || !deBlocks->isDeadEnd(succ)) {
         deadInSucc = true;
       }
+    }
+    if (usedAndRedefinedInSucc) {
+      // Here, the basic block bb uses the value and later redefines the value.
+      // Therefore, this value's lifetime ends after its last use preceding the
+      // re-definition of the value.
+      auto ii = defValue->getReverseIterator();
+      for (; ii != bb->rend(); ++ii) {
+        if (userSet.count(&*ii)) {
+          frontier.push_back(&*std::next(ii));
+          break;
+        }
+      }
+      assert(ii != bb->rend() &&
+             "There must be a user in bb before definition");
     }
     if (!liveInSucc) {
       // The value is not live in any of the successor blocks. This means the
@@ -141,8 +166,6 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &frontier, Mode mode,
       }
     }
     if (needSplit) {
-      if (mode == DontModifyCFG)
-        return false;
       // We need to split the critical edge to create a frontier instruction.
       unhandledFrontierBlocks.insert(frontierBB);
     } else {
@@ -150,6 +173,10 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &frontier, Mode mode,
       frontier.push_back(&*frontierBB->begin());
     }
   }
+  if (unhandledFrontierBlocks.size() == 0) {
+    return true;
+  }
+
   // Split critical edges from the lifetime region to not yet handled frontier
   // blocks.
   for (SILBasicBlock *frontierPred : liveOutBlocks) {
@@ -163,12 +190,17 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &frontier, Mode mode,
 
     for (unsigned i = 0, e = succBlocks.size(); i != e; ++i) {
       if (unhandledFrontierBlocks.count(succBlocks[i])) {
-        assert(mode == AllowToModifyCFG);
         assert(isCriticalEdge(term, i) && "actually not a critical edge?");
+        noCriticalEdges = false;
+        if (mode != AllowToModifyCFG) {
+          // If the CFG need not be modified, just record the critical edge and
+          // continue.
+          this->criticalEdges.push_back({term, i});
+          continue;
+        }
         SILBasicBlock *newBlock = splitEdge(term, i);
         // The single terminator instruction is part of the frontier.
         frontier.push_back(&*newBlock->begin());
-        noCriticalEdges = false;
       }
     }
   }

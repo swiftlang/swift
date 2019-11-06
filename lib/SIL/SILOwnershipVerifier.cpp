@@ -287,10 +287,22 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // If we are guaranteed, but are not a guaranteed forwarding inst,
-    // just continue. This user is just treated as a normal use.
-    if (!isGuaranteedForwardingInst(user))
+    // If we are guaranteed, but are not a guaranteed forwarding inst, we add
+    // the end scope instructions of any new sub-scopes. This ensures that the
+    // parent scope completely encloses the child borrow scope.
+    //
+    // Example: A guaranteed parameter of a co-routine.
+    if (!isGuaranteedForwardingInst(user)) {
+      // First check if we are visiting an operand that introduces a new
+      // sub-scope. If we do, we need to preserve
+      if (auto scopedOperand = BorrowScopeOperand::get(op)) {
+        scopedOperand->visitEndScopeInstructions(
+            [&](Operand *op) { implicitRegularUsers.push_back(op); });
+      }
+
+      // Then continue.
       continue;
+    }
 
     // At this point, we know that we must have a forwarded subobject. Since the
     // base type is guaranteed, we know that the subobject is either guaranteed
@@ -299,7 +311,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     // User's results to the worklist.
     if (user->getResults().size()) {
       for (SILValue result : user->getResults()) {
-        if (result.getOwnershipKind() == ValueOwnershipKind::Any) {
+        if (result.getOwnershipKind() == ValueOwnershipKind::None) {
           continue;
         }
 
@@ -351,7 +363,7 @@ bool SILValueOwnershipChecker::gatherUsers(
         }
 
         // If we have an any value, just continue.
-        if (succArgOwnershipKind == ValueOwnershipKind::Any)
+        if (succArgOwnershipKind == ValueOwnershipKind::None)
           continue;
 
         // Otherwise add all end_borrow users for this BBArg to the
@@ -380,7 +392,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   switch (arg->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
-  case ValueOwnershipKind::Any:
+  case ValueOwnershipKind::None:
     return true;
   case ValueOwnershipKind::Owned:
     break;
@@ -401,7 +413,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   switch (yield->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
-  case ValueOwnershipKind::Any:
+  case ValueOwnershipKind::None:
     return true;
   case ValueOwnershipKind::Owned:
     break;

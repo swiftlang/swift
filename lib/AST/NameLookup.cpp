@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
@@ -69,7 +70,7 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(
     ValueDecl *D, DeclVisibilityKind reason,
     DynamicLookupInfo dynamicLookupInfo) {
-  if (D->isInvalid())
+  if (D->hasInterfaceType() && D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
@@ -851,8 +852,7 @@ public:
     os << "\n";
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     dump(llvm::errs());
   }
 
@@ -1572,9 +1572,6 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
 
     // Make sure we've resolved implicit members, if we need them.
     if (typeResolver) {
-      if (member.getBaseName() == DeclBaseName::createConstructor())
-        typeResolver->resolveImplicitConstructors(current);
-
       typeResolver->resolveImplicitMember(current, member);
     }
 

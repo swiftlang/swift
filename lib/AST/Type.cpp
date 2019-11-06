@@ -1672,9 +1672,29 @@ bool TypeBase::isBindableTo(Type b) {
         if (func->getExtInfo() != substFunc->getExtInfo())
           return false;
         
-        // TODO: Generic signatures
-        if (func->getGenericSignature() || substFunc->getGenericSignature())
-          return false;
+        // Compare substituted function types.
+        if (func->getSubstGenericSignature()
+            || substFunc->getSubstGenericSignature()) {
+          if (func->getSubstGenericSignature()
+                != substFunc->getSubstGenericSignature())
+            return false;
+          
+          auto sig = func->getSubstGenericSignature();
+          
+          auto origSubs = func->getSubstitutions();
+          auto substSubs = substFunc->getSubstitutions();
+          
+          if (!origSubs || !substSubs)
+            return false;
+          
+          for (unsigned i : indices(origSubs.getReplacementTypes())) {
+            if (!visit(origSubs.getReplacementTypes()[i]->getCanonicalType(sig),
+                     substSubs.getReplacementTypes()[i]->getCanonicalType(sig)))
+              return false;
+          }
+          
+          return true;
+        }
         
         if (func->getParameters().size() != substFunc->getParameters().size())
           return false;
@@ -1685,8 +1705,8 @@ bool TypeBase::isBindableTo(Type b) {
           if (func->getParameters()[i].getConvention()
                 != substFunc->getParameters()[i].getConvention())
             return false;
-          if (!visit(func->getParameters()[i].getType(),
-                     substFunc->getParameters()[i].getType()))
+          if (!visit(func->getParameters()[i].getInterfaceType(),
+                     substFunc->getParameters()[i].getInterfaceType()))
             return false;
         }
 
@@ -1695,8 +1715,8 @@ bool TypeBase::isBindableTo(Type b) {
               != substFunc->getResults()[i].getConvention())
             return false;
 
-          if (!visit(func->getResults()[i].getType(),
-                     substFunc->getResults()[i].getType()))
+          if (!visit(func->getResults()[i].getInterfaceType(),
+                     substFunc->getResults()[i].getInterfaceType()))
             return false;
         }
         
@@ -1734,8 +1754,8 @@ bool TypeBase::isBindableTo(Type b) {
 
           auto canTy = req.getFirstType()->getCanonicalType();
           auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-          auto origConf = *origSubMap.lookupConformance(canTy, proto);
-          auto substConf = *substSubMap.lookupConformance(canTy, proto);
+          auto origConf = origSubMap.lookupConformance(canTy, proto);
+          auto substConf = substSubMap.lookupConformance(canTy, proto);
 
           if (origConf.isConcrete()) {
             if (!substConf.isConcrete())
@@ -2742,7 +2762,7 @@ substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
 
-Optional<ProtocolConformanceRef> ReplaceOpaqueTypesWithUnderlyingTypes::
+ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
   auto abstractRef = ProtocolConformanceRef(protocol);
@@ -3158,16 +3178,17 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // If we know the associated type, look in the witness table.
   if (assocType) {
     auto proto = assocType->getProtocol();
-    Optional<ProtocolConformanceRef> conformance
-      = lookupConformances(origBase->getCanonicalType(),
-                           substBase, proto);
+    ProtocolConformanceRef conformance =
+        lookupConformances(origBase->getCanonicalType(), substBase, proto);
 
-    if (!conformance) return failed();
-    if (!conformance->isConcrete()) return failed();
+    if (conformance.isInvalid())
+      return failed();
+    if (!conformance.isConcrete())
+      return failed();
 
     // Retrieve the type witness.
     auto witness =
-      conformance->getConcrete()->getTypeWitness(assocType, options);
+        conformance.getConcrete()->getTypeWitness(assocType, options);
     if (!witness || witness->hasError())
       return failed();
 
@@ -3190,10 +3211,9 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   return failed();
 }
 
-Optional<ProtocolConformanceRef>
-LookUpConformanceInModule::operator()(CanType dependentType,
-                                      Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef LookUpConformanceInModule::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
 
@@ -3201,17 +3221,15 @@ LookUpConformanceInModule::operator()(CanType dependentType,
                               conformedProtocol);
 }
 
-Optional<ProtocolConformanceRef>
-LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
-                                       Type conformingReplacementType,
-                                       ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   return Subs.lookupConformance(dependentType, conformedProtocol);
 }
 
-Optional<ProtocolConformanceRef>
-MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
-                                       Type conformingReplacementType,
-                                       ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef MakeAbstractConformanceForGenericType::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   assert((conformingReplacementType->is<ErrorType>()
           || conformingReplacementType->is<SubstitutableType>()
           || conformingReplacementType->is<DependentMemberType>())
@@ -3219,10 +3237,9 @@ MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
   return ProtocolConformanceRef(conformedProtocol);
 }
 
-Optional<ProtocolConformanceRef>
-LookUpConformanceInSignature::operator()(CanType dependentType,
-                                         Type conformingReplacementType,
-                                         ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef LookUpConformanceInSignature::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
   return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),
@@ -3760,13 +3777,13 @@ Identifier DependentMemberType::getName() const {
 static bool transformSILResult(
                            SILResultInfo &result, bool &changed,
                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = result.getType().transformRec(fn);
+  Type transType = result.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != result.getType()) {
+  if (canTransType != result.getInterfaceType()) {
     changed = true;
-    result = result.getWithType(canTransType);
+    result = result.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3774,13 +3791,13 @@ static bool transformSILResult(
 static bool transformSILYield(
                             SILYieldInfo &yield, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = yield.getType().transformRec(fn);
+  Type transType = yield.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != yield.getType()) {
+  if (canTransType != yield.getInterfaceType()) {
     changed = true;
-    yield = yield.getWithType(canTransType);
+    yield = yield.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3788,13 +3805,13 @@ static bool transformSILYield(
 static bool transformSILParameter(
                             SILParameterInfo &param, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = param.getType().transformRec(fn);
+  Type transType = param.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != param.getType()) {
+  if (canTransType != param.getInterfaceType()) {
     changed = true;
-    param = param.getWithType(canTransType);
+    param = param.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3888,6 +3905,19 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
+    
+    if (auto subs = fnTy->getSubstitutions()) {
+#ifndef NDEBUG
+      // This interface isn't suitable for updating the substitution map in a
+      // substituted SILFunctionType.
+      // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
+      for (Type type : fnTy->getSubstitutions().getReplacementTypes()) {
+        assert(type->isEqual(type.transformRec(fn))
+               && "Substituted SILFunctionType can't be transformed");
+      }
+#endif
+      return fnTy;
+    }
 
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
     for (SILParameterInfo param : fnTy->getParameters()) {
@@ -3916,16 +3946,19 @@ case TypeKind::Id:
 
     if (!changed) return *this;
 
-    return SILFunctionType::get(fnTy->getGenericSignature(),
-                                fnTy->getExtInfo(),
-                                fnTy->getCoroutineKind(),
-                                fnTy->getCalleeConvention(),
-                                transInterfaceParams,
-                                transInterfaceYields,
-                                transInterfaceResults,
-                                transErrorResult,
-                                Ptr->getASTContext(),
-                                fnTy->getWitnessMethodConformanceOrNone());
+    return SILFunctionType::get(
+        fnTy->getSubstGenericSignature(),
+        fnTy->getExtInfo(),
+        fnTy->getCoroutineKind(),
+        fnTy->getCalleeConvention(),
+        transInterfaceParams,
+        transInterfaceYields,
+        transInterfaceResults,
+        transErrorResult,
+        SubstitutionMap(),
+        /*genericSigIsImplied*/ false,
+        Ptr->getASTContext(),
+        fnTy->getWitnessMethodConformanceOrInvalid());
   }
 
 #define REF_STORAGE(Name, ...) \

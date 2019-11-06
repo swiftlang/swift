@@ -1020,9 +1020,6 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
-
-    if (type->hasError())
-      decl->setInvalid();
   }
   decl->TypeAndAccess.setPointer(type);
 }
@@ -1059,4 +1056,18 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const PrecedenceGroupDescriptor &desc) {
   out << "precedence group " << desc.ident << " at ";
   desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+}
+
+//----------------------------------------------------------------------------//
+// InheritsSuperclassInitializersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedInheritsSuperclassInitializers();
+}
+
+void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setInheritsSuperclassInitializers(value);
 }

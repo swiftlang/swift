@@ -494,7 +494,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
 
   // Bail if the result type of the converted callee is different from the callee's
   // result type of the apply instruction.
-  if (SubstCalleeTy->getAllResultsType() != ConvertCalleeTy->getAllResultsType()) {
+  if (SubstCalleeTy->getAllResultsSubstType(AI.getModule())
+        != ConvertCalleeTy->getAllResultsSubstType(AI.getModule())) {
     return nullptr;
   }
 
@@ -546,8 +547,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
   SILInstruction *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
                                             Args, setNonThrowing);
-  assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
-             AI.getSubstCalleeType()->getAllResultsType() &&
+  assert(FullApplySite::isa(NAI).getSubstCalleeType()
+                               ->getAllResultsSubstType(AI.getModule())
+           == AI.getSubstCalleeType()
+               ->getAllResultsSubstType(AI.getModule()) &&
          "Function types should be the same");
   return NAI;
 }
@@ -905,7 +908,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
       PD = archetypeTy->getConformsTo()[0];
     } else if (ArgType.isExistentialType() && !ArgType.isAnyObject() &&
                !SwiftArgType->isAny()) {
-      PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+      PD = dyn_cast_or_null<ProtocolDecl>(SwiftArgType->getAnyNominal());
     }
   }
 
@@ -1255,7 +1258,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
           return type;
         },
         [&](CanType origTy, Type substTy,
-            ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+            ProtocolDecl *proto) -> ProtocolConformanceRef {
           if (origTy->isEqual(OAI.OpenedArchetype)) {
             assert(substTy->isEqual(CEI.ConcreteType));
             // Do a conformance lookup on this witness requirement using the
@@ -1373,7 +1376,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // Get the conformance of the init_existential type, which is passed as the
   // self argument, on the witness' protocol.
   ProtocolConformanceRef SelfConformance =
-      *SelfCEI.lookupExistentialConformance(WMI->getLookupProtocol());
+      SelfCEI.lookupExistentialConformance(WMI->getLookupProtocol());
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction. It's ok to rewrite the witness method in terms

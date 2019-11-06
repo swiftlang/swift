@@ -107,6 +107,9 @@ public:
     /// Encountered an instruction not supported by the interpreter.
     UnsupportedInstruction,
 
+    /// Encountered a function call whose arguments are not constants.
+    CallArgumentUnknown,
+
     /// Encountered a function call where the body of the called function is
     /// not available.
     CalleeImplementationUnknown,
@@ -145,8 +148,9 @@ private:
 
   // Auxiliary information for different unknown kinds.
   union {
-    SILFunction *function;
-    const char *trapMessage;
+    SILFunction *function;   // For CalleeImplementationUnknown
+    const char *trapMessage; // For Trap.
+    unsigned argumentIndex;  // For CallArgumentUnknown
   } payload;
 
 public:
@@ -156,6 +160,7 @@ public:
     switch (kind) {
     case UnknownKind::CalleeImplementationUnknown:
     case UnknownKind::Trap:
+    case UnknownKind::CallArgumentUnknown:
       return true;
     default:
       return false;
@@ -199,6 +204,18 @@ public:
   const char *getTrapMessage() {
     assert(kind == UnknownKind::Trap);
     return payload.trapMessage;
+  }
+
+  static UnknownReason createCallArgumentUnknown(unsigned argIndex) {
+    UnknownReason reason;
+    reason.kind = UnknownKind::CallArgumentUnknown;
+    reason.payload.argumentIndex = argIndex;
+    return reason;
+  }
+
+  unsigned getArgumentIndex() {
+    assert(kind == UnknownKind::CallArgumentUnknown);
+    return payload.argumentIndex;
   }
 };
 

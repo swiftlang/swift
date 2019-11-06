@@ -892,15 +892,15 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
-  if (protocol)
-    if (auto conformanceRef = TypeChecker::conformsToProtocol(
-            parentTy, protocol, dc,
-            (ConformanceCheckFlags::InExpression |
-             ConformanceCheckFlags::SuppressDependencyTracking |
-             ConformanceCheckFlags::SkipConditionalRequirements))) {
-      if (conformanceRef->isConcrete())
-        conformance = conformanceRef->getConcrete();
-    }
+  if (protocol) {
+    auto conformanceRef = TypeChecker::conformsToProtocol(
+        parentTy, protocol, dc,
+        (ConformanceCheckFlags::InExpression |
+         ConformanceCheckFlags::SuppressDependencyTracking |
+         ConformanceCheckFlags::SkipConditionalRequirements));
+    if (conformanceRef.isConcrete())
+      conformance = conformanceRef.getConcrete();
+  }
 
   // If any errors have occurred, don't bother diagnosing this cross-file
   // issue.
@@ -2415,7 +2415,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       break;
     }
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-        ty, variadic, autoclosure, ownership);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2587,13 +2587,12 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
         auto result = TypeChecker::conformsToProtocol(
                                             replacement, proto, DC,
                                             ConformanceCheckOptions());
-        // TODO: getSubstitutions callback ought to return Optional.
-        if (!result) {
+        if (result.isInvalid()) {
           ok = false;
           return ProtocolConformanceRef(proto);
         }
-        
-        return *result;
+
+        return result;
       });
 
     if (!ok)
@@ -2648,9 +2647,9 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       elementOptions.setContext(TypeResolverContext::FunctionInput);
       auto param = resolveSILParameter(elt.Type, elementOptions);
       params.push_back(param);
-      if (!param.getType()) return nullptr;
+      if (!param.getInterfaceType()) return nullptr;
 
-      if (param.getType()->hasError())
+      if (param.getInterfaceType()->hasError())
         hasError = true;
     }
 
@@ -2684,26 +2683,27 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = param.getType()->mapTypeOutOfContext()
+      auto transParamType = param.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceParams.push_back(param.getWithType(transParamType));
+      interfaceParams.push_back(param.getWithInterfaceType(transParamType));
     }
     for (auto &yield : yields) {
-      auto transYieldType = yield.getType()->mapTypeOutOfContext()
+      auto transYieldType = yield.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceYields.push_back(yield.getWithType(transYieldType));
+      interfaceYields.push_back(yield.getWithInterfaceType(transYieldType));
     }
     for (auto &result : results) {
-      auto transResultType = result.getType()->mapTypeOutOfContext()
+      auto transResultType = result.getInterfaceType()->mapTypeOutOfContext()
           ->getCanonicalType();
-      interfaceResults.push_back(result.getWithType(transResultType));
+      interfaceResults.push_back(result.getWithInterfaceType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = errorResult->getType()->mapTypeOutOfContext()
+      auto transErrorResultType = errorResult->getInterfaceType()
+          ->mapTypeOutOfContext()
           ->getCanonicalType();
       interfaceErrorResult =
-        errorResult->getWithType(transErrorResultType);
+        errorResult->getWithInterfaceType(transErrorResultType);
     }
   } else {
     interfaceParams = params;
@@ -2711,7 +2711,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
-  Optional<ProtocolConformanceRef> witnessMethodConformance;
+  ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
     auto resolved = resolveType(witnessMethodProtocol, options);
     if (resolved->hasError())
@@ -2721,7 +2721,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     if (!protocolType)
       return ErrorType::get(Context);
 
-    Type selfType = params.back().getType();
+    Type selfType = params.back().getInterfaceType();
     // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
       auto next = metatypeType->getInstanceType();
@@ -2740,6 +2740,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                               callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
+                              SubstitutionMap(), false,
                               Context, witnessMethodConformance);
 }
 
@@ -2749,7 +2750,7 @@ SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
   AttributedTypeRepr attrRepr(attrs, repr);
   options.setContext(TypeResolverContext::FunctionInput);
   SILParameterInfo paramInfo = resolveSILParameter(&attrRepr, options);
-  return SILYieldInfo(paramInfo.getType(), paramInfo.getConvention());
+  return SILYieldInfo(paramInfo.getInterfaceType(), paramInfo.getConvention());
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(
@@ -2823,7 +2824,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
       // The treatment from this point on is basically completely different.
       auto yield = resolveSILYield(attrs, attrRepr->getTypeRepr(), options);
-      if (yield.getType()->hasError())
+      if (yield.getInterfaceType()->hasError())
         return true;
 
       yields.push_back(yield);
@@ -3383,13 +3384,13 @@ namespace {
 class UnsupportedProtocolVisitor
   : public TypeReprVisitor<UnsupportedProtocolVisitor>, public ASTWalker
 {
-  TypeChecker &TC;
+  ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
     
 public:
-  UnsupportedProtocolVisitor(TypeChecker &tc, bool checkStatements)
-    : TC(tc), checkStatements(checkStatements), hitTopStmt(false) { }
+  UnsupportedProtocolVisitor(ASTContext &ctx, bool checkStatements)
+    : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
     if (T->isInvalid())
@@ -3428,8 +3429,8 @@ public:
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported()) {
-        TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                    proto->getName());
+        Ctx.Diags.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+                           proto->getName());
         T->setInvalid();
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
@@ -3445,8 +3446,9 @@ public:
             if (protoDecl->existentialTypeSupported())
               continue;
             
-            TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                        protoDecl->getName());
+            Ctx.Diags.diagnose(comp->getIdLoc(),
+                               diag::unsupported_existential_type,
+                               protoDecl->getName());
             T->setInvalid();
           }
         }
@@ -3473,49 +3475,52 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
+  auto &ctx = decl->getASTContext();
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl))
-    checkUnsupportedProtocolType(protocolDecl->getTrailingWhereClause());
+    checkUnsupportedProtocolType(ctx, protocolDecl->getTrailingWhereClause());
   else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl))
-    checkUnsupportedProtocolType(genericDecl->getGenericParams());
+    checkUnsupportedProtocolType(ctx, genericDecl->getGenericParams());
   else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl))
-    checkUnsupportedProtocolType(assocType->getTrailingWhereClause());
+    checkUnsupportedProtocolType(ctx, assocType->getTrailingWhereClause());
   else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
-    checkUnsupportedProtocolType(extDecl->getTrailingWhereClause());
+    checkUnsupportedProtocolType(ctx, extDecl->getTrailingWhereClause());
   else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl))
-    checkUnsupportedProtocolType(subscriptDecl->getGenericParams());
+    checkUnsupportedProtocolType(ctx, subscriptDecl->getGenericParams());
   else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (!isa<AccessorDecl>(funcDecl))
-      checkUnsupportedProtocolType(funcDecl->getGenericParams());
+      checkUnsupportedProtocolType(ctx, funcDecl->getGenericParams());
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
   decl->walk(visitor);
 }
 
-void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
+void TypeChecker::checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt) {
   if (!stmt)
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/true);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/true);
   stmt->walk(visitor);
 }
 
-void TypeChecker::checkUnsupportedProtocolType(TrailingWhereClause *whereClause) {
+void TypeChecker::checkUnsupportedProtocolType(
+    ASTContext &ctx, TrailingWhereClause *whereClause) {
   if (whereClause == nullptr)
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
   visitor.visitRequirements(whereClause->getRequirements());
 }
 
-void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) {
+void TypeChecker::checkUnsupportedProtocolType(
+    ASTContext &ctx, GenericParamList *genericParams) {
   if (genericParams  == nullptr)
     return;
 
-  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
   visitor.visitRequirements(genericParams->getRequirements());
 }
 

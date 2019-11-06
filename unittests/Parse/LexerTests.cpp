@@ -747,16 +747,13 @@ TEST_F(LexerTest, NestedPlaceholder) {
 
 class StringCaptureDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  virtual void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const swift::DiagnosticInfo &Info,
-                   SourceLoc bufferIndirectlyCausingDiagnostic) override {
+  virtual void handleDiagnostic(SourceManager &SM,
+                                const swift::DiagnosticInfo &Info) override {
     std::string DiagMsg;
     llvm::raw_string_ostream DiagOS(DiagMsg);
-    DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);
-    auto LC = SM.getLineAndColumn(Loc);
+    DiagnosticEngine::formatDiagnosticText(DiagOS, Info.FormatString,
+                                           Info.FormatArgs);
+    auto LC = SM.getLineAndColumn(Info.Loc);
     std::ostringstream StrOS;
     StrOS << LC.first << ", " << LC.second << ": " << DiagOS.str();
     messages.push_back(StrOS.str());

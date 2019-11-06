@@ -31,6 +31,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -740,9 +741,7 @@ public:
     return None;
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
   void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
@@ -1247,7 +1246,8 @@ private:
         }
       }
 
-      unsigned threshold = cs->TC.getLangOpts().SolverShrinkUnsolvedThreshold;
+      unsigned threshold =
+          cs->getASTContext().LangOpts.SolverShrinkUnsolvedThreshold;
       return unsolvedDisjunctions >= threshold;
     }
   };
@@ -2094,10 +2094,15 @@ public:
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
-  bool hasFixFor(ConstraintLocator *locator) const {
-    return llvm::any_of(Fixes, [&locator](const ConstraintFix *fix) {
-      return fix->getLocator() == locator;
-    });
+  bool hasFixFor(ConstraintLocator *locator,
+                 Optional<FixKind> expectedKind = None) const {
+    return llvm::any_of(
+        Fixes, [&locator, &expectedKind](const ConstraintFix *fix) {
+          if (fix->getLocator() == locator) {
+            return !expectedKind || fix->getKind() == *expectedKind;
+          }
+          return false;
+        });
   }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
@@ -2361,7 +2366,7 @@ public:
 
   /// Retrieve the representative of the equivalence class containing
   /// this type variable.
-  TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
+  TypeVariableType *getRepresentative(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
@@ -2456,7 +2461,7 @@ public:
 
   /// Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
-  Type getFixedType(TypeVariableType *typeVar) {
+  Type getFixedType(TypeVariableType *typeVar) const {
     return typeVar->getImpl().getFixedType(getSavedBindings());
   }
 
@@ -2468,7 +2473,7 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  Type getFixedTypeRecursive(Type type, bool wantRValue) {
+  Type getFixedTypeRecursive(Type type, bool wantRValue) const {
     TypeMatchOptions flags = None;
     return getFixedTypeRecursive(type, flags, wantRValue);
   }
@@ -2486,7 +2491,7 @@ public:
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue);
+                             bool wantRValue) const;
 
   /// Determine whether the given type variable occurs within the given type.
   ///
@@ -3028,7 +3033,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type);
+  Type simplifyType(Type type) const;
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -3060,6 +3065,14 @@ public:
                                          bool includeInaccessibleMembers);
 
 private:
+  /// Determines whether or not a given conversion at a given locator requires
+  /// the creation of a temporary value that's only valid for a limited scope.
+  /// Such ephemeral conversions, such as array-to-pointer, cannot be passed to
+  /// non-ephemeral parameters.
+  ConversionEphemeralness
+  isConversionEphemeral(ConversionRestrictionKind conversion,
+                        ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -3479,15 +3492,15 @@ private:
     }
   };
 
-  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type);
+  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) const;
   Optional<PotentialBindings> determineBestBindings();
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(
       PotentialBindings &result, Constraint *constraint,
       bool &hasDependentMemberRelationalConstraints,
       bool &hasNonDependentMemberRelationalConstraints,
-      bool &addOptionalSupertypeBindings);
-  PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
+      bool &addOptionalSupertypeBindings) const;
+  PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
 private:
   /// Add a constraint to the constraint system.
@@ -3803,8 +3816,7 @@ public:
       return LiteralProtocols;
     }
 
-    LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                              "only for use within the debugger");
+    SWIFT_DEBUG_DUMP;
   };
 
   bool haveTypeInformationForAllArguments(FunctionType *fnType);
@@ -3835,14 +3847,11 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(Expr *) LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
+  SWIFT_DEBUG_DUMPER(dump(Expr *));
 
-  void print(raw_ostream &out);
-  void print(raw_ostream &out, Expr *);
+  void print(raw_ostream &out) const;
+  void print(raw_ostream &out, Expr *) const;
 };
 
 /// Compute the shuffle required to map from a given tuple type to

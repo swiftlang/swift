@@ -61,79 +61,85 @@ TypeChecker::TypeChecker(ASTContext &Ctx)
 
 TypeChecker::~TypeChecker() {}
 
-ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
+ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
+                                       KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
   if (!protocol && loc.isValid()) {
-    diagnose(loc, diag::missing_protocol,
-             Context.getIdentifier(getProtocolName(kind)));
+    Context.Diags.diagnose(loc, diag::missing_protocol,
+                           Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->getInterfaceType()) {
-    if (protocol->isInvalid())
-      return nullptr;
+  if (protocol && protocol->isInvalid()) {
+    return nullptr;
   }
 
   return protocol;
 }
 
-ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
+ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   if (isa<ArrayExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByArrayLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
 
   if (isa<DictionaryExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
   
   if (isa<NilLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByNilLiteral);
-  
+    return TypeChecker::getProtocol(Context, expr->getLoc(),
+                                    KnownProtocolKind::ExpressibleByNilLiteral);
+
   if (isa<IntegerLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByIntegerLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
 
   if (isa<FloatLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByFloatLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByFloatLiteral);
 
   if (isa<BooleanLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByBooleanLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByBooleanLiteral);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
     if (SLE->isSingleUnicodeScalar())
-      return getProtocol(
-          expr->getLoc(),
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
           KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
 
     if (SLE->isSingleExtendedGraphemeCluster())
       return getProtocol(
-          expr->getLoc(),
+          Context, expr->getLoc(),
           KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
 
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByStringLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
   }
 
   if (isa<InterpolatedStringLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByStringInterpolation);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByStringInterpolation);
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
     case MagicIdentifierLiteralExpr::Function:
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral);
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
 
     case MagicIdentifierLiteralExpr::Line:
     case MagicIdentifierLiteralExpr::Column:
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral);
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByIntegerLiteral);
 
     case MagicIdentifierLiteralExpr::DSOHandle:
       return nullptr;
@@ -142,9 +148,10 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
   if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
     switch (E->getLiteralKind()) {
-#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)\
-    case ObjectLiteralExpr::Name:\
-      return getProtocol(expr->getLoc(), KnownProtocolKind::Protocol);
+#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)                             \
+  case ObjectLiteralExpr::Name:                                                \
+    return TypeChecker::getProtocol(Context, expr->getLoc(),                   \
+                                    KnownProtocolKind::Protocol);
 #include "swift/Syntax/TokenKinds.def"
     }
   }
@@ -286,14 +293,14 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
       auto decl = TC.ConformanceContexts[i];
       if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-        TC.checkConformancesInContext(ext, ext);
+        TypeChecker::checkConformancesInContext(ext, ext);
       else {
         auto *ntd = cast<NominalTypeDecl>(decl);
-        TC.checkConformancesInContext(ntd, ntd);
+        TypeChecker::checkConformancesInContext(ntd, ntd);
 
         // Finally, we can check classes for missing initializers.
         if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
-          TC.maybeDiagnoseClassWithoutInitializers(classDecl);
+          TypeChecker::maybeDiagnoseClassWithoutInitializers(classDecl);
       }
     }
     TC.ConformanceContexts.clear();
@@ -416,10 +423,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
     bindExtensions(SF);
-
-    // Look for bridging functions. This only matters when
-    // -enable-source-import is provided.
-    checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {

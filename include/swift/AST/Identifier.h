@@ -18,6 +18,7 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -611,8 +612,7 @@ public:
   llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
 
   /// Dump this name to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 enum class ObjCSelectorFamily : unsigned {
@@ -693,8 +693,7 @@ public:
   }
 
   /// Dump this selector to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Compare two Objective-C selectors, producing -1 if \c *this comes before
   /// \c other,  1 if \c *this comes after \c other, and 0 if they are equal.

@@ -554,12 +554,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  // Caches whether a given declaration is "as specialized" as another.
-  llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
-                            /*isDynamicOverloadComparison*/ unsigned>,
-                 bool>
-      specializedOverloadComparisonCache;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
@@ -783,18 +777,20 @@ public:
                            TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
-  void checkUnsupportedProtocolType(Decl *decl);
+  static void checkUnsupportedProtocolType(Decl *decl);
 
   /// Check for unsupported protocol types in the given statement.
-  void checkUnsupportedProtocolType(Stmt *stmt);
+  static void checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           TrailingWhereClause *whereClause);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           GenericParamList *genericParams);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   static GenericEnvironment *
@@ -986,15 +982,15 @@ public:
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
-  Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
+  static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                               BraceStmt *body,
-                                               Type builderType);
+  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                                      BraceStmt *body,
+                                                      Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1012,16 +1008,12 @@ public:
   void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
-  void checkDeclAttributes(Decl *D);
-  void checkParameterAttributes(ParameterList *params);
+  static void checkDeclAttributes(Decl *D);
+  static void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
-
-  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
-    addImplicitConstructors(nominal);
-  }
 
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
     synthesizeMemberForLookup(nominal, member);
@@ -1032,11 +1024,11 @@ public:
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
-  void checkProtocolSelfRequirements(ValueDecl *decl);
+  static void checkProtocolSelfRequirements(ValueDecl *decl);
 
   /// All generic parameters of a generic function must be referenced in the
   /// declaration's type, otherwise we have no way to infer them.
-  void checkReferencedGenericParams(GenericContext *dc);
+  static void checkReferencedGenericParams(GenericContext *dc);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1109,7 +1101,7 @@ public:
       SubstOptions options = None);
 
   /// Diagnose if the class has no designated initializers.
-  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 
   ///
   /// Add any implicitly-defined constructors required for the given
@@ -1149,9 +1141,6 @@ private:
   Optional<Type> boolType;
 
 public:
-  /// Define the default constructor for the given struct or class.
-  static void defineDefaultConstructor(NominalTypeDecl *decl);
-
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
@@ -1421,7 +1410,7 @@ public:
     return getUnopenedTypeOfReference(
         value, baseType, UseDC,
         [&](VarDecl *var) -> Type {
-          if (!var->getInterfaceType() || var->isInvalid())
+          if (var->isInvalid())
             return ErrorType::get(Context);
 
           return wantInterfaceType ? value->getInterfaceType()
@@ -1490,10 +1479,9 @@ public:
   ///
   /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
   /// an empty optional.
-  static Optional<ProtocolConformanceRef> containsProtocol(
-                                             Type T, ProtocolDecl *Proto,
-                                             DeclContext *DC,
-                                             ConformanceCheckOptions options);
+  static ProtocolConformanceRef
+  containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                   ConformanceCheckOptions options);
 
   /// Determine whether the given type conforms to the given protocol.
   ///
@@ -1512,12 +1500,10 @@ public:
   ///
   /// \returns The protocol conformance, if \c T conforms to the
   /// protocol \c Proto, or \c None.
-  static Optional<ProtocolConformanceRef> conformsToProtocol(
-                                           Type T,
-                                           ProtocolDecl *Proto,
-                                           DeclContext *DC,
-                                           ConformanceCheckOptions options,
-                                           SourceLoc ComplainLoc = SourceLoc());
+  static ProtocolConformanceRef
+  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                     ConformanceCheckOptions options,
+                     SourceLoc ComplainLoc = SourceLoc());
 
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
@@ -1528,21 +1514,20 @@ public:
   public:
     explicit LookUpConformance(DeclContext *dc) : dc(dc) { }
 
-    Optional<ProtocolConformanceRef>
-    operator()(CanType dependentType,
-               Type conformingReplacementType,
-               ProtocolDecl *conformedProtocol) const;
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Completely check the given conformance.
-  void checkConformance(NormalProtocolConformance *conformance);
+  static void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
-  void checkConformancesInContext(DeclContext *dc,
-                                  IterableDeclContext *idc);
+  static void checkConformancesInContext(DeclContext *dc,
+                                         IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  Optional<ProtocolConformanceRef> checkConformanceToNSCopying(VarDecl *var);
+  static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
@@ -1555,16 +1540,15 @@ public:
   /// \returns nullptr if the derivation failed, or the derived declaration
   ///          if it succeeded. If successful, the derived declaration is added
   ///          to TypeDecl's body.
-  ValueDecl *deriveProtocolRequirement(DeclContext *DC,
-                                       NominalTypeDecl *TypeDecl,
-                                       ValueDecl *Requirement);
+  static ValueDecl *deriveProtocolRequirement(DeclContext *DC,
+                                              NominalTypeDecl *TypeDecl,
+                                              ValueDecl *Requirement);
 
   /// Derive an implicit type witness for the given associated type in
   /// the conformance of the given nominal type to some known
   /// protocol.
-  Type deriveTypeWitness(DeclContext *DC,
-                         NominalTypeDecl *nominal,
-                         AssociatedTypeDecl *assocType);
+  static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
+                                AssociatedTypeDecl *assocType);
 
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
@@ -1660,9 +1644,8 @@ public:
   /// A declaration is more specialized than another declaration if its type
   /// is a subtype of the other declaration's type (ignoring the 'self'
   /// parameter of function declarations) and if
-  Comparison compareDeclarations(DeclContext *dc,
-                                 ValueDecl *decl1,
-                                 ValueDecl *decl2);
+  static Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
+                                        ValueDecl *decl2);
 
   /// Build a type-checked reference to the given value.
   Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
@@ -1687,13 +1670,14 @@ public:
   ///
   /// \returns null if the protocol is not available. This represents a
   /// problem with the Standard Library.
-  ProtocolDecl *getProtocol(SourceLoc loc, KnownProtocolKind kind);
+  static ProtocolDecl *getProtocol(ASTContext &ctx, SourceLoc loc,
+                                   KnownProtocolKind kind);
 
   /// Retrieve the literal protocol for the given expression.
   ///
   /// \returns the literal protocol, if known and available, or null if the
   /// expression does not have an associated literal protocol.
-  ProtocolDecl *getLiteralProtocol(Expr *expr);
+  static ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
   DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
 
@@ -1779,7 +1763,7 @@ public:
   /// is sufficient to safely conform to the requirement in the context
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
-  bool
+  static bool
   isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
                                    ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
@@ -1924,10 +1908,10 @@ public:
           [](const GenericTypeParamDecl *) { return Type(); });
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+  static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<Identifier> omitNeedlessWords(VarDecl *var);
+  static Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
   /// Calculate edit distance between declaration names.
   static unsigned getCallEditDistance(DeclName writtenName,
@@ -1954,7 +1938,8 @@ public:
 
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
-  DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  static DeclTypeCheckingSemantics
+  getDeclTypeCheckingSemantics(ValueDecl *decl);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -2035,13 +2020,13 @@ OverrideRequiresKeyword overrideRequiresKeyword(ValueDecl *overridden);
 
 /// Compute the type of a member that will be used for comparison when
 /// performing override checking.
-Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
-                                ValueDecl *derivedDecl = nullptr);
+Type getMemberTypeForComparison(const ValueDecl *member,
+                                const ValueDecl *derivedDecl = nullptr);
 
 /// Determine whether the given declaration is an override by comparing type
 /// information.
-bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
-                           ValueDecl *parentDecl, Type parentDeclTy);
+bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
+                           const ValueDecl *parentDecl, Type parentDeclTy);
 
 /// Determine whether the given declaration is an operator defined in a
 /// protocol. If \p type is not null, check specifically whether \p decl

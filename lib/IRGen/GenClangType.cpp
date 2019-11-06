@@ -576,7 +576,8 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   if (allResults.empty()) {
     resultType = clangCtx.VoidTy;
   } else {
-    resultType = Converter.convert(IGM, allResults[0].getType());
+    resultType = Converter.convert(IGM,
+                   allResults[0].getReturnValueType(IGM.getSILModule(), type));
     if (resultType.isNull())
       return clang::CanQualType();
   }
@@ -599,7 +600,8 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("block takes indirect parameter");
     }
-    auto param = Converter.convert(IGM, paramTy.getType());
+    auto param = Converter.convert(IGM,
+                             paramTy.getArgumentType(IGM.getSILModule(), type));
     if (param.isNull())
       return clang::CanQualType();
     paramTypes.push_back(param);
@@ -773,11 +775,13 @@ clang::CanQualType IRGenModule::getClangType(SILType type) {
   return getClangType(type.getASTType());
 }
 
-clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
-  auto clangType = getClangType(params.getSILStorageType());
+clang::CanQualType IRGenModule::getClangType(SILParameterInfo params,
+                                             CanSILFunctionType funcTy) {
+  auto paramTy = params.getSILStorageType(getSILModule(), funcTy);
+  auto clangType = getClangType(paramTy);
   // @block_storage types must be @inout_aliasable and have
   // special lowering
-  if (!params.getSILStorageType().is<SILBlockStorageType>()) {
+  if (!paramTy.is<SILBlockStorageType>()) {
     if (params.isIndirectMutating()) {
       return getClangASTContext().getPointerType(clangType);
     }

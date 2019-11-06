@@ -182,7 +182,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (!anchor)
         continue;
 
-      literalProtocol = TC.getLiteralProtocol(anchor);
+      literalProtocol =
+          TypeChecker::getLiteralProtocol(getASTContext(), anchor);
       if (literalProtocol)
         break;
     }
@@ -244,7 +245,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
-  result = TC.lookupMember(DC, base, name, lookupOptions);
+  result = TypeChecker::lookupMember(DC, base, name, lookupOptions);
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
@@ -746,7 +747,7 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
-                                             bool wantRValue) {
+                                             bool wantRValue) const {
 
   if (wantRValue)
     type = type->getRValueType();
@@ -824,11 +825,6 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
           return getType(param);
 
         if (!var->hasInterfaceType()) {
-          if (!var->isInvalid()) {
-            TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
-                        var->getDescriptiveKind(), var->getName());
-            var->setInterfaceType(ErrorType::get(getASTContext()));
-          }
           return ErrorType::get(TC.Context);
         }
 
@@ -1079,7 +1075,7 @@ static void bindArchetypesFromContext(
     if (parentDC->isTypeContext()) {
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
-        auto contextTy = cs.TC.Context.TheUnresolvedType;
+        auto contextTy = cs.getASTContext().TheUnresolvedType;
         bindPrimaryArchetype(selfTy, contextTy);
       }
       continue;
@@ -1603,7 +1599,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      Type &openedFullType) {
   assert(choice.getKind() == OverloadChoiceKind::Decl);
 
-  switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
+  switch (TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
     
@@ -1781,8 +1777,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // components.
   auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
                                           ConstraintLocator *locator) {
-    if (auto *hashable = TC.getProtocol(choice.getDecl()->getLoc(),
-                                        KnownProtocolKind::Hashable)) {
+    if (auto *hashable = TypeChecker::getProtocol(
+            argType->getASTContext(), choice.getDecl()->getLoc(),
+            KnownProtocolKind::Hashable)) {
       addConstraint(ConstraintKind::ConformsTo, argType,
                     hashable->getDeclaredType(),
                     getConstraintLocator(
@@ -1966,11 +1963,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
              "subscript always has one arg");
       auto argType = refFnType->getParams()[0].getPlainType();
 
-      auto &TC = getTypeChecker();
-
-      auto stringLiteral =
-          TC.getProtocol(choice.getDecl()->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral);
+      auto stringLiteral = TypeChecker::getProtocol(
+          getASTContext(), choice.getDecl()->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
       if (!stringLiteral)
         break;
 
@@ -2243,7 +2238,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
@@ -2259,7 +2254,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 }
 
 template <typename Fn>
-Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
+Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
+                      Fn getFixedTypeFn) {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
       return getFixedTypeFn(tvt);
@@ -2292,7 +2288,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
           return DependentMemberType::get(lookupBaseType, assocType);
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
-          proto, lookupBaseType, *conformance);
+            proto, lookupBaseType, conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
         if (!result->hasError())
           return result;
@@ -2305,7 +2301,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
   });
 }
 
-Type ConstraintSystem::simplifyType(Type type) {
+Type ConstraintSystem::simplifyType(Type type) const {
   if (!type->hasTypeVariable())
     return type;
 
@@ -2395,7 +2391,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = TC.Context.TypeCheckerDebug->getStream();
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
@@ -3000,11 +2996,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       path = path.slice(1);
       continue;
     }
-        
-    case ConstraintLocator::ExplicitTypeCoercion: {
-      path = path.slice(1);
-      continue;
-    }
 
     default:
       // FIXME: Lots of other cases to handle.
@@ -3083,9 +3074,10 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
 
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
-  if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
-    return bool(TypeChecker::conformsToProtocol(
-        type, proto, cs.DC, ConformanceCheckFlags::InExpression));
+  if (auto *proto =
+          TypeChecker::getProtocol(cs.getASTContext(), SourceLoc(), protocol))
+    return (bool)TypeChecker::conformsToProtocol(
+        type, proto, cs.DC, ConformanceCheckFlags::InExpression);
   return false;
 }
 
@@ -3095,17 +3087,17 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   auto &TC = cs.TC;
   auto *DC = cs.DC;
 
-  auto rawReprType =
-      TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  auto rawReprType = TypeChecker::getProtocol(
+      cs.getASTContext(), SourceLoc(), KnownProtocolKind::RawRepresentable);
   if (!rawReprType)
     return Type();
 
   auto conformance = TypeChecker::conformsToProtocol(
       type, rawReprType, DC, ConformanceCheckFlags::InExpression);
-  if (!conformance)
+  if (conformance.isInvalid())
     return Type();
 
-  return conformance->getTypeWitnessByName(type, TC.Context.Id_RawValue);
+  return conformance.getTypeWitnessByName(type, TC.Context.Id_RawValue);
 }
 
 Type constraints::isRawRepresentable(
@@ -3252,4 +3244,148 @@ bool constraints::isArgumentOfReferenceEqualityOperator(
     ConstraintLocator *locator) {
   return isOperatorArgument(locator, "===") ||
          isOperatorArgument(locator, "!==");
+}
+
+ConversionEphemeralness
+ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
+                                        ConstraintLocatorBuilder locator) {
+  switch (conversion) {
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::StringToPointer:
+    // Always ephemeral.
+    return ConversionEphemeralness::Ephemeral;
+  case ConversionRestrictionKind::InoutToPointer: {
+
+    // Ephemeral, except if the expression is a reference to a global or
+    // static stored variable, or a directly accessed stored property on such a
+    // variable.
+
+    auto isDirectlyAccessedStoredVar = [&](ValueDecl *decl) -> bool {
+      auto *asd = dyn_cast_or_null<AbstractStorageDecl>(decl);
+      if (!asd)
+        return false;
+
+      // Check what access strategy is used for a read-write access. It must be
+      // direct-to-storage in order for the conversion to be non-ephemeral.
+      auto access = asd->getAccessStrategy(
+          AccessSemantics::Ordinary, AccessKind::ReadWrite,
+          DC->getParentModule(), DC->getResilienceExpansion());
+      return access.getKind() == AccessStrategy::Storage;
+    };
+
+    SourceRange range;
+    auto *argLoc = simplifyLocator(*this, getConstraintLocator(locator), range);
+    auto *subExpr = argLoc->getAnchor()->getSemanticsProvidingExpr();
+
+    // Look through an InOutExpr if we have one. This is usually the case, but
+    // might not be if e.g we're applying an 'add missing &' fix.
+    if (auto *ioe = dyn_cast<InOutExpr>(subExpr))
+      subExpr = ioe->getSubExpr();
+
+    while (true) {
+      subExpr = subExpr->getSemanticsProvidingExpr();
+
+      // Look through force unwraps, which can be modelled as physical lvalue
+      // components.
+      if (auto *fve = dyn_cast<ForceValueExpr>(subExpr)) {
+        subExpr = fve->getSubExpr();
+        continue;
+      }
+
+      // Look through a member reference if it's directly accessed.
+      if (auto *ude = dyn_cast<UnresolvedDotExpr>(subExpr)) {
+        // FIXME: This is an O(N) search.
+        auto overload = findSelectedOverloadFor(ude);
+
+        // If we didn't find an overload, it hasn't been resolved yet.
+        if (!overload)
+          return ConversionEphemeralness::Unresolved;
+
+        // Tuple indices are always non-ephemeral.
+        auto *base = ude->getBase();
+        if (overload->Choice.getKind() == OverloadChoiceKind::TupleIndex) {
+          subExpr = base;
+          continue;
+        }
+
+        // If we don't have a directly accessed declaration associated with the
+        // choice, it's ephemeral.
+        auto *member = overload->Choice.getDeclOrNull();
+        if (!isDirectlyAccessedStoredVar(member))
+          return ConversionEphemeralness::Ephemeral;
+
+        // If we found a static member, the conversion is non-ephemeral. We can
+        // stop iterating as there's nothing interesting about the base.
+        if (member->isStatic())
+          return ConversionEphemeralness::NonEphemeral;
+
+        // For an instance member, the base must be an @lvalue struct type.
+        if (auto *lvt = simplifyType(getType(base))->getAs<LValueType>()) {
+          auto *nominal = lvt->getObjectType()->getAnyNominal();
+          if (nominal && isa<StructDecl>(nominal)) {
+            subExpr = base;
+            continue;
+          }
+        }
+        return ConversionEphemeralness::Ephemeral;
+      }
+
+      break;
+    }
+
+    auto getBaseEphemeralness =
+        [&](ValueDecl *base) -> ConversionEphemeralness {
+      // We must have a base decl that's directly accessed.
+      if (!isDirectlyAccessedStoredVar(base))
+        return ConversionEphemeralness::Ephemeral;
+
+      // The base decl must either be static or global in order for it to be
+      // non-ephemeral.
+      if (base->isStatic() || base->getDeclContext()->isModuleScopeContext()) {
+        return ConversionEphemeralness::NonEphemeral;
+      } else {
+        return ConversionEphemeralness::Ephemeral;
+      }
+    };
+
+    // Fast path: We have a direct decl ref.
+    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr))
+      return getBaseEphemeralness(dre->getDecl());
+
+    // Otherwise, try to find an overload for the base.
+    // FIXME: This is an O(N) search.
+    if (auto baseOverload = findSelectedOverloadFor(subExpr))
+      return getBaseEphemeralness(baseOverload->Choice.getDeclOrNull());
+
+    // If we didn't find a base overload for a unresolved member or overloaded
+    // decl, it hasn't been resolved yet.
+    if (isa<UnresolvedMemberExpr>(subExpr) ||
+        isa<OverloadedDeclRefExpr>(subExpr))
+      return ConversionEphemeralness::Unresolved;
+
+    // Otherwise, we don't know what we're dealing with. Default to ephemeral.
+    return ConversionEphemeralness::Ephemeral;
+  }
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    // @_nonEphemeral has no effect on these conversions, so treat them as all
+    // being non-ephemeral in order to allow their passing to an @_nonEphemeral
+    // parameter.
+    return ConversionEphemeralness::NonEphemeral;
+  }
 }

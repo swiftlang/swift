@@ -200,7 +200,7 @@ namespace {
       auto conformance = TypeChecker::conformsToProtocol(conformingType,
                                                          foundProto, DC,
                                                          conformanceOptions);
-      if (!conformance) {
+      if (conformance.isInvalid()) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
         // not a class constraint if any.
@@ -210,7 +210,7 @@ namespace {
         return;
       }
 
-      if (conformance->isAbstract()) {
+      if (conformance.isAbstract()) {
         assert(foundInType->is<ArchetypeType>() ||
                foundInType->isExistentialType());
         addResult(found);
@@ -219,7 +219,7 @@ namespace {
 
       // Dig out the witness.
       ValueDecl *witness = nullptr;
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
         witness = concrete->getTypeWitnessAndDecl(assocType)
           .second;
@@ -512,7 +512,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.

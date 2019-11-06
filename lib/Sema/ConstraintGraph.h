@@ -17,6 +17,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_GRAPH_H
 #define SWIFT_SEMA_CONSTRAINT_GRAPH_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -159,10 +160,9 @@ private:
   mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
 
   /// Print this graph node.
-  void print(llvm::raw_ostream &out, unsigned indent);
+  void print(llvm::raw_ostream &out, unsigned indent) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Verify the invariants of this node within the given constraint graph.
   void verify(ConstraintGraph &cg);
@@ -333,15 +333,15 @@ public:
   void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
   void dump(llvm::raw_ostream &out);
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  // FIXME: Potentially side-effectful.
+  SWIFT_DEBUG_HELPER(void dump());
 
   /// Print the connected components of the graph.
   void printConnectedComponents(ArrayRef<TypeVariableType *> typeVars,
                                 llvm::raw_ostream &out);
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dumpConnectedComponents() LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  // FIXME: Potentially side-effectful.
+  SWIFT_DEBUG_HELPER(void dumpConnectedComponents());
 
   /// Verify the invariants of the graph.
   void verify();

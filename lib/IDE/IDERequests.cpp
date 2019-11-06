@@ -486,7 +486,7 @@ private:
           // Unbox the brace statement to find its type.
           if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
             if (!BS->getElements().empty()) {
-              return resolveNodeType(BS->getElements().back(),
+              return resolveNodeType(BS->getLastElement(),
                                      RangeKind::SingleStatement);
             }
           }

@@ -117,14 +117,14 @@ struct ValueOwnershipKind {
     /// instruction exactly once along any path through the program.
     Guaranteed,
 
-    /// A SILValue with Any ownership kind is an independent value outside of
+    /// A SILValue with None ownership kind is an independent value outside of
     /// the ownership system. It is used to model trivially typed values as well
-    /// as trivial cases of non-trivial enums. Naturally Any can be merged with
+    /// as trivial cases of non-trivial enums. Naturally None can be merged with
     /// any ValueOwnershipKind allowing us to naturally model merge and branch
     /// points in the SSA graph.
-    Any,
+    None,
 
-    LastValueOwnershipKind = Any,
+    LastValueOwnershipKind = None,
   } Value;
 
   using UnderlyingType = std::underlying_type<innerty>::type;
@@ -167,7 +167,7 @@ struct ValueOwnershipKind {
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
     switch (Value) {
-    case ValueOwnershipKind::Any:
+    case ValueOwnershipKind::None:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
       return UseLifetimeConstraint::MustBeLive;
@@ -181,14 +181,14 @@ struct ValueOwnershipKind {
   /// that the two ownership kinds are "compatibile".
   ///
   /// The reason why we do not compare directy is to allow for
-  /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
+  /// ValueOwnershipKind::None to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
     return merge(other).hasValue();
   }
 
   template <typename RangeTy>
   static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
-    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::None);
     return accumulate(
         std::forward<RangeTy>(r), initial,
         [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
@@ -449,7 +449,7 @@ struct OperandOwnershipKindMap {
 
   /// Return the OperandOwnershipKindMap that tests for compatibility with
   /// ValueOwnershipKind kind. This means that it will accept a element whose
-  /// ownership is ValueOwnershipKind::Any.
+  /// ownership is ValueOwnershipKind::None.
   static OperandOwnershipKindMap
   compatibilityMap(ValueOwnershipKind kind, UseLifetimeConstraint constraint) {
     OperandOwnershipKindMap set;
@@ -519,7 +519,7 @@ struct OperandOwnershipKindMap {
 
   void addCompatibilityConstraint(ValueOwnershipKind kind,
                                   UseLifetimeConstraint constraint) {
-    add(ValueOwnershipKind::Any, UseLifetimeConstraint::MustBeLive);
+    add(ValueOwnershipKind::None, UseLifetimeConstraint::MustBeLive);
     add(kind, constraint);
   }
 
@@ -532,7 +532,7 @@ struct OperandOwnershipKindMap {
   UseLifetimeConstraint getLifetimeConstraint(ValueOwnershipKind kind) const;
 
   void print(llvm::raw_ostream &os) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

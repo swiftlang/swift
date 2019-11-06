@@ -39,6 +39,7 @@ import CString
 import CSVParsing
 import Calculator
 import CaptureProp
+import ChaCha
 import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
@@ -216,6 +217,7 @@ registerBenchmark(CString)
 registerBenchmark(CSVParsing)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
+registerBenchmark(ChaCha)
 registerBenchmark(ChainedFilterMap)
 registerBenchmark(CharacterLiteralsLarge)
 registerBenchmark(CharacterLiteralsSmall)

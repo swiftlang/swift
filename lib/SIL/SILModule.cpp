@@ -491,7 +491,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!Ret) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
                "witness for: ";
-               C.dump(); Requirement.dump());
+               C.dump(llvm::dbgs()); Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }
 

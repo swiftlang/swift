@@ -86,7 +86,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}  expected-error{{variable 'j' is not bound by any pattern}}
+for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -169,7 +169,7 @@ func rdar20142523() {
 func rdar21080030() {
   var s = "Hello"
   // SR-7599: This should be `cannot_call_non_function_value`
-  if s.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
+  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}} {{13-15=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -303,7 +303,7 @@ _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
 func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
-  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}} // expected-warning {{redundant cast to '(Double, Double)' has no effect}} {{56-75=}}
+  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}}
 }
 
 // Diagnose passing an array in lieu of variadic parameters
@@ -530,8 +530,8 @@ let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in c
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .svar() // expected-error {{static property 'svar' is not a function}}
-someColor = .svar(1) // expected-error {{static property 'svar' is not a function}}
+someColor = .svar() // expected-error {{cannot call value of non-function type 'Color'}}
+someColor = .svar(1) // expected-error {{cannot call value of non-function type 'Color'}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int
@@ -700,11 +700,10 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
 struct Radar21692808<Element> {
-  init(count: Int, value: Element) {}
+  init(count: Int, value: Element) {} // expected-note {{'init(count:value:)' declared here}}
 }
 func radar21692808() -> Radar21692808<Int> {
-  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, @escaping () -> Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
+  return Radar21692808<Int>(count: 1) { // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
     return 1
   }
 }

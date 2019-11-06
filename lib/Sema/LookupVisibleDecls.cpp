@@ -282,9 +282,6 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->isRecursiveValidation())
         return;
 
-      // FIXME: This is used to compute isInvalid() below.
-      (void) D->getInterfaceType();
-
       switch (D->getKind()) {
 #define DECL(ID, SUPER) \
       case DeclKind::ID:
@@ -430,8 +427,6 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-          // FIXME(InterfaceTypeRequest): Remove this.
-          (void)VD->getInterfaceType();
           if (auto *TypeResolver = VD->getASTContext().getLazyResolver()) {
             if (!NormalConformance->hasWitness(VD) &&
                 (Conformance->getDeclContext()->getParentSourceFile() !=
@@ -697,8 +692,10 @@ static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy)
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
     if (BaseTy->getClassOrBoundGenericClass()) {
       if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
-        auto *Superclass = Conformance->getConcrete()->getRootConformance()
-            ->getType()->getClassOrBoundGenericClass();
+        auto *Superclass = Conformance.getConcrete()
+                               ->getRootConformance()
+                               ->getType()
+                               ->getClassOrBoundGenericClass();
         return BaseTy->getSuperclassForDecl(Superclass);
       }
     }
@@ -763,9 +760,6 @@ public:
       if (VD->isRecursiveValidation())
         continue;
 
-      // FIXME: This is used to compute isInvalid() below.
-      (void) VD->getInterfaceType();
-
       auto &PossiblyConflicting = DeclsByName[VD->getBaseName()];
 
       if (VD->isInvalid()) {
@@ -808,9 +802,6 @@ public:
         auto *OtherVD = *I;
         if (OtherVD->isRecursiveValidation())
           continue;
-
-        // FIXME: This is used to compute isInvalid() below.
-        (void) OtherVD->getInterfaceType();
 
         if (OtherVD->isInvalid())
           continue;

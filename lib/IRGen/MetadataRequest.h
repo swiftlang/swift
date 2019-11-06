@@ -372,6 +372,18 @@ public:
   static llvm::Constant *getCompletedState(IRGenModule &IGM);
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const MetadataResponse &MR) {
+  if (!MR.isValid())
+    return OS;
+  OS << MR.getMetadata();
+  if (MR.hasDynamicState())
+    OS << MR.getDynamicState();
+  // FIXME
+  // OS << MR.getStaticLowerBoundOnState();
+  return OS;
+}
+
 inline bool
 DynamicMetadataRequest::isSatisfiedBy(MetadataResponse response) const {
   return isSatisfiedBy(response.getStaticLowerBoundOnState());

@@ -284,7 +284,7 @@ public:
 
   bool isTrivialNoEscapeParameter() const {
     auto ClosureParmFnTy =
-        getClosureParameterInfo().getType()->getAs<SILFunctionType>();
+        getClosureParameterInfo().getInterfaceType()->getAs<SILFunctionType>();
     return ClosureParmFnTy->isTrivialNoEscape();
   }
 
@@ -654,7 +654,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
                       : ParameterConvention::Direct_Owned;
     }
 
-    SILParameterInfo NewPInfo(PInfo.getType(), ParamConv);
+    SILParameterInfo NewPInfo(PInfo.getInterfaceType(), ParamConv);
     NewParameterInfoList.push_back(NewPInfo);
   }
 
@@ -665,11 +665,14 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getSubstGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
-      ClosureUserFunTy->getOptionalErrorResult(), M.getASTContext());
+      ClosureUserFunTy->getOptionalErrorResult(),
+      ClosureUserFunTy->getSubstitutions(),
+      ClosureUserFunTy->isGenericSignatureImplied(),
+      M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
@@ -1213,7 +1216,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
         // We currently only support copying intermediate reabastraction
         // closures if the closure is ultimately passed trivially.
-        bool IsClosurePassedTrivially = ClosureParamInfo.getType()
+        bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()
                                             ->isTrivialNoEscape();
         if (HaveUsedReabstraction &&  !IsClosurePassedTrivially)

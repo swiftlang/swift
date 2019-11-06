@@ -215,6 +215,10 @@ namespace swift {
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
 
+    /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
+    /// error.
+    bool DiagnoseInvalidEphemeralnessAsError = false;
+
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
 
