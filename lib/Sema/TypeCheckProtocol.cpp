@@ -2758,8 +2758,10 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           // because editor may assume the fixit is in the same file with the note.
           Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                          MissingTypeWitness->getName());
-          Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
-            fixItInsertAfter(FixitLocation, FixIt);
+          if (EditorMode) {
+            Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
+              .fixItInsertAfter(FixitLocation, FixIt);
+          }
         }
         continue;
       }
@@ -2772,15 +2774,17 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           // we can directly associate the fixit with the note issued to the
           // requirement.
           Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
-            VD->getFullName(), RequirementType, true).
-              fixItInsertAfter(FixitLocation, FixIt);
+            VD->getFullName(), RequirementType, true)
+              .fixItInsertAfter(FixitLocation, FixIt);
         } else {
           // Otherwise, we have to issue another note to carry the fixit,
           // because editor may assume the fixit is in the same file with the note.
           Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
             VD->getFullName(), RequirementType, false);
-          Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
-            fixItInsertAfter(FixitLocation, FixIt);
+          if (EditorMode) {
+            Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
+              .fixItInsertAfter(FixitLocation, FixIt);
+          }
         }
       } else {
         Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
@@ -5346,8 +5350,9 @@ namespace {
   class DefaultWitnessChecker : public WitnessChecker {
     
   public:
-    DefaultWitnessChecker(ASTContext &ctx, ProtocolDecl *proto)
-        : WitnessChecker(ctx, proto, proto->getDeclaredType(), proto) {}
+    DefaultWitnessChecker(ProtocolDecl *proto)
+        : WitnessChecker(proto->getASTContext(), proto,
+                         proto->getDeclaredType(), proto) {}
 
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
     void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -5393,7 +5398,7 @@ void DefaultWitnessChecker::recordWitness(
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
-  DefaultWitnessChecker checker(Context, proto);
+  DefaultWitnessChecker checker(proto);
 
   // Find the default for the given associated type.
   auto findAssociatedTypeDefault = [](AssociatedTypeDecl *assocType)

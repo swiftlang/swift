@@ -2323,7 +2323,7 @@ namespace {
           // Okay, now it should be safe to coerce the pattern.
           // Pull the top-level pattern back out.
           pattern = clause->getErrorPattern();
-          Type exnType = CS.TC.getExceptionType(CS.DC, clause->getCatchLoc());
+          Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
           if (!exnType)
             return false;
           if (CS.TC.coercePatternToType(pattern,

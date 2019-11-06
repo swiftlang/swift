@@ -410,14 +410,6 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
   return Type();
 }
 
-/// Find the standard type of exceptions.
-///
-/// We call this the "exception type" to try to avoid confusion with
-/// the AST's ErrorType node.
-Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  return Context.getErrorDecl()->getDeclaredType();
-}
-
 Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,

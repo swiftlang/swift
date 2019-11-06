@@ -2216,7 +2216,7 @@ static void typeCheckSynthesizedWrapperInitializer(
   const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
-    tc.contextualizeInitializer(initializerContext, initializer);
+    TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
   TypeChecker::checkPropertyWrapperErrorHandling(pbd, initializer);
 }
