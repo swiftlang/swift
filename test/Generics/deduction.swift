@@ -7,7 +7,9 @@
 func identity<T>(_ value: T) -> T { return value }
 
 func identity2<T>(_ value: T) -> T { return value }
+// expected-note@-1 {{candidate expects value of type 'X' for parameter #1}}
 func identity2<T>(_ value: T) -> Int { return 0 }
+// expected-note@-1 {{'identity2' produces 'Int', not the expected contextual result type 'X'}}
 
 struct X { }
 struct Y { }
@@ -23,7 +25,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
   xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
-  xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity2(yy) // expected-error{{no exact matches in call to global function 'identity2'}}
 }
 
 // FIXME: Crummy diagnostic!

@@ -774,6 +774,9 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto path = getLocator()->getPath();
 
+  auto fromType = getFromType();
+  auto toType = getToType();
+
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     if (isa<AssignExpr>(anchor)) {
@@ -810,6 +813,16 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::GenericArgument: {
+      // In cases like `[[Int]]` vs. `[[String]]`
+      if (auto *assignExpr = dyn_cast<AssignExpr>(anchor)) {
+        diagnostic = getDiagnosticFor(CTP_AssignSource);
+        fromType = getType(assignExpr->getSrc());
+        toType = getType(assignExpr->getDest());
+      }
+      break;
+    }
+
     default:
       return false;
     }
@@ -818,7 +831,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType());
+  emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
   emitNotesForMismatches();
   return true;
 }
@@ -1320,6 +1333,12 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
+    auto &TC = getTypeChecker();
+    // Let's check whether this is an attempt to assign
+    // variable or property to itself.
+    if (TC.diagnoseSelfAssignment(assignExpr))
+      return true;
+
     diagExpr = assignExpr->getDest();
   }
 
@@ -1414,6 +1433,58 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   AssignmentFailure failure(diagExpr, getConstraintSystem(), loc,
                             subElementDiagID, rvalueDiagID);
   return failure.diagnose();
+}
+
+static Decl *findSimpleReferencedDecl(const Expr *E) {
+  if (auto *LE = dyn_cast<LoadExpr>(E))
+    E = LE->getSubExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl();
+
+  return nullptr;
+}
+
+static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
+  E = E->getValueProvidingExpr();
+
+  if (auto *LE = dyn_cast<LoadExpr>(E))
+    return findReferencedDecl(LE->getSubExpr());
+
+  if (auto *AE = dyn_cast<AssignExpr>(E))
+    return findReferencedDecl(AE->getDest());
+
+  if (auto *D = findSimpleReferencedDecl(E))
+    return std::make_pair(nullptr, D);
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
+      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
+  }
+
+  return std::make_pair(nullptr, nullptr);
+}
+
+bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
+  auto *assignExpr = dyn_cast<AssignExpr>(expr);
+  if (!assignExpr)
+    return false;
+
+  auto *dstExpr = assignExpr->getDest();
+  auto *srcExpr = assignExpr->getSrc();
+
+  auto dstDecl = findReferencedDecl(dstExpr);
+  auto srcDecl = findReferencedDecl(srcExpr);
+
+  if (dstDecl.second && dstDecl == srcDecl) {
+    diagnose(expr->getLoc(), dstDecl.first ? diag::self_assignment_prop
+                                           : diag::self_assignment_var)
+        .highlight(dstExpr->getSourceRange())
+        .highlight(srcExpr->getSourceRange());
+    return true;
+  }
+
+  return false;
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
@@ -1700,7 +1771,9 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       return !storage->isSettable(nullptr) ||
              !storage->isSetterAccessibleFrom(DC);
 
-    return false;
+    // If this is not something which could possibly be mutable,
+    // then it's immutable.
+    return true;
   };
 
   // Provide specific diagnostics for assignment to subscripts whose base expr
@@ -1959,6 +2032,60 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
+  case ConstraintLocator::RValueAdjustment: {
+    auto &cs = getConstraintSystem();
+
+    auto overload = getChoiceFor(
+        cs.getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember));
+    if (!(overload && overload->choice.isDecl()))
+      return false;
+
+    auto *choice = overload->choice.getDecl();
+    auto fnType = FromType->getAs<FunctionType>();
+    if (!fnType) {
+      emitDiagnostic(anchor->getLoc(),
+                     diag::expected_result_in_contextual_member,
+                     choice->getFullName(), FromType, ToType);
+      return true;
+    }
+
+    // If member type is a function and contextual type matches
+    // its result type, most likely problem is related to a
+    // missing call e.g.:
+    //
+    // struct S {
+    //   static func foo() -> S {}
+    // }
+    //
+    // let _: S = .foo
+
+    auto params = fnType->getParams();
+
+    ParameterListInfo info(params, choice,
+                           hasAppliedSelf(cs, overload->choice));
+    auto numMissingArgs = llvm::count_if(
+        indices(params), [&info](const unsigned paramIdx) -> bool {
+          return !info.hasDefaultArgument(paramIdx);
+        });
+
+    if (numMissingArgs == 0 || numMissingArgs > 1) {
+      auto diagnostic = emitDiagnostic(
+          anchor->getLoc(), diag::expected_parens_in_contextual_member,
+          choice->getFullName());
+
+      // If there are no parameters we can suggest a fix-it
+      // to form an explicit call.
+      if (numMissingArgs == 0)
+        diagnostic.fixItInsertAfter(anchor->getEndLoc(), "()");
+    } else {
+      emitDiagnostic(anchor->getLoc(),
+                     diag::expected_argument_in_contextual_member,
+                     choice->getFullName(), params.front().getPlainType());
+    }
+
+    return true;
+  }
+
   default:
     return false;
   }
@@ -2157,6 +2284,9 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
   auto &TC = getTypeChecker();
+
+  if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
+    return false;
 
   auto *srcFT = FromType->getAs<FunctionType>();
   if (!srcFT || !srcFT->getParams().empty())
@@ -5702,3 +5832,66 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   emitSuggestionNotes();
   return true;
 }
+
+bool AssignmentTypeMismatchFailure::diagnoseMissingConformance() const {
+  auto srcType = getFromType();
+  auto dstType = getToType()->lookThroughAllOptionalTypes();
+
+  llvm::SmallPtrSet<ProtocolDecl *, 4> srcMembers;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> dstMembers;
+
+  auto retrieveProtocols = [](Type type,
+                              llvm::SmallPtrSetImpl<ProtocolDecl *> &members) {
+    if (auto *protocol = type->getAs<ProtocolType>())
+      members.insert(protocol->getDecl());
+
+    if (auto *composition = type->getAs<ProtocolCompositionType>()) {
+      for (auto member : composition->getMembers()) {
+        if (auto *protocol = member->getAs<ProtocolType>())
+          members.insert(protocol->getDecl());
+      }
+    }
+  };
+
+  retrieveProtocols(srcType, srcMembers);
+  retrieveProtocols(dstType, dstMembers);
+
+  if (srcMembers.empty() || dstMembers.empty())
+    return false;
+
+  // Let's check whether there is an overlap between source and destination.
+  for (auto *member : srcMembers)
+    dstMembers.erase(member);
+
+  if (dstMembers.size() == 1)
+    dstType = (*dstMembers.begin())->getDeclaredType();
+
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_convert_assign_protocol,
+                 srcType, dstType);
+  return true;
+}
+
+bool AssignmentTypeMismatchFailure::diagnoseAsError() {
+  if (diagnoseMissingConformance())
+    return true;
+
+  return ContextualFailure::diagnoseAsError();
+}
+
+bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
+  auto *anchor = getAnchor();
+  auto &cs = getConstraintSystem();
+
+  if (auto overload = getChoiceFor(cs.getConstraintLocator(anchor))) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl,
+                     diag::cannot_convert_candidate_result_to_contextual_type,
+                     decl->getFullName(), getFromType(), getToType());
+      return true;
+    }
+  }
+
+  return false;
+}
+

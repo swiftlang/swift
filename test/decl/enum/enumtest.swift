@@ -36,8 +36,8 @@ func test1a() -> unionSearchFlags {
 
 func test1b(_ b : Bool) {
   _ = 123
-  // FIXME
-  _ = .description == 1 // expected-error {{generic parameter 'Self' could not be inferred}}
+  _ = .description == 1 // expected-error {{instance member 'description' cannot be used on type 'Int'}}
+  // expected-error@-1 {{member 'description' in 'Int' produces result of type 'String', but context expects 'Int'}}
 }
 
 enum MaybeInt {

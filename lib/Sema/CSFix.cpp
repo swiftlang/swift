@@ -879,10 +879,25 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
 bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   auto *AE = cast<AssignExpr>(getAnchor());
+
+  // Let's check whether this is a situation of chained assignment where
+  // one of the steps in the chain is an assignment to self e.g.
+  // `let _ = { $0 = $0 = 42 }`. Assignment chaining results in
+  // type mismatch between result of the previous assignment and the next.
+  {
+    auto &TC = cs.getTypeChecker();
+    llvm::SaveAndRestore<AssignExpr *> anchor(AE);
+
+    do {
+      if (TC.diagnoseSelfAssignment(AE))
+        return true;
+    } while ((AE = dyn_cast_or_null<AssignExpr>(cs.getParentExpr(AE))));
+  }
+
   auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
                                                : CTP_AssignSource;
 
-  ContextualFailure failure(
+  AssignmentTypeMismatchFailure failure(
       root, cs, CTP, getFromType(), getToType(),
       cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
   return failure.diagnose(asNote);
