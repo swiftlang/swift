@@ -202,6 +202,12 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// Computes the runtime resource path relative to the given Swift
+  /// executable.
+  static void computeRuntimeResourcePathFromExecutablePath(
+      StringRef mainExecutablePath,
+      llvm::SmallString<128> &runtimeResourcePath);
+
   void setSDKPath(const std::string &Path);
 
   StringRef getSDKPath() const {

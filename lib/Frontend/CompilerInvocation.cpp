@@ -38,11 +38,17 @@ swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
 
+void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
+    StringRef mainExecutablePath, llvm::SmallString<128> &runtimeResourcePath) {
+  runtimeResourcePath.assign(mainExecutablePath);
+  llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /swift
+  llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /bin
+  llvm::sys::path::append(runtimeResourcePath, "lib", "swift");
+}
+
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
-  llvm::SmallString<128> LibPath(Path);
-  llvm::sys::path::remove_filename(LibPath); // Remove /swift
-  llvm::sys::path::remove_filename(LibPath); // Remove /bin
-  llvm::sys::path::append(LibPath, "lib", "swift");
+  llvm::SmallString<128> LibPath;
+  computeRuntimeResourcePathFromExecutablePath(Path, LibPath);
   setRuntimeResourcePath(LibPath.str());
 
   llvm::SmallString<128> DiagnosticDocsPath(Path);
