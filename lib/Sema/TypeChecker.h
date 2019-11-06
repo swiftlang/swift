@@ -568,9 +568,6 @@ private:
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
-  /// The index of the next response metavariable to bind to a REPL result.
-  unsigned NextResponseVariableIndex = 0;
-
   /// If non-zero, warn when a function body takes longer than this many
   /// milliseconds to type-check.
   ///
@@ -1000,7 +997,6 @@ public:
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
                            unsigned StartElem);
-  Identifier getNextResponseVariableName(DeclContext *DC);
 
   void typeCheckDecl(Decl *D);
 

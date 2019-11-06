@@ -123,24 +123,6 @@ void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
   addToBody(CallExpr::createImplicit(Context, DebugPrintlnFn, { ArgRef }, { }));
 }
 
-Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
-  llvm::SmallString<4> namebuf;
-  Identifier ident;
-
-  bool nameUsed = false;
-  do {
-    namebuf.clear();
-    llvm::raw_svector_ostream names(namebuf);
-    names << "r" << NextResponseVariableIndex++;
-
-    ident = Context.getIdentifier(names.str());
-    nameUsed = static_cast<bool>(lookupUnqualified(DC, ident, SourceLoc()));
-  } while (nameUsed);
-
-  return ident;
-}
-
-
 static VarDecl *getObviousDeclFromExpr(Expr *E) {
   // Ignore lvalue->rvalue and other implicit conversions.
   while (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
@@ -204,6 +186,10 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 namespace {
   class REPLChecker : public REPLContext {
     TopLevelContext &TLC;
+
+    /// The index of the next response metavariable to bind to a REPL result.
+    unsigned NextResponseVariableIndex = 0;
+
   public:
     REPLChecker(TypeChecker &TC, SourceFile &SF, TopLevelContext &TLC)
       : REPLContext(TC, SF), TLC(TLC) {}
@@ -212,6 +198,7 @@ namespace {
     void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
   private:
     void generatePrintOfExpression(StringRef name, Expr *E);
+    Identifier getNextResponseVariableName(DeclContext *DC);
   };
 } // end anonymous namespace
 
@@ -311,7 +298,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   E = TC.coerceToRValue(E);
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC.getNextResponseVariableName(&SF);
+  Identifier name = getNextResponseVariableName(&SF);
   VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, &SF);
@@ -350,7 +337,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   for (auto entryIdx : range(PBD->getNumPatternEntries())) {
     auto *entryInit = PBD->getInit(entryIdx);
     if (!entryInit) {
-      TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
+      PBD->diagnose(diag::repl_must_be_initialized);
       continue;
     }
 
@@ -384,7 +371,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     SF.Decls.pop_back();
 
     // Create the meta-variable, let the typechecker name it.
-    Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
+    Identifier name = getNextResponseVariableName(SF.getParentModule());
     VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false,
                                         VarDecl::Introducer::Let,
                                         /*IsCaptureList*/false,
@@ -409,20 +396,37 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     
     
     // Replace the initializer of PBD with a reference to our repl temporary.
-    Expr *E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(vd->getStartLoc()),
-                                     /*Implicit=*/true);
+    Expr *E = TypeChecker::buildCheckedRefExpr(vd, &SF,
+                                               DeclNameLoc(vd->getStartLoc()),
+                                               /*Implicit=*/true);
     E = TC.coerceToRValue(E);
     PBD->setInit(entryIdx, E);
     SF.Decls.push_back(PBTLCD);
     
     // Finally, print out the result, by referring to the repl temp.
-    E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(vd->getStartLoc()),
-                               /*Implicit=*/true);
+    E = TypeChecker::buildCheckedRefExpr(vd, &SF,
+                                         DeclNameLoc(vd->getStartLoc()),
+                                         /*Implicit=*/true);
     generatePrintOfExpression(PatternString, E);
   }
 }
 
+Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
+  llvm::SmallString<4> namebuf;
+  Identifier ident;
 
+  bool nameUsed = false;
+  do {
+    namebuf.clear();
+    llvm::raw_svector_ostream names(namebuf);
+    names << "r" << NextResponseVariableIndex++;
+
+    ident = Context.getIdentifier(names.str());
+    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, ident, SourceLoc());
+  } while (nameUsed);
+
+  return ident;
+}
 
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and

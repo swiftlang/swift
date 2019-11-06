@@ -431,7 +431,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
-        TC.contextualizeTopLevelCode(TLC, TLCD);
+        TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
       } else {
         TC.typeCheckDecl(D);
       }
