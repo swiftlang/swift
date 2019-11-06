@@ -233,13 +233,14 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundAssertStmt': 229,
     'SomeType': 230,
     'CustomAttribute': 231,
-    'DifferentiableAttributeArguments': 232,
-    'DifferentiationParamsClause': 233,
-    'DifferentiationParams': 234,
-    'DifferentiationParamList': 235,
-    'DifferentiationParam': 236,
-    'DifferentiableAttributeFuncSpecifier': 237,
-    'FunctionDeclName': 238,
+    'GenericRequirement': 232,
+    'DifferentiableAttributeArguments': 233,
+    'DifferentiationParamsClause': 234,
+    'DifferentiationParams': 235,
+    'DifferentiationParamList': 236,
+    'DifferentiationParam': 237,
+    'DifferentiableAttributeFuncSpecifier': 238,
+    'FunctionDeclName': 239,
 }
 
 
