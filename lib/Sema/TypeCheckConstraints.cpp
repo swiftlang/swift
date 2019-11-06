@@ -3288,10 +3288,10 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   return (kind != CheckedCastKind::Unresolved);
 }
 
-Expr *TypeChecker::addImplicitLoadExpr(
-    Expr *expr,
-    std::function<Type(Expr *)> getType,
-    std::function<void(Expr *, Type)> setType) {
+Expr *
+TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
+                                 std::function<Type(Expr *)> getType,
+                                 std::function<void(Expr *, Type)> setType) {
   class LoadAdder : public ASTWalker {
   private:
     using GetTypeFn = std::function<Type(Expr *)>;
@@ -3340,9 +3340,10 @@ Expr *TypeChecker::addImplicitLoadExpr(
   return expr->walk(LoadAdder(Context, getType, setType));
 }
 
-Expr *TypeChecker::coerceToRValue(Expr *expr,
-                               llvm::function_ref<Type(Expr *)> getType,
-                               llvm::function_ref<void(Expr *, Type)> setType) {
+Expr *
+TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
+                            llvm::function_ref<Type(Expr *)> getType,
+                            llvm::function_ref<void(Expr *, Type)> setType) {
   Type exprTy = getType(expr);
 
   // If expr has no type, just assume it's the right expr.
@@ -3355,7 +3356,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
   // Walk into force optionals and coerce the source.
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
-    auto sub = coerceToRValue(FVE->getSubExpr(), getType, setType);
+    auto sub = coerceToRValue(Context, FVE->getSubExpr(), getType, setType);
     FVE->setSubExpr(sub);
     setType(FVE, getType(sub)->getOptionalObjectType());
     return FVE;
@@ -3363,7 +3364,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
-    auto sub =  coerceToRValue(paren->getSubExpr(), getType, setType);
+    auto sub =  coerceToRValue(Context, paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
     setType(paren, ParenType::get(Context, getType(sub)));
     return paren;
@@ -3371,7 +3372,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
   // Walk into 'try' and 'try!' expressions to update the subexpression.
   if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
-    auto sub = coerceToRValue(tryExpr->getSubExpr(), getType, setType);
+    auto sub = coerceToRValue(Context, tryExpr->getSubExpr(), getType, setType);
     tryExpr->setSubExpr(sub);
     if (isa<OptionalTryExpr>(tryExpr) && !getType(sub)->hasError())
       setType(tryExpr, OptionalType::get(getType(sub)));
@@ -3386,7 +3387,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
     for (auto &elt : tuple->getElements()) {
       // Materialize the element.
       auto oldType = getType(elt);
-      elt = coerceToRValue(elt, getType, setType);
+      elt = coerceToRValue(Context, elt, getType, setType);
 
       // If the type changed at all, make a note of it.
       if (getType(elt).getPointer() != oldType.getPointer()) {
@@ -3411,7 +3412,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
   // Load lvalues.
   if (exprTy->is<LValueType>())
-    return addImplicitLoadExpr(expr, getType, setType);
+    return addImplicitLoadExpr(Context, expr, getType, setType);
 
   // Nothing to do.
   return expr;

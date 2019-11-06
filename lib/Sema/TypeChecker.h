@@ -1423,21 +1423,21 @@ public:
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
-  Expr *coerceToRValue(Expr *expr,
-                       llvm::function_ref<Type(Expr *)> getType
-                         = [](Expr *expr) { return expr->getType(); },
-                       llvm::function_ref<void(Expr *, Type)> setType
-                         = [](Expr *expr, Type type) {
-                           expr->setType(type);
-                         });
+  static Expr *coerceToRValue(
+      ASTContext &Context, Expr *expr,
+      llvm::function_ref<Type(Expr *)> getType =
+          [](Expr *expr) { return expr->getType(); },
+      llvm::function_ref<void(Expr *, Type)> setType =
+          [](Expr *expr, Type type) { expr->setType(type); });
 
   /// Add implicit load expression to given AST, this is sometimes
   /// more complicated than simplify wrapping given root in newly created
   /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
   /// only at certain positions in AST.
-  Expr *addImplicitLoadExpr(Expr *expr,
-                            std::function<Type(Expr *)> getType,
-                            std::function<void(Expr *, Type)> setType);
+  static Expr *
+  addImplicitLoadExpr(ASTContext &Context, Expr *expr,
+                      std::function<Type(Expr *)> getType,
+                      std::function<void(Expr *, Type)> setType);
 
   /// Require that the library intrinsics for working with Optional<T>
   /// exist.

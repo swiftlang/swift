@@ -5981,9 +5981,8 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
 }
 
 static Expr *addImplicitLoadExpr(ConstraintSystem &cs, Expr *expr) {
-  auto &tc = cs.getTypeChecker();
-  return tc.addImplicitLoadExpr(
-      expr, [&cs](Expr *expr) { return cs.getType(expr); },
+  return TypeChecker::addImplicitLoadExpr(
+      cs.getASTContext(), expr, [&cs](Expr *expr) { return cs.getType(expr); },
       [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
 }
 
@@ -7374,14 +7373,9 @@ namespace {
 } // end anonymous namespace
 
 Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
-  auto &tc = getTypeChecker();
-  return tc.coerceToRValue(expr,
-                           [&](Expr *expr) {
-                             return getType(expr);
-                           },
-                           [&](Expr *expr, Type type) {
-                             setType(expr, type);
-                           });
+  return TypeChecker::coerceToRValue(
+      getASTContext(), expr, [&](Expr *expr) { return getType(expr); },
+      [&](Expr *expr, Type type) { setType(expr, type); });
 }
 
 /// Emit the fixes computed as part of the solution, returning true if we were

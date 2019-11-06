@@ -1284,7 +1284,8 @@ public:
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
     auto limitExhaustivityChecks = !resultTy;
-    if (Expr *newSubjectExpr = TC.coerceToRValue(subjectExpr))
+    if (Expr *newSubjectExpr =
+            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
       subjectExpr = newSubjectExpr;
     switchStmt->setSubjectExpr(subjectExpr);
     Type subjectType = switchStmt->getSubjectExpr()->getType();
