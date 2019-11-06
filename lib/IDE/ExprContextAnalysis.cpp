@@ -91,12 +91,6 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 } // anonymous namespace
 
 void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
-  // Lookup the swift module.  This ensures that we record all known
-  // protocols in the AST.
-  (void) DC->getASTContext().getStdlibModule();
-
-  bindExtensions(*DC->getParentSourceFile());
-
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
 
