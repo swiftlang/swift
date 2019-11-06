@@ -885,41 +885,6 @@ bool EscapeAnalysis::ConnectionGraph::forwardTraverseDefer(
   return true;
 }
 
-// Follow transitive pointsTo edges from \p startNode.
-// This path may not contain cycles.
-template <typename CGNodeVisitor>
-bool EscapeAnalysis::ConnectionGraph::forwardTraversePointsToEdges(
-    CGNode *startNode, CGNodeVisitor &&visitor) {
-  CGNodeWorklist visitedNodes(this);
-  CGNode *pointer = startNode;
-  while ((pointer = pointer->getPointsToEdge())) {
-    if (!visitedNodes.tryPush(pointer))
-      return true;
-
-    if (!visitor(pointer)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// Returns the last content node in the chain of pointsTo edges pointed to by
-// this node.
-//
-// If this node has no content, return the node itself. If has content or is
-// already a content follow the chain of pointsTo edges and return the last
-// content node in the chain.
-CGNode *EscapeAnalysis::ConnectionGraph::getPointsToEnd(CGNode *node) {
-  CGNode *content = node->isContent() ? node : node->getContentNodeOrNull();
-  if (!content)
-    return node;
-  forwardTraversePointsToEdges(content, [&](CGNode *pointsTo) {
-    content = pointsTo;
-    return true;
-  });
-  return content;
-}
-
 bool EscapeAnalysis::ConnectionGraph::mayReach(CGNode *pointer,
                                                CGNode *pointee) {
   if (pointer == pointee)

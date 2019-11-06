@@ -750,16 +750,6 @@ public:
     template <typename CGNodeVisitor>
     bool forwardTraverseDefer(CGNode *startNode, CGNodeVisitor &&visitor);
 
-    /// Follow transitive pointsTo edges from \p startNode. Return true if \p
-    /// visitor returns true for all visited nodes.
-    template <typename CGNodeVisitor>
-    bool forwardTraversePointsToEdges(CGNode *startNode,
-                                      CGNodeVisitor &&visitor);
-
-    // Returns the last content node in the chain of pointsTo edges pointed to
-    // by this node.
-    CGNode *getPointsToEnd(CGNode *node);
-
     /// Return true if \p pointer may indirectly point to \pointee via pointers
     /// and object references.
     bool mayReach(CGNode *pointer, CGNode *pointee);
