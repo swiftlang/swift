@@ -256,7 +256,7 @@
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-10-31-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-10-31-a",
                 "swift-syntax": "ed002604feb028333e9fe3612cadc8ace8c4e3ec",
-                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2019-10-31-a",
+                "swift-stress-tester": "25bf842a7fd6b0b62791231c93e50a9feecbaf77",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2019-10-31-a",
                 "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2019-10-31-a",
                 "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2019-10-31-a",
