@@ -397,7 +397,10 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \SubscriptDefaults1.[bool: false, 0, 0]
   
   _ = \SubscriptDefaults2.[]
+  _ = \SubscriptDefaults2.[0]
+  
   _ = \SubscriptDefaults3.[]
+  _ = \SubscriptDefaults3.[0]
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}subclass_generics

@@ -5399,7 +5399,8 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
       // Otherwise, create a call of the default argument generator.
       } else {
-        const ParamDecl *defaultParam = getParameterAt(cast<ValueDecl>(callee.getDecl()), newArgs.size());
+        const ParamDecl *defaultParam = getParameterAt(callee.getDecl(),
+                                                       newArgs.size());
         defArg = defaultParam->getDefaultValue();
 
         if (defArg == nullptr) {
