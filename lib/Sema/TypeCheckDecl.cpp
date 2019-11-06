@@ -1089,13 +1089,21 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
     // If we implement the ability for extensions defined in the same module
     // (or the same file) to add vtable entries, we can re-evaluate this
     // restriction.
-    if (dyn_cast<ClassDecl>(nominal) &&
-        !decl->isSynthesized() && isa<ExtensionDecl>(decl->getDeclContext()) &&
+    if (isa<ClassDecl>(nominal) && !decl->isSynthesized() &&
+        isa<ExtensionDecl>(decl->getDeclContext()) &&
         !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
-      diags.diagnose(decl->getLoc(), diag::designated_init_in_extension,
-                     nominal->getName())
-        .fixItInsert(decl->getLoc(), "convenience ");
-      return CtorInitializerKind::Convenience;
+      if (cast<ClassDecl>(nominal)->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        diags.diagnose(decl->getLoc(),
+                       diag::cfclass_designated_init_in_extension,
+                       nominal->getName());
+        return CtorInitializerKind::Designated;
+      } else {
+        diags.diagnose(decl->getLoc(),
+                       diag::designated_init_in_extension,
+                       nominal->getName())
+            .fixItInsert(decl->getLoc(), "convenience ");
+        return CtorInitializerKind::Convenience;
+      }
     }
 
     if (decl->getDeclContext()->getExtendedProtocolDecl()) {

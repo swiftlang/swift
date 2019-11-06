@@ -2929,6 +2929,9 @@ ERROR(delegating_designated_init,none,
       "designated initializer for %0 cannot delegate (with 'self.init'); "
       "did you mean this to be a convenience initializer?",
       (Type))
+ERROR(delegating_designated_init_in_extension,none,
+      "designated initializer for %0 cannot delegate (with 'self.init')",
+      (Type))
 NOTE(delegation_here,none, "delegation occurs here", ())
 ERROR(chain_convenience_init,none,
       "must call a designated initializer of the superclass %0",
@@ -2956,6 +2959,9 @@ ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (DeclName))
+ERROR(cfclass_designated_init_in_extension,none,
+      "designated initializer cannot be declared in an extension of %0",
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
@@ -2965,7 +2971,6 @@ ERROR(nonclass_convenience_init,none,
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
-
 ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "
       "a 'required' initializer", (Type))
