@@ -52,8 +52,10 @@
 using namespace swift;
 
 TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
-  (void)ctx.createLazyResolverIfMissing<TypeChecker>();
-  return *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  assert(!ctx.getLegacyGlobalTypeChecker() &&
+         "Cannot install more than one instance of the global type checker!");
+  ctx.installGlobalTypeChecker(new TypeChecker(ctx));
+  return *ctx.getLegacyGlobalTypeChecker();
 }
 
 TypeChecker::TypeChecker(ASTContext &Ctx)
@@ -729,6 +731,8 @@ bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
 }
 
 TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
+  if (auto *TC = Ctx.getLegacyGlobalTypeChecker())
+    return *TC;
   return TypeChecker::createForContext(Ctx);
 }
 

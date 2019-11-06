@@ -3768,9 +3768,9 @@ bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, GenericSignature sig,
     SubstitutionMap Substitutions, bool isExtension) {
 
-  TypeChecker &TC = createTypeChecker(DC->getASTContext());
+  auto *TC = DC->getASTContext().getLegacyGlobalTypeChecker();
   ConstraintSystemOptions Options;
-  ConstraintSystem CS(TC, const_cast<DeclContext *>(DC), Options);
+  ConstraintSystem CS(*TC, const_cast<DeclContext *>(DC), Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 
   // For every requirement, add a constraint.
@@ -3793,9 +3793,10 @@ bool swift::areGenericRequirementsSatisfied(
 bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
                        ConstraintKind kind, DeclContext *dc) {
   std::unique_ptr<TypeChecker> CreatedTC;
-  auto &TC = TypeChecker::createForContext(dc->getASTContext());
-  return TC.typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
-                                   /*unwrappedIUO=*/nullptr);
+  auto *TC = dc->getASTContext().getLegacyGlobalTypeChecker();
+  assert(TC && "Must have type checker to make semantic query!");
+  return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
+                                    /*unwrappedIUO=*/nullptr);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
@@ -3841,8 +3842,9 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
-  auto &TC = TypeChecker::createForContext(DC.getASTContext());
-  ConstraintSystem CS(TC, &DC, None);
+  auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
+  assert(TC && "Must have type checker to make global query!");
+  ConstraintSystem CS(*TC, &DC, None);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(

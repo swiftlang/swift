@@ -1589,7 +1589,6 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   auto &ctx = getASTContext();
-  auto typeResolver = ctx.getLazyResolver();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
@@ -1599,7 +1598,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved implicit members, if we need them.
-    if (typeResolver) {
+    if (ctx.getLegacyGlobalTypeChecker()) {
       current->synthesizeSemanticMembersIfNeeded(member);
       installPropertyWrapperMembersIfNeeded(current, member);
     }

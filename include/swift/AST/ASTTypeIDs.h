@@ -51,9 +51,11 @@ enum class ResilienceExpansion : unsigned;
 class Type;
 class ValueDecl;
 class VarDecl;
+class Witness;
 class TypeAliasDecl;
 class Type;
 struct TypePair;
+struct TypeWitnessAndDecl;
 enum class AncestryFlags : uint8_t;
 enum class ImplicitMemberAction : uint8_t;
 

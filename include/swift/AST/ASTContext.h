@@ -70,7 +70,6 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -102,6 +101,7 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
+  class TypeChecker;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
@@ -404,28 +404,14 @@ public:
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
-  /// Creates a new lazy resolver by passing the ASTContext and the other
-  /// given arguments to a newly-allocated instance of \c ResolverType.
-  ///
-  /// \returns true if a new lazy resolver was created, false if there was
-  /// already a lazy resolver registered.
-  template<typename ResolverType, typename ... Args>
-  bool createLazyResolverIfMissing(Args && ...args) {
-    if (getLazyResolver())
-      return false;
-
-    setLazyResolver(new ResolverType(*this, std::forward<Args>(args)...));
-    return true;
-  }
-
-  /// Retrieve the lazy resolver for this context.
-  LazyResolver *getLazyResolver() const;
-
 private:
-  /// Set the lazy resolver for this context.
-  void setLazyResolver(LazyResolver *resolver);
+  friend class TypeChecker;
 
+  void installGlobalTypeChecker(TypeChecker *TC);
 public:
+  /// Retrieve the global \c TypeChecker instance associated with this context.
+  TypeChecker *getLegacyGlobalTypeChecker() const;
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;

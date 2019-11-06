@@ -174,7 +174,7 @@ Type TypeResolution::resolveDependentMemberType(
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
+    TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
     TypoCorrectionResults corrections(tc, ref->getIdentifier(),
                                       DeclNameLoc(ref->getIdLoc()));
     tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
