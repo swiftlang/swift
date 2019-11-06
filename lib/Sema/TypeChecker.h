@@ -1014,7 +1014,7 @@ public:
                                           ReferenceOwnershipAttr *attr);
 
   /// Infer default value witnesses for all requirements in the given protocol.
-  void inferDefaultWitnesses(ProtocolDecl *proto);
+  static void inferDefaultWitnesses(ProtocolDecl *proto);
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
@@ -1234,7 +1234,7 @@ public:
   ///
   /// \param decl The declaration to be type-checked. This process will not
   /// modify the declaration.
-  void checkDeclCircularity(NominalTypeDecl *decl);
+  static void checkDeclCircularity(NominalTypeDecl *decl);
 
   /// Type check whether the given switch statement exhaustively covers
   /// its domain.
