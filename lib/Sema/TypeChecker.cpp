@@ -718,8 +718,8 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeChecker &TC = createTypeChecker(Ctx);
-  return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  (void)createTypeChecker(Ctx);
+  return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

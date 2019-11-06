@@ -981,8 +981,8 @@ public:
   /// of the function, set the result type of the expression to that sugar type.
   static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                          SourceLoc EndTypeCheckLoc);
+  static bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                                 SourceLoc EndTypeCheckLoc);
   static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
   static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
@@ -1791,7 +1791,7 @@ public:
   ///
   /// An ignored expression is one that is not nested within a larger
   /// expression or statement.
-  void checkIgnoredExpr(Expr *E);
+  static void checkIgnoredExpr(Expr *E);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.
