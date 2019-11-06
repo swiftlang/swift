@@ -371,8 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> ([String : String], _)' expects 1 argument, but 2 were used in closure body}}
-  // expected-error@-1:13 {{cannot assign value of type '([String : String], _)?' to type '[(String, String)]?'}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
 }
 
 
