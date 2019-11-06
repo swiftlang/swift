@@ -7211,7 +7211,7 @@ namespace {
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
-        cs.getTypeChecker().coerceParameterListToType(params, closure, fnType);
+        TypeChecker::coerceParameterListToType(params, closure, fnType);
 
         // If this closure had a function builder applied, rewrite it to a
         // closure with a single expression body containing the builder
