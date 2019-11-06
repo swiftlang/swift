@@ -1154,15 +1154,17 @@ namespace {
                 return finish(true, expr);
 
               if (isa<SubscriptExpr>(call->getSecond())) {
-                TC.diagnose(expr->getStartLoc(),
-                            diag::cannot_pass_inout_arg_to_subscript);
+                getASTContext().Diags.diagnose(
+                    expr->getStartLoc(),
+                    diag::cannot_pass_inout_arg_to_subscript);
                 return finish(false, nullptr);
               }
             }
           }
         }
 
-        TC.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
+        getASTContext().Diags.diagnose(expr->getStartLoc(),
+                                       diag::extraneous_address_of);
         return finish(false, nullptr);
       }
 
@@ -1648,7 +1650,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
     if (!AE->isFolded()) return nullptr;
 
-    auto diagnoseMissingParens = [](TypeChecker &TC, TypeRepr *tyR) {
+    auto diagnoseMissingParens = [](DiagnosticEngine &DE, TypeRepr *tyR) {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
         if (Void->getIdentifier().str() == "Void") {
@@ -1657,16 +1659,17 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       }
 
       if (isVoid) {
-        TC.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+        DE.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
             .fixItReplace(tyR->getStartLoc(), "()");
       } else {
-        TC.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+        DE.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
             .highlight(tyR->getSourceRange())
             .fixItInsert(tyR->getStartLoc(), "(")
             .fixItInsertAfter(tyR->getEndLoc(), ")");
       }
     };
 
+    auto &DE = getASTContext().Diags;
     auto extractInputTypeRepr = [&](Expr *E) -> TupleTypeRepr * {
       if (!E)
         return nullptr;
@@ -1674,7 +1677,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         auto ArgRepr = TyE->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
-        diagnoseMissingParens(TC, ArgRepr);
+        diagnoseMissingParens(DE, ArgRepr);
         return TupleTypeRepr::create(getASTContext(), {ArgRepr},
                                      ArgRepr->getSourceRange());
       }
@@ -1689,7 +1692,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         auto ArgRepr = ArgsTypeExpr->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
-        diagnoseMissingParens(TC, ArgRepr);
+        diagnoseMissingParens(DE, ArgRepr);
         return TupleTypeRepr::create(getASTContext(), {ArgRepr},
                                      ArgRepr->getSourceRange());
       }
@@ -1715,7 +1718,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     TupleTypeRepr *ArgsTypeRepr = extractInputTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
-      TC.diagnose(AE->getArgsExpr()->getLoc(),
+      DE.diagnose(AE->getArgsExpr()->getLoc(),
                   diag::expected_type_before_arrow);
       auto ArgRange = AE->getArgsExpr()->getSourceRange();
       auto ErrRepr = new (getASTContext()) ErrorTypeRepr(ArgRange);
@@ -1725,7 +1728,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
-      TC.diagnose(AE->getResultExpr()->getLoc(),
+      DE.diagnose(AE->getResultExpr()->getLoc(),
                   diag::expected_type_after_arrow);
       ResultTypeRepr = new (getASTContext())
           ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
@@ -1802,6 +1805,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   TypeRepr *rootType = nullptr;
   SmallVector<KeyPathExpr::Component, 4> components;
+  auto &DE = getASTContext().Diags;
 
   // Pre-order visit of a sequence foo.bar[0]?.baz, which means that the
   // components are pushed in reverse order.
@@ -1863,10 +1867,10 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
           // \(<expr>) may be an attempt to write a string interpolation outside
           // of a string literal; diagnose this case specially.
           if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
-            TC.diagnose(expr->getLoc(),
+            DE.diagnose(expr->getLoc(),
                         diag::expr_string_interpolation_outside_string);
           } else {
-            TC.diagnose(expr->getLoc(),
+            DE.diagnose(expr->getLoc(),
                         diag::expr_swift_keypath_invalid_component);
           }
         }
@@ -1890,7 +1894,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
       } else {
         // FIXME: Probably better to catch this case earlier and force-eval as
         // TypeExpr.
-        TC.diagnose(root->getLoc(),
+        DE.diagnose(root->getLoc(),
                     diag::expr_swift_keypath_not_starting_with_type);
 
         // Traverse this path for recovery purposes: it may be a typo like
@@ -1905,7 +1909,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   // Key paths must be spelled with at least one component.
   if (components.empty()) {
-    TC.diagnose(KPE->getLoc(), diag::expr_swift_keypath_empty);
+    DE.diagnose(KPE->getLoc(), diag::expr_swift_keypath_empty);
     // Passes further down the pipeline expect keypaths to always have at least
     // one component, so stuff an invalid component in the AST for recovery.
     components.push_back(KeyPathExpr::Component());
@@ -1920,7 +1924,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   // If constructor call is expected to produce an optional let's not attempt
   // this optimization because literal initializers aren't failable.
-  if (!TC.getLangOpts().isSwiftVersionAtLeast(5)) {
+  if (!getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
     if (!ExprStack.empty()) {
       auto *parent = ExprStack.back();
       if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))

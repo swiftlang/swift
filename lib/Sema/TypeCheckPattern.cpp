@@ -844,7 +844,7 @@ namespace {
 //   1b. pat
 // type ~ ((T1, ..., Tn)) (n >= 2)
 //   2. pat ~ (P1, ..., Pm) (m >= 2)
-void implicitlyUntuplePatternIfApplicable(TypeChecker *TC,
+void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
                                           Pattern *&enumElementInnerPat,
                                           Type enumPayloadType) {
   if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
@@ -853,20 +853,20 @@ void implicitlyUntuplePatternIfApplicable(TypeChecker *TC,
       auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
       if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
         if (tuplePattern->getNumElements() >= 2) {
-          TC->diagnose(tuplePattern->getLoc(),
-                       diag::matching_tuple_pattern_with_many_assoc_values);
+          DE.diagnose(tuplePattern->getLoc(),
+                      diag::matching_tuple_pattern_with_many_assoc_values);
           enumElementInnerPat = semantic;
         }
       } else {
-        TC->diagnose(enumElementInnerPat->getLoc(),
-                     diag::matching_pattern_with_many_assoc_values);
+        DE.diagnose(enumElementInnerPat->getLoc(),
+                    diag::matching_pattern_with_many_assoc_values);
       }
     }
   } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
     if (tupleType->getNumElements() >= 2
         && enumElementInnerPat->getKind() == PatternKind::Tuple)
-      TC->diagnose(enumElementInnerPat->getLoc(),
-                   diag::matching_many_patterns_with_tupled_assoc_value);
+      DE.diagnose(enumElementInnerPat->getLoc(),
+                  diag::matching_many_patterns_with_tupled_assoc_value);
   }
 }
 }
@@ -1361,7 +1361,7 @@ recur:
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
 
-      ::implicitlyUntuplePatternIfApplicable(this, sub, elementType);
+      ::implicitlyUntuplePatternIfApplicable(Context.Diags, sub, elementType);
 
       if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
