@@ -2218,13 +2218,13 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   return SelfAccessKind::NonMutating;
 }
 
-/// Check the requirements in the where clause of the given \c source
+/// Check the requirements in the where clause of the given \c atd
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
-                                          TypeDecl *source) {
-  WhereClauseOwner(source).visitRequirements(
+                                          AssociatedTypeDecl *atd) {
+  WhereClauseOwner(atd).visitRequirements(
       TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
+      [proto](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
