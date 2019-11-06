@@ -904,6 +904,19 @@ public:
   /// Each kind and SourceFile has its own cache for a Type.
   Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
 
+public:
+  /// Require that the library intrinsics for working with Optional<T>
+  /// exist.
+  bool requireOptionalIntrinsics(SourceLoc loc);
+
+  /// Require that the library intrinsics for working with
+  /// UnsafeMutablePointer<T> exist.
+  bool requirePointerArgumentIntrinsics(SourceLoc loc);
+
+  /// Require that the library intrinsics for creating
+  /// array literals exist.
+  bool requireArrayLiteralIntrinsics(SourceLoc loc);
+
 private:
   friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);

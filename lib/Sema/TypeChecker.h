@@ -1439,18 +1439,6 @@ public:
                       std::function<Type(Expr *)> getType,
                       std::function<void(Expr *, Type)> setType);
 
-  /// Require that the library intrinsics for working with Optional<T>
-  /// exist.
-  bool requireOptionalIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for working with
-  /// UnsafeMutablePointer<T> exist.
-  bool requirePointerArgumentIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for creating
-  /// array literals exist.
-  bool requireArrayLiteralIntrinsics(SourceLoc loc);
-
   /// Determine whether the given type contains the given protocol.
   ///
   /// \param DC The context in which to check conformance. This affects, for

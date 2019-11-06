@@ -4622,6 +4622,30 @@ void ASTContext::setSideCachedPropertyWrapperBackingPropertyType(
   getImpl().PropertyWrapperBackingVarTypes[var] = type;
 }
 
+bool ASTContext::requireOptionalIntrinsics(SourceLoc loc) {
+  if (hasOptionalIntrinsics())
+    return false;
+
+  Diags.diagnose(loc, diag::optional_intrinsics_not_found);
+  return true;
+}
+
+bool ASTContext::requirePointerArgumentIntrinsics(SourceLoc loc) {
+  if (hasPointerArgumentIntrinsics())
+    return false;
+
+  Diags.diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  return true;
+}
+
+bool ASTContext::requireArrayLiteralIntrinsics(SourceLoc loc) {
+  if (hasArrayLiteralIntrinsics())
+    return false;
+
+  Diags.diagnose(loc, diag::array_literal_intrinsics_not_found);
+  return true;
+}
+
 VarDecl *VarDecl::getOriginalWrappedProperty(
     Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)

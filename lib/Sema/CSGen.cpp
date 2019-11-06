@@ -1239,12 +1239,11 @@ namespace {
 
       case MagicIdentifierLiteralExpr::DSOHandle: {
         // #dsohandle has type UnsafeMutableRawPointer.
-        auto &tc = CS.getTypeChecker();
-        if (tc.requirePointerArgumentIntrinsics(expr->getLoc()))
+        auto &ctx = CS.getASTContext();
+        if (ctx.requirePointerArgumentIntrinsics(expr->getLoc()))
           return nullptr;
 
-        auto unsafeRawPointer =
-          CS.getASTContext().getUnsafeRawPointerDecl();
+        auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
         return unsafeRawPointer->getDeclaredType();
       }
       }
@@ -2848,7 +2847,7 @@ namespace {
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
       auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
-      if (!optTy || CS.getTypeChecker().requireOptionalIntrinsics(optLoc))
+      if (!optTy || CS.getASTContext().requireOptionalIntrinsics(optLoc))
         return Type();
 
       return optTy;
