@@ -161,7 +161,8 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   return nullptr;
 }
 
-DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
+DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,
+                                                      ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, DeclBaseName::createConstructor(),
@@ -200,6 +201,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
   newParams.append(params.begin(), params.end());
 
   auto replace = [&](StringRef replacement) -> Type {
+    auto &Context = ctor->getASTContext();
     newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
                                           Context.getIdentifier(replacement),
                                           newParams[0].getParameterFlags());

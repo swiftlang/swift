@@ -3531,13 +3531,14 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), E);
   if (!protocol)
     return false;
-  DeclName constrName = TC.getObjectLiteralConstructorName(E);
+  auto constrName =
+      TypeChecker::getObjectLiteralConstructorName(CS.getASTContext(), E);
   assert(constrName);
   auto *constr = dyn_cast_or_null<ConstructorDecl>(
       protocol->getSingleRequirement(constrName));
   if (!constr)
     return false;
-  auto paramType = TC.getObjectLiteralParameterType(E, constr);
+  auto paramType = TypeChecker::getObjectLiteralParameterType(E, constr);
   if (!typeCheckChildIndependently(
         E->getArg(), paramType, CTP_CallArgument))
     return true;

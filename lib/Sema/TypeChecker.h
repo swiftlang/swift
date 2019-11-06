@@ -1648,10 +1648,11 @@ public:
   /// expression does not have an associated literal protocol.
   static ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
-  DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
+  static DeclName getObjectLiteralConstructorName(ASTContext &ctx,
+                                                  ObjectLiteralExpr *expr);
 
-  Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
-                                     ConstructorDecl *ctor);
+  static Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                            ConstructorDecl *ctor);
 
   /// Get the module appropriate for looking up standard library types.
   ///

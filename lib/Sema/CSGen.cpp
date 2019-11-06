@@ -1260,10 +1260,10 @@ namespace {
       if (expr->getType())
         return expr->getType();
 
-      auto &tc = CS.getTypeChecker();
+      auto &de = CS.getASTContext().Diags;
       auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
       if (!protocol) {
-        tc.diagnose(expr->getLoc(), diag::use_unknown_object_literal_protocol,
+        de.diagnose(expr->getLoc(), diag::use_unknown_object_literal_protocol,
                     expr->getLiteralKindPlainName());
         return nullptr;
       }
@@ -1282,15 +1282,18 @@ namespace {
       // all the redundant stuff about literals (leaving e.g. "red:").
       // Constraint application will quietly rewrite the type of 'args' to
       // use the right labels before forming the call to the initializer.
-      DeclName constrName = tc.getObjectLiteralConstructorName(expr);
+      auto constrName =
+          TypeChecker::getObjectLiteralConstructorName(CS.getASTContext(),
+                                                       expr);
       assert(constrName);
       auto *constr = dyn_cast_or_null<ConstructorDecl>(
           protocol->getSingleRequirement(constrName));
       if (!constr) {
-        tc.diagnose(protocol, diag::object_literal_broken_proto);
+        de.diagnose(protocol, diag::object_literal_broken_proto);
         return nullptr;
       }
-      auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
+      auto constrParamType =
+          TypeChecker::getObjectLiteralParameterType(expr, constr);
 
       // Extract the arguments.
       SmallVector<AnyFunctionType::Param, 8> args;
