@@ -742,7 +742,6 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
-  Type getExceptionType(DeclContext *dc, SourceLoc loc);
   
   /// Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
