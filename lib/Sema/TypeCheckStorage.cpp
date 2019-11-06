@@ -212,8 +212,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  auto *TC =
-      static_cast<TypeChecker *>(binding->getASTContext().getLazyResolver());
+  auto *TC = binding->getASTContext().getLegacyGlobalTypeChecker();
   if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();

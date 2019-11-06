@@ -2361,13 +2361,13 @@ public:
       }
       return;
     }
-    checkAccessControl(TC, OD);
+    checkAccessControl(OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
-    checkAccessControl(TC, PGD);
+    checkAccessControl(PGD);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
@@ -2586,7 +2586,7 @@ public:
 
     TypeChecker::checkDeclAttributes(PBD);
 
-    checkAccessControl(TC, PBD);
+    checkAccessControl(PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
@@ -2640,7 +2640,7 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    checkAccessControl(TC, SD);
+    checkAccessControl(SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -2683,8 +2683,7 @@ public:
     (void) TAD->getUnderlyingType();
 
     TypeChecker::checkDeclAttributes(TAD);
-    checkAccessControl(TC, TAD);
-
+    checkAccessControl(TAD);
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -2692,7 +2691,7 @@ public:
     (void) OTD->getGenericSignature();
 
     TypeChecker::checkDeclAttributes(OTD);
-    checkAccessControl(TC, OTD);
+    checkAccessControl(OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -2710,7 +2709,7 @@ public:
                   proto->getName());
     }
 
-    checkAccessControl(TC, AT);
+    checkAccessControl(AT);
 
     // Trigger the checking for overridden declarations.
     (void) AT->getOverriddenDecls();
@@ -2804,7 +2803,7 @@ public:
 
     checkInheritanceClause(ED);
 
-    checkAccessControl(TC, ED);
+    checkAccessControl(ED);
 
     TC.checkPatternBindingCaptures(ED);
     
@@ -2849,7 +2848,7 @@ public:
 
     checkInheritanceClause(SD);
 
-    checkAccessControl(TC, SD);
+    checkAccessControl(SD);
 
     checkExplicitAvailability(SD);
 
@@ -3097,7 +3096,7 @@ public:
 
     checkInheritanceClause(CD);
 
-    checkAccessControl(TC, CD);
+    checkAccessControl(CD);
 
     checkExplicitAvailability(CD);
 
@@ -3132,7 +3131,7 @@ public:
 
     TypeChecker::checkDeclAttributes(PD);
 
-    checkAccessControl(TC, PD);
+    checkAccessControl(PD);
 
     checkInheritanceClause(PD);
 
@@ -3246,7 +3245,7 @@ public:
       TypeChecker::checkProtocolSelfRequirements(FD);
     }
 
-    checkAccessControl(TC, FD);
+    checkAccessControl(FD);
 
     TypeChecker::checkParameterAttributes(FD->getParameters());
     TypeChecker::checkDeclAttributes(FD);
@@ -3360,7 +3359,7 @@ public:
       EED->setInvalid();
     }
 
-    checkAccessControl(TC, EED);
+    checkAccessControl(EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -3450,7 +3449,7 @@ public:
     TC.ConformanceContexts.push_back(ED);
 
     TypeChecker::checkDeclAttributes(ED);
-    checkAccessControl(TC, ED);
+    checkAccessControl(ED);
 
     checkExplicitAvailability(ED);
   }
@@ -3585,7 +3584,7 @@ public:
       }
     }
 
-    checkAccessControl(TC, CD);
+    checkAccessControl(CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
