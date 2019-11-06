@@ -2285,7 +2285,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!cs.shouldSuppressDiagnostics() &&
       !options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticExprDiagnostics(*this, result, dc, isExprStmt);
+    performSyntacticExprDiagnostics(result, dc, isExprStmt);
   }
 
   expr = result;

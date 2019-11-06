@@ -35,8 +35,7 @@ namespace swift {
   class ValueDecl;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                     const DeclContext *DC,
+void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
                                      bool isExprStmt);
 
 /// Emit diagnostics for a given statement.
