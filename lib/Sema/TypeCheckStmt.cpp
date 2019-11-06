@@ -1324,10 +1324,9 @@ public:
         // Resolve the pattern in our case label if it has not been resolved and
         // check that our var decls follow invariants.
         bool limit = true;
-        checkCaseLabelItemPattern(
-            caseBlock, labelItem, limit,
-            TC.getExceptionType(DC, caseBlock->getStartLoc()), &prevCaseDecls,
-            &nextCaseDecls);
+        checkCaseLabelItemPattern(caseBlock, labelItem, limit,
+                                  getASTContext().getExceptionType(),
+                                  &prevCaseDecls, &nextCaseDecls);
 
         // After this is complete, prevCaseDecls will be pointing at
         // scratchMemory1 which contains the initial case block's var decls and
@@ -1362,10 +1361,9 @@ public:
         // Resolve the pattern in our case label if it has not been resolved
         // and check that our var decls follow invariants.
         bool limit = true;
-        checkCaseLabelItemPattern(
-            caseBlock, labelItem, limit,
-            TC.getExceptionType(DC, caseBlock->getStartLoc()), &prevCaseDecls,
-            &nextCaseDecls);
+        checkCaseLabelItemPattern(caseBlock, labelItem, limit,
+                                  getASTContext().getExceptionType(),
+                                  &prevCaseDecls, &nextCaseDecls);
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
           TC.typeCheckCondition(guard, DC);

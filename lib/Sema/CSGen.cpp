@@ -2347,6 +2347,7 @@ namespace {
           // Pull the top-level pattern back out.
           pattern = LabelItem.getPattern();
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
+
           if (!exnType)
             return false;
           auto contextualPattern =
