@@ -2600,9 +2600,9 @@ public:
         // If we're performing an binding to a weak or unowned variable from a
         // constructor call, emit a warning that the instance will be immediately
         // deallocated.
-        diagnoseUnownedImmediateDeallocation(TC, PBD->getPattern(i),
-                                              PBD->getEqualLoc(i),
-                                              init);
+        diagnoseUnownedImmediateDeallocation(Ctx, PBD->getPattern(i),
+                                             PBD->getEqualLoc(i),
+                                             init);
 
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.

@@ -75,13 +75,13 @@ bool diagnoseArgumentLabelError(ASTContext &ctx,
 /// with a non-owning attribute, such as 'weak' or 'unowned' and the initializer
 /// expression refers to a class constructor, emit a warning that the assigned
 /// instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const AssignExpr *assignExpr);
 
 /// If \p pattern binds to a declaration with a non-owning attribute, such as
 /// 'weak' or 'unowned' and \p initializer refers to a class constructor,
 /// emit a warning that the bound instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                           const Pattern *pattern,
                                           SourceLoc equalLoc,
                                           const Expr *initializer);

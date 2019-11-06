@@ -1690,7 +1690,7 @@ static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
   }
 }
 
-static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
+static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
                                                      const VarDecl *varDecl,
                                                      const Expr *initExpr,
                                                      SourceLoc diagLoc,
@@ -1741,17 +1741,18 @@ static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
   if (varDecl->getDeclContext()->isTypeContext())
     storageKind = SK_Property;
 
-  TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
-              varDecl->getName(), ownershipAttr->get(), unsigned(storageKind))
+  ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
+                     varDecl->getName(), ownershipAttr->get(),
+                     unsigned(storageKind))
     .highlight(diagRange);
 
-  TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
+  ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
     .highlight(diagRange);
 
-  TC.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
+  ctx.Diags.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
 }
 
-void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void swift::diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                                  const AssignExpr *assignExpr) {
   auto *destExpr = assignExpr->getDest()->getValueProvidingExpr();
   auto *initExpr = assignExpr->getSrc();
@@ -1765,12 +1766,12 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
   }
 
   if (VD)
-    diagnoseUnownedImmediateDeallocationImpl(TC, VD, initExpr,
+    diagnoseUnownedImmediateDeallocationImpl(ctx, VD, initExpr,
                                              assignExpr->getLoc(),
                                              initExpr->getSourceRange());
 }
 
-void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+void swift::diagnoseUnownedImmediateDeallocation(ASTContext &ctx,
                                                  const Pattern *pattern,
                                                  SourceLoc equalLoc,
                                                  const Expr *initExpr) {
@@ -1788,12 +1789,12 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
         const Pattern *subPattern = elt.getPattern();
         Expr *subInitExpr = TE->getElement(i);
 
-        diagnoseUnownedImmediateDeallocation(TC, subPattern, equalLoc,
+        diagnoseUnownedImmediateDeallocation(ctx, subPattern, equalLoc,
                                              subInitExpr);
       }
     }
   } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
-    diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
+    diagnoseUnownedImmediateDeallocationImpl(ctx, NP->getDecl(), initExpr,
                                              equalLoc,
                                              initExpr->getSourceRange());
   }

@@ -3722,7 +3722,7 @@ namespace {
         // If we're performing an assignment to a weak or unowned variable from
         // a constructor call, emit a warning that the instance will be
         // immediately deallocated.
-        diagnoseUnownedImmediateDeallocation(cs.getTypeChecker(), expr);
+        diagnoseUnownedImmediateDeallocation(cs.getASTContext(), expr);
       }
       return expr;
     }
