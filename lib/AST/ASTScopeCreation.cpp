@@ -2094,3 +2094,7 @@ bool ExpandASTScopeRequest::isCached() const {
 Optional<ASTScopeImpl *> ExpandASTScopeRequest::getCachedResult() const {
   return std::get<0>(getStorage());
 }
+
+namespace {
+void doNothing() {}
+}
