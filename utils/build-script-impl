@@ -3134,7 +3134,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
+                    call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/lit" \
                          ${LLVM_LIT_ARGS}
 
@@ -3143,51 +3143,11 @@ for host in "${ALL_HOSTS[@]}"; do
                          "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                     DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
-                        call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
-                             "${lldb_build_dir}/lit" \
-                             ${LLVM_LIT_ARGS} \
-                             --xunit-xml-output=${results_dir}/results.xml \
-                             --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
-                    if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
-                        echo "Running LLDB swift compatibility tests against" \
-                             "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                        with_pushd ${results_dir} \
-                           call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
-                                "${lldb_build_dir}/lit" \
-                                ${LLVM_LIT_ARGS} \
-                                --xunit-xml-output=${results_dir}/results.xml \
-                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\"" --filter=compat
-                    fi
-                else
-                    with_pushd "${results_dir}" \
-                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                        SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                        "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                        --executable "${lldb_executable}" \
-                        ${LLDB_TEST_DEBUG_SERVER} \
-                        ${LLDB_TEST_SUBDIR_CLAUSE} \
-                        ${LLDB_TEST_CATEGORIES} \
-                        ${LLDB_DOTEST_CC_OPTS} \
-                        ${LLDB_FORMATTER_OPTS} \
-                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                        -t -E "${DOTEST_EXTRA}"
-                    if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
-                        echo "Running LLDB swift compatibility tests against" \
-                             "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                             SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                             "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                             --executable "${lldb_executable}" \
-                             ${LLDB_TEST_DEBUG_SERVER} \
-                             ${LLDB_TEST_SUBDIR_CLAUSE} \
-                             ${LLDB_TEST_CATEGORIES} \
-                             ${LLDB_DOTEST_CC_OPTS} \
-                             ${LLDB_FORMATTER_OPTS} \
-                             --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                             -G swift-history \
-                             --swift-compiler "${LLDB_TEST_SWIFT_COMPATIBILITY}" \
-                             -t -E "${DOTEST_EXTRA}"
-                    fi
+                       call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
+                            "${lldb_build_dir}/lit" \
+                            ${LLVM_LIT_ARGS} \
+                            --param dotest-args="${DOTEST_ARGS}" \
+                            --filter=compat
                 fi
                 continue
                 ;;
