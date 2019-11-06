@@ -3017,12 +3017,12 @@ void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
 }
 
 // Perform checkStmtConditionTrailingClosure for single expression.
-static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
+static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
   // Shallow walker. just dig into implicit expression.
   class DiagnoseWalker : public ASTWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
       if (!E->hasTrailingClosure()) return;
@@ -3044,13 +3044,13 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
         closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
       }
 
-      auto diag = TC.diagnose(closureLoc,
-                              diag::trailing_closure_requires_parens);
-      fixItEncloseTrailingClosure(TC, diag, E, closureLabel);
+      auto diag = Ctx.Diags.diagnose(closureLoc,
+                                     diag::trailing_closure_requires_parens);
+      fixItEncloseTrailingClosure(Ctx, diag, E, closureLabel);
     }
 
   public:
-    DiagnoseWalker(TypeChecker &tc) : TC(tc) { }
+    DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
     bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
@@ -3065,7 +3065,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
     }
   };
 
-  DiagnoseWalker Walker(TC);
+  DiagnoseWalker Walker(ctx);
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -3078,23 +3078,23 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
 /// E.g.:
 ///   if let _ = arr?.map {$0+1} { ... }
 ///   for _ in numbers.filter {$0 > 4} { ... }
-static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Stmt *S) {
+static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
     for (auto elt : LCS->getCond()) {
       if (elt.getKind() == StmtConditionElement::CK_PatternBinding)
-        checkStmtConditionTrailingClosure(TC, elt.getInitializer());
+        checkStmtConditionTrailingClosure(ctx, elt.getInitializer());
       else if (elt.getKind() == StmtConditionElement::CK_Boolean)
-        checkStmtConditionTrailingClosure(TC, elt.getBoolean());
+        checkStmtConditionTrailingClosure(ctx, elt.getBoolean());
       // No trailing closure for CK_Availability: e.g. `if #available() {}`.
     }
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
-    checkStmtConditionTrailingClosure(TC, SS->getSubjectExpr());
+    checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(TC, FES->getSequence());
-    checkStmtConditionTrailingClosure(TC, FES->getWhere());
+    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
-      checkStmtConditionTrailingClosure(TC, CS->getGuardExpr());
+      checkStmtConditionTrailingClosure(ctx, CS->getGuardExpr());
   }
 }
 
@@ -3486,7 +3486,7 @@ static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
 ///     if let x: Int = i {
 static void
 checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
-                                   TypeChecker &TC) {
+                                   ASTContext &ctx) {
   auto *p = cond.getPatternOrNull();
   if (!p) return;
   
@@ -3499,22 +3499,24 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
         // Check for 'if let' to produce a tuned diagnostic.
         if (isa<OptionalSomePattern>(TP->getSubPattern()) &&
             TP->getSubPattern()->isImplicit()) {
-          TC.diagnose(cond.getIntroducerLoc(), diag::optional_check_promotion,
-                      subExpr->getType())
+          ctx.Diags.diagnose(cond.getIntroducerLoc(),
+                             diag::optional_check_promotion,
+                             subExpr->getType())
             .highlight(subExpr->getSourceRange())
             .fixItReplace(TP->getTypeLoc().getSourceRange(),
                           ooType->getString());
           return;
         }
-      TC.diagnose(cond.getIntroducerLoc(),
-                  diag::optional_pattern_match_promotion,
-                  subExpr->getType(), cond.getInitializer()->getType())
+      ctx.Diags.diagnose(cond.getIntroducerLoc(),
+                         diag::optional_pattern_match_promotion,
+                         subExpr->getType(), cond.getInitializer()->getType())
         .highlight(subExpr->getSourceRange());
       return;
     }
     
-    TC.diagnose(cond.getIntroducerLoc(), diag::optional_check_nonoptional,
-                subExpr->getType())
+    ctx.Diags.diagnose(cond.getIntroducerLoc(),
+                       diag::optional_check_nonoptional,
+                       subExpr->getType())
       .highlight(subExpr->getSourceRange());
   }
 }
@@ -3996,18 +3998,18 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
 
-void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
-  TypeChecker::checkUnsupportedProtocolType(TC.Context, const_cast<Stmt *>(S));
+void swift::performStmtDiagnostics(ASTContext &ctx, const Stmt *S) {
+  TypeChecker::checkUnsupportedProtocolType(ctx, const_cast<Stmt *>(S));
     
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(TC.Context, switchStmt);
+    checkSwitch(ctx, switchStmt);
 
-  checkStmtConditionTrailingClosure(TC, S);
+  checkStmtConditionTrailingClosure(ctx, S);
   
   // Check for implicit optional promotions in stmt-condition patterns.
   if (auto *lcs = dyn_cast<LabeledConditionalStmt>(S))
     for (const auto &elt : lcs->getCond())
-      checkImplicitPromotionsInCondition(elt, TC);
+      checkImplicitPromotionsInCondition(elt, ctx);
 }
 
 //===----------------------------------------------------------------------===//

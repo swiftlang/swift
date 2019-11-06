@@ -410,7 +410,7 @@ public:
     if (S2 == nullptr)
       return true;
     S = S2;
-    performStmtDiagnostics(TC, S);
+    performStmtDiagnostics(getASTContext(), S);
     return false;
   }
 

@@ -40,7 +40,7 @@ void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                      bool isExprStmt);
 
 /// Emit diagnostics for a given statement.
-void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
+void performStmtDiagnostics(ASTContext &ctx, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
                                         BraceStmt *body);
