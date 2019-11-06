@@ -23,7 +23,7 @@
 // Conclusion: mangling coverage is important.
 
 // Minimal dummy compiler-known `Differentiable` protocol.
-public protocol _Differentiable {
+public protocol Differentiable {
   associatedtype TangentVector
 }
 

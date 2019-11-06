@@ -52,14 +52,14 @@ struct InstanceMethod : Differentiable {
   }
 }
 
-// CHECK: @differentiable(wrt: x where T : _Differentiable)
+// CHECK: @differentiable(wrt: x where T : Differentiable)
 // CHECK-NEXT: func testOnlyWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(where T : Differentiable)
 func testOnlyWhereClause<T : Numeric>(x: T) -> T {
   return x
 }
 
-// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClause where T : _Differentiable)
+// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClause where T : Differentiable)
 // CHECK-NEXT: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
 func testWhereClause<T : Numeric>(x: T) -> T {
@@ -73,7 +73,7 @@ func vjpTestWhereClause<T>(x: T) -> (T, (T.TangentVector) -> T.TangentVector)
 
 protocol P {}
 extension P {
-  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethod where Self : _Differentiable)
+  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethod where Self : Differentiable)
   // CHECK-NEXT: func testWhereClauseMethod() -> Self
   @differentiable(wrt: self, vjp: vjpTestWhereClauseMethod where Self : Differentiable)
   func testWhereClauseMethod() -> Self {
@@ -86,7 +86,7 @@ extension P where Self : Differentiable {
   }
 }
 
-// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClauseMethodTypeConstraint where T : _Differentiable, T == T.TangentVector)
+// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.TangentVector)
 // CHECK-NEXT: func testWhereClauseMethodTypeConstraint<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.TangentVector)
 func testWhereClauseMethodTypeConstraint<T : Numeric>(x: T) -> T {
@@ -99,7 +99,7 @@ func vjpTestWhereClauseMethodTypeConstraint<T>(x: T) -> (T, (T) -> T)
 }
 
 extension P {
-  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self : _Differentiable, Self == Self.TangentVector)
+  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self : Differentiable, Self == Self.TangentVector)
   // CHECK-NEXT: func testWhereClauseMethodTypeConstraint() -> Self
   @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self.TangentVector == Self, Self : Differentiable)
   func testWhereClauseMethodTypeConstraint() -> Self {

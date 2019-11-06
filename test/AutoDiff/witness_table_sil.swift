@@ -82,7 +82,7 @@ struct S : Proto, AdditiveArithmetic {
 }
 
 // CHECK-LABEL: sil_witness_table hidden S: Proto module witness_table_sil {
-// CHECK-NEXT:  base_protocol _Differentiable: S: _Differentiable module witness_table_sil
+// CHECK-NEXT:  base_protocol Differentiable: S: Differentiable module witness_table_sil
 // CHECK-NEXT:  method #Proto.function1!1: <Self where Self : Proto> (Self) -> (Float, Double) -> Float : @{{.*}}function1
 // CHECK-NEXT:  method #Proto.function1!1.jvp.SSU: <Self where Self : Proto> (Self) -> (Float, Double) -> Float : @AD__{{.*}}function1{{.*}}_jvp_SSU
 // CHECK-NEXT:  method #Proto.function1!1.vjp.SSU: <Self where Self : Proto> (Self) -> (Float, Double) -> Float : @AD__{{.*}}function1{{.*}}_vjp_SSU
