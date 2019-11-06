@@ -74,7 +74,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
     break;
   }
 
