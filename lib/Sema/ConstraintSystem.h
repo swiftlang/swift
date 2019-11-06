@@ -741,6 +741,8 @@ public:
     return None;
   }
 
+  void setExprTypes(Expr *expr) const;
+
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
@@ -1508,58 +1510,7 @@ private:
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
-  class SetExprTypes : public ASTWalker {
-    Expr *RootExpr;
-    ConstraintSystem &CS;
-    bool ExcludeRoot;
-
-  public:
-    SetExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
-        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (ExcludeRoot && expr == RootExpr)
-        return expr;
-
-      //assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
-      //       && "Mismatched types!");
-      assert(!CS.getType(expr)->hasTypeVariable() &&
-             "Should not write type variable into expression!");
-      expr->setType(CS.getType(expr));
-
-      if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
-        for (auto i : indices(kp->getComponents())) {
-          Type componentType;
-          if (CS.hasType(kp, i))
-            componentType = CS.getType(kp, i);
-          kp->getMutableComponents()[i].setComponentType(componentType);
-        }
-      }
-
-      return expr;
-    }
-
-    /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-
-    /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
-
 public:
-
-  void setExprTypes(Expr *expr) {
-    SetExprTypes SET(expr, *this, /* excludeRoot = */ false);
-    expr->walk(SET);
-  }
-
-  void setSubExprTypes(Expr *expr) {
-    SetExprTypes SET(expr, *this, /* excludeRoot = */ true);
-    expr->walk(SET);
-  }
-
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {
     bool excludeRoot = false;

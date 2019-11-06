@@ -3566,7 +3566,7 @@ namespace {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
 
-        cs.setExprTypes(sub);
+        solution.setExprTypes(sub);
 
         if (tc.convertToType(sub, toType, cs.DC))
           return nullptr;
@@ -4697,7 +4697,7 @@ namespace {
       return result;
     }
 
-    void finalize(Expr *&result) {
+    void finalize() {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
 
@@ -4722,9 +4722,6 @@ namespace {
           .fixItInsert(cast->getStartLoc(), "(")
           .fixItInsertAfter(cast->getEndLoc(), ")");
       }
-      
-      // Set the final types on the expression.
-      cs.setExprTypes(result);
     }
 
     /// Diagnose an optional injection that is probably not what the
@@ -5603,7 +5600,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
       cs.setType(singleExpr,
                  cs.getType(singleExpr)->getWithoutSpecifierType());
 
-    cs.setExprTypes(singleExpr);
+    solution.setExprTypes(singleExpr);
     TypeChecker::checkIgnoredExpr(singleExpr);
 
     SmallVector<ASTNode, 2> elements;
@@ -5642,7 +5639,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) 
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
     auto singleExpr = returnStmt->getResult();
 
-    cs.setExprTypes(singleExpr);
+    solution.setExprTypes(singleExpr);
     TypeChecker::checkIgnoredExpr(singleExpr);
 
     SmallVector<ASTNode, 1> elements;
@@ -7038,7 +7035,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     cs.setType(apply, fnType->getResult());
     apply->setIsSuper(isSuper);
 
-    cs.setExprTypes(apply);
+    solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
 
@@ -7339,7 +7336,7 @@ namespace {
         } else {
           // For other closures, type-check the body once we've finished with
           // the expression.
-          cs.setExprTypes(closure);
+          Rewriter.solution.setExprTypes(closure);
           ClosuresToTypeCheck.push_back(closure);
         }
 
@@ -7560,8 +7557,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                    getConstraintLocator(expr));
   }
 
-  if (result)
-    rewriter.finalize(result);
+  solution.setExprTypes(result);
+  rewriter.finalize();
 
   return result;
 }
@@ -7575,6 +7572,59 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   if (!result)
     return nullptr;
 
-  rewriter.finalize(result);
+  setExprTypes(result);
+  rewriter.finalize();
   return result;
+}
+
+namespace {
+class SetExprTypes : public ASTWalker {
+  const Solution &solution;
+
+public:
+  explicit SetExprTypes(const Solution &solution)
+      : solution(solution) {}
+
+  Expr *walkToExprPost(Expr *expr) override {
+    auto &cs = solution.getConstraintSystem();
+    auto exprType = cs.getType(expr);
+    exprType = solution.simplifyType(exprType);
+    // assert((!expr->getType() || expr->getType()->isEqual(exprType)) &&
+    //       "Mismatched types!");
+    assert(!exprType->hasTypeVariable() &&
+           "Should not write type variable into expression!");
+    expr->setType(exprType);
+
+    if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
+      for (auto i : indices(kp->getComponents())) {
+        Type componentType;
+        if (cs.hasType(kp, i)) {
+          componentType = solution.simplifyType(cs.getType(kp, i));
+          assert(!componentType->hasTypeVariable() &&
+                 "Should not write type variable into key-path component");
+        }
+
+        kp->getMutableComponents()[i].setComponentType(componentType);
+      }
+    }
+
+    return expr;
+  }
+
+  /// Ignore statements.
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    return { false, stmt };
+  }
+
+  /// Ignore declarations.
+  bool walkToDeclPre(Decl *decl) override { return false; }
+};
+}
+
+void Solution::setExprTypes(Expr *expr) const {
+  if (!expr)
+    return;
+
+  SetExprTypes SET(*this);
+  expr->walk(SET);
 }
