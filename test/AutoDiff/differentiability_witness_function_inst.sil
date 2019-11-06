@@ -76,8 +76,8 @@ bb0:
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
-// CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : _Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
-// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : _Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
 // CHECK: }
 
 // CHECK-LABEL: sil @test_transpose_witnesses : $@convention(thin) () -> () {
@@ -86,7 +86,7 @@ bb0:
 // CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0 1] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0] [results 0] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
 // CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
-// CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : _Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
-// CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : _Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [transpose] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
 // CHECK:   return undef : $()
 // CHECK: }

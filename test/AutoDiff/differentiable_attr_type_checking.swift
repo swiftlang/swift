@@ -765,7 +765,7 @@ struct TF_521<T: FloatingPoint> {
     self.imaginary = imaginary
   }
 }
-// expected-error @+2 {{type 'TF_521<T>' does not conform to protocol '_Differentiable'}}
+// expected-error @+2 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
 // expected-note @+1 {{do you want to add protocol stubs}}
 extension TF_521: Differentiable where T: Differentiable {
   // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' does not conform to 'AdditiveArithmetic'}}

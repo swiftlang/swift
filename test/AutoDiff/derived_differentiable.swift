@@ -44,7 +44,7 @@ struct TestNoDerivative : EuclideanDifferentiable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct TangentVector : _Differentiable, AdditiveArithmetic, ElementaryFunctions
+// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.TangentVector
 // CHECK-AST:         internal var differentiableVectorView: TestNoDerivative.TangentVector { get }
 
@@ -57,7 +57,7 @@ struct TestPointwiseMultiplicative : Differentiable {
 // CHECK-AST:         var w: PointwiseMultiplicativeDummy
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: PointwiseMultiplicativeDummy
 // CHECK-AST:         internal init(w: PointwiseMultiplicativeDummy, technicallyDifferentiable: PointwiseMultiplicativeDummy)
-// CHECK-AST:         internal struct TangentVector : _Differentiable, AdditiveArithmetic, PointwiseMultiplicative
+// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative
 // CHECK-AST:           internal typealias TangentVector = TestPointwiseMultiplicative.TangentVector
 
 
@@ -70,14 +70,14 @@ struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct TangentVector : _Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol, KeyPathIterable
+// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol, KeyPathIterable
 // CHECK-AST:           internal typealias TangentVector = TestKeyPathIterable.TangentVector
 
 struct GenericTanMember<T : Differentiable> : Differentiable, AdditiveArithmetic {
   var x: T.TangentVector
 }
 
-// CHECK-AST-LABEL: internal struct GenericTanMember<T> : Differentiable, AdditiveArithmetic where T : _Differentiable
+// CHECK-AST-LABEL: internal struct GenericTanMember<T> : Differentiable, AdditiveArithmetic where T : Differentiable
 // CHECK-AST:   internal var x: T.TangentVector
 // CHECK-AST:   internal init(x: T.TangentVector)
 // CHECK-AST:   internal typealias TangentVector = GenericTanMember<T>
@@ -92,7 +92,7 @@ public struct ConditionallyDifferentiable<T> {
 extension ConditionallyDifferentiable : Differentiable where T : Differentiable {}
 
 // CHECK-AST-LABEL: public struct ConditionallyDifferentiable<T> {
-// CHECK-AST:         @differentiable(wrt: self where T : _Differentiable)
+// CHECK-AST:         @differentiable(wrt: self where T : Differentiable)
 // CHECK-AST:         public var x: T
 // CHECK-AST:         internal init(x: T)
 // CHECK-AST:       }
@@ -121,7 +121,7 @@ final class AdditiveArithmeticClass<T : AdditiveArithmetic & Differentiable> : A
   }
 }
 
-// CHECK-AST-LABEL: final internal class AdditiveArithmeticClass<T> : AdditiveArithmetic, Differentiable where T : AdditiveArithmetic, T : _Differentiable {
+// CHECK-AST-LABEL: final internal class AdditiveArithmeticClass<T> : AdditiveArithmetic, Differentiable where T : AdditiveArithmetic, T : Differentiable {
 // CHECK-AST:         final internal var x: T, y: T
-// CHECK-AST:         internal struct TangentVector : _Differentiable, AdditiveArithmetic
+// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic
 // CHECK-AST:       }

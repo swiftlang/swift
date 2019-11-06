@@ -11,20 +11,23 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the Differentiable protocol, used by the experimental
-// differentiable programming project. Please see forum discussion for more
-// information:
+// differentiable programming project. This API is not stable and subject to
+// change.
+//
+// Please see forum discussion for more information about the differentiable
+// programming project:
 // https://forums.swift.org/t/differentiable-programming-mega-proposal/28547
 //
 //===----------------------------------------------------------------------===//
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
-public protocol _Differentiable {
+public protocol Differentiable {
   /// A type representing a differentiable value's derivatives.
   ///
   /// Mathematically, this is equivalent to the tangent bundle of the
   /// differentiable manifold represented by the differentiable type.
-  associatedtype TangentVector: _Differentiable & AdditiveArithmetic
+  associatedtype TangentVector: Differentiable & AdditiveArithmetic
     where TangentVector.TangentVector == TangentVector
 
   /// Moves `self` along the given direction. In Riemannian geometry, this is
@@ -44,15 +47,18 @@ public protocol _Differentiable {
       this property
       """)
   var zeroTangentVector: TangentVector { get }
+  // SWIFT_ENABLE_TENSORFLOW END
 }
 
-public extension _Differentiable where TangentVector == Self {
+public extension Differentiable where TangentVector == Self {
+  @_alwaysEmitIntoClient
   mutating func move(along direction: TangentVector) {
     self += direction
   }
 }
 
-public extension _Differentiable {
+// SWIFT_ENABLE_TENSORFLOW
+public extension Differentiable {
   // This is a temporary solution that allows us to add `zeroTangentVector`
   // without implementing derived conformances. This property is marked
   // unavailable because it will produce incorrect results when tangent vectors
@@ -61,6 +67,4 @@ public extension _Differentiable {
   // implementation.
   var zeroTangentVector: TangentVector { .zero }
 }
-
-// SWIFT_ENABLE_TENSORFLOW
-public typealias Differentiable = _Differentiable
+// SWIFT_ENABLE_TENSORFLOW END

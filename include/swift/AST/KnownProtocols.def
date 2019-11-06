@@ -93,7 +93,7 @@ PROTOCOL_(DestructorSafeContainer)
 
 PROTOCOL(StringInterpolationProtocol)
 
-PROTOCOL_(Differentiable)
+PROTOCOL(Differentiable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)

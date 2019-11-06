@@ -54,7 +54,7 @@ func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.T
 func vjpGenericWrongLabel<T : Differentiable>(x: T, y: T) -> (value: T, (T) -> (T, T)) {
   return (x, { ($0, $0) })
 }
-// expected-error @+1 {{could not find function 'generic' with expected type '<T where T : _Differentiable, T == T.TangentVector> (x: T) -> T'}}
+// expected-error @+1 {{could not find function 'generic' with expected type '<T where T : Differentiable, T == T.TangentVector> (x: T) -> T'}}
 @differentiating(generic)
 func vjpGenericDiffParamMismatch<T : Differentiable>(x: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
   return (x, { ($0, $0) })
@@ -120,7 +120,7 @@ func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
 }
 
 // expected-error @+2 {{type 'T' does not conform to protocol 'FloatingPoint'}}
-// expected-error @+1 {{could not find function 'foo' with expected type '<T where T : AdditiveArithmetic, T : _Differentiable> (T) -> T'}}
+// expected-error @+1 {{could not find function 'foo' with expected type '<T where T : AdditiveArithmetic, T : Differentiable> (T) -> T'}}
 @differentiating(foo)
 func vjpFoo<T : AdditiveArithmetic & Differentiable>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> (T.TangentVector)) {
   return (x, { $0 })
@@ -157,7 +157,7 @@ extension Differentiable where Self : AdditiveArithmetic {
 }
 
 extension AdditiveArithmetic where Self : Differentiable, Self == Self.TangentVector {
-  // expected-error @+1 {{could not find function '+' with expected type '<Self where Self : _Differentiable, Self == Self.TangentVector> (Self) -> (Self, Self) -> Self'}}
+  // expected-error @+1 {{could not find function '+' with expected type '<Self where Self : Differentiable, Self == Self.TangentVector> (Self) -> (Self, Self) -> Self'}}
   @differentiating(+)
   func vjpPlusInstanceMethod(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x + y, { v in (v, v) })

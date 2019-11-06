@@ -192,10 +192,15 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
 // SWIFT_ENABLE_TENSORFLOW
 extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
 
-extension SIMD${n} : Differentiable & EuclideanDifferentiable
-  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
+extension SIMD${n} : Differentiable
+  where Scalar : Differentiable & BinaryFloatingPoint,
         Scalar.TangentVector : BinaryFloatingPoint {
   public typealias TangentVector = SIMD${n}
+}
+
+extension SIMD${n} : EuclideanDifferentiable
+  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
 }
 
 extension SIMD${n}

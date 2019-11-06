@@ -181,7 +181,7 @@ func differentGenericConstraint<T: Differentiable & BinaryFloatingPoint>(x: T)
 }
 
 // expected-error @+2 {{type 'T' does not conform to protocol 'BinaryFloatingPoint'}}
-// expected-error @+1 {{could not find function 'differentGenericConstraint' with expected type '<T where T : _Differentiable, T == T.TangentVector> (T) -> T'}}
+// expected-error @+1 {{could not find function 'differentGenericConstraint' with expected type '<T where T : Differentiable, T == T.TangentVector> (T) -> T'}}
 @transposing(differentGenericConstraint, wrt: 0)
 func differentGenericConstraintT<T: Differentiable>(x: T) 
 -> T where T == T.TangentVector {

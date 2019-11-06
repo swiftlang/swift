@@ -9,14 +9,14 @@ sil_stage lowered
 import Swift
 import Builtin
 
-struct Large : _Differentiable {
+struct Large : Differentiable {
   @_hasStorage @noDerivative let a: Float { get }
   @_hasStorage @noDerivative let b: Float { get }
   @_hasStorage @noDerivative let c: Float { get }
   @_hasStorage @noDerivative let d: Float { get }
   @_hasStorage @noDerivative let e: Float { get }
   init(a: Float, b: Float, c: Float, d: Float, e: Float)
-  struct TangentVector : _Differentiable, AdditiveArithmetic {
+  struct TangentVector : Differentiable, AdditiveArithmetic {
     init()
     typealias TangentVector = Large.TangentVector
     static var zero: Large.TangentVector { get }
