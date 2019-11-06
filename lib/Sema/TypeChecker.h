@@ -984,7 +984,7 @@ public:
 
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
-  bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
+  static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
   static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                       BraceStmt *body,

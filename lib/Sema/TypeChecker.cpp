@@ -315,7 +315,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
 
-      TC.typeCheckAbstractFunctionBody(AFD);
+      TypeChecker::typeCheckAbstractFunctionBody(AFD);
     }
 
     // Type check synthesized functions and their bodies.
