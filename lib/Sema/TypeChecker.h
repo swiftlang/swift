@@ -742,7 +742,6 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
-  Type getExceptionType(DeclContext *dc, SourceLoc loc);
   
   /// Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
@@ -982,9 +981,9 @@ public:
   /// of the function, set the result type of the expression to that sugar type.
   static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                          SourceLoc EndTypeCheckLoc);
-  bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
+  static bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                                 SourceLoc EndTypeCheckLoc);
+  static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
   static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                       BraceStmt *body,
@@ -1014,7 +1013,7 @@ public:
                                           ReferenceOwnershipAttr *attr);
 
   /// Infer default value witnesses for all requirements in the given protocol.
-  void inferDefaultWitnesses(ProtocolDecl *proto);
+  static void inferDefaultWitnesses(ProtocolDecl *proto);
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
@@ -1234,7 +1233,7 @@ public:
   ///
   /// \param decl The declaration to be type-checked. This process will not
   /// modify the declaration.
-  void checkDeclCircularity(NominalTypeDecl *decl);
+  static void checkDeclCircularity(NominalTypeDecl *decl);
 
   /// Type check whether the given switch statement exhaustively covers
   /// its domain.
@@ -1678,8 +1677,6 @@ public:
 
   /// \name Resilience diagnostics
 
-  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
-
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
@@ -1794,7 +1791,7 @@ public:
   ///
   /// An ignored expression is one that is not nested within a larger
   /// expression or statement.
-  void checkIgnoredExpr(Expr *E);
+  static void checkIgnoredExpr(Expr *E);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.

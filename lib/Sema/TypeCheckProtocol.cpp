@@ -5346,8 +5346,9 @@ namespace {
   class DefaultWitnessChecker : public WitnessChecker {
     
   public:
-    DefaultWitnessChecker(ASTContext &ctx, ProtocolDecl *proto)
-        : WitnessChecker(ctx, proto, proto->getDeclaredType(), proto) {}
+    DefaultWitnessChecker(ProtocolDecl *proto)
+        : WitnessChecker(proto->getASTContext(), proto,
+                         proto->getDeclaredType(), proto) {}
 
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
     void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -5393,7 +5394,7 @@ void DefaultWitnessChecker::recordWitness(
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
-  DefaultWitnessChecker checker(Context, proto);
+  DefaultWitnessChecker checker(proto);
 
   // Find the default for the given associated type.
   auto findAssociatedTypeDefault = [](AssociatedTypeDecl *assocType)

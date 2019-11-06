@@ -315,7 +315,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
 
-      TC.typeCheckAbstractFunctionBody(AFD);
+      TypeChecker::typeCheckAbstractFunctionBody(AFD);
     }
 
     // Type check synthesized functions and their bodies.
@@ -718,8 +718,8 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeChecker &TC = createTypeChecker(Ctx);
-  return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  (void)createTypeChecker(Ctx);
+  return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
