@@ -101,7 +101,7 @@ bool computeFixitsForOverridenDeclaration(
     llvm::function_ref<Optional<InFlightDiagnostic>(bool)> diag);
 
 /// Emit fix-its to enclose trailing closure in argument parens.
-void fixItEncloseTrailingClosure(TypeChecker &TC,
+void fixItEncloseTrailingClosure(ASTContext &ctx,
                                  InFlightDiagnostic &diag,
                                  const CallExpr *call,
                                  Identifier closureLabel);

@@ -2974,7 +2974,7 @@ static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
   }
 }
 
-void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
+void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
                                         InFlightDiagnostic &diag,
                                         const CallExpr *call,
                                         Identifier closureLabel) {
@@ -3010,7 +3010,7 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
     replacement += ": ";
   }
 
-  lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
+  lastLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, lastLoc);
   diag
     .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
     .fixItInsertAfter(closureRange.End, ")");

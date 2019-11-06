@@ -1533,7 +1533,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
     auto diag = emitDiagnostic(
         expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
         choicePair.first.empty(), choicePair.second->getFullName());
-    swift::fixItEncloseTrailingClosure(getTypeChecker(), diag, callExpr,
+    swift::fixItEncloseTrailingClosure(getASTContext(), diag, callExpr,
                                        choicePair.first);
   }
 
