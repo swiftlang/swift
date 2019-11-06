@@ -2142,6 +2142,12 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                              body->getRBraceLoc(), body->isImplicit());
   }
 
+  // Typechecking, in particular ApplySolution is going to replace closures
+  // with OpaqueValueExprs and then try to do lookups into the closures.
+  // So, build out the body now.
+  if (ctx.LangOpts.EnableASTScopeLookup)
+    ASTScope::expandFunctionBody(AFD);
+
   StmtChecker SC(tc, AFD);
   SC.EndTypeCheckLoc = endTypeCheckLoc;
   bool hadError = SC.typeCheckBody(body);
