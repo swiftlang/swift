@@ -563,6 +563,32 @@ static Expr *foldSequence(DeclContext *DC,
   return makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 }
 
+bool TypeChecker::requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc) {
+  if (ctx.hasOptionalIntrinsics())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::optional_intrinsics_not_found);
+  return true;
+}
+
+bool TypeChecker::requirePointerArgumentIntrinsics(ASTContext &ctx,
+                                                   SourceLoc loc) {
+  if (ctx.hasPointerArgumentIntrinsics())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  return true;
+}
+
+bool TypeChecker::requireArrayLiteralIntrinsics(ASTContext &ctx,
+                                                SourceLoc loc) {
+  if (ctx.hasArrayLiteralIntrinsics())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::array_literal_intrinsics_not_found);
+  return true;
+}
+
 Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
   auto type = TypeChecker::getUnopenedTypeOfReference(value, Type(), UseDC);

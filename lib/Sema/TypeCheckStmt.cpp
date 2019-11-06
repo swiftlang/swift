@@ -835,7 +835,7 @@ public:
     }
 
     // Working with iterators requires Optional.
-    if (getASTContext().requireOptionalIntrinsics(S->getForLoc()))
+    if (TypeChecker::requireOptionalIntrinsics(getASTContext(), S->getForLoc()))
       return nullptr;
 
     // Gather the witnesses from the Iterator protocol conformance, which

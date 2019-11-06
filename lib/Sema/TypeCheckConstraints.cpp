@@ -802,6 +802,30 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
 
+/// If an expression references 'self.init' or 'super.init' in an
+/// initializer context, returns the implicit 'self' decl of the constructor.
+/// Otherwise, return nil.
+VarDecl *
+TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                                   UnresolvedDotExpr *ctorRef) {
+  // If the reference isn't to a constructor, we're done.
+  if (ctorRef->getName().getBaseName() != DeclBaseName::createConstructor())
+    return nullptr;
+
+  if (auto ctorContext =
+          dyn_cast_or_null<ConstructorDecl>(DC->getInnermostMethodContext())) {
+    auto nestedArg = ctorRef->getBase();
+    if (auto inout = dyn_cast<InOutExpr>(nestedArg))
+      nestedArg = inout->getSubExpr();
+    if (nestedArg->isSuperExpr())
+      return ctorContext->getImplicitSelfDecl();
+    if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
+      if (declRef->getDecl()->getFullName() == DC->getASTContext().Id_self)
+        return ctorContext->getImplicitSelfDecl();
+  }
+  return nullptr;
+}
+
 namespace {
   /// Update the function reference kind based on adding a direct call to a
   /// callee with this kind.
@@ -1216,8 +1240,8 @@ namespace {
       // RebindSelfInConstructorExpr::getCalledConstructor.
       auto &ctx = getASTContext();
       if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
-        if (auto self
-              = ctx.getSelfForInitDelegationInConstructor(DC, unresolvedDot)) {
+        if (auto self = TypeChecker::getSelfForInitDelegationInConstructor(
+                DC, unresolvedDot)) {
           // Walk our ancestor expressions looking for the appropriate place
           // to insert the RebindSelfInConstructorExpr.
           Expr *target = nullptr;

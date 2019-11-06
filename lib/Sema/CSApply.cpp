@@ -3192,7 +3192,7 @@ namespace {
           return nullptr;
 
         // Extract a Bool from the resulting expression.
-        ctx.requireOptionalIntrinsics(expr->getLoc());
+        TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
 
         // Match the optional value against its `Some` case.
         auto *someDecl = ctx.getOptionalSomeDecl();
@@ -5069,7 +5069,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   auto &ctx = cs.getASTContext();
   Type fromType = cs.getType(expr);
 
-  ctx.requireOptionalIntrinsics(expr->getLoc());
+  TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
 
   SmallVector<Type, 4> fromOptionals;
   (void)fromType->lookThroughAllOptionalTypes(fromOptionals);
@@ -6012,7 +6012,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ValueToOptional: {
       auto toGenericType = toType->castTo<BoundGenericType>();
       assert(toGenericType->getDecl()->isOptionalDecl());
-      cs.getASTContext().requireOptionalIntrinsics(expr->getLoc());
+      TypeChecker::requireOptionalIntrinsics(cs.getASTContext(),
+                                             expr->getLoc());
 
       Type valueType = toGenericType->getGenericArgs()[0];
       expr = coerceToType(expr, valueType, locator);
@@ -6072,7 +6073,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
       assert(toEltType && "not a pointer type?"); (void) toEltType;
 
-      ctx.requirePointerArgumentIntrinsics(expr->getLoc());
+      TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
       Expr *result =
           cs.cacheType(new (ctx) InOutToPointerExpr(expr, unwrappedTy));
       if (isOptional)
@@ -6088,7 +6089,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         unwrappedTy = unwrapped;
       }
 
-      ctx.requirePointerArgumentIntrinsics(expr->getLoc());
+      TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
       Expr *result =
           cs.cacheType(new (ctx) ArrayToPointerExpr(expr, unwrappedTy));
       if (isOptional)
@@ -6104,7 +6105,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         unwrappedTy = unwrapped;
       }
 
-      ctx.requirePointerArgumentIntrinsics(expr->getLoc());
+      TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
       Expr *result =
           cs.cacheType(new (ctx) StringToPointerExpr(expr, unwrappedTy));
       if (isOptional)
@@ -6113,7 +6114,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::PointerToPointer: {
-      ctx.requirePointerArgumentIntrinsics(expr->getLoc());
+      TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
       Type unwrappedToTy = toType->getOptionalObjectType();
 
       // Optional to optional.
@@ -6364,7 +6365,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toGenericType = cast<BoundGenericEnumType>(desugaredToType);
     if (!toGenericType->getDecl()->isOptionalDecl())
       break;
-    ctx.requireOptionalIntrinsics(expr->getLoc());
+    TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
 
     if (cs.getType(expr)->getOptionalObjectType())
       return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);

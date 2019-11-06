@@ -1841,6 +1841,12 @@ public:
     return DiagnosedExprs[E];
   }
 
+  /// If an expression references 'self.init' or 'super.init' in an
+  /// initializer context, returns the implicit 'self' decl of the constructor.
+  /// Otherwise, return nil.
+  static VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                                        UnresolvedDotExpr *UDE);
+
   /// Diagnose assigning variable to itself.
   static bool diagnoseSelfAssignment(const Expr *E);
 
@@ -1894,6 +1900,19 @@ public:
   /// special case type-checking behavior.
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
+
+public:
+  /// Require that the library intrinsics for working with Optional<T>
+  /// exist.
+  static bool requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+  /// Require that the library intrinsics for working with
+  /// UnsafeMutablePointer<T> exist.
+  static bool requirePointerArgumentIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+  /// Require that the library intrinsics for creating
+  /// array literals exist.
+  static bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

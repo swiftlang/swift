@@ -1242,7 +1242,7 @@ namespace {
       case MagicIdentifierLiteralExpr::DSOHandle: {
         // #dsohandle has type UnsafeMutableRawPointer.
         auto &ctx = CS.getASTContext();
-        if (ctx.requirePointerArgumentIntrinsics(expr->getLoc()))
+        if (TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc()))
           return nullptr;
 
         auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
@@ -1578,7 +1578,7 @@ namespace {
 
       // Open a member constraint for constructor delegations on the
       // subexpr type.
-      if (ctx.getSelfForInitDelegationInConstructor(CS.DC, expr)) {
+      if (TypeChecker::getSelfForInitDelegationInConstructor(CS.DC, expr)) {
         auto baseTy = CS.getType(expr->getBase())
                         ->getWithoutSpecifierType();
 
@@ -2853,7 +2853,8 @@ namespace {
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
       auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
-      if (!optTy || CS.getASTContext().requireOptionalIntrinsics(optLoc))
+      if (!optTy ||
+          TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
         return Type();
 
       return optTy;

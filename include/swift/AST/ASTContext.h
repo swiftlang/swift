@@ -109,7 +109,6 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
-  class UnresolvedDotExpr;
   class IndexSubset;
 
   enum class KnownProtocolKind : uint8_t;
@@ -904,26 +903,6 @@ public:
 
   /// Each kind and SourceFile has its own cache for a Type.
   Type &getDefaultTypeRequestCache(SourceFile *, KnownProtocolKind);
-
-public:
-  /// Require that the library intrinsics for working with Optional<T>
-  /// exist.
-  bool requireOptionalIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for working with
-  /// UnsafeMutablePointer<T> exist.
-  bool requirePointerArgumentIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for creating
-  /// array literals exist.
-  bool requireArrayLiteralIntrinsics(SourceLoc loc);
-
-public:
-  /// If an expression references 'self.init' or 'super.init' in an
-  /// initializer context, returns the implicit 'self' decl of the constructor.
-  /// Otherwise, return nil.
-  VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                                 UnresolvedDotExpr *ctorRef);
 
 private:
   friend Decl;
