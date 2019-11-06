@@ -5179,6 +5179,20 @@ public:
   /// backing property will be treated as the member-initialized property.
   bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
 
+  /// Return the range of semantics attributes attached to this VarDecl.
+  auto getSemanticsAttrs() const
+      -> decltype(getAttrs().getAttributes<SemanticsAttr>()) {
+    return getAttrs().getAttributes<SemanticsAttr>();
+  }
+
+  /// Returns true if this VarDelc has the string \p attrValue as a semantics
+  /// attribute.
+  bool hasSemanticsAttr(StringRef attrValue) const {
+    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
+      return attrValue.equals(attr->Value);
+    });
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 

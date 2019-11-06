@@ -1263,14 +1263,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    // Diagnose using @_semantics in a local scope.  These don't
-    // actually work.
-    if (CurDeclContext->isLocalContext()) {
-      // Emit an error, but do not discard the attribute.  This enables
-      // better recovery in the parser.
-      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
-    }
-
     if (!DiscardAttribute)
       Attributes.add(new (Context) SemanticsAttr(Value.getValue(), AtLoc,
                                                  AttrRange,
