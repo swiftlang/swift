@@ -2267,8 +2267,8 @@ namespace {
 
           // Okay, resolve the pattern.
           Pattern *pattern = clause->getErrorPattern();
-          pattern = CS.TC.resolvePattern(pattern, CS.DC,
-                                         /*isStmtCondition*/false);
+          pattern = TypeChecker::resolvePattern(pattern, CS.DC,
+                                                /*isStmtCondition*/false);
           if (!pattern) return false;
 
           // Save that aside while we explore the type.

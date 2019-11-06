@@ -1308,8 +1308,8 @@ public:
 
   /// Resolve ambiguous pattern/expr productions inside a pattern using
   /// name lookup information. Must be done before type-checking the pattern.
-  Pattern *resolvePattern(Pattern *P, DeclContext *dc,
-                          bool isStmtCondition);
+  static Pattern *resolvePattern(Pattern *P, DeclContext *dc,
+                                 bool isStmtCondition);
 
   /// Type check the given pattern.
   ///

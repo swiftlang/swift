@@ -255,18 +255,18 @@ class ResolvePattern : public ASTVisitor<ResolvePattern,
                                          /*PatternRetTy=*/Pattern*>
 {
 public:
-  TypeChecker &TC;
+  ASTContext &Context;
   DeclContext *DC;
-  
-  ResolvePattern(TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
-  
+
+  ResolvePattern(DeclContext *DC) : Context(DC->getASTContext()), DC(DC) {}
+
   // Convert a subexpression to a pattern if possible, or wrap it in an
   // ExprPattern.
   Pattern *getSubExprPattern(Expr *E) {
     if (Pattern *p = visit(E))
       return p;
-    
-    return new (TC.Context) ExprPattern(E, nullptr, nullptr);
+
+    return new (Context) ExprPattern(E, nullptr, nullptr);
   }
   
   // Handle productions that are always leaf patterns or are already resolved.
@@ -293,10 +293,11 @@ public:
       P->forEachVariable([&](VarDecl *VD) { HasVariable = true; });
       
       if (!HasVariable) {
-        TC.diagnose(P->getLoc(), diag::var_pattern_didnt_bind_variables,
-                    P->isLet() ? "let" : "var")
-          .highlight(P->getSubPattern()->getSourceRange())
-          .fixItRemove(P->getLoc());
+        Context.Diags
+            .diagnose(P->getLoc(), diag::var_pattern_didnt_bind_variables,
+                      P->isLet() ? "let" : "var")
+            .highlight(P->getSubPattern()->getSourceRange())
+            .fixItRemove(P->getLoc());
       }
     }
     
@@ -339,7 +340,7 @@ public:
   
   // Convert a '_' expression to an AnyPattern.
   Pattern *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
-    return new (TC.Context) AnyPattern(E->getLoc(), E->isImplicit());
+    return new (Context) AnyPattern(E->getLoc(), E->isImplicit());
   }
   
   // Cast expressions 'x as T' get resolved to checked cast patterns.
@@ -353,17 +354,15 @@ public:
       return nullptr;
     
     Pattern *subPattern = getSubExprPattern(E->getElement(0));
-    return new (TC.Context) IsPattern(cast->getLoc(),
-                                       cast->getCastTypeLoc(),
-                                       subPattern,
-                                       CheckedCastKind::Unresolved);
+    return new (Context) IsPattern(cast->getLoc(), cast->getCastTypeLoc(),
+                                   subPattern, CheckedCastKind::Unresolved);
   }
   
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
     Pattern *subPattern = getSubExprPattern(E->getSubExpr());
-    return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
-                                         E->getRParenLoc());
+    return new (Context)
+        ParenPattern(E->getLParenLoc(), subPattern, E->getRParenLoc());
   }
   
   // Convert all tuples to patterns.
@@ -377,9 +376,9 @@ public:
                                             E->getElementNameLoc(i),
                                             pattern));
     }
-    
-    return TuplePattern::create(TC.Context, E->getLoc(),
-                                patternElts, E->getRParenLoc());
+
+    return TuplePattern::create(Context, E->getLoc(), patternElts,
+                                E->getRParenLoc());
   }
 
   Pattern *convertBindingsToOptionalSome(Expr *E) {
@@ -406,14 +405,14 @@ public:
       });
 
       if (hasDisjointChaining)
-        E = new (TC.Context) OptionalEvaluationExpr(E);
+        E = new (Context) OptionalEvaluationExpr(E);
 
       return getSubExprPattern(E);
     }
 
     auto *subExpr = convertBindingsToOptionalSome(bindExpr->getSubExpr());
-    return new (TC.Context) OptionalSomePattern(subExpr,
-                                                bindExpr->getQuestionLoc());
+    return new (Context)
+        OptionalSomePattern(subExpr, bindExpr->getQuestionLoc());
   }
 
   // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
@@ -442,31 +441,28 @@ public:
       return nullptr;
 
     // FIXME: Compound names.
-    return new (TC.Context) EnumElementPattern(
-                              ume->getDotLoc(),
-                              ume->getNameLoc().getBaseNameLoc(),
-                              ume->getName().getBaseIdentifier(),
-                              subPattern,
-                              ume);
+    return new (Context)
+        EnumElementPattern(ume->getDotLoc(), ume->getNameLoc().getBaseNameLoc(),
+                           ume->getName().getBaseIdentifier(), subPattern, ume);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
     SmallVector<ComponentIdentTypeRepr *, 2> components;
-    if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
+    if (!ExprToIdentTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
     TypeResolutionOptions options = None;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::SilenceErrors;
 
-    auto *repr = IdentTypeRepr::create(TC.Context, components);
-      
+    auto *repr = IdentTypeRepr::create(Context, components);
+
     // See if the repr resolves to a type.
-    Type ty = TC.resolveIdentifierType(TypeResolution::forContextual(DC), repr,
-                                       options);
-    
+    Type ty = TypeChecker::resolveIdentifierType(
+        TypeResolution::forContextual(DC), repr, options);
+
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
@@ -482,14 +478,9 @@ public:
     // FIXME: Compound names.
     TypeLoc loc(repr);
     loc.setType(ty);
-    return new (TC.Context) EnumElementPattern(loc,
-                                               ude->getDotLoc(),
-                                               ude->getNameLoc()
-                                                 .getBaseNameLoc(),
-                                               ude->getName()
-                                                 .getBaseIdentifier(),
-                                               referencedElement,
-                                               nullptr);
+    return new (Context) EnumElementPattern(
+        loc, ude->getDotLoc(), ude->getNameLoc().getBaseNameLoc(),
+        ude->getName().getBaseIdentifier(), referencedElement, nullptr);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -501,11 +492,8 @@ public:
     // Use the type of the enum from context.
     TypeLoc loc = TypeLoc::withoutLoc(
                             elt->getParentEnum()->getDeclaredTypeInContext());
-    return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
-                                               de->getLoc(),
-                                               elt->getName(),
-                                               elt,
-                                               nullptr);
+    return new (Context) EnumElementPattern(loc, SourceLoc(), de->getLoc(),
+                                            elt->getName(), elt, nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
     // FIXME: This shouldn't be needed.  It is only necessary because of the
@@ -520,13 +508,10 @@ public:
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
-      
-      return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
-                                                 ude->getLoc(),
-                                                 ude->getName()
-                                                   .getBaseIdentifier(),
-                                                 referencedElement,
-                                                 nullptr);
+
+      return new (Context) EnumElementPattern(
+          loc, SourceLoc(), ude->getLoc(), ude->getName().getBaseIdentifier(),
+          referencedElement, nullptr);
     }
       
     
@@ -548,7 +533,7 @@ public:
       return nullptr;
 
     SmallVector<ComponentIdentTypeRepr *, 2> components;
-    if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
+    if (!ExprToIdentTypeRepr(components, Context).visit(ce->getFn()))
       return nullptr;
     
     if (components.empty())
@@ -576,7 +561,7 @@ public:
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      auto *prefixRepr = IdentTypeRepr::create(TC.Context, components);
+      auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
       Type enumTy = TypeChecker::resolveIdentifierType(TypeResolution::forContextual(DC),
@@ -599,12 +584,9 @@ public:
            "should be handled above");
 
     auto *subPattern = getSubExprPattern(ce->getArg());
-    return new (TC.Context) EnumElementPattern(loc,
-                                               SourceLoc(),
-                                               tailComponent->getIdLoc(),
-                                               tailComponent->getIdentifier(),
-                                               referencedElement,
-                                               subPattern);
+    return new (Context) EnumElementPattern(
+        loc, SourceLoc(), tailComponent->getIdLoc(),
+        tailComponent->getIdentifier(), referencedElement, subPattern);
   }
 };
 
@@ -618,16 +600,17 @@ public:
 /// disambiguate semantics-dependent pattern forms.
 Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
                                      bool isStmtCondition) {
-  P = ResolvePattern(*this, DC).visit(P);
+  P = ResolvePattern(DC).visit(P);
 
   // If the entire pattern is "(pattern_expr (type_expr SomeType))", then this
   // is an invalid pattern.  If it were actually a value comparison (with ~=)
   // then the metatype would have had to be spelled with "SomeType.self".  What
   // they actually meant is to write "is SomeType", so we rewrite it to that
   // pattern for good QoI.
+  auto &Context = DC->getASTContext();
   if (auto *EP = dyn_cast<ExprPattern>(P))
     if (auto *TE = dyn_cast<TypeExpr>(EP->getSubExpr())) {
-      diagnose(TE->getStartLoc(), diag::type_pattern_missing_is)
+      Context.Diags.diagnose(TE->getStartLoc(), diag::type_pattern_missing_is)
         .fixItInsert(TE->getStartLoc(), "is ");
       
       P = new (Context) IsPattern(TE->getStartLoc(), TE->getTypeLoc(),
@@ -650,7 +633,8 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
     // Check for this and recover nicely if they wrote that.
     if (auto *OSP = dyn_cast<OptionalSomePattern>(Body)) {
       if (!OSP->getSubPattern()->isRefutablePattern()) {
-        diagnose(OSP->getStartLoc(), diag::iflet_implicitly_unwraps)
+        Context.Diags.diagnose(OSP->getStartLoc(),
+                               diag::iflet_implicitly_unwraps)
           .highlight(OSP->getSourceRange())
           .fixItRemove(OSP->getQuestionLoc());
         return P;
@@ -661,7 +645,7 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
     // probably meant:
     //   if case let <pattern> =
     if (Body->isRefutablePattern()) {
-      diagnose(P->getLoc(), diag::iflet_pattern_matching)
+      Context.Diags.diagnose(P->getLoc(), diag::iflet_pattern_matching)
         .fixItInsert(P->getLoc(), "case ");
       return P;
     }

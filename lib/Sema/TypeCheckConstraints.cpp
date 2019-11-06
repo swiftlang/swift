@@ -3046,8 +3046,8 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     };
 
     // Resolve the pattern.
-    auto *pattern = resolvePattern(elt.getPattern(), dc,
-                                   /*isStmtCondition*/true);
+    auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
+                                                /*isStmtCondition*/true);
     if (!pattern) {
       typeCheckPatternFailed();
       continue;
