@@ -34,7 +34,7 @@ public struct Anchoring<Thing: Anchored> {
   ) -> Thing {
     @_transparent _read {
       let keyPath = storageKeyPath.appending(path: \._storage)
-      let p = keyPath._directAddress(in: anchor)!
+      let p = MemoryLayout.unsafeAddress(of: keyPath, in: anchor)!
       yield Thing(at: p, in: anchor)
     }
     set {
