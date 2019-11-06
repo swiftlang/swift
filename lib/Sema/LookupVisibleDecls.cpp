@@ -205,6 +205,9 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
   }
 }
 
+static void
+synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC);
+
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
 static void doGlobalExtensionLookup(Type BaseType,
@@ -221,6 +224,8 @@ static void doGlobalExtensionLookup(Type BaseType,
         IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType,
                                                        extension)), false))
       continue;
+
+    synthesizePropertyWrapperStorageWrapperProperties(extension);
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
@@ -476,6 +481,20 @@ static void
   lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason);
 }
 
+// Generate '$' and '_' prefixed variables that have attached property
+// wrappers.
+static void
+synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
+  auto SF = IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  if (!SF || SF->Kind == SourceFileKind::Interface)
+    return;
+
+  for (auto Member : IDC->getMembers())
+    if (auto var = dyn_cast<VarDecl>(Member))
+      if (var->hasAttachedPropertyWrapper())
+        (void)var->getPropertyWrapperBackingPropertyInfo();
+}
+
 /// Trigger synthesizing implicit member declarations to make them "visible".
 static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                                            const DeclContext *DC) {
@@ -505,22 +524,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
     }
   }
 
-  // Generate '$' and '_' prefixed variables that have attached property
-  // wrappers.
-  auto synthesizePropertyWrappers = [](IterableDeclContext *IDC) {
-    for (auto Member : IDC->getMembers()) {
-      if (auto var = dyn_cast<VarDecl>(Member)) {
-        if (var->hasAttachedPropertyWrapper()) {
-          auto sourceFile = var->getDeclContext()->getParentSourceFile();
-          if (sourceFile && sourceFile->Kind != SourceFileKind::Interface)
-            (void)var->getPropertyWrapperBackingPropertyInfo();
-        }
-      }
-    }
-  };
-  synthesizePropertyWrappers(NTD);
-  for (auto ED : NTD->getExtensions())
-    synthesizePropertyWrappers(ED);
+  synthesizePropertyWrapperStorageWrapperProperties(NTD);
 }
 
 static void lookupVisibleMemberDeclsImpl(
