@@ -1837,28 +1837,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->setNode(TEI, ArrayElements);
       return;
     }
-    case SILInstructionKind::UncheckedRefCastInst:
-    case SILInstructionKind::ConvertFunctionInst:
-    case SILInstructionKind::UpcastInst:
-    case SILInstructionKind::InitExistentialRefInst:
-    case SILInstructionKind::OpenExistentialRefInst:
-    case SILInstructionKind::RawPointerToRefInst:
-    case SILInstructionKind::RefToRawPointerInst:
-    case SILInstructionKind::RefToBridgeObjectInst:
-    case SILInstructionKind::BridgeObjectToRefInst:
-    case SILInstructionKind::UncheckedAddrCastInst:
-    case SILInstructionKind::UnconditionalCheckedCastInst:
-    // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
-    // retain/release instructions that trigger the 'default' case.
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-    case SILInstructionKind::RefTo##Name##Inst: \
-    case SILInstructionKind::Name##ToRefInst:
-#include "swift/AST/ReferenceStorage.def"
-      // A cast is almost like a projection.
-    if (CGNode *OpNode = ConGraph->getNode(I->getOperand(0))) {
-      ConGraph->setNode(cast<SingleValueInstruction>(I), OpNode);
-    }
-      break;
     case SILInstructionKind::UncheckedRefCastAddrInst: {
       auto *URCAI = cast<UncheckedRefCastAddrInst>(I);
       CGNode *SrcNode = ConGraph->getNode(URCAI->getSrc());
