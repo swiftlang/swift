@@ -63,7 +63,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
-  const auto innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
@@ -117,14 +117,14 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   return startingScope;
 }
 
-const ASTScopeImpl *
+ASTScopeImpl *
 ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
                                           NullablePtr<raw_ostream> os) {
   return findInnermostEnclosingScopeImpl(loc, os, getSourceManager(),
                                          getScopeCreator());
 }
 
-const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
+ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
     SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
     ScopeCreator &scopeCreator) {
   expandAndBeCurrentDetectingRecursion(scopeCreator);
