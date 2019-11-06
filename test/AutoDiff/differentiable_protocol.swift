@@ -5,6 +5,24 @@ import _Differentiation
 
 // Test conformances.
 
+struct FloatWrapper {
+  var value: Float
+}
+extension FloatWrapper: AdditiveArithmetic {
+  static var zero: Self {
+    FloatWrapper(value: Float.zero)
+  }
+  static func + (lhs: Self, rhs: Self) -> Self {
+    return FloatWrapper(value: lhs.value + rhs.value)
+  }
+  static func - (lhs: Self, rhs: Self) -> Self {
+    return FloatWrapper(value: lhs.value + rhs.value)
+  }
+}
+extension FloatWrapper: Differentiable {
+  public typealias TangentVector = Self
+}
+
 struct Wrapper<T> {
   var value: T
 }
@@ -25,10 +43,4 @@ extension Wrapper: Differentiable where T: Differentiable {
   mutating func move(along direction: TangentVector) {
     value.move(along: direction.value)
   }
-}
-
-// Test conformances for standard library types.
-
-extension Float: Differentiable {
-  public typealias TangentVector = Self
 }

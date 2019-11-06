@@ -11,14 +11,17 @@
 #===----------------------------------------------------------------------===#
 
 # SWIFT_ENABLE_TENSORFLOW
-# NOTE: This CMakeLists.txt file is currently used only on master branch, not
-# on tensorflow branch. Instead, on tensorflow branch, the Swift source files
+# NOTE: A non-empty `_Differentiation` module is currently created only on
+# master branch, not on tensorflow branch.
+#
+# Instead, on tensorflow branch, the differentiation-related Swift source files
 # in this directory are directly built as part of swiftCore: see
-# stdlib/public/core/CMakeLists.txt.
+# stdlib/public/core/CMakeLists.txt. The `_Differentiation` module is created
+# empty to avoid `#if canImport(_Differentiation)` guards in tests.
 # SWIFT_ENABLE_TENSORFLOW END
 
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  Differentiable.swift
+  Empty.swift
 
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
