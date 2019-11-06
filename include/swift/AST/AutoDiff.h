@@ -32,11 +32,11 @@ private:
   SourceLoc Loc;
   Kind Kind;
   union Value {
-    struct { Identifier Name; }; // Named
-    struct { unsigned Index; }; // Ordered
-    struct {};                  // Self
-    Value(Identifier name) : Name(name) {}
-    Value(unsigned index) : Index(index) {}
+    struct { Identifier Name; } Named;
+    struct { unsigned Index; } Ordered;
+    struct {} Self;
+    Value(Identifier name) : Named({name}) {}
+    Value(unsigned index) : Ordered({index}) {}
     Value() {}
   } V;
 
@@ -63,11 +63,11 @@ public:
 
   Identifier getName() const {
     assert(Kind == Kind::Named);
-    return V.Name;
+    return V.Named.Name;
   }
 
   unsigned getIndex() const {
-    return V.Index;
+    return V.Ordered.Index;
   }
 
   enum Kind getKind() const {
