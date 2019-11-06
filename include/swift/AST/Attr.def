@@ -203,7 +203,7 @@ DECL_ATTR(inline, Inline,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   20)
 DECL_ATTR(_semantics, Semantics,
-  OnAbstractFunction | OnSubscript | OnNominalType |
+  OnAbstractFunction | OnSubscript | OnNominalType | OnVar |
   AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   21)
