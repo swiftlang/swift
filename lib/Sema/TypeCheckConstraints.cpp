@@ -2980,7 +2980,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Stmt->setPattern(pattern);
       Stmt->setSequence(expr);
 
-      cs.setExprTypes(expr);
+      solution.setExprTypes(expr);
       return expr;
     }
   };
@@ -3464,7 +3464,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
     return true;
   }
 
-  cs.setExprTypes(expr);
+  solution.setExprTypes(expr);
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
