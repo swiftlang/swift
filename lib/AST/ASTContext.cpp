@@ -74,7 +74,6 @@ STATISTIC(NumCollapsedSpecializedProtocolConformances,
 /// GenericSignatureBuilder.
 #define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
-LazyResolver::~LazyResolver() = default;
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
 
@@ -160,8 +159,8 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
-  /// The last resolver.
-  LazyResolver *Resolver = nullptr;
+  /// A global type checker instance..
+  TypeChecker *Checker = nullptr;
 
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
@@ -480,8 +479,6 @@ ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
       TheSyntaxArena(new syntax::SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
-  delete Resolver;
-
   for (auto &cleanup : Cleanups)
     cleanup();
 }
@@ -627,16 +624,13 @@ RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
 }
 
-LazyResolver *ASTContext::getLazyResolver() const {
-  return getImpl().Resolver;
+TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
+  return getImpl().Checker;
 }
 
-/// Set the lazy resolver for this context.
-void ASTContext::setLazyResolver(LazyResolver *resolver) {
-  if (auto existing = getImpl().Resolver)
-    delete existing;
-
-  getImpl().Resolver = resolver;
+void ASTContext::installGlobalTypeChecker(TypeChecker *TC) {
+  assert(!getImpl().Checker);
+  getImpl().Checker = TC;
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the

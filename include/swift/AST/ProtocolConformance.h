@@ -52,7 +52,7 @@ typedef llvm::DenseMap<ValueDecl *, Witness> WitnessMap;
 
 /// Map from associated type requirements to the corresponding type and
 /// the type declaration that was used to satisfy the requirement.
-typedef llvm::DenseMap<AssociatedTypeDecl *, std::pair<Type, TypeDecl*>>
+typedef llvm::DenseMap<AssociatedTypeDecl *, TypeWitnessAndDecl>
   TypeWitnessMap;
 
 /// Describes the kind of protocol conformance structure used to encode
@@ -157,7 +157,7 @@ public:
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<Type, TypeDecl *>
+  TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options=None) const;
 
@@ -182,7 +182,7 @@ public:
         continue;
 
       const auto &TWInfo = getTypeWitnessAndDecl(assocTypeReq);
-      if (f(assocTypeReq, TWInfo.first, TWInfo.second))
+      if (f(assocTypeReq, TWInfo.getWitnessType(), TWInfo.getWitnessDecl()))
         return true;
     }
 
@@ -404,6 +404,9 @@ public:
 class NormalProtocolConformance : public RootProtocolConformance,
                                   public llvm::FoldingSetNode
 {
+  friend class ValueWitnessRequest;
+  friend class TypeWitnessRequest;
+
   /// The protocol being conformed to and its current state.
   llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
     ProtocolAndState;
@@ -588,9 +591,12 @@ public:
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<Type, TypeDecl *>
+  TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options=None) const;
+
+  TypeWitnessAndDecl
+  getTypeWitnessUncached(AssociatedTypeDecl *requirement) const;
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
@@ -609,6 +615,8 @@ public:
 
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement) const;
+
+  Witness getWitnessUncached(ValueDecl *requirement) const;
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
@@ -641,7 +649,7 @@ public:
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
-    TypeDecl *witnessDecl = getTypeWitnessAndDecl(requirement).second;
+    TypeDecl *witnessDecl = getTypeWitnessAndDecl(requirement).getWitnessDecl();
     if (witnessDecl)
       return witnessDecl->isImplicit();
     // Conservatively assume it does not.
@@ -713,7 +721,7 @@ public:
     llvm_unreachable("self-conformances never have associated types");
   }
 
-  std::pair<Type, TypeDecl *>
+  TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options=None) const {
     llvm_unreachable("self-conformances never have associated types");
@@ -859,7 +867,7 @@ public:
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<Type, TypeDecl *>
+  TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options=None) const;
 
@@ -971,7 +979,7 @@ public:
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<Type, TypeDecl *>
+  TypeWitnessAndDecl
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         SubstOptions options=None) const {
     return InheritedConformance->getTypeWitnessAndDecl(assocType, options);
@@ -1014,6 +1022,8 @@ inline bool ProtocolConformance::isInvalid() const {
 inline bool ProtocolConformance::hasWitness(ValueDecl *requirement) const {
   return getRootConformance()->hasWitness(requirement);
 }
+
+void simple_display(llvm::raw_ostream &out, const ProtocolConformance *conf);
 
 } // end namespace swift
 

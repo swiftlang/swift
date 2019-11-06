@@ -2889,8 +2889,8 @@ Type ValueDecl::getInterfaceType() const {
 
   // N.B. This assertion exists to catch new broken callers. It can be removed
   // with the LazyResolver when the time comes.
-  assert(ctx.getLazyResolver()
-         && "The lazy resolver must be registered to make semantic queries!");
+  assert(ctx.getLegacyGlobalTypeChecker()
+         && "The type checker must be installed to make semantic queries!");
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
@@ -5686,8 +5686,9 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
+  if (!ctx.getLegacyGlobalTypeChecker()) {
     return { };
+  }
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
@@ -6542,7 +6543,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().getLazyResolver() && !skipIsObjCResolution)
+  if (getASTContext().getLegacyGlobalTypeChecker() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

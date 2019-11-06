@@ -188,6 +188,40 @@ public:
   void dump(llvm::raw_ostream &out) const;
 };
 
+struct TypeWitnessAndDecl {
+  Type witnessType;
+  TypeDecl *witnessDecl = nullptr;
+
+  TypeWitnessAndDecl() = default;
+  TypeWitnessAndDecl(Type ty, TypeDecl *decl)
+    : witnessType(ty), witnessDecl(decl) {}
+
+public:
+  Type getWitnessType() const {
+    return witnessType;
+  }
+
+  TypeDecl *getWitnessDecl() const {
+    return witnessDecl;
+  }
+
+  friend llvm::hash_code hash_value(const TypeWitnessAndDecl &owner) {
+    return llvm::hash_combine(owner.witnessType,
+                              owner.witnessDecl);
+  }
+
+  friend bool operator==(const TypeWitnessAndDecl &lhs,
+                         const TypeWitnessAndDecl &rhs) {
+    return lhs.witnessType->isEqual(rhs.witnessType) &&
+           lhs.witnessDecl == rhs.witnessDecl;
+  }
+
+  friend bool operator!=(const TypeWitnessAndDecl &lhs,
+                         const TypeWitnessAndDecl &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
 } // end namespace swift
 
 #endif // SWIFT_AST_WITNESS_H

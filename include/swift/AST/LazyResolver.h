@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the LazyResolver abstract interface.
+// This file defines the abstract interfaces for lazily resolving declarations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,23 +36,6 @@ class ProtocolDecl;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
-
-/// Abstract interface used to lazily resolve aspects of the AST, such as the
-/// types of declarations or protocol conformance structures.
-class LazyResolver {
-public:
-  virtual ~LazyResolver();
-
-  /// Resolve the type witnesses for the given associated type within the given
-  /// protocol conformance.
-  virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *assocType) = 0;
-
-  /// Resolve the witness for the given non-type requirement within
-  /// the given protocol conformance.
-  virtual void resolveWitness(const NormalProtocolConformance *conformance,
-                              ValueDecl *requirement) = 0;
-};
 
 class LazyMemberLoader;
 

@@ -170,8 +170,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   auto &Context = binding->getASTContext();
 
   // Resolve the pattern.
-  auto *TC =
-      static_cast<TypeChecker *>(binding->getASTContext().getLazyResolver());
+  auto *TC = binding->getASTContext().getLegacyGlobalTypeChecker();
   auto *pattern = TC->resolvePattern(binding->getPattern(entryNumber),
                                      binding->getDeclContext(),
                                      /*isStmtCondition*/ true);
@@ -824,7 +823,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     };
 
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
-    auto &tc = static_cast<TypeChecker&>(*ctx.getLazyResolver());
+    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
@@ -1161,7 +1160,7 @@ static std::pair<BraceStmt *, bool>
 synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                          ASTContext &Ctx) {
   // FIXME: Remove TypeChecker dependencies below.
-  auto &TC = *(TypeChecker *) Ctx.getLazyResolver();
+  auto &TC = *Ctx.getLegacyGlobalTypeChecker();
 
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
@@ -2212,7 +2211,7 @@ static void typeCheckSynthesizedWrapperInitializer(
 
   // Type-check the initialization.
   ASTContext &ctx = pbd->getASTContext();
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  auto &tc = *ctx.getLegacyGlobalTypeChecker();
   tc.typeCheckExpression(initializer, originalDC);
   const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
@@ -2387,7 +2386,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!parentPBD->isInitialized(patternNumber)
       && parentPBD->isDefaultInitializable(patternNumber)
       && !wrapperInfo.defaultInit) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     auto ty = parentPBD->getPattern(patternNumber)->getType();
     if (auto defaultInit = tc.buildDefaultInitializer(ty))
       parentPBD->setInit(patternNumber, defaultInit);
@@ -2395,7 +2394,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
   }
 

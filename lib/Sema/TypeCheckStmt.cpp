@@ -1867,7 +1867,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
-  TypeChecker &tc = *static_cast<TypeChecker *>(Context.getLazyResolver());
+  TypeChecker &tc = *Context.getLegacyGlobalTypeChecker();
   DiagnosticSuppression suppression(tc.Diags);
   auto resultTy =
       tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
@@ -1881,7 +1881,7 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
-static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor, 
+static bool checkSuperInit(ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
@@ -1895,8 +1895,9 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
       if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
         assert(classTy->getSuperclass());
-        tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
-                    classTy->getSuperclass());
+        auto &Diags = fromCtor->getASTContext().Diags;
+        Diags.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
+                       classTy->getSuperclass());
         ctor->diagnose(diag::convenience_init_here);
       }
     }
@@ -1934,7 +1935,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
       bool treatUsableFromInlineAsPublic;
       std::tie(fragileKind, treatUsableFromInlineAsPublic) =
           TypeChecker::getFragileFunctionKind(fromCtor);
-      tc.diagnoseInlinableDeclRef(
+      TypeChecker::diagnoseInlinableDeclRef(
           fromCtor->getLoc(), ctor, fromCtor, fragileKind,
           treatUsableFromInlineAsPublic);
     }
@@ -1957,7 +1958,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
                                       ConstructorDecl *ctor,
                                       BraceStmt *body) {
   ASTContext &ctx = classDecl->getASTContext();
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   bool wantSuperInitCall = false;
   bool isDelegating = false;
   ApplyExpr *initExpr = nullptr;
@@ -1968,7 +1968,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
     break;
 
   case ConstructorDecl::BodyInitKind::Chained:
-    checkSuperInit(tc, ctor, initExpr, false);
+    checkSuperInit(ctor, initExpr, false);
 
     /// A convenience initializer cannot chain to a superclass constructor.
     if (ctor->isConvenienceInit()) {
@@ -2044,7 +2044,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
 
   FindOtherConstructorRef finder;
   SuperInitCall->walk(finder);
-  if (!checkSuperInit(tc, ctor, finder.Found, true)) {
+  if (!checkSuperInit(ctor, finder.Found, true)) {
     // Store the super.init expression within the constructor declaration
     // to be emitted during SILGen.
     ctor->setSuperInitCall(SuperInitCall);
@@ -2067,7 +2067,7 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
   if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 

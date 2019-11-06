@@ -21,13 +21,10 @@
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckObjC.h"
-#include "swift/Basic/SourceManager.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -38,10 +35,14 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -981,9 +982,8 @@ bool WitnessChecker::findBestWitness(
   bool anyFromUnconstrainedExtension;
   numViable = 0;
 
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *TC = static_cast<TypeChecker *>(
-      requirement->getASTContext().getLazyResolver());
+  // FIXME: Remove dependency on the global type checker.
+  auto *TC = requirement->getASTContext().getLegacyGlobalTypeChecker();
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
     SmallVector<ValueDecl *, 4> witnesses;
@@ -1309,8 +1309,8 @@ isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req) {
   if (isa<TypeDecl>(req)) return false;
 
   auto witness = conformance->hasWitness(req)
-    ? conformance->getWitness(req).getDecl()
-    : nullptr;
+                     ? conformance->getWitnessUncached(req).getDecl()
+                     : nullptr;
 
   // An optional requirement might not have a witness...
   if (!witness)
@@ -2237,8 +2237,9 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                        const RequirementMatch &match) {
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(Conformance->getWitness(requirement).getDecl() ==
-             match.Witness && "Deduced different witnesses?");
+    assert(Conformance->getWitnessUncached(requirement).getDecl() ==
+               match.Witness &&
+           "Deduced different witnesses?");
     return;
   }
 
@@ -2250,7 +2251,7 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(!Conformance->getWitness(requirement).getDecl() &&
+    assert(!Conformance->getWitnessUncached(requirement).getDecl() &&
            "Already have a non-optional witness?");
     return;
   }
@@ -2264,7 +2265,7 @@ void ConformanceChecker::recordInvalidWitness(ValueDecl *requirement) {
 
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(!Conformance->getWitness(requirement).getDecl() &&
+    assert(!Conformance->getWitnessUncached(requirement).getDecl() &&
            "Already have a non-optional witness?");
     return;
   }
@@ -2422,7 +2423,9 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitness(assocType)->isEqual(type) &&
+    assert(Conformance->getTypeWitnessUncached(assocType)
+               .getWitnessType()
+               ->isEqual(type) &&
            "Conflicting type witness deductions");
     return;
   }
@@ -3368,7 +3371,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto *TC = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
+  auto *TC = getASTContext().getLegacyGlobalTypeChecker();
   auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, Conformance, DC,
                             requirement, derived);
   if (match.isViable()) {
@@ -3748,7 +3751,7 @@ void ConformanceChecker::resolveValueWitnesses() {
     /// Local function to finalize the witness.
     auto finalizeWitness = [&] {
       // Find the witness.
-      auto witness = Conformance->getWitness(requirement).getDecl();
+      auto witness = Conformance->getWitnessUncached(requirement).getDecl();
       if (!witness) return;
 
       // Objective-C checking for @objc requirements.
@@ -4537,8 +4540,8 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   // Describe why the witness didn't satisfy the requirement.
   WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *TC = static_cast<TypeChecker *>(req->getASTContext().getLazyResolver());
+  // FIXME: Remove dependency on the global type checker.
+  auto *TC = req->getASTContext().getLegacyGlobalTypeChecker();
   auto match = matchWitness(*TC, oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
   if (match.Kind == MatchKind::ExactMatch &&
@@ -5169,10 +5172,9 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        auto lazyResolver = ctx.getLazyResolver();
-        assert(lazyResolver && "Need a type checker to match witnesses");
-        auto &tc = *static_cast<TypeChecker *>(lazyResolver);
-        if (matchWitness(tc, reqEnvCache, proto, *conformance,
+        auto *TC = ctx.getLegacyGlobalTypeChecker();
+        assert(TC && "Need a type checker to match witnesses");
+        if (matchWitness(*TC, reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {
@@ -5228,25 +5230,43 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
   return result;
 }
 
-void TypeChecker::resolveTypeWitness(
-       const NormalProtocolConformance *conformance,
-       AssociatedTypeDecl *assocType) {
+llvm::Expected<TypeWitnessAndDecl>
+TypeWitnessRequest::evaluate(Evaluator &eval,
+                             NormalProtocolConformance *conformance,
+                             AssociatedTypeDecl *requirement) const {
   llvm::SetVector<ValueDecl*> MissingWitnesses;
-  ConformanceChecker checker(
-      Context, const_cast<NormalProtocolConformance *>(conformance),
-      MissingWitnesses);
-  checker.resolveSingleTypeWitness(assocType);
+  ConformanceChecker checker(requirement->getASTContext(), conformance,
+                             MissingWitnesses);
+  checker.resolveSingleTypeWitness(requirement);
   checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
+  // FIXME: ConformanceChecker and the other associated WitnessCheckers have
+  // an extremely convoluted caching scheme that doesn't fit nicely into the
+  // evaluator's model. All of this should be refactored away.
+  const auto known = conformance->TypeWitnesses.find(requirement);
+  assert(known != conformance->TypeWitnesses.end() &&
+         "Didn't resolve witness?");
+  return known->second;
 }
 
-void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
-                                 ValueDecl *requirement) {
+llvm::Expected<Witness>
+ValueWitnessRequest::evaluate(Evaluator &eval,
+                              NormalProtocolConformance *conformance,
+                              ValueDecl *requirement) const {
   llvm::SetVector<ValueDecl*> MissingWitnesses;
-  ConformanceChecker checker(
-      Context, const_cast<NormalProtocolConformance *>(conformance),
-      MissingWitnesses);
+  ConformanceChecker checker(requirement->getASTContext(), conformance,
+                             MissingWitnesses);
   checker.resolveSingleWitness(requirement);
   checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
+  // FIXME: ConformanceChecker and the other associated WitnessCheckers have
+  // an extremely convoluted caching scheme that doesn't fit nicely into the
+  // evaluator's model. All of this should be refactored away.
+  const auto known = conformance->Mapping.find(requirement);
+  if (known == conformance->Mapping.end()) {
+    assert((!conformance->isComplete() || conformance->isInvalid()) &&
+           "Resolver did not resolve requirement");
+    return Witness();
+  }
+  return known->second;
 }
 
 ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
