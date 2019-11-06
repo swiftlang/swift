@@ -54,7 +54,9 @@ using namespace swift;
 TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
   assert(!ctx.getLegacyGlobalTypeChecker() &&
          "Cannot install more than one instance of the global type checker!");
-  ctx.installGlobalTypeChecker(new TypeChecker(ctx));
+  auto *TC = new TypeChecker(ctx);
+  ctx.installGlobalTypeChecker(TC);
+  ctx.addDestructorCleanup(TC);
   return *ctx.getLegacyGlobalTypeChecker();
 }
 
