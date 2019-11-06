@@ -322,7 +322,7 @@ struct Subscripts<T> {
   }
 }
 
-struct SubscriptDefaults {
+struct SubscriptDefaults1 {
   subscript(x: Int = 0) -> Int {
     get { fatalError() }
     set { fatalError() }
@@ -336,6 +336,20 @@ struct SubscriptDefaults {
     set { fatalError() }
   }
   subscript(bool x: Bool, y: Int, z: Int = 0) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+struct SubscriptDefaults2 {
+  subscript(x: Int? = nil) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+struct SubscriptDefaults3 {
+  subscript(x: Int = #line) -> Int {
     get { fatalError() }
     set { fatalError() }
   }
@@ -372,15 +386,18 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \Subscripts<T>.[Bass()]
   _ = \Subscripts<T>.[Treble()]
 
-  _ = \SubscriptDefaults.[]
-  _ = \SubscriptDefaults.[0]
-  _ = \SubscriptDefaults.[0, 0]
-  _ = \SubscriptDefaults.[0, 0, 0]
+  _ = \SubscriptDefaults1.[]
+  _ = \SubscriptDefaults1.[0]
+  _ = \SubscriptDefaults1.[0, 0]
+  _ = \SubscriptDefaults1.[0, 0, 0]
 
-  _ = \SubscriptDefaults.[false]
-  _ = \SubscriptDefaults.[false, bool: false]
-  _ = \SubscriptDefaults.[bool: false, 0]
-  _ = \SubscriptDefaults.[bool: false, 0, 0]
+  _ = \SubscriptDefaults1.[false]
+  _ = \SubscriptDefaults1.[false, bool: false]
+  _ = \SubscriptDefaults1.[bool: false, 0]
+  _ = \SubscriptDefaults1.[bool: false, 0, 0]
+  
+  _ = \SubscriptDefaults2.[]
+  _ = \SubscriptDefaults3.[]
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}subclass_generics
