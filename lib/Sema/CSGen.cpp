@@ -480,7 +480,7 @@ namespace {
     if (lti.haveFloatLiteral) {
       if (auto floatProto = CS.getASTContext().getProtocol(
               KnownProtocolKind::ExpressibleByFloatLiteral)) {
-        if (auto defaultType = CS.TC.getDefaultType(floatProto, CS.DC)) {
+        if (auto defaultType = TypeChecker::getDefaultType(floatProto, CS.DC)) {
           if (!CS.getFavoredType(expr)) {
             CS.setFavoredType(expr, defaultType.getPointer());
           }
@@ -547,7 +547,6 @@ namespace {
     if (otherArgTy)
       otherArgTy = otherArgTy->getWithoutSpecifierType();
 
-    auto &tc = CS.getTypeChecker();
     for (auto literalProto : literalProtos) {
       // If there is another, concrete argument, check whether it's type
       // conforms to the literal protocol and test against it directly.
@@ -559,7 +558,7 @@ namespace {
                 otherArgTy, literalProto, CS.DC,
                 ConformanceCheckFlags::InExpression))
           return true;
-      } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
+      } else if (Type defaultType = TypeChecker::getDefaultType(literalProto, CS.DC)) {
         // If there is a default type for the literal protocol, check whether
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.

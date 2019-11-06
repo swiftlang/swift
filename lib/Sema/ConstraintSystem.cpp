@@ -190,7 +190,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
     // If the protocol has a default type, check it.
     if (literalProtocol) {
-      if (auto defaultType = TC.getDefaultType(literalProtocol, DC)) {
+      if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
         if (defaultType->getAnyNominal() != type->getAnyNominal())
@@ -350,7 +350,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
     // Integer literals can be treated as floating point literals.
     if (auto floatProto = TC.Context.getProtocol(
                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      if (auto defaultType = TC.getDefaultType(floatProto, DC)) {
+      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC)) {
         types.push_back(defaultType);
       }
     }

@@ -657,8 +657,6 @@ namespace {
                                    ValueDecl *member) {
       assert(archetype && "archetype not already opened?");
 
-      auto &tc = cs.getTypeChecker();
-
       // Dig out the base type.
       Type baseTy = cs.getType(base);
 
@@ -702,7 +700,7 @@ namespace {
       if (isLValue)
         opaqueType = LValueType::get(opaqueType);
 
-      ASTContext &ctx = tc.Context;
+      ASTContext &ctx = cs.getASTContext();
       auto archetypeVal =
           new (ctx) OpaqueValueExpr(base->getSourceRange(), opaqueType);
       cs.cacheType(archetypeVal);
@@ -726,8 +724,6 @@ namespace {
         return false;
 
       // If we had a return type of 'Self', erase it.
-      ConstraintSystem &innerCS = solution.getConstraintSystem();
-      auto &tc = innerCS.getTypeChecker();
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistential(record.Archetype)) {
@@ -736,7 +732,7 @@ namespace {
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
         if (result == nullptr) {
-          result = new (tc.Context) ErrorExpr(range);
+          result = new (cs.getASTContext()) ErrorExpr(range);
           cs.setType(result, erasedTy);
           // The opaque value is no longer reachable in an AST walk as
           // a result of the result above being replaced with an
@@ -748,7 +744,7 @@ namespace {
       }
 
       // Form the open-existential expression.
-      result = new (tc.Context) OpenExistentialExpr(
+      result = new (cs.getASTContext()) OpenExistentialExpr(
                                   record.ExistentialValue,
                                   record.OpaqueValue,
                                   result, cs.getType(result));
@@ -1847,7 +1843,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(cs.getType(expr));
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -1894,7 +1890,7 @@ namespace {
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -1931,7 +1927,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(cs.getType(expr));
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -2027,7 +2023,7 @@ namespace {
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -7284,6 +7280,7 @@ namespace {
         Rewriter.simplifyExprType(expr);
         auto &cs = Rewriter.getConstraintSystem();
         auto &tc = cs.getTypeChecker();
+        auto &ctx = cs.getASTContext();
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
@@ -7297,10 +7294,10 @@ namespace {
             Rewriter.solution.builderTransformedClosures.find(closure);
         if (builder != Rewriter.solution.builderTransformedClosures.end()) {
           auto singleExpr = builder->second.singleExpr;
-          auto returnStmt = new (tc.Context) ReturnStmt(
+          auto returnStmt = new (ctx) ReturnStmt(
              singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
           auto braceStmt = BraceStmt::create(
-              tc.Context, returnStmt->getStartLoc(), ASTNode(returnStmt),
+              ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
               returnStmt->getEndLoc(), /*implicit=*/true);
           closure->setBody(braceStmt, /*isSingleExpression=*/true);
         }
