@@ -722,7 +722,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   // The first (and only) property of OSLogMessage is the OSLogInterpolation
   // instance.
   SymbolicValue osLogInterpolationValue =
-      osLogMessageValueOpt->getAggregateValue()[0];
+      osLogMessageValueOpt->getAggregateMembers()[0];
   if (!osLogInterpolationValue.isConstant()) {
     diagnose(astContext, sourceLoc, diag::oslog_non_constant_interpolation);
     return true;
@@ -743,7 +743,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
 
   auto propertyDecls = interpolationStruct->getStoredProperties();
   ArrayRef<SymbolicValue> propertyValues =
-      osLogInterpolationValue.getAggregateValue();
+      osLogInterpolationValue.getAggregateMembers();
   auto propValueI = propertyValues.begin();
   bool errorDetected = false;
 
