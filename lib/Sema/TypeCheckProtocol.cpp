@@ -2756,8 +2756,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                          MissingTypeWitness->getName());
           if (EditorMode) {
-            Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
-              fixItInsertAfter(FixitLocation, FixIt);
+            Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
+              .fixItInsertAfter(FixitLocation, FixIt);
           }
         }
         continue;
@@ -2771,16 +2771,16 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           // we can directly associate the fixit with the note issued to the
           // requirement.
           Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
-            VD->getFullName(), RequirementType, true).
-              fixItInsertAfter(FixitLocation, FixIt);
+            VD->getFullName(), RequirementType, true)
+              .fixItInsertAfter(FixitLocation, FixIt);
         } else {
           // Otherwise, we have to issue another note to carry the fixit,
           // because editor may assume the fixit is in the same file with the note.
           Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
             VD->getFullName(), RequirementType, false);
           if (EditorMode) {
-            Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
-              fixItInsertAfter(FixitLocation, FixIt);
+            Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
+              .fixItInsertAfter(FixitLocation, FixIt);
           }
         }
       } else {
