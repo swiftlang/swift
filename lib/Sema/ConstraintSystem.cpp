@@ -2541,7 +2541,16 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     const auto *fix = fixes.front();
-    auto *calleeLocator = getCalleeLocator(fix->getLocator());
+    auto  *locator = fix->getLocator();
+
+    // Assignment failures are all about the source expression,
+    // because they treat destination as a contextual type.
+    if (auto *anchor = locator->getAnchor()) {
+      if (auto *assignExpr = dyn_cast<AssignExpr>(anchor))
+        locator = getConstraintLocator(assignExpr->getSrc());
+    }
+
+    auto *calleeLocator = getCalleeLocator(locator);
     if (commonCalleeLocator && commonCalleeLocator != calleeLocator)
       return false;
 

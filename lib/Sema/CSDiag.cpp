@@ -282,8 +282,6 @@ private:
 
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
-  bool visitAssignExpr(AssignExpr *AE);
-  bool visitInOutExpr(InOutExpr *IOE);
   bool visitCoerceExpr(CoerceExpr *CE);
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
@@ -1295,55 +1293,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 //===----------------------------------------------------------------------===//
 // Diagnose assigning variable to itself.
 //===----------------------------------------------------------------------===//
-
-static Decl *findSimpleReferencedDecl(const Expr *E) {
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    E = LE->getSubExpr();
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl();
-
-  return nullptr;
-}
-
-static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
-  E = E->getValueProvidingExpr();
-
-  if (auto *LE = dyn_cast<LoadExpr>(E))
-    return findReferencedDecl(LE->getSubExpr());
-
-  if (auto *AE = dyn_cast<AssignExpr>(E))
-    return findReferencedDecl(AE->getDest());
-
-  if (auto *D = findSimpleReferencedDecl(E))
-    return std::make_pair(nullptr, D);
-
-  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    if (auto *BaseDecl = findSimpleReferencedDecl(MRE->getBase()))
-      return std::make_pair(BaseDecl, MRE->getMember().getDecl());
-  }
-
-  return std::make_pair(nullptr, nullptr);
-}
-
-bool TypeChecker::diagnoseSelfAssignment(const Expr *E) {
-  auto AE = dyn_cast<AssignExpr>(E);
-  if (!AE)
-    return false;
-
-  auto LHSDecl = findReferencedDecl(AE->getDest());
-  auto RHSDecl = findReferencedDecl(AE->getSrc());
-
-  if (LHSDecl.second && LHSDecl == RHSDecl) {
-    diagnose(AE->getLoc(), LHSDecl.first ? diag::self_assignment_prop
-                                         : diag::self_assignment_var)
-    .highlight(AE->getDest()->getSourceRange())
-    .highlight(AE->getSrc()->getSourceRange());
-    return true;
-  }
-
-  return false;
-}
 
 static bool isSymmetricBinaryOperator(const CalleeCandidateInfo &CCI) {
   // If we don't have at least one known candidate, don't trigger.
@@ -3179,113 +3128,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   return true;
 }
 
-bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(assignExpr->getDest()->getValueProvidingExpr())) {
-    diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
-    return true;
-  }
-
-  // Situation like `var foo = &bar` didn't get diagnosed early
-  // because originally its parent is a `SequenceExpr` which hasn't
-  // been folded yet, and could represent an operator which accepts
-  // `inout` arguments.
-  if (auto *AddrOf = dyn_cast<InOutExpr>(assignExpr->getSrc())) {
-    diagnose(AddrOf->getLoc(), diag::extraneous_address_of);
-    return true;
-  }
-
-  if (CS.TC.diagnoseSelfAssignment(assignExpr))
-    return true;
-
-  // Type check the destination first, so we can coerce the source to it.
-  auto destExpr = typeCheckChildIndependently(assignExpr->getDest(),
-                                              TCC_AllowLValue);
-  if (!destExpr) return true;
-
-  auto destType = CS.getType(destExpr);
-  if (destType->is<UnresolvedType>() || destType->hasTypeVariable()) {
-    // Look closer into why destination has unresolved types since such
-    // means that destination has diagnosable structural problems, and it's
-    // better to diagnose destination (if possible) before moving on to
-    // the source of the assignment.
-    destExpr = typeCheckChildIndependently(
-        destExpr, TCC_AllowLValue | TCC_ForceRecheck, false);
-    if (!destExpr)
-      return true;
-
-    // If re-checking destination didn't produce diagnostic, let's just type
-    // check the source without contextual information.  If it succeeds, then we
-    // win, but if it fails, we'll have to diagnose this another way.
-    return !typeCheckChildIndependently(assignExpr->getSrc());
-  }
-
-  // If the result type is a non-lvalue, then we are failing because it is
-  // immutable and that's not a great thing to assign to.
-  if (!destType->hasLValueType()) {
-    // If the destination is a subscript, the problem may actually be that we
-    // incorrectly decided on a get-only subscript overload, and we may be able
-    // to come up with a better diagnosis by looking only at subscript candidates
-    // that are set-able.
-    if (auto subscriptExpr = dyn_cast<SubscriptExpr>(destExpr)) {
-      if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
-        return true;
-    }
-    // Member ref assignment errors detected elsewhere, so not an assignment issue if found here.
-    // The remaining exception involves mutable pointer conversions which aren't always caught elsewhere.
-    PointerTypeKind ptk;
-    if (!isa<MemberRefExpr>(destExpr) || CS.getType(destExpr)
-                                             ->lookThroughAllOptionalTypes()
-                                             ->getAnyPointerElementType(ptk)) {
-      AssignmentFailure failure(destExpr, CS, assignExpr->getLoc());
-      if (failure.diagnoseAsError())
-        return true;
-    }
-  }
-
-  auto *srcExpr = assignExpr->getSrc();
-  auto contextualType = destType->getRValueType();
-  auto contextualTypePurpose = isa<SubscriptExpr>(destExpr)
-                                   ? CTP_SubscriptAssignSource
-                                   : CTP_AssignSource;
-  // Let's try to type-check assignment source expression without using
-  // destination as a contextual type, that allows us to diagnose
-  // contextual problems related to source much easier.
-  //
-  // If source expression requires contextual type to be present,
-  // let's avoid this step because it's always going to fail.
-  {
-    auto *srcExpr = assignExpr->getSrc();
-    ExprTypeSaverAndEraser eraser(srcExpr);
-
-    ConcreteDeclRef ref = nullptr;
-    auto type = getTypeOfExpressionWithoutApplying(srcExpr, CS.DC, ref);
-
-    if (type && !type->isEqual(contextualType))
-      return diagnoseContextualConversionError(
-          assignExpr->getSrc(), contextualType, contextualTypePurpose);
-  }
-
-  srcExpr = typeCheckChildIndependently(assignExpr->getSrc(), contextualType,
-                                        contextualTypePurpose);
-  if (!srcExpr)
-    return true;
-
-  // If we are assigning to _ and have unresolved types on the RHS, then we have
-  // an ambiguity problem.
-  if (isa<DiscardAssignmentExpr>(destExpr->getSemanticsProvidingExpr()) &&
-      CS.getType(srcExpr)->hasUnresolvedType()) {
-    diagnoseAmbiguity(srcExpr);
-    return true;
-  }
-
-  return false;
-}
-
-bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  return false;
-}
-
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   // Coerce the input to whatever type is specified by the CoerceExpr.
   auto expr = typeCheckChildIndependently(CE->getSubExpr(),
@@ -3797,128 +3639,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       return true;
     }
 
-    auto *argExpr = E->getArgument();
-    auto candidateArgTy = candidateInfo[0].getArgumentType(CS.getASTContext());
-
-    // Depending on how we matched, produce tailored diagnostics.
-    switch (candidateInfo.closeness) {
-    case CC_SelfMismatch:         // Self argument mismatches.
-      llvm_unreachable("These aren't produced by filterContextualMemberList");
-      return false;
-
-    case CC_NonLValueInOut: // First argument is inout but no lvalue present.
-    case CC_OneArgumentMismatch: // All arguments except one match.
-    case CC_OneArgumentNearMismatch:
-    case CC_OneGenericArgumentMismatch:
-    case CC_OneGenericArgumentNearMismatch:
-    case CC_GenericNonsubstitutableMismatch:
-    case CC_ArgumentNearMismatch: // Argument list mismatch.
-    case CC_ArgumentMismatch:     // Argument list mismatch.
-      // Candidate filtering can produce these now, but they can't
-      // be properly diagnosed here at the moment.
-      return false;
-
-    case CC_ExactMatch: { // This is a perfect match for the arguments.
-
-      // If we have an exact match, then we must have an argument list, check
-      // it.
-      if (candidateArgTy) {
-        assert(argExpr && "Exact match without argument?");
-        if (!typeCheckArgumentChildIndependently(argExpr, candidateArgTy,
-                                                 candidateInfo))
-          return true;
-      }
-
-      // If the argument is a match, then check the result type.  We might have
-      // looked up a contextual member whose result type disagrees with the
-      // expected result type.
-      auto resultTy = candidateInfo[0].getResultType();
-      if (!resultTy)
-        resultTy = candidateInfo[0].getType();
-
-      if (resultTy && !CS.getContextualType()->is<UnboundGenericType>() &&
-          !CS.TC.isConvertibleTo(resultTy, CS.getContextualType(), CS.DC)) {
-        diagnose(E->getNameLoc(), diag::expected_result_in_contextual_member,
-                 E->getName(), resultTy, CS.getContextualType());
-        return true;
-      }
-
-      // Otherwise, this is an exact match, return false to diagnose this as an
-      // ambiguity.  It must be some other problem, such as failing to infer a
-      // generic argument on the enum type.
-      return false;
-    }
-
-    case CC_Unavailable:
-    case CC_Inaccessible:
-      // Diagnose some simple and common errors.
-      return candidateInfo.diagnoseSimpleErrors(E);
-
-    case CC_ArgumentLabelMismatch:
-    case CC_ArgumentCountMismatch: {
-      // If we have no argument, the candidates must have expected one.
-      if (!argExpr) {
-        if (!candidateArgTy)
-          return false; // Candidate must be incorrect for some other reason.
-
-        // Pick one of the arguments that are expected as an exemplar.
-        if (candidateArgTy->isVoid()) {
-          // If this member is () -> T, suggest adding parentheses.
-          diagnose(E->getNameLoc(), diag::expected_parens_in_contextual_member,
-                   E->getName())
-              .fixItInsertAfter(E->getEndLoc(), "()");
-        } else {
-          diagnose(E->getNameLoc(),
-                   diag::expected_argument_in_contextual_member, E->getName(),
-                   candidateArgTy);
-        }
-        return true;
-      }
-
-      assert(argExpr && candidateArgTy && "Exact match without an argument?");
-      return diagnoseSingleCandidateFailures(candidateInfo, E, argExpr,
-                                             E->getArgumentLabels());
-    }
-
-    case CC_GeneralMismatch: { // Something else is wrong.
-      // If an argument value was specified, but this member expects no
-      // arguments,
-      // then we fail with a nice error message.
-      if (!candidateArgTy) {
-        auto kind = candidateInfo[0].getDecl()->getDescriptiveKind();
-        bool isVoid = CS.getType(argExpr)->isVoid();
-        auto argumentRange = E->getArgument()->getSourceRange();
-        if (kind == DescriptiveDeclKind::EnumElement) {
-          if (isVoid) {
-            diagnose(E->getNameLoc(), diag::unexpected_arguments_in_enum_case,
-                     E->getName())
-                .fixItRemove(argumentRange);
-          } else {
-            diagnose(E->getNameLoc(), diag::unexpected_arguments_in_enum_case,
-                     E->getName())
-                .highlight(argumentRange);
-          }
-        } else {
-          if (isVoid) {
-            diagnose(E->getNameLoc(),
-                     diag::unexpected_arguments_in_contextual_member, kind,
-                     E->getName())
-                .fixItRemove(argumentRange);
-          } else {
-            diagnose(E->getNameLoc(),
-                     diag::unexpected_arguments_in_contextual_member, kind,
-                     E->getName())
-                .highlight(argumentRange);
-          }
-        }
-        return true;
-      }
-
-      return false;
-    }
-    }
-
-    llvm_unreachable("all cases should be handled");
+    return false;
   };
 
   return diagnoseMemberFailures(E, nullptr, memberConstraint->getKind(),
@@ -4520,6 +4241,30 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
 
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
+  if (auto *assignment = dyn_cast<AssignExpr>(E)) {
+    if (isa<DiscardAssignmentExpr>(assignment->getDest())) {
+      auto *srcExpr = assignment->getSrc();
+
+      bool diagnosedInvalidUseOfDiscardExpr = false;
+      srcExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
+        if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
+          diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment)
+              .highlight(srcExpr->getSourceRange());
+          diagnosedInvalidUseOfDiscardExpr = true;
+          return nullptr;
+        }
+
+        return expr;
+      });
+
+      if (diagnosedInvalidUseOfDiscardExpr)
+        return;
+
+      diagnoseAmbiguity(srcExpr);
+      return;
+    }
+  }
+
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
