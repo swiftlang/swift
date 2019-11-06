@@ -286,8 +286,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
-                              fnInterfaceType, fnType, callee);
+  return FunctionArgApplyInfo(cs, argExpr, argIdx, getType(argExpr),
+                              paramIdx, fnInterfaceType, fnType, callee);
 }
 
 Type FailureDiagnostic::restoreGenericParameters(
@@ -5680,13 +5680,16 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
     return true;
 
   // Otherwise, emit a more general diagnostic.
+  SmallString<8> scratch;
+  auto argDesc = getArgDescription(scratch);
+
   auto *argExpr = getArgExpr();
   if (isa<InOutExpr>(argExpr)) {
     auto diagID = DowngradeToWarning
                       ? diag::cannot_use_inout_non_ephemeral_warning
                       : diag::cannot_use_inout_non_ephemeral;
 
-    emitDiagnostic(argExpr->getLoc(), diagID, getArgPosition(), getCallee(),
+    emitDiagnostic(argExpr->getLoc(), diagID, argDesc, getCallee(),
                    getCalleeFullName())
         .highlight(argExpr->getSourceRange());
   } else {
@@ -5694,7 +5697,7 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
                       ? diag::cannot_pass_type_to_non_ephemeral_warning
                       : diag::cannot_pass_type_to_non_ephemeral;
 
-    emitDiagnostic(argExpr->getLoc(), diagID, getArgType(), getArgPosition(),
+    emitDiagnostic(argExpr->getLoc(), diagID, getArgType(), argDesc,
                    getCallee(), getCalleeFullName())
         .highlight(argExpr->getSourceRange());
   }

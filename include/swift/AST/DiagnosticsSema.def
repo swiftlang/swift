@@ -401,18 +401,18 @@ ERROR(cannot_convert_argument_value_generic,none,
 
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
-      "cannot pass %0 to parameter; argument #%1 must be a pointer that "
-      "outlives the call%select{| to %3}2", (Type, unsigned, bool, DeclName))
+      "cannot pass %0 to parameter; argument %1 must be a pointer that "
+      "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
 WARNING(cannot_pass_type_to_non_ephemeral_warning,none,
-        "passing %0 to parameter, but argument #%1 should be a pointer that "
-        "outlives the call%select{| to %3}2", (Type, unsigned, bool, DeclName))
+        "passing %0 to parameter, but argument %1 should be a pointer that "
+        "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
 ERROR(cannot_use_inout_non_ephemeral,none,
-      "cannot use inout expression here; argument #%0 must be a pointer that "
-      "outlives the call%select{| to %2}1", (unsigned, bool, DeclName))
+      "cannot use inout expression here; argument %0 must be a pointer that "
+      "outlives the call%select{| to %2}1", (StringRef, bool, DeclName))
 WARNING(cannot_use_inout_non_ephemeral_warning,none,
-        "inout expression creates a temporary pointer, but argument #%0 should "
+        "inout expression creates a temporary pointer, but argument %0 should "
         "be a pointer that outlives the call%select{| to %2}1",
-        (unsigned, bool, DeclName))
+        (StringRef, bool, DeclName))
 ERROR(cannot_construct_dangling_pointer,none,
       "initialization of %0 results in a dangling %select{|buffer }1pointer",
       (Type, unsigned))
