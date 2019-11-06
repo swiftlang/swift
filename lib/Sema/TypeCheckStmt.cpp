@@ -1990,9 +1990,15 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
 
   // A class designated initializer must never be delegating.
   if (ctor->isDesignatedInit() && isDelegating) {
-    ctor->diagnose(diag::delegating_designated_init,
-                   ctor->getDeclContext()->getDeclaredInterfaceType())
-      .fixItInsert(ctor->getLoc(), "convenience ");
+    if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+      ctor->diagnose(diag::delegating_designated_init_in_extension,
+                     ctor->getDeclContext()->getDeclaredInterfaceType());
+    } else {
+      ctor->diagnose(diag::delegating_designated_init,
+                     ctor->getDeclContext()->getDeclaredInterfaceType())
+          .fixItInsert(ctor->getLoc(), "convenience ");
+    }
+
     ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
   }
 
