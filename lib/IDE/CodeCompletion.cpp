@@ -4164,17 +4164,12 @@ public:
     if (Access < AccessLevel::Public &&
         !isa<ProtocolDecl>(VD->getDeclContext())) {
       for (auto Conformance : CurrentNominal->getAllConformances()) {
-        auto Proto = Conformance->getProtocol();
-        for (auto Member : Proto->getMembers()) {
-          auto Requirement = dyn_cast<ValueDecl>(Member);
-          if (!Requirement || !Requirement->isProtocolRequirement() ||
-              isa<AssociatedTypeDecl>(Requirement))
-            continue;
-
-          auto Witness = Conformance->getWitnessDecl(Requirement);
-          if (Witness == VD)
-            Access = std::max(Access, Requirement->getFormalAccess());
-        }
+        Conformance->getRootConformance()->forEachValueWitness(
+            [&](ValueDecl *req, Witness witness) {
+              if (witness.getDecl() == VD)
+                Access = std::max(
+                    Access, Conformance->getProtocol()->getFormalAccess());
+            });
       }
     }
 

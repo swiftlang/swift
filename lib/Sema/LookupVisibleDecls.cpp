@@ -513,15 +513,11 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
         Conformance->getRootConformance());
     if (!NormalConformance)
       continue;
-    for (auto Member : Proto->getMembers()) {
-      auto *VD = dyn_cast<ValueDecl>(Member);
-      if (!VD || !VD->isProtocolRequirement())
-        continue;
-      if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member))
-        (void)NormalConformance->getTypeWitnessAndDecl(ATD);
-      else
-        (void)NormalConformance->getWitness(VD);
-    }
+    NormalConformance->forEachTypeWitness(
+        [](AssociatedTypeDecl *, Type, TypeDecl *) { return false; },
+        /*useResolver=*/true);
+    NormalConformance->forEachValueWitness([](ValueDecl *, Witness) {},
+                                           /*useResolver=*/true);
   }
 
   synthesizePropertyWrapperStorageWrapperProperties(NTD);
