@@ -271,6 +271,9 @@ public:
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
 
+  /// The # of times we have performed typo correction.
+  unsigned NumTypoCorrections = 0;
+
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -840,6 +843,11 @@ public:
   /// This guarantees that resulted \p names doesn't have duplicated names.
   void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
+  /// Whether to perform typo correction given the pre-configured correction limit.
+  /// Increments \c NumTypoCorrections then checks this against the limit in
+  /// the language options.
+  bool shouldPerformTypoCorrection();
+  
 private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already

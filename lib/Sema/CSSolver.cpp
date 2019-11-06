@@ -1685,7 +1685,7 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
   llvm::SmallVector<ProtocolDecl *, 2> skippedProtocols;
 
   for (auto *protocol : LiteralProtocols) {
-    if (auto defaultType = CS.TC.getDefaultType(protocol, CS.DC)) {
+    if (auto defaultType = TypeChecker::getDefaultType(protocol, CS.DC)) {
       candidates.push_back({protocol, defaultType});
       continue;
     }
@@ -1923,7 +1923,7 @@ void ConstraintSystem::sortDesignatedTypes(
     return;
 
   for (auto *protocol : argInfo.getLiteralProtocols()) {
-    auto defaultType = TC.getDefaultType(protocol, DC);
+    auto defaultType = TypeChecker::getDefaultType(protocol, DC);
     // ExpressibleByNilLiteral does not have a default type.
     if (!defaultType)
       continue;

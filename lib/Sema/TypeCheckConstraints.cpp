@@ -235,10 +235,9 @@ static bool containsDeclRefKind(LookupResult &lookupResult,
 
 /// Emit a diagnostic with a fixit hint for an invalid binary operator, showing
 /// how to split it according to splitCandidate.
-static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
+static void diagnoseBinOpSplit(ASTContext &Context, UnresolvedDeclRefExpr *UDRE,
                                std::pair<unsigned, bool> splitCandidate,
-                               Diag<Identifier, Identifier, bool> diagID,
-                               TypeChecker &TC) {
+                               Diag<Identifier, Identifier, bool> diagID) {
 
   unsigned splitLoc = splitCandidate.first;
   bool isBinOpFirst = splitCandidate.second;
@@ -247,9 +246,9 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
   auto endStr = nameStr.drop_front(splitLoc);
 
   // One valid split found, it is almost certainly the right answer.
-  auto diag = TC.diagnose(UDRE->getLoc(), diagID,
-                          TC.Context.getIdentifier(startStr),
-                          TC.Context.getIdentifier(endStr), isBinOpFirst);
+  auto diag = Context.Diags.diagnose(
+      UDRE->getLoc(), diagID, Context.getIdentifier(startStr),
+      Context.getIdentifier(endStr), isBinOpFirst);
   // Highlight the whole operator.
   diag.highlight(UDRE->getLoc());
   // Insert whitespace on the left if the binop is at the start, or to the
@@ -268,8 +267,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 /// needs whitespace.  If so, emit specific diagnostics for it and return true,
 /// otherwise return false.
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
-                                          DeclContext *DC,
-                                          TypeChecker &TC) {
+                                          DeclContext *DC) {
   Identifier name = UDRE->getName().getBaseIdentifier();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
@@ -280,8 +278,9 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   // If this is a binary operator, relex the token, to decide whether it has
   // whitespace around it or not.  If it does "x +++ y", then it isn't likely to
   // be a case where a space was forgotten.
+  auto &Context = DC->getASTContext();
   if (isBinOp) {
-    auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
+    auto tok = Lexer::getTokenAtLocation(Context.SourceMgr, UDRE->getLoc());
     if (tok.getKind() != tok::oper_binary_unspaced)
       return false;
   }
@@ -303,8 +302,8 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
     if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))
       continue;
 
-    auto startName = TC.Context.getIdentifier(startStr);
-    auto endName = TC.Context.getIdentifier(endStr);
+    auto startName = Context.getIdentifier(startStr);
+    auto endName = Context.getIdentifier(endStr);
 
     // Perform name lookup for the first and second pieces.  If either fail to
     // be found, then it isn't a valid split.
@@ -344,32 +343,33 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   case 1:
     // One candidate: produce an error with a fixit on it.
     if (isBinOp)
-      diagnoseBinOpSplit(UDRE, WorkableSplits[0],
-                         diag::unspaced_binary_operator_fixit, TC);
+      diagnoseBinOpSplit(Context, UDRE, WorkableSplits[0],
+                         diag::unspaced_binary_operator_fixit);
     else
-      TC.diagnose(UDRE->getLoc().getAdvancedLoc(WorkableSplits[0].first),
-                  diag::unspaced_unary_operator);
+      Context.Diags.diagnose(
+          UDRE->getLoc().getAdvancedLoc(WorkableSplits[0].first),
+          diag::unspaced_unary_operator);
     return true;
 
   default:
     // Otherwise, we have to produce a series of notes listing the various
     // options.
-    TC.diagnose(UDRE->getLoc(), isBinOp ? diag::unspaced_binary_operator :
-                diag::unspaced_unary_operator)
-      .highlight(UDRE->getLoc());
+    Context.Diags
+        .diagnose(UDRE->getLoc(), isBinOp ? diag::unspaced_binary_operator
+                                          : diag::unspaced_unary_operator)
+        .highlight(UDRE->getLoc());
 
     if (isBinOp) {
       for (auto candidateSplit : WorkableSplits)
-        diagnoseBinOpSplit(UDRE, candidateSplit,
-                           diag::unspaced_binary_operators_candidate, TC);
+        diagnoseBinOpSplit(Context, UDRE, candidateSplit,
+                           diag::unspaced_binary_operators_candidate);
     }
     return true;
   }
 }
 
-
-static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
-                                          TypeChecker &TC) {
+static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
+                                          UnresolvedDeclRefExpr *UDRE) {
   auto name = UDRE->getName().getBaseIdentifier();
   if (!name.isOperator())
     return false;
@@ -383,18 +383,19 @@ static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
     corrected = "..<";
 
   if (!corrected.empty()) {
-    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
-                name, true, corrected)
-      .highlight(UDRE->getSourceRange())
-      .fixItReplace(UDRE->getSourceRange(), corrected);
+    Diags
+        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                  name, true, corrected)
+        .highlight(UDRE->getSourceRange())
+        .fixItReplace(UDRE->getSourceRange(), corrected);
 
     return true;
   }
   return false;
 }
 
-static bool diagnoseIncDecOperator(UnresolvedDeclRefExpr *UDRE,
-                                   TypeChecker &TC) {
+static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
+                                   UnresolvedDeclRefExpr *UDRE) {
   auto name = UDRE->getName().getBaseIdentifier();
   if (!name.isOperator())
     return false;
@@ -406,17 +407,17 @@ static bool diagnoseIncDecOperator(UnresolvedDeclRefExpr *UDRE,
     corrected = "-= 1";
 
   if (!corrected.empty()) {
-    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
-                name, true, corrected)
-      .highlight(UDRE->getSourceRange());
+    Diags
+        .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                  name, true, corrected)
+        .highlight(UDRE->getSourceRange());
 
     return true;
   }
   return false;
 }
 
-static bool findNonMembers(TypeChecker &TC,
-                           ArrayRef<LookupResultEntry> lookupResults,
+static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
                            DeclRefKind refKind, bool breakOnMember,
                            SmallVectorImpl<ValueDecl *> &ResultValues,
                            llvm::function_ref<bool(ValueDecl *)> isValid) {
@@ -460,8 +461,8 @@ static bool shouldConsiderOuterResultsFor(DeclName name) {
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
-Expr *TypeChecker::
-resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
+Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                      DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -473,15 +474,16 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (shouldConsiderOuterResultsFor(Name))
     lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
-  auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
+  auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
 
+  auto &Context = DC->getASTContext();
   if (!Lookup) {
     // If we failed lookup of an operator, check to see if this is a range
     // operator misspelling. Otherwise try to diagnose a juxtaposition
     // e.g. (x*-4) that needs whitespace.
-    if (diagnoseRangeOperatorMisspell(UDRE, *this) ||
-        diagnoseIncDecOperator(UDRE, *this) ||
-        diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
+    if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
+        diagnoseIncDecOperator(Context.Diags, UDRE) ||
+        diagnoseOperatorJuxtaposition(UDRE, DC)) {
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
@@ -489,19 +491,20 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    LookupResult inaccessibleResults = lookupUnqualified(DC, Name, Loc,
-                                                         relookupOptions);
+    auto inaccessibleResults =
+        TypeChecker::lookupUnqualified(DC, Name, Loc, relookupOptions);
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
-      diagnose(Loc, diag::candidate_inaccessible, Name,
-               first->getFormalAccessScope().accessLevelForDiagnostics());
+      Context.Diags.diagnose(
+          Loc, diag::candidate_inaccessible, Name,
+          first->getFormalAccessScope().accessLevelForDiagnostics());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults) {
-        diagnose(lookupResult.getValueDecl(), diag::decl_declared_here,
-                 lookupResult.getValueDecl()->getFullName());
+        auto *VD = lookupResult.getValueDecl();
+        VD->diagnose(diag::decl_declared_here, VD->getFullName());
       }
 
       // Don't try to recover here; we'll get more access-related diagnostics
@@ -536,8 +539,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     auto emitBasicError = [&] {
-      diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
-        .highlight(UDRE->getSourceRange());
+      Context.Diags
+          .diagnose(Loc, diag::use_unresolved_identifier, Name,
+                    Name.isOperator())
+          .highlight(UDRE->getSourceRange());
     };
 
     if (!isConfused) {
@@ -553,14 +558,14 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         }
       }
 
-      TypoCorrectionResults corrections(*this, Name, nameLoc);
-      performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                            lookupOptions, corrections);
+      TypoCorrectionResults corrections(Name, nameLoc);
+      TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
+                                         lookupOptions, corrections);
 
       if (auto typo = corrections.claimUniqueCorrection()) {
-        auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
-                             Name, Name.isOperator(),
-                             typo->CorrectedName.getBaseIdentifier().str());
+        auto diag = Context.Diags.diagnose(
+            Loc, diag::use_unresolved_identifier_corrected, Name,
+            Name.isOperator(), typo->CorrectedName.getBaseIdentifier().str());
         diag.highlight(UDRE->getSourceRange());
         typo->addFixits(diag);
       } else {
@@ -571,10 +576,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     } else {
       emitBasicError();
 
-      diagnose(Loc, diag::confusable_character,
-               UDRE->getName().isOperator(), simpleName.str(),
-               expectedIdentifier)
-        .fixItReplace(Loc, expectedIdentifier);
+      Context.Diags
+          .diagnose(Loc, diag::confusable_character,
+                    UDRE->getName().isOperator(), simpleName.str(),
+                    expectedIdentifier)
+          .fixItReplace(Loc, expectedIdentifier);
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
@@ -603,9 +609,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
     return true;
   };
-  bool AllDeclRefs = findNonMembers(
-      *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
-      ResultValues, isValid);
+  bool AllDeclRefs =
+      findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
+                     /*breakOnMember=*/true, ResultValues, isValid);
 
   // If local declaration after use is found, check outer results for
   // better matching candidates.
@@ -621,8 +627,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     while (localDeclAfterUse) {
       if (Lookup.outerResults().empty()) {
-        diagnose(Loc, diag::use_local_before_declaration, Name);
-        diagnose(innerDecl, diag::decl_declared_here, Name);
+        Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
+        Context.Diags.diagnose(innerDecl, diag::decl_declared_here, Name);
         Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
         return error;
       }
@@ -630,9 +636,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       Lookup.shiftDownResults();
       ResultValues.clear();
       localDeclAfterUse = nullptr;
-      AllDeclRefs = findNonMembers(
-          *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
-          ResultValues, isValid);
+      AllDeclRefs =
+          findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
+                         /*breakOnMember=*/true, ResultValues, isValid);
     }
 
     // Drop outer results if they are not supposed to be included.
@@ -664,10 +670,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
-      diagnose(Loc, diag::use_nonmatching_operator,
-               Name,
-               UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
-               UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
+      Context.Diags.diagnose(
+          Loc, diag::use_nonmatching_operator, Name,
+          UDRE->getRefKind() == DeclRefKind::BinaryOperator
+              ? 0
+              : UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
@@ -769,7 +776,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // 'clamp').
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
     if (AllConditionalConformances) {
-      (void)findNonMembers(*this, Lookup.outerResults(), UDRE->getRefKind(),
+      (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
                            /*breakOnMember=*/false, outerAlternatives,
                            /*isValid=*/[&](ValueDecl *) { return true; });
     }
@@ -787,10 +794,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   //
   // Make sure we emit a diagnostic, since returning an ErrorExpr without
   // producing one will break things downstream.
-  diagnose(Loc, diag::ambiguous_decl_ref, Name);
+  Context.Diags.diagnose(Loc, diag::ambiguous_decl_ref, Name);
   for (auto Result : Lookup) {
     auto *Decl = Result.getValueDecl();
-    diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
+    Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl->getFullName());
   }
   return new (Context) ErrorExpr(UDRE->getSourceRange());
 }
@@ -942,16 +949,16 @@ namespace {
     /// argument-labeled interpolations.
     void correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
       // These expressions are valid in Swift 5+.
-      if (TC.Context.isSwiftVersionAtLeast(5))
+      if (getASTContext().isSwiftVersionAtLeast(5))
         return;
 
       /// Diagnoses appendInterpolation(...) calls with multiple
       /// arguments or argument labels and corrects them.
       class StrangeInterpolationRewriter : public ASTWalker {
-        TypeChecker &TC;
+        ASTContext &Context;
 
       public:
-        StrangeInterpolationRewriter(TypeChecker &TC) : TC(TC) { }
+        StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
 
         virtual bool walkToDeclPre(Decl *D) {
           // We don't want to look inside decls.
@@ -972,7 +979,7 @@ namespace {
           auto call = cast<CallExpr>(E);
           if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
             if (callee->getName().getBaseName() ==
-                    TC.Context.Id_appendInterpolation) {
+                Context.Id_appendInterpolation) {
               Expr *newArg = nullptr;
               SourceLoc lParen, rParen;
 
@@ -983,13 +990,15 @@ namespace {
                 rParen = args->getRParenLoc();
                 Expr *secondArg = args->getElement(1);
 
-                TC.diagnose(secondArg->getLoc(),
-                            diag::string_interpolation_list_changing)
-                  .highlightChars(secondArg->getLoc(), rParen);
-                TC.diagnose(secondArg->getLoc(),
-                            diag::string_interpolation_list_insert_parens)
-                  .fixItInsertAfter(lParen, "(")
-                  .fixItInsert(rParen, ")");
+                Context.Diags
+                    .diagnose(secondArg->getLoc(),
+                              diag::string_interpolation_list_changing)
+                    .highlightChars(secondArg->getLoc(), rParen);
+                Context.Diags
+                    .diagnose(secondArg->getLoc(),
+                              diag::string_interpolation_list_insert_parens)
+                    .fixItInsertAfter(lParen, "(")
+                    .fixItInsert(rParen, ")");
 
                 newArg = args;
               }
@@ -1004,27 +1013,30 @@ namespace {
                 SourceLoc argLabelLoc = call->getArgumentLabelLoc(0),
                           argLoc = newArg->getStartLoc();
 
-                TC.diagnose(argLabelLoc,
-                            diag::string_interpolation_label_changing)
-                  .highlightChars(argLabelLoc, argLoc);
-                TC.diagnose(argLabelLoc,
-                            diag::string_interpolation_remove_label,
-                            call->getArgumentLabels().front())
-                  .fixItRemoveChars(argLabelLoc, argLoc);
+                Context.Diags
+                    .diagnose(argLabelLoc,
+                              diag::string_interpolation_label_changing)
+                    .highlightChars(argLabelLoc, argLoc);
+                Context.Diags
+                    .diagnose(argLabelLoc,
+                              diag::string_interpolation_remove_label,
+                              call->getArgumentLabels().front())
+                    .fixItRemoveChars(argLabelLoc, argLoc);
               }
 
               // If newArg is no longer null, we need to build a new
               // appendInterpolation(_:) call that takes it to replace the bad
               // appendInterpolation(...) call.
               if (newArg) {
-                auto newCallee = new (TC.Context) UnresolvedDotExpr(
+                auto newCallee = new (Context) UnresolvedDotExpr(
                     callee->getBase(), /*dotloc=*/SourceLoc(),
-                    DeclName(TC.Context.Id_appendInterpolation),
+                    DeclName(Context.Id_appendInterpolation),
                     /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
 
-                E = CallExpr::create(TC.Context, newCallee, lParen,
-                    { newArg }, { Identifier() }, { SourceLoc() },
-                    rParen, /*trailingClosure=*/nullptr, /*implicit=*/false);
+                E = CallExpr::create(Context, newCallee, lParen, {newArg},
+                                     {Identifier()}, {SourceLoc()}, rParen,
+                                     /*trailingClosure=*/nullptr,
+                                     /*implicit=*/false);
               }
             }
           }
@@ -1035,13 +1047,16 @@ namespace {
           return { false, E };
         }
       };
-      
-      ISLE->getAppendingExpr()->walk(StrangeInterpolationRewriter(TC));
+
+      ISLE->getAppendingExpr()->walk(
+          StrangeInterpolationRewriter(getASTContext()));
     }
 
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
         : TC(tc), DC(dc), ParentExpr(parent) {}
+
+    ASTContext &getASTContext() const { return TC.Context; }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
@@ -1117,15 +1132,15 @@ namespace {
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TypeChecker::checkForForbiddenPrefix(
-            TC.Context, unresolved->getName().getBaseName());
-        return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
+            getASTContext(), unresolved->getName().getBaseName());
+        return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
       }
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
         if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TypeChecker::validateType(TC.Context, PlaceholderE->getTypeLoc(),
-                                         TypeResolution::forContextual(DC),
-                                         None))
+          if (!TypeChecker::validateType(
+                  getASTContext(), PlaceholderE->getTypeLoc(),
+                  TypeResolution::forContextual(DC), None))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1192,7 +1207,7 @@ namespace {
 
       // Fold sequence expressions.
       if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
-        auto result = TC.foldSequence(seqExpr, DC);
+        auto result = TypeChecker::foldSequence(seqExpr, DC);
         return result->walk(*this);
       }
 
@@ -1280,8 +1295,8 @@ namespace {
       // RebindSelfInConstructorExpr, wrap it in the
       // RebindSelfInConstructorExpr.
       if (expr == UnresolvedCtorRebindTarget) {
-        expr = new (TC.Context) RebindSelfInConstructorExpr(expr,
-                                                            UnresolvedCtorSelf);
+        expr = new (getASTContext())
+            RebindSelfInConstructorExpr(expr, UnresolvedCtorSelf);
         UnresolvedCtorRebindTarget = nullptr;
         return expr;
       }
@@ -1355,7 +1370,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(TC.Context,
+      TypeChecker::validateType(getASTContext(),
                                 closure->getExplicitResultTypeLoc(),
                                 TypeResolution::forContextual(closure),
                                 TypeResolverContext::InExpression)) {
@@ -1421,18 +1436,18 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return nullptr;
 
   // Fold 'T.Protocol' into a protocol metatype.
-  if (Name == TC.Context.Id_Protocol) {
+  if (Name == getASTContext().Id_Protocol) {
     auto *NewTypeRepr =
-      new (TC.Context) ProtocolTypeRepr(InnerTypeRepr, NameLoc);
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+        new (getASTContext()) ProtocolTypeRepr(InnerTypeRepr, NameLoc);
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Fold 'T.Type' into an existential metatype if 'T' is a protocol,
   // or an ordinary metatype otherwise.
-  if (Name == TC.Context.Id_Type) {
+  if (Name == getASTContext().Id_Type) {
     auto *NewTypeRepr =
-      new (TC.Context) MetatypeTypeRepr(InnerTypeRepr, NameLoc);
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+        new (getASTContext()) MetatypeTypeRepr(InnerTypeRepr, NameLoc);
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Fold 'T.U' into a nested type.
@@ -1483,7 +1498,7 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
       return TypeExpr::createForSpecializedDecl(ITR, genericArgs, angleRange,
-                                                TC.Context);
+                                                getASTContext());
     }
   }
 
@@ -1526,8 +1541,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return TyExpr;
 
     auto *NewTypeRepr =
-      new (TC.Context) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+        new (getASTContext()) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Fold T! into an IUO type when T is a TypeExpr.
@@ -1540,10 +1555,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
 
-    auto *NewTypeRepr =
-      new (TC.Context) ImplicitlyUnwrappedOptionalTypeRepr(InnerTypeRepr,
-                                                          FVE->getExclaimLoc());
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    auto *NewTypeRepr = new (getASTContext())
+        ImplicitlyUnwrappedOptionalTypeRepr(InnerTypeRepr,
+                                            FVE->getExclaimLoc());
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Fold (T) into a type T with parens around it.
@@ -1555,11 +1570,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     assert(!TyExpr->isImplicit() && InnerTypeRepr[0].Type &&
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
-    
-    auto *NewTypeRepr = TupleTypeRepr::create(TC.Context,
-                                              InnerTypeRepr,
+
+    auto *NewTypeRepr = TupleTypeRepr::create(getASTContext(), InnerTypeRepr,
                                               PE->getSourceRange());
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
@@ -1590,10 +1604,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       Elts.push_back(elt);
       ++EltNo;
     }
-    auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, Elts,
-                                              TE->getSourceRange(),
-                                              SourceLoc(), Elts.size());
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    auto *NewTypeRepr = TupleTypeRepr::create(
+        getASTContext(), Elts, TE->getSourceRange(), SourceLoc(), Elts.size());
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   
 
@@ -1606,12 +1619,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!TyExpr)
       return nullptr;
 
-    auto *NewTypeRepr =
-      new (TC.Context) ArrayTypeRepr(TyExpr->getTypeRepr(), 
-                                     SourceRange(AE->getLBracketLoc(),
-                                                 AE->getRBracketLoc()));
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-
+    auto *NewTypeRepr = new (getASTContext())
+        ArrayTypeRepr(TyExpr->getTypeRepr(),
+                      SourceRange(AE->getLBracketLoc(), AE->getRBracketLoc()));
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Fold [K : V] into a dictionary type.
@@ -1648,12 +1659,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       valueTypeRepr = TRE->getElementType(1);
     }
 
-    auto *NewTypeRepr =
-      new (TC.Context) DictionaryTypeRepr(keyTypeRepr, valueTypeRepr,
-                                          /*FIXME:colonLoc=*/SourceLoc(),
-                                          SourceRange(DE->getLBracketLoc(),
-                                                      DE->getRBracketLoc()));
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    auto *NewTypeRepr = new (getASTContext()) DictionaryTypeRepr(
+        keyTypeRepr, valueTypeRepr,
+        /*FIXME:colonLoc=*/SourceLoc(),
+        SourceRange(DE->getLBracketLoc(), DE->getRBracketLoc()));
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Reinterpret arrow expr T1 -> T2 as function type.
@@ -1688,12 +1698,13 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
         diagnoseMissingParens(TC, ArgRepr);
-        return TupleTypeRepr::create(TC.Context, {ArgRepr},
+        return TupleTypeRepr::create(getASTContext(), {ArgRepr},
                                      ArgRepr->getSourceRange());
       }
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
-          return TupleTypeRepr::createEmpty(TC.Context, TE->getSourceRange());
+          return TupleTypeRepr::createEmpty(getASTContext(),
+                                            TE->getSourceRange());
 
       // When simplifying a type expr like "(P1 & P2) -> (P3 & P4) -> Int",
       // it may have been folded at the same time; recursively simplify it.
@@ -1702,7 +1713,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
         diagnoseMissingParens(TC, ArgRepr);
-        return TupleTypeRepr::create(TC.Context, {ArgRepr},
+        return TupleTypeRepr::create(getASTContext(), {ArgRepr},
                                      ArgRepr->getSourceRange());
       }
       return nullptr;
@@ -1715,7 +1726,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return TyE->getTypeRepr();
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
-          return TupleTypeRepr::createEmpty(TC.Context, TE->getSourceRange());
+          return TupleTypeRepr::createEmpty(getASTContext(),
+                                            TE->getSourceRange());
 
       // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
       // it may have been folded at the same time; recursively simplify it.
@@ -1729,24 +1741,23 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       TC.diagnose(AE->getArgsExpr()->getLoc(),
                   diag::expected_type_before_arrow);
       auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr =
-          new (TC.Context) ErrorTypeRepr(ArgRange);
-      ArgsTypeRepr = TupleTypeRepr::create(TC.Context, {ErrRepr}, ArgRange);
+      auto ErrRepr = new (getASTContext()) ErrorTypeRepr(ArgRange);
+      ArgsTypeRepr =
+          TupleTypeRepr::create(getASTContext(), {ErrRepr}, ArgRange);
     }
 
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       TC.diagnose(AE->getResultExpr()->getLoc(),
                   diag::expected_type_after_arrow);
-      ResultTypeRepr =
-        new (TC.Context) ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
+      ResultTypeRepr = new (getASTContext())
+          ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
     }
 
-    auto NewTypeRepr =
-      new (TC.Context) FunctionTypeRepr(nullptr, ArgsTypeRepr,
-                                        AE->getThrowsLoc(), AE->getArrowLoc(),
-                                        ResultTypeRepr);
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    auto NewTypeRepr = new (getASTContext())
+        FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getThrowsLoc(),
+                         AE->getArrowLoc(), ResultTypeRepr);
+    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   
   // Fold 'P & Q' into a composition type
@@ -1795,9 +1806,10 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       if (!rhs) return nullptr;
       Types.push_back(rhs->getTypeRepr());
 
-      auto CompRepr = CompositionTypeRepr::create(TC.Context, Types,
-          lhsExpr->getStartLoc(), binaryExpr->getSourceRange());
-      return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()));
+      auto CompRepr = CompositionTypeRepr::create(getASTContext(), Types,
+                                                  lhsExpr->getStartLoc(),
+                                                  binaryExpr->getSourceRange());
+      return new (getASTContext()) TypeExpr(TypeLoc(CompRepr, Type()));
     }
   }
 
@@ -1847,8 +1859,8 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         // .[0] or just plain [0]
         components.push_back(
             KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
-                TC.Context,
-                SE->getIndex(), SE->getArgumentLabels(), SE->getLoc()));
+                getASTContext(), SE->getIndex(), SE->getArgumentLabels(),
+                SE->getLoc()));
 
         expr = SE->getBase();
       } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
@@ -1925,7 +1937,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   std::reverse(components.begin(), components.end());
 
   KPE->setRootType(rootType);
-  KPE->resolveComponents(TC.Context, components);
+  KPE->resolveComponents(getASTContext(), components);
 }
 
 Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
@@ -1952,7 +1964,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!literal)
     return nullptr;
 
-  auto *protocol = TypeChecker::getLiteralProtocol(TC.Context, literal);
+  auto *protocol = TypeChecker::getLiteralProtocol(getASTContext(), literal);
   if (!protocol)
     return nullptr;
 
@@ -1964,9 +1976,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
     auto &typeLoc = typeExpr->getTypeLoc();
-    bool hadError =
-        TypeChecker::validateType(TC.Context, typeLoc,
-                                  TypeResolution::forContextual(DC), options);
+    bool hadError = TypeChecker::validateType(
+        getASTContext(), typeLoc, TypeResolution::forContextual(DC), options);
 
     if (hadError)
       return nullptr;
@@ -1986,7 +1997,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   auto *NTD = type->getAnyNominal();
   SmallVector<ProtocolConformance *, 2> conformances;
   return NTD->lookupConformance(DC->getParentModule(), protocol, conformances)
-             ? CoerceExpr::forLiteralInit(TC.Context, argExpr,
+             ? CoerceExpr::forLiteralInit(getASTContext(), argExpr,
                                           call->getSourceRange(),
                                           typeExpr->getTypeLoc())
              : nullptr;
@@ -2060,14 +2071,14 @@ bool GenericRequirementsCheckListener::diagnoseUnsatisfiedRequirement(
 /// error diagnostic, and there were no errors emitted or scheduled to be
 /// emitted previously.
 class FallbackDiagnosticListener : public ExprTypeCheckListener {
-  TypeChecker &TC;
+  ASTContext &Context;
   TypeCheckExprOptions Options;
   ExprTypeCheckListener *BaseListener;
 
 public:
-  FallbackDiagnosticListener(TypeChecker &TC, TypeCheckExprOptions options,
+  FallbackDiagnosticListener(ASTContext &ctx, TypeCheckExprOptions options,
                              ExprTypeCheckListener *base)
-      : TC(TC), Options(options), BaseListener(base) {}
+      : Context(ctx), Options(options), BaseListener(base) {}
 
   bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
     return BaseListener ? BaseListener->builtConstraints(cs, expr) : false;
@@ -2117,18 +2128,19 @@ public:
   }
 
 private:
-  bool hadAnyErrors() const { return TC.Context.Diags.hadAnyError(); }
+  bool hadAnyErrors() const { return Context.Diags.hadAnyError(); }
 
   void maybeProduceFallbackDiagnostic(Expr *expr) const {
     if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        DiagnosticSuppression::isEnabled(TC.Diags))
+        DiagnosticSuppression::isEnabled(Context.Diags))
       return;
 
     // Before producing fatal error here, let's check if there are any "error"
     // diagnostics already emitted or waiting to be emitted. Because they are
     // a better indication of the problem.
-    if (!(hadAnyErrors() || TC.Context.hasDelayedConformanceErrors()))
-      TC.diagnose(expr->getLoc(), diag::failed_to_produce_diagnostic);
+    if (!(hadAnyErrors() || Context.hasDelayedConformanceErrors()))
+      Context.Diags.diagnose(expr->getLoc(),
+                             diag::failed_to_produce_diagnostic);
   }
 };
 
@@ -2139,7 +2151,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
-  FallbackDiagnosticListener diagListener(*this, options, listener);
+  FallbackDiagnosticListener diagListener(Context, options, listener);
   return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
                                  options, diagListener, baseCS);
 }
@@ -2513,7 +2525,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
   UnresolvedDeclRefExpr UDRE(opName, refKind, DeclNameLoc(Loc));
-  auto *opExpr = resolveDeclRefExpr(&UDRE, DC);
+  auto *opExpr = TypeChecker::resolveDeclRefExpr(&UDRE, DC);
 
   switch (refKind) {
 
@@ -2555,7 +2567,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
-    TypeChecker &tc;
+    ASTContext &context;
     Pattern *&pattern;
     Expr *&initializer;
 
@@ -2569,10 +2581,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     VarDecl *wrappedVar = nullptr;
 
   public:
-    explicit BindingListener(TypeChecker &tc, Pattern *&pattern,
+    explicit BindingListener(ASTContext &ctx, Pattern *&pattern,
                              Expr *&initializer)
-      : tc(tc), pattern(pattern), initializer(initializer),
-        Locator(nullptr) {
+        : context(ctx), pattern(pattern), initializer(initializer),
+          Locator(nullptr) {
       maybeApplyPropertyWrapper();
     }
 
@@ -2672,7 +2684,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       // been subsumed by the backing property.
       if (wrappedVar) {
         wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
-        tc.Context.setSideCachedPropertyWrapperBackingPropertyType(
+        context.setSideCachedPropertyWrapperBackingPropertyType(
             wrappedVar, initType->mapTypeOutOfContext());
 
         // Record the semantic initializer on the outermost property wrapper.
@@ -2736,7 +2748,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
   };
 
-  BindingListener listener(*this, pattern, initializer);
+  BindingListener listener(Context, pattern, initializer);
   if (!initializer)
     return true;
 
@@ -2902,15 +2914,14 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
           cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // The expression type must conform to the Sequence.
-      auto &tc = cs.getTypeChecker();
       ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
           cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
         return true;
       }
 
-      auto elementAssocType = sequenceProto->getAssociatedType(
-        tc.Context.Id_Element);
+      auto elementAssocType =
+          sequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
 
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
@@ -3035,8 +3046,8 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     };
 
     // Resolve the pattern.
-    auto *pattern = resolvePattern(elt.getPattern(), dc,
-                                   /*isStmtCondition*/true);
+    auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
+                                                /*isStmtCondition*/true);
     if (!pattern) {
       typeCheckPatternFailed();
       continue;
@@ -3113,8 +3124,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   // Build the 'expr ~= var' expression.
   // FIXME: Compound name locations.
-  auto *matchOp = buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
-                               /*Implicit=*/true, FunctionRefKind::Compound);
+  auto *matchOp =
+      TypeChecker::buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
+                                /*Implicit=*/true, FunctionRefKind::Compound);
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
                                                 DeclNameLoc(EP->getLoc()),
                                                 /*Implicit=*/true);
@@ -3285,13 +3297,13 @@ Expr *TypeChecker::addImplicitLoadExpr(
     using GetTypeFn = std::function<Type(Expr *)>;
     using SetTypeFn = std::function<void(Expr *, Type)>;
 
-    TypeChecker &TC;
+    ASTContext &Ctx;
     GetTypeFn getType;
     SetTypeFn setType;
 
   public:
-    LoadAdder(TypeChecker &TC, GetTypeFn getType, SetTypeFn setType)
-      : TC(TC), getType(getType), setType(setType) {}
+    LoadAdder(ASTContext &ctx, GetTypeFn getType, SetTypeFn setType)
+        : Ctx(ctx), getType(getType), setType(setType) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (isa<ParenExpr>(E) || isa<ForceValueExpr>(E))
@@ -3311,7 +3323,7 @@ Expr *TypeChecker::addImplicitLoadExpr(
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
-        setType(E, ParenType::get(TC.Context, getType(PE->getSubExpr())));
+        setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
 
       return E;
     }
@@ -3319,13 +3331,13 @@ Expr *TypeChecker::addImplicitLoadExpr(
   private:
     LoadExpr *createLoadExpr(Expr *E) {
       auto objectType = getType(E)->getRValueType();
-      auto *LE = new (TC.Context) LoadExpr(E, objectType);
+      auto *LE = new (Ctx) LoadExpr(E, objectType);
       setType(LE, objectType);
       return LE;
     }
   };
 
-  return expr->walk(LoadAdder(*this, getType, setType));
+  return expr->walk(LoadAdder(Context, getType, setType));
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr,
@@ -3677,7 +3689,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
     if (auto *locator = tv->getImpl().getLocator()) {
       out << " @ ";
-      locator->dump(&TC.Context.SourceMgr, out);
+      locator->dump(&getASTContext().SourceMgr, out);
     }
 
     out << "\n";

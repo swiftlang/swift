@@ -938,26 +938,21 @@ public:
 private:
   bool exprNeedsParensBeforeAddingAs(Expr *expr) {
     auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
-    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+    return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
   }
 
   bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
     auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
 
-    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
-                                                   asPG);
+    return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
   }
 };
 

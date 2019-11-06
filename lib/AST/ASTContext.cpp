@@ -1739,6 +1739,11 @@ void ASTContext::getVisibleTopLevelModuleNames(
   names.erase(std::unique(names.begin(), names.end()), names.end());
 }
 
+bool ASTContext::shouldPerformTypoCorrection() {
+  NumTypoCorrections += 1;
+  return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
+}
+
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
   // If this module has already been successfully imported, it is importable.
   if (getLoadedModule(ModulePath) != nullptr)

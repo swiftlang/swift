@@ -486,7 +486,7 @@ static void checkInheritanceClause(
 
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
-static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
+static void checkForEmptyOptionSet(const VarDecl *VD) {
   // Check if property is a 'static let'
   if (!VD->isStatic() || !VD->isLet())
     return;
@@ -498,8 +498,8 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
     return;
   
   // Make sure this type conforms to OptionSet
-  auto *optionSetProto = tc.Context.getProtocol(KnownProtocolKind::OptionSet);
-  bool conformsToOptionSet = (bool)tc.containsProtocol(
+  auto *optionSetProto = VD->getASTContext().getProtocol(KnownProtocolKind::OptionSet);
+  bool conformsToOptionSet = (bool)TypeChecker::containsProtocol(
                                                   DC->getSelfTypeInContext(),
                                                   optionSetProto,
                                                   DC,
@@ -528,7 +528,7 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   // Make sure it is calling the rawValue constructor
   if (ctor->getNumArguments() != 1)
     return;
-  if (ctor->getArgumentLabels().front() != tc.Context.Id_rawValue)
+  if (ctor->getArgumentLabels().front() != VD->getASTContext().Id_rawValue)
     return;
   
   // Make sure the rawValue parameter is a '0' integer literal
@@ -539,10 +539,9 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   if (intArg->getValue() != 0)
     return;
   
-  auto loc = VD->getLoc();
-  tc.diagnose(loc, diag::option_set_zero_constant, VD->getName());
-  tc.diagnose(loc, diag::option_set_empty_set_init)
-  .fixItReplace(args->getSourceRange(), "([])");
+  VD->diagnose(diag::option_set_zero_constant, VD->getName());
+  VD->diagnose(diag::option_set_empty_set_init)
+    .fixItReplace(args->getSourceRange(), "([])");
 }
 
 
@@ -2362,13 +2361,13 @@ public:
       }
       return;
     }
-    checkAccessControl(TC, OD);
+    checkAccessControl(OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TypeChecker::checkDeclAttributes(PGD);
     validatePrecedenceGroup(PGD);
-    checkAccessControl(TC, PGD);
+    checkAccessControl(PGD);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
@@ -2458,7 +2457,7 @@ public:
       }
     }
     
-    checkForEmptyOptionSet(VD, TC);
+    checkForEmptyOptionSet(VD);
 
     // Under the Swift 3 inference rules, if we have @IBInspectable or
     // @GKInspectable but did not infer @objc, warn that the attribute is
@@ -2587,7 +2586,7 @@ public:
 
     TypeChecker::checkDeclAttributes(PBD);
 
-    checkAccessControl(TC, PBD);
+    checkAccessControl(PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
@@ -2641,7 +2640,7 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    checkAccessControl(TC, SD);
+    checkAccessControl(SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -2684,8 +2683,7 @@ public:
     (void) TAD->getUnderlyingType();
 
     TypeChecker::checkDeclAttributes(TAD);
-    checkAccessControl(TC, TAD);
-
+    checkAccessControl(TAD);
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -2693,7 +2691,7 @@ public:
     (void) OTD->getGenericSignature();
 
     TypeChecker::checkDeclAttributes(OTD);
-    checkAccessControl(TC, OTD);
+    checkAccessControl(OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -2711,7 +2709,7 @@ public:
                   proto->getName());
     }
 
-    checkAccessControl(TC, AT);
+    checkAccessControl(AT);
 
     // Trigger the checking for overridden declarations.
     (void) AT->getOverriddenDecls();
@@ -2805,7 +2803,7 @@ public:
 
     checkInheritanceClause(ED);
 
-    checkAccessControl(TC, ED);
+    checkAccessControl(ED);
 
     TC.checkPatternBindingCaptures(ED);
     
@@ -2850,7 +2848,7 @@ public:
 
     checkInheritanceClause(SD);
 
-    checkAccessControl(TC, SD);
+    checkAccessControl(SD);
 
     checkExplicitAvailability(SD);
 
@@ -3098,7 +3096,7 @@ public:
 
     checkInheritanceClause(CD);
 
-    checkAccessControl(TC, CD);
+    checkAccessControl(CD);
 
     checkExplicitAvailability(CD);
 
@@ -3133,7 +3131,7 @@ public:
 
     TypeChecker::checkDeclAttributes(PD);
 
-    checkAccessControl(TC, PD);
+    checkAccessControl(PD);
 
     checkInheritanceClause(PD);
 
@@ -3247,7 +3245,7 @@ public:
       TypeChecker::checkProtocolSelfRequirements(FD);
     }
 
-    checkAccessControl(TC, FD);
+    checkAccessControl(FD);
 
     TypeChecker::checkParameterAttributes(FD->getParameters());
     TypeChecker::checkDeclAttributes(FD);
@@ -3361,7 +3359,7 @@ public:
       EED->setInvalid();
     }
 
-    checkAccessControl(TC, EED);
+    checkAccessControl(EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -3451,7 +3449,7 @@ public:
     TC.ConformanceContexts.push_back(ED);
 
     TypeChecker::checkDeclAttributes(ED);
-    checkAccessControl(TC, ED);
+    checkAccessControl(ED);
 
     checkExplicitAvailability(ED);
   }
@@ -3586,7 +3584,7 @@ public:
       }
     }
 
-    checkAccessControl(TC, CD);
+    checkAccessControl(CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.

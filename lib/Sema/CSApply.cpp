@@ -657,8 +657,6 @@ namespace {
                                    ValueDecl *member) {
       assert(archetype && "archetype not already opened?");
 
-      auto &tc = cs.getTypeChecker();
-
       // Dig out the base type.
       Type baseTy = cs.getType(base);
 
@@ -702,7 +700,7 @@ namespace {
       if (isLValue)
         opaqueType = LValueType::get(opaqueType);
 
-      ASTContext &ctx = tc.Context;
+      ASTContext &ctx = cs.getASTContext();
       auto archetypeVal =
           new (ctx) OpaqueValueExpr(base->getSourceRange(), opaqueType);
       cs.cacheType(archetypeVal);
@@ -726,8 +724,6 @@ namespace {
         return false;
 
       // If we had a return type of 'Self', erase it.
-      ConstraintSystem &innerCS = solution.getConstraintSystem();
-      auto &tc = innerCS.getTypeChecker();
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistential(record.Archetype)) {
@@ -736,7 +732,7 @@ namespace {
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
         if (result == nullptr) {
-          result = new (tc.Context) ErrorExpr(range);
+          result = new (cs.getASTContext()) ErrorExpr(range);
           cs.setType(result, erasedTy);
           // The opaque value is no longer reachable in an AST walk as
           // a result of the result above being replaced with an
@@ -748,7 +744,7 @@ namespace {
       }
 
       // Form the open-existential expression.
-      result = new (tc.Context) OpenExistentialExpr(
+      result = new (cs.getASTContext()) OpenExistentialExpr(
                                   record.ExistentialValue,
                                   record.OpaqueValue,
                                   result, cs.getType(result));
@@ -1847,7 +1843,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(cs.getType(expr));
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -1894,7 +1890,7 @@ namespace {
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -1931,7 +1927,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(cs.getType(expr));
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -2027,7 +2023,7 @@ namespace {
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = TypeChecker::getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -4939,23 +4935,21 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
                                               toTuple));
 }
 
-static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
+static Type getMetatypeSuperclass(Type t) {
   if (auto *metaTy = t->getAs<MetatypeType>())
     return MetatypeType::get(getMetatypeSuperclass(
-                               metaTy->getInstanceType(),
-                               tc));
+                               metaTy->getInstanceType()));
 
   if (auto *metaTy = t->getAs<ExistentialMetatypeType>())
     return ExistentialMetatypeType::get(getMetatypeSuperclass(
-                                          metaTy->getInstanceType(),
-                                          tc));
+                                          metaTy->getInstanceType()));
 
   return t->getSuperclass();
 }
 
 Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
                                      ConstraintLocatorBuilder locator) {
-  auto &tc = cs.getTypeChecker();
+  auto &ctx = cs.getASTContext();
 
   auto fromType = cs.getType(expr);
 
@@ -4972,11 +4966,11 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
 
   if (fromInstanceType->is<ArchetypeType>()) {
     // Coercion from archetype to its (concrete) superclass.
-    auto superclass = getMetatypeSuperclass(fromType, tc);
+    auto superclass = getMetatypeSuperclass(fromType);
 
     expr =
       cs.cacheType(
-        new (tc.Context) ArchetypeToSuperExpr(expr, superclass));
+        new (ctx) ArchetypeToSuperExpr(expr, superclass));
 
     if (!superclass->isEqual(toType))
       return coerceSuperclass(expr, toType, locator);
@@ -4990,24 +4984,24 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
     // concrete superclass.
     auto fromArchetype = OpenedArchetypeType::getAny(fromType);
 
-    auto *archetypeVal = cs.cacheType(new (tc.Context) OpaqueValueExpr(
+    auto *archetypeVal = cs.cacheType(new (ctx) OpaqueValueExpr(
         expr->getSourceRange(), fromArchetype));
 
     auto *result = coerceSuperclass(archetypeVal, toType, locator);
 
     return cs.cacheType(
-      new (tc.Context) OpenExistentialExpr(expr, archetypeVal, result,
+      new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
                                            toType));
   }
 
   // Coercion from subclass to superclass.
   if (toType->is<MetatypeType>()) {
     return cs.cacheType(
-      new (tc.Context) MetatypeConversionExpr(expr, toType));
+      new (ctx) MetatypeConversionExpr(expr, toType));
   }
 
   return cs.cacheType(
-    new (tc.Context) DerivedToBaseExpr(expr, toType));
+    new (ctx) DerivedToBaseExpr(expr, toType));
 }
 
 /// Collect the conformances for all the protocols of an existential type.
@@ -5016,22 +5010,21 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
 /// allow the conversion here, except the ErasureExpr ends up with trivial
 /// conformances.
 static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
+collectExistentialConformances(Type fromType, Type toType,
                                DeclContext *DC) {
   auto layout = toType->getExistentialLayout();
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
-    conformances.push_back(tc.containsProtocol(
+    conformances.push_back(TypeChecker::containsProtocol(
         fromType, proto->getDecl(), DC, ConformanceCheckFlags::InExpression));
   }
 
-  return tc.Context.AllocateCopy(conformances);
+  return toType->getASTContext().AllocateCopy(conformances);
 }
 
 Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       ConstraintLocatorBuilder locator) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = cs.getType(expr);
   Type fromInstanceType = fromType;
   Type toInstanceType = toType;
@@ -5045,10 +5038,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
   }
 
-  ASTContext &ctx = tc.Context;
+  ASTContext &ctx = cs.getASTContext();
 
   auto conformances =
-    collectExistentialConformances(tc, fromInstanceType, toInstanceType, cs.DC);
+    collectExistentialConformances(fromInstanceType, toInstanceType, cs.DC);
 
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
@@ -6817,7 +6810,7 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
                                 Type openedType,
                                 ConstraintLocatorBuilder locator) {
-  TypeChecker &tc = cs.getTypeChecker();
+  auto &ctx = cs.getASTContext();
   
   auto fn = apply->getFn();
 
@@ -6849,7 +6842,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
 
-        auto replacement = new (tc.Context)
+        auto replacement = new (ctx)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),
                           arg,
@@ -6876,7 +6869,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
         body = coerceToType(body, bodyFnTy, locator);
         assert(body && "can't make nonescaping?!");
 
-        auto escapable = new (tc.Context)
+        auto escapable = new (ctx)
             OpaqueValueExpr(apply->getFn()->getSourceRange(), Type());
         cs.setType(escapable, escapableParams[0].getOldType());
 
@@ -6884,15 +6877,15 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
           return cs.getType(E);
         };
 
-        auto callSubExpr = CallExpr::createImplicit(tc.Context, body,
+        auto callSubExpr = CallExpr::createImplicit(ctx, body,
                                                     {escapable}, {}, getType);
         cs.cacheSubExprTypes(callSubExpr);
         cs.setType(callSubExpr->getArg(),
-                   AnyFunctionType::composeInput(tc.Context,
+                   AnyFunctionType::composeInput(ctx,
                                                  escapableParams, false));
         cs.setType(callSubExpr, resultType);
         
-        auto replacement = new (tc.Context)
+        auto replacement = new (ctx)
           MakeTemporarilyEscapableExpr(apply->getFn()->getLoc(),
                                        apply->getArg()->getStartLoc(),
                                        nonescaping,
@@ -6935,18 +6928,18 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
                    ->isEqual(existentialInstanceTy));
 
         auto opaqueValue =
-            new (tc.Context) OpaqueValueExpr(apply->getSourceRange(), openedTy);
+            new (ctx) OpaqueValueExpr(apply->getSourceRange(), openedTy);
         cs.setType(opaqueValue, openedTy);
         
         auto getType = [&](const Expr *E) -> Type {
           return cs.getType(E);
         };
 
-        auto callSubExpr = CallExpr::createImplicit(tc.Context, body, {opaqueValue}, {}, getType);
+        auto callSubExpr = CallExpr::createImplicit(ctx, body, {opaqueValue}, {}, getType);
         cs.cacheSubExprTypes(callSubExpr);
         cs.setType(callSubExpr, resultTy);
         
-        auto replacement = new (tc.Context)
+        auto replacement = new (ctx)
           OpenExistentialExpr(existential, opaqueValue, callSubExpr,
                               resultTy);
         cs.setType(replacement, resultTy);
@@ -7052,10 +7045,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     // If we have a covariant result type, perform the conversion now.
     if (covariantResultType) {
       if (covariantResultType->is<FunctionType>())
-        result = cs.cacheType(new (tc.Context) CovariantFunctionConversionExpr(
+        result = cs.cacheType(new (ctx) CovariantFunctionConversionExpr(
             result, covariantResultType));
       else
-        result = cs.cacheType(new (tc.Context) CovariantReturnConversionExpr(
+        result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
             result, covariantResultType));
     }
 
@@ -7191,13 +7184,13 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
 /// parentheses must be added around "<expr>" to allow the new operator
 /// to bind correctly.
 bool swift::exprNeedsParensInsideFollowingOperator(
-    TypeChecker &TC, DeclContext *DC, Expr *expr,
+    DeclContext *DC, Expr *expr,
     PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
     auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
 
-    return TC.Context.associateInfixOperators(exprPG, followingPG)
+    return DC->getASTContext().associateInfixOperators(exprPG, followingPG)
              != Associativity::Left;
   }
 
@@ -7214,7 +7207,7 @@ bool swift::exprNeedsParensInsideFollowingOperator(
 /// the new operator to prevent it from binding incorrectly in the
 /// surrounding context.
 bool swift::exprNeedsParensOutsideFollowingOperator(
-    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    DeclContext *DC, Expr *expr, Expr *rootExpr,
     PrecedenceGroupDecl *followingPG) {
   Expr *parent;
   unsigned index;
@@ -7233,11 +7226,12 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
     if (!parentPG) return true;
 
     // If the index is 0, this is on the LHS of the parent.
+    auto &Context = DC->getASTContext();
     if (index == 0) {
-      return TC.Context.associateInfixOperators(followingPG, parentPG)
+      return Context.associateInfixOperators(followingPG, parentPG)
                != Associativity::Left;
     } else {
-      return TC.Context.associateInfixOperators(parentPG, followingPG)
+      return Context.associateInfixOperators(parentPG, followingPG)
                != Associativity::Right;
     }
   }
@@ -7245,24 +7239,22 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
   return true;
 }
 
-bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
-                                                     DeclContext *DC,
+bool swift::exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
                                                      Expr *expr) {
   auto asPG = TypeChecker::lookupPrecedenceGroup(
       DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
   if (!asPG)
     return true;
-  return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+  return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
 }
 
-bool swift::exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
-                                                    DeclContext *DC,
+bool swift::exprNeedsParensAfterAddingNilCoalescing(DeclContext *DC,
                                                     Expr *expr,
                                                     Expr *rootExpr) {
   auto asPG = TypeChecker::lookupPrecedenceGroup(
       DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
   if (!asPG) return true;
-  return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
+  return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
 }
 
 namespace {
@@ -7288,6 +7280,7 @@ namespace {
         Rewriter.simplifyExprType(expr);
         auto &cs = Rewriter.getConstraintSystem();
         auto &tc = cs.getTypeChecker();
+        auto &ctx = cs.getASTContext();
 
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
@@ -7301,10 +7294,10 @@ namespace {
             Rewriter.solution.builderTransformedClosures.find(closure);
         if (builder != Rewriter.solution.builderTransformedClosures.end()) {
           auto singleExpr = builder->second.singleExpr;
-          auto returnStmt = new (tc.Context) ReturnStmt(
+          auto returnStmt = new (ctx) ReturnStmt(
              singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
           auto braceStmt = BraceStmt::create(
-              tc.Context, returnStmt->getStartLoc(), ASTNode(returnStmt),
+              ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
               returnStmt->getEndLoc(), /*implicit=*/true);
           closure->setBody(braceStmt, /*isSingleExpression=*/true);
         }
