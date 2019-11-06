@@ -885,11 +885,10 @@ bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
   // `let _ = { $0 = $0 = 42 }`. Assignment chaining results in
   // type mismatch between result of the previous assignment and the next.
   {
-    auto &TC = cs.getTypeChecker();
     llvm::SaveAndRestore<AssignExpr *> anchor(AE);
 
     do {
-      if (TC.diagnoseSelfAssignment(AE))
+      if (TypeChecker::diagnoseSelfAssignment(AE))
         return true;
     } while ((AE = dyn_cast_or_null<AssignExpr>(cs.getParentExpr(AE))));
   }

@@ -1842,7 +1842,7 @@ public:
   }
 
   /// Diagnose assigning variable to itself.
-  bool diagnoseSelfAssignment(const Expr *E);
+  static bool diagnoseSelfAssignment(const Expr *E);
 
   /// Builds a string representing a "default" generic argument list for
   /// \p typeDecl. In general, this means taking the bound of each generic

@@ -1333,10 +1333,9 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
-    auto &TC = getTypeChecker();
     // Let's check whether this is an attempt to assign
     // variable or property to itself.
-    if (TC.diagnoseSelfAssignment(assignExpr))
+    if (TypeChecker::diagnoseSelfAssignment(assignExpr))
       return true;
 
     diagExpr = assignExpr->getDest();
