@@ -869,8 +869,8 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   });
 
   if (Invocation.isCodeCompletion()) {
-    performDelayedParsing(MainModule, *PersistentState.get(),
-                          Invocation.getCodeCompletionFactory());
+    performCodeCompletionSecondPass(*PersistentState.get(),
+                                    *Invocation.getCodeCompletionFactory());
   }
   finishTypeChecking(TypeCheckOptions);
 }

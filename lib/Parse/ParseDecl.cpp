@@ -5394,11 +5394,16 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (SourceMgr.getCodeCompletionLoc().isInvalid() ||
-      SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
-    AFD->setBodyDelayed(BodyRange);
-  } else {
-    AFD->setBodySkipped(BodyRange);
+  AFD->setBodyDelayed(BodyRange);
+
+  if (isCodeCompletionFirstPass()) {
+    if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
+      State->delayDecl(PersistentParserState::DelayedDeclKind::FunctionBody,
+                       PD_Default, AFD, BodyRange,
+                       BeginParserPosition.PreviousLoc);
+    } else {
+      AFD->setBodySkipped(BodyRange);
+    }
   }
 }
 
@@ -5708,6 +5713,20 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
   return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
+}
+
+/// Parse a delayed function body from the 'PersistentParserState'.
+void Parser::parseAbstractFunctionBodyDelayed() {
+  auto DelayedState = State->takeDelayedDeclState();
+  assert(DelayedState.get() && "should have delayed state");
+  auto CD = DelayedState->ParentContext->getAsDecl();
+  auto AFD = cast<AbstractFunctionDecl>(CD);
+
+  // Eagarly parse local decls or nested function bodies inside the body.
+  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
+
+  auto body = parseAbstractFunctionBodyDelayed(AFD);
+  AFD->setBodyParsed(body);
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token
