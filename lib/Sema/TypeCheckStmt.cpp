@@ -2178,7 +2178,7 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
 
   // If nothing went wrong yet, perform extra checking.
   if (!hadError && endTypeCheckLoc.isInvalid())
-    performAbstractFuncDeclDiagnostics(tc, AFD, body);
+    performAbstractFuncDeclDiagnostics(AFD, body);
 
   // Wire up the function body now.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -2228,5 +2228,5 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   StmtChecker(*this, TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
-  performTopLevelDeclDiagnostics(*this, TLCD);
+  performTopLevelDeclDiagnostics(TLCD);
 }

@@ -42,12 +42,11 @@ void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
-void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                        AbstractFunctionDecl *AFD,
+void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
                                         BraceStmt *body);
 
 /// Perform diagnostics on the top level code declaration.
-void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
+void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);
   
 /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
 ///

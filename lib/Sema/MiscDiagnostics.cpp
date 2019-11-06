@@ -2037,7 +2037,8 @@ class VarDeclUsageChecker : public ASTWalker {
   void operator=(const VarDeclUsageChecker &) = delete;
 
 public:
-  VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : Diags(TC.Diags) {
+  VarDeclUsageChecker(AbstractFunctionDecl *AFD)
+    : Diags(AFD->getASTContext().Diags) {
     // If this AFD is a setter, track the parameter and the getter for
     // the containing property so if newValue isn't used but the getter is used
     // an error can be reported.
@@ -2054,7 +2055,7 @@ public:
 
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
 
-  VarDeclUsageChecker(TypeChecker &tc, VarDecl *vd) : Diags(tc.Diags) {
+  VarDeclUsageChecker(VarDecl *vd) : Diags(vd->getASTContext().Diags) {
     // Track a specific VarDecl
     VarDecls[vd] = 0;
     if (auto *childVd = vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
@@ -2283,7 +2284,7 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  TypeChecker &TC;
+  ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
@@ -2292,11 +2293,10 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   bool HasInvalidReturn = false;
 
 public:
-  OpaqueUnderlyingTypeChecker(TypeChecker &TC,
-                              AbstractFunctionDecl *Implementation,
+  OpaqueUnderlyingTypeChecker(AbstractFunctionDecl *Implementation,
                               OpaqueTypeDecl *OpaqueDecl,
                               BraceStmt *Body)
-    : TC(TC),
+    : Ctx(Implementation->getASTContext()),
       Implementation(Implementation),
       OpaqueDecl(OpaqueDecl),
       Body(Body)
@@ -2316,8 +2316,7 @@ public:
     // If there are no candidates, then the body has no return statements, and
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
-      TC.diagnose(Implementation->getLoc(),
-                  diag::opaque_type_no_underlying_type_candidates);
+      Implementation->diagnose(diag::opaque_type_no_underlying_type_candidates);
       return;
     }
     
@@ -2339,12 +2338,12 @@ public:
     }
     
     if (mismatch) {
-      TC.diagnose(Implementation->getLoc(),
-                  diag::opaque_type_mismatched_underlying_type_candidates);
+      Implementation->diagnose(
+          diag::opaque_type_mismatched_underlying_type_candidates);
       for (auto candidate : Candidates) {
-        TC.diagnose(candidate.first->getLoc(),
-                    diag::opaque_type_underlying_type_candidate_here,
-                    candidate.second);
+        Ctx.Diags.diagnose(candidate.first->getLoc(),
+                           diag::opaque_type_underlying_type_candidate_here,
+                           candidate.second);
       }
       return;
     }
@@ -2356,9 +2355,9 @@ public:
     });
     
     if (isSelfReferencing) {
-      TC.diagnose(Candidates.front().first->getLoc(),
-                  diag::opaque_type_self_referential_underlying_type,
-                  underlyingType);
+      Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
+                         diag::opaque_type_self_referential_underlying_type,
+                         underlyingType);
       return;
     }
     
@@ -2885,14 +2884,14 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
 void swift::
-performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD) {
-  VarDeclUsageChecker checker(TC.Diags);
+performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
+  auto &ctx = TLCD->getDeclContext()->getASTContext();
+  VarDeclUsageChecker checker(ctx.Diags);
   TLCD->walk(checker);
 }
 
 /// Perform diagnostics for func/init/deinit declarations.
-void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                               AbstractFunctionDecl *AFD,
+void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
                                                BraceStmt *body) {
   assert(body && "Need a body to check");
   
@@ -2902,17 +2901,17 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
-  body->walk(VarDeclUsageChecker(TC, AFD));
+  body->walk(VarDeclUsageChecker(AFD));
   
   // If the function has an opaque return type, check the return expressions
   // to determine the underlying type.
   if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {
-    OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy, body).check();
+    OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
   } else if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
     if (accessor->isGetter()) {
       if (auto opaqueResultTy
                           = accessor->getStorage()->getOpaqueResultTypeDecl()) {
-        OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy, body).check();
+        OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
     }
   }
