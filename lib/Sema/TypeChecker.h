@@ -551,9 +551,6 @@ public:
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
-  /// Declarations that need their conformances checked.
-  llvm::SmallVector<Decl *, 8> ConformanceContexts;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
