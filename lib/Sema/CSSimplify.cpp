@@ -3399,6 +3399,13 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::InstanceType: {
+    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+      return true;
+
+    break;
+  }
+
   default:
     break;
   }
