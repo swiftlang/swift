@@ -1133,8 +1133,8 @@ bool ConstraintSystem::solve(Expr *&expr,
   }
 
   if (getExpressionTooComplex(solutions)) {
-    TC.diagnose(expr->getLoc(), diag::expression_too_complex).
-    highlight(expr->getSourceRange());
+    getASTContext().Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
+      .highlight(expr->getSourceRange());
     return true;
   }
 

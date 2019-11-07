@@ -117,7 +117,7 @@ public:
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    return CS.TC.diagnose(std::forward<ArgTypes>(Args)...);
+    return CS.getASTContext().Diags.diagnose(std::forward<ArgTypes>(Args)...);
   }
 
   /// Attempt to diagnose a failure without taking into account the specific
@@ -1270,7 +1270,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   // If it failed and diagnosed something, then we're done.
   if (!exprType)
-    return CS.TC.Diags.hadAnyError();
+    return CS.getASTContext().Diags.hadAnyError();
 
   // If we don't have a type for the expression, then we cannot use it in
   // conversion constraint diagnostic generation.  If the types match, then it
@@ -1647,14 +1647,14 @@ static DeclName getBaseName(DeclContext *context) {
 };
 
 static void emitFixItForExplicitlyQualifiedReference(
-    TypeChecker &tc, UnresolvedDotExpr *UDE,
+    DiagnosticEngine &de, UnresolvedDotExpr *UDE,
     decltype(diag::fix_unqualified_access_top_level) diag, DeclName baseName,
     DescriptiveDeclKind kind) {
   auto name = baseName.getBaseIdentifier();
   SmallString<32> namePlusDot = name.str();
   namePlusDot.push_back('.');
 
-  tc.diagnose(UDE->getLoc(), diag, namePlusDot, kind, name)
+  de.diagnose(UDE->getLoc(), diag, namePlusDot, kind, name)
       .fixItInsert(UDE->getStartLoc(), namePlusDot);
 }
 
@@ -1678,14 +1678,16 @@ void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
                               ? choiceParentDecl->getDescriptiveKind()
                               : DescriptiveDeclKind::Module;
 
-  TC.diagnose(UDE->getLoc(),
+  auto &DE = getASTContext().Diags;
+  DE.diagnose(UDE->getLoc(),
               diag::warn_deprecated_conditional_conformance_outer_access,
               UDE->getName(), choiceKind, choiceParentKind, choiceBaseName,
               innerChoice->getDescriptiveKind(),
               innerParentDecl->getDescriptiveKind(), innerBaseName);
 
   emitFixItForExplicitlyQualifiedReference(
-      TC, UDE, diag::fix_deprecated_conditional_conformance_outer_access,
+      getASTContext().Diags, UDE,
+      diag::fix_deprecated_conditional_conformance_outer_access,
       choiceBaseName, choiceKind);
 }
 
@@ -1705,7 +1707,7 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   if (CCI.empty() || !CCI[0].getDecl())
     return false;
 
-  auto &TC = CS.TC;
+  auto &ctx = CS.getASTContext();
   // Call expression is formed as 'foo.bar' where 'foo' might be an
   // implicit "Self" reference, such use wouldn't provide good diagnostics
   // for situations where instance members have equal names to functions in
@@ -1719,7 +1721,7 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
     return false;
 
   auto baseDecl = baseExpr->getDecl();
-  if (!baseExpr->isImplicit() || baseDecl->getFullName() != TC.Context.Id_self)
+  if (!baseExpr->isImplicit() || baseDecl->getFullName() != ctx.Id_self)
     return false;
 
   // Our base expression is an implicit 'self.' reference e.g.
@@ -1837,21 +1839,23 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
     auto baseName = getBaseName(choice->getDeclContext());
 
     auto origCandidate = CCI[0].getDecl();
-    TC.diagnose(UDE->getLoc(), diagnostic, UDE->getName(),
-                origCandidate->getDescriptiveKind(),
-                origCandidate->getFullName(), choice->getDescriptiveKind(),
-                choice->getFullName(), baseKind, baseName);
+    ctx.Diags.diagnose(UDE->getLoc(), diagnostic, UDE->getName(),
+                      origCandidate->getDescriptiveKind(),
+                      origCandidate->getFullName(),
+                      choice->getDescriptiveKind(),
+                      choice->getFullName(), baseKind, baseName);
 
     auto topLevelDiag = diag::fix_unqualified_access_top_level;
     if (baseKind == DescriptiveDeclKind::Module)
       topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
-    emitFixItForExplicitlyQualifiedReference(TC, UDE, topLevelDiag, baseName,
+    emitFixItForExplicitlyQualifiedReference(ctx.Diags, UDE, topLevelDiag,
+                                             baseName,
                                              choice->getDescriptiveKind());
 
     for (auto &candidate : calleeInfo.candidates) {
       if (auto decl = candidate.getDecl())
-        TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
+        ctx.Diags.diagnose(decl, diag::decl_declared_here, decl->getFullName());
     }
 
     return true;
@@ -1912,7 +1916,6 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
 }
 
 class ArgumentMatcher : public MatchCallArgumentListener {
-  TypeChecker &TC;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
   const ParameterListInfo &ParamInfo;
@@ -1934,7 +1937,7 @@ public:
                   const ParameterListInfo &paramInfo,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
-      : TC(CCI.CS.TC), ArgExpr(argExpr), Parameters(params),
+      : ArgExpr(argExpr), Parameters(params),
         ParamInfo(paramInfo), Arguments(args), CandidateInfo(CCI),
         IsSubscript(isSubscript) {}
 
@@ -1950,7 +1953,8 @@ public:
     assert(!newNames.empty() && "No arguments were re-labeled");
 
     // Let's diagnose labeling problem but only related to corrected ones.
-    if (diagnoseArgumentLabelError(TC.Context, ArgExpr, newNames, IsSubscript))
+    if (diagnoseArgumentLabelError(CandidateInfo.CS.getASTContext(), ArgExpr,
+                                   newNames, IsSubscript))
       Diagnosed = true;
 
     return true;
@@ -1981,7 +1985,6 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     return false;
 
   auto candidate = CCI[0];
-  auto &TC = CCI.CS.TC;
 
   if (!candidate.hasParameters())
     return false;
@@ -2015,7 +2018,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
       };
       Expr *innerE = getInnerExpr(argExpr);
 
-      InFlightDiagnostic diag = TC.diagnose(
+      InFlightDiagnostic diag = CCI.CS.getASTContext().Diags.diagnose(
           fnExpr->getLoc(),
           diag::invalid_initialization_parameter_same_type, resTy);
       diag.highlight((innerE ? innerE : argExpr)->getSourceRange());
@@ -2063,13 +2066,14 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                ArrayRef<Identifier> argLabels) {
   if (auto *MTT = CS.getType(fnExpr)->getAs<MetatypeType>()) {
     auto instTy = MTT->getInstanceType();
+    auto &DE = CS.getASTContext().Diags;
     if (instTy->getAnyNominal()) {
       // If we are invoking a constructor on a nominal type and there are
       // absolutely no candidates, then they must all be private.
       if (CCI.empty() || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
                               isa<ProtocolDecl>(CCI.candidates[0].getDecl()))) {
-        CS.TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
-                       instTy);
+        DE.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
+                    instTy);
         return true;
       }
       // continue below
@@ -2078,9 +2082,9 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
       // is malformed.
       SourceRange initExprRange(fnExpr->getSourceRange().Start,
                                 argExpr->getSourceRange().End);
-      CS.TC.diagnose(fnExpr->getLoc(), instTy->isExistentialType() ?
-                     diag::construct_protocol_by_name :
-                     diag::non_nominal_no_initializers, instTy)
+      DE.diagnose(fnExpr->getLoc(), instTy->isExistentialType() ?
+                  diag::construct_protocol_by_name :
+                  diag::non_nominal_no_initializers, instTy)
           .highlight(initExprRange);
       return true;
     }
@@ -2362,8 +2366,8 @@ static bool diagnoseClosureExplicitParameterMismatch(
       continue;
 
     if (!CS.TC.isConvertibleTo(argType, paramType, CS.DC)) {
-      CS.TC.diagnose(loc, diag::types_not_convertible, false, paramType,
-                     argType);
+      CS.getASTContext().Diags.diagnose(loc, diag::types_not_convertible,
+                                        false, paramType, argType);
       return true;
     }
   }
@@ -2478,9 +2482,10 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     auto processor = [&](Type resultType, Type expectedResultType) -> bool {
       if (resultType && expectedResultType) {
         if (!resultType->isEqual(expectedResultType)) {
-          CS.TC.diagnose(closureExpr->getEndLoc(),
-                         diag::cannot_convert_closure_result, resultType,
-                         expectedResultType);
+          auto &DE = CS.getASTContext().Diags;
+          DE.diagnose(closureExpr->getEndLoc(),
+                      diag::cannot_convert_closure_result, resultType,
+                      expectedResultType);
           return true;
         }
 
@@ -2650,7 +2655,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // possible.
     fnExpr = typeCheckChildIndependently(callExpr->getFn());
     if (!fnExpr) {
-      return CS.TC.Diags.hadAnyError();
+      return CS.getASTContext().Diags.hadAnyError();
     }
   }
 
@@ -3298,7 +3303,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     }
 
     // Coerce parameter types here only if there are no unresolved
-    CS.TC.coerceParameterListToType(params, CE, fnType);
+    TypeChecker::coerceParameterListToType(params, CE, fnType);
     expectedResultType = fnType->getResult();
   }
 
@@ -3525,19 +3530,18 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 /// _ColorLiteralType), suggest that the user import the appropriate module for
 /// the target.
 bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-  auto &TC = CS.getTypeChecker();
-
   // Type check the argument first.
   auto protocol = TypeChecker::getLiteralProtocol(CS.getASTContext(), E);
   if (!protocol)
     return false;
-  DeclName constrName = TC.getObjectLiteralConstructorName(E);
+  auto constrName =
+      TypeChecker::getObjectLiteralConstructorName(CS.getASTContext(), E);
   assert(constrName);
   auto *constr = dyn_cast_or_null<ConstructorDecl>(
       protocol->getSingleRequirement(constrName));
   if (!constr)
     return false;
-  auto paramType = TC.getObjectLiteralParameterType(E, constr);
+  auto paramType = TypeChecker::getObjectLiteralParameterType(E, constr);
   if (!typeCheckChildIndependently(
         E->getArg(), paramType, CTP_CallArgument))
     return true;
@@ -3580,11 +3584,11 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
 
   // Emit the diagnostic.
   const auto plainName = E->getLiteralKindPlainName();
-  TC.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
-              plainName);
+  Ctx.Diags.diagnose(E->getLoc(), diag::object_literal_default_type_missing,
+                     plainName);
   if (!importModule.empty()) {
-    TC.diagnose(E->getLoc(), diag::object_literal_resolve_import,
-                importModule, importDefaultTypeName, plainName);
+    Ctx.Diags.diagnose(E->getLoc(), diag::object_literal_resolve_import,
+                       importModule, importDefaultTypeName, plainName);
   }
   return true;
 }

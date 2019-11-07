@@ -281,19 +281,22 @@ public:
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(const SILFunction &F) const;
 
-  /// True if the type, or the referenced type of an address type, is trivial,
-  /// meaning it is loadable and can be trivially copied, moved or detroyed.
+  /// True if the underlying AST type is trivial, meaning it is loadable and can
+  /// be trivially copied, moved or detroyed. Returns false for address types
+  /// even though they are technically trivial.
   bool isTrivial(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
-  /// be a scalar reference-counted type.
+  /// be a scalar reference-counted type such as a class, box, or thick function
+  /// type. Returns false for non-trivial aggregates.
   bool isReferenceCounted(SILModule &M) const;
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
   bool isNoReturnFunction(SILModule &M) const;
 
-  /// Returns true if the referenced type has reference semantics.
+  /// Returns true if the referenced AST type has reference semantics, even if
+  /// the lowered SIL type is known to be trivial.
   bool hasReferenceSemantics() const {
     return getASTType().hasReferenceSemantics();
   }
