@@ -3474,7 +3474,7 @@ public:
 
 static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
                                         const Expr *expr) {
-  auto selectorTy = tc.getObjCSelectorType(const_cast<DeclContext *>(dc));
+  auto selectorTy = dc->getASTContext().getSelectorType();
   if (!selectorTy) return;
 
   const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(tc, dc, selectorTy));
@@ -4097,9 +4097,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   Type boolType;
   if (auto boolDecl = ctx.getBoolDecl())
     boolType = boolDecl->getDeclaredInterfaceType();
-  Type objcBoolType;
-  if (auto objcBoolDecl = ctx.getObjCBoolDecl())
-    objcBoolType = objcBoolDecl->getDeclaredInterfaceType();
+  auto objcBoolType = ctx.getObjCBoolType();
 
   /// Determine the options associated with the given type.
   auto getOptions = [&](Type type) {

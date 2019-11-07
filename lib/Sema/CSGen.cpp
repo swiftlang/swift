@@ -2981,7 +2981,7 @@ namespace {
       
       // Make sure we can reference ObjectiveC.Selector.
       // FIXME: Fix-It to add the import?
-      auto type = CS.getTypeChecker().getObjCSelectorType(CS.DC);
+      auto type = CS.getASTContext().getSelectorType();
       if (!type) {
         ctx.Diags.diagnose(E->getLoc(), diag::expr_selector_module_missing);
         return nullptr;
