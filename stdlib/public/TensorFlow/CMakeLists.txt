@@ -29,7 +29,7 @@ list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
 # list(APPEND swift_stdlib_compile_flags "-O" "-whole-module-optimization")
 list(APPEND swift_stdlib_compile_flags "-Onone")
-list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
+list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_STDLIB_MODULE")
 
 set(SOURCES "")
 
