@@ -768,73 +768,53 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
     return false;
 
   // FIXME: The following attempts to do an initial ReadAST invocation to verify
-  // the PCH, without affecting the existing CompilerInstance.
+  // the PCH, without causing trouble for the existing CompilerInstance.
   // Look into combining creating the ASTReader along with verification + update
   // if necessary, so that we can create and use one ASTReader in the common case
   // when there is no need for update.
+  clang::CompilerInstance CI(Impl.Instance->getPCHContainerOperations(),
+                             &Impl.Instance->getModuleCache());
+  auto invocation =
+      std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
+  invocation->getPreprocessorOpts().DisablePCHValidation = false;
+  invocation->getPreprocessorOpts().AllowPCHWithCompilerErrors = false;
+  invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
+  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
+  invocation->getLangOpts()->CacheGeneratedPCH = true;
 
-  CompilerInstance &CI = *Impl.Instance;
-  auto clangDiags = CompilerInstance::createDiagnostics(
-                                              new clang::DiagnosticOptions());
+  // ClangImporter::create adds a remapped MemoryBuffer that we don't need
+  // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
+  // we don't clear the range then both the original and new CompilerInvocation
+  // will try to free it.
+  invocation->getPreprocessorOpts().RemappedFileBuffers.clear();
+
+  CI.setInvocation(std::move(invocation));
+  CI.setTarget(&Impl.Instance->getTarget());
+  CI.setDiagnostics(
+      &*CompilerInstance::createDiagnostics(new clang::DiagnosticOptions()));
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
-  clang::SourceManager clangSrcMgr(*clangDiags, CI.getFileManager());
+  CI.createSourceManager(Impl.Instance->getFileManager());
+  auto &clangSrcMgr = CI.getSourceManager();
   auto FID = clangSrcMgr.createFileID(
                         llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
   clangSrcMgr.setMainFileID(FID);
 
-  // Note: Reusing the real HeaderSearch is dangerous, but it's not easy to
-  // copy. We put in some effort to reset it to the way it was below.
-  clang::HeaderSearch &headerSearchInfo =
-      CI.getPreprocessor().getHeaderSearchInfo();
-  assert(headerSearchInfo.getExternalLookup() == nullptr &&
-         "already configured an ASTReader");
-
-  // Note: Reusing the PCM cache is safe because that's already shared when
-  // building PCM files for the module cache. Using the top-level compiler
-  // instance as a module loader does seem a little dangerous but does not
-  // appear to cause problems at the moment.
-  clang::Preprocessor PP(CI.getInvocation().getPreprocessorOptsPtr(),
-                         *clangDiags,
-                         CI.getLangOpts(),
-                         clangSrcMgr,
-                         headerSearchInfo,
-                         (clang::ModuleLoader &)CI,
-                         /*IILookup=*/nullptr,
-                         /*OwnsHeaderSearch=*/false);
-  PP.Initialize(CI.getTarget());
-  clang::ASTContext ctx(CI.getLangOpts(), clangSrcMgr,
-                        PP.getIdentifierTable(), PP.getSelectorTable(),
-                        PP.getBuiltinInfo());
-
-  // Note: Reusing the PCHContainerReader or ModuleFileExtensions could be
-  // dangerous.
-  std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, CI.getModuleCache(), &ctx, CI.getPCHContainerReader(),
-      CI.getFrontendOpts().ModuleFileExtensions,
-      CI.getHeaderSearchOpts().Sysroot,
-      /*DisableValidation*/ false,
-      /*AllowPCHWithCompilerErrors*/ false,
-      /*AllowConfigurationMismatch*/ false,
-      /*ValidateSystemInputs*/ true));
-  SWIFT_DEFER {
-    assert(headerSearchInfo.getExternalLookup() == Reader.get() ||
-           headerSearchInfo.getExternalLookup() == nullptr);
-    headerSearchInfo.SetExternalLookup(nullptr);
-    headerSearchInfo.SetExternalSource(nullptr);
-  };
-  ctx.InitBuiltinTypes(CI.getTarget());
+  // Pass in TU_Complete, which is the default mode for the Preprocessor
+  // constructor and the right one for reading a PCH.
+  CI.createPreprocessor(clang::TU_Complete);
+  CI.createASTContext();
+  CI.createModuleManager();
+  clang::ASTReader &Reader = *CI.getModuleManager();
 
   auto failureCapabilities =
     clang::ASTReader::ARR_Missing |
     clang::ASTReader::ARR_OutOfDate |
     clang::ASTReader::ARR_VersionMismatch;
 
-  auto result = Reader->ReadAST(PCHFilename,
-                  clang::serialization::MK_PCH,
-                  clang::SourceLocation(),
-                  failureCapabilities);
+  auto result = Reader.ReadAST(PCHFilename, clang::serialization::MK_PCH,
+                               clang::SourceLocation(), failureCapabilities);
   switch (result) {
   case clang::ASTReader::Success:
     return true;
