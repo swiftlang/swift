@@ -2151,7 +2151,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, cs.getTypeChecker().getIntType(cs.DC));
+        cs.setType(expr, TypeChecker::getIntType(ctx));
         return handleIntegerLiteralExpr(expr);
       };
 

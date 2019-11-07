@@ -600,7 +600,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
   TypeChecker &TC = createTypeChecker(Ctx);
-  return TypeChecker::validateType(TC.Context, T, resolution, options);
+  return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.

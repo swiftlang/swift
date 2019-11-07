@@ -2181,15 +2181,14 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   return getTypeMatchSuccess();
 }
 
-static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
-                                              DeclContext *DC,
+static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(TC.getInt8Type(DC)))
+  if (baseType->isEqual(TypeChecker::getInt8Type(ctx)))
     return true;
-  if (baseType->isEqual(TC.getUInt8Type(DC)))
+  if (baseType->isEqual(TypeChecker::getUInt8Type(ctx)))
     return true;
-  if (baseType->isEqual(TC.Context.TheEmptyTupleType))
+  if (baseType->isEqual(ctx.TheEmptyTupleType))
     return true;
   
   return false;
@@ -4135,11 +4134,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
-                if (type1->isEqual(TC.getStringType(DC))) {
+                auto &ctx = getASTContext();
+                if (type1->isEqual(TypeChecker::getStringType(ctx))) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
-                      isStringCompatiblePointerBaseType(TC, DC, baseTy))
+                      isStringCompatiblePointerBaseType(ctx, baseTy))
                     conversionsOrFixes.push_back(
                         ConversionRestrictionKind::StringToPointer);
                 }
@@ -4462,7 +4462,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
-  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
+  addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
                            DeclBaseName::createConstructor(),
                            memberType,
                            useDC, functionRefKind,
@@ -5160,6 +5160,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
+  auto &ctx = getASTContext();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     // Tuples don't have compound-name members.
     if (!memberName.isSimpleName() || memberName.isSpecial())
@@ -5198,7 +5199,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // anything else, because the cost of the general search is so
     // high.
     if (auto info = getArgumentInfo(memberLocator)) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(), info->Labels);
+      memberName = DeclName(ctx, memberName.getBaseName(),
+                            info->Labels);
     }
   }
 
@@ -5232,8 +5234,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == TC.Context.getStringDecl()) {
-    if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
+  if (baseObjTy->getAnyNominal() == ctx.getStringDecl()) {
+    if (Type classType = ctx.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }
   }
@@ -5500,7 +5502,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         if (!(info && info->Labels.size() == 1 &&
               info->Labels[0] == getASTContext().Id_dynamicMember)) {
           return OverloadChoice::getDynamicMemberLookup(
-              baseTy, subscript, TC.Context.getIdentifier("subscript"),
+              baseTy, subscript, ctx.getIdentifier("subscript"),
               /*isKeyPathBased=*/true);
         }
       }
@@ -5518,11 +5520,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
-  if (!TC.Context.isSwiftVersionAtLeast(5) &&
+  if (!ctx.isSwiftVersionAtLeast(5) &&
       memberName.getBaseName() == DeclBaseName::createConstructor() &&
       !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
-                                      TC.Context.getIdentifier("init"));
+                                      ctx.getIdentifier("init"));
     for (auto result : compatLookup)
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/false,
@@ -6392,12 +6394,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   }
 
   // Explicit bridging from a value type to an Objective-C class type.
+  auto &ctx = getASTContext();
   if (unwrappedFromType->isPotentiallyBridgedValueType() &&
       (unwrappedToType->isBridgeableObjectType() ||
        (unwrappedToType->isExistentialType() &&
         !unwrappedToType->isAny()))) {
     countOptionalInjections();
-    if (Type classType = TC.Context.getBridgedToObjC(DC, unwrappedFromType)) {
+    if (Type classType = ctx.getBridgedToObjC(DC, unwrappedFromType)) {
       return matchTypes(classType, unwrappedToType, ConstraintKind::Conversion,
                         subflags, locator);
     }
@@ -6409,12 +6412,12 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (unwrappedFromType->mayHaveSuperclass() &&
       unwrappedToType->isPotentiallyBridgedValueType()) {
     Type bridgedValueType;
-    if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
-                                                     &bridgedValueType)) {
+    if (auto objcClass = ctx.getBridgedToObjC(DC, unwrappedToType,
+                                              &bridgedValueType)) {
       // Bridging NSNumber to NSValue is one-way, since there are multiple Swift
       // value types that bridge to those object types. It requires a checked
       // cast to get back.
-      if (TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
+      if (ctx.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
         return SolutionKind::Error;
 
       // If the bridged value type is generic, the generic arguments
@@ -6422,13 +6425,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // FIXME: This should be an associated type of the protocol.
       auto &ctx = getASTContext();
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
-        if (fromBGT->getDecl() == TC.Context.getArrayDecl()) {
+        if (fromBGT->getDecl() == ctx.getArrayDecl()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        TC.Context.getAnyObjectType(),
+                        ctx.getAnyObjectType(),
                         getConstraintLocator(locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
-        } else if (fromBGT->getDecl() == TC.Context.getDictionaryDecl()) {
+        } else if (fromBGT->getDecl() == ctx.getDictionaryDecl()) {
           // [NSObject : AnyObject]
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
@@ -6443,11 +6446,11 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                             LocatorPathElt::GenericArgument(0))));
 
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[1],
-                        TC.Context.getAnyObjectType(),
+                        ctx.getAnyObjectType(),
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(1))));
-        } else if (fromBGT->getDecl() == TC.Context.getSetDecl()) {
+        } else if (fromBGT->getDecl() == ctx.getSetDecl()) {
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
@@ -6580,7 +6583,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     assert(instanceTy->isExistentialType());
     Type openedTy = OpenedArchetypeType::get(instanceTy);
     if (isMetatype)
-      openedTy = MetatypeType::get(openedTy, TC.Context);
+      openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
@@ -7880,15 +7883,18 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (flags.contains(TMF_GenerateConstraints)) {
         increaseScore(ScoreKind::SK_ValueToPointerConversion);
 
+        auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
-                                       baseType2, TC.getInt8Type(DC),
-                                       getConstraintLocator(locator));
+                                          baseType2,
+                                          TypeChecker::getInt8Type(ctx),
+                                          getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
-                                        baseType2, TC.getUInt8Type(DC),
-                                        getConstraintLocator(locator));
+                                           baseType2,
+                                           TypeChecker::getUInt8Type(ctx),
+                                           getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
-                                        baseType2, TC.Context.TheEmptyTupleType,
-                                        getConstraintLocator(locator));
+                                          baseType2, ctx.TheEmptyTupleType,
+                                          getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
         addDisjunctionConstraint(disjunctionChoices, locator);
@@ -7898,7 +7904,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Unsolved;
     }
     
-    if (!isStringCompatiblePointerBaseType(TC, DC, baseType2)) {
+    if (!isStringCompatiblePointerBaseType(getASTContext(), baseType2)) {
       return SolutionKind::Error;
     }
 
@@ -8007,7 +8013,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     }
 
     auto hashableProtocol =
-      TC.Context.getProtocol(KnownProtocolKind::Hashable);
+      getASTContext().getProtocol(KnownProtocolKind::Hashable);
     if (!hashableProtocol)
       return SolutionKind::Error;
 

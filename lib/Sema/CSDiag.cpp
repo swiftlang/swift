@@ -2547,10 +2547,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   if (!contextualType || contextualType->hasUnresolvedType())
     return false;
 
-  auto &TC = CS.TC;
-  auto *DC = CS.DC;
-
-  auto typeCheckExpr = [&](TypeChecker &TC, Expr *expr, DeclContext *DC,
+  auto typeCheckExpr = [&](Expr *expr, DeclContext *DC,
                            SmallPtrSetImpl<TypeBase *> &types) {
     getPossibleTypesOfExpressionWithoutApplying(
         expr, DC, types, FreeTypeVariableBinding::Disallow);
@@ -2560,7 +2557,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   // see if that's going to produce a type, if so, let's type-check
   // again, this time using given contextual type.
   SmallPtrSet<TypeBase *, 4> withoutContextual;
-  typeCheckExpr(TC, callExpr, DC, withoutContextual);
+  typeCheckExpr(callExpr, CS.DC, withoutContextual);
 
   // If there are no types returned, it means that problem was
   // nothing to do with contextual information, probably parameter/argument
