@@ -877,6 +877,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
+    IRGenOpts.SanitizersWithRecoveryInstrumentation =
+        parseSanitizerRecoverArgValues(A, Opts.Sanitizers, Diags,
+                                       /*emitWarnings=*/true);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
                                OPT_disable_verify_exclusivity)) {
     Opts.VerifyExclusivity

@@ -214,6 +214,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
