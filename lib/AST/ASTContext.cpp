@@ -4265,12 +4265,12 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // Check whether the type is an existential that contains
   // Error. If so, it's bridged to NSError.
   if (type->isExistentialWithError()) {
-    if (auto nsErrorDecl = getNSErrorDecl()) {
+    if (auto nsErrorTy = getNSErrorType()) {
       // The corresponding value type is Error.
       if (bridgedValueType)
         *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
-      return nsErrorDecl->getDeclaredInterfaceType();
+      return nsErrorTy;
     }
   }
 
@@ -4308,8 +4308,8 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
     // Bridge to NSError.
-    if (auto nsErrorDecl = getNSErrorDecl())
-      return nsErrorDecl->getDeclaredInterfaceType();
+    if (auto nsErrorTy = getNSErrorType())
+      return nsErrorTy;
   }
 
   // No special bridging to Objective-C, but this can become an 'Any'.

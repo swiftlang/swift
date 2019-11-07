@@ -4097,9 +4097,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   Type boolType;
   if (auto boolDecl = ctx.getBoolDecl())
     boolType = boolDecl->getDeclaredInterfaceType();
-  Type objcBoolType;
-  if (auto objcBoolDecl = ctx.getObjCBoolDecl())
-    objcBoolType = objcBoolDecl->getDeclaredInterfaceType();
+  auto objcBoolType = ctx.getObjCBoolType();
 
   /// Determine the options associated with the given type.
   auto getOptions = [&](Type type) {

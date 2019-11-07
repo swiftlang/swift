@@ -680,11 +680,10 @@ bool swift::isRepresentableInObjC(
     }
 
     // The error type is always 'AutoreleasingUnsafeMutablePointer<NSError?>?'.
-    auto nsError = ctx.getNSErrorDecl();
+    auto nsErrorTy = ctx.getNSErrorType();
     Type errorParameterType;
-    if (nsError) {
-      errorParameterType = nsError->getDeclaredInterfaceType();
-      errorParameterType = OptionalType::get(errorParameterType);
+    if (nsErrorTy) {
+      errorParameterType = OptionalType::get(nsErrorTy);
       errorParameterType
         = BoundGenericType::get(
             ctx.getAutoreleasingUnsafeMutablePointerDecl(),

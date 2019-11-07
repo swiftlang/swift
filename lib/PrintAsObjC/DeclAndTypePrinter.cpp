@@ -1396,8 +1396,8 @@ private:
     // upper-bounded keys.
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
-      if (auto proto = ctx.getNSCopyingDecl()) {
-        rewrittenArgsBuf[0] = proto->getDeclaredInterfaceType();
+      if (auto protoTy = ctx.getNSCopyingType()) {
+        rewrittenArgsBuf[0] = protoTy;
         rewrittenArgsBuf[1] = typeArgs[1];
         typeArgs = rewrittenArgsBuf;
       }

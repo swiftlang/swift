@@ -4427,10 +4427,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       if (!conformsToProtocol(toType, errorTypeProto, dc,
                               ConformanceCheckFlags::InExpression)
                .isInvalid()) {
-        auto nsError = Context.getNSErrorDecl();
-        if (nsError) {
-          Type NSErrorTy = nsError->getDeclaredInterfaceType();
-          if (isSubtypeOf(fromType, NSErrorTy, dc)
+        auto nsErrorTy = Context.getNSErrorType();
+        if (nsErrorTy) {
+          if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
               // Error itself.
               && !isSubtypeOf(fromType, toType, dc))
