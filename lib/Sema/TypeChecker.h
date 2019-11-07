@@ -556,12 +556,6 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
-  Type MaxIntegerType;
-  Type NSObjectType;
-  Type NSNumberType;
-  Type NSValueType;
-  Type ObjCSelectorType;
-
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
@@ -734,9 +728,7 @@ public:
   Type getIntType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
-  Type getNSObjectType(DeclContext *dc);
-  Type getObjCSelectorType(DeclContext *dc);
-  
+
   /// Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
   static Type resolveIdentifierType(TypeResolution resolution,

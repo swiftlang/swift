@@ -1670,9 +1670,8 @@ namespace {
     Expr *bridgeErrorToObjectiveC(Expr *value) {
       auto &ctx = cs.getASTContext();
 
-      auto nsErrorDecl = ctx.getNSErrorDecl();
-      assert(nsErrorDecl && "Missing NSError?");
-      Type nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
+      auto nsErrorType = ctx.getNSErrorType();
+      assert(nsErrorType && "Missing NSError?");
 
       auto result = new (ctx) BridgeToObjCExpr(value, nsErrorType);
       return cs.cacheType(result);

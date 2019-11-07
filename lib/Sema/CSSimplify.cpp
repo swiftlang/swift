@@ -6420,6 +6420,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // If the bridged value type is generic, the generic arguments
       // must either match or be bridged.
       // FIXME: This should be an associated type of the protocol.
+      auto &ctx = getASTContext();
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
         if (fromBGT->getDecl() == TC.Context.getArrayDecl()) {
           // [AnyObject]
@@ -6429,14 +6430,14 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                             LocatorPathElt::GenericArgument(0))));
         } else if (fromBGT->getDecl() == TC.Context.getDictionaryDecl()) {
           // [NSObject : AnyObject]
-          auto NSObjectType = TC.getNSObjectType(DC);
-          if (!NSObjectType) {
+          auto nsObjectType = ctx.getNSObjectType();
+          if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
             return SolutionKind::Error;
           }
 
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        NSObjectType,
+                        nsObjectType,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
@@ -6447,13 +6448,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(1))));
         } else if (fromBGT->getDecl() == TC.Context.getSetDecl()) {
-          auto NSObjectType = TC.getNSObjectType(DC);
-          if (!NSObjectType) {
+          auto nsObjectType = ctx.getNSObjectType();
+          if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
             return SolutionKind::Error;
           }
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        NSObjectType,
+                        nsObjectType,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));

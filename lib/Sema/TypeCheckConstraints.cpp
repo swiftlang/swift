@@ -1994,7 +1994,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
-  if (auto selectorTy = TC.getObjCSelectorType(DC)) {
+  if (auto selectorTy = TC.Context.getSelectorType()) {
     if (type->isEqual(selectorTy))
       return nullptr;
   }
@@ -4407,7 +4407,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
   // so casts from NSObject to potentially-class metatypes may succeed.
-  if (auto nsObject = getNSObjectType(dc)) {
+  if (auto nsObject = Context.getNSObjectType()) {
     if (fromType->isEqual(nsObject)) {
       if (auto toMeta = toType->getAs<MetatypeType>()) {
         if (toMeta->getInstanceType()->mayHaveSuperclass()
@@ -4427,10 +4427,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       if (!conformsToProtocol(toType, errorTypeProto, dc,
                               ConformanceCheckFlags::InExpression)
                .isInvalid()) {
-        auto nsError = Context.getNSErrorDecl();
-        if (nsError) {
-          Type NSErrorTy = nsError->getDeclaredInterfaceType();
-          if (isSubtypeOf(fromType, NSErrorTy, dc)
+        auto nsErrorTy = Context.getNSErrorType();
+        if (nsErrorTy) {
+          if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
               // Error itself.
               && !isSubtypeOf(fromType, toType, dc))
