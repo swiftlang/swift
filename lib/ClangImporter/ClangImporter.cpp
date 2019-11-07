@@ -1469,8 +1469,8 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 bool
 ClangImporter::emitBridgingPCH(StringRef headerPath,
                                StringRef outputPCHPath) {
-  auto invocation = std::make_shared<clang::CompilerInvocation>
-    (clang::CompilerInvocation(*Impl.Invocation));
+  auto invocation =
+      std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
