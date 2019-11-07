@@ -267,6 +267,289 @@ extension MutableCollection {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// shift(from:to:) / gather(_:at:)
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
+  /// Shifts the elements in the given range to just before the element at
+  /// the specified index.
+  ///
+  /// - Parameters:
+  ///   - range: The range of the elements to move.
+  ///   - insertionPoint: The index to use as the insertion point for the
+  ///     elements. `insertionPoint` must be a valid index of the collection.
+  /// - Returns: The new bounds of the moved elements.
+  ///
+  /// - Complexity: O(*n*) where *n* is the length of the collection.
+  @discardableResult
+  public mutating func shift(
+    from range: Range<Index>, to insertionPoint: Index
+  ) -> Range<Index> {
+    if insertionPoint < range.lowerBound {
+      let endIndex = _rotate(
+        in: insertionPoint..<range.upperBound,
+        shiftingToStart: range.lowerBound)
+      return insertionPoint..<endIndex
+    }
+    
+    if range.upperBound < insertionPoint {
+      let startIndex = _rotate(
+        in: range.lowerBound..<insertionPoint,
+        shiftingToStart: range.upperBound)
+      return startIndex..<insertionPoint
+    }
+    
+    return range
+  }
+  
+  /// Shifts the elements in the given range expression to just before the
+  /// element at the specified index.
+  ///
+  /// - Parameters:
+  ///   - range: The range of the elements to move.
+  ///   - insertionPoint: The index to use as the insertion point for the
+  ///     elements. `insertionPoint` must be a valid index of the collection.
+  /// - Returns: The new bounds of the moved elements.
+  ///
+  /// - Complexity: O(*n*) where *n* is the length of the collection.
+  @discardableResult
+  public mutating func shift<R : RangeExpression>(
+    from range: R, to insertionPoint: Index
+  ) -> Range<Index> where R.Bound == Index {
+    return shift(from: range.relative(to: self), to: insertionPoint)
+  }
+  
+  /// Moves the element at the given index to just before the element at the
+  /// specified index.
+  ///
+  /// This method moves the element at position `i` to immediately before
+  /// `insertionPoint`. This example shows moving elements forward and
+  /// backward in an array of integers.
+  ///
+  ///     var numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  ///     let newIndexOfNine = numbers.shift(from: 9, toJustBefore: 7)
+  ///     // numbers == [0, 1, 2, 3, 4, 5, 6, 9, 7, 8, 10]
+  ///     // newIndexOfNine == 7
+  ///
+  ///     let newIndexOfOne = numbers.shift(from: 1, toJustBefore: 4)
+  ///     // numbers == [0, 2, 3, 1, 4, 5, 6, 9, 7, 8, 10]
+  ///     // newIndexOfOne == 3
+  ///
+  /// To move an element to the end of a collection, pass the collection's
+  /// `endIndex` as `insertionPoint`.
+  ///
+  ///     numbers.shift(from: 0, toJustBefore: numbers.endIndex)
+  ///     // numbers == [2, 3, 1, 4, 5, 6, 9, 7, 8, 10, 0]
+  ///
+  /// - Parameters:
+  ///   - source: The index of the element to move. `source` must be a valid
+  ///     index of the collection that isn't `endIndex`.
+  ///   - insertionPoint: The index to use as the destination of the element.
+  ///     `insertionPoint` must be a valid index of the collection.
+  /// - Returns: The resulting index of the element that began at `source`.
+  ///
+  /// - Complexity: O(*n*) where *n* is the length of the collection.
+  @discardableResult
+  public mutating func shift(
+    from source: Index, to insertionPoint: Index
+  ) -> Index {
+    _failEarlyRangeCheck(source, bounds: startIndex..<endIndex)
+    _failEarlyRangeCheck(insertionPoint, bounds: startIndex..<endIndex)
+    if source == insertionPoint {
+      return source
+    } else if source < insertionPoint {
+      return _rotate(
+        in: source..<insertionPoint,
+        shiftingToStart: index(after: source))
+    } else {
+      _rotate(
+        in: insertionPoint..<index(after: source),
+        shiftingToStart: source)
+      return insertionPoint
+    }
+  }
+  
+  /// Collects the elements at the given indices just before the element at
+  /// the specified index.
+  ///
+  /// This example finds all the uppercase letters in the array and then
+  /// gathers them between `"i"` and `"j"`.
+  ///
+  ///     var letters = Array("ABCdeFGhijkLMNOp")
+  ///     let uppercase = letters.indices(where: { $0.isUppercase })
+  ///     let rangeOfUppercase = letters.gather(uppercase, justBefore: 10)
+  ///     // String(letters) == "dehiABCFGLMNOjkp"
+  ///     // rangeOfUppercase == 4..<13
+  ///
+  /// - Parameters:
+  ///   - indices: The indices of the elements to move.
+  ///   - insertionPoint: The index to use as the destination of the elements.
+  /// - Returns: The new bounds of the moved elements.
+  ///
+  /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
+  @discardableResult
+  public mutating func gather(
+    _ indices: RangeSet<Index>, at insertionPoint: Index
+  ) -> Range<Index> {
+    let lowerCount = distance(from: startIndex, to: insertionPoint)
+    let upperCount = distance(from: insertionPoint, to: endIndex)
+    let start = _indexedStablePartition(
+      count: lowerCount,
+      range: startIndex..<insertionPoint,
+      by: { indices.contains($0) })
+    let end = _indexedStablePartition(
+      count: upperCount,
+      range: insertionPoint..<endIndex,
+      by: { !indices.contains($0) })
+    return start..<end
+  }
+  
+  /// Collects the elements that satisfy the given predicate just before the
+  /// element at the specified index.
+  ///
+  /// This example gathers all the uppercase letters in the array between
+  /// `"i"` and `"j"`.
+  ///
+  ///     var letters = Array("ABCdeFGhijkLMNOp")
+  ///     let rangeOfUppercase = letters.gather(justBefore: 10) { $0.isUppercase }
+  ///     // String(letters) == "dehiABCFGLMNOjkp"
+  ///     // rangeOfUppercase == 4..<13
+  ///
+  /// - Parameters:
+  ///   - insertionPoint: The index to use as the destination of the elements.
+  ///   - predicate: A closure that returns `true` for elements that should
+  ///     move to `destination`.
+  /// - Returns: The new bounds of the moved elements.
+  ///
+  /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
+  @discardableResult
+  public mutating func gather(
+    at insertionPoint: Index, where predicate: (Element) -> Bool
+  ) -> Range<Index> {
+    let lowerCount = distance(from: startIndex, to: insertionPoint)
+    let upperCount = distance(from: insertionPoint, to: endIndex)
+    let start = _stablePartition(
+      count: lowerCount,
+      range: startIndex..<insertionPoint,
+      by: { predicate($0) })
+    let end = _stablePartition(
+      count: upperCount,
+      range: insertionPoint..<endIndex,
+      by: { !predicate($0) })
+    return start..<end
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// _rotate(in:shiftingToStart:)
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
+  /// Rotates the elements of the collection so that the element at `middle`
+  /// ends up first.
+  ///
+  /// - Returns: The new index of the element that was first pre-rotation.
+  ///
+  /// - Complexity: O(*n*)
+  @discardableResult
+  internal mutating func _rotate(
+    in subrange: Range<Index>,
+    shiftingToStart middle: Index
+  ) -> Index {
+    var m = middle, s = subrange.lowerBound
+    let e = subrange.upperBound
+    
+    // Handle the trivial cases
+    if s == m { return e }
+    if m == e { return s }
+    
+    // We have two regions of possibly-unequal length that need to be
+    // exchanged.  The return value of this method is going to be the
+    // position following that of the element that is currently last
+    // (element j).
+    //
+    //   [a b c d e f g|h i j]   or   [a b c|d e f g h i j]
+    //   ^             ^     ^        ^     ^             ^
+    //   s             m     e        s     m             e
+    //
+    var ret = e // start with a known incorrect result.
+    while true {
+      // Exchange the leading elements of each region (up to the
+      // length of the shorter region).
+      //
+      //   [a b c d e f g|h i j]   or   [a b c|d e f g h i j]
+      //    ^^^^^         ^^^^^          ^^^^^ ^^^^^
+      //   [h i j d e f g|a b c]   or   [d e f|a b c g h i j]
+      //   ^     ^       ^     ^         ^    ^     ^       ^
+      //   s    s1       m    m1/e       s   s1/m   m1      e
+      //
+      let (s1, m1) = _swapNonemptySubrangePrefixes(s..<m, m..<e)
+      
+      if m1 == e {
+        // Left-hand case: we have moved element j into position.  if
+        // we haven't already, we can capture the return value which
+        // is in s1.
+        //
+        // Note: the STL breaks the loop into two just to avoid this
+        // comparison once the return value is known.  I'm not sure
+        // it's a worthwhile optimization, though.
+        if ret == e { ret = s1 }
+        
+        // If both regions were the same size, we're done.
+        if s1 == m { break }
+      }
+      
+      // Now we have a smaller problem that is also a rotation, so we
+      // can adjust our bounds and repeat.
+      //
+      //    h i j[d e f g|a b c]   or    d e f[a b c|g h i j]
+      //         ^       ^     ^              ^     ^       ^
+      //         s       m     e              s     m       e
+      s = s1
+      if s == m { m = m1 }
+    }
+    
+    return ret
+  }
+  
+  /// Swaps the elements of the two given subranges, up to the upper bound of
+  /// the smaller subrange. The returned indices are the ends of the two
+  /// ranges that were actually swapped.
+  ///
+  ///     Input:
+  ///     [a b c d e f g h i j k l m n o p]
+  ///      ^^^^^^^         ^^^^^^^^^^^^^
+  ///      lhs             rhs
+  ///
+  ///     Output:
+  ///     [i j k l e f g h a b c d m n o p]
+  ///             ^               ^
+  ///             p               q
+  ///
+  /// - Precondition: !lhs.isEmpty && !rhs.isEmpty
+  /// - Postcondition: For returned indices `(p, q)`:
+  ///
+  ///   - distance(from: lhs.lowerBound, to: p) == distance(from:
+  ///     rhs.lowerBound, to: q)
+  ///   - p == lhs.upperBound || q == rhs.upperBound
+  mutating func _swapNonemptySubrangePrefixes(
+    _ lhs: Range<Index>, _ rhs: Range<Index>
+  ) -> (Index, Index) {
+    assert(!lhs.isEmpty)
+    assert(!rhs.isEmpty)
+    
+    var p = lhs.lowerBound
+    var q = rhs.lowerBound
+    repeat {
+      swapAt(p, q)
+      formIndex(after: &p)
+      formIndex(after: &q)
+    } while p != lhs.upperBound && q != rhs.upperBound
+    return (p, q)
+  }
+}
+
 // the legacy swap free function
 //
 /// Exchanges the values of the two arguments.

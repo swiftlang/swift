@@ -210,6 +210,68 @@ extension BidirectionalCollection where Element: Equatable {
 }
 
 //===----------------------------------------------------------------------===//
+// indices(where:) / indices(of:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+    /// Returns the indices of all the elements that match the given predicate.
+    ///
+    /// For example, you can use this method to find all the places that a
+    /// vowel occurs in a string.
+    ///
+    ///     let str = "Fresh cheese in a breeze"
+    ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+    ///     let allTheVowels = str.indices(where: { vowels.contains($0) })
+    ///     // str[allTheVowels].count == 9
+    ///
+    /// - Parameter predicate: A closure that takes an element as its argument
+    ///   and returns a Boolean value that indicates whether the passed element
+    ///   represents a match.
+    /// - Returns: A set of the indices of the elements for which `predicate`
+    ///   returns `true`.
+    ///
+    /// - Complexity: O(*n*), where *n* is the length of the collection.
+    public func indices(where predicate: (Element) throws -> Bool) rethrows
+        -> RangeSet<Index>
+    {
+        if isEmpty { return [] }
+        
+        var result = RangeSet<Index>()
+        var i = startIndex
+        while i != endIndex {
+            let next = index(after: i)
+            if try predicate(self[i]) {
+                result._append(i..<next)
+            }
+            i = next
+        }
+        
+        return result
+    }
+}
+
+extension Collection where Element: Equatable {
+    /// Returns the indices of all the elements that are equal to the given
+    /// element.
+    ///
+    /// For example, you can use this method to find all the places that a
+    /// particular letter occurs in a string.
+    ///
+    ///     let str = "Fresh cheese in a breeze"
+    ///     let allTheEs = str.indices(of: "e")
+    ///     // str[allTheEs].count == 7
+    ///
+    /// - Parameter element: An element to look for in the collection.
+    /// - Returns: A set of the indices of the elements that are equal to
+    ///   `element`.
+    ///
+    /// - Complexity: O(*n*), where *n* is the length of the collection.
+    public func indices(of element: Element) -> RangeSet<Index> {
+        indices(where: { $0 == element })
+    }
+}
+
+//===----------------------------------------------------------------------===//
 // partition(by:)
 //===----------------------------------------------------------------------===//
 
@@ -367,6 +429,111 @@ extension MutableCollection where Self: BidirectionalCollection {
 
     return lo
   }
+}
+
+//===----------------------------------------------------------------------===//
+// _stablePartition / _indexedStablePartition / _partitioningIndex
+//===----------------------------------------------------------------------===//
+
+extension MutableCollection {
+    /// Moves all elements satisfying `belongsInSecondPartition` into a suffix
+    /// of the collection, preserving their relative order, and returns the
+    /// start of the resulting suffix.
+    ///
+    /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
+    /// - Precondition:
+    ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
+    internal mutating func _stablePartition(
+        count n: Int,
+        range: Range<Index>,
+        by belongsInSecondPartition: (Element) throws-> Bool
+    ) rethrows -> Index {
+        if n == 0 { return range.lowerBound }
+        if n == 1 {
+            return try belongsInSecondPartition(self[range.lowerBound])
+                ? range.lowerBound
+                : range.upperBound
+        }
+        let h = n / 2, i = index(range.lowerBound, offsetBy: h)
+        let j = try _stablePartition(
+            count: h,
+            range: range.lowerBound..<i,
+            by: belongsInSecondPartition)
+        let k = try _stablePartition(
+            count: n - h,
+            range: i..<range.upperBound,
+            by: belongsInSecondPartition)
+        return _rotate(in: j..<k, shiftingToStart: i)
+    }
+
+    /// Moves all elements at the indices satisfying `belongsInSecondPartition`
+    /// into a suffix of the collection, preserving their relative order, and
+    /// returns the start of the resulting suffix.
+    ///
+    /// - Complexity: O(*n* log *n*) where *n* is the number of elements.
+    /// - Precondition:
+    ///   `n == distance(from: range.lowerBound, to: range.upperBound)`
+    internal mutating func _indexedStablePartition(
+        count n: Int,
+        range: Range<Index>,
+        by belongsInSecondPartition: (Index) throws-> Bool
+    ) rethrows -> Index {
+        if n == 0 { return range.lowerBound }
+        if n == 1 {
+            return try belongsInSecondPartition(range.lowerBound)
+                ? range.lowerBound
+                : range.upperBound
+        }
+        let h = n / 2, i = index(range.lowerBound, offsetBy: h)
+        let j = try _indexedStablePartition(
+            count: h,
+            range: range.lowerBound..<i,
+            by: belongsInSecondPartition)
+        let k = try _indexedStablePartition(
+            count: n - h,
+            range: i..<range.upperBound,
+            by: belongsInSecondPartition)
+        return _rotate(in: j..<k, shiftingToStart: i)
+    }
+}
+
+//===----------------------------------------------------------------------===//
+// _partitioningIndex(where:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+    /// Returns the index of the first element in the collection that matches
+    /// the predicate.
+    ///
+    /// The collection must already be partitioned according to the predicate.
+    /// That is, there should be an index `i` where for every element in
+    /// `collection[..<i]` the predicate is `false`, and for every element
+    /// in `collection[i...]` the predicate is `true`.
+    ///
+    /// - Parameter predicate: A predicate that partitions the collection.
+    /// - Returns: The index of the first element in the collection for which
+    ///   `predicate` returns `true`.
+    ///
+    /// - Complexity: O(log *n*), where *n* is the length of this collection if
+    ///   the collection conforms to `RandomAccessCollection`, otherwise O(*n*).
+    internal func _partitioningIndex(
+        where predicate: (Element) throws -> Bool
+    ) rethrows -> Index {
+        var n = count
+        var l = startIndex
+        
+        while n > 0 {
+            let half = n / 2
+            let mid = index(l, offsetBy: half)
+            if try predicate(self[mid]) {
+                n = half
+            } else {
+                l = index(after: mid)
+                n -= half + 1
+            }
+        }
+        return l
+    }
 }
 
 //===----------------------------------------------------------------------===//
