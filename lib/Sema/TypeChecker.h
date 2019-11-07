@@ -556,10 +556,7 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
-  Type MaxIntegerType;
   Type NSObjectType;
-  Type NSNumberType;
-  Type NSValueType;
   Type ObjCSelectorType;
 
   /// The set of expressions currently being analyzed for failures.
