@@ -565,9 +565,6 @@ private:
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
-  /// The index of the next response metavariable to bind to a REPL result.
-  unsigned NextResponseVariableIndex = 0;
-
   /// If non-zero, warn when a function body takes longer than this many
   /// milliseconds to type-check.
   ///
@@ -997,7 +994,6 @@ public:
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
                            unsigned StartElem);
-  Identifier getNextResponseVariableName(DeclContext *DC);
 
   void typeCheckDecl(Decl *D);
 
@@ -1335,7 +1331,8 @@ public:
 
   /// Coerce the specified parameter list of a ClosureExpr to the specified
   /// contextual type.
-  void coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
+  static void coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+                                        AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
@@ -1424,33 +1421,21 @@ public:
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
-  Expr *coerceToRValue(Expr *expr,
-                       llvm::function_ref<Type(Expr *)> getType
-                         = [](Expr *expr) { return expr->getType(); },
-                       llvm::function_ref<void(Expr *, Type)> setType
-                         = [](Expr *expr, Type type) {
-                           expr->setType(type);
-                         });
+  static Expr *coerceToRValue(
+      ASTContext &Context, Expr *expr,
+      llvm::function_ref<Type(Expr *)> getType =
+          [](Expr *expr) { return expr->getType(); },
+      llvm::function_ref<void(Expr *, Type)> setType =
+          [](Expr *expr, Type type) { expr->setType(type); });
 
   /// Add implicit load expression to given AST, this is sometimes
   /// more complicated than simplify wrapping given root in newly created
   /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
   /// only at certain positions in AST.
-  Expr *addImplicitLoadExpr(Expr *expr,
-                            std::function<Type(Expr *)> getType,
-                            std::function<void(Expr *, Type)> setType);
-
-  /// Require that the library intrinsics for working with Optional<T>
-  /// exist.
-  bool requireOptionalIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for working with
-  /// UnsafeMutablePointer<T> exist.
-  bool requirePointerArgumentIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for creating
-  /// array literals exist.
-  bool requireArrayLiteralIntrinsics(SourceLoc loc);
+  static Expr *
+  addImplicitLoadExpr(ASTContext &Context, Expr *expr,
+                      std::function<Type(Expr *)> getType,
+                      std::function<void(Expr *, Type)> setType);
 
   /// Determine whether the given type contains the given protocol.
   ///
@@ -1661,10 +1646,11 @@ public:
   /// expression does not have an associated literal protocol.
   static ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
-  DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
+  static DeclName getObjectLiteralConstructorName(ASTContext &ctx,
+                                                  ObjectLiteralExpr *expr);
 
-  Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
-                                     ConstructorDecl *ctor);
+  static Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                            ConstructorDecl *ctor);
 
   /// Get the module appropriate for looking up standard library types.
   ///
@@ -1855,11 +1841,11 @@ public:
   /// If an expression references 'self.init' or 'super.init' in an
   /// initializer context, returns the implicit 'self' decl of the constructor.
   /// Otherwise, return nil.
-  VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                                 UnresolvedDotExpr *ctorRef);
+  static VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                                        UnresolvedDotExpr *UDE);
 
   /// Diagnose assigning variable to itself.
-  bool diagnoseSelfAssignment(const Expr *E);
+  static bool diagnoseSelfAssignment(const Expr *E);
 
   /// Builds a string representing a "default" generic argument list for
   /// \p typeDecl. In general, this means taking the bound of each generic
@@ -1911,6 +1897,19 @@ public:
   /// special case type-checking behavior.
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
+
+public:
+  /// Require that the library intrinsics for working with Optional<T>
+  /// exist.
+  static bool requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+  /// Require that the library intrinsics for working with
+  /// UnsafeMutablePointer<T> exist.
+  static bool requirePointerArgumentIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+  /// Require that the library intrinsics for creating
+  /// array literals exist.
+  static bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

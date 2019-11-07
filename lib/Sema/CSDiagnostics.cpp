@@ -89,7 +89,7 @@ template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
   auto &cs = getConstraintSystem();
-  return cs.TC.diagnose(std::forward<ArgTypes>(Args)...);
+  return cs.getASTContext().Diags.diagnose(std::forward<ArgTypes>(Args)...);
 }
 
 Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
@@ -1333,10 +1333,9 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
-    auto &TC = getTypeChecker();
     // Let's check whether this is an attempt to assign
     // variable or property to itself.
-    if (TC.diagnoseSelfAssignment(assignExpr))
+    if (TypeChecker::diagnoseSelfAssignment(assignExpr))
       return true;
 
     diagExpr = assignExpr->getDest();
@@ -1477,8 +1476,9 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
   auto srcDecl = findReferencedDecl(srcExpr);
 
   if (dstDecl.second && dstDecl == srcDecl) {
-    diagnose(expr->getLoc(), dstDecl.first ? diag::self_assignment_prop
-                                           : diag::self_assignment_var)
+    auto &DE = dstDecl.second->getASTContext().Diags;
+    DE.diagnose(expr->getLoc(), dstDecl.first ? diag::self_assignment_prop
+                                              : diag::self_assignment_var)
         .highlight(dstExpr->getSourceRange())
         .highlight(srcExpr->getSourceRange());
     return true;
