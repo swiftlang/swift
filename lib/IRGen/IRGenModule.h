@@ -639,6 +639,10 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  // SWIFT_ENABLE_TENSORFLOW
+  llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
+  // SWIFT_ENABLE_TENSORFLOW_END
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
@@ -1233,6 +1237,9 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  // SWIFT_ENABLE_TENSORFLOW
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+  // SWIFT_ENABLE_TENSORFLOW END
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1410,6 +1417,12 @@ public:
   llvm::Constant *getAddrOfWitnessTablePattern(
                                       const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
+
+  // SWIFT_ENABLE_TENSORFLOW
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
+  // SWIFT_ENABLE_TENSORFLOW_END
 
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(

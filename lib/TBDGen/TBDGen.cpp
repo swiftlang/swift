@@ -176,6 +176,55 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void TBDGenVisitor::addAutoDiffDerivativeFunction(
+    AbstractFunctionDecl *original, const DifferentiableAttr *attr,
+    AutoDiffDerivativeFunctionKind kind) {
+  auto *assocFnId = AutoDiffDerivativeFunctionIdentifier::get(
+      kind, attr->getParameterIndices(), original->getASTContext());
+  addSymbol(SILDeclRef(original).asAutoDiffDerivativeFunction(assocFnId));
+}
+
+void TBDGenVisitor::addDifferentiabilityWitness(
+    AbstractFunctionDecl *original, const DifferentiableAttr *attr) {
+  if (SILDeclRef(original).getLinkage(ForDefinition) != SILLinkage::Public)
+    return;
+
+  auto *resultIndices = IndexSubset::get(original->getASTContext(), 1, {0});
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      attr->getParameterIndices(),
+      original->getInterfaceType()->castTo<AnyFunctionType>());
+
+  GenericSignature genericSignature = attr->getDerivativeGenericSignature();
+  if (auto *jvpDecl = attr->getJVPFunction()) {
+    assert(!genericSignature ||
+           jvpDecl->getGenericSignature()->isEqual(genericSignature));
+    genericSignature = jvpDecl->getGenericSignature();
+  }
+  if (auto *vjpDecl = attr->getVJPFunction()) {
+    assert(!genericSignature ||
+           vjpDecl->getGenericSignature()->isEqual(genericSignature));
+    genericSignature = vjpDecl->getGenericSignature();
+  }
+
+  std::string originalMangledName = SILDeclRef(original).mangle();
+  AutoDiffConfig config{loweredParamIndices, resultIndices, genericSignature};
+  SILDifferentiabilityWitnessKey key(originalMangledName, config);
+
+  Mangle::ASTMangler mangle;
+  std::string mangledName = mangle.mangleSILDifferentiabilityWitnessKey(key);
+  addSymbol(mangledName);
+}
+
+void TBDGenVisitor::addDifferentiableAttr(AbstractFunctionDecl *original,
+                                          const DifferentiableAttr *attr) {
+  addAutoDiffDerivativeFunction(original, attr,
+                                AutoDiffDerivativeFunctionKind::JVP);
+  addAutoDiffDerivativeFunction(original, attr,
+                                AutoDiffDerivativeFunctionKind::VJP);
+  addDifferentiabilityWitness(original, attr);
+}
+
 /// Determine whether dynamic replacement should be emitted for the allocator or
 /// the initializer given a decl.
 /// The rule is that structs and convenience init of classes emit a
@@ -240,18 +289,9 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The Differentiation transform creates an order-1 JVP and VJP for every
-  // function with a `@differentiable` attribute.
   auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
-        AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
-        AFD->getASTContext());
-    addSymbol(SILDeclRef(AFD).asAutoDiffDerivativeFunction(jvpId));
-    auto *vjpId = AutoDiffDerivativeFunctionIdentifier::get(
-        AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
-        AFD->getASTContext());
-    addSymbol(SILDeclRef(AFD).asAutoDiffDerivativeFunction(vjpId));
+    addDifferentiableAttr(AFD, DA);
   }
 
   visitDefaultArguments(AFD, AFD->getParameters());
@@ -303,20 +343,9 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The Differentiation transform creates an order-1 JVP and VJP for every
-  // var/subscript with a `@differentiable` attribute.
   auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
-        AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
-        ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
-                  .asAutoDiffDerivativeFunction(jvpId));
-    auto *vjpId = AutoDiffDerivativeFunctionIdentifier::get(
-        AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
-        ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
-                  .asAutoDiffDerivativeFunction(vjpId));
+    addDifferentiableAttr(ASD->getAccessor(AccessorKind::Get), DA);
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

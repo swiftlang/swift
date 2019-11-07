@@ -2166,6 +2166,40 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                                        RequireMetadata);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void IRGenModule::emitSILDifferentiabilityWitness(
+    SILDifferentiabilityWitness *dw) {
+  PrettyStackTraceDifferentiabilityWitness _st(
+      "emitting differentiability witness for", dw->getKey());
+
+  // Don't emit declarations.
+  if (dw->isDeclaration())
+    return;
+
+  ConstantInitBuilder builder(*this);
+  auto diffWitnessContents = builder.beginStruct();
+
+  // TODO(marcrasi): When the differentiation pass generates JVP/VJP for
+  // witnesses, remove the nullptr case and add assertions that the JVP/VJP
+  // exist.
+  if (dw->getJVP()) {
+    diffWitnessContents.addBitCast(
+        getAddrOfSILFunction(dw->getJVP(), NotForDefinition), Int8PtrTy);
+  } else {
+    diffWitnessContents.addNullPointer(Int8PtrTy);
+  }
+  if (dw->getVJP()) {
+    diffWitnessContents.addBitCast(
+        getAddrOfSILFunction(dw->getVJP(), NotForDefinition), Int8PtrTy);
+  } else {
+    diffWitnessContents.addNullPointer(Int8PtrTy);
+  }
+
+  getAddrOfDifferentiabilityWitness(
+      dw, diffWitnessContents.finishAndCreateFuture());
+}
+// SWIFT_ENABLE_TENSORFLOW_END
+
 /// True if a function's signature in LLVM carries polymorphic parameters.
 /// Generic functions and protocol witnesses carry polymorphic parameters.
 bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
