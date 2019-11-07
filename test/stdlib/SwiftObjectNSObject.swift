@@ -21,6 +21,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://problem/56959761
+// UNSUPPORTED: OS=watchos
+
 import Foundation
 
 class C { 
