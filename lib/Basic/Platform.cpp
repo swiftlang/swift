@@ -23,8 +23,8 @@ bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
   return (triple.isiOS() &&
           // FIXME: transitional, this should eventually stop testing arch, and
           // switch to only checking the -environment field.
-          (triple.isSimulatorEnvironment() || arch == llvm::Triple::x86 ||
-           arch == llvm::Triple::x86_64));
+          (triple.isSimulatorEnvironment() ||
+           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
 }
 
 bool swift::tripleIsAppleTVSimulator(const llvm::Triple &triple) {
