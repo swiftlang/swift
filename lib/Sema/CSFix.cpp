@@ -714,6 +714,25 @@ bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
   return failure.diagnose(asNote);
 }
 
+ConstraintFix *
+ExplicitlySpecifyGenericArguments::coalescedWith(ArrayRef<ConstraintFix *> fixes) {
+  if (fixes.empty())
+    return this;
+
+  auto params = getParameters();
+  llvm::SmallVector<GenericTypeParamType *, 4> missingParams{params.begin(),
+                                                             params.end()};
+  for (auto *otherFix : fixes) {
+    if (auto *fix = otherFix->getAs<ExplicitlySpecifyGenericArguments>()) {
+      auto additionalParams = fix->getParameters();
+      missingParams.append(additionalParams.begin(), additionalParams.end());
+    }
+  }
+
+  return ExplicitlySpecifyGenericArguments::create(getConstraintSystem(),
+                                                   missingParams, getLocator());
+}
+
 ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
     ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
     ConstraintLocator *locator) {
@@ -857,45 +876,27 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
-bool RemoveUnnecessaryCoercion::diagnose(Expr *root, bool asNote) const {
-  auto &cs = getConstraintSystem();
-  UnnecessaryCoercionFailure failure(root, cs, getFromType(), getToType(),
-                                     getLocator());
-  return failure.diagnose(asNote);
-}
-
-bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
-                                        Type toType,
-                                        ConstraintLocatorBuilder locator) {
-  auto last = locator.last();
-  bool isExplicitCoercion =
-      last && last->is<LocatorPathElt::ExplicitTypeCoercion>();
-  if (!isExplicitCoercion)
-    return false;
-
-  auto expr = cast<CoerceExpr>(locator.getAnchor());
-  auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
-
-  // only diagnosing for coercion where the left-side is a DeclRefExpr
-  // or a explicit/implicit coercion e.g. Double(1) as Double
-  if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr) &&
-      (isa<DeclRefExpr>(expr->getSubExpr()) ||
-       isa<CoerceExpr>(expr->getSubExpr()))) {
-    auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
-        cs, fromType, toType, cs.getConstraintLocator(locator));
-
-    return cs.recordFix(fix);
-  }
-  return false;
-}
-
 bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   auto *AE = cast<AssignExpr>(getAnchor());
+
+  // Let's check whether this is a situation of chained assignment where
+  // one of the steps in the chain is an assignment to self e.g.
+  // `let _ = { $0 = $0 = 42 }`. Assignment chaining results in
+  // type mismatch between result of the previous assignment and the next.
+  {
+    llvm::SaveAndRestore<AssignExpr *> anchor(AE);
+
+    do {
+      if (TypeChecker::diagnoseSelfAssignment(AE))
+        return true;
+    } while ((AE = dyn_cast_or_null<AssignExpr>(cs.getParentExpr(AE))));
+  }
+
   auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
                                                : CTP_AssignSource;
 
-  ContextualFailure failure(
+  AssignmentTypeMismatchFailure failure(
       root, cs, CTP, getFromType(), getToType(),
       cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
   return failure.diagnose(asNote);
@@ -1015,4 +1016,51 @@ AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
                               Type paramType, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowArgumentMismatch(cs, argType, paramType, locator);
+}
+
+bool RemoveInvalidCall::diagnose(Expr *root, bool asNote) const {
+  ExtraneousCallFailure failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveInvalidCall(cs, locator);
+}
+
+bool AllowInvalidUseOfTrailingClosure::diagnose(Expr *expr, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InvalidUseOfTrailingClosure failure(expr, cs, getFromType(), getToType(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidUseOfTrailingClosure *
+AllowInvalidUseOfTrailingClosure::create(ConstraintSystem &cs, Type argType,
+                                         Type paramType,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidUseOfTrailingClosure(cs, argType, paramType, locator);
+}
+
+bool TreatEphemeralAsNonEphemeral::diagnose(Expr *root, bool asNote) const {
+  NonEphemeralConversionFailure failure(
+      root, getConstraintSystem(), getLocator(), getFromType(), getToType(),
+      ConversionKind, isWarning());
+  return failure.diagnose(asNote);
+}
+
+TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
+    ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
+    Type dstType, ConversionRestrictionKind conversionKind,
+    bool downgradeToWarning) {
+  return new (cs.getAllocator()) TreatEphemeralAsNonEphemeral(
+      cs, locator, srcType, dstType, conversionKind, downgradeToWarning);
+}
+
+std::string TreatEphemeralAsNonEphemeral::getName() const {
+  std::string name;
+  name += "treat ephemeral as non-ephemeral for ";
+  name += ::getName(ConversionKind);
+  return name;
 }

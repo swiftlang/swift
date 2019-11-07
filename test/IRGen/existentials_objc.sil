@@ -87,7 +87,7 @@ entry(%s : $CP):
 
   %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP
   // CHECK: call %objc_object* @swift_unknownObjectRetain(%objc_object*
-  %v_copy = copy_unmanaged_value %v : $@sil_unmanaged CP
+  %v_copy = strong_copy_unmanaged_value %v : $@sil_unmanaged CP
   // CHECK: call void @swift_unknownObjectRelease(%objc_object*
   strong_release %v_copy : $CP
 

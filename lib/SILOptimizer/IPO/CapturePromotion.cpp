@@ -340,7 +340,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
   auto fnTy = F->getLoweredFunctionType();
 
   auto &Types = F->getModule().Types;
-  Lowering::GenericContextScope scope(Types, fnTy->getGenericSignature());
+  Lowering::GenericContextScope scope(Types, fnTy->getInvocationGenericSignature());
 
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
@@ -353,7 +353,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
     LLVM_DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
                << (PromotableIndices.count(ArgIndex)?"yes":"no")
-               << " Param: "; param.dump());
+               << " Param: "; param.print(llvm::dbgs()));
 
     if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
@@ -363,7 +363,8 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!param.isFormalIndirect());
-    auto paramTy = param.getSILStorageType();
+    auto paramTy = param.getSILStorageType(fnConv.silConv.getModule(),
+                                           fnConv.funcTy);
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
@@ -424,11 +425,11 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
 
   // Create the thin function type for the cloned closure.
   auto ClonedTy = SILFunctionType::get(
-      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), SubstitutionMap(), false,
+      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -488,7 +489,7 @@ ClosureCloner::populateCloned() {
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
     if (Cloned->hasOwnership() &&
-        MappedValue.getOwnershipKind() != ValueOwnershipKind::Any) {
+        MappedValue.getOwnershipKind() != ValueOwnershipKind::None) {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
       MappedValue = getBuilder().emitBeginBorrowOperation(Loc, MappedValue);
     }
@@ -579,7 +580,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
       // If ownership is enabled, then we must emit a begin_borrow for any
       // non-trivial value.
       if (F.hasOwnership() &&
-          Value.getOwnershipKind() != ValueOwnershipKind::Any) {
+          Value.getOwnershipKind() != ValueOwnershipKind::None) {
         auto *BBI = cast<BeginBorrowInst>(Value);
         Value = BBI->getOperand();
         B.emitEndBorrowOperation(Inst->getLoc(), BBI);

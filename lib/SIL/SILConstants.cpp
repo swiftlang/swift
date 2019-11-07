@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(1024),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(2048),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
@@ -66,7 +66,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "string: \"" << getStringValue() << "\"\n";
     return;
   case RK_Aggregate: {
-    ArrayRef<SymbolicValue> elements = getAggregateValue();
+    ArrayRef<SymbolicValue> elements = getAggregateMembers();
     switch (elements.size()) {
     case 0:
       os << "agg: 0 elements []\n";
@@ -211,12 +211,12 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   case RK_String:
     return SymbolicValue::getString(getStringValue(), allocator);
   case RK_Aggregate: {
-    auto elts = getAggregateValue();
+    auto elts = getAggregateMembers();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
     for (auto elt : elts)
       results.push_back(elt.cloneInto(allocator));
-    return getAggregate(results, allocator);
+    return getAggregate(results, getAggregateType(), allocator);
   }
   case RK_EnumWithPayload: {
     return getEnumWithPayload(
@@ -350,24 +350,71 @@ StringRef SymbolicValue::getStringValue() const {
 // Aggregates
 //===----------------------------------------------------------------------===//
 
-/// This returns a constant Symbolic value with the specified elements in it.
-/// This assumes that the elements lifetime has been managed for this.
-SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> elements,
-                                          SymbolicValueAllocator &allocator) {
-  // Copy the elements into the bump pointer.
-  auto *resultElts = allocator.allocate<SymbolicValue>(elements.size());
-  std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
+namespace swift {
 
+/// Representation of a constant aggregate namely a struct or a tuple.
+struct AggregateSymbolicValue final
+    : private llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue> {
+  friend class llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue>;
+
+  const Type aggregateType;
+
+  const unsigned numElements;
+
+  static AggregateSymbolicValue *create(ArrayRef<SymbolicValue> members,
+                                        Type aggregateType,
+                                        SymbolicValueAllocator &allocator) {
+    auto byteSize =
+        AggregateSymbolicValue::totalSizeToAlloc<SymbolicValue>(members.size());
+    auto rawMem = allocator.allocate(byteSize, alignof(AggregateSymbolicValue));
+
+    //  Placement initialize the object.
+    auto *aggregate =
+        ::new (rawMem) AggregateSymbolicValue(aggregateType, members.size());
+    std::uninitialized_copy(members.begin(), members.end(),
+                            aggregate->getTrailingObjects<SymbolicValue>());
+    return aggregate;
+  }
+
+  /// Return the type of the aggregate.
+  Type getAggregateType() const { return aggregateType; }
+
+  /// Return the symbolic values of members.
+  ArrayRef<SymbolicValue> getMemberValues() const {
+    return {getTrailingObjects<SymbolicValue>(), numElements};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
+    return numElements;
+  }
+
+private:
+  AggregateSymbolicValue() = delete;
+  AggregateSymbolicValue(const AggregateSymbolicValue &) = delete;
+  AggregateSymbolicValue(Type aggregateType, unsigned numElements)
+      : aggregateType(aggregateType), numElements(numElements) {}
+};
+} // namespace swift
+
+SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> members,
+                                          Type aggregateType,
+                                          SymbolicValueAllocator &allocator) {
   SymbolicValue result;
   result.representationKind = RK_Aggregate;
-  result.value.aggregate = resultElts;
-  result.auxInfo.aggregateNumElements = elements.size();
+  result.value.aggregate =
+      AggregateSymbolicValue::create(members, aggregateType, allocator);
   return result;
 }
 
-ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
+ArrayRef<SymbolicValue> SymbolicValue::getAggregateMembers() const {
   assert(getKind() == Aggregate);
-  return ArrayRef<SymbolicValue>(value.aggregate, auxInfo.aggregateNumElements);
+  return value.aggregate->getMemberValues();
+}
+
+Type SymbolicValue::getAggregateType() const {
+  assert(getKind() == Aggregate);
+  return value.aggregate->getAggregateType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -770,7 +817,7 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   while (1) {
     if (result.getKind() != Aggregate)
       return result;
-    auto elts = result.getAggregateValue();
+    auto elts = result.getAggregateMembers();
     if (elts.size() != 1)
       return result;
     result = elts[0];
@@ -790,6 +837,12 @@ static void getWitnessMethodName(WitnessMethodInst *witnessMethodInst,
   if (witnessMember.hasDecl()) {
     witnessMember.getDecl()->getFullName().getString(methodName);
   }
+}
+
+/// A helper function to pretty print function names in diagnostics.
+static std::string demangleSymbolNameForDiagnostics(StringRef name) {
+  return Demangle::demangleSymbolAsString(
+      name, Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
 }
 
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
@@ -910,11 +963,27 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   case UnknownReason::CalleeImplementationUnknown: {
     SILFunction *callee = unknownReason.getCalleeWithoutImplmentation();
     std::string demangledCalleeName =
-        Demangle::demangleSymbolAsString(callee->getName());
+        demangleSymbolNameForDiagnostics(callee->getName());
     diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
              StringRef(demangledCalleeName));
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
+               triggerLocSkipsInternalLocs);
+    return;
+  }
+  case UnknownReason::CallArgumentUnknown: {
+    unsigned argNumber = unknownReason.getArgumentIndex() + 1;
+    ApplyInst *call = dyn_cast<ApplyInst>(unknownNode);
+    assert(call);
+    SILFunction *callee = call->getCalleeFunction();
+    assert(callee);
+    std::string demangledCalleeName =
+        demangleSymbolNameForDiagnostics(callee->getName());
+    diagnose(ctx, diagLoc, diag::constexpr_found_call_with_unknown_arg,
+             demangledCalleeName,
+             (Twine(argNumber) + llvm::getOrdinalSuffix(argNumber)).str());
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, triggerLoc, diag::constexpr_call_with_unknown_arg,
                triggerLocSkipsInternalLocs);
     return;
   }
@@ -987,7 +1056,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
     elt = aggregate.getStoredElements(arrayEltTy)[elementNo];
     eltType = arrayEltTy;
   } else {
-    elt = aggregate.getAggregateValue()[elementNo];
+    elt = aggregate.getAggregateMembers()[elementNo];
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
       eltType = decl->getStoredProperties()[elementNo]->getType();
     } else if (auto tuple = type->getAs<TupleType>()) {
@@ -1041,7 +1110,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
     SmallVector<SymbolicValue, 4> newElts(numMembers,
                                           SymbolicValue::getUninitMemory());
-    aggregate = SymbolicValue::getAggregate(newElts, allocator);
+    aggregate = SymbolicValue::getAggregate(newElts, type, allocator);
   }
 
   assert((aggregate.getKind() == SymbolicValue::Aggregate ||
@@ -1058,7 +1127,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
     oldElts = aggregate.getStoredElements(arrayEltTy);
     eltType = arrayEltTy;
   } else {
-    oldElts = aggregate.getAggregateValue();
+    oldElts = aggregate.getAggregateMembers();
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
       eltType = decl->getStoredProperties()[elementNo]->getType();
     } else if (auto tuple = type->getAs<TupleType>()) {
@@ -1075,8 +1144,12 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
       setIndexedElement(newElts[elementNo], accessPath.drop_front(), newElement,
                         eltType, allocator);
 
-  if (aggregate.getKind() == SymbolicValue::Aggregate)
-    return SymbolicValue::getAggregate(newElts, allocator);
+  if (aggregate.getKind() == SymbolicValue::Aggregate) {
+    Type aggregateType = aggregate.getAggregateType();
+    assert(aggregateType->isEqual(type) &&
+           "input type does not match the type of the aggregate");
+    return SymbolicValue::getAggregate(newElts, aggregateType, allocator);
+  }
 
   return aggregate = SymbolicValue::getSymbolicArrayStorage(
              newElts, eltType->getCanonicalType(), allocator);

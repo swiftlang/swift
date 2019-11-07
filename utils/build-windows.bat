@@ -41,14 +41,14 @@ cd %source_root%
 set source_root=%CD%
 
 set full_build_root=%source_root%\build
-set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
-
 mkdir %full_build_root%
+
 :: Use the shortest path we can for the build directory, to avoid Windows
 :: path problems as much as we can.
 subst S: /d
 subst S: %full_build_root% %exitOnError%
 set build_root=S:
+set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 
 call :clone_repositories %exitOnError%
 call :download_icu %exitOnError%
@@ -65,8 +65,11 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
+call :build_libdispatch %exitOnError%
+
 path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 call :test_swift %exitOnError%
+call :test_libdispatch %exitOnError%
 
 goto :end
 endlocal
@@ -307,21 +310,36 @@ cmake "%source_root%\swift-corelibs-libdispatch"^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
     -DCMAKE_CXX_COMPILER=clang-cl^
-    -DCMAKE_SWIFT_COMPILER:PATH=%install_directory%\bin\swiftc.exe^
+    -DCMAKE_Swift_COMPILER=swiftc^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
-    -DBUILD_SHARED_LIBS:BOOL=YES^
-    -DENABLE_TESTING:BOOL=NO^
     -DCMAKE_C_COMPILER_TARGET=x86_64-unknown-windows-msvc^
+    -DCMAKE_CXX_COMPILER_TARGET=x86_64-unknown-windows-msvc^
     -DENABLE_SWIFT:BOOL=YES^
-    -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
-    -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
+    -DENABLE_TESTING:BOOL=YES^
+    -DCMAKE_C_FLAGS:STRING="${CMAKE_C_FLAGS} --target=x86_64-unknown-windows-msvc /GS- /Oy /Gw /Gy"^
+    -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} --target=x86_64-unknown-windows-msvc /GS- /Oy /Gw /Gy"^
+    -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
+    -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
+    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
+    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\"" %exitOnError%
+
 
 popd
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%
 cmake --build "%build_root%\swift-corelibs-libdispatch" --target install %exitOnError%
+
+goto :eof
+endlocal
+
+
+:test_libdispatch
+:: Tests libdispatch C interface
+setlocal enableextensions enabledelayedexpansion
+
+cmake --build "%build_root%\swift-corelibs-libdispatch" --target ExperimentalTest %exitOnError%
 
 goto :eof
 endlocal

@@ -14,6 +14,7 @@
 #define SWIFT_AST_SOURCEFILE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/Basic/Debug.h"
 
 namespace swift {
 
@@ -323,7 +324,7 @@ public:
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
   /// Pretty-print the contents of this source file.

@@ -1,0 +1,405 @@
+// RUN: %target-sil-opt -os-log-optimization -enable-sil-verify-all %s 2>&1 | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// SIL tests for the OSLogOptimization pass which performs compile-time analysis
+// and optimization of os log APIs. This test checks specific aspects of the
+// OSLogOptimization pass on hand-crafted SIL code. The tests here do not depend
+// on the os log overlay.
+
+import Swift
+import Builtin
+
+/// A type that mimics the OSLogInterpolation struct in the tests in this file.
+struct OSLogInterpolationStub {
+  var formatString: String
+}
+
+/// A type that mimics the OSLogMessage struct in the tests in this file.
+struct OSLogMessageStub {
+  var interpolation: OSLogInterpolationStub
+}
+
+/// A stub for OSLogMessage.init.
+sil [Onone] [_semantics "constant_evaluable"] [_semantics "oslog.message.init_stub"] @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub {
+bb0(%0 : $String):
+  %1 = struct $OSLogInterpolationStub(%0 : $String)
+  %2 = struct $OSLogMessageStub (%1 : $OSLogInterpolationStub)
+  return %2 : $OSLogMessageStub
+}
+
+// String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+/// A function that models the use of a string in some arbitrary way.
+sil @useFormatString: $@convention(thin) (@guaranteed String) -> ()
+
+// CHECK-LABEL: @testConstantFoldingOfStructExtract
+sil [ossa] @testConstantFoldingOfStructExtract : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Use the formatString property of OSLogMessageStub which will be constant
+  // folded by the OSLogOptimization pass, as checked below.
+  %8 = begin_borrow %7 : $OSLogMessageStub
+  %9 = struct_extract %8 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %10 = struct_extract %9 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %11 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed String) -> ()
+  end_borrow %8 : $OSLogMessageStub
+  destroy_value %7 : $OSLogMessageStub
+  %13 = tuple ()
+  return %13 : $()
+    // CHECK-NOT: {{%.*}} = struct_extract {{%.*}} : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
+}
+
+// CHECK-LABEL: @testConstantFoldingOfOwnedValue
+sil [ossa] @testConstantFoldingOfOwnedValue : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Extract the formatString property of OSLogMessageStub as a owned value and
+  // use it. The uses of this owned value should be constant folded.
+  %8 = function_ref @extractFormatStringAsOwned : $@convention(thin) (@guaranteed OSLogMessageStub) -> @owned String
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed OSLogMessageStub) -> @owned String
+  %11 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %12 = apply %11(%9) : $@convention(thin) (@guaranteed String) -> ()
+  destroy_value %7 : $OSLogMessageStub
+  destroy_value %9 : $String
+  %13 = tuple ()
+  return %13 : $()
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // FIXME: function_ref @extractFormatStringAsOwned will not be removed as of
+    // now by OSLogOptimization pass even though it is folded as function calls
+    // are not dead-code eliminated.
+}
+
+sil [ossa] [_semantics "constant_evaluable"] @extractFormatStringAsOwned : $@convention(thin) (@guaranteed OSLogMessageStub) -> @owned String {
+bb0(%0 : @guaranteed $OSLogMessageStub):
+  %1 = struct_extract %0 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %2 = struct_extract %1 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %3 = copy_value %2 : $String
+  return %3 : $String
+}
+
+// CHECK-LABEL: @testConstantFoldingOfDestructureStruct
+sil [ossa] @testConstantFoldingOfDestructureStruct : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Destructure the OSLogMessage instance and use the formatString property
+  // which should be constant folded by the OSLogOptimization pass.
+  (%8) = destructure_struct %7 : $OSLogMessageStub
+  (%9) = destructure_struct %8 : $OSLogInterpolationStub
+  %10 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@guaranteed String) -> ()
+  destroy_value %9 : $String
+  %12 = tuple ()
+  return %12 : $()
+    // CHECK-NOT: ({{%.*}}) = destructure_struct {{%.*}} : $OSLogInterpolationStub
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
+}
+
+// Test that the OSLogOptimization pass does not fold instructions that define
+// ownership scopes like `begin_borrow`, and `copy_value`.
+// CHECK-LABEL: @testNonFoldingOfOwnershipScopes
+sil [ossa] @testNonFoldingOfOwnershipScopes : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Use the formatString property of OSLogMessageStub which will be constant
+  // folded by the OSLogOptimization pass, as checked below.
+  %8 = begin_borrow %7 : $OSLogMessageStub
+  %9 = struct_extract %8 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %10 = struct_extract %9 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %11 = copy_value %10 : $String
+  %12 = begin_borrow %11 : $String
+  %13 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@guaranteed String) -> ()
+  end_borrow %12 : $String
+  destroy_value %11 : $String
+  end_borrow %8 : $OSLogMessageStub
+  destroy_value %7 : $OSLogMessageStub
+  %15 = tuple ()
+  return %15 : $()
+    // CHECK-NOT: {{%.*}} = struct_extract {{%.*}} : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[BORROW:%[0-9]+]])
+    // CHECK-DAG: [[BORROW]] = begin_borrow [[COPYVAL:%[0-9]+]]
+    // CHECK-DAG: [[COPYVAL]] = copy_value [[STRINGCONST:%[0-9]+]]
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
+}
+
+// CHECK-LABEL: @testConstantFoldingOfStructExtractNonOSSA
+sil @testConstantFoldingOfStructExtractNonOSSA : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Use the formatString property of OSLogMessageStub which will be constant
+  // folded by the OSLogOptimization pass, as checked below.
+  %9 = struct_extract %7 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %10 = struct_extract %9 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %11 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed String) -> ()
+  release_value %7 : $OSLogMessageStub
+  %13 = tuple ()
+  return %13 : $()
+    // CHECK-NOT: {{%.*}} = struct_extract {{%.*}} : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: release_value [[STRINGCONST]] : $String
+}
+
+// CHECK-LABEL: @testFoldingWithManyReleaseRetains
+sil @testFoldingWithManyReleaseRetains : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Use the formatString property of OSLogMessageStub which will be constant
+  // folded by the OSLogOptimization pass, as checked below.
+  %9 = struct_extract %7 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %10 = struct_extract %9 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  retain_value %10 : $String
+  %11 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed String) -> ()
+  release_value %10 : $String
+  release_value %7 : $OSLogMessageStub
+  %13 = tuple ()
+  return %13 : $()
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: release_value [[STRINGCONST]] : $String
+    // FIXME: Here struct_extract is not dead code eliminated by the
+    // optimization pass.
+}
+
+// CHECK-LABEL: @testPostdominatorComputation
+sil [ossa] @testPostdominatorComputation : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %8 = begin_borrow %7 : $OSLogMessageStub
+  %14 = struct_extract %8 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %15 = struct_extract %14 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %9 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  cond_br %2, bb1, bb4
+
+  // Use the OSLogMessage instance along different branches. The following code
+  // deliberately uses a borrowed operation like struct_extract so that when it
+  // is replaced with a folded value, it needs to be destroyed at the post-
+  // dominating points of its uses.
+bb1:
+  %10 = struct_extract %8 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %11 = struct_extract %10 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  cond_br %2, bb2, bb3
+    // Check release of the folded value of %15.
+    // CHECK-LABEL: bb1:
+    // CHECK-NEXT: destroy_value [[STRINGCONST1:%[0-9]+]] : $String
+
+bb2:
+  %12 = apply %9(%11) : $@convention(thin) (@guaranteed String) -> ()
+  br exit
+    // Check release of the folded value of %11.
+    // CHECK-LABEL: bb2:
+    // CHECK: destroy_value [[STRINGCONST2:%[0-9]+]] : $String
+
+bb3:
+  %13 = apply %9(%11) : $@convention(thin) (@guaranteed String) -> ()
+  br exit
+    // Check release of the folded value of %11.
+    // CHECK-LABEL: bb3:
+    // CHECK: destroy_value [[STRINGCONST2]] : $String
+
+bb4:
+  %16 = apply %9(%15) : $@convention(thin) (@guaranteed String) -> ()
+  br exit
+    // Check release of the folded value of %15.
+    // CHECK-LABEL: bb4:
+    // CHECK: destroy_value [[STRINGCONST1]] : $String
+
+exit:
+  end_borrow %8 : $OSLogMessageStub
+  destroy_value %7 : $OSLogMessageStub
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: @testPostdominatorComputationNonOSSA
+sil @testPostdominatorComputationNonOSSA : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %14 = struct_extract %7 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %15 = struct_extract %14 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %9 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  cond_br %2, bb1, bb4
+
+  // Use the OSLogMessage instance along different branches. The following code
+  // deliberately uses a borrowed operation like struct_extract so that when it
+  // is replaced with a folded value, it needs to be destroyed at the post-
+  // dominating points of its uses.
+bb1:
+  %10 = struct_extract %7 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %11 = struct_extract %10 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  cond_br %2, bb2, bb3
+    // Check release of the folded value of %15.
+    // CHECK-LABEL: bb1:
+    // CHECK-NEXT: release_value [[STRINGCONST1:%[0-9]+]] : $String
+
+bb2:
+  %12 = apply %9(%11) : $@convention(thin) (@guaranteed String) -> ()
+  br exit
+    // Check release of the folded value of %11.
+    // CHECK-LABEL: bb2:
+    // CHECK: release_value [[STRINGCONST2:%[0-9]+]] : $String
+
+bb3:
+  %13 = apply %9(%11) : $@convention(thin) (@guaranteed String) -> ()
+  br exit
+    // Check release of the folded value of %11.
+    // CHECK-LABEL: bb3:
+    // CHECK: release_value [[STRINGCONST2]] : $String
+
+bb4:
+  %16 = apply %9(%15) : $@convention(thin) (@guaranteed String) -> ()
+  br exit
+    // Check release of the folded value of %15.
+    // CHECK-LABEL: bb4:
+    // CHECK: release_value [[STRINGCONST1]] : $String
+
+exit:
+  release_value %7 : $OSLogMessageStub
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// This test checks whether values that are transitively data dependent on
+// an OSLogMessage instance are folded. These can be alive even beyond the
+// lifetime of OSLogMessage.
+// CHECK-LABEL: @testFoldingOfTransitiveDataDependencies
+sil [ossa] @testFoldingOfTransitiveDataDependencies : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "test message: %lld"
+  %1 = integer_literal $Builtin.Word, 18
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %8 = copy_value %7 : $OSLogMessageStub
+  destroy_value %7 : $OSLogMessageStub
+  %10 = begin_borrow %8 : $OSLogMessageStub
+  %14 = struct_extract %10 : $OSLogMessageStub, #OSLogMessageStub.interpolation
+  %15 = struct_extract %14 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
+  %12 = copy_value %15 : $String
+  end_borrow %10 : $OSLogMessageStub
+  destroy_value %8 : $OSLogMessageStub
+  %9 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %16 = apply %9(%12) : $@convention(thin) (@guaranteed String) -> ()
+  destroy_value %12 : $String
+  %17 = tuple ()
+  return %17 : $()
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[CONSTCOPY:%[0-9]+]])
+    // CHECK-DAG: [[CONSTCOPY]] = copy_value [[STRINGCONST:%[0-9]+]]
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
+}
+

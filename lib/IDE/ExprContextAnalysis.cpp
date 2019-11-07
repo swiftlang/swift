@@ -74,7 +74,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
     break;
   }
 
@@ -160,13 +160,11 @@ Expr *swift::ide::findParsedExpr(const DeclContext *DC,
 
 Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (FD->hasInterfaceType()) {
-      auto Ty = FD->getInterfaceType();
-      if (FD->getDeclContext()->isTypeContext())
-        Ty = FD->getMethodInterfaceType();
-      if (auto FT = Ty->getAs<AnyFunctionType>())
-        return DC->mapTypeIntoContext(FT->getResult());
-    }
+    auto Ty = FD->getInterfaceType();
+    if (FD->getDeclContext()->isTypeContext())
+      Ty = FD->getMethodInterfaceType();
+    if (auto FT = Ty->getAs<AnyFunctionType>())
+      return DC->mapTypeIntoContext(FT->getResult());
   } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
     if (ACE->getType() && !ACE->getType()->hasError())
       return ACE->getResultType();
@@ -743,8 +741,7 @@ class ExprContextAnalyzer {
       if (!AFD)
         return;
       auto param = AFD->getParameters()->get(initDC->getIndex());
-      if (param->hasInterfaceType())
-        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
       break;
     }
     }
@@ -759,7 +756,7 @@ class ExprContextAnalyzer {
   /// in order to avoid a base expression affecting the type. However, now that
   /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
-    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
+    return body->getNumElements() == 1 && body->getFirstElement().is<Expr *>();
   }
 
 public:

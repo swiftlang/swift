@@ -7,7 +7,9 @@
 func identity<T>(_ value: T) -> T { return value }
 
 func identity2<T>(_ value: T) -> T { return value }
+// expected-note@-1 {{candidate expects value of type 'X' for parameter #1}}
 func identity2<T>(_ value: T) -> Int { return 0 }
+// expected-note@-1 {{'identity2' produces 'Int', not the expected contextual result type 'X'}}
 
 struct X { }
 struct Y { }
@@ -23,7 +25,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
   xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
-  xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity2(yy) // expected-error{{no exact matches in call to global function 'identity2'}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -266,7 +268,7 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
 
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<Any>'}}
+  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<T>'}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   var x : X, y : Y
@@ -311,7 +313,7 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}} expected-error {{variable 'i' is not bound by any pattern}}
+    for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}

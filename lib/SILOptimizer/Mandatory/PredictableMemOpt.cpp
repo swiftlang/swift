@@ -753,11 +753,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 SingleValueInstruction *
 AvailableValueAggregator::addMissingDestroysForCopiedValues(
     SingleValueInstruction *svi, SILValue newVal) {
-  // If ownership is not enabled... bail. We do not need to do this since we do
-  // not need to insert an extra copy unless we have ownership since without
-  // ownership stores do not consume.
-  if (!B.hasOwnership())
-    return svi;
+  assert(B.hasOwnership() &&
+         "We assume this is only called if we have ownership");
 
   assert((isa<LoadBorrowInst>(svi) || isa<LoadInst>(svi)) &&
          "Expected to have a /real/ load here since we assume that we have a "
@@ -1489,7 +1486,12 @@ public:
   bool tryToRemoveDeadAllocation();
 
 private:
-  bool promoteLoadCopy(SILInstruction *Inst);
+  Optional<std::pair<SILType, unsigned>>
+  computeAvailableValues(SILValue SrcAddr, SILInstruction *Inst,
+                         SmallVectorImpl<AvailableValue> &AvailableValues);
+  bool promoteLoadCopy(LoadInst *li);
+  bool promoteLoadBorrow(LoadBorrowInst *lbi);
+  bool promoteCopyAddr(CopyAddrInst *cai);
   void promoteLoadTake(LoadInst *Inst, MutableArrayRef<AvailableValue> values);
   void promoteDestroyAddr(DestroyAddrInst *dai,
                           MutableArrayRef<AvailableValue> values);
@@ -1499,6 +1501,43 @@ private:
 
 } // end anonymous namespace
 
+Optional<std::pair<SILType, unsigned>> AllocOptimize::computeAvailableValues(
+    SILValue SrcAddr, SILInstruction *Inst,
+    SmallVectorImpl<AvailableValue> &AvailableValues) {
+  // If the box has escaped at this instruction, we can't safely promote the
+  // load.
+  if (DataflowContext.hasEscapedAt(Inst))
+    return None;
+
+  SILType LoadTy = SrcAddr->getType().getObjectType();
+
+  // If this is a load/copy_addr from a struct field that we want to promote,
+  // compute the access path down to the field so we can determine precise
+  // def/use behavior.
+  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
+
+  // If this is a load from within an enum projection, we can't promote it since
+  // we don't track subelements in a type that could be changing.
+  if (FirstElt == ~0U)
+    return None;
+
+  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
+
+  // Set up the bitvector of elements being demanded by the load.
+  SmallBitVector RequiredElts(NumMemorySubElements);
+  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
+
+  AvailableValues.resize(NumMemorySubElements);
+
+  // Find out if we have any available values.  If no bits are demanded, we
+  // trivially succeed. This can happen when there is a load of an empty struct.
+  if (NumLoadSubElements != 0 &&
+      !DataflowContext.computeAvailableValues(
+          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
+    return None;
+
+  return std::make_pair(LoadTy, FirstElt);
+}
 
 /// If we are able to optimize \p Inst, return the source address that
 /// instruction is loading from. If we can not optimize \p Inst, then just
@@ -1528,7 +1567,7 @@ static SILValue tryFindSrcAddrForLoad(SILInstruction *i) {
 /// cross element accesses have been scalarized.
 ///
 /// This returns true if the load has been removed from the program.
-bool AllocOptimize::promoteLoadCopy(SILInstruction *Inst) {
+bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
   // have to prove that something in this function is holding the weak value
@@ -1537,67 +1576,127 @@ bool AllocOptimize::promoteLoadCopy(SILInstruction *Inst) {
 
   // First attempt to find a source addr for our "load" instruction. If we fail
   // to find a valid value, just return.
-  SILValue SrcAddr = tryFindSrcAddrForLoad(Inst);
-  if (!SrcAddr)
+  SILValue srcAddr = tryFindSrcAddrForLoad(li);
+  if (!srcAddr)
     return false;
 
-  // If the box has escaped at this instruction, we can't safely promote the
-  // load.
-  if (DataflowContext.hasEscapedAt(Inst))
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result = computeAvailableValues(srcAddr, li, availableValues);
+  if (!result.hasValue())
     return false;
 
-  SILType LoadTy = SrcAddr->getType().getObjectType();
-
-  // If this is a load/copy_addr from a struct field that we want to promote,
-  // compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
-
-  // If this is a load from within an enum projection, we can't promote it since
-  // we don't track subelements in a type that could be changing.
-  if (FirstElt == ~0U)
-    return false;
-  
-  unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
-  
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
-
-  SmallVector<AvailableValue, 8> AvailableValues;
-  AvailableValues.resize(NumMemorySubElements);
-  
-  // Find out if we have any available values.  If no bits are demanded, we
-  // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0 &&
-      !DataflowContext.computeAvailableValues(
-          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
-    return false;
-
-  // Ok, we have some available values.  If we have a copy_addr, explode it now,
-  // exposing the load operation within it.  Subsequent optimization passes will
-  // see the load and propagate the available values into it.
-  if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    DataflowContext.explodeCopyAddr(CAI);
-
-    // This is removing the copy_addr, but explodeCopyAddr takes care of
-    // removing the instruction from Uses for us, so we return false.
-    return false;
-  }
-
-  assert((isa<LoadBorrowInst>(Inst) || isa<LoadInst>(Inst)) &&
-         "Unhandled instruction for this code path!");
+  SILType loadTy = result->first;
+  unsigned firstElt = result->second;
 
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller loads for any subelements that were
   // not available. We are "propagating" a +1 available value from the store
   // points.
-  auto *load = dyn_cast<SingleValueInstruction>(Inst);
-  AvailableValueAggregator agg(load, AvailableValues, Uses, deadEndBlocks,
+  AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
                                false /*isTake*/);
-  SILValue newVal = agg.aggregateValues(LoadTy, load->getOperand(0), FirstElt);
+  SILValue newVal = agg.aggregateValues(loadTy, li->getOperand(), firstElt);
 
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *load << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *li << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
+  ++NumLoadPromoted;
+
+  // If we did not have ownership, we did not insert extra copies at our stores,
+  // so we can just RAUW and return.
+  if (!li->getFunction()->hasOwnership()) {
+    li->replaceAllUsesWith(newVal);
+    SILValue addr = li->getOperand();
+    li->eraseFromParent();
+    if (auto *addrI = addr->getDefiningInstruction())
+      recursivelyDeleteTriviallyDeadInstructions(addrI);
+    return true;
+  }
+
+  // If we inserted any copies, we created the copies at our stores. We know
+  // that in our load block, we will reform the aggregate as appropriate at the
+  // load implying that the value /must/ be fully consumed. If we promoted a +0
+  // value, we created dominating destroys along those paths. Thus any leaking
+  // blocks that we may have can be found by performing a linear lifetime check
+  // over all copies that we found using the load as the "consuming uses" (just
+  // for the purposes of identifying the consuming block).
+  auto *oldLoad = agg.addMissingDestroysForCopiedValues(li, newVal);
+
+  // If we are returned the load, eliminate it. Otherwise, it was already
+  // handled for us... so return true.
+  if (!oldLoad)
+    return true;
+
+  oldLoad->replaceAllUsesWith(newVal);
+  SILValue addr = oldLoad->getOperand(0);
+  oldLoad->eraseFromParent();
+  if (auto *addrI = addr->getDefiningInstruction())
+    recursivelyDeleteTriviallyDeadInstructions(addrI);
+  return true;
+}
+
+bool AllocOptimize::promoteCopyAddr(CopyAddrInst *cai) {
+  // Note that we intentionally don't support forwarding of weak pointers,
+  // because the underlying value may drop be deallocated at any time.  We would
+  // have to prove that something in this function is holding the weak value
+  // live across the promoted region and that isn't desired for a stable
+  // diagnostics pass this like one.
+
+  // First attempt to find a source addr for our "load" instruction. If we fail
+  // to find a valid value, just return.
+  SILValue srcAddr = tryFindSrcAddrForLoad(cai);
+  if (!srcAddr)
+    return false;
+
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result = computeAvailableValues(srcAddr, cai, availableValues);
+  if (!result.hasValue())
+    return false;
+
+  // Ok, we have some available values.  If we have a copy_addr, explode it now,
+  // exposing the load operation within it.  Subsequent optimization passes will
+  // see the load and propagate the available values into it.
+  DataflowContext.explodeCopyAddr(cai);
+
+  // This is removing the copy_addr, but explodeCopyAddr takes care of
+  // removing the instruction from Uses for us, so we return false.
+  return false;
+}
+
+/// At this point, we know that this element satisfies the definitive init
+/// requirements, so we can try to promote loads to enable SSA-based dataflow
+/// analysis.  We know that accesses to this element only access this element,
+/// cross element accesses have been scalarized.
+///
+/// This returns true if the load has been removed from the program.
+bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
+  // Note that we intentionally don't support forwarding of weak pointers,
+  // because the underlying value may drop be deallocated at any time.  We would
+  // have to prove that something in this function is holding the weak value
+  // live across the promoted region and that isn't desired for a stable
+  // diagnostics pass this like one.
+
+  // First attempt to find a source addr for our "load" instruction. If we fail
+  // to find a valid value, just return.
+  SILValue srcAddr = tryFindSrcAddrForLoad(lbi);
+  if (!srcAddr)
+    return false;
+
+  SmallVector<AvailableValue, 8> availableValues;
+  auto result = computeAvailableValues(srcAddr, lbi, availableValues);
+  if (!result.hasValue())
+    return false;
+
+  SILType loadTy = result->first;
+  unsigned firstElt = result->second;
+
+  // Aggregate together all of the subelements into something that has the same
+  // type as the load did, and emit smaller loads for any subelements that were
+  // not available. We are "propagating" a +1 available value from the store
+  // points.
+  AvailableValueAggregator agg(lbi, availableValues, Uses, deadEndBlocks,
+                               false /*isTake*/);
+  SILValue newVal = agg.aggregateValues(loadTy, lbi->getOperand(), firstElt);
+
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *lbi << "\n");
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal << "\n");
 
   // If we inserted any copies, we created the copies at our stores. We know
@@ -1607,7 +1706,7 @@ bool AllocOptimize::promoteLoadCopy(SILInstruction *Inst) {
   // blocks that we may have can be found by performing a linear lifetime check
   // over all copies that we found using the load as the "consuming uses" (just
   // for the purposes of identifying the consuming block).
-  auto *oldLoad = agg.addMissingDestroysForCopiedValues(load, newVal);
+  auto *oldLoad = agg.addMissingDestroysForCopiedValues(lbi, newVal);
 
   ++NumLoadPromoted;
 
@@ -1618,10 +1717,9 @@ bool AllocOptimize::promoteLoadCopy(SILInstruction *Inst) {
 
   // If our load was a +0 value, borrow the value and the RAUW. We reuse the
   // end_borrows of our load_borrow.
-  if (isa<LoadBorrowInst>(oldLoad)) {
-    newVal = SILBuilderWithScope(oldLoad).createBeginBorrow(oldLoad->getLoc(),
-                                                            newVal);
-  }
+  newVal =
+      SILBuilderWithScope(oldLoad).createBeginBorrow(oldLoad->getLoc(), newVal);
+
   oldLoad->replaceAllUsesWith(newVal);
   SILValue addr = oldLoad->getOperand(0);
   oldLoad->eraseFromParent();
@@ -1954,9 +2052,28 @@ bool AllocOptimize::optimizeMemoryAccesses() {
     auto &use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
     if (use.Inst && use.Kind == PMOUseKind::Load) {
-      if (promoteLoadCopy(use.Inst)) {
-        Uses[i].Inst = nullptr;  // remove entry if load got deleted.
-        changed = true;
+      if (auto *cai = dyn_cast<CopyAddrInst>(use.Inst)) {
+        if (promoteCopyAddr(cai)) {
+          Uses[i].Inst = nullptr; // remove entry if load got deleted.
+          changed = true;
+        }
+        continue;
+      }
+
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(use.Inst)) {
+        if (promoteLoadBorrow(lbi)) {
+          Uses[i].Inst = nullptr; // remove entry if load got deleted.
+          changed = true;
+        }
+        continue;
+      }
+
+      if (auto *li = dyn_cast<LoadInst>(use.Inst)) {
+        if (promoteLoadCopy(li)) {
+          Uses[i].Inst = nullptr; // remove entry if load got deleted.
+          changed = true;
+        }
+        continue;
       }
     }
   }

@@ -46,8 +46,8 @@ struct REPLContext {
 
     {
       Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
-      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id, SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
+                                                   SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -55,8 +55,8 @@ struct REPLContext {
     }
     {
       Identifier Id(Context.getIdentifier("_replDebugPrintln"));
-      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id, SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
+                                                   SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -69,18 +69,17 @@ struct REPLContext {
 
 class StmtBuilder {
   REPLContext &C;
-  TypeChecker &TC;
   ASTContext &Context;
   DeclContext *DC;
   SmallVector<ASTNode, 8> Body;
 
 public:
   StmtBuilder(REPLContext &C, DeclContext *DC)
-      : C(C), TC(C.TC), Context(C.Context), DC(DC) {
+      : C(C), Context(C.Context), DC(DC) {
     assert(DC);
   }
   StmtBuilder(StmtBuilder &parent)
-      : C(parent.C), TC(C.TC), Context(C.Context), DC(parent.DC) {}
+      : C(parent.C), Context(C.Context), DC(parent.DC) {}
 
   ~StmtBuilder() { assert(Body.empty() && "statements remain in builder?"); }
 
@@ -97,14 +96,16 @@ public:
 
   Expr *buildPrintRefExpr(SourceLoc loc) {
     assert(!C.PrintDecls.empty());
-    return TC.buildRefExpr(C.PrintDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true, FunctionRefKind::Compound);
+    return TypeChecker::buildRefExpr(C.PrintDecls, DC, DeclNameLoc(loc),
+                                     /*Implicit=*/true,
+                                     FunctionRefKind::Compound);
   }
 
   Expr *buildDebugPrintlnRefExpr(SourceLoc loc) {
     assert(!C.DebugPrintlnDecls.empty());
-    return TC.buildRefExpr(C.DebugPrintlnDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true, FunctionRefKind::Compound);
+    return TypeChecker::buildRefExpr(C.DebugPrintlnDecls, DC, DeclNameLoc(loc),
+                                     /*Implicit=*/true,
+                                     FunctionRefKind::Compound);
   }
 };
 } // unnamed namespace
@@ -117,28 +118,10 @@ void StmtBuilder::printLiteralString(StringRef Str, SourceLoc Loc) {
 
 void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
   Expr *DebugPrintlnFn = buildDebugPrintlnRefExpr(Loc);
-  Expr *ArgRef = TC.buildRefExpr(Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true,
-                                 FunctionRefKind::Compound);
+  Expr *ArgRef = TypeChecker::buildRefExpr(
+      Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true, FunctionRefKind::Compound);
   addToBody(CallExpr::createImplicit(Context, DebugPrintlnFn, { ArgRef }, { }));
 }
-
-Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
-  llvm::SmallString<4> namebuf;
-  Identifier ident;
-
-  bool nameUsed = false;
-  do {
-    namebuf.clear();
-    llvm::raw_svector_ostream names(namebuf);
-    names << "r" << NextResponseVariableIndex++;
-
-    ident = Context.getIdentifier(names.str());
-    nameUsed = static_cast<bool>(lookupUnqualified(DC, ident, SourceLoc()));
-  } while (nameUsed);
-
-  return ident;
-}
-
 
 static VarDecl *getObviousDeclFromExpr(Expr *E) {
   // Ignore lvalue->rvalue and other implicit conversions.
@@ -203,6 +186,10 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 namespace {
   class REPLChecker : public REPLContext {
     TopLevelContext &TLC;
+
+    /// The index of the next response metavariable to bind to a REPL result.
+    unsigned NextResponseVariableIndex = 0;
+
   public:
     REPLChecker(TypeChecker &TC, SourceFile &SF, TopLevelContext &TLC)
       : REPLContext(TC, SF), TLC(TLC) {}
@@ -211,6 +198,7 @@ namespace {
     void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
   private:
     void generatePrintOfExpression(StringRef name, Expr *E);
+    Identifier getNextResponseVariableName(DeclContext *DC);
   };
 } // end anonymous namespace
 
@@ -218,7 +206,7 @@ namespace {
 /// description of the pattern involved.
 void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Always print rvalues, not lvalues.
-  E = TC.coerceToRValue(E);
+  E = TypeChecker::coerceToRValue(Context, E);
 
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
@@ -307,10 +295,10 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   // going to reparent it.
   auto TLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
 
-  E = TC.coerceToRValue(E);
+  E = TypeChecker::coerceToRValue(Context, E);
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC.getNextResponseVariableName(&SF);
+  Identifier name = getNextResponseVariableName(&SF);
   VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, &SF);
@@ -334,8 +322,8 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
                                   /*implicit*/true));
 
   // Finally, print the variable's value.
-  E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(E->getStartLoc()),
-                             /*Implicit=*/true);
+  E = TypeChecker::buildCheckedRefExpr(vd, &SF, DeclNameLoc(E->getStartLoc()),
+                                       /*Implicit=*/true);
   generatePrintOfExpression(vd->getName().str(), E);
 }
 
@@ -349,7 +337,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   for (auto entryIdx : range(PBD->getNumPatternEntries())) {
     auto *entryInit = PBD->getInit(entryIdx);
     if (!entryInit) {
-      TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
+      PBD->diagnose(diag::repl_must_be_initialized);
       continue;
     }
 
@@ -362,9 +350,9 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     // underlying Decl to print it.
     if (auto *NP = dyn_cast<NamedPattern>(pattern->
                                           getSemanticsProvidingPattern())) {
-      Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), &SF,
-                                       DeclNameLoc(PBD->getStartLoc()),
-                                       /*Implicit=*/true);
+      Expr *E = TypeChecker::buildCheckedRefExpr(
+          NP->getDecl(), &SF, DeclNameLoc(PBD->getStartLoc()),
+          /*Implicit=*/true);
       generatePrintOfExpression(PatternString, E);
       continue;
     }
@@ -383,7 +371,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     SF.Decls.pop_back();
 
     // Create the meta-variable, let the typechecker name it.
-    Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
+    Identifier name = getNextResponseVariableName(SF.getParentModule());
     VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false,
                                         VarDecl::Introducer::Let,
                                         /*IsCaptureList*/false,
@@ -408,20 +396,37 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     
     
     // Replace the initializer of PBD with a reference to our repl temporary.
-    Expr *E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(vd->getStartLoc()),
-                                     /*Implicit=*/true);
-    E = TC.coerceToRValue(E);
+    Expr *E = TypeChecker::buildCheckedRefExpr(vd, &SF,
+                                               DeclNameLoc(vd->getStartLoc()),
+                                               /*Implicit=*/true);
+    E = TypeChecker::coerceToRValue(Context, E);
     PBD->setInit(entryIdx, E);
     SF.Decls.push_back(PBTLCD);
     
     // Finally, print out the result, by referring to the repl temp.
-    E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(vd->getStartLoc()),
-                               /*Implicit=*/true);
+    E = TypeChecker::buildCheckedRefExpr(vd, &SF,
+                                         DeclNameLoc(vd->getStartLoc()),
+                                         /*Implicit=*/true);
     generatePrintOfExpression(PatternString, E);
   }
 }
 
+Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
+  llvm::SmallString<4> namebuf;
+  Identifier ident;
 
+  bool nameUsed = false;
+  do {
+    namebuf.clear();
+    llvm::raw_svector_ostream names(namebuf);
+    names << "r" << NextResponseVariableIndex++;
+
+    ident = Context.getIdentifier(names.str());
+    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, ident, SourceLoc());
+  } while (nameUsed);
+
+  return ident;
+}
 
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
@@ -443,7 +448,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
     if (!TLCD || TLCD->getBody()->getElements().empty())
       continue;
 
-    auto Entry = TLCD->getBody()->getElement(0);
+    auto Entry = TLCD->getBody()->getFirstElement();
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (auto *E = Entry.dyn_cast<Expr*>())

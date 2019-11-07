@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_OWNERSHIPUTILS_H
 #define SWIFT_SIL_OWNERSHIPUTILS_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/SILArgument.h"
@@ -227,7 +228,7 @@ struct BorrowScopeOperandKind {
   }
 
   void print(llvm::raw_ostream &os) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 /// An operand whose user instruction introduces a new borrow scope for the
@@ -327,7 +328,7 @@ struct BorrowScopeIntroducingValueKind {
   }
 
   void print(llvm::raw_ostream &os) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

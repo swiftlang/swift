@@ -53,7 +53,7 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
-  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in coercion}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
+  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{'T' is not convertible to 'EqualComparable & OtherEqualComparable'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
 
 protocol Runcible {
@@ -154,6 +154,7 @@ func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
 
   // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
   t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'Int' to subscript of type 'T.ElementType'}}
 }
 
 //===----------------------------------------------------------------------===//

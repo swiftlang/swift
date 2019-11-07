@@ -41,6 +41,8 @@ class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
+class Witness;
+struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
@@ -1508,6 +1510,240 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Computes whether all of the stored properties in a nominal type have initial
+/// values.
+class AreAllStoredPropertiesDefaultInitableRequest
+    : public SimpleRequest<AreAllStoredPropertiesDefaultInitableRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether this type has a user-defined designated initializer. This
+/// does not include a synthesized designated initializer used to satisfy a
+/// conformance.
+class HasUserDefinedDesignatedInitRequest
+    : public SimpleRequest<HasUserDefinedDesignatedInitRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this type has a synthesized memberwise initializer.
+class HasMemberwiseInitRequest
+    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, StructDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a memberwise initializer for a given type.
+class SynthesizeMemberwiseInitRequest
+    : public SimpleRequest<SynthesizeMemberwiseInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this type has a synthesized zero parameter default
+/// initializer.
+class HasDefaultInitRequest
+    : public SimpleRequest<HasDefaultInitRequest, bool(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a default initializer for a given type.
+class SynthesizeDefaultInitRequest
+    : public SimpleRequest<SynthesizeDefaultInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class CompareDeclSpecializationRequest
+    : public SimpleRequest<CompareDeclSpecializationRequest,
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, DeclContext *DC,
+                                ValueDecl *VD1, ValueDecl *VD2,
+                                bool dynamic) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this declaration inherits its superclass' designated and
+/// convenience initializers.
+class InheritsSuperclassInitializersRequest
+    : public SimpleRequest<InheritsSuperclassInitializersRequest,
+                           bool(ClassDecl *), CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+// The actions this request takes are all huge layering violations.
+//
+// Please do not add any more.
+enum class ImplicitMemberAction : uint8_t {
+  ResolveImplicitInit,
+  ResolveCodingKeys,
+  ResolveEncodable,
+  ResolveDecodable,
+};
+
+class ResolveImplicitMemberRequest
+    : public SimpleRequest<ResolveImplicitMemberRequest,
+                           bool(NominalTypeDecl *, ImplicitMemberAction),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
+                                ImplicitMemberAction action) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+class TypeWitnessRequest
+    : public SimpleRequest<TypeWitnessRequest,
+                           TypeWitnessAndDecl(NormalProtocolConformance *,
+                                              AssociatedTypeDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TypeWitnessAndDecl>
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance,
+           AssociatedTypeDecl *ATD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<TypeWitnessAndDecl> getCachedResult() const;
+  void cacheResult(TypeWitnessAndDecl value) const;
+};
+
+class ValueWitnessRequest
+    : public SimpleRequest<ValueWitnessRequest,
+                           Witness(NormalProtocolConformance *, ValueDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Witness> evaluate(Evaluator &evaluator,
+                                   NormalProtocolConformance *conformance,
+                                   ValueDecl *VD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Witness> getCachedResult() const;
+  void cacheResult(Witness value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1529,6 +1765,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
+void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

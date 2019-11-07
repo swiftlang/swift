@@ -20,13 +20,13 @@ func testString() throws {
   // Implicitly unwrapped optional
   let stringIUO = NSString(path: "blah")
   if stringIUO == nil { }
-  _ = stringIUO as NSString? // expected-warning {{redundant cast to 'NSString?' has no effect}} {{17-30=}}
+  _ = stringIUO as NSString?
   let _: NSString = NSString(path: "blah")
 }
 
 func testHive() {
   let hiveIUO = Hive()
   if hiveIUO == nil { }
-  _ = hiveIUO as Hive? // expected-warning {{redundant cast to 'Hive?' has no effect}} {{15-24=}}
+  _ = hiveIUO as Hive?
   let _: Hive = Hive()
 }

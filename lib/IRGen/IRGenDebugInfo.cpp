@@ -515,7 +515,8 @@ private:
 
     auto FnTy = SILTy.getAs<SILFunctionType>();
     if (!FnTy) {
-      LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
+      LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: ";
+                 SILTy.print(llvm::dbgs());
                  llvm::dbgs() << "\n");
       return CanSILFunctionType();
     }
@@ -584,15 +585,16 @@ private:
 
   // This is different from SILFunctionType::getAllResultsType() in some subtle
   // ways.
-  static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
+  static SILType getResultTypeForDebugInfo(IRGenModule &IGM,
+                                           CanSILFunctionType fnTy) {
     if (fnTy->getNumResults() == 1) {
-      return fnTy->getResults()[0].getSILStorageType();
+      return fnTy->getResults()[0].getSILStorageType(IGM.getSILModule(), fnTy);
     } else if (!fnTy->getNumIndirectFormalResults()) {
-      return fnTy->getDirectFormalResultsType();
+      return fnTy->getDirectFormalResultsType(IGM.getSILModule());
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {
-        eltTys.push_back(result.getType());
+        eltTys.push_back(result.getReturnValueType(IGM.getSILModule(), fnTy));
       }
       return SILType::getPrimitiveAddressType(
           CanType(TupleType::get(eltTys, fnTy->getASTContext())));
@@ -608,16 +610,16 @@ private:
   llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy) {
     SmallVector<llvm::Metadata *, 16> Parameters;
 
-    GenericContextScope scope(IGM, FnTy->getGenericSignature());
+    GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());
 
     // The function return type is the first element in the list.
-    createParameterType(Parameters, getResultTypeForDebugInfo(FnTy));
+    createParameterType(Parameters, getResultTypeForDebugInfo(IGM, FnTy));
 
     // Actually, the input type is either a single type or a tuple
     // type. We currently represent a function with one n-tuple argument
     // as an n-ary function.
     for (auto Param : FnTy->getParameters())
-      createParameterType(Parameters, IGM.silConv.getSILType(Param));
+      createParameterType(Parameters, IGM.silConv.getSILType(Param, FnTy));
 
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
@@ -802,14 +804,14 @@ private:
       if (!Reconstructed) {
         llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
-        Ty->dump();
+        Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty)) {
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
-        Ty->dump();
+        Ty->dump(llvm::errs());
         llvm::errs() << "Reconstructed type:\n";
-        Reconstructed->dump();
+        Reconstructed->dump(llvm::errs());
         abort();
       }
 #endif
@@ -999,6 +1001,29 @@ private:
     return BitWidth;
   }
 
+  /// Create a sized container for a sizeless type. Used to represent
+  /// BoundGenericEnums that may have different sizes depending on what they are
+  /// bound to, but still share a mangled name.
+  llvm::DIType *createOpaqueStructWithSizedContainer(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName) {
+    // Let the MDNode folding set do the work of uniquing the inner type. This
+    // should be cheap.
+    llvm::DICompositeType *UniqueType = DBuilder.createStructType(
+        Scope, Name, File, Line, 0, 0, Flags, nullptr,
+        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+    llvm::Metadata *Elements[] = {
+        DBuilder.createMemberType(Scope, "", File, 0, SizeInBits,
+                                  AlignInBits, 0, Flags, UniqueType)};
+
+    return DBuilder.createStructType(
+        Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
+        llvm::dwarf::DW_LANG_Swift);
+  }
+
   llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
                                          llvm::DIFile *File, unsigned Line,
                                          llvm::DINode::DIFlags Flags,
@@ -1171,7 +1196,7 @@ private:
 
     if (!BaseTy) {
       LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
-                 DbgTy.getType()->dump();
+                 DbgTy.getType()->dump(llvm::dbgs());
                  llvm::dbgs() << "\n");
       if (!InternalType) {
         StringRef Name = "<internal>";
@@ -1303,9 +1328,9 @@ private:
       auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, L.Line, SizeInBits, AlignInBits, Flags,
-                                MangledName);
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl ? Decl->getNameStr() : "", File, L.Line, SizeInBits,
+          AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::BoundGenericClass: {
@@ -1412,12 +1437,9 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
-                              Flags);
-      else
-        return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
-                                  SizeInBits, AlignInBits, Flags, MangledName);
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl->getName().str(), File, L.Line, SizeInBits, AlignInBits,
+          Flags, MangledName);
     }
 
     case TypeKind::BuiltinVector: {
@@ -1498,8 +1520,9 @@ private:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
-      LLVM_DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
-                 llvm::errs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
+                 DbgTy.getType()->dump(llvm::dbgs());
+                 llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
@@ -2082,8 +2105,8 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
       auto DTI = DebugTypeInfo::getFromTypeInfo(
-          ErrorInfo->getType(),
-          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo)));
+          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy),
+          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo, FnTy)));
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 

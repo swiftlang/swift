@@ -243,6 +243,8 @@ ERROR(cannot_subscript_ambiguous_base,none,
 
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
+ERROR(conditional_cast_from_nil,none,
+      "nil literal cannot be the source of a conditional cast", ())
 
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
@@ -397,6 +399,45 @@ ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
 
+// @_nonEphemeral conversion diagnostics
+ERROR(cannot_pass_type_to_non_ephemeral,none,
+      "cannot pass %0 to parameter; argument %1 must be a pointer that "
+      "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
+WARNING(cannot_pass_type_to_non_ephemeral_warning,none,
+        "passing %0 to parameter, but argument %1 should be a pointer that "
+        "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
+ERROR(cannot_use_inout_non_ephemeral,none,
+      "cannot use inout expression here; argument %0 must be a pointer that "
+      "outlives the call%select{| to %2}1", (StringRef, bool, DeclName))
+WARNING(cannot_use_inout_non_ephemeral_warning,none,
+        "inout expression creates a temporary pointer, but argument %0 should "
+        "be a pointer that outlives the call%select{| to %2}1",
+        (StringRef, bool, DeclName))
+ERROR(cannot_construct_dangling_pointer,none,
+      "initialization of %0 results in a dangling %select{|buffer }1pointer",
+      (Type, unsigned))
+WARNING(cannot_construct_dangling_pointer_warning,none,
+        "initialization of %0 results in a dangling %select{|buffer }1pointer",
+        (Type, unsigned))
+NOTE(ephemeral_pointer_argument_conversion_note,none,
+     "implicit argument conversion from %0 to %1 produces a pointer valid only "
+     "for the duration of the call%select{| to %3}2",
+     (Type, Type, bool, DeclName))
+NOTE(ephemeral_use_with_unsafe_pointer,none,
+     "use 'withUnsafe%select{Bytes|MutableBytes|Pointer|MutablePointer}0' in "
+     "order to explicitly convert argument to %select{buffer |buffer ||}0"
+     "pointer valid for a defined scope", (unsigned))
+NOTE(ephemeral_use_string_with_c_string,none,
+     "use the 'withCString' method on String in order to explicitly "
+     "convert argument to pointer valid for a defined scope", ())
+NOTE(ephemeral_use_array_with_unsafe_buffer,none,
+     "use the 'withUnsafe%select{Bytes|MutableBytes|BufferPointer|"
+     "MutableBufferPointer}0' method on Array in order to explicitly convert "
+     "argument to buffer pointer valid for a defined scope", (unsigned))
+NOTE(candidate_performs_illegal_ephemeral_conv,none,
+     "candidate expects pointer that outlives the call for parameter #%0",
+     (unsigned))
+
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
 ERROR(cannot_convert_partial_argument_value_protocol,none,
@@ -509,6 +550,10 @@ ERROR(cannot_convert_subscript_assign_protocol,none,
       (Type, Type))
 ERROR(cannot_convert_subscript_assign_nil,none,
       "'nil' cannot be assigned to subscript of type %0", (Type))
+
+NOTE(cannot_convert_candidate_result_to_contextual_type,none,
+     "%0 produces %1, not the expected contextual result type %2",
+     (DeclName, Type, Type))
 
 // for ... in expression
 ERROR(cannot_convert_sequence_element_value,none,
@@ -949,22 +994,18 @@ ERROR(super_initializer_not_in_initializer,none,
 WARNING(isa_is_always_true,none, "'%0' test is always true",
         (StringRef))
 WARNING(isa_is_foreign_check,none,
-        "'is' test is always true because %0 is a Core Foundation type",
-        (Type))
+      "'is' test is always true because %0 is a Core Foundation type",
+      (Type))
 WARNING(conditional_downcast_coercion,none,
-        "conditional cast from %0 to %1 always succeeds",
-        (Type, Type))
-WARNING(unnecessary_same_type_coercion,none,
-        "redundant cast to %0 has no effect",
-        (Type))
-WARNING(unnecessary_same_typealias_type_coercion,none,
-        "redundant cast from %0 to %1 has no effect",
-        (Type, Type))
+      "conditional cast from %0 to %1 always succeeds",
+      (Type, Type))
+
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
+
 WARNING(forced_downcast_coercion,none,
-        "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
-        (Type, Type))
+      "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
+      (Type, Type))
 
 // Note: the Boolean at the end indicates whether bridging is required after
 // the cast.
@@ -1424,6 +1465,12 @@ ERROR(corresponding_param_not_defaulted,none,
       ())
 NOTE(inherited_default_param_here,none,
      "corresponding parameter declared here", ())
+
+WARNING(option_set_zero_constant,none,
+        "static property %0 produces an empty option set",
+        (Identifier))
+NOTE(option_set_empty_set_init,none,
+     "use [] to silence this warning", ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -2753,6 +2800,10 @@ ERROR(escaping_non_function_parameter,none,
 NOTE(escaping_optional_type_argument, none,
      "closure is already escaping in optional type argument", ())
 
+// @_nonEphemeral attribute
+ERROR(non_ephemeral_non_pointer_type,none,
+      "@_nonEphemeral attribute only applies to pointer types", ())
+
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
       "@NSManaged only allowed on an instance property or method", ())
@@ -2882,6 +2933,9 @@ ERROR(delegating_designated_init,none,
       "designated initializer for %0 cannot delegate (with 'self.init'); "
       "did you mean this to be a convenience initializer?",
       (Type))
+ERROR(delegating_designated_init_in_extension,none,
+      "designated initializer for %0 cannot delegate (with 'self.init')",
+      (Type))
 NOTE(delegation_here,none, "delegation occurs here", ())
 ERROR(chain_convenience_init,none,
       "must call a designated initializer of the superclass %0",
@@ -2909,6 +2963,9 @@ ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (DeclName))
+ERROR(cfclass_designated_init_in_extension,none,
+      "designated initializer cannot be declared in an extension of %0",
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
@@ -2918,7 +2975,6 @@ ERROR(nonclass_convenience_init,none,
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
-
 ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "
       "a 'required' initializer", (Type))
@@ -4680,6 +4736,13 @@ NOTE(previous_function_builder_here, none,
      "previous function builder specified here", ())
 ERROR(function_builder_arguments, none,
       "function builder attributes cannot have arguments", ())
+
+//------------------------------------------------------------------------------
+// MARK: differentiable programming diagnostics
+//------------------------------------------------------------------------------
+ERROR(experimental_differentiable_programming_disabled, none,
+      "differentiable programming is an experimental feature that is "
+      "currently disabled", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

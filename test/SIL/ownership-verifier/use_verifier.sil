@@ -1166,7 +1166,7 @@ sil [ossa] @test_unreachable_users : $@convention(method) (@guaranteed UnsafeUno
 bb0(%0 : @guaranteed $UnsafeUnownedFieldKlass):
   %3 = ref_element_addr %0 : $UnsafeUnownedFieldKlass, #UnsafeUnownedFieldKlass.x
   %4 = load_borrow %3 : $*@sil_unowned Builtin.NativeObject
-  %5 = copy_unowned_value %4 : $@sil_unowned Builtin.NativeObject
+  %5 = strong_copy_unowned_value %4 : $@sil_unowned Builtin.NativeObject
   end_borrow %4 : $@sil_unowned Builtin.NativeObject
   %12 = begin_borrow %5 : $Builtin.NativeObject
   %func = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -1182,8 +1182,17 @@ bb1:
   unreachable
 }
 
-sil [ossa] @copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
+sil [ossa] @strong_copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
-  %1 = copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
+  %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }
+
+sil [ossa] @mark_dependence_test_guaranteed : $@convention(thin) (@guaranteed Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $Builtin.NativeObject on %1 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

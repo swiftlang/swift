@@ -58,7 +58,6 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
-  class LazyResolver;
   class LinkLibrary;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -409,19 +408,18 @@ public:
   /// \returns The result of the conformance search, which will be
   /// None if the type does not conform to the protocol or contain a
   /// ProtocolConformanceRef if it does conform.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(Type type, ProtocolDecl *protocol);
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
-  Optional<ProtocolConformanceRef>
-  lookupExistentialConformance(Type type, ProtocolDecl *protocol);
+  ProtocolConformanceRef lookupExistentialConformance(Type type,
+                                                      ProtocolDecl *protocol);
 
   /// Exposes TypeChecker functionality for querying protocol conformance.
   /// Returns a valid ProtocolConformanceRef only if all conditional
   /// requirements are successfully resolved.
-  Optional<ProtocolConformanceRef>
-  conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol);
+  ProtocolConformanceRef conformsToProtocol(Type sourceTy,
+                                            ProtocolDecl *targetProtocol);
 
   /// Find a member named \p name in \p container that was declared in this
   /// module.

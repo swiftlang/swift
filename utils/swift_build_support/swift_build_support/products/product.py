@@ -13,6 +13,11 @@
 import abc
 
 from .. import cmake
+from .. import targets
+
+
+def is_release_variant(build_variant):
+    return build_variant in ['Release', 'RelWithDebInfo']
 
 
 class Product(object):
@@ -41,6 +46,15 @@ class Product(object):
         Whether this product is produced by build-script-impl.
         """
         return True
+
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        """is_swiftpm_unified_build_product -> bool
+
+        Whether this product should be build in the unified build of SwiftPM
+        products.
+        """
+        return False
 
     def should_build(self, host_target):
         """should_build() -> Bool
@@ -104,6 +118,22 @@ class Product(object):
         self.source_dir = source_dir
         self.build_dir = build_dir
         self.cmake_options = cmake.CMakeOptions()
+
+    def is_release(self):
+        """is_release() -> Bool
+
+        Whether or not this target is built as a release variant
+        """
+        return is_release_variant(self.args.build_variant)
+
+    def install_toolchain_path(self):
+        """toolchain_path() -> string
+
+        Returns the path to the toolchain that is being created as part of this
+        build.
+        """
+        return targets.toolchain_path(self.args.install_destdir,
+                                      self.args.install_prefix)
 
 
 class ProductBuilder(object):

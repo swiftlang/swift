@@ -72,16 +72,16 @@ inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
 CanSILFunctionType
 adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
                    ParameterConvention calleeConv,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance);
+                   ProtocolConformanceRef witnessMethodConformance);
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   ProtocolConformanceRef witnessMethodConformance) {
   return adjustFunctionType(type, extInfo, type->getCalleeConvention(),
                             witnessMethodConformance);
 }
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   ProtocolConformanceRef witnessMethodConformance) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
   auto contextConvention = DefaultThickCalleeConvention;
@@ -255,7 +255,7 @@ public:
   void print(llvm::raw_ostream &os) const;
 
   /// Dump out the internal state of this type lowering to llvm::dbgs().
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?
@@ -1008,11 +1008,13 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(SILType type1, SILType type2,
+  ABIDifference checkForABIDifferences(SILModule &M,
+                                       SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
   /// Same as above but for SIL function types.
-  ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
+  ABIDifference checkFunctionForABIDifferences(SILModule &M,
+                                               SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
 

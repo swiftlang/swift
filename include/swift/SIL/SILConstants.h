@@ -28,6 +28,7 @@ class SILValue;
 class SILBuilder;
 class SerializedSILLoader;
 
+struct AggregateSymbolicValue;
 struct SymbolicArrayStorage;
 struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
@@ -107,6 +108,9 @@ public:
     /// Encountered an instruction not supported by the interpreter.
     UnsupportedInstruction,
 
+    /// Encountered a function call whose arguments are not constants.
+    CallArgumentUnknown,
+
     /// Encountered a function call where the body of the called function is
     /// not available.
     CalleeImplementationUnknown,
@@ -145,8 +149,9 @@ private:
 
   // Auxiliary information for different unknown kinds.
   union {
-    SILFunction *function;
-    const char *trapMessage;
+    SILFunction *function;   // For CalleeImplementationUnknown
+    const char *trapMessage; // For Trap.
+    unsigned argumentIndex;  // For CallArgumentUnknown
   } payload;
 
 public:
@@ -156,6 +161,7 @@ public:
     switch (kind) {
     case UnknownKind::CalleeImplementationUnknown:
     case UnknownKind::Trap:
+    case UnknownKind::CallArgumentUnknown:
       return true;
     default:
       return false;
@@ -199,6 +205,18 @@ public:
   const char *getTrapMessage() {
     assert(kind == UnknownKind::Trap);
     return payload.trapMessage;
+  }
+
+  static UnknownReason createCallArgumentUnknown(unsigned argIndex) {
+    UnknownReason reason;
+    reason.kind = UnknownKind::CallArgumentUnknown;
+    reason.payload.argumentIndex = argIndex;
+    return reason;
+  }
+
+  unsigned getArgumentIndex() {
+    assert(kind == UnknownKind::CallArgumentUnknown);
+    return payload.argumentIndex;
   }
 };
 
@@ -290,8 +308,8 @@ private:
     const char *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
-    /// information about the array elements and count.
-    const SymbolicValue *aggregate;
+    /// information about the aggregate elements, its type and count.
+    const AggregateSymbolicValue *aggregate;
 
     /// When this SymbolicValue is of "Enum" kind, this pointer stores
     /// information about the enum case type.
@@ -348,9 +366,6 @@ private:
 
     /// This is the number of bytes for an RK_String representation.
     unsigned stringNumBytes;
-
-    /// This is the number of elements for an RK_Aggregate representation.
-    unsigned aggregateNumElements;
   } auxInfo;
 
 public:
@@ -471,11 +486,15 @@ public:
   StringRef getStringValue() const;
 
   /// This returns an aggregate value with the specified elements in it.  This
-  /// copies the elements into the specified Allocator.
-  static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
+  /// copies the member values into the specified Allocator.
+  static SymbolicValue getAggregate(ArrayRef<SymbolicValue> members,
+                                    Type aggregateType,
                                     SymbolicValueAllocator &allocator);
 
-  ArrayRef<SymbolicValue> getAggregateValue() const;
+  ArrayRef<SymbolicValue> getAggregateMembers() const;
+
+  /// Return the type of this aggregate symbolic value.
+  Type getAggregateType() const;
 
   /// This returns a constant Symbolic value for the enum case in `decl`, which
   /// must not have an associated value.
@@ -600,7 +619,12 @@ struct SymbolicValueMemoryObject {
   Type getType() const { return type; }
 
   SymbolicValue getValue() const { return value; }
-  void setValue(SymbolicValue newValue) { value = newValue; }
+  void setValue(SymbolicValue newValue) {
+    assert((newValue.getKind() != SymbolicValue::Aggregate ||
+            newValue.getAggregateType()->isEqual(type)) &&
+           "Memory object type does not match the type of the symbolic value");
+    value = newValue;
+  }
 
   /// Create a new memory object whose overall type is as specified.
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,

@@ -50,7 +50,7 @@ func get(holder holder: inout Holder) -> C {
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [unknown] [[ADDR]] : $*Holder
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[READ]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = load [trivial] [[T0]] : $*@sil_unmanaged C
-// CHECK-NEXT:   [[T2:%.*]] = copy_unmanaged_value [[T1]]
+// CHECK-NEXT:   [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
 // CHECK-NEXT:   end_access [[READ]] : $*Holder
 // CHECK-NEXT:   return [[T2]]
 
@@ -62,6 +62,6 @@ func project(fn fn: () -> Holder) -> C {
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
-// CHECK-NEXT: [[T2:%.*]] = copy_unmanaged_value [[T1]]
+// CHECK-NEXT: [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
 // CHECK-NOT: destroy_value [[BORROWED_FN_COPY]]
 // CHECK-NEXT: return [[T2]]

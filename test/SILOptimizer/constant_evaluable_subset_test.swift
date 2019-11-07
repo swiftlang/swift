@@ -253,7 +253,7 @@ internal func interpretInvalidSingedUnsignedConversions() -> UInt64 {
 @_semantics("constant_evaluable")
 internal func testIO() -> String? {
   return readLine()
-    // CHECK: note: encountered call to 'Swift.readLine(strippingNewline: Swift.Bool) -> Swift.Optional<Swift.String>' whose body is not available
+    // CHECK: note: encountered call to 'readLine(strippingNewline:)' whose body is not available
     // CHECK: note: function whose body is not available
 }
 

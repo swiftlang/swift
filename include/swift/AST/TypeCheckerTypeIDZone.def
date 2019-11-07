@@ -29,6 +29,9 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
@@ -65,6 +68,8 @@ SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned,
                    TypeResolutionStage),
               SeparatelyCached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, InheritsSuperclassInitializersRequest,
+              bool(ClassDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InitKindRequest,
               CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
@@ -165,3 +170,25 @@ SWIFT_REQUEST(TypeChecker, ParamSpecifierRequest,
               ParamDecl::Specifier(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
+              bool(StructDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
+              bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
+              TypeWitnessAndDecl(NormalProtocolConformance *,
+                                 AssociatedTypeDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
+              Witness(NormalProtocolConformance *, ValueDecl *),
+              SeparatelyCached, NoLocationInfo)

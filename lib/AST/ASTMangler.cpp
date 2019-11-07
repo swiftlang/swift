@@ -357,7 +357,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
-  GenericSignature GenSig = ThunkType->getGenericSignature();
+  assert(ThunkType->getSubstitutions().empty() && "not implemented");
+  GenericSignature GenSig = ThunkType->getSubstGenericSignature();
   if (GenSig)
     CurGenericSignature = GenSig->getCanonicalSignature();
 
@@ -1333,16 +1334,15 @@ static bool containsRetroactiveConformance(
       continue;
     ProtocolDecl *proto =
         requirement.getSecondType()->castTo<ProtocolType>()->getDecl();
-    Optional<ProtocolConformanceRef> conformance =
-        subMap.lookupConformance(requirement.getFirstType()->getCanonicalType(),
-                                 proto);
-    if (!conformance) {
+    auto conformance = subMap.lookupConformance(
+        requirement.getFirstType()->getCanonicalType(), proto);
+    if (conformance.isInvalid()) {
       // This should only happen when mangling invalid ASTs, but that happens
       // for indexing purposes.
       continue;
     }
-    if (conformance->isConcrete() &&
-        containsRetroactiveConformance(conformance->getConcrete(), module)) {
+    if (conformance.isConcrete() &&
+        containsRetroactiveConformance(conformance.getConcrete(), module)) {
       return true;
     }
   }
@@ -1466,13 +1466,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
-    appendType(param.getType());
+    appendType(param.getInterfaceType());
   }
 
   // Mangle the results.
   for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
-    appendType(result.getType());
+    appendType(result.getInterfaceType());
   }
 
   // Mangle the error result if present.
@@ -1480,10 +1480,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     auto error = fn->getErrorResult();
     OpArgs.push_back('z');
     OpArgs.push_back(getResultConvention(error.getConvention()));
-    appendType(error.getType());
+    appendType(error.getInterfaceType());
   }
   if (fn->isPolymorphic())
-    appendGenericSignature(fn->getGenericSignature());
+    appendGenericSignature(fn->getSubstGenericSignature());
 
   OpArgs.push_back('_');
 
@@ -2366,7 +2366,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   parentGenericSig = GenericSignature();
 
   auto &C = decl->getASTContext();
-  if (!decl->getInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
+  if (decl->isInvalid()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
                                   C.TheErrorType);
@@ -2706,7 +2706,7 @@ void ASTMangler::appendConcreteProtocolConformance(
         appendOperator("HO");
       } else {
         auto conditionalConf = module->lookupConformance(canType, proto);
-        appendConcreteProtocolConformance(conditionalConf->getConcrete());
+        appendConcreteProtocolConformance(conditionalConf.getConcrete());
       }
       appendListSeparator(firstRequirement);
       break;

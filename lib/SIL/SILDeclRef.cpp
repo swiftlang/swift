@@ -990,12 +990,13 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
-  // Only non-final methods in non-final classes go in the vtable.
+  // Only methods in non-final classes go in the vtable.
   auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
-  if (decl->isFinal())
+  // Final methods only go in the vtable if they override something.
+  if (decl->isFinal() && !decl->getOverriddenDecl())
     return SubclassScope::NotApplicable;
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&

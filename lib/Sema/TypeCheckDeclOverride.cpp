@@ -65,16 +65,14 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   return FunctionType::get(parameters, resultType, fnType->getExtInfo());
 }
 
-Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
-                                       ValueDecl *derivedDecl) {
+Type swift::getMemberTypeForComparison(const ValueDecl *member,
+                                       const ValueDecl *derivedDecl) {
   auto *method = dyn_cast<AbstractFunctionDecl>(member);
-  ConstructorDecl *ctor = nullptr;
-  if (method)
-    ctor = dyn_cast<ConstructorDecl>(method);
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(method);
 
   auto abstractStorage = dyn_cast<AbstractStorageDecl>(member);
   assert((method || abstractStorage) && "Not a method or abstractStorage?");
-  SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
+  auto *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
   auto memberType = member->getInterfaceType();
   if (memberType->is<ErrorType>())
@@ -112,8 +110,9 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   return memberType;
 }
 
-static bool areAccessorsOverrideCompatible(AbstractStorageDecl *storage,
-                                           AbstractStorageDecl *parentStorage) {
+static bool
+areAccessorsOverrideCompatible(const AbstractStorageDecl *storage,
+                               const AbstractStorageDecl *parentStorage) {
   // It's okay for the storage to disagree about whether to use a getter or
   // a read accessor; we'll patch up any differences when setting overrides
   // for the accessors.  We don't want to diagnose anything involving
@@ -143,8 +142,9 @@ static bool areAccessorsOverrideCompatible(AbstractStorageDecl *storage,
   return true;
 }
 
-bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
-                                  ValueDecl *parentDecl, Type parentDeclTy) {
+bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
+                                  const ValueDecl *parentDecl,
+                                  Type parentDeclTy) {
   auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
@@ -667,7 +667,7 @@ namespace {
     /// Retrieve the type of the declaration, to be used in comparisons.
     Type getDeclComparisonType() {
       if (!cachedDeclType) {
-        cachedDeclType = getMemberTypeForComparison(ctx, decl);
+        cachedDeclType = getMemberTypeForComparison(decl);
       }
 
       return cachedDeclType;
@@ -693,7 +693,8 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
   // The final step for this constructor is to set up the superclass type,
   // without which we will not perform an matching. Early exits therefore imply
   // that there is no way we can match this declaration.
-  if (decl->isInvalid())
+  // FIXME: Break the cycle here.
+  if (decl->hasInterfaceType() && decl->isInvalid())
     return;
 
   auto *dc = decl->getDeclContext();
@@ -755,7 +756,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     (void)parentStorage;
 
     // Check whether the types are identical.
-    auto parentDeclTy = getMemberTypeForComparison(ctx, parentDecl, decl);
+    auto parentDeclTy = getMemberTypeForComparison(parentDecl, decl);
     if (parentDeclTy->hasError())
       continue;
 
@@ -930,7 +931,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
 bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     OverrideCheckingAttempt attempt) {
   auto &diags = ctx.Diags;
-  auto baseTy = getMemberTypeForComparison(ctx, baseDecl, decl);
+  auto baseTy = getMemberTypeForComparison(baseDecl, decl);
   bool emittedMatchError = false;
 
   // If the name of our match differs from the name we were looking for,
@@ -1294,6 +1295,7 @@ namespace  {
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
+    UNINTERESTING_ATTR(NonEphemeral)
     UNINTERESTING_ATTR(NonObjC)
     UNINTERESTING_ATTR(NonOverride)
     UNINTERESTING_ATTR(NSApplicationMain)

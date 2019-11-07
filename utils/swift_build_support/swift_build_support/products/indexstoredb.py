@@ -52,15 +52,18 @@ def run_build_script_helper(action, host_target, product, args):
     toolchain_path = targets.toolchain_path(args.install_destdir,
                                             args.install_prefix)
 
-    configuration = 'debug' if args.build_variant == 'Debug' else 'release'
+    is_release = product.is_release()
+    configuration = 'release' if is_release else 'debug'
     helper_cmd = [
         script_path,
         action,
-        '--verbose',
         '--package-path', product.source_dir,
         '--build-path', product.build_dir,
         '--configuration', configuration,
         '--toolchain', toolchain_path,
         '--ninja-bin', product.toolchain.ninja,
     ]
+    if args.verbose_build:
+        helper_cmd.append('--verbose')
+
     shell.call(helper_cmd)

@@ -29,7 +29,8 @@ extension OSLogInterpolation {
   ///    enum `IntFormat`.
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    The default is public.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int,
@@ -46,7 +47,8 @@ extension OSLogInterpolation {
   ///    enum `IntFormat`.
   ///  - privacy: a privacy qualifier which is either private or public.
   ///    The default is public.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ number: @autoclosure @escaping () -> Int32,
@@ -59,9 +61,9 @@ extension OSLogInterpolation {
   /// Given an integer, create and append a format specifier for the integer to the
   /// format string property. Also, append the integer along with necessary headers
   /// to the OSLogArguments property.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
-  @usableFromInline
   internal mutating func appendInteger<T>(
     _ number: @escaping () -> T,
     format: IntFormat,
@@ -83,9 +85,9 @@ extension OSLogInterpolation {
 
   /// Update preamble and append argument headers based on the parameters of
   /// the interpolation.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
-  @usableFromInline
   internal mutating func addIntHeaders(_ isPrivate: Bool, _ byteCount: Int) {
     // Append argument header.
     let argumentHeader = getArgumentHeader(isPrivate: isPrivate, type: .scalar)
@@ -139,7 +141,9 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of integer type, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @usableFromInline
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal mutating func append<T>(
     _ value: @escaping () -> T
   ) where T: FixedWidthInteger {

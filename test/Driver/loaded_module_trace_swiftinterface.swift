@@ -1,3 +1,5 @@
+// UNSUPPORTED: -windows-msvc
+
 // 1) If there is no swiftmodule, use the swiftinterface
 //
 // RUN: %empty-directory(%t)

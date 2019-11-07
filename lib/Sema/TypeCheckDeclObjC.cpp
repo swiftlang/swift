@@ -487,8 +487,7 @@ bool swift::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = AFD->getASTContext();
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)AFD->getInterfaceType();
+
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(AFD, Reason))
@@ -811,10 +810,7 @@ bool swift::isRepresentableInObjC(
 
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  // FIXME: Computes isInvalid() below.
-  (void) VD->getInterfaceType();
-
+  
   if (VD->isInvalid())
     return false;
 
@@ -983,50 +979,6 @@ Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
                                   Context.Id_ObjectiveC,
                                   Context.Id_Selector,
                                   dc);
-}
-
-#pragma mark Bridging support
-
-/// Check runtime functions responsible for implicit bridging of Objective-C
-/// types.
-static void checkObjCBridgingFunctions(ModuleDecl *mod,
-                                       StringRef bridgedTypeName,
-                                       StringRef forwardConversion,
-                                       StringRef reverseConversion) {
-  assert(mod);
-  SmallVector<ValueDecl *, 4> results;
-
-  auto &ctx = mod->getASTContext();
-  mod->lookupValue(ctx.getIdentifier(bridgedTypeName),
-                   NLKind::QualifiedLookup, results);
-  mod->lookupValue(ctx.getIdentifier(forwardConversion),
-                   NLKind::QualifiedLookup, results);
-  mod->lookupValue(ctx.getIdentifier(reverseConversion),
-                   NLKind::QualifiedLookup, results);
-
-  for (auto D : results) {
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)D->getInterfaceType();
-  }
-}
-
-void swift::checkBridgedFunctions(ASTContext &ctx) {
-  #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
-  Identifier ID_##BRIDGED_MOD = ctx.getIdentifier(#BRIDGED_MOD);\
-  if (ModuleDecl *module = ctx.getLoadedModule(ID_##BRIDGED_MOD)) {\
-    checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
-    "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
-    "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
-  }
-  #include "swift/SIL/BridgedTypes.def"
-
-  if (ModuleDecl *module = ctx.getLoadedModule(ctx.Id_Foundation)) {
-    checkObjCBridgingFunctions(module,
-                               ctx.getSwiftName(
-                                 KnownFoundationEntity::NSError),
-                               "_convertNSErrorToError",
-                               "_convertErrorToNSError");
-  }
 }
 
 #pragma mark "@objc declaration handling"

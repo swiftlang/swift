@@ -98,12 +98,23 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    auto resolvedType = CS.simplifyType(rawType);
+    if (!rawType->hasTypeVariable()) {
+      if (reconstituteSugar)
+        rawType = rawType->reconstituteSugar(/*recursive*/ true);
+      return wantRValue ? rawType->getRValueType() : rawType;
+    }
 
-    if (reconstituteSugar)
-      resolvedType = resolvedType->reconstituteSugar(/*recursive*/ true);
-
-    return wantRValue ? resolvedType->getRValueType() : resolvedType;
+    auto &cs = getConstraintSystem();
+    return cs.simplifyTypeImpl(rawType,
+        [&](TypeVariableType *typeVar) -> Type {
+          if (auto fixed = cs.getFixedType(typeVar)) {
+            auto *genericParam = typeVar->getImpl().getGenericParameter();
+            if (fixed->isHole() && genericParam)
+                return genericParam;
+            return resolveType(fixed, reconstituteSugar, wantRValue);
+          }
+          return cs.getRepresentative(typeVar);
+        });
   }
 
   /// Resolve type variables present in the raw type, using generic parameter
@@ -201,6 +212,7 @@ private:
 /// Provides information about the application of a function argument to a
 /// parameter.
 class FunctionArgApplyInfo {
+  ConstraintSystem &CS;
   Expr *ArgExpr;
   unsigned ArgIdx;
   Type ArgType;
@@ -212,11 +224,12 @@ class FunctionArgApplyInfo {
   const ValueDecl *Callee;
 
 public:
-  FunctionArgApplyInfo(Expr *argExpr, unsigned argIdx, Type argType,
-                       unsigned paramIdx, Type fnInterfaceType,
+  FunctionArgApplyInfo(ConstraintSystem &cs, Expr *argExpr, unsigned argIdx,
+                       Type argType, unsigned paramIdx, Type fnInterfaceType,
                        FunctionType *fnType, const ValueDecl *callee)
-      : ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType), ParamIdx(paramIdx),
-        FnInterfaceType(fnInterfaceType), FnType(fnType), Callee(callee) {}
+      : CS(cs), ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType),
+        ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType), FnType(fnType),
+        Callee(callee) {}
 
   /// \returns The argument being applied.
   Expr *getArgExpr() const { return ArgExpr; }
@@ -234,6 +247,45 @@ public:
   /// the argument, if any.
   Type getArgType(bool withSpecifier = false) const {
     return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The label for the argument being applied.
+  Identifier getArgLabel() const {
+    auto *parent = CS.getParentExpr(ArgExpr);
+    if (auto *te = dyn_cast<TupleExpr>(parent))
+      return te->getElementName(ArgIdx);
+
+    assert(isa<ParenExpr>(parent));
+    return Identifier();
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    llvm::raw_svector_ostream stream(scratch);
+
+    // Use the argument label only if it's unique within the argument list.
+    auto argLabel = getArgLabel();
+    auto useArgLabel = [&]() -> bool {
+      if (argLabel.empty())
+        return false;
+
+      if (auto *te = dyn_cast<TupleExpr>(CS.getParentExpr(ArgExpr)))
+        return llvm::count(te->getElementNames(), argLabel) == 1;
+
+      return false;
+    };
+
+    if (useArgLabel()) {
+      stream << "'";
+      stream << argLabel;
+      stream << "'";
+    } else {
+      stream << "#";
+      stream << getArgPosition();
+    }
+    return StringRef(scratch.data(), scratch.size());
   }
 
   /// \returns The interface type for the function being applied. Note that this
@@ -709,8 +761,8 @@ public:
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
-  /// If we're trying to convert something of type "() -> T" to T,
-  /// then we probably meant to call the value.
+  // If we're trying to convert something of type "() -> T" to T,
+  // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
@@ -782,12 +834,7 @@ protected:
 
 private:
   Type resolve(Type rawType) {
-    auto type = resolveType(rawType)->getWithoutSpecifierType();
-    if (auto *BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->hasUnresolvedType())
-        return BGT->getDecl()->getDeclaredInterfaceType();
-    }
-    return type;
+    return resolveType(rawType)->getWithoutSpecifierType();
   }
 
   /// Try to add a fix-it to convert a stored property into a computed
@@ -891,26 +938,21 @@ public:
 private:
   bool exprNeedsParensBeforeAddingAs(Expr *expr) {
     auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
-    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+    return exprNeedsParensInsideFollowingOperator(DC, expr, asPG);
   }
 
   bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
     auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
     auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
 
-    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
-                                                   asPG);
+    return exprNeedsParensOutsideFollowingOperator(DC, expr, rootExpr, asPG);
   }
 };
 
@@ -1462,11 +1504,11 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose an attempt to use AnyObject as the root type of a KeyPath
-///
-/// ```swift
-/// let keyPath = \AnyObject.bar
-/// ```
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
 class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
 
 public:
@@ -1776,27 +1818,6 @@ public:
   void tryDropArrayBracketsFixIt(Expr *anchor) const;
 };
 
-/// Diagnose a situation where there is an explicit type coercion
-/// to the same type e.g.:
-///
-/// ```swift
-/// Double(1) as Double // redundant cast to 'Double' has no effect
-/// 1 as Double as Double // redundant cast to 'Double' has no effect
-/// let string = "String"
-/// let s = string as String // redundant cast to 'String' has no effect
-/// ```
-class UnnecessaryCoercionFailure final
-    : public ContextualFailure {
-      
-public:
-  UnnecessaryCoercionFailure(Expr *root, ConstraintSystem &cs,
-                             Type fromType, Type toType,
-                             ConstraintLocator *locator)
-      : ContextualFailure(root, cs, fromType, toType, locator) {}
-  
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose a situation there is a mismatch between argument and parameter
 /// types e.g.:
 ///
@@ -1860,6 +1881,13 @@ protected:
   /// will return T.
   Type getArgType(bool withSpecifier = false) const {
     return Info->getArgType(withSpecifier);
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    return Info->getArgDescription(scratch);
   }
 
   /// \returns The interface type for the function being applied.
@@ -1931,6 +1959,74 @@ public:
       : ContextualFailure(expr, cs, fromType, toType, locator) {}
 
   bool diagnoseAsError() override;
+};
+
+class ExtraneousCallFailure final : public FailureDiagnostic {
+public:
+  ExtraneousCallFailure(Expr *expr, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
+public:
+  InvalidUseOfTrailingClosure(Expr *root, ConstraintSystem &cs, Type argType,
+                              Type paramType, ConstraintLocator *locator)
+      : ArgumentMismatchFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose the invalid conversion of a temporary pointer argument generated
+/// from an X-to-pointer conversion to an @_nonEphemeral parameter.
+///
+/// ```swift
+/// func foo(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
+///
+/// foo([1, 2, 3])
+/// ```
+class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
+  ConversionRestrictionKind ConversionKind;
+  bool DowngradeToWarning;
+
+public:
+  NonEphemeralConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                ConstraintLocator *locator,
+                                Type fromType, Type toType,
+                                ConversionRestrictionKind conversionKind,
+                                bool downgradeToWarning)
+      : ArgumentMismatchFailure(expr, cs, fromType, toType, locator),
+        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+  }
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  /// Attempts to emit a specialized diagnostic for
+  /// Unsafe[Mutable][Raw]Pointer.init([mutating]:) &
+  /// Unsafe[Mutable][Raw]BufferPointer.init(start:count:).
+  bool diagnosePointerInit() const;
+
+  /// Emits a note explaining to the user that an ephemeral conversion is only
+  /// valid for the duration of the call, and suggests an alternative to use.
+  void emitSuggestionNotes() const;
+};
+	
+class AssignmentTypeMismatchFailure final : public ContextualFailure {
+public:
+  AssignmentTypeMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                ContextualTypePurpose context, Type srcType,
+                                Type dstType, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, context, srcType, dstType, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+private:
+  bool diagnoseMissingConformance() const;
 };
 
 } // end namespace constraints

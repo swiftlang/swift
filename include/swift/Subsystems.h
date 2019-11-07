@@ -132,11 +132,9 @@ namespace swift {
                                PersistentParserState *PersistentState = nullptr,
                                bool DelayBodyParsing = true);
 
-  /// Finish the parsing by going over the nodes that were delayed
-  /// during the first parsing pass.
-  void performDelayedParsing(DeclContext *DC,
-                             PersistentParserState &PersistentState,
-                             CodeCompletionCallbacksFactory *Factory);
+  /// Finish the code completion.
+  void performCodeCompletionSecondPass(PersistentParserState &PersistentState,
+                                       CodeCompletionCallbacksFactory &Factory);
 
   /// Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(const LangOptions &LangOpts,

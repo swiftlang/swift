@@ -60,3 +60,5 @@ consumeObjCForwardNativeTypeHasDifferentCustomNameClass(SwiftForwardNativeTypeHa
 
 consumeForwardNativeTypeIsNonObjCClass(SwiftForwardNativeTypeIsNonObjCClass())
 consumeForwardNativeTypeIsNonObjCClass(ForwardNativeTypeIsNonObjCClass()) // expected-error {{cannot convert value of type 'ForwardNativeTypeIsNonObjCClass' to expected argument type 'SwiftForwardNativeTypeIsNonObjCClass'}}
+
+consumeForwardNativeTypeIsUnambiguouslyNonObjCClass(ForwardNativeTypeIsUnambiguouslyNonObjCClass())

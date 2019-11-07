@@ -67,15 +67,19 @@ class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   clang::ASTWriter &Writer;
 
   ASTContext &swiftCtx;
+  importer::ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
-  SwiftLookupTableWriter(clang::ModuleFileExtension *extension,
-                         clang::ASTWriter &writer, ASTContext &ctx,
-                         const PlatformAvailability &avail, bool inferIAM)
-      : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
-        availability(avail), inferImportAsMember(inferIAM) {}
+  SwiftLookupTableWriter(
+      clang::ModuleFileExtension *extension, clang::ASTWriter &writer,
+      ASTContext &ctx,
+      importer::ClangSourceBufferImporter &buffersForDiagnostics,
+      const PlatformAvailability &avail, bool inferIAM)
+    : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
+      buffersForDiagnostics(buffersForDiagnostics), availability(avail),
+      inferImportAsMember(inferIAM) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -838,89 +842,93 @@ static void printStoredEntry(const SwiftLookupTable *table, uint64_t entry,
 }
 
 void SwiftLookupTable::dump() const {
+  dump(llvm::errs());
+}
+
+void SwiftLookupTable::dump(raw_ostream &os) const {
   // Dump the base name -> full table entry mappings.
   SmallVector<SerializedSwiftName, 4> baseNames;
   for (const auto &entry : LookupTable) {
     baseNames.push_back(entry.first);
   }
   llvm::array_pod_sort(baseNames.begin(), baseNames.end());
-  llvm::errs() << "Base name -> entry mappings:\n";
+  os << "Base name -> entry mappings:\n";
   for (auto baseName : baseNames) {
     switch (baseName.Kind) {
     case DeclBaseName::Kind::Normal:
-      llvm::errs() << "  " << baseName.Name << ":\n";
+      os << "  " << baseName.Name << ":\n";
       break;
     case DeclBaseName::Kind::Subscript:
-      llvm::errs() << "  subscript:\n";
+      os << "  subscript:\n";
       break;
     case DeclBaseName::Kind::Constructor:
-      llvm::errs() << "  init:\n";
+      os << "  init:\n";
       break;
     case DeclBaseName::Kind::Destructor:
-      llvm::errs() << "  deinit:\n";
+      os << "  deinit:\n";
       break;
     }
     const auto &entries = LookupTable.find(baseName)->second;
     for (const auto &entry : entries) {
-      llvm::errs() << "    ";
-      printStoredContext(entry.Context, llvm::errs());
-      llvm::errs() << ": ";
+      os << "    ";
+      printStoredContext(entry.Context, os);
+      os << ": ";
 
       interleave(entry.DeclsOrMacros.begin(), entry.DeclsOrMacros.end(),
-                 [this](uint64_t entry) {
-                   printStoredEntry(this, entry, llvm::errs());
+                 [this, &os](uint64_t entry) {
+                   printStoredEntry(this, entry, os);
                  },
-                 [] {
-                   llvm::errs() << ", ";
+                 [&os] {
+                   os << ", ";
                  });
-      llvm::errs() << "\n";
+      os << "\n";
     }
   }
 
   if (!Categories.empty()) {
-    llvm::errs() << "Categories: ";
+    os << "Categories: ";
     interleave(Categories.begin(), Categories.end(),
-               [](clang::ObjCCategoryDecl *category) {
-                 llvm::errs() << category->getClassInterface()->getName()
-                              << "(" << category->getName() << ")";
+               [&os](clang::ObjCCategoryDecl *category) {
+                 os << category->getClassInterface()->getName()
+                    << "(" << category->getName() << ")";
                },
-               [] {
-                 llvm::errs() << ", ";
+               [&os] {
+                 os << ", ";
                });
-    llvm::errs() << "\n";
+    os << "\n";
   } else if (Reader && !Reader->categories().empty()) {
-    llvm::errs() << "Categories: ";
+    os << "Categories: ";
     interleave(Reader->categories().begin(), Reader->categories().end(),
-               [](clang::serialization::DeclID declID) {
-                 llvm::errs() << "decl ID #" << declID;
+               [&os](clang::serialization::DeclID declID) {
+                 os << "decl ID #" << declID;
                },
-               [] {
-                 llvm::errs() << ", ";
+               [&os] {
+                 os << ", ";
                });
-    llvm::errs() << "\n";
+    os << "\n";
   }
 
   if (!GlobalsAsMembers.empty()) {
-    llvm::errs() << "Globals-as-members mapping:\n";
+    os << "Globals-as-members mapping:\n";
     SmallVector<StoredContext, 4> contexts;
     for (const auto &entry : GlobalsAsMembers) {
       contexts.push_back(entry.first);
     }
     llvm::array_pod_sort(contexts.begin(), contexts.end());
     for (auto context : contexts) {
-      llvm::errs() << "  ";
-      printStoredContext(context, llvm::errs());
-      llvm::errs() << ": ";
+      os << "  ";
+      printStoredContext(context, os);
+      os << ": ";
 
       const auto &entries = GlobalsAsMembers.find(context)->second;
       interleave(entries.begin(), entries.end(),
-                 [this](uint64_t entry) {
-                   printStoredEntry(this, entry, llvm::errs());
+                 [this, &os](uint64_t entry) {
+                   printStoredEntry(this, entry, os);
                  },
-                 [] {
-                   llvm::errs() << ", ";
+                 [&os] {
+                   os << ", ";
                  });
-      llvm::errs() << "\n";
+      os << "\n";
     }
   }
 }
@@ -1788,8 +1796,9 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
   }
 }
 
-void importer::finalizeLookupTable(SwiftLookupTable &table,
-                                   NameImporter &nameImporter) {
+void importer::finalizeLookupTable(
+    SwiftLookupTable &table, NameImporter &nameImporter,
+    ClangSourceBufferImporter &buffersForDiagnostics) {
   // Resolve any unresolved entries.
   SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
   if (table.resolveUnresolvedEntries(unresolved)) {
@@ -1799,9 +1808,22 @@ void importer::finalizeLookupTable(SwiftLookupTable &table,
       auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
 
       if (swiftName) {
-        nameImporter.getContext().Diags.diagnose(
-            SourceLoc(), diag::unresolvable_clang_decl, decl->getNameAsString(),
-            swiftName->getName());
+        clang::SourceLocation diagLoc = swiftName->getLocation();
+        if (!diagLoc.isValid())
+          diagLoc = decl->getLocation();
+        SourceLoc swiftSourceLoc = buffersForDiagnostics.resolveSourceLocation(
+            nameImporter.getClangContext().getSourceManager(), diagLoc);
+
+        DiagnosticEngine &swiftDiags = nameImporter.getContext().Diags;
+        swiftDiags.diagnose(swiftSourceLoc, diag::unresolvable_clang_decl,
+                            decl->getNameAsString(), swiftName->getName());
+        StringRef moduleName =
+            nameImporter.getClangContext().getLangOpts().CurrentModule;
+        if (!moduleName.empty()) {
+          swiftDiags.diagnose(swiftSourceLoc,
+                              diag::unresolvable_clang_decl_is_a_framework_bug,
+                              moduleName);
+        }
       }
     }
   }
@@ -1842,14 +1864,15 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
   addMacrosToLookupTable(table, nameImporter);
 
   // Finalize the lookup table, which may fail.
-  finalizeLookupTable(table, nameImporter);
+  finalizeLookupTable(table, nameImporter, buffersForDiagnostics);
 };
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
-  return std::unique_ptr<clang::ModuleFileExtensionWriter>(
-      new SwiftLookupTableWriter(this, writer, swiftCtx, availability,
-                                 inferImportAsMember));
+  return llvm::make_unique<SwiftLookupTableWriter>(this, writer, swiftCtx,
+                                                   buffersForDiagnostics,
+                                                   availability,
+                                                   inferImportAsMember);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>

@@ -156,7 +156,7 @@ func errorRecovery() {
   var f: (Int,Int) = (1, 2, f : 3) // expected-error {{'(Int, Int, f: Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
   
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
-  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Any)', tuples have a different number of elements}}
+  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
   var (h1, h2) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
   var i: (Bool, Bool) = makeTuple() // expected-error {{tuple type '(String, Int)' is not convertible to tuple '(Bool, Bool)'}}
 }
@@ -860,7 +860,7 @@ func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide
   print(z)
 }
 
-_ = _.foo // expected-error {{type of expression is ambiguous without more context}}
+_ = _.foo // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {

@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Optional.h"
@@ -128,8 +129,8 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const;
 
   /// Look up a conformance for the given type to the given protocol.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType type, ProtocolDecl *proto) const;
+  ProtocolConformanceRef lookupConformance(CanType type,
+                                           ProtocolDecl *proto) const;
 
   /// Whether the substitution map is empty.
   bool empty() const;
@@ -234,7 +235,7 @@ public:
   void dump(llvm::raw_ostream &out, DumpStyle style = DumpStyle::Full,
             unsigned indent = 0) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Profile the substitution map, for use with LLVM's FoldingSet.
   void profile(llvm::FoldingSetNodeID &id) const;
@@ -290,11 +291,10 @@ class LookUpConformanceInSubstitutionMap {
 public:
   explicit LookUpConformanceInSubstitutionMap(SubstitutionMap Subs)
     : Subs(Subs) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 } // end namespace swift

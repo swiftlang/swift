@@ -153,8 +153,16 @@ public:
     // We need the file path, so there has to be a location.
     if (VD->getLoc().isInvalid())
       return 0;
-    StringRef FullPath =
-        VD->getDeclContext()->getParentSourceFile()->getFilename();
+
+    // If the decl being serialized isn't actually from a source file, don't
+    // put it in a group.
+    // FIXME: How do we preserve group information through partial module
+    // merging for multi-frontend builds, then?
+    SourceFile *SF = VD->getDeclContext()->getParentSourceFile();
+    if (!SF)
+      return 0;
+
+    StringRef FullPath = SF->getFilename();
     if (FullPath.empty())
       return 0;
     StringRef FileName = llvm::sys::path::filename(FullPath);

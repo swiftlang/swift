@@ -122,7 +122,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
   if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
-      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+      M.Types.checkFunctionForABIDifferences(M,
+                                             derivedInfo.SILFnType,
                                              overrideInfo.SILFnType) ==
           TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind);
@@ -561,7 +562,7 @@ public:
                  "unable to find conformance that should be known");
 
           ConditionalConformances.push_back(
-              SILWitnessTable::ConditionalConformance{type, *conformance});
+              SILWitnessTable::ConditionalConformance{type, conformance});
 
           return /*finished?*/ false;
         });
@@ -626,7 +627,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
     auto requirement = conformance.getRequirement();
     auto self = requirement->getSelfInterfaceType()->getCanonicalType();
 
-    conformance = *reqtSubMap.lookupConformance(self, requirement);
+    conformance = reqtSubMap.lookupConformance(self, requirement);
   }
 
   reqtSubstTy =
@@ -900,14 +901,11 @@ public:
         Proto->getDefaultAssociatedConformanceWitness(
           req.getAssociation(),
           req.getAssociatedRequirement());
-    if (!witness)
+    if (witness.isInvalid())
       return addMissingDefault();
 
-    auto entry =
-        SILWitnessTable::AssociatedTypeProtocolWitness{
-          req.getAssociation(),
-          req.getAssociatedRequirement(),
-          *witness};
+    auto entry = SILWitnessTable::AssociatedTypeProtocolWitness{
+        req.getAssociation(), req.getAssociatedRequirement(), witness};
     DefaultWitnesses.push_back(entry);
   }
 };

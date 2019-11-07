@@ -180,7 +180,7 @@ var c2f2: C2<[Float]>? = b as! C3
 
 
 // <rdar://problem/15633178>
-var f: (Float) -> Float = { $0 as Float } // expected-warning {{redundant cast to 'Float' has no effect}} {{32-41=}}
+var f: (Float) -> Float = { $0 as Float }
 var f2: (B) -> Bool = { $0 is D }
 
 func metatype_casts<T, U>(_ b: B.Type, t:T.Type, u: U.Type) {
@@ -220,3 +220,5 @@ func process(p: Any?) {
 
 func compare<T>(_: T, _: T) {} // expected-note {{'compare' declared here}}
 func compare<T>(_: T?, _: T?) {}
+
+_ = nil? as? Int?? // expected-error {{nil literal cannot be the source of a conditional cast}}

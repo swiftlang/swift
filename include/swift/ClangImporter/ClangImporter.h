@@ -55,7 +55,6 @@ class DeclContext;
 class EnumDecl;
 class ImportDecl;
 class IRGenOptions;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class StructDecl;

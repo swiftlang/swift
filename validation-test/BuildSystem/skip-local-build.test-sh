@@ -1,0 +1,8 @@
+# REQUIRES: standalone_build
+#
+# RUN: %swift_src_root/utils/build-script --dump-config --skip-local-build 2>&1 | %FileCheck %s -check-prefix=CONFIG
+# CONFIG: "skip_local_build": true
+
+# RUN: %swift_src_root/utils/build-script --dry-run --verbose-build --skip-local-build 2>&1 | %FileCheck %s -check-prefix=DRY
+# DRY: build-script-impl
+# DRY-SAME: --skip-local-build

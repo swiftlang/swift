@@ -577,14 +577,14 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   unsigned Index = Orig->getConventions().getSILArgIndexOfFirstParam();
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedArgIndices, Index)) {
-      auto boxTy = param.getSILStorageType().castTo<SILBoxType>();
+      auto boxTy = param.getSILStorageInterfaceType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
       SILType paramTy;
       {
         auto &TC = Orig->getModule().Types;
         Lowering::GenericContextScope scope(TC,
-                                            OrigFTI->getGenericSignature());
+                                      OrigFTI->getSubstGenericSignature());
         paramTy = getSILBoxFieldType(boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),
@@ -599,11 +599,12 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
   // Create the new function type for the cloned function with some of
   // the parameters promoted.
   auto ClonedTy = SILFunctionType::get(
-      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getSubstGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), OrigFTI->getSubstitutions(),
+      OrigFTI->isGenericSignatureImplied(), M.getASTContext(),
+      OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");

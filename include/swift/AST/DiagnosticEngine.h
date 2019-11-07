@@ -21,7 +21,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/VersionTuple.h"
 
@@ -655,7 +655,7 @@ namespace swift {
     /// A set of all strings involved in current transactional chain.
     /// This is required because diagnostics are not directly emitted
     /// but rather stored until all transactions complete.
-    llvm::StringMap<char, llvm::BumpPtrAllocator &> TransactionStrings;
+    llvm::StringSet<llvm::BumpPtrAllocator &> TransactionStrings;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.

@@ -115,13 +115,13 @@ public:
                                            ManagedValue originalValue);
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  using SILBuilder::createCopy##Name##Value;                             \
-  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
-                                       ManagedValue originalValue);
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
+                                             ManagedValue originalValue);
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  using SILBuilder::createCopy##Name##Value;                                   \
-  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
-                                       ManagedValue originalValue);
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
+                                             ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
   ManagedValue createOwnedPhiArgument(SILType type);

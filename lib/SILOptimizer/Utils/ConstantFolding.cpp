@@ -1414,9 +1414,22 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
             auto ownershipKind = operandValue.getOwnershipKind();
-            if (ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
-              return operandValue;
-            return SILValue();
+
+            // First check if we are not compatible with guaranteed. This means
+            // we would be Owned or Unowned. If so, return SILValue().
+            if (!ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+              return SILValue();
+
+            // Otherwise check if our operand is non-trivial and None. In cases
+            // like that, the non-trivial type could be replacing an owned value
+            // where we lost that our underlying value is None due to
+            // intermediate aggregate literal operations. In that case, we /do
+            // not/ want to eliminate the destructure.
+            if (ownershipKind == ValueOwnershipKind::None &&
+                !operandValue->getType().isTrivial(*Struct->getFunction()))
+              return SILValue();
+
+            return operandValue;
           });
       return true;
     }
@@ -1435,9 +1448,22 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
             auto ownershipKind = operandValue.getOwnershipKind();
-            if (ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
-              return operandValue;
-            return SILValue();
+
+            // First check if we are not compatible with guaranteed. This means
+            // we would be Owned or Unowned. If so, return SILValue().
+            if (!ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+              return SILValue();
+
+            // Otherwise check if our operand is non-trivial and None. In cases
+            // like that, the non-trivial type could be replacing an owned value
+            // where we lost that our underlying value is None due to
+            // intermediate aggregate literal operations. In that case, we /do
+            // not/ want to eliminate the destructure.
+            if (ownershipKind == ValueOwnershipKind::None &&
+                !operandValue->getType().isTrivial(*Tuple->getFunction()))
+              return SILValue();
+
+            return operandValue;
           });
       return true;
     }
@@ -1501,7 +1527,6 @@ bool ConstantFolder::constantFoldStringConcatenation(ApplyInst *AI) {
       assert(DeadI);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);
-      WorkList.remove(DeadI);
     }
   }
   // Schedule users of the new instruction for constant folding.
@@ -1528,10 +1553,9 @@ constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
                                             bool enableDiagnostics) {
   // Look through string initializer to extract the string_literal instruction.
   //
-  // We allow for a single borrow to be stripped here if we are here in
-  // [ossa]. The begin borrow occurs b/c SILGen treats builtins as having
-  // arguments with a +0 convention (implying a borrow).
-  SILValue builtinOperand = stripBorrow(bi->getOperand(0));
+  // We can look through ownership instructions to get to the string value that
+  // is passed to this builtin.
+  SILValue builtinOperand = stripOwnershipInsts(bi->getOperand(0));
   SILFunction *caller = bi->getFunction();
 
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);
@@ -1941,51 +1965,8 @@ ConstantFolder::processWorkList() {
           // Ok, we have succeeded. Add user to the FoldedUsers list and perform
           // the necessary cleanups, RAUWs, etc.
           FoldedUsers.insert(User);
-          ++NumInstFolded;
-
           InvalidateInstructions = true;
-
-          // If the constant produced a tuple, be smarter than RAUW: explicitly
-          // nuke any tuple_extract instructions using the apply.  This is a
-          // common case for functions returning multiple values.
-          if (auto *TI = dyn_cast<TupleInst>(C)) {
-            for (SILValue Result : User->getResults()) {
-              for (auto UI = Result->use_begin(), UE = Result->use_end();
-                   UI != UE;) {
-                Operand *O = *UI++;
-
-                // If the user is a tuple_extract, just substitute the right
-                // value in.
-                if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
-                  SILValue NewVal = TI->getOperand(TEI->getFieldNo());
-                  TEI->replaceAllUsesWith(NewVal);
-                  TEI->dropAllReferences();
-                  FoldedUsers.insert(TEI);
-                  if (auto *Inst = NewVal->getDefiningInstruction())
-                    WorkList.insert(Inst);
-                  continue;
-                }
-
-                if (auto *DTI = dyn_cast<DestructureTupleInst>(O->getUser())) {
-                  SILValue NewVal = TI->getOperand(O->getOperandNumber());
-                  auto OwnershipKind = NewVal.getOwnershipKind();
-                  if (OwnershipKind.isCompatibleWith(
-                          ValueOwnershipKind::Guaranteed)) {
-                    SILValue DTIResult = DTI->getResult(O->getOperandNumber());
-                    DTIResult->replaceAllUsesWith(NewVal);
-                    FoldedUsers.insert(DTI);
-                    if (auto *Inst = NewVal->getDefiningInstruction())
-                      WorkList.insert(Inst);
-                    continue;
-                  }
-                }
-              }
-            }
-
-            if (llvm::all_of(User->getResults(),
-                             [](SILValue v) { return v->use_empty(); }))
-              FoldedUsers.insert(TI);
-          }
+          ++NumInstFolded;
 
           // We were able to fold, so all users should use the new folded
           // value. If we don't have any such users, continue.

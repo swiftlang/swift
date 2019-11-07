@@ -952,9 +952,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
     for (auto &consumer : Consumers) {
-      consumer->handleDiagnostic(SourceMgr, info->Loc, info->Kind,
-                                 info->FormatString, info->FormatArgs, *info,
-                                 info->BufferIndirectlyCausingDiagnostic);
+      consumer->handleDiagnostic(SourceMgr, *info);
     }
   }
 
@@ -1028,7 +1026,7 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     if (content.empty())
       continue;
 
-    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
 }

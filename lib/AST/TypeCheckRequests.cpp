@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -1020,9 +1021,6 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
-
-    if (type->hasError())
-      decl->setInvalid();
   }
   decl->TypeAndAccess.setPointer(type);
 }
@@ -1059,4 +1057,74 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const PrecedenceGroupDescriptor &desc) {
   out << "precedence group " << desc.ident << " at ";
   desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+}
+
+//----------------------------------------------------------------------------//
+// InheritsSuperclassInitializersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedInheritsSuperclassInitializers();
+}
+
+void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setInheritsSuperclassInitializers(value);
+}
+
+//----------------------------------------------------------------------------//
+// ResolveImplicitMemberRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ImplicitMemberAction action) {
+  switch (action) {
+  case ImplicitMemberAction::ResolveImplicitInit:
+    out << "resolve implicit initializer";
+    break;
+  case ImplicitMemberAction::ResolveCodingKeys:
+    out << "resolve CodingKeys";
+    break;
+  case ImplicitMemberAction::ResolveEncodable:
+    out << "resolve Encodable.encode(to:)";
+    break;
+  case ImplicitMemberAction::ResolveDecodable:
+    out << "resolve Decodable.init(from:)";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// TypeWitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<TypeWitnessAndDecl> TypeWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->TypeWitnesses.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->TypeWitnesses[requirement];
+}
+
+void TypeWitnessRequest::cacheResult(TypeWitnessAndDecl typeWitAndDecl) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// WitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Witness> ValueWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->Mapping.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->Mapping[requirement];
+}
+
+void ValueWitnessRequest::cacheResult(Witness type) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
 }

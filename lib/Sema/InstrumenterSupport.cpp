@@ -36,17 +36,13 @@ public:
     diags.addConsumer(*this);
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (Kind == swift::DiagnosticKind::Error) {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (Info.Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                           FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(llvm::errs(), Info.FormatString,
+                                           Info.FormatArgs);
     llvm::errs() << "\n";
   }
   bool hadError() { return error; }
@@ -120,9 +116,9 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   DiagnosticSuppression suppression(Ctx.Diags);
   ErrorGatherer errorGatherer(Ctx.Diags);
 
-  TypeChecker &TC = TypeChecker::createForContext(Ctx);
-
-  TC.typeCheckExpression(parsedExpr, DC);
+  auto *TC = Ctx.getLegacyGlobalTypeChecker();
+  assert(TC && "Must have type checker installed!");
+  TC->typeCheckExpression(parsedExpr, DC);
 
   if (parsedExpr) {
     ErrorFinder errorFinder;

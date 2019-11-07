@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -41,6 +42,7 @@ class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
 class ConstraintLocatorBuilder;
+enum class ConversionRestrictionKind;
 class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -196,10 +198,6 @@ enum class FixKind : uint8_t {
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
-  
-  /// Remove an unnecessary coercion ('as') if the types are already equal.
-  /// e.g. Double(1) as Double
-  RemoveUnnecessaryCoercion,
 
   /// Allow a single argument type mismatch. This is the most generic
   /// failure related to argument-to-parameter conversions.
@@ -215,6 +213,16 @@ enum class FixKind : uint8_t {
   /// If an array was passed to a variadic argument, give a specific diagnostic
   /// and offer to drop the brackets if it's a literal.
   ExpandArrayIntoVarargs,
+
+  /// Remove extraneous call to something which can't be invoked e.g.
+  /// a variable, a property etc.
+  RemoveCall,
+
+  AllowInvalidUseOfTrailingClosure,
+
+  /// Allow an ephemeral argument conversion for a parameter marked as being
+  /// non-ephemeral.
+  TreatEphemeralAsNonEphemeral,
 };
 
 class ConstraintFix {
@@ -233,6 +241,11 @@ public:
 
   virtual ~ConstraintFix();
 
+  template <typename Fix>
+  const Fix *getAs() const {
+    return Fix::classof(this) ? static_cast<const Fix *>(this) : nullptr;
+  }
+
   FixKind getKind() const { return Kind; }
 
   bool isWarning() const { return IsWarning; }
@@ -243,11 +256,13 @@ public:
   /// root expression and information from constraint system.
   virtual bool diagnose(Expr *root, bool asNote = false) const = 0;
 
+  virtual ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) {
+    return this;
+  }
+
   void print(llvm::raw_ostream &Out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const
-                              LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
@@ -1253,6 +1268,10 @@ class ExplicitlySpecifyGenericArguments final
   }
 
 public:
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ExplicitlySpecifyGenericArguments;
+  }
+
   std::string getName() const override {
     return "default missing generic arguments to `Any`";
   }
@@ -1262,6 +1281,8 @@ public:
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
+
+  ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) override;
 
   static ExplicitlySpecifyGenericArguments *
   create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
@@ -1342,24 +1363,6 @@ public:
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
-};
-
-class RemoveUnnecessaryCoercion : public ContextualMismatch {
-protected:
-  RemoveUnnecessaryCoercion(ConstraintSystem &cs, Type fromType, Type toType,
-                            ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::RemoveUnnecessaryCoercion, fromType,
-                           toType, locator, /*isWarning*/ true) {}
-
-public:
-  std::string getName() const override {
-    return "remove unnecessary explicit type coercion";
-  }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static bool attempt(ConstraintSystem &cs, Type fromType, Type toType,
-                      ConstraintLocatorBuilder locator);
 };
 
 class IgnoreAssignmentDestinationType final : public ContextualMismatch {
@@ -1489,6 +1492,62 @@ public:
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
                                       Type toType, ConstraintLocator *locator);
+};
+
+class RemoveInvalidCall final : public ConstraintFix {
+  RemoveInvalidCall(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveCall, locator) {}
+
+public:
+  std::string getName() const {
+    return "remove extraneous call from value of non-function type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const;
+
+  static RemoveInvalidCall *create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator);
+};
+
+class AllowInvalidUseOfTrailingClosure final : public AllowArgumentMismatch {
+  AllowInvalidUseOfTrailingClosure(ConstraintSystem &cs, Type argType,
+                                   Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::AllowInvalidUseOfTrailingClosure,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const {
+    return "allow invalid use of trailing closure";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const;
+
+  static AllowInvalidUseOfTrailingClosure *create(ConstraintSystem &cs,
+                                                  Type argType, Type paramType,
+                                                  ConstraintLocator *locator);
+};
+
+class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
+  ConversionRestrictionKind ConversionKind;
+
+  TreatEphemeralAsNonEphemeral(ConstraintSystem &cs, ConstraintLocator *locator,
+                               Type srcType, Type dstType,
+                               ConversionRestrictionKind conversionKind,
+                               bool downgradeToWarning)
+      : AllowArgumentMismatch(cs, FixKind::TreatEphemeralAsNonEphemeral,
+                              srcType, dstType, locator, downgradeToWarning),
+        ConversionKind(conversionKind) {}
+
+public:
+  ConversionRestrictionKind getConversionKind() const { return ConversionKind; }
+  std::string getName() const override;
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static TreatEphemeralAsNonEphemeral *
+  create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
+         Type dstType, ConversionRestrictionKind conversionKind,
+         bool downgradeToWarning);
 };
 
 } // end namespace constraints

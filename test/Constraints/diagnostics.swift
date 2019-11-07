@@ -86,7 +86,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}  expected-error{{variable 'j' is not bound by any pattern}}
+for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -146,7 +146,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>( // expected-note {{in call to function 'myMap'}}
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -159,7 +159,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{'myMap' is unavailable: call the 'map()' method on the sequence}}
+  myMap(0..<10, { x in // expected-error{{generic parameter 'T' could not be inferred}}
     ()
     return x
   })
@@ -169,7 +169,7 @@ func rdar20142523() {
 func rdar21080030() {
   var s = "Hello"
   // SR-7599: This should be `cannot_call_non_function_value`
-  if s.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
+  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}} {{13-15=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -303,7 +303,7 @@ _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
 func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
-  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}} // expected-warning {{redundant cast to '(Double, Double)' has no effect}} {{56-75=}}
+  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}}
 }
 
 // Diagnose passing an array in lieu of variadic parameters
@@ -506,14 +506,14 @@ let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argu
 
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
-let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
+let _: Color = .Unknown // expected-error {{member 'Unknown(description:)' expects argument of type 'String'}}
 let _: Color = .Unknown(42) // expected-error {{missing argument label 'description:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 
-let _ : Color = .rainbow  // expected-error {{member 'rainbow' is a function; did you mean to call it?}} {{25-25=()}}
+let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
@@ -530,8 +530,8 @@ let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in c
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .svar() // expected-error {{static property 'svar' is not a function}}
-someColor = .svar(1) // expected-error {{static property 'svar' is not a function}}
+someColor = .svar() // expected-error {{cannot call value of non-function type 'Color'}}
+someColor = .svar(1) // expected-error {{cannot call value of non-function type 'Color'}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int
@@ -552,7 +552,7 @@ protocol r22020088P {}
 func r22020088Foo<T>(_ t: T) {}
 
 func r22020088bar(_ p: r22020088P?) {
-  r22020088Foo(p.fdafs)  // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+  r22020088Foo(p.fdafs) // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
 }
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
@@ -700,11 +700,10 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
 struct Radar21692808<Element> {
-  init(count: Int, value: Element) {}
+  init(count: Int, value: Element) {} // expected-note {{'init(count:value:)' declared here}}
 }
 func radar21692808() -> Radar21692808<Int> {
-  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, @escaping () -> Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
+  return Radar21692808<Int>(count: 1) { // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
     return 1
   }
 }
@@ -1297,7 +1296,7 @@ func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
 
 struct Array {}
-let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Any>'}}
+let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Element>'}}
 
 struct Error {}
 let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
@@ -1318,16 +1317,16 @@ takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of ty
 func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
 takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int?]'}}
 func takesGenericDictionary<T, U>(_ x: [T : U]) {}  // expected-note {{in call to function 'takesGenericDictionary'}}
-takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Any]'}}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : U]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 // expected-error@-2 {{generic parameter 'U' could not be inferred}}
 typealias Z = Int
 func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {} // expected-note {{in call to function 'takesGenericDictionaryWithTypealias'}}
-takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Z]' (aka 'Dictionary<Any, Int>'}}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : Z]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesGenericFunction<T>(_ x: ([T]) -> Void) {} // expected-note {{in call to function 'takesGenericFunction'}}
-takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any]) -> Void'}}
+takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T]) -> Void'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
-takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any], [Any])'}}
+takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}

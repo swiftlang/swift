@@ -37,6 +37,7 @@ set(swift_runtime_sources
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
+    ErrorObjectCommon.cpp
     ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
     Errors.cpp

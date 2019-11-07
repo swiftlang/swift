@@ -18,6 +18,7 @@
 #define SWIFT_AST_PARAMETERLIST_H
 
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -131,7 +132,7 @@ public:
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   
   //  void print(raw_ostream &OS) const;

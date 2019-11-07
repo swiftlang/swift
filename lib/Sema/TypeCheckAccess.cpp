@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckAccess.h"
 #include "TypeAccessScopeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
@@ -73,7 +73,6 @@ using CheckTypeAccessCallback =
 
 class AccessControlCheckerBase {
 protected:
-  TypeChecker &TC;
   bool checkUsableFromInline;
 
   void checkTypeAccessImpl(
@@ -104,8 +103,8 @@ protected:
     });
   }
 
-  AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
-    : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
+  AccessControlCheckerBase(bool checkUsableFromInline)
+      : checkUsableFromInline(checkUsableFromInline) {}
 
 public:
   void checkGenericParamAccess(
@@ -193,7 +192,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
     const DeclContext *useDC, bool mayBeInferred,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-  if (TC.Context.isAccessControlDisabled())
+  auto &Context = useDC->getASTContext();
+  if (Context.isAccessControlDisabled())
     return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
@@ -244,7 +244,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // TypeRepr into account).
 
     if (typeRepr && mayBeInferred &&
-        !TC.getLangOpts().isSwiftVersionAtLeast(5) &&
+        !Context.LangOpts.isSwiftVersionAtLeast(5) &&
         !useDC->getParentModule()->isResilient()) {
       // Swift 4.2 and earlier didn't check the Type when a TypeRepr was
       // present. However, this is a major hole when generic parameters are
@@ -298,7 +298,7 @@ void AccessControlCheckerBase::checkTypeAccess(
 /// declaration if possible.
 ///
 /// Just flushes \p diag as is if \p complainRepr is null.
-static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
+static void highlightOffendingType(InFlightDiagnostic &diag,
                                    const TypeRepr *complainRepr) {
   if (!complainRepr) {
     diag.flush();
@@ -310,7 +310,7 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 
   if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
     const ValueDecl *VD = CITR->getBoundDecl();
-    TC.diagnose(VD, diag::kind_declared_here, DescriptiveDeclKind::Type);
+    VD->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
 
@@ -372,18 +372,18 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (isa<SubscriptDecl>(owner) || isa<TypeAliasDecl>(owner))
     downgradeToWarning = DowngradeToWarning::Yes;
 
+  auto &Context = owner->getASTContext();
   if (checkUsableFromInline) {
-    if (!TC.Context.isSwiftVersionAtLeast(5))
+    if (!Context.isSwiftVersionAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
 
     auto diagID = diag::generic_param_usable_from_inline;
     if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::generic_param_usable_from_inline_warn;
-    auto diag = TC.diagnose(owner,
-                            diagID,
-                            owner->getDescriptiveKind(),
-                            accessControlErrorKind == ACEK::Requirement);
-    highlightOffendingType(TC, diag, complainRepr);
+    auto diag =
+        Context.Diags.diagnose(owner, diagID, owner->getDescriptiveKind(),
+                               accessControlErrorKind == ACEK::Requirement);
+    highlightOffendingType(diag, complainRepr);
     return;
   }
 
@@ -395,12 +395,11 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   auto diagID = diag::generic_param_access;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::generic_param_access_warn;
-  auto diag = TC.diagnose(owner, diagID,
-                          owner->getDescriptiveKind(), isExplicit,
-                          contextAccess, minAccess,
-                          isa<FileUnit>(owner->getDeclContext()),
-                          accessControlErrorKind == ACEK::Requirement);
-  highlightOffendingType(TC, diag, complainRepr);
+  auto diag = Context.Diags.diagnose(
+      owner, diagID, owner->getDescriptiveKind(), isExplicit, contextAccess,
+      minAccess, isa<FileUnit>(owner->getDeclContext()),
+      accessControlErrorKind == ACEK::Requirement);
+  highlightOffendingType(diag, complainRepr);
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -416,8 +415,8 @@ namespace {
 class AccessControlChecker : public AccessControlCheckerBase,
                              public DeclVisitor<AccessControlChecker> {
 public:
-  explicit AccessControlChecker(TypeChecker &TC)
-    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/false) {}
+  AccessControlChecker()
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/false) {}
 
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
@@ -477,14 +476,11 @@ public:
       auto diagID = diag::pattern_type_access_inferred;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::pattern_type_access_inferred_warn;
-      auto diag = TC.diagnose(NP->getLoc(), diagID,
-                              theVar->isLet(),
-                              isTypeContext,
-                              isExplicit,
-                              theVarAccess,
+      auto &DE = theVar->getASTContext().Diags;
+      auto diag = DE.diagnose(NP->getLoc(), diagID, theVar->isLet(),
+                              isTypeContext, isExplicit, theVarAccess,
                               isa<FileUnit>(theVar->getDeclContext()),
-                              typeAccess,
-                              theVar->getInterfaceType());
+                              typeAccess, theVar->getInterfaceType());
     });
   }
 
@@ -511,14 +507,11 @@ public:
       auto anyVarAccess =
           isExplicit ? anyVar->getFormalAccess()
                      : typeAccessScope.requiredAccessForDiagnostics();
-      auto diag = TC.diagnose(TP->getLoc(), diagID,
-                              anyVar->isLet(),
-                              isTypeContext,
-                              isExplicit,
-                              anyVarAccess,
-                              isa<FileUnit>(anyVar->getDeclContext()),
-                              typeAccess);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto &DE = anyVar->getASTContext().Diags;
+      auto diag = DE.diagnose(
+          TP->getLoc(), diagID, anyVar->isLet(), isTypeContext, isExplicit,
+          anyVarAccess, isa<FileUnit>(anyVar->getDeclContext()), typeAccess);
+      highlightOffendingType(diag, complainRepr);
     });
 
     // Check the property wrapper types.
@@ -542,7 +535,7 @@ public:
                                      anyVarAccess,
                                      isa<FileUnit>(anyVar->getDeclContext()),
                                      typeAccess);
-        highlightOffendingType(TC, diag, complainRepr);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -587,10 +580,9 @@ public:
       auto aliasAccess = isExplicit
         ? TAD->getFormalAccess()
         : typeAccessScope.requiredAccessForDiagnostics();
-      auto diag = TC.diagnose(TAD, diagID,
-                              isExplicit, aliasAccess,
-                              typeAccess, isa<FileUnit>(TAD->getDeclContext()));
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = TAD->diagnose(diagID, isExplicit, aliasAccess, typeAccess,
+                                isa<FileUnit>(TAD->getDeclContext()));
+      highlightOffendingType(diag, complainRepr);
     });
   }
 
@@ -658,7 +650,7 @@ public:
 
         // Swift versions before 5.0 did not check requirements on the
         // protocol's where clause, so emit a warning.
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
           downgradeToWarning = DowngradeToWarning::Yes;
       }
     });
@@ -668,10 +660,9 @@ public:
       auto diagID = diag::associated_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::associated_type_access_warn;
-      auto diag = TC.diagnose(assocType, diagID,
-                              assocType->getFormalAccess(),
-                              minAccess, accessControlErrorKind);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = assocType->diagnose(diagID, assocType->getFormalAccess(),
+                                      minAccess, accessControlErrorKind);
+      highlightOffendingType(diag, complainRepr);
     }
   }
 
@@ -702,10 +693,9 @@ public:
         auto enumDeclAccess = isExplicit
           ? ED->getFormalAccess()
           : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = TC.diagnose(ED, diagID, isExplicit,
-                                enumDeclAccess, typeAccess,
-                                isa<FileUnit>(ED->getDeclContext()));
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = ED->diagnose(diagID, isExplicit, enumDeclAccess, typeAccess,
+                                 isa<FileUnit>(ED->getDeclContext()));
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -739,7 +729,7 @@ public:
 
       auto outerDowngradeToWarning = DowngradeToWarning::No;
       if (superclassDecl->isGenericContext() &&
-          !TC.getLangOpts().isSwiftVersionAtLeast(5)) {
+          !CD->getASTContext().isSwiftVersionAtLeast(5)) {
         // Swift 4 failed to properly check this if the superclass was generic,
         // because the above loop was too strict.
         outerDowngradeToWarning = DowngradeToWarning::Yes;
@@ -760,11 +750,11 @@ public:
           ? CD->getFormalAccess()
           : typeAccessScope.requiredAccessForDiagnostics();
 
-        auto diag = TC.diagnose(CD, diagID, isExplicit, classDeclAccess,
-                                typeAccess,
-                                isa<FileUnit>(CD->getDeclContext()),
-                                superclassLocIter->getTypeRepr() != complainRepr);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag =
+            CD->diagnose(diagID, isExplicit, classDeclAccess, typeAccess,
+                         isa<FileUnit>(CD->getDeclContext()),
+                         superclassLocIter->getTypeRepr() != complainRepr);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -834,7 +824,7 @@ public:
               declKind = declKindForType(type);
               // Swift versions before 5.0 did not check requirements on the
               // protocol's where clause, so emit a warning.
-              if (!TC.Context.isSwiftVersionAtLeast(5))
+              if (!proto->getASTContext().isSwiftVersionAtLeast(5))
                 downgradeToWarning = DowngradeToWarning::Yes;
             }
           });
@@ -849,10 +839,10 @@ public:
       auto diagID = diag::protocol_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::protocol_access_warn;
-      auto diag = TC.diagnose(proto, diagID, isExplicit, protoAccess,
-                              protocolControlErrorKind, minAccess,
-                              isa<FileUnit>(proto->getDeclContext()), declKind);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = proto->diagnose(
+          diagID, isExplicit, protoAccess, protocolControlErrorKind, minAccess,
+          isa<FileUnit>(proto->getDeclContext()), declKind);
+      highlightOffendingType(diag, complainRepr);
     }
   }
 
@@ -904,12 +894,9 @@ public:
       auto subscriptDeclAccess = isExplicit
         ? SD->getFormalAccess()
         : minAccessScope.requiredAccessForDiagnostics();
-      auto diag = TC.diagnose(SD, diagID,
-                              isExplicit,
-                              subscriptDeclAccess,
-                              minAccess,
-                              problemIsElement);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = SD->diagnose(diagID, isExplicit, subscriptDeclAccess,
+                               minAccess, problemIsElement);
+      highlightOffendingType(diag, complainRepr);
     }
   }
 
@@ -975,14 +962,10 @@ public:
       auto fnAccess = isExplicit
         ? fn->getFormalAccess()
         : minAccessScope.requiredAccessForDiagnostics();
-      auto diag = TC.diagnose(fn, diagID,
-                              isExplicit,
-                              fnAccess,
-                              isa<FileUnit>(fn->getDeclContext()),
-                              minAccess,
-                              functionKind,
-                              problemIsResult);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
+                               isa<FileUnit>(fn->getDeclContext()), minAccess,
+                               functionKind, problemIsResult);
+      highlightOffendingType(diag, complainRepr);
     }
   }
 
@@ -999,8 +982,8 @@ public:
             if (downgradeToWarning == DowngradeToWarning::Yes)
               diagID = diag::enum_case_access_warn;
             auto diag =
-                TC.diagnose(EED, diagID, EED->getFormalAccess(), typeAccess);
-            highlightOffendingType(TC, diag, complainRepr);
+                EED->diagnose(diagID, EED->getFormalAccess(), typeAccess);
+            highlightOffendingType(diag, complainRepr);
           });
     }
   }
@@ -1009,8 +992,8 @@ public:
 class UsableFromInlineChecker : public AccessControlCheckerBase,
                                 public DeclVisitor<UsableFromInlineChecker> {
 public:
-  explicit UsableFromInlineChecker(TypeChecker &TC)
-    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/true) {}
+  UsableFromInlineChecker()
+      : AccessControlCheckerBase(/*checkUsableFromInline=*/true) {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
     if (VD->getFormalAccess() != AccessLevel::Internal)
@@ -1019,7 +1002,7 @@ public:
   };
 
   void visit(Decl *D) {
-    if (!TC.Context.isSwiftVersionAtLeast(4, 2))
+    if (!D->getASTContext().isSwiftVersionAtLeast(4, 2))
       return;
 
     if (D->isInvalid() || D->isImplicit())
@@ -1093,23 +1076,22 @@ public:
     if (seenVars.count(theVar) || theVar->isInvalid())
       return;
 
-    checkTypeAccess(theVar->getInterfaceType(), nullptr,
-                    fixedLayoutStructContext ? fixedLayoutStructContext
-                                             : theVar,
-                    /*mayBeInferred*/false,
-                    [&](AccessScope typeAccessScope,
-                        const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
-      if (fixedLayoutStructContext) {
-        diagID =
-            diag::pattern_type_not_usable_from_inline_inferred_frozen;
-      } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
-        diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
-      }
-      TC.diagnose(NP->getLoc(), diagID, theVar->isLet(), isTypeContext,
-                  theVar->getInterfaceType());
-    });
+    checkTypeAccess(
+        theVar->getInterfaceType(), nullptr,
+        fixedLayoutStructContext ? fixedLayoutStructContext : theVar,
+        /*mayBeInferred*/ false,
+        [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+            DowngradeToWarning downgradeToWarning) {
+          auto &Ctx = theVar->getASTContext();
+          auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
+          if (fixedLayoutStructContext) {
+            diagID = diag::pattern_type_not_usable_from_inline_inferred_frozen;
+          } else if (!Ctx.isSwiftVersionAtLeast(5)) {
+            diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
+          }
+          Ctx.Diags.diagnose(NP->getLoc(), diagID, theVar->isLet(),
+                             isTypeContext, theVar->getInterfaceType());
+        });
   }
 
   /// \see visitPatternBindingDecl
@@ -1130,22 +1112,22 @@ public:
     if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
       return;
 
-    checkTypeAccess(TP->getTypeLoc(),
-                    fixedLayoutStructContext ? fixedLayoutStructContext
-                                             : anyVar,
-                    /*mayBeInferred*/true,
-                    [&](AccessScope typeAccessScope,
-                        const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto diagID = diag::pattern_type_not_usable_from_inline;
-      if (fixedLayoutStructContext)
-        diagID = diag::pattern_type_not_usable_from_inline_frozen;
-      else if (!TC.Context.isSwiftVersionAtLeast(5))
-        diagID = diag::pattern_type_not_usable_from_inline_warn;
-      auto diag = TC.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
-                              isTypeContext);
-      highlightOffendingType(TC, diag, complainRepr);
-    });
+    checkTypeAccess(
+        TP->getTypeLoc(),
+        fixedLayoutStructContext ? fixedLayoutStructContext : anyVar,
+        /*mayBeInferred*/ true,
+        [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+            DowngradeToWarning downgradeToWarning) {
+          auto &Ctx = anyVar->getASTContext();
+          auto diagID = diag::pattern_type_not_usable_from_inline;
+          if (fixedLayoutStructContext)
+            diagID = diag::pattern_type_not_usable_from_inline_frozen;
+          else if (!Ctx.isSwiftVersionAtLeast(5))
+            diagID = diag::pattern_type_not_usable_from_inline_warn;
+          auto diag = Ctx.Diags.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
+                                         isTypeContext);
+          highlightOffendingType(diag, complainRepr);
+        });
 
     for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(),
@@ -1158,7 +1140,7 @@ public:
         auto diag = anyVar->diagnose(
             diag::property_wrapper_type_not_usable_from_inline,
             anyVar->isLet(), isTypeContext);
-        highlightOffendingType(TC, diag, complainRepr);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -1201,10 +1183,10 @@ public:
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
       auto diagID = diag::type_alias_underlying_type_not_usable_from_inline;
-      if (!TC.Context.isSwiftVersionAtLeast(5))
+      if (!TAD->getASTContext().isSwiftVersionAtLeast(5))
         diagID = diag::type_alias_underlying_type_not_usable_from_inline_warn;
-      auto diag = TC.diagnose(TAD, diagID);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = TAD->diagnose(diagID);
+      highlightOffendingType(diag, complainRepr);
     });
   }
 
@@ -1223,10 +1205,10 @@ public:
             const TypeRepr *complainRepr,
             DowngradeToWarning downgradeDiag) {
         auto diagID = diag::associated_type_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
-        auto diag = TC.diagnose(assocType, diagID, ACEK_Requirement);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = assocType->diagnose(diagID, ACEK_Requirement);
+        highlightOffendingType(diag, complainRepr);
       });
     });
     checkTypeAccess(assocType->getDefaultDefinitionType(),
@@ -1236,10 +1218,10 @@ public:
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
       auto diagID = diag::associated_type_not_usable_from_inline;
-      if (!TC.Context.isSwiftVersionAtLeast(5))
+      if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
         diagID = diag::associated_type_not_usable_from_inline_warn;
-      auto diag = TC.diagnose(assocType, diagID, ACEK_DefaultDefinition);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = assocType->diagnose(diagID, ACEK_DefaultDefinition);
+      highlightOffendingType(diag, complainRepr);
     });
 
     if (assocType->getTrailingWhereClause()) {
@@ -1252,10 +1234,10 @@ public:
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeDiag) {
         auto diagID = diag::associated_type_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
-        auto diag = TC.diagnose(assocType, diagID, ACEK_Requirement);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = assocType->diagnose(diagID, ACEK_Requirement);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -1280,10 +1262,10 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto diagID = diag::enum_raw_type_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!ED->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::enum_raw_type_not_usable_from_inline_warn;
-        auto diag = TC.diagnose(ED, diagID);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = ED->diagnose(diagID);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -1322,11 +1304,11 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto diagID = diag::class_super_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!CD->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::class_super_not_usable_from_inline_warn;
-        auto diag = TC.diagnose(CD, diagID,
-                                superclassLocIter->getTypeRepr() != complainRepr);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = CD->diagnose(diagID, superclassLocIter->getTypeRepr() !=
+                                             complainRepr);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -1346,10 +1328,10 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
         auto diagID = diag::protocol_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!proto->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::protocol_usable_from_inline_warn;
-        auto diag = TC.diagnose(proto, diagID, PCEK_Refine);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = proto->diagnose(diagID, PCEK_Refine);
+        highlightOffendingType(diag, complainRepr);
       });
     });
 
@@ -1363,10 +1345,10 @@ public:
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeDiag) {
         auto diagID = diag::protocol_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!proto->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::protocol_usable_from_inline_warn;
-        auto diag = TC.diagnose(proto, diagID, PCEK_Requirement);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = proto->diagnose(diagID, PCEK_Requirement);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -1380,11 +1362,10 @@ public:
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeDiag) {
             auto diagID = diag::subscript_type_usable_from_inline;
-            if (!TC.Context.isSwiftVersionAtLeast(5))
+            if (!SD->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::subscript_type_usable_from_inline_warn;
-            auto diag = TC.diagnose(SD, diagID,
-                                    /*problemIsElement=*/false);
-            highlightOffendingType(TC, diag, complainRepr);
+            auto diag = SD->diagnose(diagID, /*problemIsElement=*/false);
+            highlightOffendingType(diag, complainRepr);
           });
     }
 
@@ -1393,11 +1374,10 @@ public:
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
       auto diagID = diag::subscript_type_usable_from_inline;
-      if (!TC.Context.isSwiftVersionAtLeast(5))
+      if (!SD->getASTContext().isSwiftVersionAtLeast(5))
         diagID = diag::subscript_type_usable_from_inline_warn;
-      auto diag = TC.diagnose(SD, diagID,
-                              /*problemIsElement=*/true);
-      highlightOffendingType(TC, diag, complainRepr);
+      auto diag = SD->diagnose(diagID, /*problemIsElement=*/true);
+      highlightOffendingType(diag, complainRepr);
     });
   }
 
@@ -1423,11 +1403,11 @@ public:
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeDiag) {
             auto diagID = diag::function_type_usable_from_inline;
-            if (!TC.Context.isSwiftVersionAtLeast(5))
+            if (!fn->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::function_type_usable_from_inline_warn;
-            auto diag = TC.diagnose(fn, diagID, functionKind,
-                                    /*problemIsResult=*/false);
-            highlightOffendingType(TC, diag, complainRepr);
+            auto diag = fn->diagnose(diagID, functionKind,
+                                     /*problemIsResult=*/false);
+            highlightOffendingType(diag, complainRepr);
           });
     }
 
@@ -1437,11 +1417,11 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
         auto diagID = diag::function_type_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (!fn->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::function_type_usable_from_inline_warn;
-        auto diag = TC.diagnose(fn, diagID, functionKind,
-                                /*problemIsResult=*/true);
-        highlightOffendingType(TC, diag, complainRepr);
+        auto diag = fn->diagnose(diagID, functionKind,
+                                 /*problemIsResult=*/true);
+        highlightOffendingType(diag, complainRepr);
       });
     }
   }
@@ -1455,10 +1435,10 @@ public:
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
               DowngradeToWarning downgradeToWarning) {
             auto diagID = diag::enum_case_usable_from_inline;
-            if (!TC.Context.isSwiftVersionAtLeast(5))
+            if (!EED->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::enum_case_usable_from_inline_warn;
-            auto diag = TC.diagnose(EED, diagID);
-            highlightOffendingType(TC, diag, complainRepr);
+            auto diag = EED->diagnose(diagID);
+            highlightOffendingType(diag, complainRepr);
           });
     }
   }
@@ -1469,8 +1449,6 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       llvm::function_ref<void(const TypeDecl *, const TypeRepr *)>;
   using CheckExportabilityConformanceCallback =
       llvm::function_ref<void(const ProtocolConformance *)>;
-
-  TypeChecker &TC;
 
   void checkTypeImpl(
       Type type, const TypeRepr *typeRepr, const SourceFile &SF,
@@ -1620,26 +1598,24 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
   };
 
   class DiagnoseGenerically {
-    TypeChecker &TC;
     const Decl *D;
     Reason reason;
   public:
-    DiagnoseGenerically(TypeChecker &TC, const Decl *D, Reason reason)
-        : TC(TC), D(D), reason(reason) {}
+    DiagnoseGenerically(const Decl *D, Reason reason) : D(D), reason(reason) {}
 
     void operator()(const TypeDecl *offendingType,
                     const TypeRepr *complainRepr) {
       ModuleDecl *M = offendingType->getModuleContext();
-      auto diag = TC.diagnose(D, diag::decl_from_implementation_only_module,
+      auto diag = D->diagnose(diag::decl_from_implementation_only_module,
                               offendingType->getDescriptiveKind(),
                               offendingType->getFullName(),
                               static_cast<unsigned>(reason), M->getName());
-      highlightOffendingType(TC, diag, complainRepr);
+      highlightOffendingType(diag, complainRepr);
     }
 
     void operator()(const ProtocolConformance *offendingConformance) {
       ModuleDecl *M = offendingConformance->getDeclContext()->getParentModule();
-      TC.diagnose(D, diag::conformance_from_implementation_only_module,
+      D->diagnose(diag::conformance_from_implementation_only_module,
                   offendingConformance->getType(),
                   offendingConformance->getProtocol()->getFullName(),
                   static_cast<unsigned>(reason), M->getName());
@@ -1657,11 +1633,11 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
 
   DiagnoseGenerically getDiagnoseCallback(const Decl *D,
                                           Reason reason = Reason::General) {
-    return DiagnoseGenerically(TC, D, reason);
+    return DiagnoseGenerically(D, reason);
   }
 
 public:
-  explicit ExportabilityChecker(TypeChecker &TC) : TC(TC) {}
+  ExportabilityChecker() {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
     if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
@@ -1706,20 +1682,20 @@ public:
 
     ModuleDecl *M = overridden->getModuleContext();
     if (SF->isImportedImplementationOnly(M)) {
-      TC.diagnose(VD, diag::implementation_only_override_import_without_attr,
-                  overridden->getDescriptiveKind())
-        .fixItInsert(VD->getAttributeInsertionLoc(false),
-                     "@_implementationOnly ");
-      TC.diagnose(overridden, diag::overridden_here);
+      VD->diagnose(diag::implementation_only_override_import_without_attr,
+                   overridden->getDescriptiveKind())
+          .fixItInsert(VD->getAttributeInsertionLoc(false),
+                       "@_implementationOnly ");
+      overridden->diagnose(diag::overridden_here);
       return;
     }
 
     if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
-      TC.diagnose(VD, diag::implementation_only_override_without_attr,
-                  overridden->getDescriptiveKind())
-        .fixItInsert(VD->getAttributeInsertionLoc(false),
-                     "@_implementationOnly ");
-      TC.diagnose(overridden, diag::overridden_here);
+      VD->diagnose(diag::implementation_only_override_without_attr,
+                   overridden->getDescriptiveKind())
+          .fixItInsert(VD->getAttributeInsertionLoc(false),
+                       "@_implementationOnly ");
+      overridden->diagnose(diag::overridden_here);
       return;
     }
 
@@ -1970,14 +1946,15 @@ public:
     if (!SF->isImportedImplementationOnly(M))
       return;
 
-    auto diag = TC.diagnose(diagLoc, diag::decl_from_implementation_only_module,
-                            PGD->getDescriptiveKind(), PGD->getName(),
-                            static_cast<unsigned>(Reason::General),
-                            M->getName());
+    auto &DE = PGD->getASTContext().Diags;
+    auto diag =
+        DE.diagnose(diagLoc, diag::decl_from_implementation_only_module,
+                    PGD->getDescriptiveKind(), PGD->getName(),
+                    static_cast<unsigned>(Reason::General), M->getName());
     if (refRange.isValid())
       diag.highlight(refRange);
     diag.flush();
-    TC.diagnose(PGD, diag::decl_declared_here, PGD->getName());
+    PGD->diagnose(diag::decl_declared_here, PGD->getName());
   }
 
   void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
@@ -2006,8 +1983,7 @@ public:
 };
 } // end anonymous namespace
 
-static void checkExtensionGenericParamAccess(TypeChecker &TC,
-                                             const ExtensionDecl *ED) {
+static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
   auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>();
   if (!AA)
     return;
@@ -2034,18 +2010,17 @@ static void checkExtensionGenericParamAccess(TypeChecker &TC,
     break;
   }
 
-  AccessControlChecker(TC).checkGenericParamAccess(ED->getGenericParams(), ED,
-                                                   desiredAccessScope,
-                                                   userSpecifiedAccess);
+  AccessControlChecker().checkGenericParamAccess(
+      ED->getGenericParams(), ED, desiredAccessScope, userSpecifiedAccess);
 }
 
-void swift::checkAccessControl(TypeChecker &TC, Decl *D) {
+void swift::checkAccessControl(Decl *D) {
   if (isa<ValueDecl>(D) || isa<PatternBindingDecl>(D)) {
-    AccessControlChecker(TC).visit(D);
-    UsableFromInlineChecker(TC).visit(D);
+    AccessControlChecker().visit(D);
+    UsableFromInlineChecker().visit(D);
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    checkExtensionGenericParamAccess(TC, ED);
+    checkExtensionGenericParamAccess(ED);
   }
 
-  ExportabilityChecker(TC).visit(D);
+  ExportabilityChecker().visit(D);
 }
