@@ -87,7 +87,7 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
 @differentiating(sqrt)
 func _vjpSqrt<T: FloatingPoint & Differentiable> (
   _ x: T
-) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
   let value = x.squareRoot()
   return (value, { v in v / (2 * value) })
 }
@@ -124,7 +124,7 @@ func _vjpFmod<T: FloatingPoint & Differentiable> (
 @differentiating(ceil)
 func _vjpCeil<T: FloatingPoint & Differentiable> (
   _ x: T
-) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
   return (ceil(x), { v in 0 })
 }
 
@@ -132,7 +132,7 @@ func _vjpCeil<T: FloatingPoint & Differentiable> (
 @differentiating(floor)
 func _vjpFloor<T: FloatingPoint & Differentiable> (
   _ x: T
-) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
   return (floor(x), { v in 0 })
 }
 
@@ -140,7 +140,7 @@ func _vjpFloor<T: FloatingPoint & Differentiable> (
 @differentiating(round)
 func _vjpRound<T: FloatingPoint & Differentiable> (
   _ x: T
-) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
   return (round(x), { v in 0 })
 }
 
@@ -148,7 +148,7 @@ func _vjpRound<T: FloatingPoint & Differentiable> (
 @differentiating(trunc)
 func _vjpTrunc<T: FloatingPoint & Differentiable> (
   _ x: T
-) -> (value: T, differential: (T) -> T) where T == T.TangentVector {
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
   return (trunc(x), { v in 0 })
 }
 // SWIFT_ENABLE_TENSORFLOW END
