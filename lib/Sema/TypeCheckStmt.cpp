@@ -75,7 +75,36 @@ static bool isPropertyWrapperBackingInitContext(DeclContext *dc) {
 #endif
 
 namespace {
-  class ContextualizeClosures : public ASTWalker {
+static bool requiresContextReset(ClosureExpr *CE, DeclContext *ParentDC) {
+  auto *CEParent = CE->getParent();
+  if (CEParent == ParentDC) {
+    return false;
+  }
+
+  if ((CEParent->getContextKind() == ParentDC->getContextKind()) &&
+      ParentDC->getContextKind() == DeclContextKind::TopLevelCodeDecl) {
+    return false;
+  }
+
+  // Don't fight RecontextualizeClosures for lazy variables.  Closures parents
+  // will point to the getter, not the pattern binding.
+  if (auto PBI = dyn_cast<PatternBindingInitializer>(ParentDC)) {
+    if (PBI->getInitializedLazyVar() &&
+        PBI->getParent() == CEParent->getParent()) {
+      return false;
+    }
+  }
+
+  // If a closure is nested within an auto closure, we'll need to update
+  // its parent to the auto closure parent.
+  assert((ParentDC->getContextKind() ==
+          DeclContextKind::AbstractClosureExpr ||
+          isPropertyWrapperBackingInitContext(ParentDC)) &&
+         "Incorrect parent decl context for closure");
+  return true;
+}
+
+class ContextualizeClosures : public ASTWalker {
     DeclContext *ParentDC;
   public:
     unsigned NextDiscriminator = 0;
@@ -128,18 +157,8 @@ namespace {
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         // In the repl, the parent top-level context may have been re-written.
-        if (CE->getParent() != ParentDC) {
-          if ((CE->getParent()->getContextKind() !=
-                    ParentDC->getContextKind()) ||
-              ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
-            // If a closure is nested within an auto closure, we'll need to update
-            // its parent to the auto closure parent.
-            assert((ParentDC->getContextKind() ==
-                      DeclContextKind::AbstractClosureExpr ||
-                    isPropertyWrapperBackingInitContext(ParentDC)) &&
-                   "Incorrect parent decl context for closure");
-            CE->setParent(ParentDC);
-          }
+        if (requiresContextReset(CE, ParentDC)) {
+          CE->setParent(ParentDC);
         }
 
         // If the closure has a single expression body, we need to walk into it

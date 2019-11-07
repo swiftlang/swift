@@ -499,31 +499,31 @@ struct SR_10084_S {
 }
 
 enum SR_10084_E {
-  case foo(SR_10084_S) // expected-note {{'foo' previously declared here}}
+  case foo(SR_10084_S) // expected-note {{'foo' previously declared here}} expected-note 3 {{found this candidate}}
     
   static func foo(_ name: String) -> SR_10084_E { // Okay
-    return .foo(SR_10084_S(name: name))
+    return .foo(SR_10084_S(name: name)) // expected-error {{ambiguous use of 'foo'}}
   }
 
   func foo(_ name: Bool) -> SR_10084_E { // Okay
-    return .foo(SR_10084_S(name: "Test"))
+    return .foo(SR_10084_S(name: "Test")) // expected-error {{ambiguous use of 'foo'}}
   }
 
-  static func foo(_ value: SR_10084_S) -> SR_10084_E { // expected-error {{invalid redeclaration of 'foo'}}
-    return .foo(value)
+  static func foo(_ value: SR_10084_S) -> SR_10084_E { // expected-error {{invalid redeclaration of 'foo'}} expected-note 3 {{found this candidate}}
+    return .foo(value) // expected-error {{ambiguous use of 'foo'}}
   }
 }
 
 enum SR_10084_E_1 {
   static func foo(_ name: String) -> SR_10084_E_1 { // Okay
-    return .foo(SR_10084_S(name: name))
+    return .foo(SR_10084_S(name: name))  // expected-error {{ambiguous use of 'foo'}}
   }
 
-  static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}}
-    return .foo(value)
+  static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}} expected-note 2 {{found this candidate}}
+    return .foo(value)  // expected-error {{ambiguous use of 'foo'}}
   }
 
-  case foo(SR_10084_S) // expected-error {{invalid redeclaration of 'foo'}}
+  case foo(SR_10084_S) // expected-error {{invalid redeclaration of 'foo'}} expected-note 2 {{found this candidate}}
 }
 
 enum SR_10084_E_2 {
