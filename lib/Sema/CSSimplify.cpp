@@ -930,12 +930,19 @@ public:
     }
 
     auto *anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor || Arguments.size() != newLabels.size())
+    if (!anchor)
       return true;
 
     unsigned numExtraneous = 0;
     unsigned numRenames = 0;
+    unsigned numOutOfOrder = 0;
+
     for (unsigned i : indices(newLabels)) {
+      // It's already known how many arguments are missing,
+      // it would be accounted for in the impact.
+      if (i >= Arguments.size())
+        continue;
+
       auto argLabel = Arguments[i].getLabel();
       auto paramLabel = newLabels[i];
 
@@ -943,10 +950,16 @@ public:
         continue;
 
       if (!argLabel.empty()) {
-        if (paramLabel.empty())
+        // Instead of this being a label mismatch which requires
+        // re-labeling, this could be an out-of-order argument
+        // instead which has a completely different impact.
+        if (llvm::count(newLabels, argLabel) == 1) {
+          ++numOutOfOrder;
+        } else if (paramLabel.empty()) {
           ++numExtraneous;
-        else
+        } else {
           ++numRenames;
+        }
       }
     }
 
@@ -955,8 +968,12 @@ public:
     // Re-labeling fixes with extraneous/incorrect labels should be
     // lower priority vs. other fixes on same/different overload(s)
     // where labels did line up correctly.
-    CS.recordFix(fix, /*impact=*/1 + numExtraneous * 2 + numRenames * 3);
-    return false;
+    //
+    // If there are not only labeling problems but also some of the
+    // arguments are missing, let's account of that in the impact.
+    auto impact = 1 + numOutOfOrder + numExtraneous * 2 + numRenames * 3 +
+                  NumSynthesizedArgs * 2;
+    return CS.recordFix(fix, impact);
   }
 
   bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
