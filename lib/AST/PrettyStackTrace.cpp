@@ -267,12 +267,12 @@ void PrettyStackTraceSelector::print(llvm::raw_ostream &out) const {
 void PrettyStackTraceDifferentiabilityWitness::print(
     llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
-  printDifferentiabilityWitnessDescription(out, Key, Context);
+  printDifferentiabilityWitnessDescription(out, Key);
 }
 
 void swift::printDifferentiabilityWitnessDescription(
     llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
-    ASTContext &Context, bool addNewline) {
+    bool addNewline) {
   out << key.first << " ";
   key.second.print(out);
   if (addNewline)

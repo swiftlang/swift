@@ -2170,7 +2170,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 void IRGenModule::emitSILDifferentiabilityWitness(
     SILDifferentiabilityWitness *dw) {
   PrettyStackTraceDifferentiabilityWitness _st(
-      Context, "emitting differentiability witness for", dw->getKey());
+      "emitting differentiability witness for", dw->getKey());
 
   // Don't emit declarations.
   if (dw->isDeclaration())

@@ -192,21 +192,19 @@ public:
 /// specific differentiability witness.
 class PrettyStackTraceDifferentiabilityWitness
     : public llvm::PrettyStackTraceEntry {
-  ASTContext &Context;
   const SILDifferentiabilityWitnessKey Key;
   const char *Action;
 
 public:
   PrettyStackTraceDifferentiabilityWitness(
-      ASTContext &C, const char *action,
-      const SILDifferentiabilityWitnessKey key)
-      : Context(C), Key(key), Action(action) {}
+      const char *action, const SILDifferentiabilityWitnessKey key)
+      : Key(key), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
 void printDifferentiabilityWitnessDescription(
     llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
-    ASTContext &Context, bool addNewline = true);
+    bool addNewline = true);
 // SWIFT_ENABLE_TENSORFLOW END
 
 } // end namespace swift
