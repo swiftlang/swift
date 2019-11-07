@@ -2817,7 +2817,8 @@ public:
     checkExplicitAvailability(ED);
 
     TypeChecker::checkDeclCircularity(ED);
-    TC.ConformanceContexts.push_back(ED);
+
+    TypeChecker::checkConformancesInContext(ED, ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -2844,7 +2845,8 @@ public:
     checkExplicitAvailability(SD);
 
     TypeChecker::checkDeclCircularity(SD);
-    TC.ConformanceContexts.push_back(SD);
+
+    TypeChecker::checkConformancesInContext(SD, SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -3090,7 +3092,10 @@ public:
     checkExplicitAvailability(CD);
 
     TypeChecker::checkDeclCircularity(CD);
-    TC.ConformanceContexts.push_back(CD);
+
+    TypeChecker::checkConformancesInContext(CD, CD);
+
+    TypeChecker::maybeDiagnoseClassWithoutInitializers(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -3436,7 +3441,7 @@ public:
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
-    TC.ConformanceContexts.push_back(ED);
+    TypeChecker::checkConformancesInContext(ED, ED);
 
     TypeChecker::checkDeclAttributes(ED);
     checkAccessControl(ED);
