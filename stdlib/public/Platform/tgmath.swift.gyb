@@ -88,7 +88,7 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
 func _vjpSqrt<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
-  let value = x.squareRoot()
+  let value = sqrt(x)
   return (value, { v in v / (2 * value) })
 }
 
