@@ -447,17 +447,13 @@ public:
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
-  /// Retrieve the declaration of ObjectiveC.ObjCBool.
-  StructDecl *getObjCBoolDecl() const;
-
-  /// Retrieve the declaration of Foundation.NSCopying.
-  ProtocolDecl *getNSCopyingDecl() const;
-  /// Retrieve the declaration of Foundation.NSError.
-  ClassDecl *getNSErrorDecl() const;
-  /// Retrieve the declaration of Foundation.NSNumber.
-  ClassDecl *getNSNumberDecl() const;
-  /// Retrieve the declaration of Foundation.NSValue.
-  ClassDecl *getNSValueDecl() const;
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS) \
+  /** Retrieve the declaration of MODULE.NAME. */ \
+  DECL_CLASS *get##NAME##Decl() const; \
+\
+  /** Retrieve the type of MODULE.NAME. */ \
+  Type get##NAME##Type() const;
+#include "swift/AST/KnownObjCTypes.def"
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \

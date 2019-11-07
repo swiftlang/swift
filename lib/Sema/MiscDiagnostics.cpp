@@ -3474,7 +3474,7 @@ public:
 
 static void diagDeprecatedObjCSelectors(TypeChecker &tc, const DeclContext *dc,
                                         const Expr *expr) {
-  auto selectorTy = tc.getObjCSelectorType(const_cast<DeclContext *>(dc));
+  auto selectorTy = dc->getASTContext().getSelectorType();
   if (!selectorTy) return;
 
   const_cast<Expr *>(expr)->walk(ObjCSelectorWalker(tc, dc, selectorTy));

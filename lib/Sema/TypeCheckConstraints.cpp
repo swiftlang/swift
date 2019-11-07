@@ -1994,7 +1994,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
-  if (auto selectorTy = TC.getObjCSelectorType(DC)) {
+  if (auto selectorTy = TC.Context.getSelectorType()) {
     if (type->isEqual(selectorTy))
       return nullptr;
   }
@@ -4407,7 +4407,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
   // so casts from NSObject to potentially-class metatypes may succeed.
-  if (auto nsObject = getNSObjectType(dc)) {
+  if (auto nsObject = Context.getNSObjectType()) {
     if (fromType->isEqual(nsObject)) {
       if (auto toMeta = toType->getAs<MetatypeType>()) {
         if (toMeta->getInstanceType()->mayHaveSuperclass()
