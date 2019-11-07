@@ -534,12 +534,9 @@ enum class CheckedCastContextKind {
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final {
 public:
-  /// The list of function definitions we've encountered.
-  std::vector<AbstractFunctionDecl *> definedFunctions;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
-  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
+  std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
 
 private:
   ASTContext &Context;

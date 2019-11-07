@@ -293,31 +293,11 @@ static void bindExtensions(SourceFile &SF) {
 }
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
-  unsigned currentFunctionIdx = 0;
-  do {
-    // Type check the body of each of the function in turn.  Note that outside
-    // functions must be visited before nested functions for type-checking to
-    // work correctly.
-    for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
-         ++currentFunctionIdx) {
-      auto *AFD = TC.definedFunctions[currentFunctionIdx];
-      assert(!AFD->getDeclContext()->isLocalContext());
-
-      TypeChecker::typeCheckAbstractFunctionBody(AFD);
-    }
-  } while (currentFunctionIdx < TC.definedFunctions.size());
-
   // Compute captures for functions and closures we visited.
-  for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
+  for (auto closure : llvm::reverse(TC.ClosuresWithUncomputedCaptures)) {
     TypeChecker::computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
-
-  for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
-    TypeChecker::computeCaptures(FD);
-  }
-
-  TC.definedFunctions.clear();
 }
 
 void swift::typeCheckExternalDefinitions(SourceFile &SF) {

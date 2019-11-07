@@ -3237,8 +3237,9 @@ public:
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
-      // Record the body.
-      TC.definedFunctions.push_back(FD);
+      TypeChecker::typeCheckAbstractFunctionBody(FD);
+
+      TC.ClosuresWithUncomputedCaptures.push_back(FD);
     }
 
     checkExplicitAvailability(FD);
@@ -3567,7 +3568,9 @@ public:
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
-      TC.definedFunctions.push_back(CD);
+      TypeChecker::typeCheckAbstractFunctionBody(CD);
+
+      TC.ClosuresWithUncomputedCaptures.push_back(CD);
     }
 
     checkDefaultArguments(CD->getParameters());
@@ -3584,7 +3587,9 @@ public:
     } else {
       // FIXME: Remove TypeChecker dependency.
       auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.definedFunctions.push_back(DD);
+      TypeChecker::typeCheckAbstractFunctionBody(DD);
+
+      TC.ClosuresWithUncomputedCaptures.push_back(DD);
     }
   }
 };
