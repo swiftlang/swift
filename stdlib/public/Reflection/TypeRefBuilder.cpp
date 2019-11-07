@@ -329,48 +329,46 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
 
 void
 TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
-                            std::ostream &OS, bool printTypeName) {
+                            FILE *file, bool printTypeName) {
   auto DemangleTree = demangleTypeRef(MangledName);
   auto TypeName = nodeToString(DemangleTree);
-  OS << TypeName << '\n';
+  fprintf(file, "%s\n", TypeName.c_str());
   auto TR = swift::Demangle::decodeMangledType(*this, DemangleTree);
   if (!TR) {
     auto str = getTypeRefString(MangledName);
-    OS << "!!! Invalid typeref: "
-       << std::string(str.begin(), str.end())
-       << '\n';
+    fprintf(file, "!!! Invalid typeref: %s\n", std::string(str.begin(), str.end()).c_str());
     return;
   }
-  TR->dump(OS);
-  OS << '\n';
+  TR->dump(file);
+  fprintf(file, "\n");
 }
 
-void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
+void TypeRefBuilder::dumpFieldSection(FILE *file) {
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
       auto TypeDemangling =
         demangleTypeRef(readTypeRef(descriptor, descriptor->MangledTypeName));
       auto TypeName = nodeToString(TypeDemangling);
-      OS << TypeName << '\n';
+      fprintf(file, "%s\n", TypeName.c_str());
       for (size_t i = 0; i < TypeName.size(); ++i)
-        OS << '-';
-      OS << '\n';
+        fprintf(file, "-");
+      fprintf(file, "\n");
       for (auto &fieldRef : *descriptor.getLocalBuffer()) {
         auto field = descriptor.getField(fieldRef);
         auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
-        OS << std::string(fieldName.begin(), fieldName.end());
+        fprintf(file, "%*s", (int)fieldName.size(), fieldName.data());
         if (field->hasMangledTypeName()) {
-          OS << ": ";
-          dumpTypeRef(readTypeRef(field, field->MangledTypeName), OS);
+          fprintf(file, ": ");
+          dumpTypeRef(readTypeRef(field, field->MangledTypeName), file);
         } else {
-          OS << "\n\n";
+          fprintf(file, "\n\n");
         }
       }
     }
   }
 }
 
-void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
+void TypeRefBuilder::dumpAssociatedTypeSection(FILE *file) {
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.AssociatedType) {
       auto conformingTypeNode = demangleTypeRef(
@@ -380,89 +378,89 @@ void TypeRefBuilder::dumpAssociatedTypeSection(std::ostream &OS) {
                          readTypeRef(descriptor, descriptor->ProtocolTypeName));
       auto protocolName = nodeToString(protocolNode);
 
-      OS << "- " << conformingTypeName << " : " << protocolName;
-      OS << '\n';
+      fprintf(file, "- %s : %s", conformingTypeName.c_str(), protocolName.c_str());
+      fprintf(file, "\n");
 
       for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
         auto associatedType = descriptor.getField(associatedTypeRef);
         
         std::string name = getTypeRefString(
                             readTypeRef(associatedType, associatedType->Name));
-        OS << "typealias " << name << " = ";
+        fprintf(file, "typealias %s = ", name.c_str());
         dumpTypeRef(
-          readTypeRef(associatedType, associatedType->SubstitutedTypeName), OS);
+          readTypeRef(associatedType, associatedType->SubstitutedTypeName), file);
       }
     }
   }
 }
 
-void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &OS) {
+void TypeRefBuilder::dumpBuiltinTypeSection(FILE *file) {
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Builtin) {
       auto typeNode = demangleTypeRef(readTypeRef(descriptor,
                                                   descriptor->TypeName));
       auto typeName = nodeToString(typeNode);
       
-      OS << "\n- " << typeName << ":\n";
-      OS << "Size: " << descriptor->Size << "\n";
-      OS << "Alignment: " << descriptor->getAlignment() << "\n";
-      OS << "Stride: " << descriptor->Stride << "\n";
-      OS << "NumExtraInhabitants: " << descriptor->NumExtraInhabitants << "\n";
-      OS << "BitwiseTakable: " << descriptor->isBitwiseTakable() << "\n";
+      fprintf(file, "\n- %s:\n", typeName.c_str());
+      fprintf(file, "Size: %u\n", descriptor->Size);
+      fprintf(file, "Alignment: %u:\n", descriptor->getAlignment());
+      fprintf(file, "Stride: %u:\n", descriptor->Stride);
+      fprintf(file, "NumExtraInhabitants: %u:\n", descriptor->NumExtraInhabitants);
+      fprintf(file, "BitwiseTakable: %d:\n", descriptor->isBitwiseTakable());
     }
   }
 }
 
 void ClosureContextInfo::dump() const {
-  dump(std::cerr);
+  dump(stderr);
 }
 
-void ClosureContextInfo::dump(std::ostream &OS) const {
-  OS << "- Capture types:\n";
+void ClosureContextInfo::dump(FILE *file) const {
+  fprintf(file, "- Capture types:\n");
   for (auto *TR : CaptureTypes) {
     if (TR == nullptr)
-      OS << "!!! Invalid typeref\n";
+      fprintf(file, "!!! Invalid typeref\n");
     else
-      TR->dump(OS);
+      TR->dump(file);
   }
-  OS << "- Metadata sources:\n";
+  fprintf(file, "- Metadata sources:\n");
   for (auto MS : MetadataSources) {
     if (MS.first == nullptr)
-      OS << "!!! Invalid typeref\n";
+      fprintf(file, "!!! Invalid typeref\n");
     else
-      MS.first->dump(OS);
+      MS.first->dump(file);
     if (MS.second == nullptr)
-      OS << "!!! Invalid metadata source\n";
+      fprintf(file, "!!! Invalid metadata source\n");
     else
-      MS.second->dump(OS);
+      MS.second->dump(file);
   }
-  OS << "\n";
+  fprintf(file, "\n");
 }
 
-void TypeRefBuilder::dumpCaptureSection(std::ostream &OS) {
+void TypeRefBuilder::dumpCaptureSection(FILE *file) {
   for (const auto &sections : ReflectionInfos) {
     for (const auto &descriptor : sections.Capture) {
       auto info = getClosureContextInfo(descriptor);
-      info.dump(OS);
+      info.dump(file);
     }
   }
 }
 
-void TypeRefBuilder::dumpAllSections(std::ostream &OS) {
-  OS << "FIELDS:\n";
-  OS << "=======\n";
-  dumpFieldSection(OS);
-  OS << '\n';
-  OS << "ASSOCIATED TYPES:\n";
-  OS << "=================\n";
-  dumpAssociatedTypeSection(OS);
-  OS << '\n';
-  OS << "BUILTIN TYPES:\n";
-  OS << "==============\n";
-  dumpBuiltinTypeSection(OS);
-  OS << '\n';
-  OS << "CAPTURE DESCRIPTORS:\n";
-  OS << "====================\n";
-  dumpCaptureSection(OS);
-  OS << '\n';
+void TypeRefBuilder::dumpAllSections(FILE *file) {
+  fprintf(file, "FIELDS:\n");
+  fprintf(file, "=======\n");
+  dumpFieldSection(file);
+  fprintf(file, "\n");
+  fprintf(file, "ASSOCIATED TYPES:\n");
+  fprintf(file, "=================\n");
+  dumpAssociatedTypeSection(file);
+  fprintf(file, "\n");
+  fprintf(file, "BUILTIN TYPES:\n");
+  fprintf(file, "==============\n");
+  dumpBuiltinTypeSection(file);
+  fprintf(file, "\n");
+  fprintf(file, "CAPTURE DESCRIPTORS:\n");
+  fprintf(file, "====================\n");
+  dumpCaptureSection(file);
+  fprintf(file, "\n");
 }

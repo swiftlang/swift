@@ -77,6 +77,9 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
   auto memberType = member->getInterfaceType();
+  if (memberType->is<ErrorType>())
+    return memberType;
+
   if (derivedDecl) {
     auto *dc = derivedDecl->getDeclContext();
     auto owningType = dc->getDeclaredInterfaceType();
@@ -84,8 +87,6 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 
     memberType = owningType->adjustSuperclassMemberDeclType(member, derivedDecl,
                                                             memberType);
-    if (memberType->hasError())
-      return memberType;
   }
 
   if (method) {
@@ -422,44 +423,40 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base);
 static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
   auto &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
-  DiagnosticTransaction tentativeDiags(diags);
 
-  {
-    Type baseTy = base->getInterfaceType();
-    if (baseTy->hasError())
-      return false;
+  Type baseTy = base->getInterfaceType();
+  if (baseTy->hasError())
+    return false;
 
-    Optional<InFlightDiagnostic> activeDiag;
-    if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
-      // Special-case initializers, whose "type" isn't useful besides the
-      // input arguments.
-      auto *fnType = baseTy->getAs<AnyFunctionType>();
-      baseTy = fnType->getResult();
-      Type argTy = FunctionType::composeInput(ctx,
-                                              baseTy->getAs<AnyFunctionType>()
-                                                    ->getParams(),
-                                              false);
-      auto diagKind = diag::override_type_mismatch_with_fixits_init;
-      unsigned numArgs = baseInit->getParameters()->size();
-      activeDiag.emplace(diags.diagnose(decl, diagKind,
-                                        /*plural*/std::min(numArgs, 2U),
-                                        argTy));
-    } else {
-      if (isa<AbstractFunctionDecl>(base))
-        baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
+  if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
+    // Special-case initializers, whose "type" isn't useful besides the
+    // input arguments.
+    auto *fnType = baseTy->getAs<AnyFunctionType>();
+    baseTy = fnType->getResult();
+    Type argTy = FunctionType::composeInput(
+        ctx, baseTy->getAs<AnyFunctionType>()->getParams(), false);
+    auto diagKind = diag::override_type_mismatch_with_fixits_init;
+    unsigned numArgs = baseInit->getParameters()->size();
+    return computeFixitsForOverridenDeclaration(
+        decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
+          if (!HasNotes)
+            return None;
+          return diags.diagnose(decl, diagKind,
+                                /*plural*/ std::min(numArgs, 2U), argTy);
+        });
+  } else {
+    if (isa<AbstractFunctionDecl>(base))
+      baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
-      activeDiag.emplace(
-        diags.diagnose(decl,
-                       diag::override_type_mismatch_with_fixits,
-                       base->getDescriptiveKind(), baseTy));
-    }
-
-    if (fixItOverrideDeclarationTypes(*activeDiag, decl, base))
-      return true;
+    return computeFixitsForOverridenDeclaration(
+        decl, base, [&](bool HasNotes) -> Optional<InFlightDiagnostic> {
+          if (!HasNotes)
+            return None;
+          return diags.diagnose(decl, diag::override_type_mismatch_with_fixits,
+                                base->getDescriptiveKind(), baseTy);
+        });
   }
 
-  // There weren't any fixes we knew how to make. Drop this diagnostic.
-  tentativeDiags.abort();
   return false;
 }
 
@@ -794,7 +791,8 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
   // The final step for this constructor is to set up the superclass type,
   // without which we will not perform an matching. Early exits therefore imply
   // that there is no way we can match this declaration.
-  if (decl->isInvalid())
+  // FIXME: Break the cycle here.
+  if (decl->hasInterfaceType() && decl->isInvalid())
     return;
 
   auto *dc = decl->getDeclContext();

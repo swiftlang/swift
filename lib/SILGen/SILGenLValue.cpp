@@ -1209,7 +1209,8 @@ namespace {
     bool doesAccessorMutateSelf(SILGenFunction &SGF,
                                 SILDeclRef accessor) const {
       auto accessorSelf = SGF.SGM.Types.getConstantSelfParameter(accessor);
-      return accessorSelf.getType() && accessorSelf.isIndirectMutating();
+      return accessorSelf.getInterfaceType()
+        && accessorSelf.isIndirectMutating();
     }
     
     void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
@@ -2011,8 +2012,9 @@ namespace {
       auto projectFnType = projectFn->getLoweredFunctionType();
 
       auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
-      auto subs = SubstitutionMap::get(projectFnType->getGenericSignature(),
-                                       keyPathTy->getGenericArgs(), {});
+      auto subs = SubstitutionMap::get(
+                                 projectFnType->getInvocationGenericSignature(),
+                                 keyPathTy->getGenericArgs(), {});
 
       auto substFnType = projectFnType->substGenericArgs(SGF.SGM.M, subs);
 
@@ -3628,22 +3630,22 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   case ReferenceOwnership::Name: \
     /* Address-only storage types are handled with their underlying type. */ \
     llvm_unreachable("address-only pointers are handled elsewhere");
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: \
-    return B.createCopy##Name##Value(loc, src);
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: { \
-    /* For loadable reference storage types, we need to generate a strong */ \
-    /* retain and strip the box. */ \
-    assert(storageType.castTo<Name##StorageType>()->isLoadable( \
-                                               ResilienceExpansion::Maximal)); \
-    return B.createCopy##Name##Value(loc, src); \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  case ReferenceOwnership::Name:                                               \
+    return B.createStrongCopy##Name##Value(loc, src);
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  case ReferenceOwnership::Name: {                                             \
+    /* For loadable reference storage types, we need to generate a strong */   \
+    /* retain and strip the box. */                                            \
+    assert(storageType.castTo<Name##StorageType>()->isLoadable(                \
+        ResilienceExpansion::Maximal));                                        \
+    return B.createStrongCopy##Name##Value(loc, src);                          \
   }
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case ReferenceOwnership::Name: {                                             \
     /* For static reference storage types, we need to strip the box and */     \
     /* then do an (unsafe) retain. */                                          \
-    return B.createCopy##Name##Value(loc, src);                                \
+    return B.createStrongCopy##Name##Value(loc, src);                          \
   }
 #include "swift/AST/ReferenceStorage.def"
   }
@@ -3661,14 +3663,14 @@ ManagedValue SILGenFunction::emitConversionToSemanticRValue(
   case ReferenceOwnership::Name: \
     /* Address-only storage types are handled with their underlying type. */ \
     llvm_unreachable("address-only pointers are handled elsewhere");
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: \
-    /* Generate a strong retain and strip the box. */ \
-    return B.createCopy##Name##Value(loc, src);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case ReferenceOwnership::Name:                                               \
+    /* Generate a strong retain and strip the box. */                          \
+    return B.createStrongCopy##Name##Value(loc, src);
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case ReferenceOwnership::Name:                                               \
     /* Strip the box and then do an (unsafe) retain. */                        \
-    return B.createCopy##Name##Value(loc, src);
+    return B.createStrongCopy##Name##Value(loc, src);
 #include "swift/AST/ReferenceStorage.def"
   }
   llvm_unreachable("impossible");
@@ -3691,22 +3693,22 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: \
     return SGF.B.createLoad##Name(loc, src, isTake);
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name) \
-  { \
-    /* For loadable types, we need to strip the box. */ \
-    /* If we are not performing a take, use a load_borrow. */ \
-    if (!isTake) { \
-      SILValue value = SGF.B.createLoadBorrow(loc, src); \
-      SILValue strongValue = SGF.B.createCopy##Name##Value(loc, value); \
-      SGF.B.createEndBorrow(loc, value, src); \
-      return strongValue; \
-    } \
-    /* Otherwise perform a load take and destroy the stored value. */ \
-    auto value = SGF.B.emitLoadValueOperation(loc, src, \
-                                              LoadOwnershipQualifier::Take); \
-    SILValue strongValue = SGF.B.createCopy##Name##Value(loc, value); \
-    SGF.B.createDestroyValue(loc, value); \
-    return strongValue; \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name)          \
+  {                                                                            \
+    /* For loadable types, we need to strip the box. */                        \
+    /* If we are not performing a take, use a load_borrow. */                  \
+    if (!isTake) {                                                             \
+      SILValue value = SGF.B.createLoadBorrow(loc, src);                       \
+      SILValue strongValue = SGF.B.createStrongCopy##Name##Value(loc, value);  \
+      SGF.B.createEndBorrow(loc, value, src);                                  \
+      return strongValue;                                                      \
+    }                                                                          \
+    /* Otherwise perform a load take and destroy the stored value. */          \
+    auto value =                                                               \
+        SGF.B.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);  \
+    SILValue strongValue = SGF.B.createStrongCopy##Name##Value(loc, value);    \
+    SGF.B.createDestroyValue(loc, value);                                      \
+    return strongValue;                                                        \
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: \
@@ -3724,7 +3726,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
   case ReferenceOwnership::Name: {                                             \
     /* For static reference storage types, we need to strip the box. */        \
     auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial);  \
-    return SGF.B.createCopy##Name##Value(loc, value);                          \
+    return SGF.B.createStrongCopy##Name##Value(loc, value);                    \
   }
 #include "swift/AST/ReferenceStorage.def"
 #undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
@@ -3927,8 +3929,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
   bool isRValue = component.isRValue();
   ManagedValue addr = std::move(component).project(SGF, loc, base);
 
-  if (!SGF.getASTContext().LangOpts.DisableTsanInoutInstrumentation &&
-      (SGF.getModule().getOptions().Sanitizers & SanitizerKind::Thread) &&
+  if ((SGF.getModule().getOptions().Sanitizers & SanitizerKind::Thread) &&
       tsanKind == TSanKind::InoutAccess && !isRValue) {
     emitTsanInoutAccess(SGF, loc, addr);
   }

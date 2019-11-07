@@ -29,8 +29,16 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
+// SWIFT_ENABLE_TENSORFLOW
+SWIFT_REQUEST(TypeChecker, DifferentiableAttributeParameterIndicesRequest,
+              IndexSubset *(DifferentiableAttr *, Decl *),
+              SeparatelyCached, NoLocationInfo)
+// SWIFT_ENABLE_TENSORFLOW END
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
               NoLocationInfo)
@@ -67,6 +75,8 @@ SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               SeparatelyCached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, InitKindRequest,
               CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
+              Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
@@ -83,8 +93,13 @@ SWIFT_REQUEST(TypeChecker, IsSetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest, VarDecl *(VarDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LookupPrecedenceGroupRequest,
+              PrecedenceGroupDecl *(DeclContext *, Identifier, SourceLoc),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
               std::string(const TypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, NamingPatternRequest,
+              NamedPattern *(VarDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
               OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
@@ -97,6 +112,9 @@ SWIFT_REQUEST(TypeChecker, OperatorPrecedenceGroupRequest,
 SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
               llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
+              const PatternBindingEntry *(PatternBindingDecl *, unsigned),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
               PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
               NoLocationInfo)
@@ -155,3 +173,15 @@ SWIFT_REQUEST(TypeChecker, ParamSpecifierRequest,
               ParamDecl::Specifier(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
+              bool(StructDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
+              bool(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
+              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)

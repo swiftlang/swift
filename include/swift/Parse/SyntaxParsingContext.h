@@ -15,11 +15,8 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/HiddenLibSyntaxAction.h"
-#include "swift/Parse/LibSyntaxGenerator.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
-#include "swift/Parse/ParsedSyntaxNodes.h"
 
 namespace swift {
 
@@ -77,7 +74,6 @@ constexpr size_t SyntaxAlignInBits = 3;
 ///     // Now the context holds { '(' Expr ')' }.
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
-// todo [gsoc]: remove when/if possible
 class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
 public:
   /// The shared data for all syntax parsing contexts with the same root.
@@ -98,15 +94,13 @@ public:
 
     ParsedRawSyntaxRecorder Recorder;
 
-    LibSyntaxGenerator LibSyntaxCreator;
-
     llvm::BumpPtrAllocator ScratchAlloc;
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    const std::shared_ptr<HiddenLibSyntaxAction>& TwoActions)
+                    std::shared_ptr<SyntaxParseActions> spActions)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
-          Recorder(TwoActions), LibSyntaxCreator(TwoActions) {}
+          Recorder(std::move(spActions)) {}
   };
 
 private:
@@ -172,6 +166,9 @@ private:
   /// deferred nodes
   bool ShouldDefer = false;
 
+  // If false, context does nothing.
+  bool Enabled;
+
   /// Create a syntax node using the tail \c N elements of collected parts and
   /// replace those parts with the single result.
   void createNodeInPlace(SyntaxKind Kind, size_t N,
@@ -192,20 +189,19 @@ private:
   Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
                               MutableArrayRef<ParsedRawSyntaxNode> Parts);
 
-  ParsedRawSyntaxNode finalizeSourceFile();
-
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
                        unsigned BufferID,
-                       std::shared_ptr<HiddenLibSyntaxAction> SPActions);
+                       std::shared_ptr<SyntaxParseActions> SPActions);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
         IsBacktracking(CtxtHolder->IsBacktracking),
-        ShouldDefer(CtxtHolder->ShouldDefer) {
+        ShouldDefer(CtxtHolder->ShouldDefer),
+        Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     assert(CtxtHolder->Mode != AccumulationMode::SkippedForIncrementalUpdate &&
@@ -233,6 +229,8 @@ public:
   /// offset. If nothing is found \c 0 is returned.
   size_t lookupNode(size_t LexerOffset, SourceLoc Loc);
 
+  void disable() { Enabled = false; }
+  bool isEnabled() const { return Enabled; }
   bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
 
@@ -248,10 +246,6 @@ public:
 
   const std::vector<ParsedRawSyntaxNode> &getStorage() const {
     return getRootData()->Storage;
-  }
-
-  LibSyntaxGenerator &getSyntaxCreator() {
-    return getRootData()->LibSyntaxCreator;
   }
 
   const SyntaxParsingContext *getRoot() const;
@@ -272,16 +266,8 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
 
-  template <typename SyntaxNode>
-  bool isTopNode() {
-    auto parts = getParts();
-    return (!parts.empty() && SyntaxNode::kindof(parts.back().getKind()));
-  }
-
-  /// Returns the topmost Syntax node.
-  template <typename SyntaxNode> SyntaxNode topNode();
-
-  template <typename SyntaxNode> llvm::Optional<SyntaxNode> popIf() {
+  template<typename SyntaxNode>
+  llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
     if (Storage.size() <= Offset)
       return llvm::None;
@@ -319,11 +305,6 @@ public:
   void setDeferSyntax(SyntaxKind Kind) {
     Mode = AccumulationMode::DeferSyntax;
     SynKind = Kind;
-  }
-
-  /// On destruction, do not attempt to finalize the root node.
-  void setDiscard() {
-    Mode = AccumulationMode::Discard;
   }
 
   /// On destruction, if the parts size is 1 and it's kind of \c Kind, just
@@ -367,25 +348,6 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
                             "Only meant for use in the debugger");
 };
-
-template <typename SyntaxNode>
-inline SyntaxNode SyntaxParsingContext::topNode() {
-  ParsedRawSyntaxNode &TopNode = getStorage().back();
-  if (TopNode.isRecorded()) {
-    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
-  }
-  return getSyntaxCreator().createNode<SyntaxNode>(TopNode.copyDeferred());
-}
-
-template <> inline TokenSyntax SyntaxParsingContext::topNode<TokenSyntax>() {
-  ParsedRawSyntaxNode &TopNode = getStorage().back();
-  if (TopNode.isRecorded()) {
-    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-    return getSyntaxCreator().getLibSyntaxNodeFor<TokenSyntax>(OpaqueNode);
-  }
-  return getSyntaxCreator().createToken(TopNode.copyDeferred());
-}
 
 } // namespace swift
 #endif // SWIFT_SYNTAX_PARSING_CONTEXT_H

@@ -638,21 +638,19 @@ Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
   return closure;
 }
 
-static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
+static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
+  auto &ctx = dc->getASTContext();
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(dc->getModuleScopeContext(),
-                                     TC.Context.getIdentifier(name),
-                                     SourceLoc(),
-                                     lookupOptions);
+  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
+                                               ctx.getIdentifier(name),
+                                               SourceLoc(),
+                                               lookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
-  
-  // FIXME: Make isInvalid ask for the interface type.
-  (void)TD->getInterfaceType();
   
   if (TD->isInvalid())
     return Type();
@@ -664,10 +662,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
 
 static Optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
-  TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
-
 #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
-  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))          \
+  if (protocol == TypeChecker::getProtocol(protocol->getASTContext(),          \
+                                           SourceLoc(),                        \
+                                           KnownProtocolKind::Id))             \
     return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
@@ -709,15 +707,12 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
   if (!name)
     return nullptr;
 
-  // FIXME: Creating a whole type checker just to do lookup is unnecessary.
-  TypeChecker &tc = TypeChecker::createForContext(dc->getASTContext());
-
   Type type;
   if (performLocalLookup)
-    type = lookupDefaultLiteralType(tc, dc, name);
+    type = lookupDefaultLiteralType(dc, name);
 
   if (!type)
-    type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+    type = lookupDefaultLiteralType(TypeChecker::getStdlibModule(dc), name);
 
   // Strip off one level of sugar; we don't actually want to print
   // the name of the typealias itself anywhere.
@@ -759,24 +754,25 @@ TypeChecker::lookupFuncDecl(
     NameLookupOptions lookupOptions,
     const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx,
     const Optional<std::function<void()>> &invalidTypeCtxDiagnostic) {
-
+  auto &ctx = lookupContext->getASTContext();
   FuncDecl *resolvedFuncDecl = nullptr;
 
   // Perform lookup.
   LookupResult results;
   if (baseType) {
-    results = lookupMember(lookupContext, baseType, funcName);
+    results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
   } else {
-    results =
-      lookupUnqualified(lookupContext, funcName, funcNameLoc, lookupOptions);
+    results = TypeChecker::lookupUnqualified(
+        lookupContext, funcName, funcNameLoc, lookupOptions);
 
     // If looking up an operator within a type context, look specifically within
     // the type context.
     // This tries to resolve unqualified operators, like `+`.
     if (funcName.isOperator() && lookupContext->isTypeContext()) {
-      if (auto tmp = lookupMember(lookupContext,
-                                  lookupContext->getSelfTypeInContext(),
-                                  funcName))
+      if (auto tmp =
+              TypeChecker::lookupMember(lookupContext,
+                                        lookupContext->getSelfTypeInContext(),
+                                        funcName))
         results = tmp;
     }
   }
@@ -817,8 +813,8 @@ TypeChecker::lookupFuncDecl(
 
   // Otherwise, emit the appropriate diagnostic and return nullptr.
   if (results.empty()) {
-    diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
-             funcName.isOperator());
+    ctx.Diags.diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
+                       funcName.isOperator());
     return nullptr;
   }
   if (ambiguousFuncDecl) {

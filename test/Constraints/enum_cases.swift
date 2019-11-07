@@ -27,8 +27,7 @@ let _ = arr.map(E.tuple) // expected-error {{cannot invoke 'map' with an argumen
 
 let _ = arr.map(G_E<String>.foo) // Ok
 let _ = arr.map(G_E<String>.bar) // Ok
-let _ = arr.map(G_E<String>.two) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (String, String) -> G_E<String>)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(G_E<String>.two) // expected-error {{cannot convert value of type '(String, String) -> G_E<String>' to expected argument type '(String) throws -> G_E<String>'}}
 let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> G_E<Int>)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
 

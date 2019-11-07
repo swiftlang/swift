@@ -1035,6 +1035,20 @@ DeclContextKind DeclContext::getContextKind() const {
   llvm_unreachable("Unhandled DeclContext ASTHierarchy");
 }
 
+bool DeclContext::hasValueSemantics() const {
+  if (getExtendedProtocolDecl())
+    return !isClassConstrainedProtocolExtension();
+  return !getDeclaredInterfaceType()->hasReferenceSemantics();
+}
+
+bool DeclContext::isClassConstrainedProtocolExtension() const {
+  if (getExtendedProtocolDecl()) {
+    auto ED = cast<ExtensionDecl>(this);
+    return ED->getGenericSignature()->requiresClass(ED->getSelfInterfaceType());
+  }
+  return false;
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:

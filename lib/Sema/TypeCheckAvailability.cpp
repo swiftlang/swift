@@ -644,8 +644,10 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // We can assume we are running on at least the minimum deployment target.
   auto OverApproximateContext =
     AvailabilityContext::forDeploymentTarget(Context);
-
-  while (DC && loc.isInvalid()) {
+  auto isInvalidLoc = [SF](SourceLoc loc) {
+    return SF ? loc.isInvalid() : true;
+  };
+  while (DC && isInvalidLoc(loc)) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
     if (!D)
       break;
@@ -955,15 +957,8 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // all parsed attribute that appear in the concrete syntax upon on the
     // PatternBindingDecl are added to all of the VarDecls for the pattern
     // binding.
-    ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
-    if (!Entries.empty()) {
-      const VarDecl *AnyVD = nullptr;
-      // FIXME: This is wasteful; we only need the first variable.
-      Entries.front().getPattern()->forEachVariable([&](const VarDecl *VD) {
-        AnyVD = VD;
-      });
-      if (AnyVD)
-        return AnyVD;
+    if (PBD->getNumPatternEntries() != 0) {
+      return PBD->getAnchoringVarDecl(0);
     }
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
     // Similar to the PatternBindingDecl case above, we return the
@@ -2649,11 +2644,10 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
     Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
-  return
-    TypeChecker::conformsToProtocol(ty, integerType, DC,
-                                    ConformanceCheckFlags::InExpression) ||
-    TypeChecker::conformsToProtocol(ty, floatingType, DC,
-                                    ConformanceCheckFlags::InExpression);
+  return TypeChecker::conformsToProtocol(ty, integerType, DC,
+                                         ConformanceCheckFlags::InExpression) ||
+         TypeChecker::conformsToProtocol(ty, floatingType, DC,
+                                         ConformanceCheckFlags::InExpression);
 }
 
 

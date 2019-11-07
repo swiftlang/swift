@@ -59,7 +59,7 @@ static ArraySliceType *computeAllKeyPathsType(NominalTypeDecl *nominal) {
 // module is not resilient and the `ValueDecl` is effectively public.
 // TODO: Dedupe with DerivedConformanceRawRepresentable.cpp.
 static void maybeMarkAsInlinable(DerivedConformance &derived, ValueDecl *decl) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
   if (!parentDC->getParentModule()->isResilient()) {
     auto access = decl->getFormalAccessScope(
@@ -78,8 +78,9 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
-  auto allKeyPathsInterfaceType = computeAllKeyPathsType(nominal);
-  auto allKeyPathsType = parentDC->mapTypeIntoContext(allKeyPathsInterfaceType);
+  auto partialKeyPathInterfaceType = computePartialKeyPathType(nominal);
+  auto partialKeyPathType =
+      parentDC->mapTypeIntoContext(partialKeyPathInterfaceType);
 
   auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
@@ -97,17 +98,17 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
     auto *dotExpr = new (C)
         UnresolvedDotExpr(nominalTypeExpr, SourceLoc(), member->getFullName(),
                           DeclNameLoc(), /*Implicit*/ true);
-    auto *keyPathExpr =
+    Expr *keyPathExpr =
         new (C) KeyPathExpr(SourceLoc(), dotExpr, nullptr, /*Implicit*/ true);
+    // NOTE(TF-575): Adding an explicit coercion expression here is necessary
+    // due to type-checker changes.
+    keyPathExpr = new (C) CoerceExpr(
+        keyPathExpr, SourceLoc(), TypeLoc::withoutLoc(partialKeyPathType));
     keyPathExprs.push_back(keyPathExpr);
   }
   // Return array of all key path expressions.
   Expr *keyPathsArrayExpr =
       ArrayExpr::create(C, SourceLoc(), keyPathExprs, {}, SourceLoc());
-  // NOTE(TF-575): Adding an explicit coercion expression here is necessary due
-  // to a missing regression.
-  keyPathsArrayExpr = new (C) CoerceExpr(
-      keyPathsArrayExpr, SourceLoc(), TypeLoc::withoutLoc(allKeyPathsType));
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), keyPathsArrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
@@ -120,7 +121,7 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
 static ValueDecl *
 deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   auto returnInterfaceTy = computeAllKeyPathsType(nominal);
   auto returnTy =
@@ -160,9 +161,9 @@ ValueDecl *DerivedConformance::deriveKeyPathIterable(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_allKeyPaths)
+  if (requirement->getBaseName() == Context.Id_allKeyPaths)
     return deriveKeyPathIterable_allKeyPaths(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;
 }
@@ -172,9 +173,9 @@ Type DerivedConformance::deriveKeyPathIterable(
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_AllKeyPaths)
+  if (requirement->getBaseName() == Context.Id_AllKeyPaths)
     return deriveKeyPathIterable_AllKeyPaths(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;
 }

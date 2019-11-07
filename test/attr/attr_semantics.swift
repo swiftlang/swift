@@ -19,3 +19,16 @@ func func_with_nested_semantics_2() {
    func exit(_ code : UInt32) -> Void
    exit(0)
 }
+
+@_semantics("struct")
+struct StructWithSemantics {}
+
+@_semantics("class")
+class ClassWithSemantics {}
+
+@_semantics("enum")
+enum EnumWithSemantics {}
+
+@_semantics("struct1")
+@_semantics("struct2")
+struct StructWithDuplicateSemantics {}

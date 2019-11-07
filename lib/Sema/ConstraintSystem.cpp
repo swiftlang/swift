@@ -20,6 +20,7 @@
 #include "CSDiagnostics.h"
 #include "CSFix.h"
 #include "TypeCheckType.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Statistic.h"
@@ -181,7 +182,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
       if (!anchor)
         continue;
 
-      literalProtocol = TC.getLiteralProtocol(anchor);
+      literalProtocol =
+          TypeChecker::getLiteralProtocol(getASTContext(), anchor);
       if (literalProtocol)
         break;
     }
@@ -243,7 +245,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
 
-  result = TC.lookupMember(DC, base, name, lookupOptions);
+  result = TypeChecker::lookupMember(DC, base, name, lookupOptions);
 
   // If we aren't performing dynamic lookup, we're done.
   if (!*result || !base->isAnyObject())
@@ -414,7 +416,8 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 ConstraintLocator *
-ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
+ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
+                                   bool lookThroughApply) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -455,26 +458,28 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
   if (isa<SubscriptExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
-  if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-    auto *fnExpr = applyExpr->getFn();
-    // For an apply of a metatype, we have a short-form constructor. Unlike
-    // other locators to callees, these are anchored on the apply expression
-    // rather than the function expr.
-    auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
-    if (fnTy->is<AnyMetatypeType>()) {
-      auto *fnLocator =
-          getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
-      return getConstraintLocator(fnLocator,
-                                  ConstraintLocator::ConstructorMember);
-    }
+  if (lookThroughApply) {
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+      auto *fnExpr = applyExpr->getFn();
+      // For an apply of a metatype, we have a short-form constructor. Unlike
+      // other locators to callees, these are anchored on the apply expression
+      // rather than the function expr.
+      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
+      if (fnTy->is<AnyMetatypeType>()) {
+        auto *fnLocator =
+            getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
+        return getConstraintLocator(fnLocator,
+                                    ConstraintLocator::ConstructorMember);
+      }
 
-    // Otherwise fall through and look for locators anchored on the function
-    // expr. For CallExprs, this can look through things like parens and
-    // optional chaining.
-    if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
-      anchor = callExpr->getDirectCallee();
-    } else {
-      anchor = fnExpr;
+      // Otherwise fall through and look for locators anchored on the function
+      // expr. For CallExprs, this can look through things like parens and
+      // optional chaining.
+      if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
+        anchor = callExpr->getDirectCallee();
+      } else {
+        anchor = fnExpr;
+      }
     }
   }
 
@@ -820,11 +825,6 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
           return getType(param);
 
         if (!var->hasInterfaceType()) {
-          if (!var->isInvalid()) {
-            TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
-                        var->getDescriptiveKind(), var->getName());
-            var->markInvalid();
-          }
           return ErrorType::get(TC.Context);
         }
 
@@ -1075,7 +1075,7 @@ static void bindArchetypesFromContext(
     if (parentDC->isTypeContext()) {
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
-        auto contextTy = cs.TC.Context.TheUnresolvedType;
+        auto contextTy = cs.getASTContext().TheUnresolvedType;
         bindPrimaryArchetype(selfTy, contextTy);
       }
       continue;
@@ -1463,13 +1463,20 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   if (decl->isImplicitlyUnwrappedOptional())
     return Type();
 
+  // In a pattern binding initializer, all of its bound variables have no
+  // effective overload type.
+  if (auto *PBI = dyn_cast<PatternBindingInitializer>(useDC)) {
+    if (auto *VD = dyn_cast<VarDecl>(decl)) {
+      if (PBI->getBinding() == VD->getParentPatternBinding()) {
+        return Type();
+      }
+    }
+  }
+
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
-  if (!type) {
-    type = decl->getInterfaceType();
-    if (!type) {
-      return Type();
-    }
+  if (!type || type->hasError()) {
+    return Type();
   }
 
   // If we have a generic function type, drop the generic signature; we don't
@@ -1595,7 +1602,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                                                      Type &openedFullType) {
   assert(choice.getKind() == OverloadChoiceKind::Decl);
 
-  switch (CS.TC.getDeclTypeCheckingSemantics(choice.getDecl())) {
+  switch (TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl())) {
   case DeclTypeCheckingSemantics::Normal:
     return false;
     
@@ -1781,8 +1788,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // components.
   auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
                                           ConstraintLocator *locator) {
-    if (auto *hashable = TC.getProtocol(choice.getDecl()->getLoc(),
-                                        KnownProtocolKind::Hashable)) {
+    if (auto *hashable = TypeChecker::getProtocol(
+            argType->getASTContext(), choice.getDecl()->getLoc(),
+            KnownProtocolKind::Hashable)) {
       addConstraint(ConstraintKind::ConformsTo, argType,
                     hashable->getDeclaredType(),
                     getConstraintLocator(
@@ -1966,11 +1974,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
              "subscript always has one arg");
       auto argType = refFnType->getParams()[0].getPlainType();
 
-      auto &TC = getTypeChecker();
-
-      auto stringLiteral =
-          TC.getProtocol(choice.getDecl()->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral);
+      auto stringLiteral = TypeChecker::getProtocol(
+          getASTContext(), choice.getDecl()->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
       if (!stringLiteral)
         break;
 
@@ -2243,7 +2249,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
@@ -2292,7 +2298,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
           return DependentMemberType::get(lookupBaseType, assocType);
 
         auto subs = SubstitutionMap::getProtocolSubstitutions(
-          proto, lookupBaseType, *conformance);
+            proto, lookupBaseType, conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
         if (!result->hasError())
           return result;
@@ -2395,7 +2401,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = TC.Context.TypeCheckerDebug->getStream();
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
@@ -3010,6 +3016,12 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
     }
 
+    case ConstraintLocator::Condition: {
+      anchor = cast<IfExpr>(anchor)->getCondExpr();
+      path = path.slice(1);
+      continue;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -3087,9 +3099,10 @@ bool constraints::hasAppliedSelf(ConstraintSystem &cs,
 
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
-  if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
-    return bool(TypeChecker::conformsToProtocol(
-        type, proto, cs.DC, ConformanceCheckFlags::InExpression));
+  if (auto *proto =
+          TypeChecker::getProtocol(cs.getASTContext(), SourceLoc(), protocol))
+    return (bool)TypeChecker::conformsToProtocol(
+        type, proto, cs.DC, ConformanceCheckFlags::InExpression);
   return false;
 }
 
@@ -3099,17 +3112,17 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   auto &TC = cs.TC;
   auto *DC = cs.DC;
 
-  auto rawReprType =
-      TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  auto rawReprType = TypeChecker::getProtocol(
+      cs.getASTContext(), SourceLoc(), KnownProtocolKind::RawRepresentable);
   if (!rawReprType)
     return Type();
 
   auto conformance = TypeChecker::conformsToProtocol(
       type, rawReprType, DC, ConformanceCheckFlags::InExpression);
-  if (!conformance)
+  if (conformance.isInvalid())
     return Type();
 
-  return conformance->getTypeWitnessByName(type, TC.Context.Id_RawValue);
+  return conformance.getTypeWitnessByName(type, TC.Context.Id_RawValue);
 }
 
 Type constraints::isRawRepresentable(

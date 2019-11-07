@@ -225,8 +225,7 @@ static void diagnoseFunctionParamNotRepresentable(
     AFD->diagnose(diag::objc_invalid_on_func_param_type,
                   ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (P->hasType()) {
-    Type ParamTy = P->getType();
+  if (Type ParamTy = P->getType()) {
     SourceRange SR;
     if (auto typeRepr = P->getTypeRepr())
       SR = typeRepr->getSourceRange();
@@ -812,10 +811,7 @@ bool swift::isRepresentableInObjC(
 
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  // FIXME: Computes isInvalid() below.
-  (void) VD->getInterfaceType();
-
+  
   if (VD->isInvalid())
     return false;
 
@@ -1394,7 +1390,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Classes can be @objc.
 
     // Protocols and enums can also be @objc, but this is covered by the
-    // isObjC() check a the beginning.;
+    // isObjC() check at the beginning.
     isObjC = shouldMarkAsObjC(VD, /*allowImplicit=*/false);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable

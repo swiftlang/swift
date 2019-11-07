@@ -33,6 +33,7 @@ struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
 struct SymbolicValueMemoryObject;
 struct UnknownSymbolicValue;
+struct SymbolicClosure;
 
 extern llvm::cl::opt<unsigned> ConstExprLimit;
 
@@ -106,6 +107,9 @@ public:
     /// Encountered an instruction not supported by the interpreter.
     UnsupportedInstruction,
 
+    /// Encountered a function call whose arguments are not constants.
+    CallArgumentUnknown,
+
     /// Encountered a function call where the body of the called function is
     /// not available.
     CalleeImplementationUnknown,
@@ -144,8 +148,9 @@ private:
 
   // Auxiliary information for different unknown kinds.
   union {
-    SILFunction *function;
-    const char *trapMessage;
+    SILFunction *function;   // For CalleeImplementationUnknown
+    const char *trapMessage; // For Trap.
+    unsigned argumentIndex;  // For CallArgumentUnknown
   } payload;
 
 public:
@@ -155,6 +160,7 @@ public:
     switch (kind) {
     case UnknownKind::CalleeImplementationUnknown:
     case UnknownKind::Trap:
+    case UnknownKind::CallArgumentUnknown:
       return true;
     default:
       return false;
@@ -198,6 +204,18 @@ public:
   const char *getTrapMessage() {
     assert(kind == UnknownKind::Trap);
     return payload.trapMessage;
+  }
+
+  static UnknownReason createCallArgumentUnknown(unsigned argIndex) {
+    UnknownReason reason;
+    reason.kind = UnknownKind::CallArgumentUnknown;
+    reason.payload.argumentIndex = argIndex;
+    return reason;
+  }
+
+  unsigned getArgumentIndex() {
+    assert(kind == UnknownKind::CallArgumentUnknown);
+    return payload.argumentIndex;
   }
 };
 
@@ -261,6 +279,9 @@ private:
 
     /// This represents an array.
     RK_Array,
+
+    /// This represents a closure.
+    RK_Closure,
   };
 
   union {
@@ -305,7 +326,7 @@ private:
     /// information about the memory object and access path of the access.
     DerivedAddressValue *derivedAddress;
 
-    // The following fields are for representing an Array.
+    // The following two fields are for representing an Array.
     //
     // In Swift, an array is a non-trivial struct that stores a reference to an
     // internal storage: _ContiguousArrayStorage. Though arrays have value
@@ -329,6 +350,10 @@ private:
     /// When this symbolic value is of an "Array" kind, this stores a memory
     /// object that contains a SymbolicArrayStorage value.
     SymbolicValueMemoryObject *array;
+
+    /// When this symbolic value is of "Closure" kind, store a pointer to the
+    /// symbolic representation of the closure.
+    SymbolicClosure *closure;
   } value;
 
   RepresentationKind representationKind : 8;
@@ -383,6 +408,9 @@ public:
 
     /// This represents an array value.
     Array,
+
+    /// This represents a closure.
+    Closure,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -533,6 +561,22 @@ public:
   /// Return the type of this array symbolic value.
   Type getArrayType() const;
 
+  /// Create and return a symbolic value that represents a closure.
+  /// \param target SILFunction corresponding the target of the closure.
+  /// \param capturedArguments an array consisting of SILValues of captured
+  /// arguments along with their symbolic values when available.
+  /// \param allocator the allocator to use for storing the contents of this
+  /// symbolic value.
+  static SymbolicValue makeClosure(
+      SILFunction *target,
+      ArrayRef<std::pair<SILValue, Optional<SymbolicValue>>> capturedArguments,
+      SymbolicValueAllocator &allocator);
+
+  SymbolicClosure *getClosure() const {
+    assert(getKind() == Closure);
+    return value.closure;
+  }
+
   //===--------------------------------------------------------------------===//
   // Helpers
 
@@ -607,6 +651,57 @@ private:
   SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
   void operator=(const SymbolicValueMemoryObject &) = delete;
 };
+
+using SymbolicClosureArgument = std::pair<SILValue, Optional<SymbolicValue>>;
+
+/// Representation of a symbolic closure. A symbolic closure consists of a
+/// SILFunction and an array of SIL values, corresponding to the captured
+/// arguments, and (optional) symbolic values representing the constant values
+/// of the captured arguments. The symbolic values are optional as it is not
+/// necessary for every captured argument to be a constant, which enables
+/// representing closures whose captured arguments are not compile-time
+/// constants.
+struct SymbolicClosure final
+  : private llvm::TrailingObjects<SymbolicClosure, SymbolicClosureArgument> {
+
+  friend class llvm::TrailingObjects<SymbolicClosure, SymbolicClosureArgument>;
+
+private:
+
+  SILFunction *target;
+
+  // The number of SIL values captured by the closure.
+  unsigned numCaptures;
+
+  // True iff there exists captured arguments whose constant value is not known.
+  bool hasNonConstantCaptures = true;
+
+  SymbolicClosure() = delete;
+  SymbolicClosure(const SymbolicClosure &) = delete;
+  SymbolicClosure(SILFunction *callee, unsigned numArguments,
+                  bool nonConstantCaptures)
+      : target(callee), numCaptures(numArguments),
+        hasNonConstantCaptures(nonConstantCaptures) {}
+
+public:
+  static SymbolicClosure *create(SILFunction *callee,
+                                 ArrayRef<SymbolicClosureArgument> args,
+                                 SymbolicValueAllocator &allocator);
+
+  ArrayRef<SymbolicClosureArgument> getCaptures() const {
+    return {getTrailingObjects<SymbolicClosureArgument>(), numCaptures};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicClosureArgument>) const {
+    return numCaptures;
+  }
+
+  SILFunction *getTarget() {
+    return target;
+  }
+};
+
 } // end namespace swift
 
 #endif

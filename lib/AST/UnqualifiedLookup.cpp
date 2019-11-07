@@ -373,10 +373,10 @@ namespace {
     void print(raw_ostream &OS) const;
     
     void dumpResults() const;
-    
-    bool verifyEqualTo(const UnqualifiedLookupFactory &&, const char *thisLabel,
-                       const char *otherLabel) const;
-    
+
+    bool verifyEqualTo(const UnqualifiedLookupFactory &&, StringRef thisLabel,
+                       StringRef otherLabel) const;
+
     /// Legacy lookup is wrong here; we should NOT find this symbol.
     bool shouldDiffer() const;
     StringRef getSourceFileName() const;
@@ -515,8 +515,13 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     else
       altLookup.lookupNamesIntroducedBy(contextAndIsCascadingUse);
 
-    assert(
-        verifyEqualTo(std::move(altLookup), "main lookup", "alternate lookup"));
+    const auto *ASTScopeLabel = "ASTScope lookup";
+    const auto *contextLabel = "context-bsed lookup";
+    const auto *mainLabel =
+        useASTScopesForLookup() ? ASTScopeLabel : contextLabel;
+    const auto *alternateLabel =
+        useASTScopesForLookup() ? contextLabel : ASTScopeLabel;
+    assert(verifyEqualTo(std::move(altLookup), mainLabel, alternateLabel));
   }
 }
 
@@ -1285,16 +1290,16 @@ StringRef UnqualifiedLookupFactory::getSourceFileName() const {
   return DC->getParentSourceFile()->getFilename();
 }
 
-static void writeFirstLine(const UnqualifiedLookupFactory &ul, StringRef s) {
+static void writeFirstLine(const UnqualifiedLookupFactory &ul, llvm::Twine s) {
   std::string line =
       std::string("In file: ") + ul.getSourceFileName().str() + ", " + s.str();
   writeLine(line);
 }
 
 static void writeInconsistent(const UnqualifiedLookupFactory &me,
-                              const char *thisLabel,
+                              StringRef thisLabel,
                               const UnqualifiedLookupFactory &other,
-                              const char *otherLabel, StringRef s) {
+                              StringRef otherLabel, llvm::Twine s) {
   writeFirstLine(me, s);
   other.dump();
   llvm::errs() << "\n" << thisLabel << " Results:\n";
@@ -1307,23 +1312,18 @@ static void writeInconsistent(const UnqualifiedLookupFactory &me,
 #pragma mark comparing results
 
 bool UnqualifiedLookupFactory::verifyEqualTo(
-    const UnqualifiedLookupFactory &&other, const char *thisLabel,
-    const char *otherLabel) const {
+    const UnqualifiedLookupFactory &&other, const StringRef thisLabel,
+    StringRef otherLabel) const {
   if (shouldDiffer()) {
      return true;
   }
-  auto writeErr = [&](StringRef s) {
+  auto writeErr = [&](llvm::Twine s) {
     writeInconsistent(*this, thisLabel, other, otherLabel, s);
   };
   if (Results.size() != other.Results.size()) {
-    const bool tooMany = Results.size() < other.Results.size();
-    writeErr(std::string(tooMany ? "Found too many: " : "Found too few: ") +
-             std::to_string(Results.size()) + " vs " +
-             std::to_string(other.Results.size()));
-    if (tooMany)
-      assert(false && "ASTScopeImpl found too many");
-    else
-      assert(false && "ASTScopeImpl found too few");
+    writeErr(thisLabel + " found " + std::to_string(Results.size()) + " but " +
+             otherLabel + " found " + std::to_string(other.Results.size()));
+    assert(false && "mismatch in number of results");
   }
   for (size_t i : indices(Results)) {
     const auto &e = Results[i];
@@ -1338,7 +1338,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
         llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
-        assert(false && "ASTScopeImpl found different Decl");
+        assert(false && "other lookup found different Decl");
       }
     }
     if (e.getDeclContext() != oe.getDeclContext()) {
@@ -1353,7 +1353,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
              + std::to_string(IndexOfFirstOuterResult)
              + std::string( ", is: ")
              + std::to_string(other.IndexOfFirstOuterResult));
-    assert(false && "ASTScopeImpl IndexOfFirstOuterResult differs");
+    assert(false && "other lookup IndexOfFirstOuterResult differs");
   }
   if (recordedSF != other.recordedSF) {
     writeErr(std::string("recordedSF differs: shouldBe: ") +
@@ -1362,13 +1362,13 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
              std::string(" is: ") +
              (other.recordedSF ? other.recordedSF->getFilename().str()
                                : std::string("<no name>")));
-    assert(false && "ASTScopeImpl recordedSF differs");
+    assert(false && "other lookup recordedSF differs");
   }
   if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
     writeErr(std::string("recordedIsCascadingUse differs: shouldBe: ") +
              std::to_string(recordedIsCascadingUse) + std::string(" is: ") +
              std::to_string(other.recordedIsCascadingUse));
-    assert(false && "ASTScopeImpl recordedIsCascadingUse differs");
+    assert(false && "other lookup recordedIsCascadingUse differs");
   }
   return true;
 }

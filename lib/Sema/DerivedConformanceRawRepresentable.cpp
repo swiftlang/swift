@@ -136,7 +136,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
 static void maybeMarkAsInlinable(DerivedConformance &derived,
                                  AbstractFunctionDecl *afd) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
   if (!parentDC->getParentModule()->isResilient()) {
     AccessScope access =
@@ -150,7 +150,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
 }
 
 static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto parentDC = derived.getConformanceContext();
@@ -393,19 +393,18 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
 static ConstructorDecl *
 deriveRawRepresentable_init(DerivedConformance &derived) {
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  ASTContext &C = derived.Context;
 
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto parentDC = derived.getConformanceContext();
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
 
-  auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
-                                       KnownProtocolKind::Equatable);
+  auto equatableProto = TypeChecker::getProtocol(C, enumDecl->getLoc(),
+                                                 KnownProtocolKind::Equatable);
   assert(equatableProto);
-  assert(TypeChecker::conformsToProtocol(rawType, equatableProto,
-                                         enumDecl, None));
+  assert(
+      TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
   (void)rawType;
 
@@ -430,7 +429,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the interface type of the initializer.
-  initDecl->computeType();
+  (void)initDecl->getInterfaceType();
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
 
@@ -446,7 +445,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
 static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
-  auto &tc = derived.TC;
 
   Type rawType = enumDecl->getRawType();
   if (!rawType)
@@ -462,12 +460,13 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   // The raw type must be Equatable, so that we have a suitable ~= for
   // synthesized switch statements.
   auto equatableProto =
-      tc.getProtocol(enumDecl->getLoc(), KnownProtocolKind::Equatable);
+      TypeChecker::getProtocol(enumDecl->getASTContext(), enumDecl->getLoc(),
+                               KnownProtocolKind::Equatable);
   if (!equatableProto)
     return false;
 
-  if (!TypeChecker::conformsToProtocol(rawType, equatableProto,
-                                       enumDecl, None))
+  if (TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl, None)
+          .isInvalid())
     return false;
   
   // There must be enum elements.
@@ -483,8 +482,6 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
     if (elt->hasAssociatedValues())
       return false;
 
-    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-    (void)elt->getInterfaceType();
     if (elt->isInvalid()) {
       return false;
     }
@@ -504,14 +501,14 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (!canSynthesizeRawRepresentable(*this))
     return nullptr;
 
-  if (requirement->getBaseName() == TC.Context.Id_rawValue)
+  if (requirement->getBaseName() == Context.Id_rawValue)
     return deriveRawRepresentable_raw(*this);
 
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveRawRepresentable_init(*this);
 
-  TC.diagnose(requirement->getLoc(),
-              diag::broken_raw_representable_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_raw_representable_requirement);
   return nullptr;
 }
 
@@ -525,10 +522,11 @@ Type DerivedConformance::deriveRawRepresentable(AssociatedTypeDecl *assocType) {
   if (!canSynthesizeRawRepresentable(*this))
     return nullptr;
 
-  if (assocType->getName() == TC.Context.Id_RawValue) {
+  if (assocType->getName() == Context.Id_RawValue) {
     return deriveRawRepresentable_Raw(*this);
   }
 
-  TC.diagnose(assocType->getLoc(), diag::broken_raw_representable_requirement);
+  Context.Diags.diagnose(assocType->getLoc(),
+                         diag::broken_raw_representable_requirement);
   return nullptr;
 }

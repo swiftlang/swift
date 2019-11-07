@@ -25,6 +25,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Mangler.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/FileSystem.h"
 #include <vector>
@@ -85,7 +86,14 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
   std::vector<StringRef> irNotTBD;
 
   for (auto &nameValue : IRModule.getValueSymbolTable()) {
-    auto name = nameValue.getKey();
+    // TBDGen inserts mangled names (usually with a leading '_') into its
+    // symbol table, so make sure to mangle IRGen names before comparing them
+    // with what TBDGen created.
+    auto unmangledName = nameValue.getKey();
+    SmallString<128> name;
+    llvm::Mangler::getNameWithPrefix(name, unmangledName,
+                                     IRModule.getDataLayout());
+
     auto value = nameValue.getValue();
     if (auto GV = dyn_cast<llvm::GlobalValue>(value)) {
       // Is this a symbol that should be listed?
@@ -94,7 +102,9 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
       if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
         if (!symbols.erase(name))
-          irNotTBD.push_back(name);
+          // Note: Add the unmangled name to the irNotTBD list, which is owned
+          //       by the IRModule, instead of the mangled name.
+          irNotTBD.push_back(unmangledName);
       }
     } else {
       assert(symbols.find(name) == symbols.end() &&

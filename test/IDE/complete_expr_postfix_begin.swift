@@ -563,6 +563,7 @@ func testTuple(localInt: Int) {
 var ownInit1: Int = #^OWN_INIT_1^#
 // OWN_INIT_1: Begin completions
 // OWN_INIT_1-NOT: ownInit1
+func sync() {}
 var ownInit2: () -> Void = { #^OWN_INIT_2^# }
 // OWN_INIT_2: Begin completions
 // OWN_INIT_2-NOT: ownInit2

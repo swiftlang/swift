@@ -681,17 +681,12 @@ public:
   /// \param toType The type to coerce the expression to.
   /// \param locator Locator used to describe the location of this expression.
   ///
-  /// \param ignoreTopLevelInjection Whether to suppress diagnostics
-  /// on a suspicious top-level optional injection (because the caller already
-  /// diagnosed it).
-  ///
   /// \param typeFromPattern Optionally, the caller can specify the pattern
   /// from where the toType is derived, so that we can deliver better fixit.
   ///
   /// \returns the coerced expression, which will have type \c ToType.
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
-                     bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
   /// Compute the set of substitutions for a generic signature opened at the
@@ -702,7 +697,12 @@ public:
   /// \param locator The locator that describes where the substitutions came
   /// from.
   SubstitutionMap computeSubstitutions(GenericSignature sig,
-                                       ConstraintLocatorBuilder locator) const;
+                                       ConstraintLocator *locator) const;
+
+  /// Resolves the contextual substitutions for a reference to a declaration
+  /// at a given locator.
+  ConcreteDeclRef
+  resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocator *locator) const;
 
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
@@ -720,7 +720,8 @@ public:
   Type getFixedType(TypeVariableType *typeVar) const;
 
   /// Try to resolve the given locator to a declaration within this
-  /// solution.
+  /// solution. Note that this only returns a decl for a direct reference such
+  /// as \c x.foo and will not return a decl for \c x.foo().
   ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
 
   /// Retrieve the overload choice associated with the given
@@ -1246,7 +1247,8 @@ private:
         }
       }
 
-      unsigned threshold = cs->TC.getLangOpts().SolverShrinkUnsolvedThreshold;
+      unsigned threshold =
+          cs->getASTContext().LangOpts.SolverShrinkUnsolvedThreshold;
       return unsolvedDisjunctions >= threshold;
     }
   };
@@ -2049,7 +2051,13 @@ public:
   /// anchored on \c functionA(functionB()) with path elements pointing to the
   /// argument \c functionB(), the returned callee locator will describe
   /// \c functionA rather than \c functionB.
-  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator);
+  ///
+  /// \param locator The input locator.
+  /// \param lookThroughApply Whether to look through applies. If false, a
+  /// callee locator will only be returned for a direct reference such as
+  /// \c x.foo rather than \c x.foo().
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
+                                      bool lookThroughApply = true);
 
 public:
 
@@ -2150,6 +2158,12 @@ public:
   /// \returns the joined type, which is generally a new type variable.
   Type addJoinConstraint(ConstraintLocator *locator,
                          ArrayRef<std::pair<Type, ConstraintLocator *>> inputs);
+
+  /// Add a constraint to the constraint system with an associated fix.
+  void addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
+                        Type first, Type second,
+                        ConstraintLocatorBuilder locator,
+                        bool isFavored = false);
 
   /// Add a key path application constraint to the constraint system.
   void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
@@ -3873,7 +3887,10 @@ public:
   /// parameter.
   ///
   /// \param argIdx The index of the extra argument.
-  virtual void extraArgument(unsigned argIdx);
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool extraArgument(unsigned argIdx);
 
   /// Indicates that no argument was provided for the parameter at the given
   /// indices.
@@ -3944,7 +3961,7 @@ public:
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+bool matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const ParameterListInfo &paramInfo,
                         bool hasTrailingClosure,
@@ -3954,6 +3971,7 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
+                   FunctionType *contextualType,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintKind subKind,

@@ -258,9 +258,6 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<std::string>
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
-  if (!D->getInterfaceType())
-    return std::string();
-
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
 
@@ -342,8 +339,6 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
 }
 
 bool ide::printDeclUSR(const Decl *D, raw_ostream &OS) {
-  if (D->isImplicit())
-    return true;
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (ide::printValueDeclUSR(VD, OS)) {
       return true;

@@ -24,7 +24,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-% for node in SYNTAX_NODES + PARSEONLY_NODES:
+% for node in SYNTAX_NODES:
 %   if node.requires_validation():
 void ${node.name}::validate() const {
 #ifndef NDEBUG
@@ -55,14 +55,14 @@ void ${node.name}::validate() const {
 
 %   for child in node.children:
 %     if child.is_optional:
-llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() const {
+llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() {
   auto ChildData = Data->getChild(Cursor::${child.name});
   if (!ChildData)
     return llvm::None;
   return ${child.type_name} {Root, ChildData.get()};
 }
 %     else:
-${child.type_name} ${node.name}::get${child.name}() const {
+${child.type_name} ${node.name}::get${child.name}() {
   return ${child.type_name} {Root, Data->getChild(Cursor::${child.name}).get()};
 }
 %     end

@@ -188,7 +188,7 @@ public:
     TokKind = uint16_t(tok::unknown);
     DK = DataKind::Null;
     IsMissing = false;
- }
+  }
 
   ParsedRawSyntaxNode unsafeCopy() const {
     ParsedRawSyntaxNode copy;
@@ -213,7 +213,7 @@ public:
   }
 
   CharSourceRange getDeferredRange() const {
-    switch (DK) { 
+    switch (DK) {
     case DataKind::DeferredLayout:
       return getDeferredLayoutRange();
     case DataKind::DeferredToken:
@@ -222,7 +222,7 @@ public:
       llvm_unreachable("node not deferred");
     }
   }
-  
+
   // Recorded Data ===========================================================//
 
   CharSourceRange getRecordedRange() const {
@@ -250,10 +250,12 @@ public:
     assert(DK == DataKind::DeferredLayout);
     return DeferredLayout.Children;
   }
+
   MutableArrayRef<ParsedRawSyntaxNode> getDeferredChildren() {
     assert(DK == DataKind::DeferredLayout);
     return DeferredLayout.Children;
   }
+
   ParsedRawSyntaxNode copyDeferred() const {
     ParsedRawSyntaxNode copy;
     switch (DK) {

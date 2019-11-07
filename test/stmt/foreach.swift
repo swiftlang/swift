@@ -5,7 +5,7 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
+  for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
 }
 
 struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
@@ -14,6 +14,7 @@ struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does n
 
 func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
+  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
@@ -22,6 +23,7 @@ struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does n
 
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
+  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 struct BadIterator1 {}
@@ -33,6 +35,7 @@ struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does n
 
 func bad_containers_4(bc: BadContainer4) {
   for e in bc { }
+  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 // Pattern type-checking
@@ -171,9 +174,7 @@ func testMatchingPatterns() {
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
   let array : [Int]?
-  for x in array {  // expected-error {{value of optional type '[Int]?' must be unwrapped}}
-    // expected-note@-1{{coalesce}}
-    // expected-note@-2{{force-unwrap}}
+  for x in array {  // expected-error {{for-in loop requires '[Int]?' to conform to 'Sequence'; did you mean to unwrap optional?}}
   }
 }
 

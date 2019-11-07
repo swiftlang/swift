@@ -113,6 +113,7 @@ protected:
     auto error =
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()}, tempDir,
         "Library.swiftmodule", "Library.swiftdoc", "Library.swiftsourceinfo",
+        /*ModuleInterfacePath*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());

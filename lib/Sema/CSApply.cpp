@@ -58,14 +58,13 @@ static bool isOpenedAnyObject(Type type) {
   return archetype->getOpenedExistentialType()->isAnyObject();
 }
 
-SubstitutionMap Solution::computeSubstitutions(
-                               GenericSignature sig,
-                               ConstraintLocatorBuilder locatorBuilder) const {
+SubstitutionMap
+Solution::computeSubstitutions(GenericSignature sig,
+                               ConstraintLocator *locator) const {
   if (sig.isNull())
     return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.
-  auto locator = getConstraintSystem().getConstraintLocator(locatorBuilder);
   auto openedTypes = OpenedTypes.find(locator);
 
   // If we have a member reference on an existential, there are no
@@ -78,8 +77,8 @@ SubstitutionMap Solution::computeSubstitutions(
     subs[opened.first] = getFixedType(opened.second);
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolDecl *protoType)
-          -> Optional<ProtocolConformanceRef> {
+      [&](CanType original, Type replacement,
+          ProtocolDecl *protoType) -> ProtocolConformanceRef {
     if (replacement->hasError() ||
         isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
@@ -94,6 +93,17 @@ SubstitutionMap Solution::computeSubstitutions(
   return SubstitutionMap::get(sig,
                               QueryTypeSubstitutionMap{subs},
                               lookupConformanceFn);
+}
+
+ConcreteDeclRef
+Solution::resolveConcreteDeclRef(ValueDecl *decl,
+                                 ConstraintLocator *locator) const {
+  if (!decl)
+    return ConcreteDeclRef();
+
+  // Get the generic signatue of the decl and compute the substitutions.
+  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+  return ConcreteDeclRef(decl, computeSubstitutions(sig, locator));
 }
 
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
@@ -262,7 +272,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
 static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
                                                DeclContext *dc,
                                                ConstraintSystem &cs) {
-  auto &ctx = cs.TC.Context;
+  auto &ctx = cs.getASTContext();
 
   auto *stringDecl = ctx.getStringDecl();
   auto stringType = stringDecl->getDeclaredType();
@@ -426,9 +436,9 @@ namespace {
               TypeChecker::conformsToProtocol(
                         baseTy, proto, cs.DC,
                         ConformanceCheckFlags::InExpression);
-            if (conformance && conformance->isConcrete()) {
+            if (conformance.isConcrete()) {
               if (auto witness =
-                      conformance->getConcrete()->getWitnessDecl(decl)) {
+                      conformance.getConcrete()->getWitnessDecl(decl)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
                 // FIXME: the hop through 'getDecl()' is because
@@ -490,13 +500,9 @@ namespace {
         return typeExpr;
       }
 
-      auto substitutions =
-          solution.computeSubstitutions(
-            decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            locator);
+      auto ref = resolveConcreteDeclRef(decl, locator);
       auto declRefExpr =
-        new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
-                              loc, implicit, semantics, type);
+          new (ctx) DeclRefExpr(ref, loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       return forceUnwrapIfExpected(declRefExpr, choice, locator);
@@ -526,6 +532,35 @@ namespace {
 
     /// A stack of expressions being walked, used to compute existential depth.
     llvm::SmallVector<Expr *, 8> ExprStack;
+
+    /// A map of apply exprs to their callee locators. This is necessary
+    /// because after rewriting an apply's function expr, its callee locator
+    /// will no longer be equivalent to the one stored in the solution.
+    llvm::DenseMap<ApplyExpr *, ConstraintLocator *> CalleeLocators;
+
+    /// A cache of decl references with their contextual substitutions for a
+    /// given callee locator.
+    llvm::DenseMap<ConstraintLocator *, ConcreteDeclRef> CachedConcreteRefs;
+
+    /// Resolves the contextual substitutions for a reference to a declaration
+    /// at a given locator. This should be preferred to
+    /// Solution::resolveConcreteDeclRef as it caches the result.
+    ConcreteDeclRef
+    resolveConcreteDeclRef(ValueDecl *decl, ConstraintLocatorBuilder locator) {
+      if (!decl)
+        return ConcreteDeclRef();
+
+      // Cache the resulting concrete reference. Ideally this would be done on
+      // Solution, however unfortunately that would require a const_cast which
+      // would be undefined behaviour if we ever had a `const Solution`.
+      auto *loc = getConstraintSystem().getConstraintLocator(locator);
+      auto &ref = CachedConcreteRefs[loc];
+      if (!ref)
+        ref = solution.resolveConcreteDeclRef(decl, loc);
+
+      assert(ref.getDecl() == decl);
+      return ref;
+    }
 
     /// Members which are AbstractFunctionDecls but not FuncDecls cannot
     /// mutate self.
@@ -751,12 +786,7 @@ namespace {
       }
 
       // Build a member reference.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(
-            member->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            memberLocator);
-      auto memberRef = ConcreteDeclRef(member, substitutions);
-
+      auto memberRef = resolveConcreteDeclRef(member, memberLocator);
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
@@ -1001,7 +1031,7 @@ namespace {
         }
       }
 
-      return finishApply(apply, openedType, locator);
+      return finishApply(apply, memberRef, openedType, locator);
     }
     
     /// Describes either a type or the name of a type to be resolved.
@@ -1060,12 +1090,14 @@ namespace {
     /// \param apply The function application to finish type-checking, which
     /// may be a newly-built expression.
     ///
+    /// \param callee The callee for the function being applied.
+    ///
     /// \param openedType The "opened" type this expression had during
     /// type checking, which will be used to specialize the resulting,
     /// type-checked expression appropriately.
     ///
     /// \param locator The locator for the original expression.
-    Expr *finishApply(ApplyExpr *apply, Type openedType,
+    Expr *finishApply(ApplyExpr *apply, ConcreteDeclRef callee, Type openedType,
                       ConstraintLocatorBuilder locator);
 
     // Resolve `@dynamicCallable` applications.
@@ -1129,6 +1161,7 @@ namespace {
     ///
     /// \param arg The argument expression.
     /// \param funcType The function type.
+    /// \param callee The callee for the function being applied.
     /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
     /// \param hasTrailingClosure Whether the last argument is a trailing
@@ -1138,7 +1171,7 @@ namespace {
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *
     coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
-                        ApplyExpr *apply,
+                        ConcreteDeclRef callee, ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
                         bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
@@ -1362,14 +1395,17 @@ namespace {
 
       // If we opened up an existential when performing the subscript, open
       // the base accordingly.
+      auto memberLoc = locator.withPathElement(locatorKind);
       auto knownOpened = solution.OpenedExistentialTypes.find(
-                           getConstraintSystem().getConstraintLocator(
-                             locator.withPathElement(locatorKind)));
+          cs.getConstraintLocator(memberLoc));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
       }
- 
+
+      // Compute the concrete reference to the subscript.
+      auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
+
       // Figure out the index and result types.
       Type resultTy;
       if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup &&
@@ -1379,7 +1415,7 @@ namespace {
         resultTy = subscriptFnTy->getResult();
 
         // Coerce the index argument.
-        index = coerceCallArguments(index, subscriptFnTy, nullptr,
+        index = coerceCallArguments(index, subscriptFnTy, subscriptRef, nullptr,
                                     argLabels, hasTrailingClosure,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));
@@ -1397,15 +1433,6 @@ namespace {
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
       };
-
-      // Form the subscript expression.
-
-      // Compute the substitutions used to reference the subscript.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(
-          subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
-          locator.withPathElement(locatorKind));
-      ConcreteDeclRef subscriptRef(subscript, substitutions);
 
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
@@ -1472,18 +1499,12 @@ namespace {
 
     /// Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, Expr *base,
+                                   ConcreteDeclRef ref, Expr *base,
                                    DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
-
-      // Compute the concrete reference.
-      SubstitutionMap substitutions =
-        solution.computeSubstitutions(ctor->getGenericSignature(), locator);
-
-      auto ref = ConcreteDeclRef(ctor, substitutions);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -1718,7 +1739,7 @@ namespace {
       FuncDecl *fn = nullptr;
 
       if (bridgedToObjectiveCConformance) {
-        assert(bridgedToObjectiveCConformance->getConditionalRequirements()
+        assert(bridgedToObjectiveCConformance.getConditionalRequirements()
                    .empty() &&
                "cannot conditionally conform to _BridgedToObjectiveC");
         // The conformance to _BridgedToObjectiveC is statically known.
@@ -1745,16 +1766,16 @@ namespace {
       auto genericSig = fn->getGenericSignature();
 
       auto subMap = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) -> Type {
-          assert(type->isEqual(genericSig->getGenericParams()[0]));
-          return valueType;
-        },
-        [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
-          -> ProtocolConformanceRef {
-          assert(bridgedToObjectiveCConformance);
-          return *bridgedToObjectiveCConformance;
-        });
+          genericSig,
+          [&](SubstitutableType *type) -> Type {
+            assert(type->isEqual(genericSig->getGenericParams()[0]));
+            return valueType;
+          },
+          [&](CanType origType, Type replacementType,
+              ProtocolDecl *protoType) -> ProtocolConformanceRef {
+            assert(bridgedToObjectiveCConformance);
+            return bridgedToObjectiveCConformance;
+          });
 
       ConcreteDeclRef fnSpecRef(fn, subMap);
 
@@ -1816,12 +1837,12 @@ namespace {
         return expr;
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByIntegerLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1830,9 +1851,9 @@ namespace {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-      if (auto floatProtocol
-            = tc.getProtocol(expr->getLoc(),
-                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
+      if (auto floatProtocol = TypeChecker::getProtocol(
+              cs.getASTContext(), expr->getLoc(),
+              KnownProtocolKind::ExpressibleByFloatLiteral)) {
         if (auto defaultFloatType = tc.getDefaultType(floatProtocol, dc)) {
           if (defaultFloatType->isEqual(type))
             type = defaultFloatType;
@@ -1867,8 +1888,9 @@ namespace {
       }
 
       auto &tc = cs.getTypeChecker();
-      auto *protocol = tc.getProtocol(expr->getLoc(),
-                                      KnownProtocolKind::ExpressibleByNilLiteral);
+      auto *protocol =
+          TypeChecker::getProtocol(cs.getASTContext(), expr->getLoc(),
+                                   KnownProtocolKind::ExpressibleByNilLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1899,12 +1921,12 @@ namespace {
         return expr;
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByFloatLiteral);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByFloatLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1918,7 +1940,6 @@ namespace {
       auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
 
       if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->getInterfaceType() ||
           !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
@@ -1943,12 +1964,12 @@ namespace {
         return expr;
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBooleanLiteral);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBooleanLiteral);
+      ProtocolDecl *builtinProtocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral);
       if (!protocol || !builtinProtocol)
         return nullptr;
 
@@ -1980,24 +2001,25 @@ namespace {
 
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
-      ProtocolDecl *protocol = tc.getProtocol(
-          expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
+      ProtocolDecl *protocol = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC,
-                                           ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(
+              type, protocol, cs.DC, ConformanceCheckFlags::InExpression)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
-        protocol = tc.getProtocol(
-            expr->getLoc(),
+        protocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!TypeChecker::conformsToProtocol(type, protocol, cs.DC,
-                                           ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(
+              type, protocol, cs.DC, ConformanceCheckFlags::InExpression)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
-        protocol = tc.getProtocol(
-            expr->getLoc(),
+        protocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = false;
@@ -2023,8 +2045,8 @@ namespace {
         literalFuncName = DeclName(tc.Context, DeclBaseName::createConstructor(),
                                    { tc.Context.Id_stringLiteral });
 
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
+        builtinProtocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
         builtinLiteralFuncName
           = DeclName(tc.Context, DeclBaseName::createConstructor(),
@@ -2049,9 +2071,10 @@ namespace {
                        tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
 
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
+        builtinProtocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
+            KnownProtocolKind::
+                ExpressibleByBuiltinExtendedGraphemeClusterLiteral);
         brokenProtocolDiag =
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
@@ -2067,8 +2090,8 @@ namespace {
           = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_builtinUnicodeScalarLiteral});
 
-        builtinProtocol = tc.getProtocol(
-            expr->getLoc(),
+        builtinProtocol = TypeChecker::getProtocol(
+            cs.getASTContext(), expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral);
 
         brokenProtocolDiag = diag::unicode_scalar_literal_broken_proto;
@@ -2104,10 +2127,10 @@ namespace {
       auto loc = expr->getStartLoc();
 
       auto fetchProtocolInitWitness =
-        [&](KnownProtocolKind protocolKind, Type type,
-            ArrayRef<Identifier> argLabels) -> ConcreteDeclRef {
-
-        auto proto = tc.getProtocol(loc, protocolKind);
+          [&](KnownProtocolKind protocolKind, Type type,
+              ArrayRef<Identifier> argLabels) -> ConcreteDeclRef {
+        auto proto =
+            TypeChecker::getProtocol(cs.getASTContext(), loc, protocolKind);
         assert(proto && "Missing string interpolation protocol?");
 
         auto conformance =
@@ -2118,15 +2141,15 @@ namespace {
         DeclName constrName(tc.Context, DeclBaseName::createConstructor(), argLabels);
 
         ConcreteDeclRef witness =
-            conformance->getWitnessByName(type->getRValueType(), constrName);
+            conformance.getWitnessByName(type->getRValueType(), constrName);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         return witness;
       };
 
-      auto *interpolationProto = 
-        tc.getProtocol(expr->getLoc(),
-             KnownProtocolKind::ExpressibleByStringInterpolation);
+      auto *interpolationProto = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringInterpolation);
       auto associatedTypeDecl = interpolationProto->getAssociatedType(
           tc.Context.Id_StringInterpolation);
       if (associatedTypeDecl == nullptr) {
@@ -2214,7 +2237,7 @@ namespace {
       }
 
       // Find the appropriate object literal protocol.
-      auto proto = tc.getLiteralProtocol(expr);
+      auto proto = TypeChecker::getLiteralProtocol(cs.getASTContext(), expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
         TypeChecker::conformsToProtocol(conformingType, proto, cs.DC,
@@ -2223,9 +2246,8 @@ namespace {
 
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
 
-      ConcreteDeclRef witness =
-        conformance->getWitnessByName(conformingType->getRValueType(),
-                                      constrName);
+      ConcreteDeclRef witness = conformance.getWitnessByName(
+          conformingType->getRValueType(), constrName);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -2436,10 +2458,11 @@ namespace {
       // Build the member reference.
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+      auto *exprLoc = cs.getConstraintLocator(expr);
       auto result = buildMemberRef(
           base, selected.openedFullType, expr->getDotLoc(), selected.choice,
           expr->getNameLoc(), selected.openedType,
-          cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
+          exprLoc, memberLocator, expr->isImplicit(),
           selected.choice.getFunctionRefKind(), AccessSemantics::Ordinary,
           isDynamic);
       if (!result)
@@ -2451,11 +2474,13 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
+        auto callee = resolveConcreteDeclRef(selected.choice.getDecl(),
+                                             memberLocator);
         ApplyExpr *apply = CallExpr::create(
             tc.Context, result, arg, expr->getArgumentLabels(),
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
-        result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+        result = finishApply(apply, callee, Type(), exprLoc);
 
         // FIXME: Application could fail, because some of the solutions
         // are not expressible in AST (yet?), like certain tuple-to-tuple
@@ -2509,10 +2534,9 @@ namespace {
           auto baseTyNominalDecl = baseTyUnwrapped
                                    ->getNominalOrBoundGenericNominal();
           auto &tc = cs.getTypeChecker();
-          auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
-                                         baseTyUnwrapped,
-                                         memberName,
-                                         defaultMemberLookupOptions);
+          auto results = TypeChecker::lookupMember(
+              baseTyNominalDecl->getModuleContext(), baseTyUnwrapped,
+              memberName, defaultMemberLookupOptions);
 
           // Filter out any functions, instance members, enum cases with
           // associated values or variables whose type does not match the
@@ -2571,10 +2595,6 @@ namespace {
     /// forced downcasts.
     SmallVector<InjectIntoOptionalExpr *, 4> SuspiciousOptionalInjections;
 
-  public:
-    /// A list of optional injections that have been diagnosed.
-    llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
-  private:
     /// Create a member reference to the given constructor.
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                            DeclNameLoc nameLoc, bool implicit,
@@ -2634,12 +2654,13 @@ namespace {
       }
 
       // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, base, nameLoc,
-                                               ctorLocator, implicit);
+      auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
+      Expr *ctorRef = buildOtherConstructorRef(openedType, callee, base,
+                                               nameLoc, ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
 
-      return finishApply(call, cs.getType(expr),
+      return finishApply(call, callee, cs.getType(expr),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
     }
@@ -2910,9 +2931,9 @@ namespace {
       Type arrayTy = cs.getType(expr);
       auto &tc = cs.getTypeChecker();
 
-      ProtocolDecl *arrayProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByArrayLiteral);
+      ProtocolDecl *arrayProto = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByArrayLiteral);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       auto conformance =
@@ -2923,7 +2944,7 @@ namespace {
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
       ConcreteDeclRef witness =
-        conformance->getWitnessByName(arrayTy->getRValueType(), name);
+          conformance.getWitnessByName(arrayTy->getRValueType(), name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -2956,20 +2977,20 @@ namespace {
       Type dictionaryTy = cs.getType(expr);
 
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *dictionaryProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      ProtocolDecl *dictionaryProto = TypeChecker::getProtocol(
+          cs.getASTContext(), expr->getLoc(),
+          KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       auto conformance =
         TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC,
                                         ConformanceCheckFlags::InExpression);
-      if (!conformance)
+      if (conformance.isInvalid())
         return nullptr;
 
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_dictionaryLiteral });
       ConcreteDeclRef witness =
-        conformance->getWitnessByName(dictionaryTy->getRValueType(), name);
+          conformance.getWitnessByName(dictionaryTy->getRValueType(), name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -3064,9 +3085,19 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      return finishApply(expr, cs.getType(expr),
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr)));
+      auto *calleeLoc = CalleeLocators[expr];
+      assert(calleeLoc);
+
+      // Resolve the callee for the application if we have one. Note that we're
+      // using `resolveConcreteDeclRef` instead `solution.resolveLocatorToDecl`
+      // here to benefit from ExprRewriter's cache of concrete refs.
+      ConcreteDeclRef callee;
+      if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc)) {
+        auto *decl = overload->choice.getDeclOrNull();
+        callee = resolveConcreteDeclRef(decl, calleeLoc);
+      }
+      return finishApply(expr, callee, cs.getType(expr),
+                         cs.getConstraintLocator(expr));
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
@@ -4493,7 +4524,6 @@ namespace {
           SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
-      param->setType(baseTy);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
       param->setSpecifier(ParamSpecifier::Default);
 
@@ -4509,7 +4539,6 @@ namespace {
                               /*argument label*/ SourceLoc(), Identifier(),
                               /*parameter name*/ SourceLoc(),
                               ctx.getIdentifier("$kp$"), outerClosure);
-      outerParam->setType(keyPathTy);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
       outerParam->setSpecifier(ParamSpecifier::Default);
 
@@ -4544,6 +4573,10 @@ namespace {
       outerClosure->setType(outerClosureTy);
       cs.cacheType(outerClosure);
 
+      // The inner closure at least will definitely have a capture.
+      cs.TC.ClosuresWithUncomputedCaptures.push_back(outerClosure);
+      cs.TC.ClosuresWithUncomputedCaptures.push_back(closure);
+
       // let outerApply = "\( outerClosure )( \(E) )"
       auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
       outerApply->setType(closureTy);
@@ -4565,17 +4598,11 @@ namespace {
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
 
-        auto dc = property->getInnermostDeclContext();
-
-        // Compute substitutions to refer to the member.
-        SubstitutionMap subs = solution.computeSubstitutions(
-            dc->getGenericSignatureOfContext(), locator);
-
         auto resolvedTy = overload.openedType;
         resolvedTy = simplifyType(resolvedTy);
 
-        auto ref = ConcreteDeclRef(property, subs);
-
+        // Compute the concrete reference to the member.
+        auto ref = resolveConcreteDeclRef(property, locator);
         return KeyPathExpr::Component::forProperty(ref, resolvedTy,
                                                    componentLoc);
       }
@@ -4597,16 +4624,13 @@ namespace {
       auto dc = subscript->getInnermostDeclContext();
 
       auto indexType = AnyFunctionType::composeInput(
-          cs.TC.Context,
+          cs.getASTContext(),
           subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
           /*canonicalVararg=*/false);
 
-      SubstitutionMap subs;
-      if (auto sig = dc->getGenericSignatureOfContext()) {
-        // Compute substitutions to refer to the member.
-        subs = solution.computeSubstitutions(sig, locator);
-        indexType = indexType.subst(subs);
-      }
+      // Compute substitutions to refer to the member.
+      auto ref = resolveConcreteDeclRef(subscript, locator);
+      indexType = indexType.subst(ref.getSubstitutions());
 
       // If this is a @dynamicMemberLookup reference to resolve a property
       // through the subscript(dynamicMember:) member, restore the
@@ -4639,11 +4663,10 @@ namespace {
       auto subscriptType =
           simplifyType(overload.openedType)->castTo<AnyFunctionType>();
       auto resolvedTy = subscriptType->getResult();
-      auto ref = ConcreteDeclRef(subscript, subs);
 
       // Coerce the indices to the type the subscript expects.
       auto *newIndexExpr =
-          coerceCallArguments(indexExpr, subscriptType,
+          coerceCallArguments(indexExpr, subscriptType, ref,
                               /*applyExpr*/ nullptr, labels,
                               /*hasTrailingClosure*/ false, locator);
 
@@ -4667,9 +4690,9 @@ namespace {
         auto hashableConformance =
           TypeChecker::conformsToProtocol(indexType, hashable, cs.DC,
                                           ConformanceCheckFlags::InExpression);
-        assert(hashableConformance.hasValue());
+        assert(hashableConformance);
 
-        conformances.push_back(*hashableConformance);
+        conformances.push_back(hashableConformance);
       }
 
       component.setSubscriptIndexHashableConformances(conformances);
@@ -4688,7 +4711,6 @@ namespace {
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 
-      E->getVar()->setType(type);
       E->getVar()->setInterfaceType(type->mapTypeOutOfContext());
 
       cs.setType(E, type);
@@ -4699,6 +4721,12 @@ namespace {
 
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
+      // If we have an apply, make a note of its callee locator prior to
+      // rewriting.
+      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+        auto *calleeLoc = cs.getCalleeLocator(cs.getConstraintLocator(expr));
+        CalleeLocators[apply] = calleeLoc;
+      }
       ExprStack.push_back(expr);
     }
 
@@ -4719,11 +4747,6 @@ namespace {
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
-        // If we already diagnosed this injection, we're done.
-        if (DiagnosedOptionalInjections.count(injection)) {
-          continue;
-        }
-
         auto *cast = findForcedDowncast(tc.Context, injection->getSubExpr());
         if (!cast)
           continue;
@@ -4760,201 +4783,17 @@ namespace {
   };
 } // end anonymous namespace
 
-
-/// Resolve a locator to the specific declaration it references, if possible.
-///
-/// \param cs The constraint system in which the locator will be resolved.
-///
-/// \param locator The locator to resolve.
-///
-/// \param findOvlChoice A function that searches for the overload choice
-/// associated with the given locator, or an empty optional if there is no such
-/// overload.
-///
-/// \returns the decl to which the locator resolved.
-///
-static ConcreteDeclRef resolveLocatorToDecl(
-    ConstraintSystem &cs, ConstraintLocator *locator,
-    llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
-        findOvlChoice,
-    llvm::function_ref<ConcreteDeclRef(ValueDecl *decl, Type openedType,
-                                       ConstraintLocator *declLocator)>
-        getConcreteDeclRef) {
-  assert(locator && "Null locator");
-  if (!locator->getAnchor())
+ConcreteDeclRef
+Solution::resolveLocatorToDecl(ConstraintLocator *locator) const {
+  // Get the callee locator without looking through applies, ensuring we only
+  // return a decl for a direct reference.
+  auto *calleeLoc =
+      constraintSystem->getCalleeLocator(locator, /*lookThroughApply*/ false);
+  auto overload = getOverloadChoiceIfAvailable(calleeLoc);
+  if (!overload)
     return ConcreteDeclRef();
 
-  auto anchor = locator->getAnchor();
-  // Unwrap any specializations, constructor calls, implicit conversions, and
-  // '.'s.
-  // FIXME: This is brittle.
-  do {
-    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
-      anchor = specialize->getSubExpr();
-      continue;
-    }
-
-    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
-      anchor = implicit->getSubExpr();
-      continue;
-    }
-
-    if (auto identity = dyn_cast<IdentityExpr>(anchor)) {
-      anchor = identity->getSubExpr();
-      continue;
-    }
-
-    if (auto tryExpr = dyn_cast<AnyTryExpr>(anchor)) {
-      if (isa<OptionalTryExpr>(tryExpr))
-        break;
-
-      anchor = tryExpr->getSubExpr();
-      continue;
-    }
-
-    if (auto selfApply = dyn_cast<SelfApplyExpr>(anchor)) {
-      anchor = selfApply->getFn();
-      continue;
-    }
-
-    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
-      anchor = dotSyntax->getRHS();
-      continue;
-    }
-
-    if (auto *OEE = dyn_cast<OpenExistentialExpr>(anchor)) {
-      anchor = OEE->getSubExpr();
-      continue;
-    }
-
-    break;
-  } while (true);
-  
-  // Simple case: direct reference to a declaration.
-  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
-    return dre->getDeclRef();
-    
-  // Simple case: direct reference to a declaration.
-  if (auto mre = dyn_cast<MemberRefExpr>(anchor))
-    return mre->getMember();
-  
-  if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
-    return ctorRef->getDeclRef();
-
-  if (isa<OverloadedDeclRefExpr>(anchor) ||
-      isa<UnresolvedDeclRefExpr>(anchor)) {
-    // Overloaded and unresolved cases: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-  
-  if (isa<UnresolvedMemberExpr>(anchor)) {
-    // Unresolved member: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor,
-                           ConstraintLocator::UnresolvedMember);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-
-  if (isa<UnresolvedDotExpr>(anchor)) {
-    // Unresolved member: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor,
-                                                 ConstraintLocator::Member);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-
-  if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
-    // Subscript expressions may have a declaration. If so, use it.
-    if (subscript->hasDecl())
-      return subscript->getDecl();
-
-    // Otherwise, find the resolved overload.
-    auto anchorLocator =
-      cs.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
-    if (auto selected = findOvlChoice(anchorLocator)) {
-      if (auto *decl = selected->choice.getDeclOrNull())
-        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
-    }
-  }
-
-  if (auto subscript = dyn_cast<DynamicSubscriptExpr>(anchor)) {
-    // Dynamic subscripts are always resolved.
-    return subscript->getMember();
-  }
-
-  return ConcreteDeclRef();
-}
-
-ConcreteDeclRef Solution::resolveLocatorToDecl(
-                  ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-
-  // Simplify the locator.
-  SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-
-  // If we didn't map down to a specific expression, we can't handle a default
-  // argument.
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
-
-  if (auto resolved
-        = ::resolveLocatorToDecl(cs, locator,
-            [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-              auto known = overloadChoices.find(locator);
-              if (known == overloadChoices.end()) {
-                return None;
-              }
-
-              return known->second;
-            },
-            [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
-                  -> ConcreteDeclRef {
-              SubstitutionMap subs =
-                computeSubstitutions(
-                  decl->getInnermostDeclContext()
-                      ->getGenericSignatureOfContext(),
-                locator);
-              return ConcreteDeclRef(decl, subs);
-            })) {
-    return resolved;
-  }
-
-  return ConcreteDeclRef();
-}
-
-/// Given a constraint locator, find the declaration reference
-/// to the callee, it is a call to a declaration.
-static ConcreteDeclRef
-findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
-                  ConstraintLocator *locator) {
-  if (locator->getPath().empty() || !locator->getAnchor())
-    return nullptr;
-
-  // If the locator points to a function application, find the function itself.
-  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
-    assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
-           "ApplyArgument adds no flags");
-    SmallVector<LocatorPathElt, 4> newPath;
-    newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
-
-    unsigned newFlags = locator->getSummaryFlags();
-    newPath.push_back(ConstraintLocator::ApplyFunction);
-
-    assert(newPath.back().getNewSummaryFlags() == 0 &&
-           "added element that changes the flags?");
-    locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
-  }
-
-  return solution.resolveLocatorToDecl(locator);
+  return resolveConcreteDeclRef(overload->choice.getDeclOrNull(), locator);
 }
 
 /// Produce the caller-side default argument for this default argument, or
@@ -5026,8 +4865,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = owner.getDecl()->getDeclContext()->mapTypeIntoContext(
-      param->getInterfaceType());
+  auto defArgType =
+      param->getInterfaceType().subst(owner.getSubstitutions());
   auto resultTy =
       tc.typeCheckParameterDefault(init, dc, defArgType,
                                    /*isAutoClosure=*/param->isAutoClosure(),
@@ -5221,9 +5060,8 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : layout.getProtocols()) {
-    conformances.push_back(
-      *tc.containsProtocol(fromType, proto->getDecl(), DC,
-                           ConformanceCheckFlags::InExpression));
+    conformances.push_back(tc.containsProtocol(
+        fromType, proto->getDecl(), DC, ConformanceCheckFlags::InExpression));
   }
 
   return tc.Context.AllocateCopy(conformances);
@@ -5423,12 +5261,12 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
-Expr *ExprRewriter::coerceCallArguments(
-    Expr *arg, AnyFunctionType *funcType,
-    ApplyExpr *apply,
-    ArrayRef<Identifier> argLabels,
-    bool hasTrailingClosure,
-    ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
+                                        ConcreteDeclRef callee,
+                                        ApplyExpr *apply,
+                                        ArrayRef<Identifier> argLabels,
+                                        bool hasTrailingClosure,
+                                        ConstraintLocatorBuilder locator) {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto params = funcType->getParams();
 
@@ -5444,10 +5282,6 @@ Expr *ExprRewriter::coerceCallArguments(
       llvm::any_of(params, [](const AnyFunctionType::Param &param) {
         return param.getPlainType()->hasUnresolvedType();
       });
-
-  // Find the callee declaration.
-  ConcreteDeclRef callee =
-    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
@@ -6391,7 +6225,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
-          new (tc.Context) AnyHashableErasureExpr(expr, toType, *conformance));
+          new (tc.Context) AnyHashableErasureExpr(expr, toType, conformance));
     }
 
     case ConversionRestrictionKind::DictionaryUpcast: {
@@ -6925,37 +6759,36 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
-  Optional<ProtocolConformanceRef> builtinConformance;
-  if (builtinProtocol &&
-      (builtinConformance =
-         TypeChecker::conformsToProtocol(type, builtinProtocol, cs.DC,
-                                         ConformanceCheckFlags::InExpression))) {
+  if (builtinProtocol) {
+    auto builtinConformance = TypeChecker::conformsToProtocol(
+        type, builtinProtocol, cs.DC, ConformanceCheckFlags::InExpression);
+    if (builtinConformance) {
+      // Find the witness that we'll use to initialize the type via a builtin
+      // literal.
+      auto witness = builtinConformance.getWitnessByName(
+          type->getRValueType(), builtinLiteralFuncName);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+        return nullptr;
 
-    // Find the witness that we'll use to initialize the type via a builtin
-    // literal.
-    auto witness = builtinConformance->getWitnessByName(type->getRValueType(),
-                                                        builtinLiteralFuncName);
-    if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
-      return nullptr;
+      // Form a reference to the builtin conversion function.
 
-    // Form a reference to the builtin conversion function.
+      // Set the builtin initializer.
+      if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
+        stringLiteral->setBuiltinInitializer(witness);
+      else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
+        booleanLiteral->setBuiltinInitializer(witness);
+      else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
+        numberLiteral->setBuiltinInitializer(witness);
+      else {
+        cast<MagicIdentifierLiteralExpr>(literal)->setBuiltinInitializer(
+            witness);
+      }
 
-    // Set the builtin initializer.
-    if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
-      stringLiteral->setBuiltinInitializer(witness);
-    else if (auto booleanLiteral = dyn_cast<BooleanLiteralExpr>(literal))
-      booleanLiteral->setBuiltinInitializer(witness);
-    else if (auto numberLiteral = dyn_cast<NumberLiteralExpr>(literal))
-      numberLiteral->setBuiltinInitializer(witness);
-    else {
-      cast<MagicIdentifierLiteralExpr>(literal)
-        ->setBuiltinInitializer(witness);
+      // The literal expression has this type.
+      cs.setType(literal, type);
+
+      return literal;
     }
-
-    // The literal expression has this type.
-    cs.setType(literal, type);
-
-    return literal;
   }
 
   // This literal type must conform to the (non-builtin) protocol.
@@ -6968,7 +6801,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   if (!literalType.empty()) {
     // Extract the literal type.
     Type builtinLiteralType =
-        conformance->getTypeWitnessByName(type, literalType);
+        conformance.getTypeWitnessByName(type, literalType);
     if (builtinLiteralType->hasError())
       return nullptr;
 
@@ -6981,8 +6814,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   }
 
   // Find the witness that we'll use to initialize the literal value.
-  auto witness = conformance->getWitnessByName(type->getRValueType(),
-                                               literalFuncName);
+  auto witness =
+      conformance.getWitnessByName(type->getRValueType(), literalFuncName);
   if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
     return nullptr;
 
@@ -7040,9 +6873,11 @@ static Expr *finishApplyCallAsFunctionMethod(
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
   // Coerce argument to input type of the `callAsFunction` method.
+  auto callee = rewriter.resolveConcreteDeclRef(choice.getDecl(),
+                                                applyFunctionLoc);
   SmallVector<Identifier, 2> argLabelsScratch;
   auto *arg = rewriter.coerceCallArguments(
-      apply->getArg(), openedMethodType, apply,
+      apply->getArg(), openedMethodType, callee, apply,
       apply->getArgumentLabels(argLabelsScratch), apply->hasTrailingClosure(),
       applyFunctionLoc);
   if (!arg)
@@ -7099,11 +6934,11 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        cs.TC.conformsToProtocol(argumentType, dictLitProto, cs.DC,
-                                 ConformanceCheckFlags::InExpression);
-    auto keyType = conformance->getTypeWitnessByName(argumentType, ctx.Id_Key);
-    auto valueType = conformance->getTypeWitnessByName(argumentType,
-                                                       ctx.Id_Value);
+        TypeChecker::conformsToProtocol(argumentType, dictLitProto, cs.DC,
+                                        ConformanceCheckFlags::InExpression);
+    auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
+    auto valueType =
+        conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
@@ -7139,7 +6974,8 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   return result;
 }
 
-Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
+Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
+                                Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
   
@@ -7150,9 +6986,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
     = [&](ApplyExpr *apply,
-          ValueDecl *decl,
+          ConcreteDeclRef declRef,
           Type openedType) -> Expr* {
-      switch (cs.TC.getDeclTypeCheckingSemantics(decl)) {
+      switch (TypeChecker::getDeclTypeCheckingSemantics(declRef.getDecl())) {
       case DeclTypeCheckingSemantics::TypeOf: {
         // Resolve into a DynamicTypeExpr.
         auto arg = apply->getArg();
@@ -7160,7 +6996,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         SmallVector<Identifier, 2> argLabelsScratch;
 
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
-        arg = coerceCallArguments(arg, fnType,
+        arg = coerceCallArguments(arg, fnType, declRef,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
                                   hasTrailingClosure,
@@ -7310,7 +7146,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       dyn_cast<DeclRefExpr>(getSemanticExprForDeclOrMemberRef(fn))) {
     if (auto special =
         finishApplyOfDeclWithSpecialTypeCheckingSemantics(apply,
-                                                          declRef->getDecl(),
+                                                          declRef->getDeclRef(),
                                                           openedType)) {
       return special;
     }
@@ -7355,7 +7191,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    Expr *arg = coerceCallArguments(origArg, fnType,
+    Expr *arg = coerceCallArguments(origArg, fnType, callee,
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
                                     hasTrailingClosure,
@@ -7370,7 +7206,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setIsSuper(isSuper);
 
     cs.setExprTypes(apply);
-    Expr *result = tc.substituteInputSugarTypeForResult(apply);
+    Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
 
     // If we have a covariant result type, perform the conversion now.
@@ -7432,6 +7268,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  auto ctorRef = resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
   Expr *declRef = buildMemberRef(fn, selected->openedFullType,
                                  /*dotLoc=*/SourceLoc(), choice,
                                  DeclNameLoc(fn->getEndLoc()),
@@ -7445,7 +7282,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   apply->setFn(declRef);
 
   // Tail-recur to actually call the constructor.
-  return finishApply(apply, openedType, locator);
+  return finishApply(apply, ctorRef, openedType, locator);
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of
@@ -7923,22 +7760,12 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator,
-                             bool ignoreTopLevelInjection,
                              Optional<Pattern*> typeFromPattern) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
   if (!result)
     return nullptr;
-
-  // If we were asked to ignore top-level optional injections, mark
-  // the top-level injection (if any) as "diagnosed".
-  if (ignoreTopLevelInjection) {
-    if (auto injection = dyn_cast<InjectIntoOptionalExpr>(
-                           result->getSemanticsProvidingExpr())) {
-      rewriter.DiagnosedOptionalInjections.insert(injection);
-    }
-  }
 
   rewriter.finalize(result);
   return result;

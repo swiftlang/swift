@@ -41,9 +41,7 @@ bool DerivedConformance::canDeriveTensorArrayProtocol(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
@@ -148,8 +146,8 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
     ValueDecl *memberMethodDecl = methodReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberMethodDecl = confRef->getConcrete()->
+    if (confRef.isConcrete())
+      memberMethodDecl = confRef.getConcrete()->
       getWitnessDecl(methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE = new (C) DeclRefExpr(
@@ -224,7 +222,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
@@ -244,7 +242,6 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
@@ -256,7 +253,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
 // Synthesize the `_unpackTensorHandles(into:)` function declaration.
 static ValueDecl
 *deriveTensorArrayProtocol_unpackTensorHandles(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
@@ -330,8 +327,7 @@ deriveBodyTensorArrayProtocol_tensorHandleCount(AbstractFunctionDecl *funcDecl,
 static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
     DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type intType = C.getInt32Decl()->getDeclaredType();
@@ -411,8 +407,7 @@ deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl, void *) {
 static ValueDecl *deriveTensorArrayProtocol_typeList(
     DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
@@ -514,8 +509,8 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
     ValueDecl *memberInitDecl = initReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
-    if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(initReq);
+    if (confRef.isConcrete())
+      memberInitDecl = confRef.getConcrete()->getWitnessDecl(initReq);
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
         memberInitDecl, DeclNameLoc(), /*implicit*/ true);
@@ -611,7 +606,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
 // Synthesize the `init(_owning:count:)` function declaration.
 static ValueDecl
 *deriveTensorArrayProtocol_init(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
 
@@ -645,7 +640,6 @@ static ValueDecl
   initDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_init, nullptr);
 
   initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({initDecl});
@@ -659,15 +653,15 @@ ValueDecl *DerivedConformance::deriveTensorArrayProtocol(
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_unpackTensorHandles)
+  if (requirement->getBaseName() == Context.Id_unpackTensorHandles)
     return deriveTensorArrayProtocol_unpackTensorHandles(*this);
-  if (requirement->getBaseName() == TC.Context.Id_tensorHandleCount)
+  if (requirement->getBaseName() == Context.Id_tensorHandleCount)
     return deriveTensorArrayProtocol_tensorHandleCount(*this);
-  if (requirement->getBaseName() == TC.Context.Id_typeList)
+  if (requirement->getBaseName() == Context.Id_typeList)
     return deriveTensorArrayProtocol_typeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorArrayProtocol_init(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_tensor_array_protocol_requirement);
   return nullptr;
 }

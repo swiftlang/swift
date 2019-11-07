@@ -1442,6 +1442,10 @@ void RequirementSource::print(llvm::raw_ostream &out,
 static Type formProtocolRelativeType(ProtocolDecl *proto,
                                      Type baseType,
                                      Type type) {
+  // Error case: hand back the erroneous type.
+  if (type->hasError())
+    return type;
+
   // Basis case: we've hit the base potential archetype.
   if (baseType->isEqual(type))
     return proto->getSelfInterfaceType();
@@ -2312,7 +2316,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   auto conformance =
       lookupConformance(type.getDependentType(*this)->getCanonicalType(),
                         concrete, proto);
-  if (!conformance) {
+  if (conformance.isInvalid()) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
       Impl->HadAnyError = true;
 
@@ -2326,9 +2330,9 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
     return nullptr;
   }
 
-  concreteSource = concreteSource->viaConcrete(*this, *conformance);
+  concreteSource = concreteSource->viaConcrete(*this, conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
-  if (addConditionalRequirements(*conformance, /*inferForModule=*/nullptr,
+  if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
                                  concreteSource->getLoc()))
     return nullptr;
 
@@ -2346,7 +2350,8 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   auto conformance =
     lookupConformance(type.getDependentType(*this)->getCanonicalType(),
                       superclass, proto);
-  if (!conformance) return nullptr;
+  if (conformance.isInvalid())
+    return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
   // appropriately.
@@ -2357,10 +2362,9 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   else
     superclassSource = equivClass->superclassConstraints.front().source;
 
-  superclassSource =
-    superclassSource->viaSuperclass(*this, *conformance);
+  superclassSource = superclassSource->viaSuperclass(*this, conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
-  if (addConditionalRequirements(*conformance, /*inferForModule=*/nullptr,
+  if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
                                  superclassSource->getLoc()))
     return nullptr;
 
@@ -3497,7 +3501,7 @@ GenericSignatureBuilder::getLookupConformanceFn()
   return LookUpConformanceInBuilder(this);
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 GenericSignatureBuilder::lookupConformance(CanType dependentType,
                                            Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol) {
@@ -4414,7 +4418,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
-          if (addConditionalRequirements(*conformance, inferForModule,
+          if (addConditionalRequirements(conformance, inferForModule,
                                          source.getLoc()))
             return ConstraintResult::Conflicting;
         }

@@ -592,39 +592,9 @@ Runtime.test("Struct layout with reference storage types") {
 }
 
 Runtime.test("SwiftError layout constants for LLDB") {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
-#elseif os(Linux)
-  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
-#elseif os(Android)
-  #if arch(arm)
-    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff as UInt)
-  #elseif arch(arm64)
-    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
-  #else
-    _UnimplementedError()
-  #endif
-#elseif os(Windows)
-  let hStdlibCore: HMODULE = GetModuleHandleA("swiftCore.dll")!
-#else
-  _UnimplementedError()
-#endif
+  let offsetof_SwiftError_typeMetadata = pointerToSwiftCoreSymbol(name: "_swift_lldb_offsetof_SwiftError_typeMetadata")!
+  let sizeof_SwiftError = pointerToSwiftCoreSymbol(name: "_swift_lldb_sizeof_SwiftError")!
 
-#if os(Windows)
-  let offsetof_SwiftError_typeMetadata: UnsafeRawPointer =
-      unsafeBitCast(GetProcAddress(hStdlibCore,
-                                   "_swift_lldb_offsetof_SwiftError_typeMetadata")!,
-                    to: UnsafeRawPointer.self)
-  let sizeof_SwiftError: UnsafeRawPointer =
-      unsafeBitCast(GetProcAddress(hStdlibCore,
-                                   "_swift_lldb_sizeof_SwiftError")!,
-                    to: UnsafeRawPointer.self)
-#else
-  let offsetof_SwiftError_typeMetadata =
-    dlsym(RTLD_DEFAULT, "_swift_lldb_offsetof_SwiftError_typeMetadata")!
-  let sizeof_SwiftError =
-    dlsym(RTLD_DEFAULT, "_swift_lldb_sizeof_SwiftError")!
-#endif
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 #if arch(i386) || arch(arm)
   expectEqual(20, offsetof_SwiftError_typeMetadata.load(as: UInt.self))

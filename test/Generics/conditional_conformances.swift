@@ -11,7 +11,7 @@ protocol P6: P2 {}
 
 protocol Assoc { associatedtype AT }
 
-func takes_P2<X: P2>(_: X) {} // expected-note {{in call to function 'takes_P2'}}
+func takes_P2<X: P2>(_: X) {}
 func takes_P5<X: P5>(_: X) {}
 
 // Skip the first generic signature declcontext dump
@@ -21,7 +21,9 @@ struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free
 // CHECK-NEXT: (normal_conformance type=Free<T> protocol=P2
 // CHECK-NEXT:   conforms_to: T P1)
-extension Free: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'Free<U>' to 'P2'}}
+extension Free: P2 where T: P1 {} 
+// expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}} 
+// expected-note@-2 {{requirement from conditional conformance of 'Free<T>' to 'P2'}}
 func free_good<U: P1>(_: U) {
     takes_P2(Free<U>())
 }
@@ -87,6 +89,7 @@ struct SameTypeGeneric<T, U> {}
 extension SameTypeGeneric: P2 where T == U {}
 // expected-note@-1 {{requirement from conditional conformance of 'SameTypeGeneric<U, Int>' to 'P2'}}
 // expected-note@-2 {{requirement from conditional conformance of 'SameTypeGeneric<Int, Float>' to 'P2'}}
+// expected-note@-3 {{requirement from conditional conformance of 'SameTypeGeneric<U, V>' to 'P2'}}
 func same_type_generic_good<U, V>(_: U, _: V)
   where U: Assoc, V: Assoc, U.AT == V.AT
 {
@@ -96,7 +99,7 @@ func same_type_generic_good<U, V>(_: U, _: V)
 }
 func same_type_bad<U, V>(_: U, _: V) {
   takes_P2(SameTypeGeneric<U, V>())
-  // expected-error@-1{{generic parameter 'X' could not be inferred}}
+  // expected-error@-1{{global function 'takes_P2' requires the types 'U' and 'V' be equivalent}}
   takes_P2(SameTypeGeneric<U, Int>())
   // expected-error@-1{{global function 'takes_P2' requires the types 'U' and 'Int' be equivalent}}
   takes_P2(SameTypeGeneric<Int, Float>())
@@ -324,8 +327,7 @@ func existential_good<T: P1>(_: T.Type) {
 }
 
 func existential_bad<T>(_: T.Type) {
-  // FIXME: Poor diagnostic.
-  _ = Free<T>() as P2 // expected-error{{'Free<T>' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}}
+  _ = Free<T>() as P2 // expected-error{{protocol 'P2' requires that 'T' conform to 'P1'}}
 }
 
 // rdar://problem/35837054

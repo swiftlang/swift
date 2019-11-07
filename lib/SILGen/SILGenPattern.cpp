@@ -2465,7 +2465,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
       } else {
         SILValue arg = caseBB->getArgument(argIndex++);
         assert(arg.getOwnershipKind() == ValueOwnershipKind::Owned ||
-               arg.getOwnershipKind() == ValueOwnershipKind::Any);
+               arg.getOwnershipKind() == ValueOwnershipKind::None);
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
 

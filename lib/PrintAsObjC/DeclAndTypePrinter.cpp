@@ -278,6 +278,10 @@ private:
     if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
       os << "SWIFT_WEAK_IMPORT\n";
 
+    if (CD->getAttrs().hasAttribute<IBDesignableAttr>()) {
+      os << "IB_DESIGNABLE\n";
+    }
+
     bool hasResilientAncestry =
       CD->checkAncestry().contains(AncestryFlags::ResilientOther);
     if (hasResilientAncestry) {
@@ -1189,6 +1193,10 @@ private:
     }
 
     os << ") ";
+    if (VD->getAttrs().hasAttribute<IBInspectableAttr>()) {
+      os << "IBInspectable ";
+    }
+
     if (VD->getAttrs().hasAttribute<IBOutletAttr>()) {
       if (!maybePrintIBOutletCollection(ty))
         os << "IBOutlet ";

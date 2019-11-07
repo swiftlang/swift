@@ -578,6 +578,7 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("Address Lowering");
+  P.addOwnershipModelEliminator();
   P.addIRGenPrepare();
   P.addAddressLowering();
 

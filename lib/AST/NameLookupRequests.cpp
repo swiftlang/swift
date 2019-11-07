@@ -128,26 +128,6 @@ void GenericParamListRequest::cacheResult(GenericParamList *params) const {
   context->GenericParamsAndBit.setPointerAndInt(params, true);
 }
 
-
-//----------------------------------------------------------------------------//
-// LookupPrecedenceGroupRequest computation.
-//----------------------------------------------------------------------------//
-
-SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
-  auto &desc = std::get<0>(getStorage());
-  return desc.getLoc();
-}
-
-SourceLoc PrecedenceGroupDescriptor::getLoc() const {
-  return nameLoc;
-}
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           const PrecedenceGroupDescriptor &desc) {
-  out << "precedence group " << desc.ident << " at ";
-  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
-}
-
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

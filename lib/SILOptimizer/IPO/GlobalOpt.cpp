@@ -276,6 +276,7 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
                          SILCoroutineKind::None,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
+                         SubstitutionMap(), false,
                          M.getASTContext());
   auto getterName = M.allocateCopy(getterNameTmp);
   return FunctionBuilder.getOrCreateFunction(

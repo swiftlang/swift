@@ -1,4 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -emit-sil -sdk %S/../SILGen/Inputs %s -o /dev/null -verify
+
+// SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-799): Re-enable test after SR-11336 is fixed.
+// XFAIL: *
 
 // <rdar://problem/18213320> enum with raw values that are too big are not diagnosed
 enum EnumWithTooLargeElements : UInt8 {

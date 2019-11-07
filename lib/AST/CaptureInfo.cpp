@@ -78,7 +78,7 @@ getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
   }
 }
 
-void CaptureInfo::dump() const {
+LLVM_ATTRIBUTE_USED void CaptureInfo::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }

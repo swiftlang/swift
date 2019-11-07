@@ -355,3 +355,9 @@ func lvalueCapture<T>(c: GenericClass<T>) {
     cc = wc!
   }
 }
+
+// Don't expose @lvalue-ness in diagnostics.
+let closure = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> Bool in }}
+  var helper = true
+  return helper
+}

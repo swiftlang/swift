@@ -155,7 +155,6 @@ private:
     node.present = true;
   }
 
-public:
   OpaqueSyntaxNode recordToken(tok tokenKind,
                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
                                ArrayRef<ParsedTriviaPiece> trailingTrivia,
@@ -206,10 +205,6 @@ public:
     auto result = NodeLookup(lexerOffset, ckind);
     return {result.length, result.node};
   }
-
-  OpaqueSyntaxNodeKind getOpaqueKind() override {
-    return OpaqueSyntaxNodeKind::SwiftSyntax;
-  }
 };
 
 static swiftparser_diagnostic_severity_t getSeverity(DiagnosticKind Kind) {
@@ -238,21 +233,18 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   const unsigned BufferID;
   SynParserDiagConsumer(SynParser &Parser, unsigned BufferID):
     Parser(Parser), BufferID(BufferID) {}
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    assert(Kind != DiagnosticKind::Remark && "Shouldn't see this in parser.");
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    assert(Info.Kind != DiagnosticKind::Remark &&
+           "Shouldn't see this in parser.");
     // The buffer where all char* will point into.
     llvm::SmallString<256> Buffer;
     auto getCurrentText = [&]() -> const char* {
       return Buffer.data() + Buffer.size();
     };
     DiagnosticDetail Result;
-    Result.Severity = getSeverity(Kind);
-    Result.Offset = getByteOffset(Loc, SM, BufferID);
+    Result.Severity = getSeverity(Info.Kind);
+    Result.Offset = getByteOffset(Info.Loc, SM, BufferID);
 
     // Terminate each printed text with 0 so the client-side can use char* directly.
     char NullTerm = '\0';
@@ -260,7 +252,8 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
       // Print the error message to buffer and record it.
       llvm::raw_svector_ostream OS(Buffer);
       Result.Message = getCurrentText();
-      DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+      DiagnosticEngine::formatDiagnosticText(OS, Info.FormatString,
+                                             Info.FormatArgs);
       OS << NullTerm;
     }
     for (auto R: Info.Ranges) {

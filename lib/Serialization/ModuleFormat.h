@@ -1224,6 +1224,7 @@ namespace decls_block {
     BCFixed<1>,   // IUO result?
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
+    BCFixed<1>,   // whether the overridden decl affects ABI
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     AccessLevelField, // access level
@@ -1265,6 +1266,7 @@ namespace decls_block {
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?
     DeclIDField,  // overridden function
+    BCFixed<1>,   // whether the overridden decl affects ABI
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
     AccessLevelField, // access level

@@ -61,79 +61,85 @@ TypeChecker::TypeChecker(ASTContext &Ctx)
 
 TypeChecker::~TypeChecker() {}
 
-ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
+ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
+                                       KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
   if (!protocol && loc.isValid()) {
-    diagnose(loc, diag::missing_protocol,
-             Context.getIdentifier(getProtocolName(kind)));
+    Context.Diags.diagnose(loc, diag::missing_protocol,
+                           Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->getInterfaceType()) {
-    if (protocol->isInvalid())
-      return nullptr;
+  if (protocol && protocol->isInvalid()) {
+    return nullptr;
   }
 
   return protocol;
 }
 
-ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
+ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   if (isa<ArrayExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByArrayLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
 
   if (isa<DictionaryExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
   
   if (isa<NilLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByNilLiteral);
-  
+    return TypeChecker::getProtocol(Context, expr->getLoc(),
+                                    KnownProtocolKind::ExpressibleByNilLiteral);
+
   if (isa<IntegerLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByIntegerLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
 
   if (isa<FloatLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByFloatLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByFloatLiteral);
 
   if (isa<BooleanLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByBooleanLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByBooleanLiteral);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
     if (SLE->isSingleUnicodeScalar())
-      return getProtocol(
-          expr->getLoc(),
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
           KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
 
     if (SLE->isSingleExtendedGraphemeCluster())
       return getProtocol(
-          expr->getLoc(),
+          Context, expr->getLoc(),
           KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
 
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByStringLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
   }
 
   if (isa<InterpolatedStringLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByStringInterpolation);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByStringInterpolation);
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
     case MagicIdentifierLiteralExpr::Function:
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral);
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
 
     case MagicIdentifierLiteralExpr::Line:
     case MagicIdentifierLiteralExpr::Column:
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral);
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByIntegerLiteral);
 
     case MagicIdentifierLiteralExpr::DSOHandle:
       return nullptr;
@@ -142,9 +148,10 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
   if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
     switch (E->getLiteralKind()) {
-#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)\
-    case ObjectLiteralExpr::Name:\
-      return getProtocol(expr->getLoc(), KnownProtocolKind::Protocol);
+#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)                             \
+  case ObjectLiteralExpr::Name:                                                \
+    return TypeChecker::getProtocol(Context, expr->getLoc(),                   \
+                                    KnownProtocolKind::Protocol);
 #include "swift/Syntax/TokenKinds.def"
     }
   }
@@ -209,7 +216,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (auto *stdlib = Context.getStdlibModule()) {
+  if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
     return stdlib;
   }
 
@@ -293,7 +300,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
         // Finally, we can check classes for missing initializers.
         if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
-          TC.maybeDiagnoseClassWithoutInitializers(classDecl);
+          TypeChecker::maybeDiagnoseClassWithoutInitializers(classDecl);
       }
     }
     TC.ConformanceContexts.clear();
@@ -623,7 +630,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 GenericEnvironment *
 swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
-  return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
+  return TypeChecker::handleSILGenericParams(genericParams, DC);
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -737,38 +744,18 @@ TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
   return TypeChecker::createForContext(Ctx);
 }
 
-// checkForForbiddenPrefix is for testing purposes.
+void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
+  if (C.LangOpts.DebugForbidTypecheckPrefix.empty())
+    return;
 
-void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
+  // Don't touch special names or empty names.
+  if (Name.isSpecial() || Name.empty())
     return;
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (!VD->getBaseName().isSpecial())
-      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
-  }
-}
 
-void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (!E->getName().isSpecial())
-    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
-}
-
-void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  checkForForbiddenPrefix(Ident.empty() ? StringRef() : Ident.str());
-}
-
-void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (Name.empty())
-    return;
-  if (Name.startswith(Context.LangOpts.DebugForbidTypecheckPrefix)) {
+  StringRef Str = Name.getIdentifier().str();
+  if (Str.startswith(C.LangOpts.DebugForbidTypecheckPrefix)) {
     std::string Msg = "forbidden typecheck occurred: ";
-    Msg += Name;
+    Msg += Str;
     llvm::report_fatal_error(Msg);
   }
 }

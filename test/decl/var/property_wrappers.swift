@@ -235,9 +235,8 @@ struct Initialization {
   @Wrapper(stored: 17)
   var x2: Double
 
-  @Wrapper(stored: 17) // expected-error {{initializer expects a single parameter of type 'T' [with T = (wrappedValue: Int, stored: Int)]}}
-  // expected-note@-1 {{did you mean to pass a tuple?}}
-  var x3 = 42
+  @Wrapper(stored: 17)
+  var x3 = 42 // expected-error {{extra argument 'wrappedValue' in call}}
 
   @Wrapper(stored: 17)
   var x4
@@ -720,8 +719,7 @@ struct DefaultedPrivateMemberwiseLets {
 func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
-  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
-  // expected-error@-1 {{cannot convert value of type 'Wrapper<Bool>' to expected argument type 'Int'}}
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{argument passed to call that takes no arguments}}
 }
 
 
@@ -1117,8 +1115,8 @@ struct MissingPropertyWrapperUnwrap {
 }
 
 struct InvalidPropertyDelegateUse {
-  @Foo var x: Int = 42 // expected-error {{cannot invoke initializer for ty}}
-  // expected-note@-1{{overloads for 'Foo<_>' exist with these partially matching paramet}}
+  // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
+  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
@@ -1581,12 +1579,14 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject {
+extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{'SR_11288_S4.SR_11288_Wrapper4.Type' (aka 'SR_11288_S0.Type') requires that 'SR_11288_S4' conform to 'AnyObject'}}
+  // FIXME: We shouldn't diagnose the arg-to-param mismatch (rdar://problem/56345248)
+  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
+  // expected-error @-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
@@ -1788,4 +1788,21 @@ protocol ProtocolWithWrapper {
 
 struct UsesProtocolWithWrapper: ProtocolWithWrapper {
   @Wrapper var foo: Int // expected-warning{{ignoring associated type 'Wrapper' in favor of module-scoped property wrapper 'Wrapper'; please qualify the reference with 'property_wrappers'}}{{4-4=property_wrappers.}}
+}
+
+// rdar://problem/56350060 - [Dynamic key path member lookup] Assertion when subscripting with a key path
+func test_rdar56350060() {
+  @propertyWrapper
+  @dynamicMemberLookup
+  struct DynamicWrapper<Value> {
+    var wrappedValue: Value { fatalError() }
+
+    subscript<T>(keyPath keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      fatalError()
+    }
+
+    subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      return self[keyPath: keyPath] // Ok
+    }
+  }
 }

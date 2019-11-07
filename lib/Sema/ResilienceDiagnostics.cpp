@@ -156,8 +156,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Property initializers that are not exposed to clients are OK.
   if (auto pattern = dyn_cast<PatternBindingInitializer>(DC)) {
     auto bindingIndex = pattern->getBindingIndex();
-    auto &patternEntry = pattern->getBinding()->getPatternList()[bindingIndex];
-    auto varDecl = patternEntry.getAnchoringVarDecl();
+    auto *varDecl = pattern->getBinding()->getAnchoringVarDecl(bindingIndex);
     if (!varDecl->isInitExposedToClients())
       return false;
   }

@@ -952,9 +952,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
     for (auto &consumer : Consumers) {
-      consumer->handleDiagnostic(SourceMgr, info->Loc, info->Kind,
-                                 info->FormatString, info->FormatArgs, *info,
-                                 info->BufferIndirectlyCausingDiagnostic);
+      consumer->handleDiagnostic(SourceMgr, *info);
     }
   }
 

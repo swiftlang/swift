@@ -171,21 +171,19 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         singleVar->getOriginalWrappedProperty() != nullptr;
     }
 
-    unsigned idx = 0U-1;
-    for (auto entry : PBD->getPatternList()) {
-      ++idx;
-      if (Pattern *Pat = doIt(entry.getPattern()))
-        PBD->setPattern(idx, Pat, entry.getInitContext());
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      if (Pattern *Pat = doIt(PBD->getPattern(idx)))
+        PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
       else
         return true;
-      if (entry.getInit() &&
+      if (PBD->getInit(idx) &&
           !isPropertyWrapperBackingProperty &&
-          (!entry.isInitializerSubsumed() ||
+          (!PBD->isInitializerSubsumed(idx) ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
-        if (Expr *E2 = doIt(entry.getInit()))
+        if (Expr *E2 = doIt(PBD->getInit(idx)))
           PBD->setInit(idx, E2);
         else
           return true;

@@ -37,7 +37,6 @@
 
 #include <algorithm>
 #include <csignal>
-#include <iostream>
 
 using llvm::ArrayRef;
 using llvm::dyn_cast;
@@ -549,7 +548,7 @@ makeReflectionContextForObjectFiles(
 
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
                                     StringRef Arch, ActionType Action,
-                                    std::ostream &OS) {
+                                    FILE *file) {
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   std::vector<OwningBinary<Binary>> BinaryOwners;
@@ -582,7 +581,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    builder.dumpAllSections(OS);
+    builder.dumpAllSections(file);
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {
@@ -597,17 +596,17 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       auto *TypeRef =
           swift::Demangle::decodeMangledType(builder, Demangled);
       if (TypeRef == nullptr) {
-        OS << "Invalid typeref: " << Line << "\n";
+        fprintf(file, "Invalid typeref:%s\n", Line.c_str());
         continue;
       }
 
-      TypeRef->dump(OS);
+      TypeRef->dump(file);
       auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef);
       if (TypeInfo == nullptr) {
-        OS << "Invalid lowering\n";
+        fprintf(file, "Invalid lowering\n");
         continue;
       }
-      TypeInfo->dump(OS);
+      TypeInfo->dump(file);
     }
     break;
   }
@@ -621,5 +620,5 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
                                   options::Architecture, options::Action,
-                                  std::cout);
+                                  stdout);
 }

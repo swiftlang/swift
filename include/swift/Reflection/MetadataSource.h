@@ -177,7 +177,7 @@ public:
   }
 
   void dump() const;
-  void dump(std::ostream &OS, unsigned Indent = 0) const;
+  void dump(FILE *file, unsigned Indent = 0) const;
   template <typename Allocator>
   static const MetadataSource *decode(Allocator &A, const std::string &str) {
     auto begin = str.begin();

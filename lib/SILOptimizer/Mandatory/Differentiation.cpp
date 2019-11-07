@@ -240,7 +240,7 @@ static GenericSignature getConstrainedDerivativeGenericSignature(
     CanSILFunctionType originalFnTy, IndexSubset *paramIndexSet,
     GenericSignature derivativeGenSig) {
   if (!derivativeGenSig)
-    derivativeGenSig = originalFnTy->getGenericSignature();
+    derivativeGenSig = originalFnTy->getSubstGenericSignature();
   if (!derivativeGenSig)
     return nullptr;
   // Constrain all wrt parameters to `Differentiable`.
@@ -248,7 +248,7 @@ static GenericSignature getConstrainedDerivativeGenericSignature(
   auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   SmallVector<Requirement, 4> requirements;
   for (unsigned paramIdx : paramIndexSet->getIndices()) {
-    auto paramType = originalFnTy->getParameters()[paramIdx].getType();
+    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
     Requirement req(RequirementKind::Conformance, paramType,
                     diffableProto->getDeclaredType());
     requirements.push_back(req);
@@ -271,7 +271,7 @@ static CanGenericSignature getDerivativeGenericSignature(
     SILDifferentiableAttr *attr, SILFunction *original) {
   if (auto attrDerivativeGenSig = attr->getDerivativeGenericSignature())
     return attrDerivativeGenSig->getCanonicalSignature();
-  return original->getLoweredFunctionType()->getGenericSignature();
+  return original->getLoweredFunctionType()->getSubstGenericSignature();
 }
 
 // Clone the generic parameters of the given generic signature and return a new
@@ -669,14 +669,14 @@ private:
     auto silFnTy = linearMapType.castTo<SILFunctionType>();
     SmallVector<AnyFunctionType::Param, 8> params;
     for (auto &param : silFnTy->getParameters())
-      params.push_back(AnyFunctionType::Param(param.getType()));
+      params.push_back(AnyFunctionType::Param(param.getInterfaceType()));
     AnyFunctionType *astFnTy;
-    if (auto genSig = silFnTy->getGenericSignature())
+    if (auto genSig = silFnTy->getSubstGenericSignature())
       astFnTy = GenericFunctionType::get(
-          genSig, params, silFnTy->getAllResultsType().getASTType());
+          genSig, params, silFnTy->getAllResultsInterfaceType().getASTType());
     else
       astFnTy = FunctionType::get(
-          params, silFnTy->getAllResultsType().getASTType());
+          params, silFnTy->getAllResultsInterfaceType().getASTType());
 
     auto *origBB = inst->getParent();
     auto *linMapStruct = getLinearMapStruct(origBB);
@@ -1684,14 +1684,14 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
         // Check non-differentiable arguments.
         for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
           auto remappedParamType =
-              origFnTy->getParameters()[paramIndex].getSILStorageType();
+              origFnTy->getParameters()[paramIndex].getSILStorageInterfaceType();
           if (applyIndices.isWrtParameter(paramIndex) &&
               !remappedParamType.isDifferentiable(derivative->getModule()))
             return true;
         }
         // Check non-differentiable results.
         auto remappedResultType =
-            origFnTy->getResults()[applyIndices.source].getSILStorageType();
+            origFnTy->getResults()[applyIndices.source].getSILStorageInterfaceType();
         if (!remappedResultType.isDifferentiable(derivative->getModule()))
           return true;
         return false;
@@ -1705,7 +1705,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
       LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
 
   auto derivativeFnResultTypes =
-      derivativeFnType->getAllResultsType().castTo<TupleType>();
+      derivativeFnType->getAllResultsInterfaceType().castTo<TupleType>();
   derivativeFnResultTypes->getElement(derivativeFnResultTypes->getElements().size() - 1);
   auto linearMapSILType = SILType::getPrimitiveObjectType(
       derivativeFnResultTypes
@@ -2614,7 +2614,7 @@ emitDerivativeFunctionReference(
       for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
         if (desiredIndices.isWrtParameter(paramIndex) &&
             !originalFnTy->getParameters()[paramIndex]
-                 .getSILStorageType()
+                 .getSILStorageInterfaceType()
                  .isDifferentiable(context.getModule())) {
           auto diag = context.emitNondifferentiabilityError(
               original, invoker, diag::autodiff_nondifferentiable_argument);
@@ -2623,7 +2623,7 @@ emitDerivativeFunctionReference(
       }
       // Check and diagnose non-differentiable results.
       if (!originalFnTy->getResults()[desiredIndices.source]
-               .getSILStorageType()
+               .getSILStorageInterfaceType()
                .isDifferentiable(context.getModule())) {
         context.emitNondifferentiabilityError(
             original, invoker, diag::autodiff_nondifferentiable_result);
@@ -2690,7 +2690,7 @@ emitDerivativeFunctionReference(
     auto convertedRef = reapplyFunctionConversion(
         derivativeFnRef, originalFRI, original, builder, loc,
         newBuffersToDealloc,
-        derivativeFn->getLoweredFunctionType()->getGenericSignature());
+        derivativeFn->getLoweredFunctionType()->getSubstGenericSignature());
     return std::make_pair(convertedRef, minimalAttr->getIndices());
   }
 
@@ -2808,7 +2808,7 @@ static void emitZeroIntoBuffer(
   auto *additiveArithmeticProto =
       astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
-  assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
+  assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
   // Look up `AdditiveArithmetic.zero.getter`.
   auto zeroDeclLookup = additiveArithmeticProto->lookupDirect(astCtx.Id_zero);
   auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
@@ -2818,14 +2818,14 @@ static void emitZeroIntoBuffer(
   auto silFnType = typeConverter.getConstantType(accessorDeclRef);
   // %wm = witness_method ...
   auto *getter = builder.createWitnessMethod(
-      loc, type, *confRef, accessorDeclRef, silFnType);
+      loc, type, confRef, accessorDeclRef, silFnType);
   // %metatype = metatype $T
   auto metatypeType = CanMetatypeType::get(
       type, MetatypeRepresentation::Thick);
   auto metatype = builder.createMetatype(
       loc, SILType::getPrimitiveObjectType(metatypeType));
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      additiveArithmeticProto, type, *confRef);
+      additiveArithmeticProto, type, confRef);
   builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
                       /*isNonThrowing*/ false);
   builder.emitDestroyValueOperation(loc, getter);
@@ -2849,7 +2849,7 @@ buildThunkSignature(SILFunction *fn,
   // If there's no opened existential, we just inherit the generic environment
   // from the parent function.
   if (openedExistential == nullptr) {
-    auto genericSig = fn->getLoweredFunctionType()->getGenericSignature();
+    auto genericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
     genericEnv = fn->getGenericEnvironment();
     interfaceSubs = fn->getForwardingSubstitutionMap();
     contextSubs = interfaceSubs;
@@ -2863,7 +2863,7 @@ buildThunkSignature(SILFunction *fn,
   int depth = 0;
   if (inheritGenericSig) {
     if (auto genericSig =
-            fn->getLoweredFunctionType()->getGenericSignature()) {
+            fn->getLoweredFunctionType()->getSubstGenericSignature()) {
       builder.addGenericSignature(genericSig);
       depth = genericSig->getGenericParams().back()->getDepth() + 1;
     }
@@ -2889,7 +2889,7 @@ buildThunkSignature(SILFunction *fn,
   // Calculate substitutions to map the caller's archetypes to the thunk's
   // archetypes.
   if (auto calleeGenericSig =
-          fn->getLoweredFunctionType()->getGenericSignature()) {
+          fn->getLoweredFunctionType()->getSubstGenericSignature()) {
     contextSubs = SubstitutionMap::get(
         calleeGenericSig,
         [&](SubstitutableType *type) -> Type {
@@ -3039,31 +3039,31 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
   for (auto &param : params) {
-    auto paramIfaceTy = param.getType()->mapTypeOutOfContext();
+    auto paramIfaceTy = param.getInterfaceType()->mapTypeOutOfContext();
     interfaceParams.push_back(SILParameterInfo(
         paramIfaceTy->getCanonicalType(genericSig), param.getConvention()));
   }
 
   SmallVector<SILYieldInfo, 4> interfaceYields;
   for (auto &yield : expectedType->getYields()) {
-    auto yieldIfaceTy = yield.getType()->mapTypeOutOfContext();
+    auto yieldIfaceTy = yield.getInterfaceType()->mapTypeOutOfContext();
     auto interfaceYield =
-        yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
+        yield.getWithInterfaceType(yieldIfaceTy->getCanonicalType(genericSig));
     interfaceYields.push_back(interfaceYield);
   }
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getResults()) {
-    auto resultIfaceTy = result.getType()->mapTypeOutOfContext();
+    auto resultIfaceTy = result.getInterfaceType()->mapTypeOutOfContext();
     auto interfaceResult =
-        result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
+        result.getWithInterfaceType(resultIfaceTy->getCanonicalType(genericSig));
     interfaceResults.push_back(interfaceResult);
   }
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
-    auto errorIfaceTy = errorResult.getType()->mapTypeOutOfContext();
+    auto errorIfaceTy = errorResult.getInterfaceType()->mapTypeOutOfContext();
     interfaceErrorResult =
         SILResultInfo(errorIfaceTy->getCanonicalType(genericSig),
                       expectedType->getErrorResult().getConvention());
@@ -3073,7 +3073,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   return SILFunctionType::get(
       genericSig, extInfo, expectedType->getCoroutineKind(),
       ParameterConvention::Direct_Unowned, interfaceParams, interfaceYields,
-      interfaceResults, interfaceErrorResult, module.getASTContext());
+      interfaceResults, interfaceErrorResult, {}, false, module.getASTContext());
 }
 
 /// Get or create a reabstraction thunk from `fromType` to `toType`, to be
@@ -3327,7 +3327,7 @@ private:
         passManager.getAnalysis<DifferentiableActivityAnalysis>();
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
-        vjp->getLoweredFunctionType()->getGenericSignature(),
+        vjp->getLoweredFunctionType()->getSubstGenericSignature(),
         AutoDiffDerivativeFunctionKind::VJP);
     LLVM_DEBUG(
         dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
@@ -3359,7 +3359,7 @@ public:
     // `module.Types` so that the calls to `module.Types.getTypeLowering()`
     // below will know the original function's generic parameter types.
     Lowering::GenericContextScope genericContextScope(
-        module.Types, origTy->getGenericSignature());
+        module.Types, origTy->getSubstGenericSignature());
 
     // Given a type, returns its formal SIL parameter info.
     auto getTangentParameterInfoForOriginalResult = [&](
@@ -3423,7 +3423,7 @@ public:
     // Add pullback parameter for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
     pbParams.push_back(getTangentParameterInfoForOriginalResult(
-        origResInfo.getType()
+        origResInfo.getInterfaceType()
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
             ->getCanonicalType(), origResInfo.getConvention()));
 
@@ -3439,7 +3439,7 @@ public:
     for (auto i : indices.parameters->getIndices()) {
       auto origParam = origParams[i];
       adjResults.push_back(getTangentResultInfoForOriginalParameter(
-          origParam.getType()
+          origParam.getInterfaceType()
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getCanonicalType(), origParam.getConvention()));
     }
@@ -3455,6 +3455,7 @@ public:
     auto pbType = SILFunctionType::get(
         pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
+        origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
         original->getASTContext());
 
     SILOptFunctionBuilder fb(context.getTransform());
@@ -3807,7 +3808,7 @@ public:
           for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
             if (indices.isWrtParameter(paramIndex) &&
                     !originalFnTy->getParameters()[paramIndex]
-                    .getSILStorageType()
+                    .getSILStorageInterfaceType()
                     .isDifferentiable(getModule())) {
               context.emitNondifferentiabilityError(
                   ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
@@ -3818,7 +3819,7 @@ public:
           }
           // Check and diagnose non-differentiable results.
           if (!originalFnTy->getResults()[indices.source]
-                  .getSILStorageType()
+                  .getSILStorageInterfaceType()
                   .isDifferentiable(getModule())) {
             context.emitNondifferentiabilityError(
                 original, invoker, diag::autodiff_nondifferentiable_result);
@@ -4250,7 +4251,7 @@ private:
         passManager.getAnalysis<DifferentiableActivityAnalysis>();
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
-        jvp->getLoweredFunctionType()->getGenericSignature(),
+        jvp->getLoweredFunctionType()->getSubstGenericSignature(),
         AutoDiffDerivativeFunctionKind::JVP);
     LLVM_DEBUG(
         dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
@@ -5254,7 +5255,7 @@ public:
     // `module.Types` so that calls to `module.Types.getTypeLowering()` below
     // will know the original function's generic parameter types.
     Lowering::GenericContextScope genericContextScope(
-        module.Types, origTy->getGenericSignature());
+        module.Types, origTy->getSubstGenericSignature());
 
     // Parameters of the differential are:
     // - the tangent values of the wrt parameters.
@@ -5269,7 +5270,7 @@ public:
     // Add differential results.
     auto origResInfo = origTy->getResults()[indices.source];
     dfResults.push_back(
-        SILResultInfo(origResInfo.getType()
+        SILResultInfo(origResInfo.getInterfaceType()
                           ->getAutoDiffAssociatedTangentSpace(lookupConformance)
                           ->getCanonicalType(),
                       origResInfo.getConvention()));
@@ -5278,7 +5279,7 @@ public:
     for (auto i : indices.parameters->getIndices()) {
       auto origParam = origParams[i];
       dfParams.push_back(SILParameterInfo(
-          origParam.getType()
+          origParam.getInterfaceType()
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getCanonicalType(),
           origParam.getConvention()));
@@ -5303,6 +5304,7 @@ public:
     auto diffType = SILFunctionType::get(
         diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
+        origTy->getSubstitutions(), origTy->isGenericSignatureImplied(),
         original->getASTContext());
 
     SILOptFunctionBuilder fb(context.getTransform());
@@ -5519,7 +5521,7 @@ public:
             for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
               if (indices.isWrtParameter(paramIndex) &&
                       !originalFnTy->getParameters()[paramIndex]
-                      .getSILStorageType()
+                      .getSILStorageInterfaceType()
                       .isDifferentiable(getModule())) {
                 context.emitNondifferentiabilityError(
                     ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
@@ -5530,7 +5532,7 @@ public:
             }
             // Check and diagnose non-differentiable results.
             if (!originalFnTy->getResults()[indices.source]
-                    .getSILStorageType()
+                    .getSILStorageInterfaceType()
                     .isDifferentiable(getModule())) {
               context.emitNondifferentiabilityError(
                   original, invoker, diag::autodiff_nondifferentiable_result);
@@ -6496,7 +6498,7 @@ public:
     auto indirectResultIt = pullback.getIndirectResults().begin();
     for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
       auto resultType =
-          pullback.mapTypeIntoContext(resultInfo.getType())->getCanonicalType();
+          pullback.mapTypeIntoContext(resultInfo.getInterfaceType())->getCanonicalType();
       if (resultInfo.isFormalDirect())
         directResults.push_back(emitZeroDirect(resultType, pbLoc));
       else
@@ -6748,13 +6750,13 @@ public:
     auto swiftModule = getModule().getSwiftModule();
     auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
     auto diffConf = swiftModule->lookupConformance(astType, diffProto);
-    assert(diffConf.hasValue() && "Missing conformance to `Differentiable`");
+    assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
     auto addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
     auto addArithConf = swiftModule->lookupConformance(astType, addArithProto);
-    assert(addArithConf.hasValue() &&
+    assert(!addArithConf.isInvalid() &&
            "Missing conformance to `AdditiveArithmetic`");
     auto subMap =
-        SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
+        SubstitutionMap::get(genericSig, {astType}, {addArithConf, diffConf});
     builder.createApply(ai->getLoc(), fnRef, subMap,
                         {subscriptBuffer, intStruct, adjointArray});
     return subscriptBuffer;
@@ -6807,7 +6809,7 @@ public:
       auto fnBuilder = SILOptFunctionBuilder(getContext().getTransform());
       auto fn = fnBuilder.getOrCreateFunction(
           ai->getLoc(), subscriptRef, NotForDefinition);
-      genericSig = fn->getLoweredFunctionType()->getGenericSignature();
+      genericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
       fnRef = builder.createFunctionRef(ai->getLoc(), fn);
     }
     assert(adjointArray && "Array does not have adjoint value");
@@ -6923,7 +6925,7 @@ public:
         : pullbackType;
     for (auto indRes : actualPullbackType->getIndirectFormalResults()) {
       auto *alloc =
-          builder.createAllocStack(loc, remapType(indRes.getSILStorageType()));
+          builder.createAllocStack(loc, remapType(indRes.getSILStorageInterfaceType()));
       pullbackIndirectResults.push_back(alloc);
       args.push_back(alloc);
     }
@@ -7707,15 +7709,15 @@ void PullbackEmitter::accumulateIndirect(
         : getModule().getSwiftModule();
     auto confRef = adjointParentModule->lookupConformance(adjointASTTy,
                                                            proto);
-    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
+    assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
     // %0 = witness_method @+
     auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
-                                                     *confRef, declRef,
+                                                     confRef, declRef,
                                                      silFnTy);
     auto subMap = SubstitutionMap::getProtocolSubstitutions(
-        proto, adjointASTTy, *confRef);
+        proto, adjointASTTy, confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
@@ -7764,14 +7766,14 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
     auto *accumulatorFuncDecl = getContext().getPlusEqualDecl();
     // Call the combiner function and return.
     auto confRef = swiftMod->lookupConformance(astType, proto);
-    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
+    assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(accumulatorFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
     // %0 = witness_method @+=
     auto witnessMethod =
-        builder.createWitnessMethod(loc, astType, *confRef, declRef, silFnTy);
+        builder.createWitnessMethod(loc, astType, confRef, declRef, silFnTy);
     auto subMap =
-        SubstitutionMap::getProtocolSubstitutions(proto, astType, *confRef);
+        SubstitutionMap::getProtocolSubstitutions(proto, astType, confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(astType, MetatypeRepresentation::Thick);
@@ -8089,7 +8091,7 @@ bool ADContext::processDifferentiableAttribute(
               SILFunctionTypeRepresentation::Thin),
           SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
           /*interfaceYields*/ {}, neverResultInfo,
-          /*interfaceErrorResults*/ None, getASTContext());
+          /*interfaceErrorResults*/ None, {}, false, getASTContext());
       auto fnBuilder = SILOptFunctionBuilder(getTransform());
       auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
           loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
@@ -8273,7 +8275,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       else {
         auto zeroSILType =
             linearMapType->getParameters()[mapOriginalParameterIndex(i)]
-                .getSILStorageType();
+                .getSILStorageInterfaceType();
         buildZeroArgument(zeroSILType);
       }
     }
@@ -8304,7 +8306,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       }
       // Otherwise, construct and use an uninitialized indirect result.
       auto *indirectResult =
-          builder.createAllocStack(loc, resultInfo.getSILStorageType());
+          builder.createAllocStack(loc, resultInfo.getSILStorageInterfaceType());
       localAllocations.push_back(indirectResult);
       arguments.push_back(indirectResult);
     }
@@ -8499,7 +8501,7 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto linearMap = directResults.back();
 
   auto linearMapType = linearMap->getType().castTo<SILFunctionType>();
-  auto linearMapTargetType = targetType->getResults().back().getSILStorageType()
+  auto linearMapTargetType = targetType->getResults().back().getSILStorageInterfaceType()
       .castTo<SILFunctionType>();
 
   SILFunction *linearMapThunk;
@@ -8547,16 +8549,17 @@ SILValue ADContext::promoteToDifferentiableFunction(
 
       auto thunkTy = thunk->getLoweredFunctionType();
       auto thunkResult = thunkTy->getSingleResult();
-      if (auto resultFnTy = thunkResult.getType()->getAs<SILFunctionType>()) {
+      if (auto resultFnTy = thunkResult.getInterfaceType()->getAs<SILFunctionType>()) {
         // Construct new curry thunk type with `@differentiable` result.
         auto diffableResultFnTy = resultFnTy->getWithExtInfo(
             resultFnTy->getExtInfo()
                 .withDifferentiabilityKind(DifferentiabilityKind::Normal));
-        auto newThunkResult = thunkResult.getWithType(diffableResultFnTy);
+        auto newThunkResult = thunkResult.getWithInterfaceType(diffableResultFnTy);
         auto thunkType = SILFunctionType::get(
-            thunkTy->getGenericSignature(), thunkTy->getExtInfo(),
+            thunkTy->getSubstGenericSignature(), thunkTy->getExtInfo(),
             thunkTy->getCoroutineKind(), thunkTy->getCalleeConvention(),
             thunkTy->getParameters(), {}, {newThunkResult}, {},
+            thunkTy->getSubstitutions(), thunkTy->isGenericSignatureImplied(),
             thunkTy->getASTContext());
 
         // Construct new curry thunk, returning a `@differentiable` function.
@@ -8571,7 +8574,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
         // returned function value with an `differentiable_function`
         // instruction, and process the `differentiable_function` instruction.
         if (newThunk->empty()) {
-          if (auto newThunkGenSig = thunkType->getGenericSignature())
+          if (auto newThunkGenSig = thunkType->getSubstGenericSignature())
             newThunk->setGenericEnvironment(
                 newThunkGenSig->getGenericEnvironment());
           newThunk->setOwnershipEliminated();
@@ -8680,7 +8683,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
               actualIndices);
       auto *thunkFRI = builder.createFunctionRef(loc, thunk);
       if (auto genSig =
-              thunk->getLoweredFunctionType()->getGenericSignature()) {
+              thunk->getLoweredFunctionType()->getSubstGenericSignature()) {
         derivativeFn = builder.createPartialApply(
             loc, thunkFRI, interfaceSubs, {},
             ParameterConvention::Direct_Guaranteed);

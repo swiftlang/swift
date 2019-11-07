@@ -1,6 +1,5 @@
 from __future__ import print_function
-
-import sys
+import sys  # noqa: I201
 
 from kinds import SYNTAX_BASE_KINDS, kind_to_type, lowercase_first_word
 

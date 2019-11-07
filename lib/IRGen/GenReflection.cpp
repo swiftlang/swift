@@ -1094,9 +1094,10 @@ public:
     B.addInt32(CaptureTypes.size());
     B.addInt32(MetadataSources.size());
     B.addInt32(Layout.getBindings().size());
-
-    auto sig = OrigCalleeType->getGenericSignature()
-              ? OrigCalleeType->getGenericSignature()->getCanonicalSignature()
+    
+    auto sig = OrigCalleeType->getSubstGenericSignature()
+              ? OrigCalleeType->getSubstGenericSignature()
+                              ->getCanonicalSignature()
               : CanGenericSignature();
     
     // Now add typerefs of all of the captures.

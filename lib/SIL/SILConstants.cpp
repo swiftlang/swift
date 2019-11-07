@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(1024),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(2048),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
@@ -126,6 +126,29 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_Array: {
     os << getArrayType() << ": \n";
     getStorageOfArray().print(os, indent);
+    return;
+  }
+  case RK_Closure: {
+    SymbolicClosure *clo = getClosure();
+    SILFunction *target = clo->getTarget();
+    std::string targetName = target->getName();
+    os << "closure: target: " << targetName;
+    ArrayRef<SymbolicClosureArgument> args = clo->getCaptures();
+    os << " captures [\n";
+    for (SymbolicClosureArgument closureArg : args) {
+      os.indent(indent + 2) << closureArg.first << "\n";
+    }
+    os.indent(indent) << "] values: [\n";
+    for (SymbolicClosureArgument closureArg : args) {
+      Optional<SymbolicValue> value = closureArg.second;
+      if (!value.hasValue()) {
+        os.indent(indent + 2) << "nil\n";
+        continue;
+      }
+      value->print(os, indent + 2);
+    }
+    os.indent(indent) << "]\n";
+    return;
   }
   }
 }
@@ -162,6 +185,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
     return ArrayStorage;
   case RK_Array:
     return Array;
+  case RK_Closure:
+    return Closure;
   }
   llvm_unreachable("covered switch");
 }
@@ -218,6 +243,11 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   case RK_Array: {
     SymbolicValue clonedStorage = getStorageOfArray().cloneInto(allocator);
     return getArray(getArrayType(), clonedStorage, allocator);
+  }
+  case RK_Closure: {
+    SymbolicClosure *clo = getClosure();
+    ArrayRef<SymbolicClosureArgument> closureArgs = clo->getCaptures();
+    return SymbolicValue::makeClosure(clo->getTarget(), closureArgs, allocator);
   }
   }
   llvm_unreachable("covered switch");
@@ -662,6 +692,44 @@ Type SymbolicValue::getArrayType() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Symbolic Closure
+//===----------------------------------------------------------------------===//
+
+SymbolicValue SymbolicValue::makeClosure(SILFunction *target,
+                                         ArrayRef<SymbolicClosureArgument> args,
+                                         SymbolicValueAllocator &allocator) {
+  auto clo = SymbolicClosure::create(target, args, allocator);
+  SymbolicValue result;
+  result.representationKind = RK_Closure;
+  result.value.closure = clo;
+  return result;
+}
+
+SymbolicClosure *SymbolicClosure::create(SILFunction *target,
+                                         ArrayRef<SymbolicClosureArgument> args,
+                                         SymbolicValueAllocator &allocator) {
+  // Determine whether there are captured arguments without a symbolic value.
+  bool hasNonConstantCapture = false;
+  for (SymbolicClosureArgument closureArg : args) {
+    if (!closureArg.second) {
+      hasNonConstantCapture = true;
+      break;
+    }
+  }
+
+  auto byteSizeOfArgs =
+      SymbolicClosure::totalSizeToAlloc<SymbolicClosureArgument>(args.size());
+  auto rawMem = allocator.allocate(byteSizeOfArgs, alignof(SymbolicClosure));
+  //  Placement initialize the object.
+  auto closure = ::new (rawMem)
+      SymbolicClosure(target, args.size(), hasNonConstantCapture);
+  std::uninitialized_copy(
+      args.begin(), args.end(),
+      closure->getTrailingObjects<SymbolicClosureArgument>());
+  return closure;
+}
+
+//===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
 
@@ -722,6 +790,12 @@ static void getWitnessMethodName(WitnessMethodInst *witnessMethodInst,
   if (witnessMember.hasDecl()) {
     witnessMember.getDecl()->getFullName().getString(methodName);
   }
+}
+
+/// A helper function to pretty print function names in diagnostics.
+static std::string demangleSymbolNameForDiagnostics(StringRef name) {
+  return Demangle::demangleSymbolAsString(
+      name, Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
 }
 
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
@@ -842,11 +916,27 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   case UnknownReason::CalleeImplementationUnknown: {
     SILFunction *callee = unknownReason.getCalleeWithoutImplmentation();
     std::string demangledCalleeName =
-        Demangle::demangleSymbolAsString(callee->getName());
+        demangleSymbolNameForDiagnostics(callee->getName());
     diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
              StringRef(demangledCalleeName));
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
+               triggerLocSkipsInternalLocs);
+    return;
+  }
+  case UnknownReason::CallArgumentUnknown: {
+    unsigned argNumber = unknownReason.getArgumentIndex() + 1;
+    ApplyInst *call = dyn_cast<ApplyInst>(unknownNode);
+    assert(call);
+    SILFunction *callee = call->getCalleeFunction();
+    assert(callee);
+    std::string demangledCalleeName =
+        demangleSymbolNameForDiagnostics(callee->getName());
+    diagnose(ctx, diagLoc, diag::constexpr_found_call_with_unknown_arg,
+             demangledCalleeName,
+             (Twine(argNumber) + llvm::getOrdinalSuffix(argNumber)).str());
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, triggerLoc, diag::constexpr_call_with_unknown_arg,
                triggerLocSkipsInternalLocs);
     return;
   }

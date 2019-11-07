@@ -1217,6 +1217,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
+  TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
 
@@ -1350,8 +1351,8 @@ public:
 
   void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifierWithDot() override;
-  void completeTypeIdentifierWithoutDot() override;
+  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -2106,9 +2107,9 @@ public:
         auto *Module = NTD->getParentModule();
         auto Conformance = Module->lookupConformance(
             BaseTy, ATD->getProtocol());
-        if (Conformance && Conformance->isConcrete()) {
-          return Conformance->getConcrete()
-              ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD));
+        if (Conformance.isConcrete()) {
+          return Conformance.getConcrete()->getTypeWitness(
+              const_cast<AssociatedTypeDecl *>(ATD));
         }
       }
     }
@@ -2430,8 +2431,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (!AFD || !AFD->getInterfaceType() ||
-        !AFD->getInterfaceType()->is<AnyFunctionType>()) {
+    if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
       // Probably, calling closure type expression.
       foundFunction(AFT);
       addPattern();
@@ -4605,13 +4605,22 @@ void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot() {
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
+    IdentTypeRepr *ITR) {
+  if (!ITR) {
+    completeTypeSimpleBeginning();
+    return;
+  }
   Kind = CompletionKind::TypeIdentifierWithDot;
+  ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot() {
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
+    IdentTypeRepr *ITR) {
+  assert(ITR);
   Kind = CompletionKind::TypeIdentifierWithoutDot;
+  ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
 

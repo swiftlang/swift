@@ -180,8 +180,9 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
+  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`
+  // expected-error@+2 {{key path value type 'Prop?' cannot be converted to contextual type 'Prop'}}
+  // expected-error@+1 {{key path value type 'A' cannot be converted to contextual type 'Prop'}}
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
@@ -229,7 +230,9 @@ func testDisembodiedStringInterpolation(x: Int) {
 
 func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
+  // FIXME(diagnostics): This should be diagnosed as `missing generic parameter 'T'` instead of a contextual failure.
   let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<Any>, A>'}}
 }
 
 struct TupleStruct {
@@ -504,10 +507,10 @@ func testLabeledSubscript() {
   let k = \AA.[labeled: 0]
 
   // TODO: These ought to work without errors.
-  let _ = \AA.[keyPath: k] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  let _ = \AA.[keyPath: k] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 
-  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 }
 

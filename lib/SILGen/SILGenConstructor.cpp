@@ -914,12 +914,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
 
-      for (auto entry : pbd->getPatternList()) {
-        auto init = entry.getExecutableInit();
+      for (auto i : range(pbd->getNumPatternEntries())) {
+        auto init = pbd->getExecutableInit(i);
         if (!init) continue;
 
+        auto *varPattern = pbd->getPattern(i);
         // Cleanup after this initialization.
-        FullExpr scope(Cleanups, entry.getPattern());
+        FullExpr scope(Cleanups, varPattern);
 
         // We want a substitution list written in terms of the generic
         // signature of the type, with replacement archetypes from the
@@ -948,13 +949,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
         CanType resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, entry.getPattern())->getCanonicalType();
+            pbd->getDeclContext(), dc, varPattern)->getCanonicalType();
         AbstractionPattern origResultType(resultType);
 
         // FIXME: Can emitMemberInit() share code with
         // InitializationForPattern in SILGenDecl.cpp?
         RValue result = emitApplyOfStoredPropertyInitializer(
-                                  init, entry, subs,
+                                  init, pbd->getAnchoringVarDecl(i), subs,
                                   resultType, origResultType,
                                   SGFContext());
 
@@ -970,7 +971,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           }
         }
 
-        emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
+        emitMemberInit(*this, selfDecl, varPattern, std::move(result));
       }
     }
   }

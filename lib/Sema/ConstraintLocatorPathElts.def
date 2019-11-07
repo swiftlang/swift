@@ -164,6 +164,9 @@ SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 /// The candidate witness during protocol conformance checking.
 CUSTOM_LOCATOR_PATH_ELT(Witness)
 
+/// The condition associated with 'if' expression or ternary operator.
+SIMPLE_LOCATOR_PATH_ELT(Condition)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

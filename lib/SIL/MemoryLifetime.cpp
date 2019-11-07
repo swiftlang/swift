@@ -28,16 +28,8 @@ llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     llvm::cl::desc("Don't abort compliation if the memory lifetime checker "
                    "detects an error."));
 
-namespace swift {
-namespace {
-
-//===----------------------------------------------------------------------===//
-//                            Utility functions
-//===----------------------------------------------------------------------===//
-
 /// Debug dump a location bit vector.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              const SmallBitVector &bits) {
+void swift::printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits) {
   const char *separator = "";
   OS << '[';
   for (int idx = bits.find_first(); idx >= 0; idx = bits.find_next(idx)) {
@@ -45,8 +37,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
     separator = ",";
   }
   OS << ']';
-  return OS;
 }
+
+void swift::dumpBits(const SmallBitVector &bits) {
+  llvm::dbgs() << bits << '\n';
+}
+
+namespace swift {
+namespace {
+
+//===----------------------------------------------------------------------===//
+//                            Utility functions
+//===----------------------------------------------------------------------===//
 
 /// Enlarge the bitset if needed to set the bit with \p idx.
 static void setBitAndResize(SmallBitVector &bits, unsigned idx) {
@@ -240,10 +242,6 @@ void MemoryLocations::dump() const {
   }
 }
 
-void MemoryLocations::dumpBits(const Bits &bits) {
-  llvm::errs() << bits << '\n';
-}
-
 void MemoryLocations::clear() {
   locations.clear();
   addr2LocIdx.clear();
@@ -299,6 +297,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::CopyAddrInst:
       case SILInstructionKind::YieldInst:

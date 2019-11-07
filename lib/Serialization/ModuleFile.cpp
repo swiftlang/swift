@@ -1261,7 +1261,7 @@ public:
 std::unique_ptr<ModuleFile::SerializedDeclUSRTable>
 ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   if (fields.empty() || blobData.empty())
-     return nullptr;
+    return nullptr;
   uint32_t tableOffset = static_cast<uint32_t>(fields.front());
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
   return std::unique_ptr<SerializedDeclUSRTable>(
@@ -2357,6 +2357,8 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 
   if (!DeclCommentTable)
     return None;
+  if (D->isImplicit())
+    return None;
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   llvm::raw_svector_ostream OS(USRBuffer);
@@ -2380,6 +2382,8 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
     return None;
   // Future compilers may not provide BasicDeclLocsData anymore.
   if (BasicDeclLocsData.empty())
+    return None;
+  if (D->isImplicit())
     return None;
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;

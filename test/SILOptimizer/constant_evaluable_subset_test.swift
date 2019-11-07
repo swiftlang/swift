@@ -18,6 +18,7 @@
 //
 // RUN: %FileCheck %s < %t/error-output-mandatory
 
+// SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-799): Re-enable test after SR-11336 is fixed.
 // XFAIL: *
 
@@ -256,7 +257,7 @@ internal func interpretInvalidSingedUnsignedConversions() -> UInt64 {
 @_semantics("constant_evaluable")
 internal func testIO() -> String? {
   return readLine()
-    // CHECK: note: encountered call to 'Swift.readLine(strippingNewline: Swift.Bool) -> Swift.Optional<Swift.String>' whose body is not available
+    // CHECK: note: encountered call to 'readLine(strippingNewline:)' whose body is not available
     // CHECK: note: function whose body is not available
 }
 
@@ -786,4 +787,112 @@ func testArrayAppendNonEmpty(_ x: String) -> [String] {
 @_semantics("test_driver")
 func interpretArrayAppendNonEmpty() -> [String] {
   return testArrayAppendNonEmpty("mkdir")
+}
+
+struct StructContaningArray {
+  var array: [Int]
+}
+
+// CHECK-LABEL: @testArrayFieldAppend
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayFieldAppend(_ x: Int) -> StructContaningArray {
+  var s = StructContaningArray(array: [])
+  s.array.append(x)
+  return s
+}
+
+@_semantics("test_driver")
+func interpretArrayFieldAppend() -> StructContaningArray {
+  return testArrayFieldAppend(0)
+}
+
+// CHECK-LABEL: @testClosureInit
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureInit(_ x: Int) -> () -> Int {
+  return { x }
+}
+
+@_semantics("test_driver")
+func interpretClosureCreation() -> () -> Int {
+  return testClosureInit(19)
+}
+
+// CHECK-LABEL: @testClosureChaining
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureChaining(_ x: Int, _ y: Int) -> () -> Int {
+  let clo: (Int) -> Int = { $0 + x }
+  return { clo(y) }
+}
+
+@_semantics("test_driver")
+func interpretClosureChains() -> () -> Int {
+  return testClosureChaining(191, 201)
+}
+
+// CHECK-LABEL: @testClosureWithNonConstantCaptures
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureWithNonConstantCaptures(_ x: @escaping () -> Int) -> () -> Int {
+  return x
+}
+
+@_semantics("test_driver")
+func interpretClosureWithNonConstantCaptures(_ x: Int) -> () -> Int {
+  return testClosureWithNonConstantCaptures({ x })
+}
+
+// CHECK-LABEL: @testAutoClosure
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testAutoClosure(_ x: @escaping @autoclosure () -> Int) -> () -> Int {
+  return x
+}
+
+@_semantics("test_driver")
+func interpretAutoClosure(_ x: Int) -> () -> Int {
+  return testAutoClosure(x)
+}
+
+// Test thin-to-thick function conversion.
+
+func someFunction(_ x: Int) -> Int {
+  return x + 1
+}
+
+// CHECK-LABEL: @testThinToThick
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testThinToThick() -> (Int) -> Int {
+  return someFunction
+}
+
+@_semantics("test_driver")
+func interpretThinToThick() -> (Int) -> Int {
+  return testThinToThick()
+}
+
+// Test closures and arrays combination.
+
+// CHECK-LABEL: @testArrayOfClosures
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayOfClosures(_ byte: @escaping () -> Int) -> [(Int) -> Int] {
+  var closureArray: [(Int) -> Int] = []
+  // Append a simple closure.
+  closureArray.append({ arg in
+    return 0
+  })
+  // Append a closure that does computation.
+  closureArray.append({ arg in
+    return byte() + arg
+  })
+  return closureArray
+}
+
+@_semantics("test_driver")
+func interpretArrayOfClosures() -> [(Int) -> Int] {
+  return testArrayOfClosures({ 10 })
 }

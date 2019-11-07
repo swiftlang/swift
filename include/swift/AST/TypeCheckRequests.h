@@ -1392,6 +1392,291 @@ public:
   void cacheResult(Type value) const;
 };
 
+class PatternBindingEntryRequest
+    : public SimpleRequest<PatternBindingEntryRequest,
+                           const PatternBindingEntry *(PatternBindingDecl *,
+                                                       unsigned),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<const PatternBindingEntry *>
+  evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<const PatternBindingEntry *> getCachedResult() const;
+  void cacheResult(const PatternBindingEntry *value) const;
+};
+
+class NamingPatternRequest
+    : public SimpleRequest<NamingPatternRequest, NamedPattern *(VarDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<NamedPattern *> evaluate(Evaluator &evaluator,
+                                          VarDecl *VD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<NamedPattern *> getCachedResult() const;
+  void cacheResult(NamedPattern *P) const;
+};
+
+class InterfaceTypeRequest :
+    public SimpleRequest<InterfaceTypeRequest,
+                         Type (ValueDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+struct PrecedenceGroupDescriptor {
+  enum PathDirection : bool {
+    LowerThan = false,
+    HigherThan = true,
+  };
+  DeclContext *dc;
+  Identifier ident;
+  SourceLoc nameLoc;
+  // Exists for diagnostics. Does not contribute to the descriptor otherwise.
+  Optional<PathDirection> pathDirection;
+
+  SourceLoc getLoc() const;
+
+  friend llvm::hash_code hash_value(const PrecedenceGroupDescriptor &owner) {
+    return llvm::hash_combine(owner.dc,
+                              owner.ident.getAsOpaquePointer(),
+                              owner.nameLoc.getOpaquePointerValue());
+  }
+
+  friend bool operator==(const PrecedenceGroupDescriptor &lhs,
+                         const PrecedenceGroupDescriptor &rhs) {
+    return lhs.dc == rhs.dc &&
+           lhs.ident == rhs.ident &&
+           lhs.nameLoc == rhs.nameLoc;
+  }
+
+  friend bool operator!=(const PrecedenceGroupDescriptor &lhs,
+                         const PrecedenceGroupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
+
+class LookupPrecedenceGroupRequest
+    : public SimpleRequest<LookupPrecedenceGroupRequest,
+                           PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Source location
+  SourceLoc getNearestLoc() const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether all of the stored properties in a nominal type have initial
+/// values.
+class AreAllStoredPropertiesDefaultInitableRequest
+    : public SimpleRequest<AreAllStoredPropertiesDefaultInitableRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether this type has a user-defined designated initializer. This
+/// does not include a synthesized designated initializer used to satisfy a
+/// conformance.
+class HasUserDefinedDesignatedInitRequest
+    : public SimpleRequest<HasUserDefinedDesignatedInitRequest,
+                           bool(NominalTypeDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this type has a synthesized memberwise initializer.
+class HasMemberwiseInitRequest
+    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, StructDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a memberwise initializer for a given type.
+class SynthesizeMemberwiseInitRequest
+    : public SimpleRequest<SynthesizeMemberwiseInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks whether this type has a synthesized zero parameter default
+/// initializer.
+class HasDefaultInitRequest
+    : public SimpleRequest<HasDefaultInitRequest, bool(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a default initializer for a given type.
+class SynthesizeDefaultInitRequest
+    : public SimpleRequest<SynthesizeDefaultInitRequest,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ConstructorDecl *> evaluate(Evaluator &evaluator,
+                                             NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class CompareDeclSpecializationRequest
+    : public SimpleRequest<CompareDeclSpecializationRequest,
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, DeclContext *DC,
+                                ValueDecl *VD1, ValueDecl *VD2,
+                                bool dynamic) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+// SWIFT_ENABLE_TENSORFLOW
+class DifferentiableAttributeParameterIndicesRequest :
+    public SimpleRequest<DifferentiableAttributeParameterIndicesRequest,
+                         IndexSubset *(DifferentiableAttr *, Decl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<IndexSubset *>
+  evaluate(Evaluator &evaluator, DifferentiableAttr *attr, Decl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<IndexSubset *> getCachedResult() const;
+  void cacheResult(IndexSubset *value) const;
+};
+// SWIFT_ENABLE_TENSORFLOW END
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

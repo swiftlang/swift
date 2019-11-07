@@ -41,9 +41,7 @@ bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
@@ -116,8 +114,7 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl, void *) {
 /// Derive a '_typeList' implementation.
 static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
@@ -219,8 +216,8 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     ValueDecl *memberInitDecl = initReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
-    if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(initReq);
+    if (confRef.isConcrete())
+      memberInitDecl = confRef.getConcrete()->getWitnessDecl(initReq);
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
         memberInitDecl, DeclNameLoc(), /*implicit*/ true);
@@ -319,7 +316,7 @@ static ValueDecl *deriveTensorGroup_constructor(
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
@@ -339,7 +336,6 @@ static ValueDecl *deriveTensorGroup_constructor(
   initDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({initDecl});
@@ -350,7 +346,7 @@ static ValueDecl *deriveTensorGroup_constructor(
 
 // Synthesize the `init(_owning:)` function declaration.
 static ValueDecl *deriveTensorGroup_init(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
@@ -370,10 +366,10 @@ ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_typeList)
+  if (requirement->getBaseName() == Context.Id_typeList)
     return deriveTensorGroup_typeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorGroup_init(*this);
-  TC.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
   return nullptr;
 }

@@ -160,13 +160,11 @@ Expr *swift::ide::findParsedExpr(const DeclContext *DC,
 
 Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (FD->hasInterfaceType()) {
-      auto Ty = FD->getInterfaceType();
-      if (FD->getDeclContext()->isTypeContext())
-        Ty = FD->getMethodInterfaceType();
-      if (auto FT = Ty->getAs<AnyFunctionType>())
-        return DC->mapTypeIntoContext(FT->getResult());
-    }
+    auto Ty = FD->getInterfaceType();
+    if (FD->getDeclContext()->isTypeContext())
+      Ty = FD->getMethodInterfaceType();
+    if (auto FT = Ty->getAs<AnyFunctionType>())
+      return DC->mapTypeIntoContext(FT->getResult());
   } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
     if (ACE->getType() && !ACE->getType()->hasError())
       return ACE->getResultType();
@@ -686,7 +684,7 @@ class ExprContextAnalyzer {
     switch (D->getKind()) {
     case DeclKind::PatternBinding: {
       auto PBD = cast<PatternBindingDecl>(D);
-      for (unsigned I = 0; I < PBD->getNumPatternEntries(); ++I) {
+      for (unsigned I : range(PBD->getNumPatternEntries())) {
         if (auto Init = PBD->getInit(I)) {
           if (containsTarget(Init)) {
             if (PBD->getPattern(I)->hasType()) {
@@ -743,8 +741,7 @@ class ExprContextAnalyzer {
       if (!AFD)
         return;
       auto param = AFD->getParameters()->get(initDC->getIndex());
-      if (param->hasInterfaceType())
-        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
       break;
     }
     }

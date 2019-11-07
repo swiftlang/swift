@@ -455,7 +455,7 @@ static void printSILFunctionNameAndType(
   OS << " : $";
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
-  auto sig = function->getLoweredFunctionType()->getGenericSignature();
+  auto sig = function->getLoweredFunctionType()->getSubstGenericSignature();
   auto env = function->getGenericEnvironment();
   if (sig && env) {
     llvm::SmallString<16> disambiguatedNameBuf;
@@ -530,7 +530,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::Any) {
+    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -1144,7 +1144,7 @@ public:
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutionMap(),
-                       AI->getOrigCalleeType()->getGenericSignature());
+                       AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
@@ -1700,13 +1700,13 @@ public:
   }
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \
   }
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    *this << getIDAndType(I->getOperand()); \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
+    *this << getIDAndType(I->getOperand());                                    \
   }
 #include "swift/AST/ReferenceStorage.def"
 
@@ -2580,7 +2580,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
   
-  auto sig = getLoweredFunctionType()->getGenericSignature();
+  auto sig = getLoweredFunctionType()->getSubstGenericSignature();
   auto *env = getGenericEnvironment();
   if (sig && env) {
     llvm::SmallString<16> disambiguatedNameBuf;

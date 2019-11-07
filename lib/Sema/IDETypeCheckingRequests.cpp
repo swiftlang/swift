@@ -114,9 +114,7 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<TypePair>
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  auto &TC = TypeChecker::createForContext(subscript->getASTContext());
-
-  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+  if (!isValidKeyPathDynamicMemberLookup(subscript))
     return TypePair();
 
   const auto *param = subscript->getIndices()->get(0);

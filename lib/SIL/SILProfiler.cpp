@@ -135,6 +135,7 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
       return true;
   } else if (auto *E = N.get<Expr *>()) {
     if (forDecl.isStoredPropertyInitializer() ||
+        forDecl.isPropertyWrapperBackingInitializer() ||
         forDecl.getAbstractClosureExpr())
       return true;
   }
@@ -151,8 +152,10 @@ SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
   if (!doesASTRequireProfiling(M, N) && Opts.UseProfile.empty())
     return nullptr;
 
-  if (!canCreateProfilerForAST(N, forDecl))
+  if (!canCreateProfilerForAST(N, forDecl)) {
+    N.dump(llvm::errs());
     llvm_unreachable("Invalid AST node for profiling");
+  }
 
   auto *Buf = M.allocate<SILProfiler>(1);
   auto *SP =

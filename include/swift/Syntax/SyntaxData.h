@@ -149,10 +149,6 @@ public:
   /// node does not contain non-missing tokens.
   RC<SyntaxData> getFirstToken() const;
 
-  /// Get the last non-missing token node in this tree. Return nullptr if this
-  /// node does not contain non-missing tokens.
-  RC<SyntaxData> getLastToken() const;
-
   ~SyntaxData() {
     for (auto &I : getChildren())
       I.~AtomicCache<SyntaxData>();

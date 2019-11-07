@@ -42,6 +42,18 @@ public let UTF8Decode = [
       name: "UTF8Decode_InitFromBytes_ascii",
       runFunction: run_UTF8Decode_InitFromBytes_ascii,
       tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitFromData_ascii_as_ascii",
+      runFunction: run_UTF8Decode_InitFromData_ascii_as_ascii,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitDecoding_ascii_as_ascii",
+      runFunction: run_UTF8Decode_InitDecoding_ascii_as_ascii,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitFromBytes_ascii_as_ascii",
+      runFunction: run_UTF8Decode_InitFromBytes_ascii_as_ascii,
+      tags: [.validation, .api, .String]),
 ]
 
 // 1-byte sequences
@@ -126,6 +138,28 @@ public func run_UTF8Decode_InitFromBytes_ascii(_ N: Int) {
   let input = asciiBytes
   for _ in 0..<1_000*N {
     blackHole(String(bytes: input, encoding: .utf8))
+  }
+}
+
+@inline(never)
+public func run_UTF8Decode_InitFromData_ascii_as_ascii(_ N: Int) {
+  let input = asciiData
+  for _ in 0..<1_000*N {
+    blackHole(String(data: input, encoding: .ascii))
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecoding_ascii_as_ascii(_ N: Int) {
+  let input = asciiBytes
+  for _ in 0..<1_000*N {
+    blackHole(String(decoding: input, as: Unicode.ASCII.self))
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitFromBytes_ascii_as_ascii(_ N: Int) {
+  let input = asciiBytes
+  for _ in 0..<1_000*N {
+    blackHole(String(bytes: input, encoding: .ascii))
   }
 }
 

@@ -128,8 +128,8 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const;
 
   /// Look up a conformance for the given type to the given protocol.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType type, ProtocolDecl *proto) const;
+  ProtocolConformanceRef lookupConformance(CanType type,
+                                           ProtocolDecl *proto) const;
 
   /// Whether the substitution map is empty.
   bool empty() const;
@@ -290,11 +290,10 @@ class LookUpConformanceInSubstitutionMap {
 public:
   explicit LookUpConformanceInSubstitutionMap(SubstitutionMap Subs)
     : Subs(Subs) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 } // end namespace swift

@@ -847,11 +847,11 @@ inline SingleValueInstruction *SILNode::castToSingleValueInstruction() {
            inst->getKind() <= SILInstructionKind::Last_##ID;    \
   }
 
-/// A single value inst that also forwards either owned or guaranteed ownership.
+/// A single value inst that forwards a static ownership from one (or all) of
+/// its operands.
 ///
-/// The specific forwarded ownership is static since it is set upon
-/// construction. After that point the instruction can not have a different form
-/// of ownership.
+/// The ownership kind is set on construction and afterwards must be changed
+/// explicitly using setOwnershipKind().
 class OwnershipForwardingSingleValueInst : public SingleValueInstruction {
   ValueOwnershipKind ownershipKind;
 
@@ -1933,7 +1933,7 @@ public:
   }
 
   bool isCalleeNoReturn() const {
-    return getSubstCalleeSILType().isNoReturnFunction();
+    return getSubstCalleeSILType().isNoReturnFunction(this->getModule());
   }
 
   bool isCalleeThin() const {
@@ -2231,6 +2231,9 @@ public:
   }
 };
 
+class EndApplyInst;
+class AbortApplyInst;
+
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
 class BeginApplyInst final
@@ -2285,6 +2288,13 @@ public:
   bool isNonThrowing() const {
     return isNonThrowingApply();
   }
+
+  void getCoroutineEndPoints(
+      SmallVectorImpl<EndApplyInst *> &endApplyInsts,
+      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const;
+
+  void getCoroutineEndPoints(SmallVectorImpl<Operand *> &endApplyInsts,
+                             SmallVectorImpl<Operand *> &abortApplyInsts) const;
 };
 
 inline BeginApplyInst *BeginApplyResult::getParent() {
@@ -5075,7 +5085,7 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
       : InstructionBaseWithTrailingOperands(
             Elements, DebugLoc, Ty,
             HasOwnership ? *mergeSILValueOwnership(Elements)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
     SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
@@ -5122,7 +5132,7 @@ class TupleInst final : public InstructionBaseWithTrailingOperands<
       : InstructionBaseWithTrailingOperands(
             Elems, DebugLoc, Ty,
             HasOwnership ? *mergeSILValueOwnership(Elems)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
@@ -5197,9 +5207,8 @@ class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy)
       : InstructionBase(DebugLoc, ResultTy,
-                        Operand
-                            ? Operand.getOwnershipKind()
-                            : ValueOwnershipKind(ValueOwnershipKind::Any)),
+                        Operand ? Operand.getOwnershipKind()
+                                : ValueOwnershipKind(ValueOwnershipKind::None)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5453,8 +5462,7 @@ public:
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
 
-/// A select enum inst that produces a static OwnershipKind set upon the
-/// instruction's construction.
+/// A select enum inst that produces a static OwnershipKind.
 class OwnershipForwardingSelectEnumInstBase : public SelectEnumInstBase {
   ValueOwnershipKind ownershipKind;
 
@@ -5493,7 +5501,7 @@ private:
             Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
             DefaultCount,
             HasOwnership ? *mergeSILValueOwnership(CaseValues)
-                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+                         : ValueOwnershipKind(ValueOwnershipKind::None)) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -6405,16 +6413,34 @@ public:
 /// the base must not be moved before any instructions which depend on the
 /// result of this instruction, exactly as if the address had been obviously
 /// derived from that operand (e.g. using ``ref_element_addr``). The result is
-/// always equal to the first operand.
+/// always equal to the first operand and thus forwards ownership through the
+/// first operand. This is a "regular" use of the second operand (i.e. the
+/// second operand must be live at the use point).
+///
+/// Example:
+///
+///   %base = ...
+///   %value = ... @trivial value ...
+///   %value_dependent_on_base = mark_dependence %value on %base
+///   ...
+///   use(%value_dependent_on_base)     (1)
+///   ...
+///   destroy_value %base               (2)
+///
+/// (2) can never move before (1). In English this is a way for the compiler
+/// writer to say to the optimizer: 'This subset of uses of "value" (the uses of
+/// result) have a dependence on "base" being alive. Do not allow for things
+/// that /may/ destroy base to be moved earlier than any of these uses of
+/// "value"'.
 class MarkDependenceInst
     : public InstructionBase<SILInstructionKind::MarkDependenceInst,
-                             SingleValueInstruction> {
+                             OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   FixedOperandList<2> Operands;
 
   MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base)
-      : InstructionBase(DebugLoc, value->getType()),
+      : InstructionBase(DebugLoc, value->getType(), value.getOwnershipKind()),
         Operands{this, value, base} {}
 
 public:
@@ -6486,22 +6512,24 @@ class CopyValueInst
 };
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  class Copy##Name##ValueInst                                                  \
-      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                    SingleValueInstruction> {                  \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
     friend class SILBuilder;                                                   \
-    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
-                          SILType type)                                        \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  class Copy##Name##ValueInst                                                  \
-      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                    SingleValueInstruction> {                  \
+  class StrongCopy##Name##ValueInst                                            \
+      : public UnaryInstructionBase<                                           \
+            SILInstructionKind::StrongCopy##Name##ValueInst,                   \
+            SingleValueInstruction> {                                          \
     friend class SILBuilder;                                                   \
-    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
-                          SILType type)                                        \
+    StrongCopy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,   \
+                                SILType type)                                  \
         : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
   };
 #include "swift/AST/ReferenceStorage.def"

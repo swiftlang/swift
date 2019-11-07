@@ -85,8 +85,6 @@ RC<SyntaxData> SyntaxData::getNextNode() const {
 }
 
 RC<SyntaxData> SyntaxData::getFirstToken() const {
-  if (getRaw()->isMissing())
-    return nullptr;
   if (getRaw()->isToken()) {
     // Get a reference counted version of this
     assert(hasParent() && "The syntax tree should not conisist only of the root");
@@ -100,28 +98,6 @@ RC<SyntaxData> SyntaxData::getFirstToken() const {
       if (Child->getRaw()->isToken()) {
         return Child;
       } else if (auto Token = Child->getFirstToken()) {
-        return Token;
-      }
-    }
-  }
-  return nullptr;
-}
-
-RC<SyntaxData> SyntaxData::getLastToken() const {
-  if (getRaw()->isMissing())
-    return nullptr;
-  if (getRaw()->isToken()) {
-    // Get a reference counted version of this
-    assert(hasParent() && "The syntax tree should not conisist only of the root");
-    return getParent()->getChild(getIndexInParent());
-  }
-  for (size_t I = getNumChildren(); I != 0; --I) {
-    if (auto Child = getChild(I - 1)) {
-      if (Child->getRaw()->isMissing())
-        continue;
-      if (Child->getRaw()->isToken()) {
-        return Child;
-      } else if (auto Token = Child->getLastToken()) {
         return Token;
       }
     }

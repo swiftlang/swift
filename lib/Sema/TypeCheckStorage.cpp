@@ -39,10 +39,10 @@ void swift::setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType() && !var->getType()->hasError())
+    if (var->hasInterfaceType())
       return;
 
-    var->markInvalid();
+    var->setInvalid();
   });
 }
 
@@ -162,25 +162,27 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
-static void validatePatternBindingEntry(TypeChecker &tc,
-                                        PatternBindingDecl *binding,
-                                        unsigned entryNumber) {
-  // If the pattern already has a type, we're done.
-  if (binding->getPattern(entryNumber)->hasType())
-    return;
+llvm::Expected<const PatternBindingEntry *>
+PatternBindingEntryRequest::evaluate(Evaluator &eval,
+                                     PatternBindingDecl *binding,
+                                     unsigned entryNumber) const {
+  const auto &pbe = binding->getPatternList()[entryNumber];
+  auto &Context = binding->getASTContext();
 
   // Resolve the pattern.
-  auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
-                                    binding->getDeclContext(),
-                                    /*isStmtCondition*/true);
+  auto *TC =
+      static_cast<TypeChecker *>(binding->getASTContext().getLazyResolver());
+  auto *pattern = TC->resolvePattern(binding->getPattern(entryNumber),
+                                     binding->getDeclContext(),
+                                     /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
-    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
-    return;
+    binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
+    return &pbe;
   }
 
   binding->setPattern(entryNumber, pattern,
-                      binding->getPatternList()[entryNumber].getInitContext());
+                      binding->getInitContext(entryNumber));
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -189,9 +191,9 @@ static void validatePatternBindingEntry(TypeChecker &tc,
     if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_not_in_class, false)
-            .fixItReplace(binding->getStaticLoc(), "static");
-          tc.diagnose(NTD, diag::extended_type_declared_here);
+          binding->diagnose(diag::class_var_not_in_class, false)
+              .fixItReplace(binding->getStaticLoc(), "static");
+          NTD->diagnose(diag::extended_type_declared_here);
         }
       }
     }
@@ -212,33 +214,49 @@ static void validatePatternBindingEntry(TypeChecker &tc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
-    setBoundVarsTypeError(pattern, tc.Context);
+  if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
+    swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
-    pattern->setType(ErrorType::get(tc.Context));
-    return;
+    pattern->setType(ErrorType::get(Context));
+    return &pbe;
+  }
+
+  // If we have a type but no initializer, check whether the type is
+  // default-initializable. If so, do it.
+  if (!pbe.isInitialized() &&
+      binding->isDefaultInitializable(entryNumber) &&
+      pattern->hasStorage() &&
+      !pattern->getType()->hasError()) {
+    auto type = pattern->getType();
+    if (auto defaultInit = TC->buildDefaultInitializer(type)) {
+      // If we got a default initializer, install it and re-type-check it
+      // to make sure it is properly coerced to the pattern type.
+      binding->setInit(entryNumber, defaultInit);
+    }
   }
 
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (tc.typeCheckPatternBinding(binding, entryNumber))
-      return;
-    
+    if (TC->typeCheckPatternBinding(binding, entryNumber)) {
+      binding->setInvalid();
+      return &pbe;
+    }
+
     // A pattern binding at top level is not allowed to pick up another decl's
     // opaque result type as its type by type inference.
-    if (!binding->getDeclContext()->isLocalContext()
-        && binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
+    if (!binding->getDeclContext()->isLocalContext() &&
+        binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
       // TODO: Check whether the type is the pattern binding's own opaque type.
-      tc.diagnose(binding, diag::inferred_opaque_type,
-                  binding->getInit(entryNumber)->getType());
+      binding->diagnose(diag::inferred_opaque_type,
+                        binding->getInit(entryNumber)->getType());
     }
   }
 
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    llvm::SmallVector<VarDecl*, 2> vars;
+    llvm::SmallVector<VarDecl *, 2> vars;
     binding->getPattern(entryNumber)->collectVariables(vars);
     if (vars.empty()) {
       // Selector for error message.
@@ -246,31 +264,22 @@ static void validatePatternBindingEntry(TypeChecker &tc,
         Property,
         GlobalVariable,
       };
-      tc.diagnose(binding->getPattern(entryNumber)->getLoc(),
-                  diag::pattern_binds_no_variables,
-                  binding->getDeclContext()->isTypeContext()
-                                                   ? Property : GlobalVariable);
+      Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
+                             diag::pattern_binds_no_variables,
+                             binding->getDeclContext()->isTypeContext()
+                                 ? Property
+                                 : GlobalVariable);
     }
   }
-}
-
-/// Validate the entries in the given pattern binding declaration.
-void swift::validatePatternBindingEntries(TypeChecker &tc,
-                                          PatternBindingDecl *binding) {
-  if (binding->hasValidationStarted())
-    return;
-
-  DeclValidationRAII IBV(binding);
-
-  for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
-    validatePatternBindingEntry(tc, binding, i);
+  return &pbe;
 }
 
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -298,7 +307,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -324,8 +333,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
@@ -732,18 +742,39 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
 
   bool isMemberLValue = isLValue;
+  auto propertyWrapperMutability =
+      [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
+    if (accessor->isCoroutine())
+      return None;
+    auto var = dyn_cast<VarDecl>(decl);
+    if (!var)
+      return None;
+    auto mut = var->getPropertyWrapperMutability();
+    if (!mut)
+      return None;
+    return std::make_pair(mut->Getter == PropertyWrapperMutability::Mutating,
+                          mut->Setter == PropertyWrapperMutability::Mutating);
+  };
 
-  // If we're acessing a property wrapper, determine if the
+  // If we're accessing a property wrapper, determine if the
   // intermediate access requires an lvalue.
-  if (underlyingVars.size() > 0) {
-    isMemberLValue = underlyingVars[0]->isGetterMutating();
+  if (auto mut = propertyWrapperMutability(accessor->getStorage())) {
+    isMemberLValue = mut->first;
     if (isLValue)
-      isMemberLValue |= underlyingVars[0]->isSetterMutating();
+      isMemberLValue |= mut->second;
   }
 
   bool isSelfLValue = storage->isGetterMutating();
   if (isMemberLValue)
     isSelfLValue |= storage->isSetterMutating();
+
+  // If we're accessing a property wrapper, determine if
+  // the self requires an lvalue.
+  if (auto mut = propertyWrapperMutability(storage)) {
+    isSelfLValue = mut->first;
+    if (isMemberLValue)
+      isSelfLValue |= mut->second;
+  }
 
   Expr *selfDRE =
     buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
@@ -846,19 +877,19 @@ createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                ctx);
 }
 
-static Optional<ProtocolConformanceRef>
-checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var, Type type) {
+static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
+                                                          Type type) {
   auto dc = var->getDeclContext();
+  auto &ctx = dc->getASTContext();
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    auto result = TypeChecker::conformsToProtocol(type, proto, dc, None);
-    if (result)
+    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc, None))
       return result;
   }
 
   ctx.Diags.diagnose(var->getLoc(), diag::nscopying_doesnt_conform);
-  return None;
+  return ProtocolConformanceRef::forInvalid();
 }
 
 static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
@@ -871,10 +902,9 @@ static std::pair<Type, bool> getUnderlyingTypeOfVariable(VarDecl *var) {
   }
 }
 
-Optional<ProtocolConformanceRef>
-TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
+ProtocolConformanceRef TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
   Type type = getUnderlyingTypeOfVariable(var).first;
-  return ::checkConformanceToNSCopying(Context, var, type);
+  return ::checkConformanceToNSCopying(var, type);
 }
 
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
@@ -891,14 +921,14 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // The element type must conform to NSCopying.  If not, emit an error and just
   // recovery by synthesizing without the copy call.
-  auto conformance = checkConformanceToNSCopying(Ctx, VD, underlyingType);
+  auto conformance = checkConformanceToNSCopying(VD, underlyingType);
   if (!conformance)
     return Val;
 
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance->getRequirement()->getMembers()) {
+  for (auto member : conformance.getRequirement()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getFullName() == copyWithZoneName) {
         copyMethod = func;
@@ -916,9 +946,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   }
 
   SubstitutionMap subs =
-    SubstitutionMap::get(copyMethod->getGenericSignature(),
-                         {underlyingType},
-                         ArrayRef<ProtocolConformanceRef>(*conformance));
+      SubstitutionMap::get(copyMethod->getGenericSignature(), {underlyingType},
+                           ArrayRef<ProtocolConformanceRef>(conformance));
   ConcreteDeclRef copyMethodRef(copyMethod, subs);
   auto copyMethodType = copyMethod->getInterfaceType()
                            ->castTo<GenericFunctionType>()
@@ -1200,13 +1229,13 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
 
   Expr *InitValue;
-  if (PBD->getPatternList()[entryIndex].getInit()) {
+  if (PBD->getInit(entryIndex)) {
     PBD->setInitializerSubsumed(entryIndex);
 
     if (!PBD->isInitializerChecked(entryIndex))
       TC.typeCheckPatternBinding(PBD, entryIndex);
 
-    InitValue = PBD->getPatternList()[entryIndex].getInit();
+    InitValue = PBD->getInit(entryIndex);
   } else {
     InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getType());
   }
@@ -1636,8 +1665,9 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
+      const auto i = bindingDecl->getPatternEntryIndexForVarDecl(varDecl);
       auto *bindingInit = cast<PatternBindingInitializer>(
-        bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
+        bindingDecl->getInitContext(i));
 
       selfDecl = bindingInit->getImplicitSelfDecl();
     }
@@ -2184,12 +2214,12 @@ static void typeCheckSynthesizedWrapperInitializer(
   ASTContext &ctx = pbd->getASTContext();
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   tc.typeCheckExpression(initializer, originalDC);
+  const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
-          dyn_cast_or_null<Initializer>(
-            pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
+          dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
     tc.contextualizeInitializer(initializerContext, initializer);
   }
-  tc.checkPropertyWrapperErrorHandling(pbd, initializer);
+  TypeChecker::checkPropertyWrapperErrorHandling(pbd, initializer);
 }
 
 static PropertyWrapperMutability::Value
@@ -2421,7 +2451,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
                                           StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     SourceLoc typeLoc;
-    if (auto *repr = var->getTypeRepr())
+    if (auto *repr = var->getTypeReprOrParentPatternTypeRepr())
       typeLoc = repr->getLoc();
     
     if (info.hasStorage()) {
@@ -2538,7 +2568,16 @@ static void finishNSManagedImplInfo(VarDecl *var,
   if (var->isLet())
     diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
 
+  SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
+
   auto diagnoseNotStored = [&](unsigned kind) {
+    // Skip diagnosing @NSManaged declarations in module interfaces. They are
+    // properties that are stored, but have specially synthesized observers
+    // and we should allow them to have getters and setters in a module
+    // interface.
+    if (parentFile && parentFile->Kind == SourceFileKind::Interface)
+      return;
+
     diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
   };
 

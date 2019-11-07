@@ -200,8 +200,8 @@ public:
            ParsedTrivia &TrailingTriviaResult) {
     Result = NextToken;
     if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-      std::swap(LeadingTriviaResult, LeadingTrivia);
-      std::swap(TrailingTriviaResult, TrailingTrivia);
+      LeadingTriviaResult = {LeadingTrivia};
+      TrailingTriviaResult = {TrailingTrivia};
     }
     if (Result.isNot(tok::eof))
       lexImpl();

@@ -10,7 +10,7 @@ class C {
 	init() {}
 }
 
-typealias t = t // expected-error {{type alias 't' references itself}}
+typealias t = t // expected-error {{type alias 't' references itself}} expected-note {{through reference here}}
 
 extension Foo {
   convenience init() {} // expected-error{{invalid redeclaration of synthesized 'init()'}}

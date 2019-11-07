@@ -33,12 +33,6 @@ namespace syntax {
 
 typedef void *OpaqueSyntaxNode;
 
-// todo [gsoc]: remove when possible
-enum class OpaqueSyntaxNodeKind {
-  SwiftSyntax,
-  LibSyntax,
-};
-
 class SyntaxParseActions {
   virtual void _anchor();
 
@@ -73,9 +67,6 @@ public:
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
     return std::make_pair(0, nullptr);
   }
-
-  /// Returns what kind of OpaqueSyntaxNode is created by `recordXXX` methods.
-  virtual OpaqueSyntaxNodeKind getOpaqueKind() = 0;
 };
 
 } // end namespace swift

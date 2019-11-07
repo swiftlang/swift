@@ -187,11 +187,6 @@ public:
 
   Optional<SymbolicValue> lookupConstValue(SILValue value);
 
-  /// Returns true if and only if `errorVal` denotes an error that requires
-  /// aborting interpretation and returning the error. Skipping an instruction
-  /// that produces such errors is not a valid behavior.
-  bool isFailStopError(SymbolicValue errorVal);
-
   /// Return the number of instructions evaluated for the last `evaluate`
   /// operation. This could be used by the clients to limit the number of
   /// instructions that should be evaluated by the step-wise evaluator.
@@ -207,9 +202,23 @@ public:
   const SmallPtrSetImpl<SILFunction *> &getFuncsCalledDuringEvaluation() {
     return evaluator.getFuncsCalledDuringEvaluation();
   }
+
+  /// Dump the internal state to standard error for debugging.
+  void dumpState();
 };
 
+bool isConstantEvaluable(SILFunction *fun);
+
+/// Return true if and only if the given function \p fun is specially modeled
+/// by the constant evaluator. These are typically functions in the standard
+/// library, such as String.+=, Array.append, whose semantics is built into the
+/// evaluator.
 bool isKnownConstantEvaluableFunction(SILFunction *fun);
+
+/// Return true if and only if \p errorVal denotes an error that requires
+/// aborting interpretation and returning the error. Skipping an instruction
+/// that produces such errors is not a valid behavior.
+bool isFailStopError(SymbolicValue errorVal);
 
 } // end namespace swift
 #endif

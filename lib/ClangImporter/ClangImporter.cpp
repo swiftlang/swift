@@ -1014,6 +1014,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
       std::make_shared<SwiftNameLookupExtension>(
           importer->Impl.BridgingHeaderLookupTable,
           importer->Impl.LookupTables, importer->Impl.SwiftContext,
+          importer->Impl.getBufferImporterForDiagnostics(),
           importer->Impl.platformAvailability,
           importer->Impl.InferImportAsMember));
 
@@ -1356,7 +1357,8 @@ bool ClangImporter::Implementation::importHeader(
   }
 
   // Finalize the lookup table, which may fail.
-  finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter());
+  finalizeLookupTable(*BridgingHeaderLookupTable, getNameImporter(),
+                      getBufferImporterForDiagnostics());
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -1380,7 +1382,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
 
   // If we've made it to here, this is some header other than the bridging
   // header, which means we can no longer rely on one file's modification time
-  // to invalid code completion caches. :-(
+  // to invalidate code completion caches. :-(
   Impl.setSinglePCHImport(None);
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
@@ -1878,6 +1880,7 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
+      BuffersForDiagnostics(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DWARFImporter(dwarfImporterDelegate) {}
 
@@ -3728,8 +3731,16 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
       (nominal->getAttrs().hasAttribute<ObjCAttr>() ||
        (!nominal->getParentSourceFile() && nominal->isObjC()))) {
     // Map the name. If we can't represent the Swift name in Clang.
-    // FIXME: We should be using the Objective-C name here!
-    auto clangName = exportName(nominal->getName());
+    Identifier name = nominal->getName();
+    if (auto objcAttr = nominal->getAttrs().getAttribute<ObjCAttr>()) {
+      if (auto objcName = objcAttr->getName()) {
+        if (objcName->getNumArgs() == 0) {
+          // This is an error if not 0, but it should be caught later.
+          name = objcName->getSimpleName();
+        }
+      }
+    }
+    auto clangName = exportName(name);
     if (!clangName)
       return EffectiveClangContext();
 
@@ -3738,6 +3749,28 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     clang::LookupResult lookupResult(sema, clangName,
                                      clang::SourceLocation(),
                                      clang::Sema::LookupOrdinaryName);
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+      // FIXME: Filter based on access path? C++ access control?
+      for (auto clangDecl : lookupResult) {
+        if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+          return EffectiveClangContext(objcClass);
+
+        /// FIXME: Other type declarations should also be okay?
+      }
+    }
+
+    // For source compatibility reasons, fall back to the Swift name.
+    //
+    // This is how people worked around not being able to import-as-member onto
+    // Swift types by their ObjC name before the above code to handle ObjCAttr
+    // was added.
+    if (name != nominal->getName())
+      clangName = exportName(nominal->getName());
+
+    lookupResult.clear();
+    lookupResult.setLookupName(clangName);
+    // FIXME: This loop is duplicated from above, but doesn't obviously factor
+    // out in a nice way.
     if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
       // FIXME: Filter based on access path? C++ access control?
       for (auto clangDecl : lookupResult) {

@@ -103,11 +103,11 @@ static ValueDecl *getElementaryFunctionRequirement(
 // Get the effective memberwise initializer of the given nominal type, or create
 // it if it does not exist.
 static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    TypeChecker &TC, NominalTypeDecl *nominal) {
+    ASTContext &ctx, NominalTypeDecl *nominal) {
   auto &C = nominal->getASTContext();
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
-  auto *initDecl = createMemberwiseImplicitConstructor(TC, nominal);
+  auto *initDecl = createMemberwiseImplicitConstructor(ctx, nominal);
   nominal->addMember(initDecl);
   C.addSynthesizedDecl(initDecl);
   return initDecl;
@@ -129,9 +129,7 @@ bool DerivedConformance::canDeriveElementaryFunctions(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, mathProto, DC, None);
@@ -184,8 +182,8 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberOpDecl = operatorReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberOpDecl = confRef->getConcrete()->getWitnessDecl(
+    if (confRef.isConcrete())
+      memberOpDecl = confRef.getConcrete()->getWitnessDecl(
           operatorReq);
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
@@ -247,7 +245,7 @@ static ValueDecl *deriveElementaryFunction(DerivedConformance &derived,
 ElementaryFunction op) {
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
 
   // Create parameter declaration with the given name and type.
@@ -302,7 +300,6 @@ ElementaryFunction op) {
 #undef ELEMENTARY_FUNCTION
   }
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  operatorDecl->computeType();
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({operatorDecl});
@@ -317,21 +314,21 @@ DerivedConformance::deriveElementaryFunctions(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
+  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
 #define ELEMENTARY_FUNCTION_UNARY(ID, NAME)                                    \
-  if (requirement->getBaseName() == TC.Context.getIdentifier(NAME))            \
+  if (requirement->getBaseName() == Context.getIdentifier(NAME))            \
     return deriveElementaryFunction(*this, ID);
 #include "DerivedConformanceElementaryFunctions.def"
 #undef ELEMENTARY_FUNCTION_UNARY
-  if (requirement->getBaseName() == TC.Context.getIdentifier("root"))
+  if (requirement->getBaseName() == Context.getIdentifier("root"))
     return deriveElementaryFunction(*this, Root);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("pow")) {
+  if (requirement->getBaseName() == Context.getIdentifier("pow")) {
     auto *powFuncDecl = cast<FuncDecl>(requirement);
     return powFuncDecl->getParameters()->get(1)->getName().str() == "n"
         ? deriveElementaryFunction(*this, PowInt)
         : deriveElementaryFunction(*this, Pow);
   }
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_elementary_functions_requirement);
   return nullptr;
 }

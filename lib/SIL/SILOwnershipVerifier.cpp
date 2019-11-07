@@ -299,7 +299,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     // User's results to the worklist.
     if (user->getResults().size()) {
       for (SILValue result : user->getResults()) {
-        if (result.getOwnershipKind() == ValueOwnershipKind::Any) {
+        if (result.getOwnershipKind() == ValueOwnershipKind::None) {
           continue;
         }
 
@@ -351,7 +351,7 @@ bool SILValueOwnershipChecker::gatherUsers(
         }
 
         // If we have an any value, just continue.
-        if (succArgOwnershipKind == ValueOwnershipKind::Any)
+        if (succArgOwnershipKind == ValueOwnershipKind::None)
           continue;
 
         // Otherwise add all end_borrow users for this BBArg to the
@@ -380,7 +380,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   switch (arg->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
-  case ValueOwnershipKind::Any:
+  case ValueOwnershipKind::None:
     return true;
   case ValueOwnershipKind::Owned:
     break;
@@ -401,7 +401,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   switch (yield->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
-  case ValueOwnershipKind::Any:
+  case ValueOwnershipKind::None:
     return true;
   case ValueOwnershipKind::Owned:
     break;

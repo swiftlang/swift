@@ -291,7 +291,7 @@ public:
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
-  bool isNoReturnFunction() const;
+  bool isNoReturnFunction(SILModule &M) const;
 
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
@@ -591,11 +591,10 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(
     Lowering::TypeConverter &TC, Lowering::AbstractionPattern origType,
-    CanAnyFunctionType substType,
-    Optional<SILDeclRef> origConstant = None,
+    CanAnyFunctionType substType, Optional<SILDeclRef> origConstant = None,
     Optional<SILDeclRef> constant = None,
     Optional<SubstitutionMap> reqtSubs = None,
-    Optional<ProtocolConformanceRef> witnessMethodConformance = None);
+    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

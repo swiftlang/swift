@@ -321,7 +321,7 @@ public:
 
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -482,7 +482,6 @@ public:
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setType(MaybeLoadInitExpr->getType());
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
@@ -692,9 +691,8 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker &TC = TypeChecker::createForContext(ctx);
-              TC.checkTopLevelErrorHandling(TLCD);
-              TC.contextualizeTopLevelCode(TLC, TLCD);
+              TypeChecker::checkTopLevelErrorHandling(TLCD);
+              TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
             }
             return false;
           }

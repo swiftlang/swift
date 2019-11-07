@@ -3,8 +3,8 @@
 
 // 1. Emit two TBDs, one with -tbd-is-installapi set, and one without
 
-// RUN: %target-swift-frontend -emit-ir -o /dev/null %s -tbd-is-installapi -emit-tbd -emit-tbd-path %t/flag-provided.tbd
-// RUN: %target-swift-frontend -emit-ir -o /dev/null %s -emit-tbd -emit-tbd-path %t/flag-omitted.tbd
+// RUN: %target-swift-frontend -typecheck %s -tbd-is-installapi -emit-tbd -emit-tbd-path %t/flag-provided.tbd
+// RUN: %target-swift-frontend -typecheck %s -emit-tbd -emit-tbd-path %t/flag-omitted.tbd
 
 // 2. Ensure that the file with -tbd-is-installapi passed includes the installapi flag
 

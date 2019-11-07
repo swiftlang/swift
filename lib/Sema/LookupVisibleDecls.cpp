@@ -697,8 +697,10 @@ static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy)
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
     if (BaseTy->getClassOrBoundGenericClass()) {
       if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
-        auto *Superclass = Conformance->getConcrete()->getRootConformance()
-            ->getType()->getClassOrBoundGenericClass();
+        auto *Superclass = Conformance.getConcrete()
+                               ->getRootConformance()
+                               ->getType()
+                               ->getClassOrBoundGenericClass();
         return BaseTy->getSuperclassForDecl(Superclass);
       }
     }
@@ -768,9 +770,6 @@ public:
       if (VD->isRecursiveValidation())
         continue;
 
-      // FIXME: This is used to compute isInvalid() below.
-      (void) VD->getInterfaceType();
-
       auto &PossiblyConflicting = DeclsByName[VD->getBaseName()];
 
       if (VD->isInvalid()) {
@@ -813,9 +812,6 @@ public:
         auto *OtherVD = *I;
         if (OtherVD->isRecursiveValidation())
           continue;
-
-        // FIXME: This is used to compute isInvalid() below.
-        (void) OtherVD->getInterfaceType();
 
         if (OtherVD->isInvalid())
           continue;

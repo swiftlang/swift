@@ -94,8 +94,6 @@ public:
   void setHasCodeCompletion() {
     PtrAndBits.setInt(PtrAndBits.getInt() | IsError | IsCodeCompletion);
   }
-  
-  ParserStatus getStatus() const;
 };
 
 /// Create a successful parser result.
@@ -218,16 +216,6 @@ template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
   setIsParseError();
   if (Status.hasCodeCompletion())
     setHasCodeCompletion();
-}
-
-template <typename T>
-ParserStatus ParserResult<T>::getStatus() const {
-  ParserStatus S;
-  if (isParseError())
-    S.setIsParseError();
-  if (hasCodeCompletion())
-    S.setHasCodeCompletion();
-  return S;
 }
 
 } // namespace swift

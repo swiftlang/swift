@@ -49,8 +49,7 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
   }
 
   for (auto proto : archetype->getConformsTo()) {
-    if (!dc->getParentModule()->lookupConformance(
-          type, proto))
+    if (dc->getParentModule()->lookupConformance(type, proto).isInvalid())
       return false;
   }
 
@@ -138,7 +137,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       // treat it as unavailable, which is a very close failure.
       if (declCloseness.first == CC_ExactMatch &&
           VD->getAttrs().isUnavailable(CS.getASTContext()) &&
-          !CS.TC.getLangOpts().DisableAvailabilityChecking)
+          !CS.getASTContext().LangOpts.DisableAvailabilityChecking)
         declCloseness.first = CC_Unavailable;
       
       // Likewise, if the candidate is inaccessible from the scope it is being
@@ -281,8 +280,9 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     CandidateCloseness getResult() const {
       return result;
     }
-    void extraArgument(unsigned argIdx) override {
+    bool extraArgument(unsigned argIdx) override {
       result = CC_ArgumentCountMismatch;
+      return true;
     }
     Optional<unsigned> missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
@@ -313,12 +313,14 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
   } listener;
-  
+
   // Use matchCallArguments to determine how close the argument list is (in
   // shape) to the specified candidates parameters.  This ignores the concrete
   // types of the arguments, looking only at the argument labels etc.
+  SmallVector<AnyFunctionType::Param, 4> arguments(actualArgs.begin(),
+                                                   actualArgs.end());
   SmallVector<ParamBinding, 4> paramBindings;
-  if (matchCallArguments(actualArgs, candArgs,
+  if (matchCallArguments(arguments, candArgs,
                          candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,

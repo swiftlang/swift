@@ -68,6 +68,65 @@ SWIFT_PROTOCOL("SwiftProto")
 id<SwiftProtoWithCustomName> _Nonnull
 convertToProto(SwiftClassWithCustomName *_Nonnull obj);
 
+SWIFT_CLASS("ObjCClass")
+__attribute__((objc_root_class))
+@interface ObjCClass
+@end
+
+SWIFT_CLASS("ImplicitlyObjCClass")
+@interface ImplicitlyObjCClass : ObjCClass
+@end
+void consumeImplicitlyObjCClass(ImplicitlyObjCClass *_Nonnull obj);
+
+SWIFT_CLASS("ExplicitlyObjCClass")
+__attribute__((objc_root_class))
+@interface ExplicitlyObjCClass
+@end
+void consumeExplicitlyObjCClass(ExplicitlyObjCClass *_Nonnull obj);
+
+SWIFT_CLASS_NAMED("HasSameCustomNameClass")
+__attribute__((objc_root_class))
+@interface HasSameCustomNameClass
+@end
+void consumeHasSameCustomNameClass(HasSameCustomNameClass *_Nonnull obj);
+
+SWIFT_CLASS_NAMED("SwiftNativeTypeHasDifferentCustomNameClass")
+__attribute__((objc_root_class))
+@interface NativeTypeHasDifferentCustomNameClass
+@end
+SWIFT_CLASS_NAMED("NativeTypeHasDifferentCustomNameClass")
+__attribute__((objc_root_class))
+@interface ObjCNativeTypeHasDifferentCustomNameClass
+@end
+void consumeNativeTypeHasDifferentCustomNameClass(NativeTypeHasDifferentCustomNameClass *_Nonnull obj);
+void consumeObjCNativeTypeHasDifferentCustomNameClass(ObjCNativeTypeHasDifferentCustomNameClass *_Nonnull obj);
+
+SWIFT_CLASS_NAMED("SwiftNativeTypeIsNonObjCClass")
+__attribute__((objc_root_class))
+@interface NativeTypeIsNonObjCClass
+@end
+void consumeNativeTypeIsNonObjCClass(NativeTypeIsNonObjCClass *_Nonnull obj);
+
+@class ForwardImplicitlyObjCClass;
+void consumeForwardImplicitlyObjCClass(ForwardImplicitlyObjCClass *_Nonnull obj);
+
+@class ForwardExplicitlyObjCClass;
+void consumeForwardExplicitlyObjCClass(ForwardExplicitlyObjCClass *_Nonnull obj);
+
+@class ForwardHasSameCustomNameClass;
+void consumeForwardHasSameCustomNameClass(ForwardHasSameCustomNameClass *_Nonnull obj);
+
+@class ForwardNativeTypeHasDifferentCustomNameClass;
+@class ObjCForwardNativeTypeHasDifferentCustomNameClass;
+void consumeForwardNativeTypeHasDifferentCustomNameClass(ForwardNativeTypeHasDifferentCustomNameClass *_Nonnull obj);
+void consumeObjCForwardNativeTypeHasDifferentCustomNameClass(ObjCForwardNativeTypeHasDifferentCustomNameClass *_Nonnull obj);
+
+@class ForwardNativeTypeIsNonObjCClass;
+void consumeForwardNativeTypeIsNonObjCClass(ForwardNativeTypeIsNonObjCClass *_Nonnull obj);
+
+@class ForwardNativeTypeIsUnambiguouslyNonObjCClass;
+void consumeForwardNativeTypeIsUnambiguouslyNonObjCClass(ForwardNativeTypeIsUnambiguouslyNonObjCClass *_Nonnull obj);
+
 SWIFT_CLASS("BOGUS")
 @interface BogusClass
 @end

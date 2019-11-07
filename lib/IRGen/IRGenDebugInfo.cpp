@@ -444,7 +444,7 @@ private:
         Dir = CurDir;
     }
     llvm::DIFile *F = DBuilder.createFile(File, Dir, CSInfo, Source);
-    DIFileCache[FileName.data()].reset(F);
+    DIFileCache[FileName].reset(F);
     return F;
   }
 
@@ -584,15 +584,16 @@ private:
 
   // This is different from SILFunctionType::getAllResultsType() in some subtle
   // ways.
-  static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
+  static SILType getResultTypeForDebugInfo(IRGenModule &IGM,
+                                           CanSILFunctionType fnTy) {
     if (fnTy->getNumResults() == 1) {
-      return fnTy->getResults()[0].getSILStorageType();
+      return fnTy->getResults()[0].getSILStorageType(IGM.getSILModule(), fnTy);
     } else if (!fnTy->getNumIndirectFormalResults()) {
-      return fnTy->getDirectFormalResultsType();
+      return fnTy->getDirectFormalResultsType(IGM.getSILModule());
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {
-        eltTys.push_back(result.getType());
+        eltTys.push_back(result.getReturnValueType(IGM.getSILModule(), fnTy));
       }
       return SILType::getPrimitiveAddressType(
           CanType(TupleType::get(eltTys, fnTy->getASTContext())));
@@ -608,16 +609,16 @@ private:
   llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy) {
     SmallVector<llvm::Metadata *, 16> Parameters;
 
-    GenericContextScope scope(IGM, FnTy->getGenericSignature());
+    GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());
 
     // The function return type is the first element in the list.
-    createParameterType(Parameters, getResultTypeForDebugInfo(FnTy));
+    createParameterType(Parameters, getResultTypeForDebugInfo(IGM, FnTy));
 
     // Actually, the input type is either a single type or a tuple
     // type. We currently represent a function with one n-tuple argument
     // as an n-ary function.
     for (auto Param : FnTy->getParameters())
-      createParameterType(Parameters, IGM.silConv.getSILType(Param));
+      createParameterType(Parameters, IGM.silConv.getSILType(Param, FnTy));
 
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
@@ -2082,8 +2083,8 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
       auto DTI = DebugTypeInfo::getFromTypeInfo(
-          ErrorInfo->getType(),
-          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo)));
+          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy),
+          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo, FnTy)));
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 

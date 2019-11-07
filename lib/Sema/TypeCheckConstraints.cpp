@@ -315,11 +315,11 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
     NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
     // This is only used for diagnostics, so always use KnownPrivate.
     LookupOptions |= NameLookupFlags::KnownPrivate;
-    auto startLookup = TC.lookupUnqualified(DC, startName, UDRE->getLoc(),
-                                       LookupOptions);
+    auto startLookup = TypeChecker::lookupUnqualified(
+        DC, startName, UDRE->getLoc(), LookupOptions);
     if (!startLookup) continue;
-    auto endLookup = TC.lookupUnqualified(DC, endName, UDRE->getLoc(),
-                                          LookupOptions);
+    auto endLookup = TypeChecker::lookupUnqualified(DC, endName, UDRE->getLoc(),
+                                                    LookupOptions);
     if (!endLookup) continue;
 
     // If the overall operator is a binary one, then we're looking at
@@ -734,7 +734,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
             ConformanceCheckFlags::InExpression |
                 ConformanceCheckFlags::SkipConditionalRequirements);
 
-        if (!conformance || conformance->getConditionalRequirements().empty()) {
+        if (conformance.isInvalid() ||
+            conformance.getConditionalRequirements().empty()) {
           AllConditionalConformances = false;
         }
       }
@@ -1119,7 +1120,8 @@ namespace {
         return finish(walkToClosureExprPre(closure), expr);
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        TC.checkForForbiddenPrefix(unresolved);
+        TypeChecker::checkForForbiddenPrefix(
+            TC.Context, unresolved->getName().getBaseName());
         return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
       }
 
@@ -1352,9 +1354,6 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // afterwards.  This allows for better diagnostics, and keeps the
   // closure expression type well-formed.
   for (auto param : *PL) {
-    // FIXME: Forces computation of isInvalid().
-    (void) param->getInterfaceType();
-
     hadParameterError |= param->isInvalid();
   }
 
@@ -1402,10 +1401,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
       // See if the type has a member type with this name.
-      auto Result = TC.lookupMemberType(DC,
-                                        TD->getDeclaredInterfaceType(),
-                                        Name,
-                                        lookupOptions);
+      auto Result = TypeChecker::lookupMemberType(
+          DC, TD->getDeclaredInterfaceType(), Name, lookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1460,10 +1457,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
 
       // See if there is a member type with this name.
-      auto Result = TC.lookupMemberType(DC,
-                                        BaseTy,
-                                        Name,
-                                        lookupOptions);
+      auto Result =
+          TypeChecker::lookupMemberType(DC, BaseTy, Name, lookupOptions);
 
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
@@ -1961,7 +1956,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (!literal)
     return nullptr;
 
-  auto *protocol = TC.getLiteralProtocol(literal);
+  auto *protocol = TypeChecker::getLiteralProtocol(TC.Context, literal);
   if (!protocol)
     return nullptr;
 
@@ -2671,8 +2666,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, initType, Locator,
-                                   false /* ignoreTopLevelInjection */);
+      expr = solution.coerceToType(expr, initType, Locator);
       if (!expr)
         return nullptr;
 
@@ -2819,12 +2813,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      if (var->hasType() &&
+      if (var->hasInterfaceType() &&
           !var->getType()->hasUnboundGenericType() &&
-          !var->getType()->hasError())
+          !var->isInvalid())
         return;
 
-      var->markInvalid();
+      var->setInvalid();
     });
   }
 
@@ -2833,7 +2827,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber) {
-  const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2841,7 +2834,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
   if (!DC->isLocalContext()) {
-    initContext = cast_or_null<PatternBindingInitializer>(pbe.getInitContext());
+    initContext = cast_or_null<PatternBindingInitializer>(
+        PBD->getInitContext(patternNumber));
     if (initContext)
       DC = initContext;
   }
@@ -2908,11 +2902,13 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
+      auto *contextualLocator =
+          cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // The expression type must conform to the Sequence.
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *sequenceProto
-        = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
+      ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+          cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
       if (!sequenceProto) {
         return true;
       }
@@ -2924,11 +2920,16 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       sequenceProto->getDeclaredType(), Locator);
+                       sequenceProto->getDeclaredType(), contextualLocator);
 
-      auto elementLocator =
-        cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceElementType);
+      // Since we are using "contextual type" here, it has to be recorded
+      // in the constraint system for diagnostics to have access to "purpose".
+      cs.setContextualType(
+          expr, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+          CTP_ForEachStmt);
+
+      auto elementLocator = cs.getConstraintLocator(
+          contextualLocator, ConstraintLocator::SequenceElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
@@ -3031,9 +3032,9 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasType() && !var->getType()->hasError())
+        if (var->hasInterfaceType() && !var->getType()->hasError())
           return;
-        var->markInvalid();
+        var->setInvalid();
       });
     };
 
@@ -3088,7 +3089,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          DC);
-  matchVar->setType(rhsType);
   matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
@@ -3451,7 +3451,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
                                        cs.getConstraintLocator(expr),
-                                       /*ignoreTopLevelInjection*/false,
                                        typeFromPattern);
   if (!result) {
     return true;
@@ -4411,8 +4410,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (conformsToProtocol(toType, errorTypeProto, dc,
-                             ConformanceCheckFlags::InExpression)) {
+      if (!conformsToProtocol(toType, errorTypeProto, dc,
+                              ConformanceCheckFlags::InExpression)
+               .isInvalid()) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
           Type NSErrorTy = nsError->getDeclaredInterfaceType();

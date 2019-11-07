@@ -90,9 +90,9 @@ bool SILType::isReferenceCounted(SILModule &M) const {
     .isReferenceCounted();
 }
 
-bool SILType::isNoReturnFunction() const {
+bool SILType::isNoReturnFunction(SILModule &M) const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getASTType()))
-    return funcTy->isNoReturnFunction();
+    return funcTy->isNoReturnFunction(M);
 
   return false;
 }
@@ -410,14 +410,15 @@ swift::getSILBoxFieldLoweredType(SILBoxType *type, TypeConverter &TC,
 ValueOwnershipKind
 SILResultInfo::getOwnershipKind(SILFunction &F) const {
   auto &M = F.getModule();
-  auto sig = F.getLoweredFunctionType()->getGenericSignature();
+  auto FTy = F.getLoweredFunctionType();
+  auto sig = FTy->getInvocationGenericSignature();
   GenericContextScope GCS(M.Types, sig);
 
-  bool IsTrivial = getSILStorageType().isTrivial(F);
+  bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
-               ? ValueOwnershipKind::Any
+               ? ValueOwnershipKind::None
                : ValueOwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
@@ -425,16 +426,18 @@ SILResultInfo::getOwnershipKind(SILFunction &F) const {
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
-      return ValueOwnershipKind::Any;
+      return ValueOwnershipKind::None;
     return ValueOwnershipKind::Unowned;
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
-SILModuleConventions::SILModuleConventions(const SILModule &M)
-    : loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
-                       || M.getStage() == SILStage::Lowered) {}
+SILModuleConventions::SILModuleConventions(SILModule &M)
+    : M(&M),
+      loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
+                       || M.getStage() == SILStage::Lowered)
+{}
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
@@ -458,9 +461,9 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 }
 
 
-bool SILFunctionType::isNoReturnFunction() const {
+bool SILFunctionType::isNoReturnFunction(SILModule &M) const {
   for (unsigned i = 0, e = getNumResults(); i < e; ++i) {
-    if (getResults()[i].getType()->isUninhabited())
+    if (getResults()[i].getReturnValueType(M, this)->isUninhabited())
       return true;
   }
 

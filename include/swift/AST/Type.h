@@ -93,7 +93,7 @@ struct QueryTypeSubstitutionMapOrIdentity {
 using GenericFunction = auto(CanType dependentType,
                              Type conformingReplacementType,
                              ProtocolDecl *conformedProtocol)
-  -> Optional<ProtocolConformanceRef>;
+                            -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -103,11 +103,10 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule(ModuleDecl *M)
     : M(M) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -115,10 +114,9 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
@@ -130,11 +128,10 @@ public:
     : Sig(Sig) {
       assert(Sig && "Cannot lookup conformance in null signature!");
     }
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.

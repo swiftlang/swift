@@ -819,7 +819,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
     // Form the inherited conformance.
     entry->Conformance =
-        ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
+        ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredInterfaceType();

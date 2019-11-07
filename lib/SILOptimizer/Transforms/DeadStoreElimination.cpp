@@ -60,6 +60,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -148,11 +149,11 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::Copy##Name##ValueInst:
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
@@ -268,6 +269,8 @@ public:
       : BB(B), LocationNum(LocationNum) {
     init(LocationNum, Optimistic);
   }
+
+  void dump();
 
   /// Initialize the bitvectors for the current basic block.
   void init(unsigned LocationNum, bool Optimistic);
@@ -448,6 +451,8 @@ public:
              llvm::SpecificBumpPtrAllocator<BlockState> &BPA) 
     : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BPA(BPA) {}
 
+  void dump();
+
   /// Entry point for dead store elimination.
   bool run();
 
@@ -481,6 +486,12 @@ public:
 
 } // end anonymous namespace
 
+void BlockState::dump() {
+  llvm::dbgs() << "  block " << BB->getDebugID() << ": in=" << BBWriteSetIn
+               << ", out=" << BBWriteSetOut << ", mid=" << BBWriteSetMid
+               << ", gen=" << BBGenSet << ", kill=" << BBKillSet << '\n';
+}
+
 void BlockState::init(unsigned LocationNum, bool Optimistic) {
   // For function that requires just 1 iteration of the data flow to converge
   // we set the initial state of BBWriteSetIn to 0.
@@ -511,6 +522,21 @@ void BlockState::init(unsigned LocationNum, bool Optimistic) {
 
   // DeallocateLocation initially empty.
   BBDeallocateLocation.resize(LocationNum, false);
+}
+
+#if __has_attribute(used)
+__attribute((used))
+#endif
+void DSEContext::dump() {
+  llvm::dbgs() << "Locations:\n";
+  unsigned idx = 0;
+  for (const LSLocation &loc : LocationVault) {
+    llvm::dbgs() << "  #" << idx << ": " << loc.getBase();
+    ++idx;
+  }
+  for (SILBasicBlock &BB : *F) {
+    getBlockState(&BB)->dump();
+  }
 }
 
 unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
@@ -691,6 +717,10 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   // dead for block with no successor.
   BlockState *C = getBlockState(BB);
   if (BB->succ_empty()) {
+    if (isa<UnreachableInst>(BB->getTerminator())) {
+      C->BBWriteSetOut.set();
+      return;
+    }
     C->BBWriteSetOut |= C->BBDeallocateLocation;
     return;
   }

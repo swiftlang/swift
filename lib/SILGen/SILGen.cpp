@@ -284,8 +284,10 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
 
   // Find the conformance to _ObjectiveCBridgeable.
   auto result = SwiftModule->lookupConformance(type, proto);
-  if (result) return result->getConcrete();
-  return nullptr;
+  if (result.isInvalid())
+    return nullptr;
+
+  return result.getConcrete();
 }
 
 ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
@@ -319,10 +321,11 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   return found;
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return None;
+  if (!proto)
+    return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
   return SwiftModule->lookupConformance(type, proto);
@@ -349,8 +352,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
                                    cast<ProtocolDecl>(error));
 
-  if (conformance && conformance->isConcrete())
-    NSErrorConformanceToError = conformance->getConcrete();
+  if (conformance.isConcrete())
+    NSErrorConformanceToError = conformance.getConcrete();
   else
     NSErrorConformanceToError = nullptr;
   return *NSErrorConformanceToError;
@@ -427,6 +430,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
+                                         SubstitutionMap(), false,
                                          getASTContext());
 
   auto env = sig->getGenericEnvironment();
@@ -487,6 +491,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
+                                   SubstitutionMap(), false,
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -816,13 +821,13 @@ void SILGenModule::emitDifferentiabilityWitness(
   // type-checking no longer generates implicit `@differentiable` attributes.
   // See TF-835 for replacement code.
   if (jvp) {
-    auto jvpCanGenSig = jvp->getLoweredFunctionType()->getGenericSignature();
+    auto jvpCanGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
     if (!derivativeCanGenSig && jvpCanGenSig)
       derivativeCanGenSig = jvpCanGenSig;
     assert(derivativeCanGenSig == jvpCanGenSig);
   }
   if (vjp) {
-    auto vjpCanGenSig = vjp->getLoweredFunctionType()->getGenericSignature();
+    auto vjpCanGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
     if (!derivativeCanGenSig && vjpCanGenSig)
       derivativeCanGenSig = vjpCanGenSig;
     assert(derivativeCanGenSig == vjpCanGenSig);
@@ -881,7 +886,7 @@ void SILGenModule::emitDifferentiabilityWitness(
 
 void SILGenModule::
 emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                             const CaptureInfo &captureInfo) {
+                                             CaptureInfo captureInfo) {
   assert(TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()
          && "no valid code generator for top-level function?!");
 
@@ -1060,8 +1065,8 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
-    for (auto entry : pbd->getPatternList())
-      if (entry.getExecutableInit())
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (pbd->getExecutableInit(i))
         return true;
   }
 
@@ -1226,12 +1231,11 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
 
 void SILGenModule::
 emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
-  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
-  auto *var = pbdEntry.getAnchoringVarDecl();
-  auto *init = pbdEntry.getInit();
-  auto *initDC = pbdEntry.getInitContext();
-  auto &captureInfo = pbdEntry.getCaptureInfo();
-  assert(!pbdEntry.isInitializerSubsumed());
+  auto *var = pbd->getAnchoringVarDecl(i);
+  auto *init = pbd->getInit(i);
+  auto *initDC = pbd->getInitContext(i);
+  auto captureInfo = pbd->getCaptureInfo(i);
+  assert(!pbd->isInitializerSubsumed(i));
 
   // If this is the backing storage for a property with an attached wrapper
   // that was initialized with `=`, use that expression as the initializer.
@@ -1275,10 +1279,11 @@ emitPropertyWrapperBackingInitializer(VarDecl *var) {
     preEmitFunction(constant, var, f, var);
     PrettyStackTraceSILFunction X(
         "silgen emitPropertyWrapperBackingInitializer", f);
-    f->createProfiler(var, constant, ForDefinition);
-    auto varDC = var->getInnermostDeclContext();
     auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
     assert(wrapperInfo.initializeFromOriginal);
+    f->createProfiler(wrapperInfo.initializeFromOriginal, constant,
+                      ForDefinition);
+    auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
     SGF.emitGeneratorFunction(constant, wrapperInfo.initializeFromOriginal);
     postEmitFunction(constant, f);
@@ -1434,7 +1439,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
-  for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
+  for (auto i : range(pd->getNumPatternEntries()))
     if (pd->getExecutableInit(i))
       emitGlobalInitialization(pd, i);
 }

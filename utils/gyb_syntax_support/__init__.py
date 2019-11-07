@@ -1,57 +1,31 @@
 import textwrap
+from AttributeNodes import ATTRIBUTE_NODES  # noqa: I201
+from AvailabilityNodes import AVAILABILITY_NODES  # noqa: I201
+import Classification  # noqa: I201
+from CommonNodes import COMMON_NODES  # noqa: I201
+from DeclNodes import DECL_NODES  # noqa: I201
+from ExprNodes import EXPR_NODES  # noqa: I201
+from GenericNodes import GENERIC_NODES  # noqa: I201
 
-from . import Token
-from .AttributeNodes import ATTRIBUTE_NODES
-from .AvailabilityNodes import AVAILABILITY_NODES
-from .Classification import SYNTAX_CLASSIFICATIONS
-from .CommonNodes import COMMON_NODES
-from .CompletionOnlyNodes import COMPLETIONONLY_NODES
-from .DeclNodes import DECL_NODES
-from .ExprNodes import EXPR_NODES
-from .GenericNodes import GENERIC_NODES
-from .NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
+from NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
     get_serialization_code, \
     verify_syntax_node_serialization_codes
-from .PatternNodes import PATTERN_NODES
-from .SILOnlyNodes import SILONLY_NODES
-from .StmtNodes import STMT_NODES
-from .Token import SYNTAX_TOKENS, SYNTAX_TOKEN_MAP
-from .Trivia import TRIVIAS
-from .TypeNodes import TYPE_NODES
 
-__all__ = [
-    'Token',
-    'AVAILABILITY_NODES',
-    'SYNTAX_CLASSIFICATIONS',
-    'COMMON_NODES',
-    'DECL_NODES',
-    'EXPR_NODES',
-    'GENERIC_NODES',
-    'SYNTAX_NODE_SERIALIZATION_CODES',
-    'PATTERN_NODES',
-    'PARSEONLY_NODES',
-    'STMT_NODES',
-    'SYNTAX_TOKENS',
-    'SYNTAX_TOKEN_MAP',
-    'TRIVIAS',
-    'TYPE_NODES',
-    'SYNTAX_NODES',
-    'make_missing_child',
-    'check_child_condition_raw',
-    'check_parsed_child_condition_raw',
-    'make_missing_swift_child',
-    'create_node_map',
-    'is_visitable',
-    'dedented_lines',
-    'calculate_node_hash',
-]
+from PatternNodes import PATTERN_NODES  # noqa: I201
+from StmtNodes import STMT_NODES  # noqa: I201
+
+import Token
+from Trivia import TRIVIAS  # noqa: I201
+from TypeNodes import TYPE_NODES  # noqa: I201
 
 
+# Re-export global constants
 SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
     STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES + \
     AVAILABILITY_NODES
-
-PARSEONLY_NODES = SILONLY_NODES + COMPLETIONONLY_NODES
+SYNTAX_TOKENS = Token.SYNTAX_TOKENS
+SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
+SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
 
 verify_syntax_node_serialization_codes(SYNTAX_NODES,
                                        SYNTAX_NODE_SERIALIZATION_CODES)
@@ -156,7 +130,7 @@ def create_node_map():
     """
     Creates a lookup table to find nodes by their kind.
     """
-    return {node.syntax_kind: node for node in SYNTAX_NODES + PARSEONLY_NODES}
+    return {node.syntax_kind: node for node in SYNTAX_NODES}
 
 
 def is_visitable(node):

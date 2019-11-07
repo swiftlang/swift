@@ -805,7 +805,7 @@ class ForEachStmt : public LabeledStmt {
   BraceStmt *Body;
 
   // Set by Sema:
-  Optional<ProtocolConformanceRef> sequenceConformance;
+  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
   ConcreteDeclRef makeIterator;
   ConcreteDeclRef iteratorNext;
   VarDecl *iteratorVar = nullptr;
@@ -842,10 +842,10 @@ public:
   void setIteratorNext(ConcreteDeclRef declRef) { iteratorNext = declRef; }
   ConcreteDeclRef getIteratorNext() const { return iteratorNext; }
 
-  void setSequenceConformance(Optional<ProtocolConformanceRef> conformance) {
+  void setSequenceConformance(ProtocolConformanceRef conformance) {
     sequenceConformance = conformance;
   }
-  Optional<ProtocolConformanceRef> getSequenceConformance() const {
+  ProtocolConformanceRef getSequenceConformance() const {
     return sequenceConformance;
   }
 

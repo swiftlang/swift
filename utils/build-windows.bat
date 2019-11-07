@@ -65,7 +65,7 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 call :test_swift %exitOnError%
 
 goto :end
@@ -79,10 +79,13 @@ setlocal enableextensions enabledelayedexpansion
 
 git config --global core.autocrlf false
 git clone --depth 1 --single-branch https://github.com/apple/swift-cmark cmark %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-clang clang %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-llvm llvm %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-lldb lldb %exitOnError%
-git clone --depth 1 --single-branch https://github.com/apple/swift-compiler-rt compiler-rt %exitOnError%
+git clone --depth 1 --single-branch --branch swift/master https://github.com/apple/llvm-project llvm-project %exitOnError%
+mklink /D "%source_root%\clang" "%source_root%\llvm-project\clang"
+mklink /D "%source_root%\llvm" "%source_root%\llvm-project\llvm"
+mklink /D "%source_root%\lldb" "%source_root%\llvm-project\lldb"
+mklink /D "%source_root%\compiler-rt" "%source_root%\llvm-project\compiler-rt"
+mklink /D "%source_root%\libcxx" "%source_root%\llvm-project\libcxx"
+mklink /D "%source_root%\clang-tools-extra" "%source_root%\llvm-project\clang-tools-extra"
 git clone --depth 1 --single-branch https://github.com/apple/swift-corelibs-libdispatch %exitOnError%
 
 goto :eof
@@ -276,7 +279,7 @@ cmake "%source_root%\lldb"^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
     -DLLVM_ENABLE_ASSERTIONS:BOOL=YES^
-    -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=YES^
+    -DLLDB_USE_STATIC_BINDINGS:BOOL=YES^
     -DPYTHON_HOME:PATH=%PYTHON_HOME%^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^

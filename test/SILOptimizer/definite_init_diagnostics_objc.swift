@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -I %S/../SILGen/Inputs -enable-source-import -parse-stdlib -o /dev/null -verify -enable-ownership-stripping-after-serialization
 // REQUIRES: objc_interop
+
+// SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-799): Re-enable test after SR-11336 is fixed.
+// XFAIL: *
 
 import Swift
 import gizmo

@@ -520,6 +520,7 @@ public:
 };
 
 namespace importer {
+class ClangSourceBufferImporter;
 class NameImporter;
 
 /// Add the given named declaration as an entry to the given Swift name
@@ -533,7 +534,8 @@ void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
 
 /// Finalize a lookup table, handling any as-yet-unresolved entries
 /// and emitting diagnostics if necessary.
-void finalizeLookupTable(SwiftLookupTable &table, NameImporter &);
+void finalizeLookupTable(SwiftLookupTable &table, NameImporter &,
+                         ClangSourceBufferImporter &buffersForDiagnostics);
 }
 }
 

@@ -316,6 +316,51 @@ func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
 
 testAcceptColorTagged(b: true, i: 17, s: "Hello", d: 3.14159)
 
+// Use buildExpression() when it's available.
+enum Component {
+  case string(StaticString)
+  case floating(Double)
+  case color(Color)
+  indirect case array([Component])
+  indirect case optional(Component?)
+}
+
+@_functionBuilder
+struct ComponentBuilder {
+  static func buildExpression(_ string: StaticString) -> Component {
+    return .string(string)
+  }
+
+  static func buildExpression(_ float: Double) -> Component {
+    return .floating(float)
+  }
+
+  static func buildExpression(_ color: Color) -> Component {
+    return .color(color)
+  }
+
+  static func buildBlock(_ components: Component...) -> Component {
+    return .array(components)
+  }
+
+  static func buildIf(_ value: Component?) -> Component {
+    return .optional(value)
+  }
+}
+
+func acceptComponentBuilder(@ComponentBuilder _ body: () -> Component) {
+  print(body())
+}
+
+acceptComponentBuilder {
+  "hello"
+  if true {
+    3.14159
+  }
+  .red
+}
+// CHECK: array([main.Component.string("hello"), main.Component.optional(Optional(main.Component.array([main.Component.floating(3.14159)]))), main.Component.color(main.Color.red)])
+
 // rdar://53325810
 
 // Test that we don't have problems with expression pre-checking when

@@ -150,8 +150,7 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
 
 /// Build a builtin function declaration.
 static FuncDecl *
-getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
-                   FunctionType::ExtInfo Info = FunctionType::ExtInfo()) {
+getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   auto &Context = ResType->getASTContext();
   
   ModuleDecl *M = Context.TheBuiltinModule;
@@ -178,7 +177,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*GenericParams=*/nullptr,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
-  FD->computeType(Info);
+  (void)FD->getInterfaceType();
   FD->setImplicit();
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -228,7 +227,7 @@ getBuiltinGenericFunction(Identifier Id,
                                TypeLoc::withoutLoc(ResType), DC);
 
   func->setGenericSignature(Sig);
-  func->computeType();
+  (void)func->getInterfaceType();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
   // SWIFT_ENABLE_TENSORFLOW

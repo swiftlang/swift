@@ -2167,7 +2167,8 @@ static bool attributeChainContains(DeclAttribute *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Set original declaration in `@differentiable` attributes.
+// Set original declaration and parameter indices in `@differentiable`
+// attributes.
 //
 // Serializing/deserializing the original declaration DeclID in
 // `@differentiable` attributes does not work because it causes
@@ -2175,12 +2176,17 @@ static bool attributeChainContains(DeclAttribute *attr) {
 //
 // Instead, call this ad-hoc function after deserializing a declaration to set
 // it as the original declaration in its `@differentiable` attributes.
-static void setOriginalDeclarationInDifferentiableAttributes(
-    Decl *decl, DeclAttribute *attrs) {
+static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
+    Decl *decl, DeclAttribute *attrs,
+    llvm::DenseMap<DifferentiableAttr *, IndexSubset *>
+        &diffAttrParamIndicesMap) {
   DeclAttributes tempAttrs;
   tempAttrs.setRawAttributeChain(attrs);
-  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>())
-    const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(decl);
+  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
+    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
+    diffAttr->setOriginalDeclaration(decl);
+    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
+  }
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
@@ -2204,6 +2210,8 @@ class swift::DeclDeserializer {
 
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
+
+  llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
 
   Identifier privateDiscriminator;
   unsigned localDiscriminator = 0;
@@ -2582,7 +2590,7 @@ public:
     }
 
     ctor->setImplicitlyUnwrappedOptional(isIUO);
-    ctor->computeType();
+    (void)ctor->getInterfaceType();
 
     return ctor;
   }
@@ -2840,7 +2848,7 @@ public:
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool needsNewVTableEntry, isTransparent;
+    bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
@@ -2853,6 +2861,7 @@ public:
                                           resultInterfaceTypeID,
                                           isIUO,
                                           associatedDeclID, overriddenID,
+                                          overriddenAffectsABI,
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
@@ -2867,6 +2876,7 @@ public:
                                               resultInterfaceTypeID,
                                               isIUO,
                                               overriddenID,
+                                              overriddenAffectsABI,
                                               accessorStorageDeclID,
                                               rawAccessorKind,
                                               rawAccessLevel,
@@ -2932,20 +2942,11 @@ public:
       overridden = overriddenOrError.get();
     } else {
       llvm::consumeError(overriddenOrError.takeError());
-      // There's one case where we know it's safe to ignore a missing override:
-      // if this declaration is '@objc' and 'dynamic'.
-      bool canIgnoreMissingOverriddenDecl = false;
-      if (isObjC && ctx.LangOpts.EnableDeserializationRecovery) {
-        canIgnoreMissingOverriddenDecl =
-            std::any_of(DeclAttributes::iterator(DAttrs),
-                        DeclAttributes::iterator(nullptr),
-                        [](const DeclAttribute *attr) -> bool {
-          return isa<DynamicAttr>(attr);
-        });
-      }
-      if (!canIgnoreMissingOverriddenDecl)
+
+      if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
         return llvm::make_error<OverrideError>(
             name, errorFlags, numVTableEntries);
+      }
 
       overridden = nullptr;
     }
@@ -3054,8 +3055,8 @@ public:
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
-    // Set the interface type.
-    fn->computeType();
+    // Compute the interface type.
+    (void)fn->getInterfaceType();
 
     return fn;
   }
@@ -3838,7 +3839,7 @@ public:
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    dtor->computeType();
+    (void)dtor->getInterfaceType();
 
     if (isImplicit)
       dtor->setImplicit();
@@ -4105,7 +4106,11 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         auto *diffAttr = DifferentiableAttr::create(
             ctx, isImplicit, SourceLoc(), SourceRange(), linear,
             /*parsedParameters*/ {}, jvp, vjp, /*trailingWhereClause*/ nullptr);
-        diffAttr->setParameterIndices(indices);
+        // Cache parameter indices so that they can set later.
+        // `DifferentiableAttr::setParameterIndices` cannot be called here
+        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
+        // be called first.
+        diffAttrParamIndicesMap[diffAttr] = indices;
         diffAttr->setDerivativeGenericSignature(derivativeGenSig);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
@@ -4257,12 +4262,14 @@ DeclDeserializer::getDeclCheckedImpl() {
 
   switch (recordID) {
   // SWIFT_ENABLE_TENSORFLOW
-  // Set original declaration in `@differentiable` attributes.
+  // Set original declaration and parameter indices in `@differentiable`
+  // attributes.
 #define CASE(RECORD_NAME) \
   case decls_block::RECORD_NAME##Layout::Code: {\
     auto decl = deserialize##RECORD_NAME(scratch, blobData); \
     if (decl) \
-      setOriginalDeclarationInDifferentiableAttributes(decl.get(), DAttrs); \
+      setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
+          decl.get(), DAttrs, diffAttrParamIndicesMap); \
     return decl; \
   }
   // SWIFT_ENABLE_TENSORFLOW END
@@ -5209,17 +5216,18 @@ public:
       errorResult = maybeErrorResult.get();
     }
 
-    Optional<ProtocolConformanceRef> witnessMethodConformance;
+    ProtocolConformanceRef witnessMethodConformance;
     if (*representation == SILFunctionTypeRepresentation::WitnessMethod) {
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
     GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
-
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
-                                errorResult, ctx, witnessMethodConformance);
+                                errorResult,
+                                SubstitutionMap(), false,
+                                ctx, witnessMethodConformance);
   }
 
   Expected<Type> deserializeArraySliceType(ArrayRef<uint64_t> scratch,
@@ -5558,9 +5566,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // conformance requirements are on Self. This isn't actually a /safe/ change
     // even in Objective-C, but we mostly just don't want to crash.
 
-    // FIXME: DenseMap requires that its value type be default-constructible,
-    // which ProtocolConformanceRef is not, hence the extra Optional.
-    llvm::SmallDenseMap<ProtocolDecl *, Optional<ProtocolConformanceRef>, 16>
+    llvm::SmallDenseMap<ProtocolDecl *, ProtocolConformanceRef, 16>
         conformancesForProtocols;
     while (conformanceCount--) {
       ProtocolConformanceRef nextConformance = readConformance(DeclTypeCursor);
@@ -5575,7 +5581,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           req.getSecondType()->castTo<ProtocolType>()->getDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
-        reqConformances.push_back(iter->getSecond().getValue());
+        reqConformances.push_back(iter->getSecond());
       } else {
         // Put in an abstract conformance as a placeholder. This is a lie, but
         // there's not much better we can do. We're relying on the fact that

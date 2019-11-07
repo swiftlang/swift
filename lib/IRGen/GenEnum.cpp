@@ -1127,10 +1127,12 @@ namespace {
   protected:
     int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
-      // raw values from C.
-      assert(target->getRawValueExpr()
-             && "c-compatible enum elt has no raw value?!");
-      auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
+      // raw values from C. An invalid raw value is assigned the error index -1.
+      auto intExpr =
+          dyn_cast_or_null<IntegerLiteralExpr>(target->getRawValueExpr());
+      if (!intExpr) {
+        return -1;
+      }
       auto intType = getDiscriminatorType();
 
       APInt intValue =

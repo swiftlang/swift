@@ -740,9 +740,7 @@ getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
 /// should be stripped from the first selector piece, e.g., "init"
 /// or the restated name of the class in a factory method.
 ///
-///  \param kind Will be set to the kind of initializer being
-///  imported. Note that this does not distinguish designated
-///  vs. convenience; both will be classified as "designated".
+/// \param kind Will be set to the kind of initializer being imported.
 static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
                                       ImportNameVersion version,
                                       unsigned &prefixLength,
@@ -750,7 +748,17 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
   /// Is this an initializer?
   if (isInitMethod(method)) {
     prefixLength = 4;
-    kind = CtorInitializerKind::Designated;
+
+    // If the owning Objective-C class has designated initializers and this
+    // is not one of them, treat it as a convenience initializer.
+    const clang::ObjCInterfaceDecl *interface = method->getClassInterface();
+    if (interface && interface->hasDesignatedInitializers() &&
+        !method->hasAttr<clang::ObjCDesignatedInitializerAttr>()) {
+      kind = CtorInitializerKind::Convenience;
+    } else {
+      kind = CtorInitializerKind::Designated;
+    }
+
     return true;
   }
 
@@ -833,8 +841,8 @@ static bool omitNeedlessWordsInFunctionName(
             param->getType(),
             getParamOptionality(swiftLanguageVersion, param,
                                 !nonNullArgs.empty() && nonNullArgs[i]),
-            nameImporter.getIdentifier(baseName), numParams, argumentName,
-            i == 0, isLastParameter, nameImporter) != DefaultArgumentKind::None;
+            nameImporter.getIdentifier(baseName), argumentName, i == 0,
+            isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
                                                      param->getOriginalType())
@@ -1781,9 +1789,11 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
                                       ImportNameVersion version,
                                       clang::DeclarationName givenName) {
   CacheKeyType key(decl, version);
-  if (importNameCache.count(key) && !givenName) {
-    ++ImportNameNumCacheHits;
-    return importNameCache[key];
+  if (!givenName) {
+    if (auto cachedRes = importNameCache[key]) {
+      ++ImportNameNumCacheHits;
+      return cachedRes;
+    }
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);

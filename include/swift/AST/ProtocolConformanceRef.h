@@ -63,13 +63,18 @@ public:
            "cannot construct ProtocolConformanceRef with null");
   }
 
+  ProtocolConformanceRef(std::nullptr_t = nullptr)
+      : Union((ProtocolDecl *)nullptr) {}
+
   static ProtocolConformanceRef forInvalid() {
-    return ProtocolConformanceRef(UnionType((ProtocolDecl *)nullptr));
+    return ProtocolConformanceRef();
   }
 
   bool isInvalid() const {
     return !Union;
   }
+
+  explicit operator bool() const { return !isInvalid(); }
 
   /// Create either a concrete or an abstract protocol conformance reference,
   /// depending on whether ProtocolConformance is null.

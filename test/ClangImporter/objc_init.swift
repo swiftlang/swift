@@ -197,3 +197,16 @@ func classPropertiesAreNotInit() -> ProcessInfo {
   procInfo = ProcessInfo.processInfo // okay
   return procInfo
 }
+
+// Make sure we can still inherit a convenience initializer when we have a
+// designated initializer override in Obj-C that isn't considered a proper
+// override in Swift. In this case, both the superclass and subclass have a
+// designed init with the selector `initWithI:`, however the Swift signature for
+// the subclass' init is `init(__i:)` rather than `init(i:)`.
+extension SuperclassWithDesignatedInitInCategory {
+  convenience init(y: Int) { self.init(i: y) }
+}
+
+func testConvenienceInitInheritance() {
+  _ = SubclassWithSwiftPrivateDesignatedInit(y: 5)
+}

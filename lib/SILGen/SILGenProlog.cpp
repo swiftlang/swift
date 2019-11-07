@@ -85,11 +85,13 @@ public:
   SILGenFunction &SGF;
   SILBasicBlock *parent;
   SILLocation loc;
+  CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
+                  CanSILFunctionType fnTy,
                   ArrayRef<SILParameterInfo> &parameters)
-    : SGF(sgf), parent(parent), loc(l), parameters(parameters) {}
+    : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters) {}
 
   ManagedValue visitType(CanType t) {
     return visitType(t, /*isInOut=*/false);
@@ -106,7 +108,8 @@ public:
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
 
-    auto paramType = SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo));
+    auto paramType =
+      SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, loc.getAsASTNode<ValueDecl>());
 
@@ -235,7 +238,8 @@ struct ArgumentInitHelper {
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    EmitBBArguments argEmitter(SGF, parent, l, parameters);
+    EmitBBArguments argEmitter(SGF, parent, l,
+                               f.getLoweredFunctionType(), parameters);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     if (isInOut)
@@ -420,7 +424,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
+void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 ParameterList *paramList,
                                 ParamDecl *selfParam,
                                 DeclContext *DC,
@@ -445,6 +449,9 @@ void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
+  assert((captureInfo.hasBeenComputed() ||
+          !TypeConverter::canCaptureFromParent(DC)) &&
+         "can't emit prolog of function with uncomputed captures");
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(

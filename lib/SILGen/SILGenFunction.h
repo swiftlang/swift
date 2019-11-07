@@ -517,11 +517,11 @@ public:
     return F.getTypeLowering(type);
   }
 
-  SILType getSILType(SILParameterInfo param) const {
-    return silConv.getSILType(param);
+  SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
+    return silConv.getSILType(param, fnTy);
   }
-  SILType getSILType(SILResultInfo result) const {
-    return silConv.getSILType(result);
+  SILType getSILType(SILResultInfo result, CanSILFunctionType fnTy) const {
+    return silConv.getSILType(result, fnTy);
   }
 
   const SILConstantInfo &getConstantInfo(SILDeclRef constant) {
@@ -770,7 +770,7 @@ public:
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(const CaptureInfo &captureInfo,
+  void emitProlog(CaptureInfo captureInfo,
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
                   bool throws, SourceLoc throwsLoc);
@@ -1454,7 +1454,7 @@ public:
 
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
-      const PatternBindingEntry &entry,
+      VarDecl *anchoringVar,
       SubstitutionMap subs,
       CanType resultType,
       AbstractionPattern origResultType,
@@ -1513,6 +1513,7 @@ public:
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
+                                      CanSILFunctionType fnTy,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
 

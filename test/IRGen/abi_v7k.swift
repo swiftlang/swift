@@ -18,8 +18,8 @@ func addFloats(x: Float, y : Float) -> Float {
 // CHECK: fadd double
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k10addDoubles
-// V7K: vadd.f64 d0, d0, d1
-// V7K: vadd.f64 d0, d0, d2
+// V7K: vadd.f64 [[R:d[0-9]+]], d0, d1
+// V7K: vadd.f64 d0, [[R]], d2
 func addDoubles(x: Double, y: Double, z: Double) -> Double {
   return x+y+z
 }

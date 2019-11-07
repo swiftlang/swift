@@ -233,7 +233,9 @@ protected:
 
   /// Check whether constraint solver is running in "debug" mode,
   /// which should output diagnostic information.
-  bool isDebugMode() const { return CS.TC.getLangOpts().DebugConstraintSolver; }
+  bool isDebugMode() const {
+    return CS.getASTContext().LangOpts.DebugConstraintSolver;
+  }
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
     auto &log = CS.getASTContext().TypeCheckerDebug->getStream();

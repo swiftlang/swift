@@ -975,3 +975,115 @@ Optional<Type> ResultTypeRequest::getCachedResult() const {
 void ResultTypeRequest::cacheResult(Type type) const {
   getResultTypeLoc().setType(type);
 }
+
+//----------------------------------------------------------------------------//
+// PatternBindingEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<const PatternBindingEntry *>
+PatternBindingEntryRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  if (!PBD->getPatternList()[idx].isFullyValidated()) {
+    return None;
+  }
+  return &PBD->getPatternList()[idx];
+}
+
+void PatternBindingEntryRequest::cacheResult(
+    const PatternBindingEntry *value) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setFullyValidated();
+}
+
+//----------------------------------------------------------------------------//
+// NamingPatternRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
+  auto *VD = std::get<0>(getStorage());
+  if (auto *Pat = VD->NamingPattern) {
+    return Pat;
+  }
+  return None;
+}
+
+void NamingPatternRequest::cacheResult(NamedPattern *value) const {
+  auto *VD = std::get<0>(getStorage());
+  VD->NamingPattern = value;
+}
+
+//----------------------------------------------------------------------------//
+// InterfaceTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> InterfaceTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto Ty = decl->TypeAndAccess.getPointer()) {
+    return Ty;
+  }
+  return None;
+}
+
+void InterfaceTypeRequest::cacheResult(Type type) const {
+  auto *decl = std::get<0>(getStorage());
+  if (type) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+    assert(!type->hasArchetype() && "Archetype in interface type");
+  }
+  decl->TypeAndAccess.setPointer(type);
+}
+
+//----------------------------------------------------------------------------//
+// LookupPrecedenceGroupRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc.getLoc();
+}
+
+void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto &desc = std::get<0>(getStorage());
+  if (auto pathDir = desc.pathDirection) {
+    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
+  } else {
+    diags.diagnose(desc.nameLoc, diag::circular_reference);
+  }
+}
+
+void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+  auto &desc = std::get<0>(getStorage());
+  diag.diagnose(desc.nameLoc,
+                 diag::circular_reference_through_precedence_group, desc.ident);
+}
+
+SourceLoc PrecedenceGroupDescriptor::getLoc() const {
+  return nameLoc;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const PrecedenceGroupDescriptor &desc) {
+  out << "precedence group " << desc.ident << " at ";
+  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+}
+
+//----------------------------------------------------------------------------//
+// DifferentiableAttributeParameterIndicesRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<IndexSubset *>
+DifferentiableAttributeParameterIndicesRequest::getCachedResult() const {
+  auto *attr = std::get<0>(getStorage());
+  if (attr->hasComputedParameterIndices())
+    return attr->ParameterIndicesAndBit.getPointer();
+  return None;
+}
+
+void DifferentiableAttributeParameterIndicesRequest::cacheResult(
+    IndexSubset *parameterIndices) const {
+  auto *attr = std::get<0>(getStorage());
+  attr->ParameterIndicesAndBit.setPointerAndInt(parameterIndices, true);
+}

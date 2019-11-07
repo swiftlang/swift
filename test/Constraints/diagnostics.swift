@@ -31,6 +31,7 @@ func f5<T : P2>(_ : T) { }
 // expected-note@-1 {{required by global function 'f5' where 'T' = '(Int) -> Int'}}
 // expected-note@-2 {{required by global function 'f5' where 'T' = '(Int, String)'}}
 // expected-note@-3 {{required by global function 'f5' where 'T' = 'Int.Type'}}
+// expected-note@-4 {{where 'T' = 'Int'}}
 
 func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
@@ -45,7 +46,7 @@ f1(
    ) 
 
 // Tuple element unused.
-f0(i, i,
+f0(i, i, // expected-error@:7 {{cannot convert value of type 'Int' to expected argument type 'Float'}}
    i) // expected-error{{extra argument in call}}
 
 
@@ -75,17 +76,17 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 
 // Generic member does not conform.
 extension Int {
-  func wibble<T: P2>(_ x: T, _ y: T) -> T { return x }
+  func wibble<T: P2>(_ x: T, _ y: T) -> T { return x } // expected-note {{where 'T' = 'Int'}}
   func wubble<T>(_ x: (Int) -> T) -> T { return x(self) }
 }
-i.wibble(3, 4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+i.wibble(3, 4) // expected-error {{instance method 'wibble' requires that 'Int' conform to 'P2'}}
 
 // Generic member args correct, but return type doesn't match.
 struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}
+for j in i.wibble(a, a) { // expected-error {{for-in loop requires 'A' to conform to 'Sequence'}}
 }
 
 // Generic as part of function/tuple types
@@ -98,9 +99,9 @@ func f7() -> (c: Int, v: A) {
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
-func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
+func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
 // expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
-f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
 f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
@@ -111,7 +112,7 @@ f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conf
 "awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.
-f5(i)  // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
+f5(i)  // expected-error {{global function 'f5' requires that 'Int' conform to 'P2'}}
 
 // Make sure we don't leave open existentials when diagnosing.
 // <rdar://problem/20598568>
@@ -430,11 +431,13 @@ CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
 CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
+// expected-error@-1:27 {{argument passed to call that takes no arguments}}
 
 CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
+// expected-error@-1 {{instance member 'method2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // expected-error@-1 {{extraneous argument label 'b:' in call}}
 CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -449,7 +452,8 @@ _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'me
 // expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}} expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
 extension CurriedClass {
@@ -906,7 +910,7 @@ struct rdar27891805 {
 }
 
 try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
-// expected-error@-1 {{incorrect argument labels in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:encoding:')}}
+// expected-error@-1 {{incorrect argument label in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:usedEncoding:')}}
 // expected-error@-2 {{'nil' is not compatible with expected argument type 'String'}}
 // expected-error@-3 {{'nil' is not compatible with expected argument type 'String'}}
 
@@ -928,10 +932,12 @@ func valueForKey<K>(_ key: K) -> CacheValue? {
 // SR-2242: poor diagnostic when argument label is omitted
 
 func r27212391(x: Int, _ y: Int) {
+  // expected-note@-1 {{candidate '(Int, Int) -> ()' requires 2 arguments, but 3 were provided}}
   let _: Int = x + y
 }
 
 func r27212391(a: Int, x: Int, _ y: Int) {
+  // expected-note@-1 {{incorrect labels for candidate (have: '(a:y:x:)', expected: '(a:x:_:)')}}
   let _: Int = a + x + y
 }
 
@@ -943,7 +949,7 @@ r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call
 r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
 r27212391(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
 r27212391(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{incorrect argument labels in call (have 'a:y:x:', expected 'a:x:_:')}} {{17-18=x}} {{23-26=}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{no exact matches in call to global function 'r27212391'}}
 r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
 
 // SR-1255
@@ -1254,22 +1260,15 @@ func rdar17170728() {
   var j: Int?
   var k: Int? = 2
 
-  let _ = [i, j, k].reduce(0 as Int?) { // expected-error 3 {{cannot convert value of type 'Int?' to expected element type 'Bool'}}
-  // expected-error@-1 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+  let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
-    // expected-error@-2 4 {{cannot force unwrap value of non-optional type 'Bool'}}
-    // expected-error@-3 {{value of optional type 'Bool?' must be unwrapped to a value of type 'Bool'}}
-    // expected-note@-4 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 
-  let _ = [i, j, k].reduce(0 as Int?) { // expected-error 3 {{cannot convert value of type 'Int?' to expected element type 'Bool'}}
-    // expected-error@-1 {{missing argument label 'into:' in call}}
-    // expected-error@-2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
+  let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to operands of type '@lvalue Bool' and 'Bool'}}
-    // expected-error@-2 {{'nil' cannot be used in context expecting type 'Bool'}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Int?' operands}}
+    // expected-error@-2 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 }
 

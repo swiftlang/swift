@@ -24,31 +24,30 @@ using namespace swift;
 using namespace reflection;
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
-  std::ostream &OS;
+  FILE *file;
   unsigned Indent;
 
-  std::ostream &indent(unsigned Amount) {
+  FILE * &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      OS << ' ';
-    return OS;
+      fprintf(file, " ");
+    return file;
   }
 
-  std::ostream &printHeader(std::string Name) {
-    indent(Indent) << '(' << Name;
-    return OS;
+  FILE * &printHeader(std::string Name) {
+    fprintf(indent(Indent), "(%s", Name.c_str());
+    return file;
   }
 
-  template<typename T>
-  std::ostream &printField(std::string name, const T &value) {
+  FILE * &printField(std::string name, std::string value) {
     if (!name.empty())
-      OS << " " << name << "=" << value;
+      fprintf(file, " %s=%s", name.c_str(), value.c_str());
     else
-      OS << " " << value;
-    return OS;
+      fprintf(file, " %s", value.c_str());
+    return file;
   }
 
   void printRec(const TypeRef *typeRef) {
-    OS << "\n";
+    fprintf(file, "\n");
 
     Indent += 2;
     visit(typeRef);
@@ -56,14 +55,14 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   }
 
 public:
-  PrintTypeRef(std::ostream &OS, unsigned Indent)
-    : OS(OS), Indent(Indent) {}
+  PrintTypeRef(FILE *file, unsigned Indent)
+    : file(file), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
     auto demangled = Demangle::demangleTypeAsString(B->getMangledName());
     printField("", demangled);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
@@ -86,7 +85,7 @@ public:
     printField("", demangled);
     if (auto parent = N->getParent())
       printRec(parent);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
@@ -105,14 +104,14 @@ public:
       printRec(param);
     if (auto parent = BG->getParent())
       printRec(parent);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
     printHeader("tuple");
     for (auto element : T->getElements())
       printRec(element);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -132,7 +131,7 @@ public:
       break;
     }
 
-    OS << '\n';
+    fprintf(file, "\n");
     Indent += 2;
     printHeader("parameters");
 
@@ -142,7 +141,7 @@ public:
 
       if (!flags.isNone()) {
         Indent += 2;
-        OS << '\n';
+        fprintf(file, "\n");
       }
 
       switch (flags.getValueOwnership()) {
@@ -167,17 +166,17 @@ public:
 
       if (!flags.isNone()) {
         Indent -= 2;
-        OS << ')';
+        fprintf(file, ")");
       }
     }
 
     if (parameters.empty())
-      OS << ')';
+      fprintf(file, ")");
 
-    OS << '\n';
+    fprintf(file, "\n");
     printHeader("result");
     printRec(F->getResult());
-    OS << ')';
+    fprintf(file, ")");
 
     Indent -= 2;
   }
@@ -185,12 +184,12 @@ public:
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol_composition");
     if (PC->hasExplicitAnyObject())
-      OS << " any_object";
+      fprintf(file, " any_object");
     if (auto superclass = PC->getSuperclass())
       printRec(superclass);
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -198,20 +197,20 @@ public:
     if (M->wasAbstract())
       printField("", "was_abstract");
     printRec(M->getInstanceType());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential_metatype");
     printRec(EM->getInstanceType());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
     printHeader("generic_type_parameter");
-    printField("depth", GTP->getDepth());
-    printField("index", GTP->getIndex());
-    OS << ')';
+    printField("depth", std::to_string(GTP->getDepth()));
+    printField("index", std::to_string(GTP->getIndex()));
+    fprintf(file, ")");
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -219,47 +218,47 @@ public:
     printField("protocol", DM->getProtocol());
     printRec(DM->getBase());
     printField("member", DM->getMember());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     printHeader("foreign");
     if (!F->getName().empty())
       printField("name", F->getName());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     printHeader("objective_c_class");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
     printHeader("objective_c_protocol");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    OS << ')';
+    fprintf(file, ")");
   }
 
 #define REF_STORAGE(Name, name, ...) \
   void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
     printHeader(#name "_storage"); \
     printRec(US->getType()); \
-    OS << ')'; \
+    fprintf(file, ")"); \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     printHeader("sil_box");
     printRec(SB->getBoxedType());
-    OS << ')';
+    fprintf(file, ")");
   }
 
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
-    OS << ')';
+    fprintf(file, ")");
   }
 };
 
@@ -369,12 +368,12 @@ const OpaqueTypeRef *OpaqueTypeRef::get() {
 }
 
 void TypeRef::dump() const {
-  dump(std::cerr);
+  dump(stderr);
 }
 
-void TypeRef::dump(std::ostream &OS, unsigned Indent) const {
-  PrintTypeRef(OS, Indent).visit(this);
-  OS << std::endl;
+void TypeRef::dump(FILE *file, unsigned Indent) const {
+  PrintTypeRef(file, Indent).visit(this);
+  fprintf(file, "\n");
 }
 
 bool TypeRef::isConcrete() const {

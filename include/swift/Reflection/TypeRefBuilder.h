@@ -25,7 +25,6 @@
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
 
-#include <iostream>
 #include <vector>
 #include <unordered_map>
 
@@ -211,7 +210,7 @@ struct ClosureContextInfo {
   unsigned NumBindings = 0;
 
   void dump() const;
-  void dump(std::ostream &OS) const;
+  void dump(FILE *file) const;
 };
 
 struct FieldTypeInfo {
@@ -653,13 +652,13 @@ public:
   /// Dumping typerefs, field declarations, associated types
   ///
 
-  void dumpTypeRef(RemoteRef<char> mangledName,
-                   std::ostream &OS, bool printTypeName = false);
-  void dumpFieldSection(std::ostream &OS);
-  void dumpAssociatedTypeSection(std::ostream &OS);
-  void dumpBuiltinTypeSection(std::ostream &OS);
-  void dumpCaptureSection(std::ostream &OS);
-  void dumpAllSections(std::ostream &OS);
+  void dumpTypeRef(RemoteRef<char> MangledName,
+                   FILE *file, bool printTypeName = false);
+  void dumpFieldSection(FILE *file);
+  void dumpAssociatedTypeSection(FILE *file);
+  void dumpBuiltinTypeSection(FILE *file);
+  void dumpCaptureSection(FILE *file);
+  void dumpAllSections(FILE *file);
 };
 
 

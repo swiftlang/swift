@@ -87,7 +87,7 @@ private:
                                     /*trailing closure*/ nullptr,
                                     /*implicit*/true);
 
-    if (ctx.LangOpts.FunctionBuilderOneWayConstraints && allowOneWay) {
+    if (allowOneWay) {
       // Form a one-way constraint to prevent backward propagation.
       result = new (ctx) OneWayExpr(result);
     }
@@ -169,8 +169,15 @@ public:
       }
 
       auto expr = node.get<Expr *>();
-      if (wantExpr && ctx.LangOpts.FunctionBuilderOneWayConstraints)
-        expr = new (ctx) OneWayExpr(expr);
+      if (wantExpr) {
+        if (builderSupports(ctx.Id_buildExpression)) {
+          expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
+                                   { expr }, { Identifier() },
+                                   /*allowOneWay=*/true);
+        } else {
+          expr = new (ctx) OneWayExpr(expr);
+        }
+      }
 
       expressions.push_back(expr);
     }
@@ -293,7 +300,7 @@ public:
                                     ctx.Id_buildIf, chainExpr,
                                     /*argLabels=*/{ },
                                     /*allowOneWay=*/true);
-    } else if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+    } else {
       // Form a one-way constraint to prevent backward propagation.
       chainExpr = new (ctx) OneWayExpr(chainExpr);
     }
@@ -477,7 +484,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                BraceStmt *body,
                                                Type builderType) {
   // Try to build a single result expression.
-  BuilderClosureVisitor visitor(Context, nullptr,
+  auto &ctx = FD->getASTContext();
+  BuilderClosureVisitor visitor(ctx, nullptr,
                                 /*wantExpr=*/true, builderType);
   Expr *returnExpr = visitor.visit(body);
   if (!returnExpr)
@@ -489,9 +497,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
     return nullptr;
 
   auto loc = returnExpr->getStartLoc();
-  auto returnStmt =
-    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
-  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
+  auto returnStmt = new (ctx) ReturnStmt(loc, returnExpr, /*implicit*/ true);
+  return BraceStmt::create(ctx, body->getLBraceLoc(), { returnStmt },
                            body->getRBraceLoc());
 }
 
