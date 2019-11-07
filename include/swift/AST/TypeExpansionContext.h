@@ -18,9 +18,11 @@
 #define SWIFT_TYPEEXPANSIONCONTEXT_H
 
 #include "swift/AST/ResilienceExpansion.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
   class DeclContext;
+  class SILFunction;
 
 /// Describes the context in which SIL types should eventually be expanded.
 /// Required for lowering resilient types and deciding whether to look through
@@ -110,5 +112,34 @@ public:
 };
 
 } // namespace swift
+
+namespace llvm {
+template <> struct DenseMapInfo<swift::TypeExpansionContext> {
+  using TypeExpansionContext = swift::TypeExpansionContext;
+
+  static TypeExpansionContext getEmptyKey() {
+    return TypeExpansionContext(
+        swift::ResilienceExpansion::Minimal,
+        reinterpret_cast<swift::DeclContext *>(
+            DenseMapInfo<swift::DeclContext *>::getEmptyKey()),
+        false);
+  }
+  static TypeExpansionContext getTombstoneKey() {
+    return TypeExpansionContext(
+        swift::ResilienceExpansion::Minimal,
+        reinterpret_cast<swift::DeclContext *>(
+            DenseMapInfo<swift::DeclContext *>::getTombstoneKey()),
+        false);
+  }
+
+  static unsigned getHashValue(TypeExpansionContext val) {
+    return DenseMapInfo<uintptr_t>::getHashValue(val.getHashKey());
+  }
+
+  static bool isEqual(TypeExpansionContext LHS, TypeExpansionContext RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
 
 #endif

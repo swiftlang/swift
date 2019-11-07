@@ -28,9 +28,8 @@ const ProjectionPathList &
 TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod,
                                         TypeExpansionContext context) {
   // Check whether we have the type expansion.
-  auto Iter = ExpansionCache.find(B);
-  // TODO: FIXME: ExpansionCache.find((B,context))
-  //
+  auto key = std::make_pair(B, context);
+  auto Iter = ExpansionCache.find(key);
   //
   if (Iter != ExpansionCache.end()) {
     return Iter->second;
@@ -40,8 +39,8 @@ TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod,
   if (!shouldExpand(*Mod, B)) {
     // Push the empty projection path.
     ProjectionPath P(B);
-    ExpansionCache[B].push_back(P);
-    return ExpansionCache[B];
+    ExpansionCache[key].push_back(P);
+    return ExpansionCache[key];
   }
 
   // Flush the cache if the size of the cache is too large.
@@ -51,8 +50,8 @@ TypeExpansionAnalysis::getTypeExpansion(SILType B, SILModule *Mod,
 
   // Build the type expansion for the leaf nodes.
   ProjectionPath::expandTypeIntoLeafProjectionPaths(B, Mod, context,
-                                                    ExpansionCache[B]);
-  return ExpansionCache[B];
+                                                    ExpansionCache[key]);
+  return ExpansionCache[key];
 }
 
 SILAnalysis *swift::createTypeExpansionAnalysis(SILModule *M) {

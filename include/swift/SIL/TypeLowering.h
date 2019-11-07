@@ -30,35 +30,6 @@ namespace clang {
   class Type;
 }
 
-namespace llvm {
-template <> struct DenseMapInfo<swift::TypeExpansionContext> {
-  using TypeExpansionContext = swift::TypeExpansionContext;
-
-  static TypeExpansionContext getEmptyKey() {
-    return TypeExpansionContext(
-        swift::ResilienceExpansion::Minimal,
-        reinterpret_cast<swift::ModuleDecl *>(
-            DenseMapInfo<swift::ModuleDecl *>::getEmptyKey()),
-        false);
-  }
-  static TypeExpansionContext getTombstoneKey() {
-    return TypeExpansionContext(
-        swift::ResilienceExpansion::Minimal,
-        reinterpret_cast<swift::ModuleDecl *>(
-            DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey()),
-        false);
-  }
-
-  static unsigned getHashValue(TypeExpansionContext val) {
-    return DenseMapInfo<uintptr_t>::getHashValue(val.getHashKey());
-  }
-
-  static bool isEqual(TypeExpansionContext LHS, TypeExpansionContext RHS) {
-    return LHS == RHS;
-  }
-};
-}
-
 namespace swift {
   class AnyFunctionRef;
   enum class Bridgeability : unsigned;
