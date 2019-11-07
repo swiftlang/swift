@@ -56,7 +56,7 @@ TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
          "Cannot install more than one instance of the global type checker!");
   auto *TC = new TypeChecker(ctx);
   ctx.installGlobalTypeChecker(TC);
-  ctx.addDestructorCleanup(TC);
+  ctx.addCleanup([=](){ delete TC; });
   return *ctx.getLegacyGlobalTypeChecker();
 }
 
