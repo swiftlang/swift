@@ -605,7 +605,7 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
   internal init(_ str: String) {
     _contents = str
     super.init()
-    assert(_contents._guts.isFastUTF8)
+    _internalInvariant(_contents._guts.isFastUTF8)
   }
   
   final internal var asString: String {
@@ -673,40 +673,15 @@ internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
     }
   }
 
-  @objc(_fastCStringContents:)
-  @_effects(readonly)
-  final internal func _fastCStringContents(
-    _ requiresNulTermination: Int8
-  ) -> UnsafePointer<CChar>? {
-    let guts = _contents._guts
-    guard !guts.isSmall && guts.isASCII else {
-      return nil
-    }
-    assert(guts.isFastUTF8)
-    return guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked._asCChar
-  }
-
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8> {
-    let guts = _contents._guts
-    guard !guts.isSmall else {
-      // This is Cocoa's trick for returning an "autoreleased char *", but using
-      // our CoW to make it a bit faster
-      let anchor = _contents._bridgeToObjectiveCImpl()
-      let unmanagedAnchor = Unmanaged.passRetained(anchor)
-      _ = unmanagedAnchor.autorelease()
-      return _cocoaStringGetUTF8Pointer(anchor)
-    }
-    assert(guts.isFastUTF8)
-    return guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked
-    
-  }
-
-  @objc(cStringUsingEncoding:)
-  @_effects(readonly)
-  final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    // This is Cocoa's trick for returning an "autoreleased char *", but using
+    // our CoW to make it a bit faster
+    let anchor = _contents._bridgeToObjectiveCImpl()
+    let unmanagedAnchor = Unmanaged.passRetained(anchor)
+    _ = unmanagedAnchor.autorelease()
+    return _cocoaStringGetUTF8Pointer(anchor)
   }
 
   @objc(getCString:maxLength:encoding:)
