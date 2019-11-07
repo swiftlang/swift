@@ -602,7 +602,7 @@ var ruleVar: Rule
 // FIXME(diagnostics): To be able to suggest different candidates here we need to teach the solver how to figure out to which parameter
 // does argument belong to in this case. If the `target` was of a different type, we currently suggest to add an argument for `dependencies:`
 // which is incorrect.
-ruleVar = Rule("a") // expected-error {{cannot convert value of type 'String' to expected argument type '(target: String, dependencies: String)'}}
+ruleVar = Rule("a") // expected-error {{missing argument label 'target:' in call}}
 
 
 class C {
