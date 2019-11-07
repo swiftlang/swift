@@ -3623,9 +3623,8 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   llvm::Value *value = base.claimNext();
 
   SILType baseTy = i->getOperand()->getType();
-  Address field = projectPhysicalClassMemberAddress(
-                      TypeExpansionContext(*i->getFunction()), *this, value,
-                      baseTy, i->getType(), i->getField())
+  Address field = projectPhysicalClassMemberAddress(*this, value, baseTy,
+                                                    i->getType(), i->getField())
                       .getAddress();
   setLoweredAddress(i, field);
 }
@@ -5468,8 +5467,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {
-    auto *fnPtr = IGM.getAddrOfDispatchThunk(
-        IGM.getMaximalTypeExpansionContext(), member, NotForDefinition);
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
     auto fnType = IGM.getSILTypes().getConstantFunctionType(
         IGM.getMaximalTypeExpansionContext(), member);
     auto sig = IGM.getSignature(fnType);
@@ -5482,9 +5480,8 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   // It would be nice if this weren't discarded.
   llvm::Value *baseMetadataCache = nullptr;
 
-  auto fn =
-      emitWitnessMethodValue(TypeExpansionContext(*i->getFunction()), *this,
-                             baseTy, &baseMetadataCache, member, conformance);
+  auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache, member,
+                                   conformance);
 
   setLoweredFunctionPointer(i, fn);
 }
@@ -5668,8 +5665,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   if (IGM.hasResilientMetadata(classDecl,
                                ResilienceExpansion::Maximal)) {
-    auto *fnPtr = IGM.getAddrOfDispatchThunk(TypeExpansionContext(*CurSILFn),
-                                             method, NotForDefinition);
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
     FunctionPointer fn(fnPtr, sig);
 

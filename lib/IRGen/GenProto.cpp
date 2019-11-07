@@ -3185,11 +3185,9 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
   out.push_back(IGM.WitnessTablePtrTy);
 }
 
-FunctionPointer
-irgen::emitWitnessMethodValue(TypeExpansionContext expansionContext,
-                              IRGenFunction &IGF,
-                              llvm::Value *wtable,
-                              SILDeclRef member) {
+FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
+                                              llvm::Value *wtable,
+                                              SILDeclRef member) {
   auto *fn = cast<AbstractFunctionDecl>(member.getDecl());
   auto proto = cast<ProtocolDecl>(fn->getDeclContext());
 
@@ -3202,8 +3200,8 @@ irgen::emitWitnessMethodValue(TypeExpansionContext expansionContext,
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
                                      index.forProtocolWitnessTable());
 
-  auto fnType =
-      IGF.IGM.getSILTypes().getConstantFunctionType(expansionContext, member);
+  auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
+      IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
                                            signature.getType()->getPointerTo());
@@ -3212,13 +3210,12 @@ irgen::emitWitnessMethodValue(TypeExpansionContext expansionContext,
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(
-    TypeExpansionContext expansionContext, IRGenFunction &IGF, CanType baseTy,
-    llvm::Value **baseMetadataCache, SILDeclRef member,
-    ProtocolConformanceRef conformance) {
+    IRGenFunction &IGF, CanType baseTy, llvm::Value **baseMetadataCache,
+    SILDeclRef member, ProtocolConformanceRef conformance) {
   llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseMetadataCache,
                                             conformance);
 
-  return emitWitnessMethodValue(expansionContext, IGF, wtable, member);
+  return emitWitnessMethodValue(IGF, wtable, member);
 }
 
 llvm::Value *irgen::computeResilientWitnessTableIndex(

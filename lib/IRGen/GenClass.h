@@ -52,7 +52,7 @@ namespace irgen {
   enum class FieldAccess : uint8_t;
 
   OwnedAddress projectPhysicalClassMemberAddress(
-      TypeExpansionContext context, IRGenFunction &IGF, llvm::Value *base,
+      IRGenFunction &IGF, llvm::Value *base,
       SILType baseType, SILType fieldType, VarDecl *field);
 
   /// Return a strategy for accessing the given stored class property.
@@ -179,8 +179,7 @@ namespace irgen {
   /// Emit the constant fragile offset of the given property inside an instance
   /// of the class.
   llvm::Constant *tryEmitConstantClassFragilePhysicalMemberOffset(
-      TypeExpansionContext context, IRGenModule &IGM, SILType baseType,
-      VarDecl *field);
+      IRGenModule &IGM, SILType baseType, VarDecl *field);
 
   FieldAccess getClassFieldAccess(IRGenModule &IGM,
                                   SILType baseType,

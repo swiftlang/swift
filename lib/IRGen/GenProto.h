@@ -58,15 +58,13 @@ namespace irgen {
 
   /// Extract the method pointer from the given witness table
   /// as a function value.
-  FunctionPointer emitWitnessMethodValue(TypeExpansionContext context,
-                                         IRGenFunction &IGF,
+  FunctionPointer emitWitnessMethodValue(IRGenFunction &IGF,
                                          llvm::Value *wtable,
                                          SILDeclRef member);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
-  FunctionPointer emitWitnessMethodValue(TypeExpansionContext context,
-                                         IRGenFunction &IGF, CanType baseTy,
+  FunctionPointer emitWitnessMethodValue(IRGenFunction &IGF, CanType baseTy,
                                          llvm::Value **baseMetadataCache,
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);

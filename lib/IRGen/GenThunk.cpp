@@ -36,8 +36,7 @@ using namespace irgen;
 
 /// Find the entry point for a method dispatch thunk.
 llvm::Function *
-IRGenModule::getAddrOfDispatchThunk(TypeExpansionContext context,
-                                    SILDeclRef declRef,
+IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
                                     ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forDispatchThunk(declRef);
 
@@ -47,7 +46,8 @@ IRGenModule::getAddrOfDispatchThunk(TypeExpansionContext context,
     return entry;
   }
 
-  auto fnType = getSILModule().Types.getConstantFunctionType(context, declRef);
+  auto fnType = getSILModule().Types.getConstantFunctionType(
+      getMaximalTypeExpansionContext(), declRef);
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
@@ -56,7 +56,7 @@ IRGenModule::getAddrOfDispatchThunk(TypeExpansionContext context,
 }
 
 static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
-  auto expansionContext = TypeExpansionContext::minimal();
+  auto expansionContext = IGF.IGM.getMaximalTypeExpansionContext();
   auto *decl = cast<AbstractFunctionDecl>(declRef.getDecl());
 
   // Protocol case.
@@ -65,7 +65,7 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
     llvm::Value *wtable = (IGF.CurFn->arg_end() - 1);
 
     // Find the witness we're interested in.
-    return emitWitnessMethodValue(expansionContext, IGF, wtable, declRef);
+    return emitWitnessMethodValue(IGF, wtable, declRef);
   }
 
   // Class case.
@@ -99,8 +99,7 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF, SILDeclRef declRef) {
 }
 
 void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
-  auto *f = getAddrOfDispatchThunk(TypeExpansionContext::minimal(), declRef,
-                                   ForDefinition);
+  auto *f = getAddrOfDispatchThunk(declRef, ForDefinition);
 
   IRGenFunction IGF(*this, f);
 

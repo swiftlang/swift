@@ -791,7 +791,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.
         auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
-            TypeExpansionContext::minimal(), IGM, loweredClassTy, property);
+            IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
         addFixedOffset(/*struct*/ false, property->isLet(), offset);
         break;
