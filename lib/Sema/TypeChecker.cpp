@@ -599,7 +599,8 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
+  assert(Ctx.getLegacyGlobalTypeChecker() &&
+         "Should have a TypeChecker registered");
   return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 
