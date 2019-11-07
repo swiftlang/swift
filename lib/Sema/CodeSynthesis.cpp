@@ -1127,8 +1127,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // synthesized, it will be synthesized.
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    if (!evaluateTargetConformanceTo(decodableProto)) {
-      (void)evaluateTargetConformanceTo(encodableProto);
+    if (!evaluateTargetConformanceTo(encodableProto)) {
+      (void)evaluateTargetConformanceTo(decodableProto);
     }
   }
     break;
