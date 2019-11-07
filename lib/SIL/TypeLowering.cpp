@@ -1522,7 +1522,7 @@ TypeConverter::getSILFunctionType(TypeExpansionContext context,
       getLoweredRValueType(context, origType, substType));
 }
 
-bool TypeConverter::hasOpaqueArchetypePropertiesOrCases(CanType ty) {
+bool TypeConverter::hasOpaqueArchetypeOrPropertiesOrCases(CanType ty) {
   if (ty->hasOpaqueArchetype())
     return true;
 
@@ -1541,14 +1541,13 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
                                TypeExpansionContext forExpansion) {
   CanType substType = origSubstType->getCanonicalType();
   auto origHadOpaqueTypeArchetype =
-      origSubstType->hasOpaqueArchetype() ||
-      hasOpaqueArchetypePropertiesOrCases(origSubstType->getCanonicalType());
+      hasOpaqueArchetypeOrPropertiesOrCases(origSubstType->getCanonicalType());
   auto key = getTypeKey(origType, substType, forExpansion);
   assert((!key.isDependent() || getCurGenericContext())
          && "dependent type outside of generic context?!");
   assert(!substType->is<InOutType>());
 
-  auto *candidateLowering = find(key);
+  auto *candidateLowering = find(key.getKeyForMinimalExpansion());
   auto *lowering = getTypeLoweringForExpansion(
       key, forExpansion, candidateLowering, origHadOpaqueTypeArchetype);
   if (lowering != nullptr)
@@ -1741,8 +1740,7 @@ TypeConverter::getTypeLowering(SILType type,
                         loweredType, forExpansion);
 
   auto origHadOpaqueTypeArchetype =
-      loweredType->hasOpaqueArchetype() ||
-      hasOpaqueArchetypePropertiesOrCases(loweredType);
+      hasOpaqueArchetypeOrPropertiesOrCases(loweredType);
 
   return getTypeLoweringForLoweredType(key, forExpansion,
                                        origHadOpaqueTypeArchetype);

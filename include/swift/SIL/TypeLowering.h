@@ -862,7 +862,7 @@ public:
 
   CanType getLoweredTypeOfGlobal(VarDecl *var);
 
-  bool hasOpaqueArchetypePropertiesOrCases(CanType ty);
+  bool hasOpaqueArchetypeOrPropertiesOrCases(CanType ty);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.

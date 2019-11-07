@@ -4641,13 +4641,11 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
 }
 
 bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
-  if (hasOpaqueArchetype())
-    return true;
-
   if (auto *structDecl = getStructOrBoundGenericStruct()) {
     for (auto *field : structDecl->getStoredProperties()) {
-      auto fieldTy = field->getInterfaceType();
-      if (fieldTy->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
+      auto fieldTy = field->getInterfaceType()->getCanonicalType();
+      if (fieldTy->hasOpaqueArchetype() ||
+          fieldTy->hasOpaqueArchetypePropertiesOrCases())
         return true;
     }
   }
@@ -4655,7 +4653,8 @@ bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
   if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
     for (auto *elt : enumDecl->getAllElements()) {
       auto eltType = elt->getInterfaceType();
-      if (eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
+      if (eltType->hasOpaqueArchetype() ||
+          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
         return true;
     }
   }
