@@ -117,10 +117,9 @@ static bool mayContainReference(SILType Ty, const SILFunction &F) {
 
 // Returns true if the type \p Ty must be a reference or must transitively
 // contain a reference. If \p Ty is itself an address, return false.
-// Will be used in a subsequent commit.
-// static bool mustContainReference(SILType Ty, const SILFunction &F) {
-//  return findRecursiveRefType(Ty, F, true);
-//}
+static bool mustContainReference(SILType Ty, const SILFunction &F) {
+  return findRecursiveRefType(Ty, F, true);
+}
 
 bool EscapeAnalysis::isPointer(ValueBase *V) const {
   auto *F = V->getFunction();
@@ -334,6 +333,15 @@ public:
 void EscapeAnalysis::CGNode::mergeProperties(CGNode *fromNode) {
   if (!V)
     V = fromNode->V;
+
+  // TODO: Optimistically merge hasRC. 'this' node can only be merged with
+  // `fromNode` if their pointer values are compatible. If `fromNode->hasRC` is
+  // true, then it is guaranteed to represent the head of a heap object. Thus,
+  // it can only be merged with 'this' when the pointer values that access
+  // 'this' are also references.
+  //
+  // For now, this is pessimistic until we understand performance implications.
+  hasRC &= fromNode->hasRC;
 }
 
 template <typename Visitor>
@@ -842,8 +850,9 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 }
 
 CGNode *EscapeAnalysis::ConnectionGraph::createContentNode(CGNode *addrNode,
-                                                           SILValue addrVal) {
-  CGNode *newContent = allocNode(addrVal, NodeType::Content);
+                                                           SILValue addrVal,
+                                                           bool hasRC) {
+  CGNode *newContent = allocNode(addrVal, NodeType::Content, hasRC);
   initializePointsToEdge(addrNode, newContent);
   assert(ToMerge.empty()
          && "Initially setting pointsTo should not require any node merges");
@@ -860,7 +869,7 @@ EscapeAnalysis::ConnectionGraph::createMergedContent(CGNode *destAddrNode,
   // on the source content.
   //
   // TODO: node properties will come from `srcContent` here...
-  return createContentNode(destAddrNode, destAddrNode->V);
+  return createContentNode(destAddrNode, destAddrNode->V, srcContent->hasRC);
 }
 
 // Get a node representing the field data within the given reference-counted
@@ -872,7 +881,7 @@ CGNode *EscapeAnalysis::ConnectionGraph::getFieldContent(CGNode *rcNode) {
   if (rcNode->pointsTo)
     return rcNode->pointsTo;
 
-  return createContentNode(rcNode, rcNode->V);
+  return createContentNode(rcNode, rcNode->V, /*hasRC=*/false);
 }
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
@@ -1140,6 +1149,8 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
   
   switch (Node->OrigNode->Type) {
     case swift::EscapeAnalysis::NodeType::Content:
+      if (Node->OrigNode->hasRefCount())
+        O << "rc-";
       O << "content";
       break;
     case swift::EscapeAnalysis::NodeType::Return:
@@ -1177,7 +1188,11 @@ std::string CGForDotView::getNodeAttributes(const Node *Node) const {
   std::string attr;
   switch (Orig->Type) {
     case swift::EscapeAnalysis::NodeType::Content:
-      attr = "style=\"rounded\"";
+      attr = "style=\"rounded";
+      if (Orig->hasRefCount()) {
+        attr += ",filled";
+      }
+      attr += "\"";
       break;
     case swift::EscapeAnalysis::NodeType::Argument:
     case swift::EscapeAnalysis::NodeType::Return:
@@ -1296,6 +1311,9 @@ void EscapeAnalysis::ConnectionGraph::dumpCG() const {
 
 void EscapeAnalysis::CGNode::dump() const {
   llvm::errs() << getTypeStr();
+  if (hasRefCount())
+    llvm::errs() << " [rc]";
+
   if (V)
     llvm::errs() << ": " << *V;
   else
@@ -1406,6 +1424,9 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
       OS << Separator << NodeStr(Def);
       Separator = ", ";
     }
+    if (Nd->hasRefCount())
+      OS << " [rc]";
+
     OS << '\n';
   }
   OS << "End\n";
@@ -1439,6 +1460,10 @@ void EscapeAnalysis::ConnectionGraph::verify(bool allowMerge) const {
     // which consist of only defer-edges and a single trailing points-to edge
     // must lead to the same
     assert(Nd->matchPointToOfDefers(allowMerge));
+    if (Nd->isContent() && Nd->V) {
+      if (Nd->hasRefCount())
+        assert(mayContainReference(Nd->V->getType(), *F));
+    }
   }
 #endif
 }
@@ -1522,15 +1547,26 @@ EscapeAnalysis::getValueContent(ConnectionGraph *conGraph, SILValue addrVal) {
     assert(isPointer(addrNodeValue));
     assert(addrNodeValue == getPointerRoot(addrVal));
   }
+  auto *F = addrVal->getFunction();
+  bool hasRC = mustContainReference(baseAddr->getType(), *F)
+               || mustContainReference(addrVal->getType(), *F);
+
   // Have we already merged a content node?
   if (CGNode *content = addrNode->getContentNodeOrNull()) {
-    // TODO: Merge node properties here.
+    // hasRC might not match if one of the values pointing to this content was
+    // cast to an unknown type. If any of the types must contain a reference,
+    // then the content should contain a reference.
+    if (content->hasRefCount())
+      assert(mayContainReference(baseAddr->getType(), *F));
+    else if (hasRC)
+      content->setRefCount();
+
     return content;
   }
   if (!isPointer(baseAddr))
     return nullptr;
 
-  return conGraph->createContentNode(addrNode, baseAddr);
+  return conGraph->createContentNode(addrNode, baseAddr, hasRC);
 }
 
 void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
@@ -1737,8 +1773,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           CGNode *ArrayRefNode = ArrayStructValue->getContentNodeOrNull();
           if (!ArrayRefNode) {
             ArrayRefNode = ConGraph->createContentNode(
-                ArrayStructValue, ArrayStructValue->getValueOrNull());
-          }
+                ArrayStructValue, ArrayStructValue->getValueOrNull(),
+                /*hasRC=*/true);
+          } else
+            ArrayRefNode->setRefCount();
+
           // Another content node for the element storage.
           CGNode *ArrayElementStorage = ConGraph->getFieldContent(ArrayRefNode);
           ArrayElementStorage->markEscaping();
@@ -1868,6 +1907,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       if (!rcContent)
         return;
 
+      // rcContent->hasRefCount() may or may not be true depending on whether
+      // the type could be analyzed. Either way, treat it structurally like a
+      // refcounted object.
       CGNode *fieldContent = ConGraph->getFieldContent(rcContent);
       if (!deinitIsKnownToNotCapture(OpV)) {
         fieldContent->markEscaping();
