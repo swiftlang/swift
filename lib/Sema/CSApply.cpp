@@ -2151,7 +2151,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, cs.getTypeChecker().getIntType(cs.DC));
+        cs.setType(expr, TypeChecker::getIntType(ctx));
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -3722,7 +3722,7 @@ namespace {
         // If we're performing an assignment to a weak or unowned variable from
         // a constructor call, emit a warning that the instance will be
         // immediately deallocated.
-        diagnoseUnownedImmediateDeallocation(cs.getTypeChecker(), expr);
+        diagnoseUnownedImmediateDeallocation(cs.getASTContext(), expr);
       }
       return expr;
     }

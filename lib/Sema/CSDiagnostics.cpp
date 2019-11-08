@@ -1533,7 +1533,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
     auto diag = emitDiagnostic(
         expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
         choicePair.first.empty(), choicePair.second->getFullName());
-    swift::fixItEncloseTrailingClosure(getTypeChecker(), diag, callExpr,
+    swift::fixItEncloseTrailingClosure(getASTContext(), diag, callExpr,
                                        choicePair.first);
   }
 
@@ -2416,9 +2416,9 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
 
   // If we tried to throw the error code of an error type, suggest object
   // construction.
-  auto &TC = getTypeChecker();
+  auto &Ctx = getASTContext();
   if (auto errorCodeProtocol =
-          TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
+          Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
     auto conformance = TypeChecker::conformsToProtocol(
         errorCodeType, errorCodeProtocol, getDC(),
@@ -2641,11 +2641,8 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (!getASTContext().getStdlibModule())
     return false;
 
-  auto &TC = getTypeChecker();
-  auto *DC = getDC();
-
-  auto String = TC.getStringType(DC);
-  auto Substring = TC.getSubstringType(DC);
+  auto String = TypeChecker::getStringType(getASTContext());
+  auto Substring = TypeChecker::getSubstringType(getASTContext());
 
   if (!String || !Substring)
     return false;

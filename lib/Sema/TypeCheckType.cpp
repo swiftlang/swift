@@ -375,35 +375,35 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getStringType(DeclContext *dc) {
+Type TypeChecker::getStringType(ASTContext &Context) {
   if (auto typeDecl = Context.getStringDecl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getSubstringType(DeclContext *dc) {
+Type TypeChecker::getSubstringType(ASTContext &Context) {
   if (auto typeDecl = Context.getSubstringDecl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getIntType(DeclContext *dc) {
+Type TypeChecker::getIntType(ASTContext &Context) {
   if (auto typeDecl = Context.getIntDecl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getInt8Type(DeclContext *dc) {
+Type TypeChecker::getInt8Type(ASTContext &Context) {
   if (auto typeDecl = Context.getInt8Decl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getUInt8Type(DeclContext *dc) {
+Type TypeChecker::getUInt8Type(ASTContext &Context) {
   if (auto typeDecl = Context.getUInt8Decl())
     return typeDecl->getDeclaredInterfaceType();
 

@@ -723,11 +723,11 @@ public:
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
-  Type getStringType(DeclContext *dc);
-  Type getSubstringType(DeclContext *dc);
-  Type getIntType(DeclContext *dc);
-  Type getInt8Type(DeclContext *dc);
-  Type getUInt8Type(DeclContext *dc);
+  static Type getStringType(ASTContext &ctx);
+  static Type getSubstringType(ASTContext &ctx);
+  static Type getIntType(ASTContext &ctx);
+  static Type getInt8Type(ASTContext &ctx);
+  static Type getUInt8Type(ASTContext &ctx);
 
   /// Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
