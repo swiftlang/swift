@@ -2457,7 +2457,10 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   checkObjCTypeErasedGenerics(assocType, type, typeDecl);
 
-  if (typeDecl) {
+  if (typeDecl && isa<GenericTypeParamDecl>(typeDecl)) {
+    // Nothing to check.
+
+  } else if (typeDecl) {
     // Check access.
     bool isSetter = false;
     if (checkWitnessAccess(assocType, typeDecl, &isSetter)) {
@@ -3532,7 +3535,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       for (auto gp : genericSig->getInnermostGenericParams()) {
         if (gp->getName() == assocType->getName()) {
           if (!checkTypeWitness(DC, Proto, assocType, gp)) {
-            recordTypeWitness(assocType, gp, nullptr);
+            recordTypeWitness(assocType, gp, gp->getDecl());
             return ResolveWitnessResult::Success;
           }
         }
