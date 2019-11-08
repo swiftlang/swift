@@ -4540,6 +4540,9 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))
+WARNING(observe_keypath_property_not_objc_dynamic, none,
+        "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
+        "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics

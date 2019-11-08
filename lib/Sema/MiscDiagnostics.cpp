@@ -3990,6 +3990,59 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
+                                                     const DeclContext *DC) {
+  class KVOObserveCallWalker : public ASTWalker {
+    const ASTContext &C;
+
+  public:
+    KVOObserveCallWalker(ASTContext &ctx) : C(ctx) {}
+
+    void maybeDiagnoseCallExpr(CallExpr *expr) {
+      auto fn = expr->getCalledValue();
+      if (!fn)
+        return;
+      if (fn->getModuleContext()->getName() != C.Id_Foundation)
+        return;
+      if (!fn->getFullName().isCompoundName("observe",
+                                            {"", "options", "changeHandler"}))
+        return;
+      auto args = cast<TupleExpr>(expr->getArg());
+      auto firstArg = dyn_cast<KeyPathExpr>(args->getElement(0));
+      if (!firstArg)
+        return;
+      auto lastComponent = firstArg->getComponents().back();
+      if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        return;
+      auto property = lastComponent.getDeclRef().getDecl();
+      if (!property)
+        return;
+      if (property->isObjCDynamic())
+        return;
+      C.Diags
+          .diagnose(expr->getLoc(),
+                    diag::observe_keypath_property_not_objc_dynamic,
+                    property->getFullName(), fn->getFullName())
+          .highlight(lastComponent.getLoc());
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *CE = dyn_cast<CallExpr>(E)) {
+        maybeDiagnoseCallExpr(CE);
+        return {false, E};
+      }
+
+      return {true, E};
+    }
+  };
+
+  KVOObserveCallWalker Walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -4004,6 +4057,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
+  maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   if (!ctx.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
