@@ -506,7 +506,7 @@ DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
 DECL_ATTR(differentiable, Differentiable,
   OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
   AllowMultipleAttributes |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   90)
 DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |
