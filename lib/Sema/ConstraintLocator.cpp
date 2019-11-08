@@ -255,7 +255,7 @@ void ConstraintLocator::dump(SourceManager *sm) const {
 }
 
 void ConstraintLocator::dump(ConstraintSystem *CS) const {
-  dump(&CS->TC.Context.SourceMgr, llvm::errs());
+  dump(&CS->getASTContext().SourceMgr, llvm::errs());
   llvm::errs() << "\n";
 }
 

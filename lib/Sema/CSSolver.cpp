@@ -55,7 +55,7 @@ TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
                                      unsigned options) {
   ++TotalNumTypeVariables;
-  auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
+  auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
                                      locator, options);
   addTypeVariable(tv);
   return tv;
@@ -89,7 +89,7 @@ Solution ConstraintSystem::finalize() {
       break;
         
     case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, TC.Context.TheUnresolvedType);
+      assignFixedType(tv, getASTContext().TheUnresolvedType);
       break;
     }
   }
@@ -573,7 +573,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(TC, DC, None, E);
+  ConstraintSystem cs(BaseCS.getTypeChecker(), DC, None, E);
   cs.baseCS = &BaseCS;
 
   // Set up expression type checker timer for the candidate.
@@ -594,12 +594,13 @@ bool ConstraintSystem::Candidate::solve(
   if (isTooComplexGiven(&cs, shrunkExprs))
     return false;
 
-  if (cs.getASTContext().LangOpts.DebugConstraintSolver) {
+  auto &ctx = cs.getASTContext();
+  if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log << "--- Solving candidate for shrinking at ";
     auto R = E->getSourceRange();
     if (R.isValid()) {
-      R.print(log, TC.Context.SourceMgr, /*PrintText=*/ false);
+      R.print(log, ctx.SourceMgr, /*PrintText=*/ false);
     } else {
       log << "<invalid range>";
     }
@@ -631,7 +632,7 @@ bool ConstraintSystem::Candidate::solve(
     cs.solve(solutions);
   }
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     if (solutions.empty()) {
       log << "--- No Solutions ---\n";
@@ -1053,7 +1054,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   // survive even after primary constraint system is destroyed.
   for (auto &OSR : shrunkExprs) {
     auto choices = OSR->getDecls();
-    auto decls = TC.Context.AllocateUninitialized<ValueDecl *>(choices.size());
+    auto decls =
+        getASTContext().AllocateUninitialized<ValueDecl *>(choices.size());
 
     std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
     OSR->setDecls(decls);
@@ -1100,7 +1102,7 @@ bool ConstraintSystem::solve(Expr *&expr,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   llvm::SaveAndRestore<bool> debugForExpr(
       getASTContext().LangOpts.DebugConstraintSolver,
-      debugConstraintSolverForExpr(TC.Context, expr));
+      debugConstraintSolverForExpr(getASTContext(), expr));
 
   // Attempt to solve the constraint system.
   auto solution = solveImpl(expr,
@@ -1165,7 +1167,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
     log << "---Constraint solving for the expression at ";
     auto R = expr->getSourceRange();
     if (R.isValid()) {
-      R.print(log, TC.Context.SourceMgr, /*PrintText=*/ false);
+      R.print(log, getASTContext().SourceMgr, /*PrintText=*/ false);
     } else {
       log << "<invalid range>";
     }

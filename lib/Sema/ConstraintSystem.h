@@ -1184,7 +1184,6 @@ private:
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
-    TypeChecker &TC;
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
@@ -1197,7 +1196,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
           CT(ct), CTP(ctp) {}
 
     /// Return underlying expression.
@@ -3699,12 +3698,12 @@ public:
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto used = TC.Context.getSolverMemory();
+    auto used = getASTContext().getSolverMemory();
     for (auto const& s : solutions) {
       used += s.getTotalMemory();
     }
     MaxMemory = std::max(used, MaxMemory);
-    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    auto threshold = getASTContext().LangOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       return isExpressionAlreadyTooComplex= true;
     }
@@ -3721,7 +3720,7 @@ public:
 
     // Bail out once we've looked at a really large number of
     // choices.
-    if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold) {
+    if (CountScopes > getASTContext().LangOpts.SolverBindingThreshold) {
       return isExpressionAlreadyTooComplex = true;
     }
 
