@@ -18,8 +18,7 @@
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
-#include "ASTContext.h"
-#include "llvm/ADT/SmallBitVector.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/Basic/Range.h"
 
 namespace swift {
@@ -29,23 +28,23 @@ public:
   enum class Kind { Named, Ordered, Self };
 
 private:
-  SourceLoc Loc;
-  Kind Kind;
+  SourceLoc loc;
+  Kind kind;
   union Value {
-    struct { Identifier Name; } Named;
-    struct { unsigned Index; } Ordered;
-    struct {} Self;
+    struct { Identifier name; } Named;
+    struct { unsigned index; } Ordered;
+    struct {} self;
     Value(Identifier name) : Named({name}) {}
     Value(unsigned index) : Ordered({index}) {}
     Value() {}
-  } V;
+  } value;
 
 public:
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
-    : Loc(loc), Kind(kind), V(value) {}
+  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, Value value)
+    : loc(loc), kind(kind), value(value) {}
 
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
-  : Loc(loc), Kind(kind), V(index) {}
+  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, unsigned index)
+    : loc(loc), kind(kind), value(index) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
                                                    Identifier name) {
@@ -62,20 +61,20 @@ public:
   }
 
   Identifier getName() const {
-    assert(Kind == Kind::Named);
-    return V.Named.Name;
+    assert(kind == Kind::Named);
+    return value.Named.name;
   }
 
   unsigned getIndex() const {
-    return V.Ordered.Index;
+    return value.Ordered.index;
   }
 
-  enum Kind getKind() const {
-    return Kind;
+  Kind getKind() const {
+    return kind;
   }
 
   SourceLoc getLoc() const {
-    return Loc;
+    return loc;
   }
 
   bool isEqual(const ParsedAutoDiffParameter &other) const {
