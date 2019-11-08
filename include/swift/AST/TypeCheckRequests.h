@@ -39,6 +39,7 @@ struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
+class TrailingWhereClause;
 class TypeAliasDecl;
 struct TypeLoc;
 class Witness;
@@ -369,9 +370,10 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, Decl *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *, SpecializeAttr *> source;
 
-  WhereClauseOwner(Decl *decl);
+  WhereClauseOwner(GenericContext *genCtx);
+  WhereClauseOwner(AssociatedTypeDecl *atd);
 
   WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
       : dc(dc), source(genericParams) {}
@@ -382,13 +384,12 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
+    return llvm::hash_value(owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
                          const WhereClauseOwner &rhs) {
-    return lhs.dc == rhs.dc &&
-           lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
+    return lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
   }
 
   friend bool operator!=(const WhereClauseOwner &lhs,

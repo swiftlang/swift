@@ -547,8 +547,8 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
 
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
-static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC) {
+static void checkGenericParams(GenericContext *ownerCtx) {
+  const auto genericParams = ownerCtx->getGenericParams();
   if (!genericParams)
     return;
 
@@ -558,7 +558,7 @@ static void checkGenericParams(GenericParamList *genericParams,
   }
 
   // Force visitation of each of the requirements here.
-  WhereClauseOwner(owningDC, genericParams)
+  WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
 }
@@ -2218,13 +2218,13 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   return SelfAccessKind::NonMutating;
 }
 
-/// Check the requirements in the where clause of the given \c source
+/// Check the requirements in the where clause of the given \c atd
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
-                                          TypeDecl *source) {
-  WhereClauseOwner(source).visitRequirements(
+                                          AssociatedTypeDecl *atd) {
+  WhereClauseOwner(atd).visitRequirements(
       TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
+      [proto](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
@@ -2631,7 +2631,7 @@ public:
 
     if (!SD->isInvalid()) {
       TypeChecker::checkReferencedGenericParams(SD);
-      checkGenericParams(SD->getGenericParams(), SD);
+      checkGenericParams(SD);
       TypeChecker::checkProtocolSelfRequirements(SD);
     }
 
@@ -2777,7 +2777,7 @@ public:
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
-    checkGenericParams(ED->getGenericParams(), ED);
+    checkGenericParams(ED);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2824,7 +2824,7 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    checkGenericParams(SD->getGenericParams(), SD);
+    checkGenericParams(SD);
 
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
@@ -2949,7 +2949,7 @@ public:
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();
 
-    checkGenericParams(CD->getGenericParams(), CD);
+    checkGenericParams(CD);
 
     {
       // Check for circular inheritance.
@@ -3234,7 +3234,7 @@ public:
     (void) FD->getOperatorDecl();
 
     if (!FD->isInvalid()) {
-      checkGenericParams(FD->getGenericParams(), FD);
+      checkGenericParams(FD);
       TypeChecker::checkReferencedGenericParams(FD);
       TypeChecker::checkProtocolSelfRequirements(FD);
     }
@@ -3436,7 +3436,7 @@ public:
       }
     }
 
-    checkGenericParams(ED->getGenericParams(), ED);
+    checkGenericParams(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
@@ -3478,7 +3478,7 @@ public:
     (void) CD->getInitKind();
 
     if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams(), CD);
+      checkGenericParams(CD);
       TypeChecker::checkReferencedGenericParams(CD);
       TypeChecker::checkProtocolSelfRequirements(CD);
     }
