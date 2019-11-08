@@ -282,42 +282,52 @@ evaluateOrSkip(ConstExprStepEvaluator &stepEval,
 
 /// Return true iff the given value is a stdlib Int or Bool and it not a direct
 /// construction of Int or Bool.
-static bool isFoldableIntOrBool(SILValue value, SILInstruction *definingInst,
-                                ASTContext &astContext) {
-  assert(definingInst);
-  return !isa<StructInst>(definingInst) &&
-         isIntegerOrBoolType(value->getType(), astContext);
+static bool isFoldableIntOrBool(SILValue value, ASTContext &astContext) {
+  return isIntegerOrBoolType(value->getType(), astContext) &&
+         !isa<StructInst>(value);
 }
 
 /// Return true iff the given value is a string and is not an initialization
 /// of an string from a string literal.
-static bool isFoldableString(SILValue value, SILInstruction *definingInst,
-                             ASTContext &astContext) {
-  assert(definingInst);
+static bool isFoldableString(SILValue value, ASTContext &astContext) {
   return isStringType(value->getType(), astContext) &&
-         !getStringMakeUTF8Init(definingInst);
+         (!isa<ApplyInst>(value) ||
+          !getStringMakeUTF8Init(cast<ApplyInst>(value)));
 }
 
 /// Return true iff the given value is an array and is not an initialization
 /// of an array from an array literal.
-static bool isFoldableArray(SILValue value, SILInstruction *definingInst,
-                            ASTContext &astContext) {
-  assert(definingInst);
+static bool isFoldableArray(SILValue value, ASTContext &astContext) {
   if (!isArrayType(value->getType(), astContext))
     return false;
-
-  // Check if this is not an initialization of an array from a literal.
+  // If value is an initialization of an array from a literal or an empty array
+  // initializer, it need not be folded. Arrays constructed from literals use a
+  // function with semantics: "array.uninitialized_intrinsic" that returns
+  // a pair, where the first element of the pair is the array.
+  SILInstruction *definingInst = value->getDefiningInstruction();
+  if (!definingInst)
+    return true;
   SILInstruction *constructorInst = definingInst;
   if (isa<DestructureTupleInst>(definingInst) ||
       isa<TupleExtractInst>(definingInst)) {
     constructorInst = definingInst->getOperand(0)->getDefiningInstruction();
   }
-  ApplyInst *apply = dyn_cast<ApplyInst>(definingInst);
-  if (!apply)
+  if (!constructorInst || !isa<ApplyInst>(constructorInst))
     return true;
-  SILFunction *callee = apply->getCalleeFunction();
-  return !callee || !callee->hasSemanticsAttr("array.init.empty") ||
-         !callee->hasSemanticsAttr("array.uninitialized_intrinsic");
+  SILFunction *callee = cast<ApplyInst>(constructorInst)->getCalleeFunction();
+  return !callee ||
+         (!callee->hasSemanticsAttr("array.init.empty") &&
+          !callee->hasSemanticsAttr("array.uninitialized_intrinsic"));
+}
+
+/// Return true iff the given value is a closure but is not a creation of a
+/// closure e.g., through partial_apply or thin_to_thick_function or
+/// convert_function.
+static bool isFoldableClosure(SILValue value) {
+  return value->getType().is<SILFunctionType>() &&
+         (!isa<FunctionRefInst>(value) && !isa<PartialApplyInst>(value) &&
+          !isa<ThinToThickFunctionInst>(value) &&
+          !isa<ConvertFunctionInst>(value));
 }
 
 /// Check whether a SILValue is foldable. String, integer, array and
@@ -337,9 +347,9 @@ static bool isSILValueFoldable(SILValue value) {
           !isa<LoadBorrowInst>(definingInst) &&
           !isa<BeginBorrowInst>(definingInst) &&
           !isa<CopyValueInst>(definingInst) &&
-          (isFoldableIntOrBool(value, definingInst, astContext) ||
-           isFoldableString(value, definingInst, astContext) ||
-           isFoldableArray(value, definingInst, astContext)));
+          (isFoldableIntOrBool(value, astContext) ||
+           isFoldableString(value, astContext) ||
+           isFoldableArray(value, astContext) || isFoldableClosure(value)));
 }
 
 /// Diagnose failure during evaluation of a call to a constant-evaluable
@@ -585,6 +595,39 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   return arraySIL;
 }
 
+/// Given a SILValue \p value, return the instruction immediately following the
+/// definition of the value. That is, if the value is defined by an
+/// instruction, return the instruction following the definition. Otherwise, if
+/// the value is a basic block parameter, return the first instruction of the
+/// basic block.
+SILInstruction *getInstructionFollowingValueDefinition(SILValue value) {
+  SILInstruction *definingInst = value->getDefiningInstruction();
+  if (definingInst) {
+    return &*std::next(definingInst->getIterator());
+  }
+  // Here value must be a basic block argument.
+  SILBasicBlock *bb = value->getParentBlock();
+  return &*bb->begin();
+}
+
+/// Given a SILValue \p value, create a copy of the value using copy_value in
+/// OSSA or retain in non-OSSA, if \p value is a non-trivial type. Otherwise, if
+/// \p value is a trivial type, return the value itself.
+SILValue makeOwnedCopyOfSILValue(SILValue value, SILFunction &fun) {
+  SILType type = value->getType();
+  if (type.isTrivial(fun))
+    return value;
+  assert(!type.isAddress() && "cannot make owned copy of addresses");
+
+  SILInstruction *instAfterValueDefinition =
+      getInstructionFollowingValueDefinition(value);
+  SILLocation copyLoc = instAfterValueDefinition->getLoc();
+  SILBuilderWithScope builder(instAfterValueDefinition);
+  const TypeLowering &typeLowering = builder.getTypeLowering(type);
+  SILValue copy = typeLowering.emitCopyValue(builder, copyLoc, value);
+  return copy;
+}
+
 /// Generate SIL code that computes the constant given by the symbolic value
 /// `symVal`. Note that strings and struct-typed constant values will require
 /// multiple instructions to be emitted.
@@ -683,6 +726,61 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     SILValue arraySIL = emitCodeForConstantArray(
         elementSILValues, expectedType->getCanonicalType(), builder, loc);
     return arraySIL;
+  }
+  case SymbolicValue::Closure: {
+    assert(expectedType->is<AnyFunctionType>() ||
+           expectedType->is<SILFunctionType>());
+
+    SymbolicClosure *closure = symVal.getClosure();
+    SubstitutionMap callSubstMap = closure->getCallSubstitutionMap();
+    SILModule &module = builder.getModule();
+    ArrayRef<SymbolicClosureArgument> captures = closure->getCaptures();
+
+    // Recursively emit code for all captured values that are mapped to a
+    // symbolic value. If there is a captured value that is not mapped
+    // to a symbolic value, use the captured value as such (after possibly
+    // copying non-trivial captures).
+    SmallVector<SILValue, 4> capturedSILVals;
+    for (SymbolicClosureArgument capture : captures) {
+      SILValue captureOperand = capture.first;
+      Optional<SymbolicValue> captureSymVal = capture.second;
+      if (!captureSymVal) {
+        SILFunction &fun = builder.getFunction();
+        assert(captureOperand->getFunction() == &fun &&
+               "non-constant captured arugment not defined in this function");
+        // If the captureOperand is a non-trivial value, it should be copied
+        // as it now used in a new folded closure.
+        SILValue captureCopy = makeOwnedCopyOfSILValue(captureOperand, fun);
+        capturedSILVals.push_back(captureCopy);
+        continue;
+      }
+      // Here, we have a symbolic value for the capture. Therefore, use it to
+      // create a new constant at this point. Note that the captured operand
+      // type may have generic parameters which has to be substituted with the
+      // substitution map that was inferred by the constant evaluator at the
+      // partial-apply site.
+      SILType operandType = captureOperand->getType();
+      SILType captureType = operandType.subst(module, callSubstMap);
+      SILValue captureSILVal = emitCodeForSymbolicValue(
+          captureSymVal.getValue(), captureType.getASTType(), builder, loc,
+          stringInfo);
+      capturedSILVals.push_back(captureSILVal);
+    }
+
+    FunctionRefInst *functionRef =
+        builder.createFunctionRef(loc, closure->getTarget());
+    SILType closureType = closure->getClosureType();
+    ParameterConvention convention =
+        closureType.getAs<SILFunctionType>()->getCalleeConvention();
+    PartialApplyInst *papply = builder.createPartialApply(
+        loc, functionRef, callSubstMap, capturedSILVals, convention);
+    // The type of the created closure must be a lowering of the expected type.
+    SILType resultType = papply->getType();
+    CanType expectedCanType = expectedType->getCanonicalType();
+    assert(expectedType->is<SILFunctionType>()
+               ? resultType.getASTType() == expectedCanType
+               : resultType.is<SILFunctionType>());
+    return papply;
   }
   default: {
     llvm_unreachable("Symbolic value kind is not supported");
@@ -997,8 +1095,9 @@ static void constantFold(SILInstruction *start,
 /// marks the begining of the string interpolation that is used to create an
 /// OSLogMessage instance. This function traverses the backward data-dependence
 /// chain of the given OSLogMessage initializer: \p oslogInit. As a special case
-/// it avoid chasing the data-dependenceies through a partial-apply as they are
-/// considered as constants.
+/// it avoids chasing the data-dependencies from the captured values of
+/// partial-apply instructions, as a partial apply instruction is considered as
+/// a constant regardless of the constantness of its captures.
 static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   auto oslogInitCallSite = FullApplySite(oslogInit);
   SILFunction *callee = oslogInitCallSite.getCalleeFunction();
@@ -1023,7 +1122,14 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
       // Partial applies are used to capture the dynamic arguments passed to
       // the string interpolation. Their arguments are not required to be
       // known at compile time and they need not be constant evaluated.
-      // Therefore, do not follow this dependency chain.
+      // Therefore, follow only the dependency chain along function ref operand.
+      SILInstruction *definingInstruction =
+          inst->getOperand(0)->getDefiningInstruction();
+      assert(definingInstruction && "no function-ref operand in partial-apply");
+      if (seenInstructions.insert(definingInstruction).second) {
+        worklist.push_back(definingInstruction);
+        candidateStartInstructions.insert(definingInstruction);
+      }
       continue;
     }
 
