@@ -72,7 +72,6 @@ static Type getVectorProtocolVectorSpaceScalarAssocType(
 // the given context, or `nullptr` if `VectorSpaceScalar` cannot be derived.
 static Type deriveVectorProtocol_VectorSpaceScalar(NominalTypeDecl *nominal,
                                                    DeclContext *DC) {
-  auto &C = DC->getASTContext();
   // Nominal type must be a struct. (Zero stored properties is okay.)
   if (!isa<StructDecl>(nominal))
     return nullptr;
