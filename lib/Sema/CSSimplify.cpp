@@ -2199,7 +2199,6 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
 /// is potentially more optional than the second type with its number of
 /// optionals.
 static bool isPotentiallyMoreOptionalThan(Type type1, Type type2) {
-
   SmallVector<Type, 2> optionals1;
   Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
   auto numOptionals1 = optionals1.size();
@@ -7661,11 +7660,17 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
-static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
-  auto pointeeTy = type->lookThroughSingleOptionalType()
-                       ->getAnyPointerElementType();
+static llvm::PointerIntPair<Type, 3, unsigned>
+getBaseTypeForPointer(TypeBase *type) {
+  unsigned unwrapCount = 0;
+  while (auto objectTy = type->getOptionalObjectType()) {
+    type = objectTy.getPointer();
+    ++unwrapCount;
+  }
+
+  auto pointeeTy = type->getAnyPointerElementType();
   assert(pointeeTy);
-  return pointeeTy;
+  return {pointeeTy, unwrapCount};
 }
 
 void ConstraintSystem::addRestrictedConstraint(
@@ -7858,22 +7863,26 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto t2 = type2->getDesugaredType();
 
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false);
-    auto baseType2 = getBaseTypeForPointer(*this, t2);
+    auto ptr2 = getBaseTypeForPointer(t2);
 
-    return matchPointerBaseTypes(baseType1, baseType2);
+    increaseScore(SK_ValueToOptional, ptr2.getInt());
+
+    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
   }
 
   // String ===> UnsafePointer<[U]Int8>
   case ConversionRestrictionKind::StringToPointer: {
     addContextualScore();
 
-    auto baseType2 = getBaseTypeForPointer(*this, type2->getDesugaredType());
-    
+    auto ptr2 = getBaseTypeForPointer(type2->getDesugaredType());
+
+    increaseScore(SK_ValueToOptional, ptr2.getInt());
+
     // The pointer element type must be void or a byte-sized type.
     // TODO: Handle different encodings based on pointer element type, such as
     // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
     // Int8 pointers using UTF8 encoding.
-    baseType2 = getFixedTypeRecursive(baseType2, false);
+    auto baseType2 = getFixedTypeRecursive(ptr2.getPointer(), false);
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
       if (flags.contains(TMF_GenerateConstraints)) {
@@ -7910,22 +7919,24 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
 
     auto t2 = type2->getDesugaredType();
-    
-    auto baseType1 = type1->getInOutObjectType();
-    auto baseType2 = getBaseTypeForPointer(*this, t2);
 
-    return matchPointerBaseTypes(baseType1, baseType2);
+    auto baseType1 = type1->getInOutObjectType();
+    auto ptr2 = getBaseTypeForPointer(t2);
+
+    increaseScore(SK_ValueToOptional, ptr2.getInt());
+
+    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
   }
       
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
   case ConversionRestrictionKind::PointerToPointer: {
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
-    
-    Type baseType1 = getBaseTypeForPointer(*this, t1);
-    Type baseType2 = getBaseTypeForPointer(*this, t2);
 
-    return matchPointerBaseTypes(baseType1, baseType2);
+    auto ptr1 = getBaseTypeForPointer(t1);
+    auto ptr2 = getBaseTypeForPointer(t2);
+
+    return matchPointerBaseTypes(ptr1.getPointer(), ptr2.getPointer());
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
