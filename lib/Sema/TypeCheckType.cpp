@@ -2569,26 +2569,11 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       auto argTy = resolveType(repr->getGenericArguments()[i], options);
       genericArgMap.insert({params[i], argTy->getCanonicalType()});
     }
-    
-    bool ok = true;
+
     subMap = SubstitutionMap::get(
       genericSig,
       QueryTypeSubstitutionMap{genericArgMap},
-      [&](CanType depTy, Type replacement, ProtocolDecl *proto)
-      -> ProtocolConformanceRef {
-        auto result = TypeChecker::conformsToProtocol(
-                                            replacement, proto, DC,
-                                            ConformanceCheckOptions());
-        if (result.isInvalid()) {
-          ok = false;
-          return ProtocolConformanceRef(proto);
-        }
-
-        return result;
-      });
-
-    if (!ok)
-      return ErrorType::get(Context);
+      TypeChecker::LookUpConformance(DC));
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);
