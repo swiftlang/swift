@@ -2311,6 +2311,18 @@ public:
     }
   }
 
+  // FIXME: This is a dirty hack to force the interface types of
+  // an aggregate or extension so that witness matching doesn't
+  // loop back on itself and pick unintended witnesses by silently
+  // failing, or spuriously emit errors by loudly failing.  If
+  // we can untangle the cycle handling in witness matching,
+  // this and its callers can go away.
+  void forceInterfaceTypeOfMembers(IterableDeclContext *IDC) {
+    for (Decl *Member : IDC->getMembers()) {
+      if (auto *VD = dyn_cast<ValueDecl>(Member))
+        (void)VD->getInterfaceType();
+    }
+  }
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -2765,6 +2777,8 @@ public:
     // Check for circular inheritance of the raw type.
     (void)ED->hasCircularRawValue();
 
+    forceInterfaceTypeOfMembers(ED);
+
     for (Decl *member : ED->getMembers())
       visit(member);
 
@@ -2808,6 +2822,8 @@ public:
     (void) SD->getStoredProperties();
 
     TypeChecker::addImplicitConstructors(SD);
+
+    forceInterfaceTypeOfMembers(SD);
 
     for (Decl *Member : SD->getMembers())
       visit(Member);
@@ -3087,6 +3103,8 @@ public:
     }
 
     // Check the members.
+    forceInterfaceTypeOfMembers(PD);
+
     for (auto Member : PD->getMembers())
       visit(Member);
 
@@ -3226,8 +3244,6 @@ public:
       }
     }
 
-    // FIXME: Remove TypeChecker dependencies below.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
@@ -3239,6 +3255,8 @@ public:
     } else {
       TypeChecker::typeCheckAbstractFunctionBody(FD);
 
+      // FIXME: Remove TypeChecker dependencies below.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.ClosuresWithUncomputedCaptures.push_back(FD);
     }
 
@@ -3412,6 +3430,8 @@ public:
 
     checkGenericParams(ED);
 
+    forceInterfaceTypeOfMembers(ED);
+
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -3557,8 +3577,6 @@ public:
 
     checkAccessControl(CD);
 
-    // FIXME: Remove TypeChecker dependencies below.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       CD->diagnose(diag::missing_initializer_def);
@@ -3570,6 +3588,8 @@ public:
     } else {
       TypeChecker::typeCheckAbstractFunctionBody(CD);
 
+      // FIXME: Remove TypeChecker dependencies below.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.ClosuresWithUncomputedCaptures.push_back(CD);
     }
 
@@ -3585,10 +3605,10 @@ public:
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TypeChecker::typeCheckAbstractFunctionBody(DD);
 
+      // FIXME: Remove TypeChecker dependencies below.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.ClosuresWithUncomputedCaptures.push_back(DD);
     }
   }
