@@ -1129,6 +1129,8 @@ endif()
 
 add_subdirectory(utils)
 
+add_subdirectory(userdocs)
+
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(SWIFT_BUILD_PERF_TESTSUITE)
     add_subdirectory(benchmark)
