@@ -15,6 +15,7 @@
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -4247,6 +4248,26 @@ getActualFunctionTypeRepresentation(uint8_t rep) {
   }
 }
 
+/// Translate from the Serialization differentiability kind enum values to the
+/// AST strongly-typed enum.
+///
+/// The former is guaranteed to be stable, but may not reflect this version of
+/// the AST.
+static Optional<swift::DifferentiabilityKind>
+getActualDifferentiabilityKind(uint8_t rep) {
+  switch (rep) {
+#define CASE(THE_CC) \
+  case (uint8_t)serialization::DifferentiabilityKind::THE_CC: \
+    return swift::DifferentiabilityKind::THE_CC;
+  CASE(NonDifferentiable)
+  CASE(Normal)
+  CASE(Linear)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
 /// Translate from the Serialization function type repr enum values to the AST
 /// strongly-typed enum.
 ///
@@ -4577,22 +4598,18 @@ public:
                                             StringRef blobData,
                                             bool isGeneric) {
     TypeID resultID;
-    uint8_t rawRepresentation;
+    uint8_t rawRepresentation, rawDiffKind;
     bool noescape = false, throws;
     GenericSignature genericSig = GenericSignature();
 
     if (!isGeneric) {
-      decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
-                                                  rawRepresentation,
-                                                  noescape,
-                                                  throws);
+      decls_block::FunctionTypeLayout::readRecord(
+          scratch, resultID, rawRepresentation, noescape, throws, rawDiffKind);
     } else {
       GenericSignatureID rawGenericSig;
-      decls_block::GenericFunctionTypeLayout::readRecord(scratch,
-                                                         resultID,
-                                                         rawRepresentation,
-                                                         throws,
-                                                         rawGenericSig);
+      decls_block::GenericFunctionTypeLayout::readRecord(
+          scratch, resultID, rawRepresentation, throws, rawDiffKind,
+          rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
     }
 
@@ -4600,7 +4617,12 @@ public:
     if (!representation.hasValue())
       MF.fatal();
 
-    auto info = FunctionType::ExtInfo(*representation, noescape, throws);
+    auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
+    if (!diffKind.hasValue())
+      MF.fatal();
+
+    auto info =
+        FunctionType::ExtInfo(*representation, noescape, throws, *diffKind);
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -4924,6 +4946,7 @@ public:
     uint8_t rawCoroutineKind;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
+    uint8_t rawDiffKind;
     bool pseudogeneric = false;
     bool noescape;
     bool hasErrorResult;
@@ -4939,6 +4962,7 @@ public:
                                              rawRepresentation,
                                              pseudogeneric,
                                              noescape,
+                                             rawDiffKind,
                                              hasErrorResult,
                                              numParams,
                                              numYields,
@@ -4951,7 +4975,11 @@ public:
       = getActualSILFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue())
       MF.fatal();
-    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape);
+    auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
+    if (!diffKind.hasValue())
+      MF.fatal();
+    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
+                                     *diffKind);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

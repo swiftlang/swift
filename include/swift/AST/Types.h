@@ -17,6 +17,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -300,8 +301,8 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 6 };
-  enum { NumSILExtInfoBits = 6 };
+  enum { NumAFTExtInfoBits = 8 };
+  enum { NumSILExtInfoBits = 8 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -2875,14 +2876,16 @@ public:
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
     //
-    //   |representation|noEscape|throws|
-    //   |    0 .. 3    |    4   |   5  |
+    //   |representation|noEscape|throws|differentiability|
+    //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask     = 0xF << 0,
-      NoEscapeMask           = 1 << 4,
-      ThrowsMask             = 1 << 5,
-      NumMaskBits            = 6
+      RepresentationMask          = 0xF << 0,
+      NoEscapeMask                = 1 << 4,
+      ThrowsMask                  = 1 << 5,
+      DifferentiabilityMaskOffset = 6,
+      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
+      NumMaskBits                 = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2905,13 +2908,24 @@ public:
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
             bool IsNoEscape,
-            bool Throws)
+            bool Throws,
+            DifferentiabilityKind DiffKind)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      Bits |= ((unsigned)DiffKind << DifferentiabilityMaskOffset) &
+              DifferentiabilityMask;
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
+    bool isDifferentiable() const {
+      return getDifferentiabilityKind() >
+             DifferentiabilityKind::NonDifferentiable;
+    }
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
+    }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
@@ -3067,6 +3081,11 @@ public:
 
   bool throws() const {
     return getExtInfo().throws();
+  }
+
+  bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
   }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
@@ -3716,14 +3735,16 @@ public:
     // If bits are added or removed, then TypeBase::SILFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
 
-    //   |representation|pseudogeneric| noescape |
-    //   |    0 .. 3    |      4      |     5    |
+    //   |representation|pseudogeneric| noescape |differentiability|
+    //   |    0 .. 3    |      4      |     5    |      6 .. 7     |
     //
     enum : unsigned {
       RepresentationMask = 0xF << 0,
       PseudogenericMask  = 1 << 4,
       NoEscapeMask       = 1 << 5,
-      NumMaskBits        = 6
+      DifferentiabilityMaskOffset = 6,
+      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
+      NumMaskBits                 = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -3737,10 +3758,13 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
+            DifferentiabilityKind diffKind) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
-             (isNoEscape ? NoEscapeMask : 0);
+             (isNoEscape ? NoEscapeMask : 0) |
+             (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+              DifferentiabilityMask);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3749,6 +3773,16 @@ public:
 
     // Is this function guaranteed to be no-escape by the type system?
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+
+    bool isDifferentiable() const {
+      return getDifferentiabilityKind() !=
+             DifferentiabilityKind::NonDifferentiable;
+    }
+
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
+    }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -4152,6 +4186,11 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
+  }
+
+  bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
   }
 
   bool isNoReturnFunction(SILModule &M) const; // Defined in SILType.cpp

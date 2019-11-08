@@ -3789,6 +3789,14 @@ public:
     if (Options.SkipAttributes)
       return;
 
+    if (!Options.excludeAttrKind(TAK_differentiable) &&
+        info.isDifferentiable()) {
+      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+        Printer << "@differentiable(linear) ";
+      } else {
+        Printer << "@differentiable ";
+      }
+    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&
@@ -3832,6 +3840,15 @@ public:
                             ProtocolConformanceRef witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
+
+    if (!Options.excludeAttrKind(TAK_differentiable) &&
+        info.isDifferentiable()) {
+      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+        Printer << "@differentiable(linear) ";
+      } else {
+        Printer << "@differentiable ";
+      }
+    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&
