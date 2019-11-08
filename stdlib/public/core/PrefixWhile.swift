@@ -149,6 +149,10 @@ extension LazyPrefixWhileCollection {
   }
 }
 
+extension LazyPrefixWhileSequence where Base: Collection {
+  public typealias Indices = DefaultIndices<LazyPrefixWhileSequence<Base>>
+}
+
 // FIXME: should work on the typealias
 extension LazyPrefixWhileSequence.Index: Comparable where Base: Collection {
   @inlinable // lazy-performance

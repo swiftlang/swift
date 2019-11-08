@@ -137,6 +137,9 @@ extension LazySequenceProtocol where Element: Sequence {
 public typealias FlattenCollection<T: Collection> = FlattenSequence<T> where T.Element: Collection
 
 extension FlattenSequence where Base: Collection, Base.Element: Collection {
+  public typealias SubSequence = Slice<FlattenSequence<Base>>
+  public typealias Indices = DefaultIndices<FlattenSequence<Base>>
+
   /// A position in a FlattenCollection
   @frozen // lazy-performance
   public struct Index {

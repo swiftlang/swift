@@ -343,3 +343,7 @@ extension LazyFilterSequence {
     }
   }
 }
+
+extension LazyFilterSequence where Base: Collection {
+  public typealias Indices = DefaultIndices<LazyFilterSequence<Base>>
+}
