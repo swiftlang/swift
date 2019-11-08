@@ -2215,16 +2215,39 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
     return known->second;
 
   // Collect the set of associated types rooted on Self in the
-  // signature.
+  // signature. Note that for references to nested types, we only
+  // want to consider the outermost dependent member type.
+  //
+  // For example, a requirement typed '(Iterator.Element) -> ()'
+  // is not considered to reference the associated type 'Iterator'.
   auto &assocTypes = ReferencedAssociatedTypes[req];
-  llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
-  req->getInterfaceType()->getCanonicalType().visit([&](CanType type) {
-      if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
-        if (knownAssocTypes.insert(assocType).second) {
-          assocTypes.push_back(assocType);
+
+  class Walker : public TypeWalker {
+    ProtocolDecl *Proto;
+    llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes;
+    llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
+
+  public:
+    Walker(ProtocolDecl *Proto,
+           llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes)
+      : Proto(Proto), assocTypes(assocTypes) {}
+
+    Action walkToTypePre(Type type) override {
+      if (type->is<DependentMemberType>()) {
+        if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
+          if (knownAssocTypes.insert(assocType).second)
+            assocTypes.push_back(assocType);
         }
+
+        return Action::SkipChildren;
       }
-    });
+
+      return Action::Continue;
+    }
+  };
+
+  Walker walker(Proto, assocTypes);
+  req->getInterfaceType()->getCanonicalType().walk(walker);
 
   return assocTypes;
 }
