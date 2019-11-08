@@ -748,7 +748,9 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (hasPublicVisibility(SILG->getLinkage()))
     expansion = ResilienceExpansion::Minimal;
 
-  auto &tl = Module->Types.getTypeLowering(SILG->getLoweredType(), expansion);
+  auto &tl = Module->Types.getTypeLowering(
+      SILG->getLoweredType(),
+      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
   if (!tl.isLoadable())
     return;
 
