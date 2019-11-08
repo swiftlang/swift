@@ -1243,15 +1243,14 @@ ConstraintSystem::solveImpl(Expr *&expr,
   }
 
   // Try to solve the constraint system using computed suggestions.
-  solve(expr, solutions, allowFreeTypeVariables);
+  solve(solutions, allowFreeTypeVariables);
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
   return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
-bool ConstraintSystem::solve(Expr *const expr,
-                             SmallVectorImpl<Solution> &solutions,
+bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // Set up solver state.
   SolverState state(*this, allowFreeTypeVariables);
