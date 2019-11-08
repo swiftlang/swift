@@ -355,6 +355,48 @@ ControlFlowTests.test("NestedConditionals") {
   expectEqual((0, -1), gradient(at: 4, 21, in: nested3))
   expectEqual((1, 1), gradient(at: 4, 5, in: nested3))
   expectEqual((0, -1), gradient(at: -3, -2, in: nested3))
+
+  // TF-781: nested if derivative correctness.
+  do {
+    struct TF_781: Differentiable {
+      var w: Float = 3
+
+      @differentiable(wrt: self) // wrt only self is important
+      func callAsFunction(_ input: Float) -> Float {
+        var x = input
+        if true {
+          if true {
+            // Function application below should make `self` have non-zero
+            // derivative.
+            x = x * w
+          }
+        }
+        return x
+      }
+    }
+    let x: Float = 10
+    // FIXME(TF-781): Fix zero gradients (related to activity analysis).
+    // expectEqual(TF_781.TangentVector(w: x), gradient(at: TF_781()) { $0(x) })
+    expectEqual(TF_781.TangentVector(w: 0), gradient(at: TF_781()) { $0(x) })
+  }
+
+  // Non-method version of TF-781.
+  do {
+    @differentiable(wrt: x)
+    func TF_781(_ x: Float, _ y: Float) -> Float {
+      var result = y
+      if true {
+        if true {
+          result = result * x
+        }
+      }
+      return result
+    }
+    let x: Float = 10
+    // FIXME(TF-781): Fix zero gradients (related to activity analysis).
+    // expectEqual(x, gradient(at: 3) { TF_781($0, x) })
+    expectEqual(0, gradient(at: 3) { TF_781($0, x) })
+  }
 }
 
 ControlFlowTests.test("Recursion") {
@@ -397,7 +439,7 @@ ControlFlowTests.test("Recursion") {
     }
     return y
   }
-  // FIXME: Fix zero gradients (related to activity analysis).
+  // FIXME(TF-933): Fix zero gradients (related to activity analysis).
   // See `factorial_var1` for the working version.
   /*
   expectEqual(0, gradient(at: 1, in: factorial_var2))
@@ -537,7 +579,7 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  // TODO(TF-933): Fix incorrect derivatives when `var result` is not initially
+  // FIXME(TF-933): Fix incorrect derivatives when `var result` is not initially
   // assigned to `x`.
   // expectEqual((4, 4), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
   // expectEqual((9, 6), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
@@ -565,7 +607,7 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  // TODO(TF-933): Fix incorrect derivatives when `var result` is not initially
+  // FIXME(TF-933): Fix incorrect derivatives when `var result` is not initially
   // assigned to `x`.
   // expectEqual((4, 4), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
   // expectEqual((9, 6), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
@@ -597,7 +639,7 @@ ControlFlowTests.test("Loops") {
     } while i < 2
     return result
   }
-  // TODO(TF-584, TF-933): Fix incorrect derivatives when `var result` is not
+  // FIXME(TF-584, TF-933): Fix incorrect derivatives when `var result` is not
   // initially assigned to `x`.
   // expectEqual((4, 4), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
   // expectEqual((9, 6), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))

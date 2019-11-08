@@ -97,6 +97,15 @@ SimpleMathTests.test("SideEffects") {
   expectEqual(4 * 27, gradient(at: 3, in: fourthPower))
 }
 
+SimpleMathTests.test("Tuple") {
+  // TF-945: Nested tuple projections.
+  func nested(_ x: Float) -> Float {
+    var tuple = (1, 1, ((x, 1), 1))
+    return tuple.2.0.0
+  }
+  expectEqual(1, gradient(at: 3, in: nested))
+}
+
 SimpleMathTests.test("TupleSideEffects") {
   func foo(_ x: Float) -> Float {
     var tuple = (x, x)
