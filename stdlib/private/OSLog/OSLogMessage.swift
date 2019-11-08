@@ -349,22 +349,6 @@ internal struct OSLogArguments {
   }
 
   /// `append` for other types must be implemented by extensions.
-
-  /// Serialize the arguments tracked by self in a byte buffer.
-  /// - Parameters:
-  ///   - bufferPosition: the pointer to a location within a byte buffer where
-  ///   the argument must be serialized. This will be incremented by the number
-  ///   of bytes used up to serialize the arguments.
-  ///   - storageObjects: An array to store references to objects representing
-  ///   auxiliary storage created during serialization. This is only used while
-  ///   serializing strings.
-  @usableFromInline
-  internal func serializeAt(
-    _ bufferPosition: inout ByteBufferPointer,
-    using storageObjects: inout StorageObjects
-  ) {
-    argumentClosures.forEach { $0(&bufferPosition, &storageObjects) }
-  }
 }
 
 /// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
