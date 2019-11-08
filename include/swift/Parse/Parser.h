@@ -711,6 +711,20 @@ public:
   /// Check whether the current token starts with '>'.
   bool startsWithGreater(Token Tok) { return startsWithSymbol(Tok, '>'); }
 
+  /// Returns true if token is an identifier with the given value.
+  bool isIdentifier(Token Tok, StringRef value) {
+    return Tok.is(tok::identifier) && Tok.getText() == value;
+  }
+
+  /// Returns true if token is the identifier "wrt".
+  bool isWRTIdentifier(Token tok) { return isIdentifier(Tok, "wrt"); }
+
+  /// Returns true if token is the identifier "jvp".
+  bool isJVPIdentifier(Token Tok) { return isIdentifier(Tok, "jvp"); }
+
+  /// Returns true if token is the identifier "vjp".
+  bool isVJPIdentifier(Token Tok) { return isIdentifier(Tok, "vjp"); }
+
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
