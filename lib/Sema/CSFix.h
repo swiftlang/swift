@@ -47,9 +47,11 @@ class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
 /// visiting it.
+///
+/// Note: values 0 and 1 are reserved for empty and tombstone kinds.
 enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
-  ForceOptional,
+  ForceOptional = 2,
 
   /// Unwrap an optional base when we have a member access.
   UnwrapOptionalBase,
@@ -1552,5 +1554,24 @@ public:
 
 } // end namespace constraints
 } // end namespace swift
+
+namespace llvm {
+  template <>
+  struct DenseMapInfo<swift::constraints::FixKind> {
+    using FixKind = swift::constraints::FixKind;
+    static inline FixKind getEmptyKey() {
+      return static_cast<FixKind>(0);
+    }
+    static inline FixKind getTombstoneKey() {
+      return static_cast<FixKind>(1);
+    }
+    static unsigned getHashValue(FixKind kind) {
+      return static_cast<unsigned>(kind);
+    }
+    static bool isEqual(FixKind lhs, FixKind rhs) {
+      return lhs == rhs;
+    }
+  };
+}
 
 #endif // SWIFT_SEMA_CSFIX_H

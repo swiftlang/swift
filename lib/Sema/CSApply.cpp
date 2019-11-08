@@ -7367,23 +7367,26 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
         return;
 
       // Coalesce fixes with the same locator to avoid duplicating notes.
+      using ConstraintFixVector = llvm::SmallVector<ConstraintFix *, 4>;
       llvm::SmallMapVector<ConstraintLocator *,
-          llvm::SmallVector<ConstraintFix *, 4>, 4> aggregatedFixes;
+          llvm::SmallMapVector<FixKind, ConstraintFixVector, 4>, 4> aggregatedFixes;
       for (auto *fix : fixes->second)
-        aggregatedFixes[fix->getLocator()].push_back(fix);
+        aggregatedFixes[fix->getLocator()][fix->getKind()].push_back(fix);
 
       for (auto fixesPerLocator : aggregatedFixes) {
-        auto fixes = fixesPerLocator.second;
-        auto *primaryFix = fixes[0];
-        ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
+        for (auto fixesPerKind : fixesPerLocator.second) {
+          auto fixes = fixesPerKind.second;
+          auto *primaryFix = fixes[0];
+          ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
 
-        auto *coalescedFix = primaryFix->coalescedWith(secondaryFixes);
-        auto diagnosed = coalescedFix->diagnose();
-        if (coalescedFix->isWarning()) {
-          assert(diagnosed && "warnings should always be diagnosed");
-          (void)diagnosed;
-        } else {
-          DiagnosedAnyErrors |= diagnosed;
+          auto *coalescedFix = primaryFix->coalescedWith(secondaryFixes);
+          auto diagnosed = coalescedFix->diagnose();
+          if (coalescedFix->isWarning()) {
+            assert(diagnosed && "warnings should always be diagnosed");
+            (void)diagnosed;
+          } else {
+            DiagnosedAnyErrors |= diagnosed;
+          }
         }
       }
     }

@@ -6780,8 +6780,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
       if (auto *fix = AllowInvalidRefInKeyPath::forRef(
               *this, choices[i].getDecl(), componentLoc)) {
-        if (!shouldAttemptFixes() || recordFix(fix))
-          return SolutionKind::Error;
+        if (!hasFixFor(componentLoc, FixKind::AllowTypeOrInstanceMember))
+          if (!shouldAttemptFixes() || recordFix(fix))
+            return SolutionKind::Error;
 
         // If this was a method reference let's mark it as read-only.
         if (!storage) {
