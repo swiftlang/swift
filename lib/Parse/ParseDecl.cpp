@@ -1046,7 +1046,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     linear = true;
     consumeToken(tok::identifier);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+    if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
@@ -1089,7 +1089,7 @@ bool Parser::parseDifferentiableAttributeArguments(
                                  funcDiag, /*allowOperators=*/true,
                                  /*allowZeroArgCompoundNames=*/true);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+    if (Tok.isNot(tok::comma, tok::kw_where))
       terminateParsingArgs = true;
     return !result.Name;
   };
@@ -1126,8 +1126,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.
-  if (Tok.getLoc() == startingLoc &&
-      Tok.isNot(tok::kw_where) && Tok.isNot(tok::r_paren)) {
+  if (Tok.getLoc() == startingLoc && Tok.isNot(tok::kw_where, tok::r_paren)) {
     diagnose(Tok, diag::attr_differentiable_expected_label);
     return errorAndSkipToEnd();
   }
