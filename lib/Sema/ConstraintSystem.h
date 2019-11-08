@@ -3634,7 +3634,7 @@ private:
   /// It doesn't filter solutions, that's the job of top-level `solve` methods.
   ///
   /// \param solutions The set of solutions to this system of constraints.
-  void solve(SmallVectorImpl<Solution> &solutions);
+  void solveImpl(SmallVectorImpl<Solution> &solutions);
 
   /// Compare two solutions to the same set of constraints.
   ///

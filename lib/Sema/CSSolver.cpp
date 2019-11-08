@@ -537,7 +537,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
   state.recordFixes = allowFixes;
 
   SmallVector<Solution, 4> solutions;
-  solve(solutions);
+  solveImpl(solutions);
   filterSolutions(solutions);
 
   if (solutions.size() != 1)
@@ -629,7 +629,7 @@ bool ConstraintSystem::Candidate::solve(
 
     // Use solve which doesn't try to filter solution list.
     // Because we want the whole set of possible domain choices.
-    cs.solve(solutions);
+    cs.solveImpl(solutions);
   }
 
   if (ctx.LangOpts.DebugConstraintSolver) {
@@ -1257,7 +1257,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   SolverState state(*this, allowFreeTypeVariables);
 
   // Solve the system.
-  solve(solutions);
+  solveImpl(solutions);
 
   if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1281,7 +1281,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   return solutions.empty() || getExpressionTooComplex(solutions);
 }
 
-void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
+void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
   // If constraint system failed while trying to

@@ -2404,7 +2404,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     state.recordFixes = true;
 
     // Solve the system.
-    solve(viable);
+    solveImpl(viable);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
