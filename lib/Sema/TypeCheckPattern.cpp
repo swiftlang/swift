@@ -711,6 +711,7 @@ static bool validateTypedPattern(TypeResolution resolution,
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
+  auto &diags = dc->getASTContext().Diags;
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -767,7 +768,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
       return false;
 
-    diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
+    diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
@@ -821,7 +822,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Expr:
     // In a let/else, these always require an initial value to match against.
     if (!(options & TypeResolutionFlags::AllowUnspecifiedTypes)) {
-      diagnose(P->getLoc(), diag::refutable_pattern_requires_initializer);
+      diags.diagnose(P->getLoc(), diag::refutable_pattern_requires_initializer);
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -882,6 +883,7 @@ recur:
   }
 
   auto dc = resolution.getDeclContext();
+  auto &diags = dc->getASTContext().Diags;
   auto subOptions = options;
   subOptions.setContext(None);
   switch (P->getKind()) {
@@ -940,7 +942,8 @@ recur:
         if (options & TypeResolutionFlags::OverrideType) {
           TP->setType(type);
         } else {
-          diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
+          diags.diagnose(P->getLoc(), diag::pattern_type_mismatch_context,
+                         type);
           hadError = true;
         }
       }
@@ -1013,9 +1016,10 @@ recur:
         !options.is(TypeResolverContext::ForEachStmt) &&
         !options.is(TypeResolverContext::EditorPlaceholderExpr) &&
         !(options & TypeResolutionFlags::FromNonInferredPattern)) {
-      diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
-               NP->getDecl()->isLet());
-      diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
+      diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
+                     NP->getDecl()->isLet());
+      diags.diagnose(NP->getLoc(),
+                     diag::add_explicit_type_annotation_to_silence);
     }
 
     return false;
@@ -1055,8 +1059,8 @@ recur:
     if (!tupleTy && !hadError) {
       if (canDecayToParen)
         return decayToParen();
-      diagnose(TP->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
-               type);
+      diags.diagnose(TP->getStartLoc(),
+                     diag::tuple_pattern_in_non_tuple_context, type);
       hadError = true;
     }
 
@@ -1065,7 +1069,8 @@ recur:
       if (canDecayToParen)
         return decayToParen();
       
-      diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch, type);
+      diags.diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch,
+                     type);
       hadError = true;
     }
 
@@ -1086,8 +1091,8 @@ recur:
       // the label for the tuple type being matched.
       if (!hadError && !elt.getLabel().empty() &&
           elt.getLabel() != tupleTy->getElement(i).getName()) {
-        diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
-                 elt.getLabel(), tupleTy->getElement(i).getName());
+        diags.diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                       elt.getLabel(), tupleTy->getElement(i).getName());
         hadError = true;
       }
       
@@ -1189,8 +1194,8 @@ recur:
       // types are the same, then produce a warning.
       if (!IP->getSubPattern() ||
           type->isEqual(IP->getCastTypeLoc().getType())) {
-        diagnose(IP->getLoc(), diag::isa_is_always_true,
-                 IP->getSubPattern() ? "as" : "is");
+        diags.diagnose(IP->getLoc(), diag::isa_is_always_true,
+                       IP->getSubPattern() ? "as" : "is");
       }
       IP->setCastKind(castKind);
       break;
@@ -1199,9 +1204,9 @@ recur:
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast: {
-      diagnose(IP->getLoc(),
-               diag::isa_collection_downcast_pattern_value_unimplemented,
-               IP->getCastTypeLoc().getType());
+      diags.diagnose(IP->getLoc(),
+                     diag::isa_collection_downcast_pattern_value_unimplemented,
+                     IP->getCastTypeLoc().getType());
       return false;
     }
 
@@ -1247,7 +1252,7 @@ recur:
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
-              diagnose(
+              diags.diagnose(
                   EEP->getLoc(), diag::availability_decl_unavailable_rename,
                   /*"getter" prefix*/ 2, EEP->getName(), /*replaced*/ false,
                   /*special kind*/ 0, Rename.str(), /*message*/ StringRef())
@@ -1278,9 +1283,9 @@ recur:
                   OptionalSomePattern(EEP, EEP->getEndLoc(), /*implicit*/true);
               return coercePatternToType(P, resolution, type, options);
             } else {
-              diagnose(EEP->getLoc(),
-                       diag::enum_element_pattern_member_not_found,
-                       EEP->getName().str(), type);
+              diags.diagnose(EEP->getLoc(),
+                             diag::enum_element_pattern_member_not_found,
+                             EEP->getName().str(), type);
               return true;
             }
           }
@@ -1308,8 +1313,8 @@ recur:
             parentTy->getAnyNominal() == type->getAnyNominal()) {
           enumTy = type;
         } else {
-          diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
-                   parentTy, type);
+          diags.diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
+                         parentTy, type);
           return true;
         }
       }
@@ -1331,9 +1336,9 @@ recur:
         castKind = foundCastKind;
         enumTy = parentTy;
       } else {
-        diagnose(EEP->getLoc(),
-                 diag::enum_element_pattern_not_member_of_enum,
-                 EEP->getName().str(), type);
+        diags.diagnose(EEP->getLoc(),
+                       diag::enum_element_pattern_not_member_of_enum,
+                       EEP->getName().str(), type);
         return true;
       }
     }
@@ -1343,10 +1348,11 @@ recur:
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
-        diagnose(EEP->getLoc(),
-                 diag::enum_element_pattern_assoc_values_mismatch,
-                 EEP->getName());
-        diagnose(EEP->getLoc(), diag::enum_element_pattern_assoc_values_remove)
+        diags.diagnose(EEP->getLoc(),
+                       diag::enum_element_pattern_assoc_values_mismatch,
+                       EEP->getName());
+        diags.diagnose(EEP->getLoc(),
+                       diag::enum_element_pattern_assoc_values_remove)
           .fixItRemove(sub->getSourceRange());
         return true;
       }
@@ -1433,7 +1439,7 @@ recur:
         loc = OP->getLoc();
       }
 
-      diagnose(loc, diagID, type);
+      diags.diagnose(loc, diagID, type);
       return true;
     }
 
