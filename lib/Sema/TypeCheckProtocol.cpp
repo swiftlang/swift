@@ -3510,12 +3510,29 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
-  if (isa<ClangModuleUnit>(Conformance->getDeclContext()->getModuleScopeContext())) {
+  if (isa<ClangModuleUnit>(DC->getModuleScopeContext())) {
     llvm::errs() << "Cannot look up associated type for imported conformance:\n";
     Conformance->getType().dump(llvm::errs());
     assocType->dump(llvm::errs());
     abort();
   }
+
+  // If we fail to find a witness via lookup, check for a generic parameter.
+  auto checkForGenericParameter = [&]() {
+    // If there is a generic parameter of the named type, use that.
+    if (auto genericSig = DC->getGenericSignatureOfContext()) {
+      for (auto gp : genericSig->getInnermostGenericParams()) {
+        if (gp->getName() == assocType->getName()) {
+          if (!checkTypeWitness(DC, Proto, assocType, gp)) {
+            recordTypeWitness(assocType, gp, nullptr);
+            return ResolveWitnessResult::Success;
+          }
+        }
+      }
+    }
+
+    return ResolveWitnessResult::Missing;
+  };
 
   // Look for a member type with the same name as the associated type.
   auto candidates = TypeChecker::lookupMemberType(
@@ -3523,7 +3540,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
-    return ResolveWitnessResult::Missing;
+    return checkForGenericParameter();
   }
 
   // Determine which of the candidates is viable.
@@ -3557,7 +3574,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                      return x.first->getDeclContext()
                         ->getSelfProtocolDecl() == nullptr;
                    }) == nonViable.end())
-    return ResolveWitnessResult::Missing;
+    return checkForGenericParameter();
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {

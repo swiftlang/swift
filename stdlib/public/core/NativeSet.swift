@@ -283,6 +283,9 @@ extension _NativeSet {
 
 extension _NativeSet: _SetBuffer {
   @usableFromInline
+  internal typealias Element = Element
+
+  @usableFromInline
   internal typealias Index = Set<Element>.Index
 
   @inlinable
