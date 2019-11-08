@@ -2881,7 +2881,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
         
         opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
       } else {
-        diagnose(var->getLoc(), diag::opaque_type_var_no_underlying_type);
+        var->diagnose(diag::opaque_type_var_no_underlying_type);
       }
     }
   }
@@ -3081,9 +3081,10 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
   
   // If the binding is not refutable, and there *is* an else, reject it as
   // unreachable.
-  if (!hadAnyFalsable && !hadError)
-    diagnose(cond[0].getStartLoc(), diagnosticForAlwaysTrue);
-  
+  if (!hadAnyFalsable && !hadError) {
+    auto &diags = dc->getASTContext().Diags;
+    diags.diagnose(cond[0].getStartLoc(), diagnosticForAlwaysTrue);
+  }
   return false;
 }
 
@@ -3112,8 +3113,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto matchLookup = lookupUnqualified(DC, Context.Id_MatchOperator,
                                        SourceLoc(), lookupOptions);
+  auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
-    diagnose(EP->getLoc(), diag::no_match_operator);
+    diags.diagnose(EP->getLoc(), diag::no_match_operator);
     return true;
   }
   
@@ -3123,7 +3125,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   }
   
   if (choices.empty()) {
-    diagnose(EP->getLoc(), diag::no_match_operator);
+    diags.diagnose(EP->getLoc(), diag::no_match_operator);
     return true;
   }
   
@@ -3868,6 +3870,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // Determine whether we should suppress diagnostics.
   bool suppressDiagnostics = (contextKind == CheckedCastContextKind::None);
 
+  auto &diags = dc->getASTContext().Diags;
   bool optionalToOptionalCast = false;
 
   // Local function to indicate failure.
@@ -3881,7 +3884,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (optionalToOptionalCast)
       return CheckedCastKind::ValueCast;
 
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+    diags.diagnose(diagLoc, diag::downcast_to_unrelated, origFromType,
+                   origToType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
 
@@ -3897,8 +3901,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     auto fromValueType = fromType->getOptionalObjectType();
     if (!fromValueType) {
       if (!suppressDiagnostics) {
-        diagnose(diagLoc, diag::downcast_to_more_optional,
-                 origFromType, origToType)
+        diags.diagnose(diagLoc, diag::downcast_to_more_optional,
+                       origFromType, origToType)
           .highlight(diagFromRange)
           .highlight(diagToRange);
       }
@@ -3937,10 +3941,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
         case CheckedCastContextKind::ForcedCast: {
           std::string extraFromOptionalsStr(extraFromOptionals, '!');
-          auto diag = diagnose(diagLoc, diag::downcast_same_type,
-                               origFromType, origToType,
-                               extraFromOptionalsStr,
-                               isBridged);
+          auto diag = diags.diagnose(diagLoc, diag::downcast_same_type,
+                                     origFromType, origToType,
+                                     extraFromOptionalsStr,
+                                     isBridged);
           diag.highlight(diagFromRange);
           diag.highlight(diagToRange);
 
@@ -3969,11 +3973,12 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           if (extraFromOptionals == 1) {
             // A single optional is carried through. It's better to use 'as' to
             // the appropriate optional type.
-            auto diag = diagnose(diagLoc, diag::conditional_downcast_same_type,
-                                 origFromType, origToType,
-                                 fromType->isEqual(toType) ? 0
-                                               : isBridged ? 2
-                                               : 1);
+            auto diag = diags.diagnose(diagLoc,
+                                       diag::conditional_downcast_same_type,
+                                       origFromType, origToType,
+                                       fromType->isEqual(toType) ? 0
+                                                     : isBridged ? 2
+                                                     : 1);
             diag.highlight(diagFromRange);
             diag.highlight(diagToRange);
 
@@ -4005,8 +4010,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           // If we're only unwrapping a single optional, we could have just
           // checked for 'nil'.
           if (extraFromOptionals == 1) {
-            auto diag = diagnose(diagLoc, diag::is_expr_same_type,
-                                 origFromType, origToType);
+            auto diag = diags.diagnose(diagLoc, diag::is_expr_same_type,
+                                       origFromType, origToType);
             diag.highlight(diagFromRange);
             diag.highlight(diagToRange);
 
@@ -4178,7 +4183,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     switch (contextKind) {
     case CheckedCastContextKind::ConditionalCast:
     case CheckedCastContextKind::ForcedCast:
-      diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+      diags.diagnose(diagLoc, diag::downcast_to_unrelated, origFromType,
+                     origToType)
           .highlight(diagFromRange)
           .highlight(diagToRange);
 
@@ -4187,7 +4193,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       if (auto DRE = dyn_cast<DeclRefExpr>(fromExpr)) {
         if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
           if (!FD->getResultInterfaceType()->isVoid()) {
-            diagnose(diagLoc, diag::downcast_to_unrelated_fixit, FD->getName())
+            diags.diagnose(diagLoc, diag::downcast_to_unrelated_fixit,
+                           FD->getName())
                 .fixItInsertAfter(fromExpr->getEndLoc(), "()");
           }
         }

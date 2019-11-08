@@ -708,18 +708,6 @@ public:
     this->InImmediateMode = InImmediateMode;
   }
 
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    return Diags.diagnose(std::forward<ArgTypes>(Args)...);
-  }
-
-  void diagnoseWithNotes(InFlightDiagnostic parentDiag,
-                         llvm::function_ref<void(void)> builder) {
-    CompoundDiagnosticTransaction transaction(Diags);
-    parentDiag.flush();
-    builder();
-  }
-
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
