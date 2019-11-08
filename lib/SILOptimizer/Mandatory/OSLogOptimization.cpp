@@ -631,12 +631,10 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
          "cannot constant fold a terminator instruction");
   assert(foldedInst && "constant value does not have a defining instruction");
 
-  // First, replace all uses of originalVal by foldedVal, and then adjust their
-  // lifetimes if necessary.
-  originalVal->replaceAllUsesWith(foldedVal);
-
   if (originalVal->getType().isTrivial(*fun)) {
     assert(foldedVal->getType().isTrivial(*fun));
+    // Just replace originalVal by foldedVal.
+    originalVal->replaceAllUsesWith(foldedVal);
     return;
   }
   assert(!foldedVal->getType().isTrivial(*fun));
@@ -644,12 +642,34 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   if (!fun->hasOwnership()) {
     // In non-ownership SIL, handle only folding of struct_extract instruction,
     // which is the only important instruction that should be folded by this
-    // pass. Note that folding an arbitrary instruction in non-ownership SIL
-    // makes updating reference counts of the original value much harder and
-    // error prone.
+    // pass. The logic used here is not correct in general and overfits a
+    // specific form of SIL. This code should be removed once OSSA is enabled
+    // for this pass.
     // TODO: this code can be safely removed once ownership SIL becomes the
     // default SIL this pass works on.
-    assert(isa<StructExtractInst>(originalInst));
+    assert(isa<StructExtractInst>(originalInst) &&
+           !originalVal->getType().isAddress());
+
+    // First, replace all uses of originalVal by foldedVal, and then adjust
+    // their lifetimes if necessary.
+    originalVal->replaceAllUsesWith(foldedVal);
+
+    unsigned retainCount = 0;
+    unsigned consumeCount = 0;
+    for (Operand *use : foldedVal->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (isa<ReleaseValueInst>(user) || isa<StoreInst>(user))
+        consumeCount++;
+      if (isa<RetainValueInst>(user))
+        retainCount++;
+      // Note that there could other consuming operations but they are not
+      // handled here as this code should be phased out soon.
+    }
+    if (consumeCount > retainCount) {
+      // The original value was at +1 and therefore consumed at the end. Since
+      // the foldedVal is also at +1 there is nothing to be done.
+      return;
+    }
     cleanupAtEndOfLifetime(foldedInst, [&](SILInstruction *lifetimeEndInst) {
       SILBuilderWithScope builder(lifetimeEndInst);
       builder.emitReleaseValue(lifetimeEndInst->getLoc(), foldedVal);
@@ -661,6 +681,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
          "constant value must have owned ownership kind");
 
   if (originalVal.getOwnershipKind() == ValueOwnershipKind::Owned) {
+    originalVal->replaceAllUsesWith(foldedVal);
     // Destroy originalVal, which is now unused, immediately after its
     // definition. Note that originalVal's destorys are now transferred to
     // foldedVal.
@@ -671,10 +692,20 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
     return;
   }
 
-  // Here, originalVal is not owned. Hence, destroy foldedVal at the end of its
+  // Here, originalVal is not owned. Hence, borrow form foldedVal and use the
+  // borrow in place of originalVal. Also, destroy foldedVal at the end of its
   // lifetime.
-  cleanupAtEndOfLifetime(foldedInst, [&](SILInstruction *lifetimeEndInst) {
+  assert(originalVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+
+  SILBuilderWithScope builder(&*std::next(foldedInst->getIterator()));
+  BeginBorrowInst *borrow =
+      builder.createBeginBorrow(foldedInst->getLoc(), foldedVal);
+
+  originalVal->replaceAllUsesWith(borrow);
+
+  cleanupAtEndOfLifetime(borrow, [&](SILInstruction *lifetimeEndInst) {
     SILBuilderWithScope builder(lifetimeEndInst);
+    builder.createEndBorrow(lifetimeEndInst->getLoc(), borrow);
     builder.emitDestroyValueOperation(lifetimeEndInst->getLoc(), foldedVal);
   });
   return;
