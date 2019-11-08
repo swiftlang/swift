@@ -739,6 +739,14 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (!SILG)
     return;
 
+  auto expansion = ResilienceExpansion::Maximal;
+  if (hasPublicVisibility(SILG->getLinkage()))
+    expansion = ResilienceExpansion::Minimal;
+
+  auto &tl = Module->Types.getTypeLowering(SILG->getLoweredType(), expansion);
+  if (!tl.isLoadable())
+    return;
+
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
                           << SILG->getName() << '\n');
 
