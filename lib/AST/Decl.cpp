@@ -6127,13 +6127,25 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         if (!call->isImplicit())
           return { true, E };
 
-        // ... producing a value of the same nominal type as the innermost
-        // property wrapper.
+        // ... which may call the constructor of another property
+        // wrapper if there are multiple wrappers attached to the
+        // property.
+        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
+          if (tuple->getNumElements() > 0) {
+            auto elem = tuple->getElement(0);
+            if (elem->isImplicit() && isa<CallExpr>(elem)) {
+              return { true, E };
+            }
+          }
+        }
+
+        // ... producing a value of the same nominal type as the
+        // innermost property wrapper.
         if (!call->getType() ||
             call->getType()->getAnyNominal() != innermostNominal)
-          return { true, E };
+          return { false, E };
 
-        // Find the implicit initialValue argument.
+        // Find the implicit initialValue/wrappedValue argument.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
