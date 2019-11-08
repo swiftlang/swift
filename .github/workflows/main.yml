@@ -49,6 +49,8 @@ jobs:
             -DSWIFT_SDKS='WASM;LINUX' \
             -DSWIFT_BUILD_SOURCEKIT=FALSE \
             -DSWIFT_ENABLE_SOURCEKIT_TESTS=FALSE \
+            -DCMAKE_AR='$sourcedir/wasi-sdk/bin/llvm-ar' \
+            -DCMAKE_RANLIB='$sourcedir/wasi-sdk/bin/llvm-ranlib' \
           " \
           --build-stdlib-deployment-targets "wasm-wasm32" \
           --build-swift-static-stdlib \
@@ -73,7 +75,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Run a multi-line script
       run: |
-        brew install cmake ninja
+        brew install cmake ninja llvm
         ./utils/update-checkout --clone --scheme wasm
         git checkout $GITHUB_SHA
         export sourcedir=$PWD/..
@@ -96,6 +98,8 @@ jobs:
             -DSWIFT_OSX_x86_64_ICU_STATICLIB=TRUE \
             -DSWIFT_BUILD_SOURCEKIT=FALSE \
             -DSWIFT_ENABLE_SOURCEKIT_TESTS=FALSE \
+            -DCMAKE_AR='/usr/local/opt/llvm/bin/llvm-ar' \
+            -DCMAKE_RANLIB='/usr/local/opt/llvm/bin/llvm-ranlib' \
           " \
           --build-stdlib-deployment-targets "wasm-wasm32" \
           --build-swift-dynamic-sdk-overlay false \
