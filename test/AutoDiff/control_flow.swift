@@ -375,9 +375,7 @@ ControlFlowTests.test("NestedConditionals") {
       }
     }
     let x: Float = 10
-    // FIXME(TF-781): Fix zero gradients (related to activity analysis).
-    // expectEqual(TF_781.TangentVector(w: x), gradient(at: TF_781()) { $0(x) })
-    expectEqual(TF_781.TangentVector(w: 0), gradient(at: TF_781()) { $0(x) })
+    expectEqual(TF_781.TangentVector(w: x), gradient(at: TF_781()) { $0(x) })
   }
 
   // Non-method version of TF-781.
@@ -393,9 +391,7 @@ ControlFlowTests.test("NestedConditionals") {
       return result
     }
     let x: Float = 10
-    // FIXME(TF-781): Fix zero gradients (related to activity analysis).
-    // expectEqual(x, gradient(at: 3) { TF_781($0, x) })
-    expectEqual(0, gradient(at: 3) { TF_781($0, x) })
+    expectEqual(x, gradient(at: 3) { TF_781($0, x) })
   }
 }
 
@@ -439,20 +435,11 @@ ControlFlowTests.test("Recursion") {
     }
     return y
   }
-  // FIXME(TF-933): Fix zero gradients (related to activity analysis).
-  // See `factorial_var1` for the working version.
-  /*
   expectEqual(0, gradient(at: 1, in: factorial_var2))
   expectEqual(1, gradient(at: 2, in: factorial_var2))
   expectEqual(5, gradient(at: 3, in: factorial_var2))
   expectEqual(26, gradient(at: 4, in: factorial_var2))
   expectEqual(154, gradient(at: 5, in: factorial_var2))
-  */
-  expectEqual(0, gradient(at: 1, in: factorial_var2))
-  expectEqual(0, gradient(at: 2, in: factorial_var2))
-  expectEqual(0, gradient(at: 3, in: factorial_var2))
-  expectEqual(0, gradient(at: 4, in: factorial_var2))
-  expectEqual(0, gradient(at: 5, in: factorial_var2))
 
   func product(_ x: Float, count: Int) -> Float {
     precondition(count > 0)
@@ -579,12 +566,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  // FIXME(TF-933): Fix incorrect derivatives when `var result` is not initially
-  // assigned to `x`.
-  // expectEqual((4, 4), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
-  // expectEqual((9, 6), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
-  expectEqual((4, 2), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
-  expectEqual((9, 3), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
+  expectEqual((4, 4), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
 
   func while_loop(_ x: Float) -> Float {
     var result = x
@@ -607,12 +590,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  // FIXME(TF-933): Fix incorrect derivatives when `var result` is not initially
-  // assigned to `x`.
-  // expectEqual((4, 4), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
-  // expectEqual((9, 6), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
-  expectEqual((4, 2), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
-  expectEqual((9, 3), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
+  expectEqual((4, 4), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
 
   func repeat_while_loop(_ x: Float) -> Float {
     var result = x
@@ -623,8 +602,8 @@ ControlFlowTests.test("Loops") {
     } while i < 2
     return result
   }
-  // FIXME(TF-584): Investigate incorrect (too big) gradient values
-  // for repeat-while loops.
+  // FIXME(TF-584): Investigate incorrect (too big) gradient values for
+  // repeat-while loops.
   // expectEqual((8, 12), valueWithGradient(at: 2, in: repeat_while_loop))
   // expectEqual((27, 27), valueWithGradient(at: 3, in: repeat_while_loop))
   expectEqual((8, 18), valueWithGradient(at: 2, in: repeat_while_loop))
@@ -639,12 +618,12 @@ ControlFlowTests.test("Loops") {
     } while i < 2
     return result
   }
-  // FIXME(TF-584, TF-933): Fix incorrect derivatives when `var result` is not
-  // initially assigned to `x`.
+  // FIXME(TF-584): Investigate incorrect (too big) gradient values for
+  // repeat-while loops.
   // expectEqual((4, 4), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
   // expectEqual((9, 6), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
-  expectEqual((4, 3), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
-  expectEqual((9, 4), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
+  expectEqual((4, 5), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
+  expectEqual((9, 7), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
 
   func loop_continue(_ x: Float) -> Float {
     var result = x

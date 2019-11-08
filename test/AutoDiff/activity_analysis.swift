@@ -38,16 +38,13 @@ func TF_781_function(_ x: Float, _ y: Float) -> Float {
   return result
 }
 
-// FIXME(TF-781): `%4 = alloc_stack $Float` is active, so all `begin_access`
-// users (and the results of their users, recursively) should also be active.
-
 // CHECK-LABEL: [AD] Activity info for ${{.*}}TF_781_function{{.*}} at (source=0 parameters=(0))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL] %1 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %4 = alloc_stack $Float, var, name "result"
-// CHECK: [USEFUL]   %19 = begin_access [read] [static] %4 : $*Float
-// CHECK: [USEFUL]   %20 = load [trivial] %19 : $*Float
+// CHECK: [ACTIVE]   %19 = begin_access [read] [static] %4 : $*Float
+// CHECK: [ACTIVE]   %20 = load [trivial] %19 : $*Float
 // CHECK: [ACTIVE]   %23 = apply %22(%20, %0, %18) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK: [ACTIVE]   %24 = begin_access [modify] [static] %4 : $*Float
-// CHECK: [USEFUL]   %31 = begin_access [read] [static] %4 : $*Float
-// CHECK: [USEFUL]   %32 = load [trivial] %31 : $*Float
+// CHECK: [ACTIVE]   %31 = begin_access [read] [static] %4 : $*Float
+// CHECK: [ACTIVE]   %32 = load [trivial] %31 : $*Float
