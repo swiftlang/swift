@@ -3089,7 +3089,7 @@ bool ConstraintSystem::repairFailures(
     }
 
     // If either type has a hole, consider this fixed.
-    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     conversionsOrFixes.push_back(
@@ -3155,7 +3155,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
     // If either type has a hole, consider this fixed.
-    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     // If dependent members are present here it's because
@@ -3415,7 +3415,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::InstanceType: {
-    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     break;
