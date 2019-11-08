@@ -108,14 +108,14 @@ protected:
 
 public:
   void checkGenericParamAccess(
-    const GenericParamList *params,
-    const Decl *owner,
+    const GenericContext *ownerCtx,
+    const Decl *ownerDecl,
     AccessScope accessScope,
     AccessLevel contextAccess);
 
   void checkGenericParamAccess(
-    const GenericParamList *params,
-    const ValueDecl *owner);
+    const GenericContext *ownerCtx,
+    const ValueDecl *ownerDecl);
 };
 
 class TypeAccessScopeDiagnoser : private ASTWalker {
@@ -315,10 +315,11 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
-    const GenericParamList *params,
-    const Decl *owner,
+    const GenericContext *ownerCtx,
+    const Decl *ownerDecl,
     AccessScope accessScope,
     AccessLevel contextAccess) {
+  auto params = ownerCtx->getGenericParams();
   if (!params)
     return;
 
@@ -348,7 +349,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     }
   };
 
-  auto *DC = owner->getDeclContext();
+  auto *DC = ownerDecl->getDeclContext();
 
   for (auto param : *params) {
     if (param->getInherited().empty())
@@ -361,18 +362,17 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   callbackACEK = ACEK::Requirement;
 
   checkRequirementAccess(WhereClauseOwner(
-                           owner->getInnermostDeclContext(),
-                           const_cast<GenericParamList *>(params)),
+                           const_cast<GenericContext *>(ownerCtx)),
                          accessScope, DC, callback);
 
   if (minAccessScope.isPublic())
     return;
 
   // FIXME: Promote these to an error in the next -swift-version break.
-  if (isa<SubscriptDecl>(owner) || isa<TypeAliasDecl>(owner))
+  if (isa<SubscriptDecl>(ownerDecl) || isa<TypeAliasDecl>(ownerDecl))
     downgradeToWarning = DowngradeToWarning::Yes;
 
-  auto &Context = owner->getASTContext();
+  auto &Context = ownerDecl->getASTContext();
   if (checkUsableFromInline) {
     if (!Context.isSwiftVersionAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
@@ -381,7 +381,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::generic_param_usable_from_inline_warn;
     auto diag =
-        Context.Diags.diagnose(owner, diagID, owner->getDescriptiveKind(),
+        Context.Diags.diagnose(ownerDecl, diagID, ownerDecl->getDescriptiveKind(),
                                accessControlErrorKind == ACEK::Requirement);
     highlightOffendingType(diag, complainRepr);
     return;
@@ -390,25 +390,25 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   auto minAccess = minAccessScope.accessLevelForDiagnostics();
 
   bool isExplicit =
-    owner->getAttrs().hasAttribute<AccessControlAttr>() ||
-    isa<ProtocolDecl>(owner->getDeclContext());
+    ownerDecl->getAttrs().hasAttribute<AccessControlAttr>() ||
+    isa<ProtocolDecl>(DC);
   auto diagID = diag::generic_param_access;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::generic_param_access_warn;
   auto diag = Context.Diags.diagnose(
-      owner, diagID, owner->getDescriptiveKind(), isExplicit, contextAccess,
-      minAccess, isa<FileUnit>(owner->getDeclContext()),
+      ownerDecl, diagID, ownerDecl->getDescriptiveKind(), isExplicit,
+      contextAccess, minAccess, isa<FileUnit>(DC),
       accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(diag, complainRepr);
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
-    const GenericParamList *params,
-    const ValueDecl *owner) {
-  checkGenericParamAccess(params, owner,
-                          owner->getFormalAccessScope(nullptr,
-                                                      checkUsableFromInline),
-                          owner->getFormalAccess());
+    const GenericContext *ownerCtx,
+    const ValueDecl *ownerDecl) {
+  checkGenericParamAccess(ownerCtx, ownerDecl,
+                          ownerDecl->getFormalAccessScope(
+                              nullptr, checkUsableFromInline),
+                          ownerDecl->getFormalAccess());
 }
 
 namespace {
@@ -563,7 +563,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkGenericParamAccess(TAD->getGenericParams(), TAD);
+    checkGenericParamAccess(TAD, TAD);
 
     checkTypeAccess(TAD->getUnderlyingType(),
                     TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
@@ -667,7 +667,7 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
-    checkGenericParamAccess(ED->getGenericParams(), ED);
+    checkGenericParamAccess(ED, ED);
 
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
@@ -701,11 +701,11 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    checkGenericParamAccess(SD->getGenericParams(), SD);
+    checkGenericParamAccess(SD, SD);
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    checkGenericParamAccess(CD->getGenericParams(), CD);
+    checkGenericParamAccess(CD, CD);
 
     if (const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl()) {
       // Be slightly defensive here in the presence of badly-ordered
@@ -847,7 +847,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    checkGenericParamAccess(SD->getGenericParams(), SD);
+    checkGenericParamAccess(SD, SD);
 
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
@@ -903,7 +903,7 @@ public:
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
-    checkGenericParamAccess(fn->getGenericParams(), fn);
+    checkGenericParamAccess(fn, fn);
 
     // This must stay in sync with diag::function_type_access.
     enum {
@@ -1175,7 +1175,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkGenericParamAccess(TAD->getGenericParams(), TAD);
+    checkGenericParamAccess(TAD, TAD);
 
     checkTypeAccess(TAD->getUnderlyingType(),
                     TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
@@ -1243,7 +1243,7 @@ public:
   }
 
   void visitEnumDecl(const EnumDecl *ED) {
-    checkGenericParamAccess(ED->getGenericParams(), ED);
+    checkGenericParamAccess(ED, ED);
 
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
@@ -1271,11 +1271,11 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    checkGenericParamAccess(SD->getGenericParams(), SD);
+    checkGenericParamAccess(SD, SD);
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    checkGenericParamAccess(CD->getGenericParams(), CD);
+    checkGenericParamAccess(CD, CD);
 
     if (CD->hasSuperclass()) {
       const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl();
@@ -1354,7 +1354,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    checkGenericParamAccess(SD->getGenericParams(), SD);
+    checkGenericParamAccess(SD, SD);
 
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(
@@ -1384,7 +1384,7 @@ public:
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
-    checkGenericParamAccess(fn->getGenericParams(), fn);
+    checkGenericParamAccess(fn, fn);
 
     // This must stay in sync with diag::function_type_usable_from_inline.
     enum {
@@ -1566,8 +1566,9 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
               diagnoseConformance);
   }
 
-  void checkGenericParams(const GenericParamList *params,
-                          const Decl *owner) {
+  void checkGenericParams(const GenericContext *ownerCtx,
+                          const ValueDecl *ownerDecl) {
+    const auto params = ownerCtx->getGenericParams();
     if (!params)
       return;
 
@@ -1575,16 +1576,16 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       if (param->getInherited().empty())
         continue;
       assert(param->getInherited().size() == 1);
-      checkType(param->getInherited().front(), owner,
-                getDiagnoseCallback(owner), getDiagnoseCallback(owner));
+      checkType(param->getInherited().front(), ownerDecl,
+                getDiagnoseCallback(ownerDecl),
+                getDiagnoseCallback(ownerDecl));
     }
 
     forAllRequirementTypes(WhereClauseOwner(
-                             owner->getInnermostDeclContext(),
-                             const_cast<GenericParamList *>(params)),
+                             const_cast<GenericContext *>(ownerCtx)),
                            [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, owner, getDiagnoseCallback(owner),
-                getDiagnoseCallback(owner));
+      checkType(type, typeRepr, ownerDecl, getDiagnoseCallback(ownerDecl),
+                getDiagnoseCallback(ownerDecl));
     });
   }
 
@@ -1809,7 +1810,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkGenericParams(TAD->getGenericParams(), TAD);
+    checkGenericParams(TAD, TAD);
     checkType(TAD->getUnderlyingType(),
               TAD->getUnderlyingTypeRepr(), TAD, getDiagnoseCallback(TAD),
               getDiagnoseCallback(TAD));
@@ -1835,7 +1836,7 @@ public:
   }
 
   void visitNominalTypeDecl(const NominalTypeDecl *nominal) {
-    checkGenericParams(nominal->getGenericParams(), nominal);
+    checkGenericParams(nominal, nominal);
 
     llvm::for_each(nominal->getInherited(),
                    [&](TypeLoc nextInherited) {
@@ -1860,7 +1861,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    checkGenericParams(SD->getGenericParams(), SD);
+    checkGenericParams(SD, SD);
 
     for (auto &P : *SD->getIndices()) {
       checkType(P->getInterfaceType(), P->getTypeRepr(), SD,
@@ -1871,7 +1872,7 @@ public:
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
-    checkGenericParams(fn->getGenericParams(), fn);
+    checkGenericParams(fn, fn);
 
     for (auto *P : *fn->getParameters())
       checkType(P->getInterfaceType(), P->getTypeRepr(), fn,
@@ -2011,7 +2012,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
   }
 
   AccessControlChecker().checkGenericParamAccess(
-      ED->getGenericParams(), ED, desiredAccessScope, userSpecifiedAccess);
+      ED, ED, desiredAccessScope, userSpecifiedAccess);
 }
 
 void swift::checkAccessControl(Decl *D) {
