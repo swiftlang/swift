@@ -298,6 +298,7 @@ namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   TypeChecker &TC;
+  ASTContext &Ctx;
 
   /// This is the current function or closure being checked.
   /// This is null for top level code.
@@ -332,7 +333,7 @@ public:
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
-  ASTContext &getASTContext() const { return TC.Context; };
+  ASTContext &getASTContext() const { return Ctx; };
   
   struct AddLabeledStmt {
     StmtChecker &SC;
@@ -374,15 +375,15 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-      : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false),
+      : TC(TC), Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD), IsREPL(false),
         IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-      : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false),
-        IsBraceStmtFromTopLevelDecl(false) {}
+      : TC(TC), Ctx(TheClosure->getASTContext()), TheFunc(TheClosure),
+        DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) {}
 
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-      : TC(TC), TheFunc(), DC(DC), IsREPL(false),
+      : TC(TC), Ctx(DC->getASTContext()), TheFunc(), DC(DC), IsREPL(false),
         IsBraceStmtFromTopLevelDecl(false) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)

@@ -2275,10 +2275,11 @@ namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   TypeChecker &TC;
+  ASTContext &Ctx;
 
-  explicit DeclChecker(TypeChecker &TC) : TC(TC) {}
+  explicit DeclChecker(TypeChecker &TC, ASTContext &ctx) : TC(TC), Ctx(ctx) {}
 
-  ASTContext &getASTContext() const { return TC.Context; }
+  ASTContext &getASTContext() const { return Ctx; }
 
   void visit(Decl *decl) {
     if (getASTContext().Stats)
@@ -3658,7 +3659,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 }
 
 void TypeChecker::typeCheckDecl(Decl *D) {
-  DeclChecker(*this).visit(D);
+  DeclChecker(*this, D->getASTContext()).visit(D);
 }
 
 // Returns 'nullptr' if this is the setter's 'newValue' parameter;

@@ -910,6 +910,7 @@ namespace {
 
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
+    ASTContext &Ctx;
     DeclContext *DC;
 
     Expr *ParentExpr;
@@ -1054,9 +1055,9 @@ namespace {
 
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
-        : TC(tc), DC(dc), ParentExpr(parent) {}
+        : TC(tc), Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
 
-    ASTContext &getASTContext() const { return TC.Context; }
+    ASTContext &getASTContext() const { return Ctx; }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
@@ -1994,7 +1995,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
-  if (auto selectorTy = TC.Context.getSelectorType()) {
+  if (auto selectorTy = getASTContext().getSelectorType()) {
     if (type->isEqual(selectorTy))
       return nullptr;
   }
@@ -2444,7 +2445,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 static FunctionType *
 getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
                                 ConcreteDeclRef &referencedDecl) {
-  ASTContext &Context = TC.Context;
+  auto &Context = DC->getASTContext();
 
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-completion-operator", expr);
