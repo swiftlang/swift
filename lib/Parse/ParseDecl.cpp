@@ -942,9 +942,8 @@ bool Parser::parseDifferentiableAttributeArguments(
       return true;
     }
     // Check that token after comma is 'wrt:' or a function specifier label.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt" ||
-                                      Tok.getText() == "jvp" ||
-                                      Tok.getText() == "vjp")) {
+    if (!(isWRTIdentifier(Tok) || isJVPIdentifier(Tok) ||
+          isVJPIdentifier(Tok))) {
       diagnose(Tok, diag::attr_differentiable_expected_label);
       return true;
     }
@@ -977,11 +976,11 @@ bool Parser::parseDifferentiableAttributeArguments(
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();
   }
-  if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
+  if (isWRTIdentifier(Tok)) {
     if (parseDifferentiationParametersClause(params, AttrName))
       return true;
     // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+    if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
@@ -1015,7 +1014,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   bool terminateParsingArgs = false;
 
   // Parse 'jvp: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "jvp") {
+  if (isJVPIdentifier(Tok)) {
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
@@ -1028,7 +1027,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // Parse 'vjp: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "vjp") {
+  if (isVJPIdentifier(Tok)) {
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();
