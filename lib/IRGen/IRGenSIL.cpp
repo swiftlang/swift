@@ -5640,6 +5640,15 @@ void IRGenModule::emitSILStaticInitializers() {
     if (!InitValue)
       continue;
 
+#ifndef NDEBUG
+    SILType loweredTy = Global.getLoweredType();
+    auto &ti = getTypeInfo(loweredTy);
+
+    auto expansion = getResilienceExpansionForLayout(&Global);
+    assert(ti.isFixedSize(expansion) &&
+           "cannot emit a static initializer for dynamically-sized global");
+#endif
+
     auto *IRGlobal =
         Module.getGlobalVariable(Global.getName(), true /* = AllowLocal */);
 
