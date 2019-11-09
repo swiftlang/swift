@@ -2274,11 +2274,11 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
-  TypeChecker &TC;
+  ASTContext &Ctx;
 
-  explicit DeclChecker(TypeChecker &TC) : TC(TC) {}
+  explicit DeclChecker(ASTContext &ctx) : Ctx(ctx) {}
 
-  ASTContext &getASTContext() const { return TC.Context; }
+  ASTContext &getASTContext() const { return Ctx; }
 
   void visit(Decl *decl) {
     if (getASTContext().Stats)
@@ -2585,6 +2585,9 @@ public:
 
     checkAccessControl(PBD);
 
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
@@ -2657,6 +2660,9 @@ public:
     (void) SD->getImplInfo();
 
     TypeChecker::checkParameterAttributes(SD->getIndices());
+
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     checkDefaultArguments(TC, SD->getIndices());
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
@@ -3213,6 +3219,9 @@ public:
 
 
   bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     // Make sure we're in the mode that's skipping function bodies.
     if (!TC.canSkipNonInlinableBodies())
       return false;
@@ -3256,6 +3265,8 @@ public:
       }
     }
 
+    // FIXME: Remove TypeChecker dependencies below.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
@@ -3333,6 +3344,9 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TypeChecker::checkParameterAttributes(PL);
+
+      // FIXME: Remove TypeChecker dependency.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       checkDefaultArguments(TC, PL);
     }
 
@@ -3583,6 +3597,8 @@ public:
 
     checkAccessControl(CD);
 
+    // FIXME: Remove TypeChecker dependencies below.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       CD->diagnose(diag::missing_initializer_def);
@@ -3607,6 +3623,8 @@ public:
     } else if (shouldSkipBodyTypechecking(DD)) {
       DD->setBodySkipped(DD->getBodySourceRange());
     } else {
+      // FIXME: Remove TypeChecker dependency.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.definedFunctions.push_back(DD);
     }
   }
@@ -3658,7 +3676,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 }
 
 void TypeChecker::typeCheckDecl(Decl *D) {
-  DeclChecker(*this).visit(D);
+  DeclChecker(D->getASTContext()).visit(D);
 }
 
 // Returns 'nullptr' if this is the setter's 'newValue' parameter;

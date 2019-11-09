@@ -545,9 +545,6 @@ enum class FunctionBuilderClosurePreCheck : uint8_t {
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final {
 public:
-  ASTContext &Context;
-  DiagnosticEngine &Diags;
-
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
@@ -556,6 +553,9 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
+  ASTContext &Context;
+  DiagnosticEngine &Diags;
+
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
