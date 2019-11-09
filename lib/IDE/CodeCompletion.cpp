@@ -1923,6 +1923,8 @@ public:
       PrintOptions PO;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        PO.setBaseType(typeContext->getDeclaredTypeInContext());
       Builder.addTypeAnnotation(T.getString(PO));
     }
   }
@@ -1944,6 +1946,8 @@ public:
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
@@ -2288,9 +2292,12 @@ public:
 
       if (NeedComma)
         Builder.addComma();
+      Type contextTy;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        contextTy = typeContext->getDeclaredTypeInContext();
 
-      Builder.addCallParameter(argName, bodyName, paramTy, isVariadic, isInOut,
-                               isIUO, isAutoclosure);
+      Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
+                               isVariadic, isInOut, isIUO, isAutoclosure);
 
       modifiedBuilder = true;
       NeedComma = true;
@@ -2636,6 +2643,8 @@ public:
           PO.OpaqueReturnTypePrinting =
               PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
           PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+          if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+            PO.setBaseType(typeContext->getDeclaredTypeInContext());
           ResultType.print(OS, PO);
         }
       }
@@ -3472,9 +3481,10 @@ public:
     builder.addEqual();
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
-    builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                             /*IsVarArg*/ false, /*IsInOut*/ false,
-                             /*isIUO*/ false, /*isAutoClosure*/ false);
+    Type contextTy;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      contextTy = typeContext->getDeclaredTypeInContext();
+    builder.addCallParameter(Identifier(), RHSType, contextTy);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3495,10 +3505,12 @@ public:
       builder.addWhitespace(" ");
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
-    if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+    if (RHSType) {
+      Type contextTy;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        contextTy = typeContext->getDeclaredTypeInContext();
+      builder.addCallParameter(Identifier(), RHSType, contextTy);
+    }
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3722,21 +3734,13 @@ public:
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("red"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("green"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType);
       builder.addRightParen();
     });
 
@@ -3745,9 +3749,7 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, /*IsVarArg*/ false,
-                               /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+                               stringType);
       builder.addRightParen();
     });
 
@@ -4391,6 +4393,8 @@ public:
     {
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
+      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
+        Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
       CD->print(OS, Options);
