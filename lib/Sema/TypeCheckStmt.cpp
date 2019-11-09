@@ -297,7 +297,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
-  TypeChecker &TC;
+  ASTContext &Ctx;
 
   /// This is the current function or closure being checked.
   /// This is null for top level code.
@@ -332,7 +332,7 @@ public:
   /// Used to distinguish the first BraceStmt that starts a TopLevelCodeDecl.
   bool IsBraceStmtFromTopLevelDecl;
 
-  ASTContext &getASTContext() const { return TC.Context; };
+  ASTContext &getASTContext() const { return Ctx; };
   
   struct AddLabeledStmt {
     StmtChecker &SC;
@@ -373,16 +373,16 @@ public:
     }
   };
 
-  StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-      : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false),
+  StmtChecker(AbstractFunctionDecl *AFD)
+      : Ctx(AFD->getASTContext()), TheFunc(AFD), DC(AFD), IsREPL(false),
         IsBraceStmtFromTopLevelDecl(false) {}
 
-  StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-      : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false),
-        IsBraceStmtFromTopLevelDecl(false) {}
+  StmtChecker(ClosureExpr *TheClosure)
+      : Ctx(TheClosure->getASTContext()), TheFunc(TheClosure),
+        DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) {}
 
-  StmtChecker(TypeChecker &TC, DeclContext *DC)
-      : TC(TC), TheFunc(), DC(DC), IsREPL(false),
+  StmtChecker(DeclContext *DC)
+      : Ctx(DC->getASTContext()), TheFunc(), DC(DC), IsREPL(false),
         IsBraceStmtFromTopLevelDecl(false) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)
@@ -544,6 +544,8 @@ public:
       }
     }
 
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
                                          ctp,
                                          options);
@@ -605,6 +607,8 @@ public:
         contextTypePurpose = CTP_YieldByValue;
       }
 
+      // FIXME: Remove TypeChecker dependency.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.typeCheckExpression(exprToCheck, DC,
                              TypeLoc::withoutLoc(contextType),
                              contextTypePurpose);
@@ -636,6 +640,8 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType), CTP_ThrowStmt);
     TS->setSubExpr(E);
     
@@ -643,6 +649,9 @@ public:
   }
 
   Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     Expr *C = PA->getCondition();
     TC.typeCheckCondition(C, DC);
     PA->setCondition(C);
@@ -650,6 +659,9 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     TC.typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
@@ -660,6 +672,9 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     StmtCondition C = IS->getCond();
     TC.typeCheckStmtCondition(C, DC, diag::if_always_true);
     IS->setCond(C);
@@ -679,6 +694,9 @@ public:
   }
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     StmtCondition C = GS->getCond();
     TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
     GS->setCond(C);
@@ -700,6 +718,9 @@ public:
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     StmtCondition C = WS->getCond();
     TC.typeCheckStmtCondition(C, DC, diag::while_always_true);
     WS->setCond(C);
@@ -718,7 +739,10 @@ public:
       typeCheckStmt(S);
       RWS->setBody(S);
     }
-    
+
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     Expr *E = RWS->getCond();
     TC.typeCheckCondition(E, DC);
     RWS->setCond(E);
@@ -737,7 +761,9 @@ public:
       S->getPattern()->setType(ErrorType::get(getASTContext()));
       return nullptr;
     }
-  
+
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (TC.typeCheckPattern(S->getPattern(), DC, options)) {
       // FIXME: Handle errors better.
       S->getPattern()->setType(ErrorType::get(getASTContext()));
@@ -1080,6 +1106,9 @@ public:
       return;
     }
 
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     pattern = newPattern;
     // Coerce the pattern to the subject's type.
     TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
@@ -1280,6 +1309,9 @@ public:
   }
 
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
@@ -1435,6 +1467,9 @@ public:
   }
 
   void checkCatchStmt(CatchStmt *S) {
+    // FIXME: Remove TypeChecker dependency.
+    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
     // Check the catch pattern.
     TC.typeCheckCatchPattern(S, DC);
 
@@ -1803,6 +1838,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
   }
 
+  // FIXME: Remove TypeChecker dependencies below.
+  auto &TC = *Ctx.getLegacyGlobalTypeChecker();
   for (auto &elem : BS->getElements()) {
     if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       SourceLoc Loc = SubExpr->getStartLoc();
@@ -2149,7 +2186,7 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (ctx.LangOpts.EnableASTScopeLookup)
     ASTScope::expandFunctionBody(AFD);
 
-  StmtChecker SC(tc, AFD);
+  StmtChecker SC(AFD);
   SC.EndTypeCheckLoc = endTypeCheckLoc;
   bool hadError = SC.typeCheckBody(body);
 
@@ -2202,7 +2239,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(closure, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  bool HadError = StmtChecker(*this, closure).typeCheckBody(body);
+  bool HadError = StmtChecker(closure).typeCheckBody(body);
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
@@ -2213,7 +2250,7 @@ bool TypeChecker::typeCheckTapBody(TapExpr *expr, DeclContext *DC) {
   // We intentionally use typeCheckStmt instead of typeCheckBody here
   // because we want to contextualize TapExprs with the body they're in.
   BraceStmt *body = expr->getBody();
-  bool HadError = StmtChecker(*this, DC).typeCheckStmt(body);
+  bool HadError = StmtChecker(DC).typeCheckStmt(body);
   if (body) {
     expr->setBody(body);
   }
@@ -2225,7 +2262,7 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   // because we want to contextualize all the TopLevelCode
   // declarations simultaneously.
   BraceStmt *Body = TLCD->getBody();
-  StmtChecker(*this, TLCD).typeCheckStmt(Body);
+  StmtChecker(TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
   checkTopLevelErrorHandling(TLCD);
   performTopLevelDeclDiagnostics(TLCD);

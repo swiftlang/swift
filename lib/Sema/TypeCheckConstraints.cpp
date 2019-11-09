@@ -909,7 +909,7 @@ namespace {
   }
 
   class PreCheckExpression : public ASTWalker {
-    TypeChecker &TC;
+    ASTContext &Ctx;
     DeclContext *DC;
 
     Expr *ParentExpr;
@@ -1053,14 +1053,17 @@ namespace {
     }
 
   public:
-    PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
-        : TC(tc), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc, Expr *parent)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
 
-    ASTContext &getASTContext() const { return TC.Context; }
+    ASTContext &getASTContext() const { return Ctx; }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // FIXME: Remove TypeChecker dependencies below.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
+
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
         if (!isa<SelfApplyExpr>(expr)) {
@@ -1994,7 +1997,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
-  if (auto selectorTy = TC.Context.getSelectorType()) {
+  if (auto selectorTy = getASTContext().getSelectorType()) {
     if (type->isEqual(selectorTy))
       return nullptr;
   }
@@ -2011,7 +2014,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(*this, dc, expr);
+  PreCheckExpression preCheck(dc, expr);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -2444,7 +2447,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 static FunctionType *
 getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
                                 ConcreteDeclRef &referencedDecl) {
-  ASTContext &Context = TC.Context;
+  auto &Context = DC->getASTContext();
 
   FrontendStatsTracer StatsTracer(Context.Stats,
                                   "typecheck-completion-operator", expr);
