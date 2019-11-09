@@ -8390,7 +8390,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
-  case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::DefaultGenericArgument:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:

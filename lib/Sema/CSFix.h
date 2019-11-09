@@ -183,10 +183,8 @@ enum class FixKind : uint8_t {
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
 
-  /// Generic parameters could not be inferred and have to be explicitly
-  /// specified in the source. This fix groups all of the missing arguments
-  /// associated with single declaration.
-  ExplicitlySpecifyGenericArguments,
+  /// Default ambiguous generic arguments to \c Any
+  DefaultGenericArgument,
 
   /// Skip any unhandled constructs that occur within a closure argument that
   /// matches up with a
@@ -254,13 +252,17 @@ public:
 
   virtual std::string getName() const = 0;
 
-  /// Diagnose a failure associated with this fix given
-  /// root expression and information from constraint system.
-  virtual bool diagnose(bool asNote = false) const = 0;
-
-  virtual ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) {
-    return this;
+  /// Coalesce this fix with the given secondary fixes and diagnose the failure.
+  ///
+  /// The default implementation ignores \c secondaryFixes and calls
+  /// \c diagnose.
+  virtual bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                                   bool asNote = false) const {
+    return diagnose(asNote);
   }
+
+  /// Diagnose a failure associated with this fix.
+  virtual bool diagnose(bool asNote = false) const = 0;
 
   void print(llvm::raw_ostream &Out) const;
 
@@ -1251,49 +1253,32 @@ public:
          ConstraintLocator *locator);
 };
 
-class ExplicitlySpecifyGenericArguments final
-    : public ConstraintFix,
-      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
-                                    GenericTypeParamType *> {
-  friend TrailingObjects;
+class DefaultGenericArgument final : public ConstraintFix {
+  GenericTypeParamType *Param;
 
-  unsigned NumMissingParams;
-
-  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
-                                    ArrayRef<GenericTypeParamType *> params,
-                                    ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
-        NumMissingParams(params.size()) {
-    assert(!params.empty());
-    std::uninitialized_copy(params.begin(), params.end(),
-                            getParametersBuf().begin());
-  }
+  DefaultGenericArgument(ConstraintSystem &cs, GenericTypeParamType *param,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefaultGenericArgument, locator),
+        Param(param) {}
 
 public:
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::ExplicitlySpecifyGenericArguments;
+    return fix->getKind() == FixKind::DefaultGenericArgument;
   }
 
   std::string getName() const override {
-    return "default missing generic arguments to `Any`";
+    auto paramName = Param->getString();
+    return "default generic argument '" + paramName + "' to 'Any'";
   }
 
-  ArrayRef<GenericTypeParamType *> getParameters() const {
-    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
-  }
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
 
   bool diagnose(bool asNote = false) const override;
 
-  ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) override;
-
-  static ExplicitlySpecifyGenericArguments *
-  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
-         ConstraintLocator *locator);
-
-private:
-  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
-    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
-  }
+  static DefaultGenericArgument *create(ConstraintSystem &cs,
+                                        GenericTypeParamType *param,
+                                        ConstraintLocator *locator);
 };
 
 class SkipUnhandledConstructInFunctionBuilder final : public ConstraintFix {

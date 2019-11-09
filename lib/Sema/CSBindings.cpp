@@ -991,11 +991,11 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
 
     if (locator->isForGenericParameter() && type->isHole()) {
-      // Drop `generic parameter '...'` part of the locator to group all of the
-      // missing generic parameters related to the same path together.
+      // Drop `generic parameter` locator element so that all missing
+      // generic parameters related to the same path can be coalesced later.
       auto path = locator->getPath();
       auto genericParam = locator->getGenericParameter();
-      auto *fix = ExplicitlySpecifyGenericArguments::create(cs, {genericParam},
+      auto *fix = DefaultGenericArgument::create(cs, genericParam,
           cs.getConstraintLocator(locator->getAnchor(), path.drop_back()));
       if (cs.recordFix(fix))
         return true;
