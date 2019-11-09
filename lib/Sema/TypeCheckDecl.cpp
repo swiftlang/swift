@@ -563,93 +563,75 @@ static void checkGenericParams(GenericContext *ownerCtx) {
                          [](Requirement, RequirementRepr *) { return false; });
 }
 
-/// Retrieve the set of protocols the given protocol inherits.
-static llvm::TinyPtrVector<ProtocolDecl *>
-getInheritedForCycleCheck(ProtocolDecl *proto, ProtocolDecl **scratch) {
-  TinyPtrVector<ProtocolDecl *> result;
+static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
+  // Don't bother checking imported or deserialized decls.
+  return decl->hasClangNode() || decl->wasDeserialized();
+}
 
-  bool anyObject = false;
-  for (const auto &found :
-         getDirectlyInheritedNominalTypeDecls(proto, anyObject)) {
-    if (auto protoDecl = dyn_cast<ProtocolDecl>(found.second))
-      result.push_back(protoDecl);
+llvm::Expected<bool>
+HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
+                                        ClassDecl *decl) const {
+  if (canSkipCircularityCheck(decl) || !decl->hasSuperclass())
+    return false;
+
+  auto *superclass = decl->getSuperclassDecl();
+  auto result = evaluator(HasCircularInheritanceRequest{superclass});
+
+  // If we have a cycle, handle it and return true.
+  if (!result) {
+    using Error = CyclicalRequestError<HasCircularInheritanceRequest>;
+    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+    return true;
   }
-
   return result;
 }
 
-/// Retrieve the superclass of the given class.
-static ArrayRef<ClassDecl *> getInheritedForCycleCheck(ClassDecl *classDecl,
-                                                       ClassDecl **scratch) {
-  if (classDecl->hasSuperclass()) {
-    *scratch = classDecl->getSuperclassDecl();
-    return *scratch;
+llvm::Expected<bool>
+HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                               ProtocolDecl *decl) const {
+  if (canSkipCircularityCheck(decl))
+    return false;
+
+  bool anyObject = false;
+  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+  for (auto &found : inherited) {
+    auto *protoDecl = dyn_cast<ProtocolDecl>(found.second);
+    if (!protoDecl)
+      continue;
+
+    // If we have a cycle, handle it and return true.
+    auto result = evaluator(HasCircularInheritedProtocolsRequest{protoDecl});
+    if (!result) {
+      using Error = CyclicalRequestError<HasCircularInheritedProtocolsRequest>;
+      llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+      return true;
+    }
+
+    // If the underlying request handled a cycle and returned true, bail.
+    if (*result)
+      return true;
   }
-  return { };
+  return false;
 }
 
-/// Retrieve the raw type of the given enum.
-static ArrayRef<EnumDecl *> getInheritedForCycleCheck(EnumDecl *enumDecl,
-                                                      EnumDecl **scratch) {
-  if (enumDecl->hasRawType()) {
-    *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
-    return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
+llvm::Expected<bool>
+HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
+                                     EnumDecl *decl) const {
+  if (canSkipCircularityCheck(decl) || !decl->hasRawType())
+    return false;
+
+  auto *inherited = decl->getRawType()->getEnumOrBoundGenericEnum();
+  if (!inherited)
+    return false;
+
+  // If we have a cycle, handle it and return true.
+  auto result = evaluator(HasCircularRawValueRequest{inherited});
+  if (!result) {
+    using Error = CyclicalRequestError<HasCircularRawValueRequest>;
+    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+    return true;
   }
-  return { };
-}
-
-/// Check for circular inheritance.
-template <typename T>
-static void checkCircularity(T *decl, Diag<Identifier> circularDiag,
-                             DescriptiveDeclKind declKind,
-                             SmallVectorImpl<T *> &path) {
-  switch (decl->getCircularityCheck()) {
-  case CircularityCheck::Checked:
-    return;
-
-  case CircularityCheck::Checking: {
-    // We're already checking this type, which means we have a cycle.
-
-    // The beginning of the path might not be part of the cycle, so find
-    // where the cycle starts.
-    assert(!path.empty());
-
-    auto cycleStart = path.end() - 1;
-    while (*cycleStart != decl) {
-      assert(cycleStart != path.begin() && "Missing cycle start?");
-      --cycleStart;
-    }
-
-    // If the path length is 1 the type directly references itself.
-    if (path.end() - cycleStart == 1) {
-      path.back()->diagnose(circularDiag, path.back()->getName());
-
-      break;
-    }
-
-    // Diagnose the cycle.
-    decl->diagnose(circularDiag, (*cycleStart)->getName());
-    for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
-      (*i)->diagnose(diag::kind_declname_declared_here, declKind,
-                     (*i)->getName());
-    }
-
-    break;
-  }
-
-  case CircularityCheck::Unchecked: {
-    // Walk to the inherited class or protocols.
-    path.push_back(decl);
-    decl->setCircularityCheck(CircularityCheck::Checking);
-    T *scratch = nullptr;
-    for (auto inherited : getInheritedForCycleCheck(decl, &scratch)) {
-      checkCircularity(inherited, circularDiag, declKind, path);
-    }
-    decl->setCircularityCheck(CircularityCheck::Checked);
-    path.pop_back();
-    break;
-  }
-  }
+  return result;
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -2780,13 +2762,8 @@ public:
 
     checkGenericParams(ED);
 
-    {
-      // Check for circular inheritance of the raw type.
-      SmallVector<EnumDecl *, 8> path;
-      path.push_back(ED);
-      checkCircularity(ED, diag::circular_enum_inheritance,
-                       DescriptiveDeclKind::Enum, path);
-    }
+    // Check for circular inheritance of the raw type.
+    (void)ED->hasCircularRawValue();
 
     for (Decl *member : ED->getMembers())
       visit(member);
@@ -2952,13 +2929,8 @@ public:
 
     checkGenericParams(CD);
 
-    {
-      // Check for circular inheritance.
-      SmallVector<ClassDecl *, 8> path;
-      path.push_back(CD);
-      checkCircularity(CD, diag::circular_class_inheritance,
-                       DescriptiveDeclKind::Class, path);
-    }
+    // Check for circular inheritance.
+    (void)CD->hasCircularInheritance();
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
@@ -3102,21 +3074,15 @@ public:
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
 
-    auto *SF = PD->getParentSourceFile();
-    {
-      // Check for circular inheritance within the protocol.
-      SmallVector<ProtocolDecl *, 8> path;
-      path.push_back(PD);
-      checkCircularity(PD, diag::circular_protocol_def,
-                       DescriptiveDeclKind::Protocol, path);
+    // Check for circular inheritance within the protocol.
+    (void)PD->hasCircularInheritedProtocols();
 
-      if (SF) {
-        if (auto *tracker = SF->getReferencedNameTracker()) {
-          bool isNonPrivate =
-              (PD->getFormalAccess() > AccessLevel::FilePrivate);
-          for (auto *parentProto : PD->getInheritedProtocols())
-            tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
-        }
+    auto *SF = PD->getParentSourceFile();
+    if (SF) {
+      if (auto *tracker = SF->getReferencedNameTracker()) {
+        bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
+        for (auto *parentProto : PD->getInheritedProtocols())
+          tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
       }
     }
 
