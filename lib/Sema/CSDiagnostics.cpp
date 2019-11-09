@@ -2541,8 +2541,25 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     if (auto rawTy = isRawRepresentable(CS, toType, rawRepresentableProtocol)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
+      auto &C = getASTContext();
+      auto inits = TC.lookupMember(
+          getDC(), toType,
+          DeclName(C, DeclBaseName::createConstructor(), {Identifier()}));
+      auto hasLabelLessInit =
+          llvm::any_of(inits, [&](const LookupResultEntry entry) {
+            auto decl = entry.getValueDecl();
+            if (!decl)
+              return false;
+            auto CD = cast<ConstructorDecl>(decl);
+            assert(CD->getParameters()->size() == 1);
+            return CD->getParameters()->get(0)->getType()->isEqual(rawTy);
+          });
       std::string convWrapBefore = toType.getString();
-      convWrapBefore += "(rawValue: ";
+      if (hasLabelLessInit) {
+        convWrapBefore += "(";
+      } else {
+        convWrapBefore += "(rawValue: ";
+      }
       std::string convWrapAfter = ")";
       if (!isa<LiteralExpr>(expr) &&
           !TC.isConvertibleTo(fromType, rawTy, getDC())) {

@@ -189,3 +189,46 @@ enum ArrayOfNewEquatable : Array<NotEquatable> { }
 // expected-error@-2{{'ArrayOfNewEquatable' declares raw type 'Array<NotEquatable>', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-3{{RawRepresentable conformance cannot be synthesized because raw type 'Array<NotEquatable>' is not Equatable}}
 // expected-error@-4{{an enum with no cases cannot declare a raw type}}
+
+// SR-4723
+
+enum SR_4723_1: RawRepresentable {
+  init(_ rawValue: Int) {}
+  init(rawValue: Int) {}
+  var rawValue: Int { return 0 }
+}
+
+enum SR_4723_2: RawRepresentable {
+  init(_ foo: String) {}
+  init(rawValue: String) {}
+  var rawValue: String { return "foo" }
+}
+
+enum SR_4723_3: RawRepresentable {
+  init(_ bar: Int) {}
+  init(rawValue: String) {}
+  var rawValue: String { return "bar" }
+}
+
+enum SR_4723_4: RawRepresentable {
+  init(_ baz: String, _ rawValue: Double) {}
+  init(rawValue: String) {}
+  var rawValue: String { return "bar" }
+}
+
+func use_sr_4723_1(_: SR_4723_1) {}
+func use_sr_4723_2(_: SR_4723_2) {}
+func use_sr_4723_3(_: SR_4723_3) {}
+func use_sr_4723_4(_: SR_4723_4) {}
+
+// Make sure we prefer the label-less init
+use_sr_4723_1(0) // expected-error {{cannot convert value of type 'Int' to expected argument type 'SR_4723_1'}}{{15-15=SR_4723_1(}}{{16-16=)}}
+
+// Make sure we prefer the label-less init, even if the parameter name is not rawValue
+use_sr_4723_2("foo") // expected-error {{cannot convert value of type 'String' to expected argument type 'SR_4723_2'}}{{15-15=SR_4723_2(}} {{20-20=)}}
+
+// Make sure we prefer the rawValue init if the label-less init's type does not match the raw type
+use_sr_4723_3("bar") // expected-error {{cannot convert value of type 'String' to expected argument type 'SR_4723_3'}}{{15-15=SR_4723_3(rawValue: }} {{20-20=)}}
+
+// Make sure we prefer the rawValue init if the label-less init has more than one argument
+use_sr_4723_4("baz") // expected-error {{cannot convert value of type 'String' to expected argument type 'SR_4723_4'}}{{15-15=SR_4723_4(rawValue: }} {{20-20=)}}
