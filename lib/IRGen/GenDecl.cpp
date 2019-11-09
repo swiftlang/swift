@@ -1259,6 +1259,27 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
     }
   }
 
+  // Force emission of ObjC class refs used by type refs.
+  //
+  // Otherwise, autolinking can fail if we try to load the class decl from the
+  // name of the class.
+  if (auto *classDecl = dyn_cast<ClassDecl>(type)) {
+    // The logic behind this predicate is that:
+    //
+    // 1. We need to check if a class decl is foreign to exclude CF classes.
+    //
+    // 2. We want to check that the class decl is objc to exclude c++ classes in
+    //    the future.
+    //
+    // 3. We check that we have a clang node since we want to ensure we have
+    //    something coming from clang, rather than from swift which does not
+    //    have this issue.
+    if (classDecl->hasClangNode() && classDecl->isObjC() && !classDecl->isForeign()) {
+      PrimaryIGM->getAddrOfObjCClassRef(classDecl);
+      return;
+    }
+  }
+
   if (!hasLazyMetadata(type))
     return;
 
