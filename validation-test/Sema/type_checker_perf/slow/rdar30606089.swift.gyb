@@ -1,8 +1,8 @@
 // RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s --polynomial-threshold 1.7
-// REQUIRES: asserts
+// REQUIRES: asserts,no_asan
 
 // FIXME: https://bugs.swift.org/browse/SR-6520
-// REQUIRES: SR6520
+// REQUIRES: SR6520,no_asan
 
 let derivative = { (t: Double) -> (Double) in
   return -2.0 / (
