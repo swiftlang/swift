@@ -56,7 +56,7 @@ namespace swift {
 
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
-  class LangOptions {
+  class LangOptions final {
   public:
 
     /// The target we are building for.
@@ -455,6 +455,54 @@ namespace swift {
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
+  };
+
+  class TypeCheckerOptions final {
+  public:
+    /// If non-zero, warn when a function body takes longer than this many
+    /// milliseconds to type-check.
+    ///
+    /// Intended for debugging purposes only.
+    unsigned WarnLongFunctionBodies = 0;
+
+    /// If non-zero, warn when type-checking an expression takes longer
+    /// than this many milliseconds.
+    ///
+    /// Intended for debugging purposes only.
+    unsigned WarnLongExpressionTypeChecking = 0;
+
+    /// If non-zero, abort the expression type checker if it takes more
+    /// than this many seconds.
+    unsigned ExpressionTimeoutThreshold = 600;
+
+    /// If non-zero, abort the switch statement exhaustiveness checker if
+    /// the Space::minus function is called more than this many times.
+    ///
+    /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
+    /// 4.2 GHz Intel Core i7.
+    /// (It's arbitrary, but will keep the compiler from taking too much time.)
+    unsigned SwitchCheckingInvocationThreshold = 200000;
+
+    /// Whether to delay checking that benefits from having the entire
+    /// module parsed, e.g., Objective-C method override checking.
+    bool DelayWholeModuleChecking = false;
+
+    /// If true, the time it takes to type-check each function will be dumped
+    /// to llvm::errs().
+    bool DebugTimeFunctionBodies = false;
+
+    /// If true, the time it takes to type-check each expression will be
+    /// dumped to llvm::errs().
+    bool DebugTimeExpressions = false;
+
+    /// Indicate that the type checker is checking code that will be
+    /// immediately executed. This will suppress certain warnings
+    /// when executing scripts.
+    bool InImmediateMode = false;
+
+    /// Indicate that the type checker should skip type-checking non-inlinable
+    /// function bodies.
+    bool SkipNonInlinableFunctionBodies = false;
   };
 } // end namespace swift
 

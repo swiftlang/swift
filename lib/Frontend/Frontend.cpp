@@ -912,27 +912,6 @@ void CompilerInstance::parseLibraryFile(
   performNameBinding(*NextInput);
 }
 
-OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
-  OptionSet<TypeCheckingFlags> TypeCheckOptions;
-  if (isWholeModuleCompilation()) {
-    TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
-  }
-  const auto &options = Invocation.getFrontendOptions();
-  if (options.DebugTimeFunctionBodies) {
-    TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
-  }
-  if (FrontendOptions::isActionImmediate(options.RequestedAction)) {
-    TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
-  }
-  if (options.DebugTimeExpressionTypeChecking) {
-    TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
-  }
-  if (options.SkipNonInlinableFunctionBodies) {
-    TypeCheckOptions |= TypeCheckingFlags::SkipNonInlinableFunctionBodies;
-  }
-  return TypeCheckOptions;
-}
-
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports) {
   FrontendStatsTracer tracer(Context->Stats,

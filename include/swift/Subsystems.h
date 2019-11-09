@@ -168,30 +168,6 @@ namespace swift {
   /// to add calls to externally provided functions that simulate
   /// "program counter"-like debugging events.
   void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
-  
-  /// Flags used to control type checking.
-  enum class TypeCheckingFlags : unsigned {
-    /// Whether to delay checking that benefits from having the entire
-    /// module parsed, e.g., Objective-C method override checking.
-    DelayWholeModuleChecking = 1 << 0,
-
-    /// If set, dumps wall time taken to check each function body to
-    /// llvm::errs().
-    DebugTimeFunctionBodies = 1 << 1,
-
-    /// Indicates that the type checker is checking code that will be
-    /// immediately executed.
-    ForImmediateMode = 1 << 2,
-
-    /// If set, dumps wall time taken to type check each expression to
-    /// llvm::errs().
-    DebugTimeExpressions = 1 << 3,
-
-    /// If set, the typechecker will skip typechecking non-inlinable function
-    /// bodies. Set this if you're trying to quickly emit a module or module
-    /// interface without a full compilation.
-    SkipNonInlinableFunctionBodies = 1 << 4,
-  };
 
   /// Creates a type checker instance on the given AST context, if it
   /// doesn't already have one.
@@ -372,7 +348,8 @@ namespace swift {
   class ParserUnit {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-               const LangOptions &LangOpts, StringRef ModuleName,
+               const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
+               StringRef ModuleName,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
