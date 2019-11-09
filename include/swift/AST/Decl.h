@@ -5214,7 +5214,7 @@ enum class ParamSpecifier : uint8_t {
 
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
-  Identifier ArgumentName;
+  llvm::PointerIntPair<Identifier, 1, bool> ArgumentNameAndDestructured;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
@@ -5251,7 +5251,9 @@ public:
   static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
   
   /// Retrieve the argument (API) name for this function parameter.
-  Identifier getArgumentName() const { return ArgumentName; }
+  Identifier getArgumentName() const {
+    return ArgumentNameAndDestructured.getPointer();
+  }
 
   /// Retrieve the parameter (local) name for this function parameter.
   Identifier getParameterName() const { return getName(); }
@@ -5269,6 +5271,9 @@ public:
   /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
   TypeRepr *getTypeRepr() const { return TyRepr; }
   void setTypeRepr(TypeRepr *repr) { TyRepr = repr; }
+
+  bool isDestructured() const { return ArgumentNameAndDestructured.getInt(); }
+  void setDestructured(bool repr) { ArgumentNameAndDestructured.setInt(repr); }
 
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
