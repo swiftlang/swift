@@ -1059,8 +1059,9 @@ public:
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
-                                 bool limitChecking);
+  static void checkSwitchExhaustiveness(const SwitchStmt *stmt,
+                                        const DeclContext *DC,
+                                        bool limitChecking);
 
   /// Type check the given expression as a condition, which converts
   /// it to a logic value.
