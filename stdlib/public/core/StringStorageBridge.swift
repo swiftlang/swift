@@ -180,14 +180,18 @@ extension _AbstractStringStorage {
 }
 
 extension __StringStorage {
-  @objc(length) @_effects(readonly) @inline(__always)
+  @objc(length)
   final internal var UTF16Length: Int {
-    return asString.utf16.count // UTF16View special-cases ASCII for us.
+    @_effects(readonly) @inline(__always) get {
+      return asString.utf16.count // UTF16View special-cases ASCII for us.
+    }
   }
 
-  @objc @_effects(readonly)
+  @objc
   final internal var hash: UInt {
-    return _getCocoaHash()
+    @_effects(readonly) get {
+      return _getCocoaHash()
+    }
   }
 
   @objc(characterAtIndex:)
@@ -236,9 +240,11 @@ extension __StringStorage {
     return _getCString(outputPtr, maxLength, encoding)
   }
 
-  @objc @_effects(readonly)
+  @objc
   final internal var fastestEncoding: UInt {
-    return _getFastestEncoding()
+    @_effects(readonly) get {
+      return _getFastestEncoding()
+    }
   }
 
   @objc(isEqualToString:)
@@ -285,9 +291,11 @@ extension __SharedStringStorage {
     return asString.utf16.count // UTF16View special-cases ASCII for us.
   }
 
-  @objc @_effects(readonly)
+  @objc(hash)
   final internal var hash: UInt {
-    return _getCocoaHash()
+    @_effects(readonly) get {
+      return _getCocoaHash()
+    }
   }
 
   @objc(characterAtIndex:)
@@ -305,9 +313,11 @@ extension __SharedStringStorage {
     _getCharacters(buffer, aRange)
   }
 
-  @objc @_effects(readonly)
+  @objc(fastestEncoding)
   final internal var fastestEncoding: UInt {
-    return _getFastestEncoding()
+    @_effects(readonly) get {
+      return _getFastestEncoding()
+    }
   }
 
   @objc(_fastCStringContents:)

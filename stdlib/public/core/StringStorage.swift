@@ -90,26 +90,11 @@ final internal class __StringStorage
   @inline(__always)
   final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
-  @_effects(readonly) @inline(__always)
   final internal var asString: String {
-    return String(_StringGuts(self))
+    @_effects(readonly) @inline(__always) get {
+      return String(_StringGuts(self))
+    }
   }
-  
-  @objc(copy)
-  final internal func copy() -> AnyObject {
-    return self
-  }
-  
-  @objc(mutableCopyWithZone:)
-  final internal func mutableCopy(with zone: _SwiftNSZone?) -> AnyObject {
-    return _SwiftNSMutableString(self.asString)
-  }
-  
-  @objc(mutableCopy)
-  final internal func mutableCopy() -> AnyObject {
-    return _SwiftNSMutableString(self.asString)
-  }
-
 
   private init(_doNotCallMe: ()) {
     _internalInvariantFailure("Use the create method")
@@ -537,9 +522,11 @@ final internal class __SharedStringStorage
   @inline(__always)
   final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
-  @_effects(readonly) @inline(__always)
+  
   final internal var asString: String {
-    return String(_StringGuts(self))
+    @_effects(readonly) @inline(__always) get {
+      return String(_StringGuts(self))
+    }
   }
 
 }
