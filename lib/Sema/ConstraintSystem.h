@@ -1979,7 +1979,13 @@ public:
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) const {
     auto e = ExprWeights.find(expr);
-    return e != ExprWeights.end() ? e->second.second : nullptr;
+    if (e != ExprWeights.end())
+      return e->second.second;
+
+    if (baseCS && baseCS != this)
+      return baseCS->getParentExpr(expr);
+
+    return nullptr;
   }
 
   /// Returns a locator describing the callee for the anchor of a given locator.
@@ -3610,7 +3616,7 @@ public:
   /// \returns true if an error occurred, false otherwise.  Note that multiple
   /// ambiguous solutions for the same constraint system are considered to be
   /// success by this API.
-  bool solve(Expr *const expr, SmallVectorImpl<Solution> &solutions,
+  bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables =
                  FreeTypeVariableBinding::Disallow);
 
@@ -3634,7 +3640,7 @@ private:
   /// It doesn't filter solutions, that's the job of top-level `solve` methods.
   ///
   /// \param solutions The set of solutions to this system of constraints.
-  void solve(SmallVectorImpl<Solution> &solutions);
+  void solveImpl(SmallVectorImpl<Solution> &solutions);
 
   /// Compare two solutions to the same set of constraints.
   ///

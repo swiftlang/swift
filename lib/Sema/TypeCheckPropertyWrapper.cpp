@@ -591,7 +591,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
                    propertyType, emptyLocator);
 
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
+  if (cs.solve(solutions) || solutions.size() != 1) {
     var->diagnose(diag::property_wrapper_incompatible_property,
                   propertyType, rawType);
     var->setInvalid();

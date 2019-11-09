@@ -471,7 +471,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
 
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
-    MissingMemberFailure failure(nullptr, CS, baseObjTy, memberName,
+    MissingMemberFailure failure(CS, baseObjTy, memberName,
                                  CS.getConstraintLocator(E));
     auto diagnosed = failure.diagnoseAsError();
     assert(diagnosed && "Failed to produce missing member diagnostic");
@@ -513,7 +513,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       InvalidMemberRefOnExistential failure(
-          baseExpr, CS, instanceTy, memberName, CS.getConstraintLocator(E));
+          CS, instanceTy, memberName, CS.getConstraintLocator(E));
       failure.diagnoseAsError();
       return;
     }
@@ -524,7 +524,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
                              ? ConstraintLocator::SubscriptMember
                              : ConstraintLocator::Member;
       AllowTypeOrInstanceMemberFailure failure(
-          expr, CS, baseObjTy, choice->getDecl(), memberName,
+          CS, baseObjTy, choice->getDecl(), memberName,
           CS.getConstraintLocator(E, locatorKind));
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed &&
@@ -534,7 +534,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
-      MutatingMemberRefOnImmutableBase failure(E, CS, choice->getDecl(),
+      MutatingMemberRefOnImmutableBase failure(CS, choice->getDecl(),
                                                CS.getConstraintLocator(E));
       (void)failure.diagnose();
       return;
@@ -548,7 +548,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       // visible to us, but the conforming type is. In this case, we need to
       // clamp the formal access for diagnostics purposes to the formal access
       // of the protocol itself.
-      InaccessibleMemberFailure failure(expr, CS, choice->getDecl(),
+      InaccessibleMemberFailure failure(CS, choice->getDecl(),
                                         CS.getConstraintLocator(E));
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed && "failed to produce expected diagnostic");
@@ -730,7 +730,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   if (auto fromTT = fromType->getAs<TupleType>())
     if (auto toTT = toType->getAs<TupleType>()) {
       if (fromTT->getNumElements() != toTT->getNumElements()) {
-        auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
+        auto failure = TupleContextualFailure(CS, fromTT, toTT,
                                               CS.getConstraintLocator(expr));
         return failure.diagnoseAsError();
       }
@@ -748,7 +748,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       // then we have a type error.
       if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
                               toTT->getElements(), sources)) {
-        auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
+        auto failure = TupleContextualFailure(CS, fromTT, toTT,
                                               CS.getConstraintLocator(expr));
         return failure.diagnoseAsError();
       }
@@ -766,7 +766,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   
   // Check for various issues converting to Bool.
-  ContextualFailure failure(expr, CS, fromType, toType,
+  ContextualFailure failure(CS, fromType, toType,
                             constraint->getLocator());
   if (failure.diagnoseConversionToBool())
     return true;
@@ -1285,7 +1285,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return false;
 
   ContextualFailure failure(
-      expr, CS, CTP, exprType, contextualType,
+      CS, CTP, exprType, contextualType,
       CS.getConstraintLocator(expr, LocatorPathElt::ContextualType()));
   return failure.diagnoseAsError();
 }
@@ -2877,7 +2877,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
            LocatorPathElt::ApplyArgToParam(0, 0, flags)},
           /*summaryFlags=*/0);
 
-      ArgumentMismatchFailure failure(expr, CS, lhsType, rhsType, locator);
+      ArgumentMismatchFailure failure(CS, lhsType, rhsType, locator);
       return failure.diagnosePatternMatchingMismatch();
     }
 
@@ -3133,7 +3133,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
           // destructuring and provide a proper fix-it.
           if (argTupleTy->getNumElements() == actualArgCount) {
             ClosureParamDestructuringFailure failure(
-                expr, CS, fnType, CS.getConstraintLocator(CE));
+                CS, fnType, CS.getConstraintLocator(CE));
             return failure.diagnoseAsError();
           }
         }
@@ -3312,7 +3312,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     return false;
   }
 
-  ContextualFailure failure(expr, CS, CS.getType(E), contextualType,
+  ContextualFailure failure(CS, CS.getType(E), contextualType,
                             CS.getConstraintLocator(E));
   if (failure.diagnoseConversionToDictionary())
     return true;
@@ -3581,7 +3581,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
   if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
     if (baseExpr && baseFTy->getParams().empty()) {
       auto failure =
-          MissingCallFailure(expr, CS, CS.getConstraintLocator(baseExpr));
+          MissingCallFailure(CS, CS.getConstraintLocator(baseExpr));
       return failure.diagnoseAsError();
     }
   }
@@ -3720,7 +3720,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
       if (!optionalResult.ViableCandidates.empty()) {
         MemberAccessOnOptionalBaseFailure failure(
-            expr, CS, CS.getConstraintLocator(baseExpr), memberName,
+            CS, CS.getConstraintLocator(baseExpr), memberName,
             /*resultOptional=*/false);
         return failure.diagnoseAsError();
       }
@@ -4224,7 +4224,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   {
     bool diagnosed = false;
     for (auto *fix : CS.getFixes())
-      diagnosed |= fix->diagnose(expr);
+      diagnosed |= fix->diagnose();
 
     if (diagnosed)
       return;

@@ -93,7 +93,7 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
 }
 
 Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
-  return E ? E->getParentMap()[subExpr] : nullptr;
+  return CS.getParentExpr(subExpr);
 }
 
 Expr *
@@ -680,7 +680,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   // about missing conformance just in case.
   auto operatorID = name.getIdentifier();
 
-  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
+  auto *applyExpr = cast_or_null<ApplyExpr>(findParentExpr(anchor));
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
     auto lhsType = getType(binaryOp->getArg()->getElement(0));
     auto rhsType = getType(binaryOp->getArg()->getElement(1));
@@ -1048,7 +1048,10 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (!useAs && !useAsBang)
     return false;
 
-  auto *expr = getParentExpr();
+  auto *expr = findParentExpr(getAnchor());
+  if (!expr)
+    expr = getAnchor();
+
   // If we're performing pattern matching,
   // "as" means something completely different...
   if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
@@ -1146,8 +1149,9 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   // Figure out what we need to parenthesize.
   bool needsParensInside =
       exprNeedsParensBeforeAddingNilCoalescing(DC, expr);
+  auto parentExpr = findParentExpr(anchor);
   bool needsParensOutside =
-      exprNeedsParensAfterAddingNilCoalescing(DC, expr, getParentExpr());
+      exprNeedsParensAfterAddingNilCoalescing(DC, expr, parentExpr);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -1488,8 +1492,8 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  const auto *expr = getParentExpr();
-  auto *callExpr = dyn_cast<CallExpr>(expr);
+  const auto *expr = findParentExpr(getAnchor());
+  auto *callExpr = dyn_cast_or_null<CallExpr>(expr);
   if (!callExpr)
     return false;
   if (!callExpr->hasTrailingClosure())
@@ -1542,7 +1546,8 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
 
 AssignmentFailure::AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
                                      SourceLoc diagnosticLoc)
-    : FailureDiagnostic(destExpr, cs, cs.getConstraintLocator(destExpr)),
+    : FailureDiagnostic(cs, cs.getConstraintLocator(destExpr)),
+      DestExpr(destExpr),
       Loc(diagnosticLoc),
       DeclDiagnostic(findDeclDiagonstic(cs.getASTContext(), destExpr)),
       TypeDiagnostic(diag::assignment_lhs_not_lvalue) {}
@@ -1550,11 +1555,10 @@ AssignmentFailure::AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
 bool AssignmentFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *DC = getDC();
-  auto *destExpr = getParentExpr();
 
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
-  auto immInfo = resolveImmutableBase(destExpr);
+  auto immInfo = resolveImmutableBase(DestExpr);
 
   Optional<OverloadChoice> choice = immInfo.second;
 
@@ -1755,7 +1759,7 @@ bool AssignmentFailure::diagnoseAsError() {
     return true;
   }
 
-  emitDiagnostic(Loc, TypeDiagnostic, getType(destExpr))
+  emitDiagnostic(Loc, TypeDiagnostic, getType(DestExpr))
       .highlight(immInfo.first->getSourceRange());
   return true;
 }
@@ -3339,7 +3343,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     return true;
   }
 
-  Expr *expr = getParentExpr();
+  Expr *expr = findParentExpr(getAnchor());
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
   // If the base is an implicit self type reference, and we're in a
@@ -3552,7 +3556,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
     if (locator->isForKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(expr, cs, Member, locator);
+      InvalidStaticMemberRefInKeyPath failure(cs, Member, locator);
       return failure.diagnoseAsError();
     }
 
@@ -5532,7 +5536,7 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   auto *anchor = getRawAnchor();
 
   MissingArgumentsFailure failure(
-      getParentExpr(), cs, {param.withType(argType)},
+      cs, {param.withType(argType)},
       cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();
