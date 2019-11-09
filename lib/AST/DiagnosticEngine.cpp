@@ -121,12 +121,24 @@ static constexpr const char *const fixItStrings[] = {
                                                                   nullptr};
 #include "swift/AST/EducationalNotes.def"
 
-static constexpr const char *const *educationalNotes[LocalDiagID::NumDiags]{
-    [LocalDiagID::invalid_diagnostic] = {},
+// NOTE: sadly, while GCC and Clang support array designators in C++, they are
+// not part of the standard at the moment, so Visual C++ doesn't support them.
+// This construct allows us to provide a constexpr array initialized to empty
+// values except in the cases that EducationalNotes.def are provided, similar to
+// what the C array would have looked like.
+template<int N>
+struct EducationalNotes {
+  constexpr EducationalNotes() : value() {
+    for (auto i = 0; i < N; ++i) value[i] = {};
 #define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  [LocalDiagID::DIAG] = DIAG##_educationalNotes,
+  value[LocalDiagID::DIAG] = DIAG##_educationalNotes;
 #include "swift/AST/EducationalNotes.def"
+  }
+  const char *const *value[N];
 };
+
+static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = EducationalNotes<LocalDiagID::NumDiags>();
+static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
