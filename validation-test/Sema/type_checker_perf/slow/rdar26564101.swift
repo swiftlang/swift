@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: tools-release
 // REQUIRES: rdar46850561
 
 func rdar26564101(a: [Double], m: Double) -> Double {
