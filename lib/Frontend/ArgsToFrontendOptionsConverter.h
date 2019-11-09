@@ -47,9 +47,6 @@ private:
   void computePrintStatsOptions();
   void computeTBDOptions();
 
-  void setUnsignedIntegerArgument(options::ID optionID, unsigned radix,
-                                  unsigned &valueToSet);
-
   bool setUpInputKindAndImmediateArgs();
 
   bool checkUnusedSupplementaryOutputPaths() const;
