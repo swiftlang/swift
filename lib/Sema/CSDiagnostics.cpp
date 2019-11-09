@@ -93,7 +93,7 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
 }
 
 Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
-  return E ? E->getParentMap()[subExpr] : nullptr;
+  return CS.getParentExpr(subExpr);
 }
 
 Expr *
