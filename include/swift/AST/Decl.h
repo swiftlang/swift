@@ -531,7 +531,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+1+2+1+7+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+1+2+1+1+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
