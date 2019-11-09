@@ -37,7 +37,7 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:       `-BraceStmtScope {{.*}}, [8:1 - 21:28]
 // CHECK-EXPANDED-NEXT:         `-GuardStmtScope {{.*}}, [8:1 - 21:28]
 // CHECK-EXPANDED-NEXT:           |-ConditionalClauseScope, [8:7 - 8:22] index 0
-// CHECK-EXPANDED-NEXT:             `-ConditionalClausePatternUseScope, [8:22 - 8:22] let b?
+// CHECK-EXPANDED-NEXT:             `-ConditionalClausePatternUseScope, [8:22 - 8:22] let b{{\??}}
 // CHECK-EXPANDED-NEXT:           |-BraceStmtScope {{.*}}, [8:22 - 9:1]
 // CHECK-EXPANDED-NEXT:           `-LookupParentDiversionScope, [9:1 - 21:28]
 // CHECK-EXPANDED-NEXT:             |-AbstractFunctionDeclScope {{.*}}, [11:1 - 11:13] 'foo()'
@@ -49,8 +49,12 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:                 |-PatternEntryDeclScope {{.*}}, [13:5 - 13:9] entry 0 'c'
 // CHECK-EXPANDED-NEXT:                   `-PatternEntryInitializerScope {{.*}}, [13:9 - 13:9] entry 0 'c'
 // CHECK-EXPANDED-NEXT:                 |-TypeAliasDeclScope {{.*}}, [15:1 - 15:15]
-// CHECK-EXPANDED-NEXT:                 |-ExtensionDeclScope {{.*}}, [17:1 - 19:1]
+// CHECK-EXPANDED-NEXT:                 |-ExtensionDeclScope {{.*}}, [17:14 - 19:1]
 // CHECK-EXPANDED-NEXT:                   `-ExtensionBodyScope {{.*}}, [17:15 - 19:1]
+// CHECK-EXPANDED-NEXT:                     `-AbstractFunctionDeclScope {{.*}}, [18:3 - 18:43] 'my_identity()'
+// CHECK-EXPANDED-NEXT:                       `-ParameterListScope {{.*}}, [18:19 - 18:43]
+// CHECK-EXPANDED-NEXT:                         `-MethodBodyScope {{.*}}, [18:29 - 18:43]
+// CHECK-EXPANDED-NEXT:                           `-BraceStmtScope {{.*}}, [18:29 - 18:43]
 // CHECK-EXPANDED-NEXT:                 `-TopLevelCodeScope {{.*}}, [21:1 - 21:28]
 // CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [21:1 - 21:28]
 // CHECK-EXPANDED-NEXT:                     `-PatternEntryDeclScope {{.*}}, [21:5 - 21:28] entry 0 'i'

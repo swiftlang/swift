@@ -26,15 +26,15 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -74,7 +74,7 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
                                                       CanType target) {
   auto bridgedProto =
       mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  auto conf = *mod.getSwiftModule()->lookupConformance(target, bridgedProto);
+  auto conf = mod.getSwiftModule()->lookupConformance(target, bridgedProto);
   return SubstitutionMap::getProtocolSubstitutions(conf.getRequirement(),
                                                    target, conf);
 }
@@ -1215,8 +1215,8 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (Inst->isExact())
     return nullptr;
 
-  // Local helper we use to simplify replacing a checked_cast_branch with an
-  // optimized checked cast branch.
+  // InstOptUtils.helper we use to simplify replacing a checked_cast_branch with
+  // an optimized checked cast branch.
   auto replaceCastHelper = [](SILBuilderWithScope &B,
                               SILDynamicCastInst dynamicCast,
                               MetatypeInst *mi) -> SILInstruction * {
@@ -1227,7 +1227,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto *fBlock = dynamicCast.getFailureBlock();
     if (B.hasOwnership()) {
       fBlock->replacePhiArgumentAndReplaceAllUses(0, mi->getType(),
-                                                  ValueOwnershipKind::Any);
+                                                  ValueOwnershipKind::None);
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
@@ -1522,12 +1522,12 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
     auto Conformance = SM->conformsToProtocol(SourceType, Proto);
-    if (!Conformance)
+    if (Conformance.isInvalid())
       return false;
 
     SILBuilderWithScope B(Inst);
     SmallVector<ProtocolConformanceRef, 1> NewConformances;
-    NewConformances.push_back(Conformance.getValue());
+    NewConformances.push_back(Conformance);
     ArrayRef<ProtocolConformanceRef> Conformances =
         Ctx.AllocateCopy(NewConformances);
 

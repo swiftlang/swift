@@ -11,11 +11,7 @@ struct SimpleCallable {
 let foo = SimpleCallable()
 _ = foo(1)
 _ = foo(foo(1))
-
-// TODO(SR-11378): Improve this error to match the error using a direct `callAsFunction` member reference.
-// expected-error @+2 {{cannot call value of non-function type 'SimpleCallable'}}
-// expected-error @+1 {{cannot invoke 'foo' with an argument list of type '(Int, Int)'}}
-_ = foo(1, 1)
+_ = foo(1, 1) // expected-error@:12 {{extra argument in call}}
 // expected-error @+1 {{cannot convert value of type 'SimpleCallable' to specified type '(Float) -> Float'}}
 let _: (Float) -> Float = foo
 

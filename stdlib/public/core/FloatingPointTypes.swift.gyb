@@ -1263,7 +1263,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 
 ${SelfDocComment}
 @frozen
-@available(*, unavailable, message: "Float80 is only available on non-Windows x86 targets.")
+@available(*, unavailable, message: "Float80 is not available on target platform.")
 public struct ${Self} {
   /// Creates a value initialized to zero.
   @_transparent

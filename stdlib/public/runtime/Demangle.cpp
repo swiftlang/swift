@@ -68,7 +68,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       return genericArgsList;
     };
   
-  for (auto component : reversed(descriptorPath)) {
+  for (auto component : llvm::reverse(descriptorPath)) {
     switch (auto kind = component->getKind()) {
     case ContextDescriptorKind::Module: {
       assert(node == nullptr && "module should be top level");
@@ -80,7 +80,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     case ContextDescriptorKind::Extension: {
       auto extension = llvm::cast<ExtensionContextDescriptor>(component);
       // Demangle the extension self type.
-      auto selfType = Dem.demangleType(extension->getMangledExtendedContext());
+      auto selfType = Dem.demangleType(extension->getMangledExtendedContext(),
+                                       ResolveToDemanglingForContext(Dem));
       if (selfType->getKind() == Node::Kind::Type)
         selfType = selfType->getChild(0);
       

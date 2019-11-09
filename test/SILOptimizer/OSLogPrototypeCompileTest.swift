@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -swift-version 5 -emit-sil -primary-file %s |  %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
 // Tests for the OSLogOptimization pass that performs compile-time analysis
@@ -34,12 +35,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 0
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
@@ -67,12 +68,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 0
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
@@ -103,12 +104,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 1
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
@@ -145,12 +146,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 1
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 3
@@ -182,12 +183,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 0
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 0
@@ -252,12 +253,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 0
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 48
@@ -284,12 +285,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 0
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
@@ -324,12 +325,12 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
     // Check whether the header bytes: premable and argument count are constants.
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 3
 
-    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 2

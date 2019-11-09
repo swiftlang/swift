@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 
@@ -42,7 +43,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   // diagnostic engine here.
   Parser parser(bufferID, sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
   // Disable libSyntax creation in the delayed parsing.
-  parser.SyntaxContext->setDiscard();
+  parser.SyntaxContext->disable();
   ASTContext &ctx = idc->getDecl()->getASTContext();
   return ctx.AllocateCopy(
       llvm::makeArrayRef(parser.parseDeclListDelayed(idc)));
@@ -69,6 +70,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
 
     std::tie(body, isTypeChecked) = (afd->Synthesizer.Fn)(
         afd, afd->Synthesizer.Context);
+    assert(body && "cannot synthesize a null body");
     afd->setBodyKind(isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
     return body;
   }
@@ -80,13 +82,13 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
     unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
     Parser parser(bufferID, sf, static_cast<SILParserTUStateBase *>(nullptr),
                   nullptr, nullptr);
-    parser.SyntaxContext->setDiscard();
+    parser.SyntaxContext->disable();
     auto body = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
     return body;
   }
   }
-
+  llvm_unreachable("Unhandled BodyKind in switch");
 }
 
 

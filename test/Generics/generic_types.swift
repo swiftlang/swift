@@ -230,6 +230,8 @@ class Top {}
 class Bottom<T : Bottom<Top>> {}
 // expected-error@-1 {{generic class 'Bottom' references itself}}
 // expected-note@-2 {{type declared here}}
+// expected-error@-3 {{circular reference}}
+// expected-note@-4 {{through reference here}}
 
 // Invalid inheritance clause
 

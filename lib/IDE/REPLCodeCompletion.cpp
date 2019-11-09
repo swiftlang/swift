@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
@@ -214,7 +215,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
                       OriginalDeclCount);
 
-  performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
+  performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.

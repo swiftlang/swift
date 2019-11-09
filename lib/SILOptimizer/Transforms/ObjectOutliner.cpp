@@ -14,9 +14,9 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -506,7 +506,8 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (FTy->getNumParameters() != 3)
     return;
 
-  SILType cacheType = FTy->getParameters()[2].getSILStorageType().getObjectType();
+  SILType cacheType = FTy->getParameters()[2].getSILStorageType(*Module, FTy)
+                                             .getObjectType();
   NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
   if (!cacheDecl)
     return;

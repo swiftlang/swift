@@ -22,6 +22,16 @@
 
 namespace swift {
 
+void printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits);
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SmallBitVector &bits) {
+  printBitsAsArray(OS, bits);
+  return OS;
+}
+
+void dumpBits(const SmallBitVector &bits);
+
 /// The MemoryLocations utility provides functions to analyze memory locations.
 ///
 /// Memory locations are limited to addresses which are guaranteed to

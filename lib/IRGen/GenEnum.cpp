@@ -1127,10 +1127,12 @@ namespace {
   protected:
     int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
-      // raw values from C.
-      assert(target->hasRawValueExpr()
-             && "c-compatible enum elt has no raw value?!");
-      auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
+      // raw values from C. An invalid raw value is assigned the error index -1.
+      auto intExpr =
+          dyn_cast_or_null<IntegerLiteralExpr>(target->getRawValueExpr());
+      if (!intExpr) {
+        return -1;
+      }
       auto intType = getDiscriminatorType();
 
       APInt intValue =
@@ -5777,10 +5779,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
-
-    if (!elt->hasInterfaceType())
-      TC.IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
-
+    
     // Compute whether this gives us an apparent payload or dynamic layout.
     // Note that we do *not* apply substitutions from a bound generic instance
     // yet. We want all instances of a generic enum to share an implementation

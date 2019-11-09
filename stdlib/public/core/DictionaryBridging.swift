@@ -29,6 +29,7 @@ internal func _stdlib_NSDictionary_allKeys(
 extension _NativeDictionary { // Bridging
   @usableFromInline
   __consuming internal func bridged() -> AnyObject {
+    _connectOrphanedFoundationSubclassesIfNeeded()
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
@@ -67,6 +68,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   internal init(_ base: __owned _NativeDictionary<Key, Value>) {
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = base
     self.bridgedKeys = nil
     self.nextBucket = base.hashTable.startBucket
@@ -77,6 +79,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSDictionary<Key, Value>) {
     _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
     self.nextBucket = base.hashTable.startBucket

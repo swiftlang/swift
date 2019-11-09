@@ -20,13 +20,13 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
   func testNonconstantFormatOption(h: Logger, formatOpt: IntFormat) {
     h.log(level: .debug, "Minimum integer value: \(Int.min, format: formatOpt)")
-    // expected-error @-1 {{'OSLogInterpolation.formatString' is not a constant: formatting and privacy options must be literals}}
+    // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
     // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
   }
 
   func testNonconstantPrivacyOption(h: Logger,  privacyOpt: Privacy) {
     h.log(level: .debug, "Minimum integer value: \(Int.min, privacy: privacyOpt)")
-    // expected-error @-1 {{'OSLogInterpolation.formatString' is not a constant: formatting and privacy options must be literals}}
+    // expected-error @-1 {{interpolation arguments like format and privacy options must be constants}}
     // expected-error @-2 {{globalStringTablePointer builtin must used only on string literals}}
   }
 

@@ -18,115 +18,82 @@
 
 namespace swift {
 
-enum class ResultDataKind : uint8_t {
-  Success,
-  Error,
-  CodeCompletion,
-};
+template <typename Syntax, typename AST> class SyntaxParserResult {
+  llvm::Optional<Syntax> SyntaxNode;
+  ParserResult<AST> ASTResult;
 
-template <typename ParsedSyntaxNode> class ParsedSyntaxResult {
-public:
-  template <typename OtherParsedSyntaxNode>
-  friend class ParsedSyntaxResult;
-
-private:
-  ParsedRawSyntaxNode Raw;
-  ParserStatus Status;
+  template <typename T, typename U> friend class SyntaxParserResult;
 
 public:
-  explicit ParsedSyntaxResult() : Raw(), Status() { setIsError(); }
+  SyntaxParserResult(std::nullptr_t = nullptr)
+      : SyntaxNode(None), ASTResult(nullptr) {}
+  SyntaxParserResult(ParserStatus Status)
+      : SyntaxNode(None), ASTResult(Status) {}
+  SyntaxParserResult(llvm::Optional<Syntax> &&SyntaxNode, AST *ASTNode)
+      : SyntaxNode(std::move(SyntaxNode)), ASTResult(ASTNode) {}
+  SyntaxParserResult(ParserStatus Status, llvm::Optional<Syntax> &&SyntaxNode,
+                     AST *ASTNode)
+      : SyntaxNode(std::move(SyntaxNode)), ASTResult(makeParserResult(Status, ASTNode)) {}
 
-  ParsedSyntaxResult(ParserStatus Status) : Raw(), Status(Status) {
-    assert(Status.isError());
-  }
+  /// Convert from a different but compatible parser result.
+  template <typename U, typename Enabler = typename std::enable_if<
+                            std::is_base_of<AST, U>::value>::type>
+  SyntaxParserResult(SyntaxParserResult<Syntax, U> &&Other)
+      : SyntaxNode(std::move(Other.SyntaxNode)), ASTResult(Other.ASTResult) {}
 
-  explicit ParsedSyntaxResult(ParsedRawSyntaxNode Raw)
-      : Raw(Raw), Status() {}
 
-  explicit ParsedSyntaxResult(ParsedSyntaxNode Node)
-      : ParsedSyntaxResult(Node.getRaw()) {}
+  bool isNull() const { return ASTResult.isNull(); }
+  bool isNonNull() const { return ASTResult.isNonNull(); }
+  bool isParseError() const { return ASTResult.isParseError(); }
+  bool hasCodeCompletion() const { return ASTResult.hasCodeCompletion(); }
 
-  template <typename OtherParsedSyntaxNode,
-            typename Enable = typename std::enable_if<std::is_base_of<
-                ParsedSyntaxNode, OtherParsedSyntaxNode>::value>::type>
-  ParsedSyntaxResult(ParsedSyntaxResult<OtherParsedSyntaxNode> other) {
-    Raw = other.Raw;
-    Status = other.Status;
-  }
+  void setIsParseError() { return ASTResult.setIsParserError(); }
+  void setHasCodeCompletion() { return ASTResult.setHasCodeCompletion(); }
 
-  bool isSuccess() const {
-    return Status.isSuccess();
-  }
+  const ParserResult<AST> &getASTResult() { return ASTResult; }
 
-  bool isError() const {
-    return Status.isError();
-  }
-  void setIsError() {
-    Status.setIsParseError();
-  }
+  AST *getAST() const { return ASTResult.get(); }
 
-  bool hasCodeCompletion() const {
-    return Status.hasCodeCompletion();
-  }
-  void setHasCodeCompletion() {
-    Status.setHasCodeCompletion();
+  bool hasSyntax() const {
+    return SyntaxNode.hasValue();
   }
 
-  ParsedSyntaxNode get() const {
-    assert(!isNull());
-    return ParsedSyntaxNode(Raw);
-  }
-  Optional<ParsedSyntaxNode> getOrNull() const {
-    if (isNull())
-      return None;
-    return get();
+  Syntax getSyntax() {
+    assert(SyntaxNode.hasValue() && "getSyntax from None value");
+    return std::move(*SyntaxNode);
   }
 
-  bool isNull() const {
-    return Raw.isNull();
-  }
-
-  ParserStatus getStatus() const {
-    return Status;
-  }
+  SyntaxParserResult<Syntax, AST> &
+  operator=(SyntaxParserResult<Syntax, AST> R){
+    std::swap(*this, R);
+    return *this;
+  };
 };
 
-template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedResult(ParsedSyntaxNode node) {
-  return ParsedSyntaxResult<ParsedSyntaxNode>(node);
+/// Create a successful parser result.
+template <typename Syntax, typename AST>
+static inline SyntaxParserResult<Syntax, AST>
+makeSyntaxResult(llvm::Optional<Syntax> &&SyntaxNode, AST *ASTNode) {
+  return SyntaxParserResult<Syntax, AST>(std::move(SyntaxNode), ASTNode);
 }
 
-template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedError(ParsedSyntaxNode node) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
-  result.setIsError();
-  return result;
+/// Create a result with the specified status.
+template <typename Syntax, typename AST>
+static inline SyntaxParserResult<Syntax, AST>
+makeSyntaxResult(ParserStatus Status, llvm::Optional<Syntax> &&SyntaxNode,
+                 AST *ASTNode) {
+  return SyntaxParserResult<Syntax, AST>(Status, std::move(SyntaxNode), ASTNode);
 }
 
-template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode> makeParsedError() {
-  return ParsedSyntaxResult<ParsedSyntaxNode>();
-}
-
-template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedCodeCompletion(ParsedSyntaxNode node) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
-  result.setHasCodeCompletion();
-  return result;
-}
-
-template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedResult(ParsedSyntaxNode node, ParserStatus Status) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
-  if (Status.hasCodeCompletion())
-    result.setHasCodeCompletion();
-  else if (Status.isError())
-    result.setIsError();
-  return result;
+/// Create a result (null or non-null) with error and code completion bits set.
+template <typename Syntax, typename AST>
+static inline SyntaxParserResult<Syntax, AST>
+makeSyntaxCodeCompletionResult(AST *Result = nullptr) {
+  SyntaxParserResult<Syntax, AST> SR;
+  if (Result)
+    SR = SyntaxParserResult<Syntax, AST>(None, Result);
+  SR.setHasCodeCompletion();
+  return SR;
 }
 
 } // namespace swift

@@ -64,8 +64,7 @@ static CanType getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
   // that's a real thing.
   if (results.size() == 1) {
     if (auto typeDecl = dyn_cast<TypeDecl>(results[0]))
-      if (typeDecl->hasInterfaceType())
-        return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
+      return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
   }
   return CanType();
 }
@@ -86,6 +85,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/OpenCLExtensionTypes.def"
+#define SVE_TYPE(Name, Id, SingletonId)                                        \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/AArch64SVEACLETypes.def"
   }
 
   llvm_unreachable("Not a valid BuiltinType.");
@@ -156,8 +159,6 @@ public:
   clang::CanQualType visitBuiltinRawPointerType(CanBuiltinRawPointerType type);
   clang::CanQualType visitBuiltinIntegerType(CanBuiltinIntegerType type);
   clang::CanQualType visitBuiltinFloatType(CanBuiltinFloatType type);
-  clang::CanQualType visitBuiltinUnknownObjectType(
-                                                CanBuiltinUnknownObjectType type);
   clang::CanQualType visitArchetypeType(CanArchetypeType type);
   clang::CanQualType visitSILFunctionType(CanSILFunctionType type);
   clang::CanQualType visitGenericTypeParamType(CanGenericTypeParamType type);
@@ -575,7 +576,8 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   if (allResults.empty()) {
     resultType = clangCtx.VoidTy;
   } else {
-    resultType = Converter.convert(IGM, allResults[0].getType());
+    resultType = Converter.convert(IGM,
+                   allResults[0].getReturnValueType(IGM.getSILModule(), type));
     if (resultType.isNull())
       return clang::CanQualType();
   }
@@ -598,7 +600,8 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("block takes indirect parameter");
     }
-    auto param = Converter.convert(IGM, paramTy.getType());
+    auto param = Converter.convert(IGM,
+                             paramTy.getArgumentType(IGM.getSILModule(), type));
     if (param.isNull())
       return clang::CanQualType();
     paramTypes.push_back(param);
@@ -703,13 +706,6 @@ clang::CanQualType GenClangType::visitBuiltinFloatType(
   llvm_unreachable("cannot translate floating-point format to C");
 }
 
-clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(
-  CanBuiltinUnknownObjectType type) {
-  auto &clangCtx = getClangASTContext();
-  auto ptrTy = clangCtx.getObjCObjectPointerType(clangCtx.VoidTy);
-  return clangCtx.getCanonicalType(ptrTy);
-}
-
 clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
   // We see these in the case where we invoke an @objc function
   // through a protocol.
@@ -779,11 +775,13 @@ clang::CanQualType IRGenModule::getClangType(SILType type) {
   return getClangType(type.getASTType());
 }
 
-clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
-  auto clangType = getClangType(params.getSILStorageType());
+clang::CanQualType IRGenModule::getClangType(SILParameterInfo params,
+                                             CanSILFunctionType funcTy) {
+  auto paramTy = params.getSILStorageType(getSILModule(), funcTy);
+  auto clangType = getClangType(paramTy);
   // @block_storage types must be @inout_aliasable and have
   // special lowering
-  if (!params.getSILStorageType().is<SILBlockStorageType>()) {
+  if (!paramTy.is<SILBlockStorageType>()) {
     if (params.isIndirectMutating()) {
       return getClangASTContext().getPointerType(clangType);
     }

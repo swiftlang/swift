@@ -43,14 +43,14 @@ Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} ${child.nam
   assert(${child_elt_name}s.empty() && "use either 'use' function or 'add', not both");
 %       end
   Layout[cursorIndex(${node.name}::Cursor::${child.name})] =
-    ${child.name}.getRaw();
+    ${child.name}.takeRaw();
   return *this;
 }
 %       if child_elt:
 Parsed${node.name}Builder &
 Parsed${node.name}Builder::add${child_elt_name}(Parsed${child_elt_type} ${child_elt}) {
   assert(Layout[cursorIndex(${node.name}::Cursor::${child.name})].isNull() && "use either 'use' function or 'add', not both");
-  ${child_elt_name}s.push_back(std::move(${child_elt}.getRaw()));
+  ${child_elt_name}s.push_back(${child_elt}.takeRaw());
   return *this;
 }
 %       end

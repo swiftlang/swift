@@ -7,7 +7,7 @@
 // DUMPOFM: {{.*}}/Inputs/main.swift -> object: "/build/main.o"
 // DUMPOFM: {{.*}}/basic_output_file_map.swift -> object: "/build/basic_output_file_map.o"
 
-// BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}/basic_output_file_map.swift"], output: {object: "/build/basic_output_file_map.o"}
-// BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}/Inputs/main.swift"], output: {object: "/build/main.o"}
-// BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{c?(\.EXE)?}}", inputs: ["{{.*}}/Inputs/lib.swift"], output: {object: "/build/lib.o"}
+// BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{c?(\.exe)?}}", inputs: ["{{.*}}/basic_output_file_map.swift"], output: {object: "/build/basic_output_file_map.o"}
+// BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{c?(\.exe)?}}", inputs: ["{{.*}}/Inputs/main.swift"], output: {object: "/build/main.o"}
+// BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{c?(\.exe)?}}", inputs: ["{{.*}}/Inputs/lib.swift"], output: {object: "/build/lib.o"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "ld{{(\.exe)?}}", inputs: ["/build/basic_output_file_map.o", "/build/main.o", "/build/lib.o"], output: {image: "/build/basic_output_file_map.out"}

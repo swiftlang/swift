@@ -23,6 +23,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -134,9 +135,7 @@ public:
   Stmt *walk(ASTWalker &walker);
   Stmt *walk(ASTWalker &&walker) { return walk(walker); }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -173,10 +172,13 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
+  bool empty() const { return getNumElements() == 0; }
   unsigned getNumElements() const { return Bits.BraceStmt.NumElements; }
 
-  ASTNode getElement(unsigned i) const { return getElements()[i]; }
-  void setElement(unsigned i, ASTNode node) { getElements()[i] = node; }
+  ASTNode getFirstElement() const { return getElements().front(); }
+  ASTNode getLastElement() const { return getElements().back(); }
+
+  void setFirstElement(ASTNode node) { getElements().front() = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
@@ -805,7 +807,7 @@ class ForEachStmt : public LabeledStmt {
   BraceStmt *Body;
 
   // Set by Sema:
-  Optional<ProtocolConformanceRef> sequenceConformance;
+  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
   ConcreteDeclRef makeIterator;
   ConcreteDeclRef iteratorNext;
   VarDecl *iteratorVar = nullptr;
@@ -842,10 +844,10 @@ public:
   void setIteratorNext(ConcreteDeclRef declRef) { iteratorNext = declRef; }
   ConcreteDeclRef getIteratorNext() const { return iteratorNext; }
 
-  void setSequenceConformance(Optional<ProtocolConformanceRef> conformance) {
+  void setSequenceConformance(ProtocolConformanceRef conformance) {
     sequenceConformance = conformance;
   }
-  Optional<ProtocolConformanceRef> getSequenceConformance() const {
+  ProtocolConformanceRef getSequenceConformance() const {
     return sequenceConformance;
   }
 

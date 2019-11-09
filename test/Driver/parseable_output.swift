@@ -6,8 +6,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c -primary-file {{.*[\\/]}}parseable_output.swift{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output-[[OUTPUT:.*]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*[\\/]}}parseable_output.swift{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output-[[OUTPUT:.*]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -37,6 +37,10 @@
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output-[[OUTPUT]].swiftdoc"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output-[[OUTPUT]].swiftsourceinfo"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "diagnostics",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output-[[OUTPUT]].dia"
 // CHECK-NEXT:     }
@@ -63,8 +67,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}parseable_output-[[OUTPUT]].swiftmodule{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output.swift.tmp.swiftmodule{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}parseable_output-[[OUTPUT]].swiftmodule{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output.swift.tmp.swiftmodule{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-merge-modules",
@@ -84,6 +88,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output.swift.tmp.swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output.swift.tmp.swiftsourceinfo"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "objc-header",

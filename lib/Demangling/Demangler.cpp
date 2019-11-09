@@ -317,6 +317,7 @@ Node::iterator Node::end() const {
 }
 
 void Node::addChild(NodePointer Child, NodeFactory &Factory) {
+  assert(Child);
   switch (NodePayloadKind) {
     case PayloadKind::None:
       InlineChildren[0] = Child;
@@ -411,7 +412,7 @@ void NodeFactory::clear() {
   assert(!isBorrowed);
   if (CurrentSlab) {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "## clear: allocated memory = " << allocatedMemory  << "\n";
+    fprintf(stderr, "%s## clear: allocated memory = %zu\n", indent().c_str(), allocatedMemory);
 #endif
 
     freeSlabs(CurrentSlab->Previous);
@@ -493,11 +494,13 @@ void Demangler::clear() {
 }
 
 Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
-                                              StringRef MangledName)
+        StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> TheSymbolicReferenceResolver)
 // Save the current demangler state so we can restore it.
   : Dem(Dem),
     NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
-    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos)
+    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
+    SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
   // Reset the demangler state for a nested job.
   Dem.NodeStack.init(Dem, 16);
@@ -505,6 +508,7 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   Dem.NumWords = 0;
   Dem.Text = MangledName;
   Dem.Pos = 0;
+  Dem.SymbolicReferenceResolver = std::move(TheSymbolicReferenceResolver);
 }
 
 Demangler::DemangleInitRAII::~DemangleInitRAII() {
@@ -514,10 +518,13 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   Dem.NumWords = NumWords;
   Dem.Text = Text;
   Dem.Pos = Pos;
+  Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
 }
 
-NodePointer Demangler::demangleSymbol(StringRef MangledName) {
-  DemangleInitRAII state(*this, MangledName);
+NodePointer Demangler::demangleSymbol(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
 
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
@@ -561,8 +568,10 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   return topLevel;
 }
 
-NodePointer Demangler::demangleType(StringRef MangledName) {
-  DemangleInitRAII state(*this, MangledName);
+NodePointer Demangler::demangleType(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
 
   parseAndPushNodes();
 
@@ -701,6 +710,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
   NodePointer resolved = nullptr;
   if (SymbolicReferenceResolver)
     resolved = SymbolicReferenceResolver(kind, direct, value, at);
+    
   // With no resolver, or a resolver that failed, refuse to demangle further.
   if (!resolved)
     return nullptr;
@@ -1568,6 +1578,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::ExplicitClosure:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
       return false;
     default:
       return true;
@@ -2925,6 +2936,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
+    case 'P':
+      Args = None;
+      Kind = Node::Kind::PropertyWrapperBackingInitializer;
+      break;
     default: return nullptr;
   }
 

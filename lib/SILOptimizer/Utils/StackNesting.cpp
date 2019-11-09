@@ -139,7 +139,7 @@ bool StackNesting::solve() {
     changed = false;
 
     // It's a backward dataflow problem.
-    for (BlockInfo &BI : reversed(BlockInfos)) {
+    for (BlockInfo &BI : llvm::reverse(BlockInfos)) {
       // Collect the alive-bits (at the block exit) from the successor blocks.
       for (BlockInfo *SuccBI : BI.Successors) {
         BI.AliveStackLocsAtExit |= SuccBI->AliveStackLocsAtEntry;
@@ -158,7 +158,7 @@ bool StackNesting::solve() {
         }
         BI.AliveStackLocsAtExit = Bits;
       }
-      for (SILInstruction *StackInst : reversed(BI.StackInsts)) {
+      for (SILInstruction *StackInst : llvm::reverse(BI.StackInsts)) {
         if (StackInst->isAllocatingStack()) {
           int BitNr = bitNumberForAlloc(StackInst);
           if (Bits != StackLocs[BitNr].AliveLocs) {
@@ -246,7 +246,7 @@ bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
 //   dealloc_stack %1
 StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
   Changes changes = Changes::None;
-  for (const BlockInfo &BI : reversed(BlockInfos)) {
+  for (const BlockInfo &BI : llvm::reverse(BlockInfos)) {
     for (unsigned SuccIdx = 0, NumSuccs = BI.Successors.size();
          SuccIdx < NumSuccs; ++SuccIdx) {
 
@@ -280,11 +280,11 @@ bool StackNesting::adaptDeallocs() {
 
   // Visit all blocks. Actually the order doesn't matter, but let's to it in
   // the same order as in solve().
-  for (const BlockInfo &BI : reversed(BlockInfos)) {
+  for (const BlockInfo &BI : llvm::reverse(BlockInfos)) {
     Bits = BI.AliveStackLocsAtExit;
 
     // Insert/remove deallocations inside blocks.
-    for (SILInstruction *StackInst : reversed(BI.StackInsts)) {
+    for (SILInstruction *StackInst : llvm::reverse(BI.StackInsts)) {
       if (StackInst->isAllocatingStack()) {
         // For allocations we just update the bit-set.
         int BitNr = bitNumberForAlloc(StackInst);

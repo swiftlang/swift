@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeRepr.h"

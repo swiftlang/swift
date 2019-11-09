@@ -14,7 +14,7 @@ if let realRoomName = roomName as! NSString { // expected-warning{{forced cast f
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}} // expected-note{{expected an argument list of type '(CGFloat, CGFloat)'}}
+var dpi:CGFloat = d*pi // expected-error@:21{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
 
 let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
 
@@ -22,8 +22,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists:}}
 
-if (1) {} // expected-error{{'Int' is not convertible to 'Bool'}}
-if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
+if (1) {} // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+if 1 {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
@@ -90,10 +90,10 @@ func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
 func insertA<T>(array : inout [T], elt : T) {
-  array.append(T.self); // expected-error {{cannot invoke 'append' with an argument list of type '(T.Type)'}} expected-note {{expected an argument list of type '(__owned T)'}}
+  array.append(T.self); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T'}}
 
   // FIXME: Kind of weird
-  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}} expected-note {{expected an argument list of type '(__owned T)'}}
+  array.append(T); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T'}}
 }
 
 // <rdar://problem/17875634> can't append to array of tuples
@@ -103,14 +103,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note@-1 {{overloads for '+=' exist with these partially matching parameter lists: (inout Array<Element>, Array<Element>), (inout Self, Other)}}
+  match += (1, 2) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
 
-  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)}}
-  // expected-note@-1 {{overloads for '+=' exist with these partially matching parameter lists: (inout Array<Element>, Array<Element>), (inout Self, Other)}}
+  match += (row, col) // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
 
-  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  // expected-note@-1 {{overloads for '+=' exist with these partially matching parameter lists: (inout Array<Element>, Array<Element>), (inout Self, Other)}}
+  match += coord // expected-error{{cannot convert value of type '(Int, Int)' to expected argument type 'Array<(Int, Int)>'}}
 
   match.append(row, col) // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 
@@ -140,9 +137,9 @@ func test20770032() {
 
 func tuple_splat1(_ a : Int, _ b : Int) { // expected-note 2 {{'tuple_splat1' declared here}}
   let x = (1,2)
-  tuple_splat1(x)          // expected-error {{missing argument for parameter #2 in call}}
+  tuple_splat1(x)          // expected-error {{global function 'tuple_splat1' expects 2 separate arguments}}
   tuple_splat1(1, 2)       // Ok.
-  tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
+  tuple_splat1((1, 2))     // expected-error {{global function 'tuple_splat1' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
 }
 
 // This take a tuple as a value, so it isn't a tuple splat.

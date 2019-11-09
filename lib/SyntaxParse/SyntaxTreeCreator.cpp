@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/OwnedString.h"
 #include "RawSyntaxTokenCache.h"
 
@@ -172,4 +173,10 @@ SyntaxTreeCreator::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
   size_t length = raw->getTextLength();
   raw.resetWithoutRelease();
   return {length, opaqueN};
+}
+
+void SyntaxTreeCreator::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
+  if (!opaqueN)
+    return;
+  static_cast<RawSyntax *>(opaqueN)->Release();
 }

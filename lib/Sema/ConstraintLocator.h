@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINTLOCATOR_H
 #define SWIFT_SEMA_CONSTRAINTLOCATOR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -53,90 +54,9 @@ public:
   /// Describes the kind of a particular path element, e.g.,
   /// "tuple element", "call result", "base of member lookup", etc.
   enum PathElementKind : unsigned char {
-    /// The argument of function application.
-    ApplyArgument,
-    /// The function being applied.
-    ApplyFunction,
-    /// Matching an argument to a parameter.
-    ApplyArgToParam,
-    /// A generic parameter being opened.
-    ///
-    /// Also contains the generic parameter type itself.
-    GenericParameter,
-    /// The argument type of a function.
-    FunctionArgument,
-    /// The result type of a function.
-    FunctionResult,
-    /// A tuple element referenced by position.
-    TupleElement,
-    /// A tuple element referenced by name.
-    NamedTupleElement,
-    /// An optional payload.
-    OptionalPayload,
-    /// A generic argument.
-    /// FIXME: Add support for named generic arguments?
-    GenericArgument,
-    /// A member.
-    /// FIXME: Do we need the actual member name here?
-    Member,
-    /// An unresolved member.
-    UnresolvedMember,
-    /// The base of a member expression.
-    MemberRefBase,
-    /// The lookup for a subscript member.
-    SubscriptMember,
-    /// The lookup for a constructor member.
-    ConstructorMember,
-    /// An implicit @lvalue-to-inout conversion; only valid for operator
-    /// arguments.
-    LValueConversion,
-    /// RValue adjustment.
-    RValueAdjustment,
-    /// The result of a closure.
-    ClosureResult,
-    /// The parent of a nested type.
-    ParentType,
-    /// The superclass of a protocol existential type.
-    ExistentialSuperclassType,
-    /// The instance of a metatype type.
-    InstanceType,
-    /// The element type of a sequence in a for ... in ... loop.
-    SequenceElementType,
-    /// An argument passed in an autoclosure parameter
-    /// position, which must match the autoclosure return type.
-    AutoclosureResult,
-    /// The requirement that we're matching during protocol conformance
-    /// checking.
-    Requirement,
-    /// The candidate witness during protocol conformance checking.
-    Witness,
-    /// This is referring to a type produced by opening a generic type at the
-    /// base of the locator.
-    OpenedGeneric,
-    /// A component of a key path.
-    KeyPathComponent,
-    /// The Nth conditional requirement in the parent locator's conformance.
-    ConditionalRequirement,
-    /// A single requirement placed on the type parameters.
-    TypeParameterRequirement,
-    /// Locator for a binding from an IUO disjunction choice.
-    ImplicitlyUnwrappedDisjunctionChoice,
-    /// A result of an expression involving dynamic lookup.
-    DynamicLookupResult,
-    /// The desired contextual type passed in to the constraint system.
-    ContextualType,
-    /// The missing argument synthesized by the solver.
-    SynthesizedArgument,
-    /// The member looked up via keypath based dynamic lookup.
-    KeyPathDynamicMember,
-    /// The type of the key path expression
-    KeyPathType,
-    /// The root of a key path
-    KeyPathRoot,
-    /// The value of a key path
-    KeyPathValue,
-    /// The result type of a key path component. Not used for subscripts.
-    KeyPathComponentResult,
+#define LOCATOR_PATH_ELT(Name) Name,
+#define ABSTRACT_LOCATOR_PATH_ELT(Name)
+#include "ConstraintLocatorPathElts.def"
   };
 
   /// Determine the number of numeric values used for the given path
@@ -162,7 +82,7 @@ public:
     case ExistentialSuperclassType:
     case SequenceElementType:
     case AutoclosureResult:
-    case Requirement:
+    case ProtocolRequirement:
     case Witness:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
@@ -170,6 +90,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case Condition:
       return 0;
 
     case ContextualType:
@@ -184,8 +105,10 @@ public:
 
     case TypeParameterRequirement:
     case ConditionalRequirement:
-    case ApplyArgToParam:
       return 2;
+
+    case ApplyArgToParam:
+      return 3;
     }
 
     llvm_unreachable("Unhandled PathElementKind in switch.");
@@ -201,55 +124,11 @@ public:
     /// Does this path involve a function conversion, i.e. a
     /// FunctionArgument or FunctionResult node?
     IsFunctionConversion = 0x1,
+
+    /// Does this path involve an argument being applied to a non-ephemeral
+    /// parameter?
+    IsNonEphemeralParam = 0x2,
   };
-
-  static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
-    switch (kind) {
-    case ApplyArgument:
-    case ApplyFunction:
-    case ApplyArgToParam:
-    case SequenceElementType:
-    case ClosureResult:
-    case ConstructorMember:
-    case InstanceType:
-    case AutoclosureResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case ParentType:
-    case ExistentialSuperclassType:
-    case LValueConversion:
-    case RValueAdjustment:
-    case SubscriptMember:
-    case OpenedGeneric:
-    case GenericParameter:
-    case GenericArgument:
-    case NamedTupleElement:
-    case TupleElement:
-    case Requirement:
-    case Witness:
-    case KeyPathComponent:
-    case ConditionalRequirement:
-    case TypeParameterRequirement:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
-    case ContextualType:
-    case SynthesizedArgument:
-    case KeyPathDynamicMember:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
-      return 0;
-
-    case FunctionArgument:
-    case FunctionResult:
-      return IsFunctionConversion;
-    }
-
-    llvm_unreachable("Unhandled PathElementKind in switch.");
-  }
 
   /// One element in the path of a locator, which can include both
   /// a kind (PathElementKind) and a value used to describe specific
@@ -258,7 +137,7 @@ public:
     /// Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredGenericParameter,
-      StoredRequirement,
+      StoredProtocolRequirement,
       StoredWitness,
       StoredGenericSignature,
       StoredKeyPathDynamicMemberBase,
@@ -282,12 +161,12 @@ public:
     uint64_t storedKind : 3;
 
     /// Encode a path element kind and a value into the storage format.
-    static uint64_t encodeStorage(PathElementKind kind, unsigned value) {
-      return ((uint64_t)value << 8) | kind;
+    static uint64_t encodeStorage(PathElementKind kind, uint64_t value) {
+      return (value << 8) | kind;
     }
 
     /// Decode a storage value into path element kind and value.
-    static std::pair<PathElementKind, unsigned>
+    static std::pair<PathElementKind, uint64_t>
     decodeStorage(uint64_t storage) {
       return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
     }
@@ -323,6 +202,17 @@ public:
       assert(value1 == getValue(1) && "value1 truncated");
     }
 
+    PathElement(PathElementKind kind, uint64_t value0, uint64_t value1,
+                uint64_t value2)
+        : storage(encodeStorage(kind, value0 << 32 | value1 << 16 | value2)),
+          storedKind(StoredKindAndValue) {
+      assert(numNumericValuesInPathElement(kind) == 3 &&
+             "Path element kind does not require 3 values");
+      assert(value0 == getValue(0) && "value0 truncated");
+      assert(value1 == getValue(1) && "value1 truncated");
+      assert(value2 == getValue(2) && "value2 truncated");
+    }
+
     /// Store a path element with an associated pointer, accessible using
     /// \c getStoredPointer.
     template <typename T>
@@ -343,22 +233,8 @@ public:
     friend class ConstraintLocator;
 
   public:
-    class ApplyArgToParam;
-    class SynthesizedArgument;
-    class AnyTupleElement;
-    class TupleElement;
-    class NamedTupleElement;
-    class KeyPathComponent;
-    class GenericArgument;
-    class AnyRequirement;
-    class ConditionalRequirement;
-    class TypeParameterRequirement;
-    class ContextualType;
-    class Witness;
-    class Requirement;
-    class GenericParameter;
-    class OpenedGeneric;
-    class KeyPathDynamicMember;
+#define LOCATOR_PATH_ELT(Name) class Name;
+#include "ConstraintLocatorPathElts.def"
 
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -373,8 +249,8 @@ public:
       case StoredGenericParameter:
         return PathElementKind::GenericParameter;
 
-      case StoredRequirement:
-        return PathElementKind::Requirement;
+      case StoredProtocolRequirement:
+        return PathElementKind::ProtocolRequirement;
 
       case StoredWitness:
         return PathElementKind::Witness;
@@ -411,9 +287,7 @@ public:
     bool is() const { return isa<T>(this); }
 
     /// Return the summary flags for this particular element.
-    unsigned getNewSummaryFlags() const {
-      return getSummaryFlagsForPathElement(getKind());
-    }
+    unsigned getNewSummaryFlags() const;
 
     bool isConditionalRequirement() const {
       return getKind() == PathElementKind::ConditionalRequirement;
@@ -460,6 +334,12 @@ public:
   /// conversion.
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
+  }
+
+  /// Checks whether this locator is describing an argument application for a
+  /// non-ephemeral parameter.
+  bool isNonEphemeralParameterApplication() const {
+    return (getSummaryFlags() & IsNonEphemeralParam);
   }
 
   /// Determine whether given locator points to the subscript reference
@@ -523,9 +403,13 @@ public:
     return path[0].castTo<T>();
   }
 
-  /// Check whether the last element in the path of this locator
-  /// is of a given kind.
-  bool isLastElement(ConstraintLocator::PathElementKind kind) const;
+  /// Check whether the last element in the path of this locator (if any)
+  /// is a given \c LocatorPathElt subclass.
+  template <class T>
+  bool isLastElement() const {
+    auto path = getPath();
+    return !path.empty() && path.back().is<T>();
+  }
 
   /// Attempts to cast the last path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
@@ -618,14 +502,10 @@ public:
   }
   
   /// Produce a debugging dump of this locator.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
-  void dump(SourceManager *SM, raw_ostream &OS) LLVM_ATTRIBUTE_USED;
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 
 private:
   /// Initialize a constraint locator with an anchor and a path.
@@ -687,6 +567,16 @@ template <class X>
 inline typename llvm::cast_retty<X, LocatorPathElt>::ret_type
 dyn_cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::getAs instead.
 
+#define SIMPLE_LOCATOR_PATH_ELT(Name) \
+class LocatorPathElt:: Name final : public LocatorPathElt { \
+public: \
+  Name () : LocatorPathElt(ConstraintLocator:: Name) {} \
+                                                        \
+  static bool classof(const LocatorPathElt *elt) { \
+    return elt->getKind() == ConstraintLocator:: Name; \
+  } \
+};
+#include "ConstraintLocatorPathElts.def"
 
 // The following LocatorPathElt subclasses are used to expose accessors for
 // specific path element information. They shouldn't introduce additional
@@ -694,11 +584,15 @@ dyn_cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::getAs instead.
 
 class LocatorPathElt::ApplyArgToParam final : public LocatorPathElt {
 public:
-  ApplyArgToParam(unsigned argIdx, unsigned paramIdx)
-      : LocatorPathElt(ConstraintLocator::ApplyArgToParam, argIdx, paramIdx) {}
+  ApplyArgToParam(unsigned argIdx, unsigned paramIdx, ParameterTypeFlags flags)
+      : LocatorPathElt(ConstraintLocator::ApplyArgToParam, argIdx, paramIdx,
+                       flags.toRaw()) {}
 
   unsigned getArgIdx() const { return getValue(0); }
   unsigned getParamIdx() const { return getValue(1); }
+  ParameterTypeFlags getParameterFlags() const {
+    return ParameterTypeFlags::fromRaw(getValue(2));
+  }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ApplyArgToParam;
@@ -852,15 +746,15 @@ public:
   }
 };
 
-class LocatorPathElt::Requirement final : public LocatorPathElt {
+class LocatorPathElt::ProtocolRequirement final : public LocatorPathElt {
 public:
-  Requirement(ValueDecl *decl)
-      : LocatorPathElt(LocatorPathElt::StoredRequirement, decl) {}
+  ProtocolRequirement(ValueDecl *decl)
+      : LocatorPathElt(LocatorPathElt::StoredProtocolRequirement, decl) {}
 
   ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::Requirement;
+    return elt->getKind() == ConstraintLocator::ProtocolRequirement;
   }
 };
 
@@ -883,11 +777,12 @@ public:
 
 class LocatorPathElt::OpenedGeneric final : public LocatorPathElt {
 public:
-  OpenedGeneric(GenericSignature *sig)
-      : LocatorPathElt(LocatorPathElt::StoredGenericSignature, sig) {}
+  OpenedGeneric(GenericSignature sig)
+      : LocatorPathElt(LocatorPathElt::StoredGenericSignature,
+                       sig.getPointer()) {}
 
-  GenericSignature *getSignature() const {
-    return getStoredPointer<GenericSignature>();
+  GenericSignature getSignature() const {
+    return getStoredPointer<GenericSignatureImpl>();
   }
 
   static bool classof(const LocatorPathElt *elt) {
@@ -976,6 +871,12 @@ public:
       return last->getKind() == ConstraintLocator::AutoclosureResult;
 
     return false;
+  }
+
+  /// Checks whether this locator is describing an argument application for a
+  /// non-ephemeral parameter.
+  bool isNonEphemeralParameterApplication() const {
+    return (getSummaryFlags() & ConstraintLocator::IsNonEphemeralParam);
   }
 
   /// Retrieve the base constraint locator, on which this builder's

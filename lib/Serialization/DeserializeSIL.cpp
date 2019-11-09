@@ -266,7 +266,7 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
   // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Any);
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::None);
   else if (Id == 1)
     return SILUndef::get(Type, SILMod, ValueOwnershipKind::Owned);
 
@@ -653,7 +653,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    if (auto *genericSig = MF->getGenericSignature(genericSigID))
+    if (auto genericSig = MF->getGenericSignature(genericSigID))
       genericEnv = genericSig->getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
@@ -1678,12 +1678,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (Atomicity)Attr);          \
     break;
 
-#define UNCHECKED_REF_STORAGE(Name, ...) UNARY_INSTRUCTION(Copy##Name##Value)
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  REFCOUNTING_INSTRUCTION(Name##Retain) \
-  REFCOUNTING_INSTRUCTION(Name##Release) \
-  REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
-  UNARY_INSTRUCTION(Copy##Name##Value)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  REFCOUNTING_INSTRUCTION(Name##Retain)                                        \
+  REFCOUNTING_INSTRUCTION(Name##Release)                                       \
+  REFCOUNTING_INSTRUCTION(StrongRetain##Name)                                  \
+  UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
   REFCOUNTING_INSTRUCTION(RetainValue)
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
@@ -2446,7 +2447,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SmallVector<Requirement, 4> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
     
-    CanGenericSignature sig = nullptr;
+    CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
       sig = GenericSignature::get(genericParams, requirements)
          ->getCanonicalSignature();

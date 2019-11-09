@@ -75,9 +75,9 @@ private:
   union {
    BeginAccessInst *Inst;
     struct {
-      SILAccessKind ClosureAccessKind;
-      SILLocation ClosureAccessLoc;
-    };
+      SILAccessKind AccessKind;
+      SILLocation AccessLoc;
+    } Closure;
   };
 
   const IndexTrieNode *SubPath;
@@ -89,7 +89,7 @@ public:
   RecordedAccess(SILAccessKind ClosureAccessKind,
                  SILLocation ClosureAccessLoc, const IndexTrieNode *SubPath) :
       RecordKind(RecordedAccessKind::NoescapeClosureCapture),
-      ClosureAccessKind(ClosureAccessKind), ClosureAccessLoc(ClosureAccessLoc),
+      Closure({ClosureAccessKind, ClosureAccessLoc}),
       SubPath(SubPath) { }
 
   RecordedAccessKind getRecordKind() const {
@@ -106,7 +106,7 @@ public:
       case RecordedAccessKind::BeginInstruction:
         return Inst->getAccessKind();
       case RecordedAccessKind::NoescapeClosureCapture:
-        return ClosureAccessKind;
+        return Closure.AccessKind;
     };
     llvm_unreachable("unhandled kind");
   }
@@ -116,7 +116,7 @@ public:
       case RecordedAccessKind::BeginInstruction:
         return Inst->getLoc();
       case RecordedAccessKind::NoescapeClosureCapture:
-        return ClosureAccessLoc;
+        return Closure.AccessLoc;
     };
     llvm_unreachable("unhandled kind");
   }

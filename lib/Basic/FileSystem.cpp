@@ -257,6 +257,7 @@ std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
     // Files are different; overwrite the destination file.
     return fs::rename(source, destination);
   }
+  llvm_unreachable("Unhandled FileDifference in switch");
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>

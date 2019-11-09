@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -38,6 +39,29 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
 static_assert(IsTriviallyDestructible<TypeAttributes>::value,
               "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
 
+#define DECL_ATTR(Name, Id, ...)                                                                     \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToAdd),     \
+              #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                        \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToRemove) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToRemove),     \
+              #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                     \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToAdd) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToAdd),     \
+              #Name " needs to specify either APIBreakingToAdd or APIStableToAdd");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                        \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToRemove) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
+              #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
+#include "swift/AST/Attr.def"
 
 // Only allow allocation of attributes using the allocator in ASTContext.
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
@@ -1102,7 +1126,7 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause,
                                bool exported,
                                SpecializationKind kind,
-                               GenericSignature *specializedSignature)
+                               GenericSignature specializedSignature)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause),
@@ -1120,7 +1144,7 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        TrailingWhereClause *clause,
                                        bool exported,
                                        SpecializationKind kind,
-                                       GenericSignature *specializedSignature) {
+                                       GenericSignature specializedSignature) {
   return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
                                   specializedSignature);
 }

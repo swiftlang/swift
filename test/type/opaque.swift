@@ -26,7 +26,7 @@ struct GenericProperty<T: P> {
 let (bim, bam): some P = (1, 2) // expected-error{{'some' type can only be declared on a single property declaration}}
 var computedProperty: some P {
   get { return 1 }
-  set { _ = newValue + 1 } // TODO expected-error{{}} expected-note{{}}
+  set { _ = newValue + 1 } // expected-error{{cannot convert value of type 'some P' to expected argument type 'Int'}}
 }
 struct SubscriptTest {
   subscript(_ x: Int) -> some P {
@@ -269,10 +269,10 @@ func associatedTypeIdentity() {
 
   sameType(cr, c.r_out())
   sameType(dr, d.r_out())
-  sameType(cr, dr) // expected-error{{}}
+  sameType(cr, dr) // expected-error{{}} expected-note {{}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
-  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
+  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}} expected-note {{}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
@@ -376,9 +376,9 @@ protocol P_51641323 {
 
 func rdar_51641323() {
   struct Foo: P_51641323 {
-    var foo: some P_51641323 { {} }
-    // expected-error@-1 {{return type of property 'foo' requires that '() -> ()' conform to 'P_51641323'}}
-    // expected-note@-2 {{opaque return type declared here}}
+    var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only struct/enum/class types can conform to protocols}}
+    }
   }
 }
 
@@ -402,9 +402,8 @@ func testCoercionDiagnostics() {
   opaque = SubscriptTest()[0] // expected-error {{cannot assign value of type 'some P' (result of 'SubscriptTest.subscript(_:)') to type 'some P' (result of 'foo()')}} {{none}}
 
   var opaqueOpt: Optional = opaque
-  // FIXME: It would be nice to show the "from" info here as well.
-  opaqueOpt = bar() // expected-error {{cannot assign value of type 'some P' to type '(some P)?'}} {{none}}
-  opaqueOpt = () // expected-error {{cannot assign value of type '()' to type '(some P)?'}} {{none}}
+  opaqueOpt = bar() // expected-error {{cannot assign value of type 'some P' (result of 'bar()') to type 'some P' (result of 'foo()')}} {{none}}
+  opaqueOpt = () // expected-error {{cannot assign value of type '()' to type 'some P'}} {{none}}
 }
 
 var globalVar: some P = 17

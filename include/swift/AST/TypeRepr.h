@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -160,9 +161,7 @@ public:
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Clone the given type representation.
   TypeRepr *clone(const ASTContext &ctx) const;
@@ -653,7 +652,7 @@ struct TupleTypeReprElement {
   TypeRepr *Type;
   SourceLoc TrailingCommaLoc;
 
-  TupleTypeReprElement() {}
+  TupleTypeReprElement(): Type(nullptr) {}
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 

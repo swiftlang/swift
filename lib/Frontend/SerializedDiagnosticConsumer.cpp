@@ -191,11 +191,7 @@ public:
     CompilationWasComplete = false;
   }
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
   /// The version of the diagnostics file.
   enum { Version = 1 };
@@ -543,15 +539,12 @@ emitDiagnosticMessage(SourceManager &SM,
 }
 
 void SerializedDiagnosticConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    SourceManager &SM, const DiagnosticInfo &Info) {
 
   // Enter the block for a non-note diagnostic immediately, rather
   // than waiting for beginDiagnostic, in case associated notes
   // are emitted before we get there.
-  if (Kind != DiagnosticKind::Note) {
+  if (Info.Kind != DiagnosticKind::Note) {
     if (State->EmittedAnyDiagBlocks)
       exitDiagBlock();
 
@@ -561,7 +554,7 @@ void SerializedDiagnosticConsumer::handleDiagnostic(
 
   // Special-case diagnostics with no location.
   // Make sure we bracket all notes as "sub-diagnostics".
-  bool bracketDiagnostic = (Kind == DiagnosticKind::Note);
+  bool bracketDiagnostic = (Info.Kind == DiagnosticKind::Note);
 
   if (bracketDiagnostic)
     enterDiagBlock();
@@ -570,10 +563,11 @@ void SerializedDiagnosticConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
-  
-  emitDiagnosticMessage(SM, Loc, Kind, Text, Info);
+
+  emitDiagnosticMessage(SM, Info.Loc, Info.Kind, Text, Info);
 
   if (bracketDiagnostic)
     exitDiagBlock();

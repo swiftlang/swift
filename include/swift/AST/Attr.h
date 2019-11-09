@@ -17,6 +17,7 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
@@ -65,6 +66,10 @@ public:
   Optional<StringRef> convention = None;
   Optional<StringRef> conventionWitnessMethodProtocol = None;
 
+  // Indicates whether the type's '@differentiable' attribute has a 'linear'
+  // argument.
+  bool linear = false;
+
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
   
@@ -79,7 +84,15 @@ public:
   TypeAttributes() {}
   
   bool isValid() const { return AtLoc.isValid(); }
-  
+
+  bool isLinear() const {
+    assert(
+        !linear ||
+        (linear && has(TAK_differentiable)) &&
+            "Linear shouldn't have been true if there's no `@differentiable`");
+    return linear;
+  }
+
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
   }
@@ -365,6 +378,18 @@ public:
 
     /// Whether removing this attribute can break ABI
     ABIBreakingToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 11),
+
+    /// The opposite of APIBreakingToAdd
+    APIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 12),
+
+    /// The opposite of APIBreakingToRemove
+    APIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 13),
+
+    /// The opposite of ABIBreakingToAdd
+    ABIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 14),
+
+    /// The opposite of ABIBreakingToRemove
+    ABIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 15),
   };
 
   LLVM_READNONE
@@ -450,6 +475,12 @@ public:
   static bool isAddingBreakingABI(DeclAttrKind DK) {
     return getOptions(DK) & ABIBreakingToAdd;
   }
+
+#define DECL_ATTR(_, CLASS, OPTIONS, ...)                                                         \
+  static constexpr bool isOptionSetFor##CLASS(DeclAttrOptions Bit) {                              \
+    return (OPTIONS) & Bit;                                                                       \
+  }
+#include "swift/AST/Attr.def"
 
   static bool isAddingBreakingAPI(DeclAttrKind DK) {
     return getOptions(DK) & APIBreakingToAdd;
@@ -1261,27 +1292,27 @@ public:
 
 private:
   TrailingWhereClause *trailingWhereClause;
-  GenericSignature *specializedSignature;
+  GenericSignature specializedSignature;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind,
-                 GenericSignature *specializedSignature);
+                 GenericSignature specializedSignature);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
                                 bool exported, SpecializationKind kind,
-                                GenericSignature *specializedSignature
+                                GenericSignature specializedSignature
                                     = nullptr);
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature *getSpecializedSgnature() const {
+  GenericSignature getSpecializedSgnature() const {
     return specializedSignature;
   }
 
-  void setSpecializedSignature(GenericSignature *newSig) {
+  void setSpecializedSignature(GenericSignature newSig) {
     specializedSignature = newSig;
   }
 
@@ -1565,7 +1596,7 @@ public:
   /// a declaration is deprecated on all deployment targets, or null otherwise.
   const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
 
-  void dump(const Decl *D = nullptr) const;
+  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
   static void print(ASTPrinter &Printer, const PrintOptions &Options,
@@ -1654,7 +1685,7 @@ private:
 public:
   template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<llvm::iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<const_iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
                              const_iterator>;
 

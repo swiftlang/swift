@@ -857,10 +857,10 @@ emitKeyPathComponent(IRGenModule &IGM,
               // Protocol requirement.
               auto conformance = subs.lookupConformance(
                            reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
-              externalSubArgs.push_back(
-                IGM.emitWitnessTableRefString(substType, *conformance,
-                      genericEnv ? genericEnv->getGenericSignature() : nullptr,
-                      /*shouldSetLowBit*/ true));
+              externalSubArgs.push_back(IGM.emitWitnessTableRefString(
+                  substType, conformance,
+                  genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                  /*shouldSetLowBit*/ true));
             }
           });
       }
@@ -929,7 +929,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         fnName.append("keypath_get_selector_");
         fnName.append(selectorName);
         auto fn = cast<llvm::Function>(
-          IGM.Module.getOrInsertFunction(fnName, fnTy));
+          IGM.Module.getOrInsertFunction(fnName, fnTy).getCallee());
         if (fn->empty()) {
           fn->setLinkage(llvm::Function::PrivateLinkage);
           IRGenFunction subIGF(IGM, fn);

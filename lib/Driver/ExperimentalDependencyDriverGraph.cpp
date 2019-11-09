@@ -478,6 +478,8 @@ void ModuleDepGraph::verifyNodeIsInRightEntryInNodeMap(
   const DependencyKey &nodeKey = n->getKey();
   const Optional<std::string> swiftDeps =
       swiftDepsString.empty() ? None : Optional<std::string>(swiftDepsString);
+  (void)nodeKey;
+  (void)swiftDeps;
   assert(n->getSwiftDeps() == swiftDeps ||
          mapCorruption("Node misplaced for swiftDeps"));
   assert(nodeKey == key || mapCorruption("Node misplaced for key"));

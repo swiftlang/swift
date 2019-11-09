@@ -21,6 +21,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -57,7 +58,7 @@ public:
 ///
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
         : private llvm::TrailingObjects<GenericEnvironment, Type> {
-  GenericSignature *Signature = nullptr;
+  GenericSignature Signature = GenericSignature();
   GenericSignatureBuilder *Builder = nullptr;
 
   friend TrailingObjects;
@@ -74,7 +75,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   /// generic signature.
   ArrayRef<Type> getContextTypes() const;
 
-  GenericEnvironment(GenericSignature *signature,
+  GenericEnvironment(GenericSignature signature,
                      GenericSignatureBuilder *builder);
 
   friend ArchetypeType;
@@ -85,7 +86,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   friend QueryInterfaceTypeSubstitutions;
 
 public:
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     return Signature;
   }
 
@@ -94,7 +95,7 @@ public:
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
-  GenericEnvironment *getIncomplete(GenericSignature *signature,
+  GenericEnvironment *getIncomplete(GenericSignature signature,
                                     GenericSignatureBuilder *builder);
 
   /// Add a mapping of a generic parameter to a specific type (which may be
@@ -160,7 +161,7 @@ public:
 
   void dump(raw_ostream &os) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 };
   
 } // end namespace swift

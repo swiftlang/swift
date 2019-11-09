@@ -15,7 +15,7 @@ public class DerivedClass<Result> : BaseClass<Int, Result> {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s34vtable_thunks_reabstraction_modify12DerivedClassC8callbackyxSicvMAA04BaseF0CADyq_xcvMTV : $@yield_once @convention(method) <Result> (@guaranteed DerivedClass<Result>) -> @yields @inout @callee_guaranteed (@in_guaranteed Int) -> @out Result {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s34vtable_thunks_reabstraction_modify12DerivedClassC8callbackyxSicvMAA04BaseF0CADyq_xcvMTV : $@yield_once @convention(method) <Result> (@guaranteed DerivedClass<Result>) -> @yields @inout @callee_guaranteed (@in_guaranteed Int) -> @out Result {
 // CHECK: [[DERIVED:%.*]] = function_ref @$s34vtable_thunks_reabstraction_modify12DerivedClassC8callbackyxSicvM : $@yield_once @convention(method) <τ_0_0> (@guaranteed DerivedClass<τ_0_0>) -> @yields @inout @callee_guaranteed (Int) -> @out τ_0_0
 // CHECK: ([[RESULT_BUF:%.*]], [[TOKEN:%.*]]) = begin_apply [[DERIVED]]<Result>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed DerivedClass<τ_0_0>) -> @yields @inout @callee_guaranteed (Int) -> @out τ_0_0
 // CHECK: [[OUTER_RESULT_BUF:%.*]] = alloc_stack $@callee_guaranteed (@in_guaranteed Int) -> @out Result

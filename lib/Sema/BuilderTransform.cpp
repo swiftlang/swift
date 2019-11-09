@@ -53,7 +53,7 @@ private:
   Expr *buildCallIfWanted(SourceLoc loc,
                           Identifier fnName, ArrayRef<Expr *> args,
                           ArrayRef<Identifier> argLabels,
-                          bool allowOneWay) {
+                          bool oneWay) {
     if (!wantExpr)
       return nullptr;
 
@@ -87,7 +87,7 @@ private:
                                     /*trailing closure*/ nullptr,
                                     /*implicit*/true);
 
-    if (ctx.LangOpts.FunctionBuilderOneWayConstraints && allowOneWay) {
+    if (oneWay) {
       // Form a one-way constraint to prevent backward propagation.
       result = new (ctx) OneWayExpr(result);
     }
@@ -169,8 +169,15 @@ public:
       }
 
       auto expr = node.get<Expr *>();
-      if (wantExpr && ctx.LangOpts.FunctionBuilderOneWayConstraints)
+      if (wantExpr) {
+        if (builderSupports(ctx.Id_buildExpression)) {
+          expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
+                                   { expr }, { Identifier() },
+                                   /*oneWay=*/false);
+        }
+
         expr = new (ctx) OneWayExpr(expr);
+      }
 
       expressions.push_back(expr);
     }
@@ -179,7 +186,7 @@ public:
     return buildCallIfWanted(braceStmt->getStartLoc(),
                              ctx.Id_buildBlock, expressions,
                              /*argLabels=*/{ },
-                             /*allowOneWay=*/true);
+                             /*oneWay=*/true);
   }
 
   Expr *visitReturnStmt(ReturnStmt *stmt) {
@@ -205,7 +212,7 @@ public:
       return nullptr;
 
     return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg,
-                             /*argLabels=*/{ }, /*allowOneWay=*/true);
+                             /*argLabels=*/{ }, /*oneWay=*/true);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -292,8 +299,8 @@ public:
       chainExpr = buildCallIfWanted(ifStmt->getStartLoc(),
                                     ctx.Id_buildIf, chainExpr,
                                     /*argLabels=*/{ },
-                                    /*allowOneWay=*/true);
-    } else if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+                                    /*oneWay=*/true);
+    } else {
       // Form a one-way constraint to prevent backward propagation.
       chainExpr = new (ctx) OneWayExpr(chainExpr);
     }
@@ -416,7 +423,7 @@ public:
       operand = buildCallIfWanted(operand->getStartLoc(),
                                   ctx.Id_buildEither, operand,
                                   {isSecond ? ctx.Id_second : ctx.Id_first},
-                                  /*allowOneWay=*/false);
+                                  /*oneWay=*/false);
     }
 
     // Inject into Optional if required.  We'll be adding the call to
@@ -477,7 +484,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                BraceStmt *body,
                                                Type builderType) {
   // Try to build a single result expression.
-  BuilderClosureVisitor visitor(Context, nullptr,
+  auto &ctx = FD->getASTContext();
+  BuilderClosureVisitor visitor(ctx, nullptr,
                                 /*wantExpr=*/true, builderType);
   Expr *returnExpr = visitor.visit(body);
   if (!returnExpr)
@@ -489,9 +497,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
     return nullptr;
 
   auto loc = returnExpr->getStartLoc();
-  auto returnStmt =
-    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
-  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
+  auto returnStmt = new (ctx) ReturnStmt(loc, returnExpr, /*implicit*/ true);
+  return BraceStmt::create(ctx, body->getLBraceLoc(), { returnStmt },
                            body->getRBraceLoc());
 }
 
@@ -586,14 +593,16 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   assert(transformedType && "Missing type");
 
   // Record the transformation.
-  assert(std::find_if(builderTransformedClosures.begin(),
-                      builderTransformedClosures.end(),
-                      [&](const std::tuple<ClosureExpr *, Type, Expr *> &elt) {
-                        return std::get<0>(elt) == closure;
-                      }) == builderTransformedClosures.end() &&
+  assert(std::find_if(
+      builderTransformedClosures.begin(),
+      builderTransformedClosures.end(),
+      [&](const std::pair<ClosureExpr *, AppliedBuilderTransform> &elt) {
+        return elt.first == closure;
+      }) == builderTransformedClosures.end() &&
          "already transformed this closure along this path!?!");
   builderTransformedClosures.push_back(
-    std::make_tuple(closure, builderType, singleExpr));
+      std::make_pair(closure,
+                     AppliedBuilderTransform{builderType, singleExpr}));
 
   // Bind the result type of the closure to the type of the transformed
   // expression.

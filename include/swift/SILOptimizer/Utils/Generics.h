@@ -20,7 +20,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -78,7 +78,7 @@ class ReabstractionInfo {
 
   /// The generic signature of the specialization.
   /// It is nullptr if the specialization is not polymorphic.
-  GenericSignature *SpecializedGenericSig;
+  GenericSignature SpecializedGenericSig;
 
   // Set of substitutions from callee's invocation before
   // any transformations performed by the generic specializer.
@@ -148,7 +148,7 @@ public:
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// a specialization signature.
-  ReabstractionInfo(SILFunction *Callee, GenericSignature *SpecializedSig);
+  ReabstractionInfo(SILFunction *Callee, GenericSignature SpecializedSig);
 
   IsSerialized_t isSerialized() const {
     return Serialized;
@@ -217,7 +217,7 @@ public:
     return SpecializedGenericEnv;
   }
 
-  GenericSignature *getSpecializedGenericSignature() const {
+  GenericSignature getSpecializedGenericSignature() const {
     return SpecializedGenericSig;
   }
 

@@ -22,11 +22,12 @@
 #ifndef SWIFT_SIL_PROJECTION_H
 #define SWIFT_SIL_PROJECTION_H
 
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/PointerIntEnum.h"
-#include "swift/AST/TypeAlignments.h"
-#include "swift/SIL/SILValue.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/Hashing.h"
@@ -751,15 +752,17 @@ public:
   ~ProjectionTreeNode() = default;
   ProjectionTreeNode(const ProjectionTreeNode &) = default;
 
-  llvm::ArrayRef<unsigned> getChildProjections() {
-     return llvm::makeArrayRef(ChildProjections);
+  bool isLeaf() const { return ChildProjections.empty(); }
+
+  ArrayRef<unsigned> getChildProjections() const {
+    return llvm::makeArrayRef(ChildProjections);
   }
 
-  llvm::Optional<Projection> &getProjection() { return Proj; }
+  Optional<Projection> &getProjection() { return Proj; }
 
-  llvm::SmallVector<Operand *, 4> getNonProjUsers() const {
-    return NonProjUsers;
-  };
+  const ArrayRef<Operand *> getNonProjUsers() const {
+    return llvm::makeArrayRef(NonProjUsers);
+  }
 
   SILType getType() const { return NodeType; }
 
@@ -914,6 +917,24 @@ public:
     return false;
   }
 
+  void getAllLeafTypes(llvm::SmallVectorImpl<SILType> &outArray) const {
+    llvm::SmallVector<const ProjectionTreeNode *, 32> worklist;
+    worklist.push_back(getRoot());
+
+    while (!worklist.empty()) {
+      auto *node = worklist.pop_back_val();
+      // If we have a leaf node, add its type.
+      if (node->isLeaf()) {
+        outArray.push_back(node->getType());
+        continue;
+      }
+
+      // Otherwise, add the nodes children to the worklist.
+      transform(node->getChildProjections(), std::back_inserter(worklist),
+                [&](unsigned idx) { return getNode(idx); });
+    }
+  }
+
   void getLiveLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
@@ -940,7 +961,9 @@ public:
   void
   replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
                                llvm::SmallVectorImpl<SILValue> &Leafs);
- 
+
+  void getUsers(SmallPtrSetImpl<SILInstruction *> &users) const;
+
 private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&

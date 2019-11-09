@@ -38,10 +38,6 @@ SILType SILType::getBridgeObjectType(const ASTContext &C) {
   return SILType(C.TheBridgeObjectType, SILValueCategory::Object);
 }
 
-SILType SILType::getUnknownObjectType(const ASTContext &C) {
-  return getPrimitiveObjectType(C.TheUnknownObjectType);
-}
-
 SILType SILType::getRawPointerType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheRawPointerType);
 }
@@ -94,9 +90,9 @@ bool SILType::isReferenceCounted(SILModule &M) const {
     .isReferenceCounted();
 }
 
-bool SILType::isNoReturnFunction() const {
+bool SILType::isNoReturnFunction(SILModule &M) const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getASTType()))
-    return funcTy->isNoReturnFunction();
+    return funcTy->isNoReturnFunction(M);
 
   return false;
 }
@@ -139,18 +135,13 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
 
 SILType SILType::getFieldType(VarDecl *field,
                               TypeConverter &TC) const {
-  auto baseTy = getASTType();
-
-  if (!field->hasInterfaceType())
-    TC.Context.getLazyResolver()->resolveDeclSignature(field);
-
   AbstractionPattern origFieldTy = TC.getAbstractionPattern(field);
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      baseTy->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
+      getASTType()->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
   }
 
   auto loweredTy = TC.getLoweredRValueType(origFieldTy, substFieldTy);
@@ -174,9 +165,6 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
     assert(elt == TC.Context.getOptionalSomeDecl());
     return SILType(objectType, getCategory());
   }
-
-  if (!elt->hasInterfaceType())
-    TC.Context.getLazyResolver()->resolveDeclSignature(elt);
 
   // If the case is indirect, then the payload is boxed.
   if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
@@ -223,8 +211,6 @@ bool SILType::isHeapObjectReferenceType() const {
   if (Ty->isEqual(C.TheNativeObjectType))
     return true;
   if (Ty->isEqual(C.TheBridgeObjectType))
-    return true;
-  if (Ty->isEqual(C.TheUnknownObjectType))
     return true;
   if (is<SILBoxType>())
     return true;
@@ -318,12 +304,10 @@ static bool isBridgedErrorClass(ASTContext &ctx, Type t) {
     t = archetypeType->getSuperclass();
 
   // NSError (TODO: and CFError) can be bridged.
-  auto nsErrorType = ctx.getNSErrorDecl();
-  if (t && nsErrorType &&
-      nsErrorType->getDeclaredType()->isExactSuperclassOf(t)) {
+  auto nsErrorType = ctx.getNSErrorType();
+  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t))
     return true;
-  }
-  
+
   return false;
 }
 
@@ -424,14 +408,15 @@ swift::getSILBoxFieldLoweredType(SILBoxType *type, TypeConverter &TC,
 ValueOwnershipKind
 SILResultInfo::getOwnershipKind(SILFunction &F) const {
   auto &M = F.getModule();
-  auto sig = F.getLoweredFunctionType()->getGenericSignature();
+  auto FTy = F.getLoweredFunctionType();
+  auto sig = FTy->getInvocationGenericSignature();
   GenericContextScope GCS(M.Types, sig);
 
-  bool IsTrivial = getSILStorageType().isTrivial(F);
+  bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
   switch (getConvention()) {
   case ResultConvention::Indirect:
     return SILModuleConventions(M).isSILIndirect(*this)
-               ? ValueOwnershipKind::Any
+               ? ValueOwnershipKind::None
                : ValueOwnershipKind::Owned;
   case ResultConvention::Autoreleased:
   case ResultConvention::Owned:
@@ -439,16 +424,18 @@ SILResultInfo::getOwnershipKind(SILFunction &F) const {
   case ResultConvention::Unowned:
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
-      return ValueOwnershipKind::Any;
+      return ValueOwnershipKind::None;
     return ValueOwnershipKind::Unowned;
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
-SILModuleConventions::SILModuleConventions(const SILModule &M)
-    : loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
-                       || M.getStage() == SILStage::Lowered) {}
+SILModuleConventions::SILModuleConventions(SILModule &M)
+    : M(&M),
+      loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
+                       || M.getStage() == SILStage::Lowered)
+{}
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
@@ -472,9 +459,9 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 }
 
 
-bool SILFunctionType::isNoReturnFunction() const {
+bool SILFunctionType::isNoReturnFunction(SILModule &M) const {
   for (unsigned i = 0, e = getNumResults(); i < e; ++i) {
-    if (getResults()[i].getType()->isUninhabited())
+    if (getResults()[i].getReturnValueType(M, this)->isUninhabited())
       return true;
   }
 

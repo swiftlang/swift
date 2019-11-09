@@ -24,7 +24,7 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -299,18 +299,6 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   return true;
 }
 
-static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
-  if (!getUnderlyingBorrowIntroducers(operand, out))
-    return false;
-
-  /// TODO: Add support for begin_borrow, load_borrow.
-  auto canHandleValue = [](SILValue v) -> bool {
-    return isa<SILFunctionArgument>(v) || isa<LoadBorrowInst>(v) ||
-           isa<BeginBorrowInst>(v);
-  };
-  return all_of(out, canHandleValue);
-}
-
 // Eliminate a copy of a borrowed value, if:
 //
 // 1. All of the copies users do not consume the copy (and thus can accept a
@@ -344,11 +332,13 @@ static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
 //
 // TODO: This needs a better name.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
-  SmallVector<SILValue, 16> borrowIntroducers;
+  SmallVector<BorrowScopeIntroducingValue, 4> borrowScopeIntroducers;
 
-  // Whitelist the operands that we know how to support and make sure
-  // our operand is actually guaranteed.
-  if (!canHandleOperand(cvi->getOperand(), borrowIntroducers))
+  // Find all borrow introducers for our copy operand. If we are unable to find
+  // all of the reproducers (due to pattern matching failure), conservatively
+  // return false. We can not optimize.
+  if (!getUnderlyingBorrowIntroducingValues(cvi->getOperand(),
+                                            borrowScopeIntroducers))
     return false;
 
   // Then go over all of our uses and see if the value returned by our copy
@@ -361,10 +351,13 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   if (!isDeadLiveRange(cvi, destroys, &guaranteedForwardingInsts))
     return false;
 
-  // Next check if we have any destroys at all of our copy_value and an operand
-  // that is not a function argument. Otherwise, due to the way we ignore dead
-  // end blocks, we may eliminate the copy_value, creating a use of the borrowed
-  // value after the end_borrow.
+  // Next check if we do not have any destroys of our copy_value and are
+  // processing a local borrow scope. In such a case, due to the way we ignore
+  // dead end blocks, we may eliminate the copy_value, creating a use of the
+  // borrowed value after the end_borrow. To avoid this, in such cases we
+  // bail. In contrast, a non-local borrow scope does not have any end scope
+  // instructions, implying we can avoid this hazard and still optimize in such
+  // a case.
   //
   // DISCUSSION: Consider the following SIL:
   //
@@ -411,48 +404,35 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // destroy_value /after/ the end_borrow we will not optimize here. This means
   // that this bug can only occur if the copy_value is only post-dominated by
   // dead end blocks that use the value in a non-consuming way.
-  if (destroys.empty() && llvm::any_of(borrowIntroducers, [](SILValue v) {
-        return !isa<SILFunctionArgument>(v);
-      })) {
+  //
+  // TODO: There may be some way of sinking this into the loop below.
+  if (destroys.empty() &&
+      llvm::any_of(borrowScopeIntroducers,
+                   [](BorrowScopeIntroducingValue borrowScope) {
+                     return borrowScope.isLocalScope();
+                   })) {
     return false;
   }
 
-  // If we reached this point, then we know that all of our users can
-  // accept a guaranteed value and our owned value is destroyed only
-  // by destroy_value. Check if all of our destroys are joint
-  // post-dominated by the end_borrow set. If they do not, then the
-  // copy_value is lifetime extending the guaranteed value, we can not
-  // eliminate it.
+  // If we reached this point, then we know that all of our users can accept a
+  // guaranteed value and our owned value is destroyed only by
+  // destroy_value. Check if all of our destroys are joint post-dominated by the
+  // our end borrow scope set. If they do not, then the copy_value is lifetime
+  // extending the guaranteed value, we can not eliminate it.
   {
-    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck(
-        destroys.begin(), destroys.end());
-    SmallVector<BranchPropagatedUser, 8> endBorrowInsts;
+    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck;
+    for (auto *dvi : destroys) {
+      destroysForLinearLifetimeCheck.push_back(&dvi->getAllOperands()[0]);
+    }
+    SmallVector<BranchPropagatedUser, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    for (SILValue v : borrowIntroducers) {
-      if (isa<SILFunctionArgument>(v)) {
-        continue;
-      }
-
-      SWIFT_DEFER {
-        endBorrowInsts.clear();
-        visitedBlocks.clear();
-      };
-
-      if (auto *lbi = dyn_cast<LoadBorrowInst>(v)) {
-        llvm::copy(lbi->getEndBorrows(), std::back_inserter(endBorrowInsts));
-      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(v)) {
-        llvm::copy(bbi->getEndBorrows(), std::back_inserter(endBorrowInsts));
-      } else {
-        llvm_unreachable("Unhandled borrow introducer?!");
-      }
-
-      // Make sure that our destroys are properly nested within our end
-      // borrows. Otherwise, we can not optimize.
-      auto result = valueHasLinearLifetime(
-          v, endBorrowInsts, destroysForLinearLifetimeCheck, visitedBlocks,
-          getDeadEndBlocks(), ownership::ErrorBehaviorKind::ReturnFalse);
-      if (result.getFoundError())
-        return false;
+    if (llvm::any_of(borrowScopeIntroducers,
+                     [&](BorrowScopeIntroducingValue borrowScope) {
+                       return !borrowScope.areInstructionsWithinScope(
+                           destroysForLinearLifetimeCheck, scratchSpace,
+                           visitedBlocks, getDeadEndBlocks());
+                     })) {
+      return false;
     }
   }
 
@@ -681,24 +661,24 @@ public:
     SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
     for (auto *use : borrowInst->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
-        baseEndBorrows.push_back(BranchPropagatedUser(use->getUser()));
+        baseEndBorrows.emplace_back(use);
       }
     }
     
     SmallVector<BranchPropagatedUser, 4> valueDestroys;
     for (auto *use : Load->getUses()) {
       if (isa<DestroyValueInst>(use->getUser())) {
-        valueDestroys.push_back(BranchPropagatedUser(use->getUser()));
+        valueDestroys.emplace_back(use);
       }
     }
     
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    
-    auto result = valueHasLinearLifetime(baseObject, baseEndBorrows,
-                                   valueDestroys, visitedBlocks,
-                                   ARCOpt.getDeadEndBlocks(),
-                                   ownership::ErrorBehaviorKind::ReturnFalse);
-    return answer(result.getFoundError());
+
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    // Returns true on success. So we invert.
+    bool foundError =
+        !checker.validateLifetime(baseObject, baseEndBorrows, valueDestroys);
+    return answer(foundError);
   }
   
   // TODO: Handle other access kinds?

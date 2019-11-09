@@ -61,7 +61,7 @@ sil_vtable C2 {}
 // -- %a: S.x
 // CHECK: [[KP_A:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"symbolic 8keypaths1SV"
+// CHECK-SAME: @"symbolic{{.*}}8keypaths1SV"
 // CHECK-SAME: @"symbolic Si
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
@@ -71,7 +71,7 @@ sil_vtable C2 {}
 // -- %b: S.y
 // CHECK: [[KP_B:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"symbolic 8keypaths1SV
+// CHECK-SAME: @"symbolic{{.*}}8keypaths1SV
 // CHECK-SAME: @"symbolic SS
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
@@ -82,8 +82,8 @@ sil_vtable C2 {}
 // -- %c: S.z
 // CHECK: [[KP_C:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"symbolic 8keypaths1SV
-// CHECK-SAME: @"symbolic 8keypaths1CC
+// CHECK-SAME: @"symbolic{{.*}}8keypaths1SV
+// CHECK-SAME: @"symbolic{{.*}}8keypaths1CC
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- offset of S.z, mutable
@@ -237,7 +237,7 @@ sil_vtable C2 {}
 // CHECK: [[KP_I:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
 // CHECK-SAME: @"generic environment l"
-// CHECK-SAME: @"symbolic 8keypaths3GenVyxxG"
+// CHECK-SAME: @"symbolic{{[^"]*}}8keypaths3GenV{{[^"]*}}"
 // CHECK-SAME: @"symbolic x"
 //             -- size 8
 // CHECK-SAME: i32 8,
@@ -250,7 +250,7 @@ sil_vtable C2 {}
 // CHECK: [[KP_J:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
 // CHECK-SAME: @"generic environment l"
-// CHECK-SAME: @"symbolic 8keypaths3GenVyxxG"
+// CHECK-SAME: @"symbolic{{[^"]*}}8keypaths3GenV{{[^"]*}}"
 // CHECK-SAME: @"symbolic x"
 //             -- size 8
 // CHECK-SAME: i32 8,
@@ -305,7 +305,7 @@ sil_vtable C2 {}
 // -- %gcx: GC<T>.x
 // CHECK: [[KP_GCX:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment l"
-// CHECK-SAME: @"symbolic 8keypaths2GCCyxG"
+// CHECK-SAME: @"symbolic{{[^"]*}}8keypaths2GCC{{[^"]*}}"
 // CHECK-SAME: @"symbolic x"
 //             -- class with runtime-resolved offset, mutable
 // CHECK-SAME: <i32 0x3fffffe>

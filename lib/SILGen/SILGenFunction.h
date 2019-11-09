@@ -517,11 +517,11 @@ public:
     return F.getTypeLowering(type);
   }
 
-  SILType getSILType(SILParameterInfo param) const {
-    return silConv.getSILType(param);
+  SILType getSILType(SILParameterInfo param, CanSILFunctionType fnTy) const {
+    return silConv.getSILType(param, fnTy);
   }
-  SILType getSILType(SILResultInfo result) const {
-    return silConv.getSILType(result);
+  SILType getSILType(SILResultInfo result, CanSILFunctionType fnTy) const {
+    return silConv.getSILType(result, fnTy);
   }
 
   const SILConstantInfo &getConstantInfo(SILDeclRef constant) {
@@ -770,12 +770,14 @@ public:
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(AnyFunctionRef TheClosure,
+  void emitProlog(CaptureInfo captureInfo,
                   ParameterList *paramList, ParamDecl *selfParam,
-                  Type resultType, bool throws);
+                  DeclContext *DC, Type resultType,
+                  bool throws, SourceLoc throwsLoc);
   /// returns the number of variables in paramPatterns.
   uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
-                      Type resultType, DeclContext *DeclCtx, bool throws);
+                      Type resultType, DeclContext *DC,
+                      bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1211,7 +1213,7 @@ public:
                                   bool isBaseGuaranteed = false);
 
   void emitCaptures(SILLocation loc,
-                    AnyFunctionRef TheClosure,
+                    SILDeclRef closure,
                     CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 
@@ -1452,11 +1454,17 @@ public:
 
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
-      const PatternBindingEntry &entry,
+      VarDecl *anchoringVar,
       SubstitutionMap subs,
       CanType resultType,
       AbstractionPattern origResultType,
       SGFContext C);
+
+  RValue emitApplyOfPropertyWrapperBackingInitializer(
+      SILLocation loc,
+      VarDecl *var,
+      RValue &&originalValue,
+      SGFContext C = SGFContext());
 
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
@@ -1484,12 +1492,6 @@ public:
                          ArgumentSource &&self, PreparedArguments &&args,
                          SGFContext C);
 
-  RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
-                                            SubstitutionMap subs,
-                                            SILDeclRef ctorRef,
-                                            Type wrapperTy,
-                                            CanAnyFunctionType funcTy);
-
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,
@@ -1511,6 +1513,7 @@ public:
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
+                                      CanSILFunctionType fnTy,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
 

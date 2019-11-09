@@ -65,6 +65,7 @@ namespace swift {
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
+  class TypeChecker;
   struct TypeLoc;
   class UnifiedStatsReporter;
   enum class SourceFileKind;
@@ -131,11 +132,9 @@ namespace swift {
                                PersistentParserState *PersistentState = nullptr,
                                bool DelayBodyParsing = true);
 
-  /// Finish the parsing by going over the nodes that were delayed
-  /// during the first parsing pass.
-  void performDelayedParsing(DeclContext *DC,
-                             PersistentParserState &PersistentState,
-                             CodeCompletionCallbacksFactory *Factory);
+  /// Finish the code completion.
+  void performCodeCompletionSecondPass(PersistentParserState &PersistentState,
+                                       CodeCompletionCallbacksFactory &Factory);
 
   /// Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(const LangOptions &LangOpts,
@@ -187,7 +186,18 @@ namespace swift {
     /// If set, dumps wall time taken to type check each expression to
     /// llvm::errs().
     DebugTimeExpressions = 1 << 3,
+
+    /// If set, the typechecker will skip typechecking non-inlinable function
+    /// bodies. Set this if you're trying to quickly emit a module or module
+    /// interface without a full compilation.
+    SkipNonInlinableFunctionBodies = 1 << 4,
   };
+
+  /// Creates a type checker instance on the given AST context, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type checker instance.
+  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
@@ -282,6 +292,7 @@ namespace swift {
                           const SerializationOptions &opts,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                           const SILModule *M = nullptr);
 
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.

@@ -80,7 +80,16 @@ public:
   std::string mangleValueWitness(Type type, ValueWitness witness);
 
   std::string mangleValueWitnessTable(Type type) {
-    return mangleTypeSymbol(type, "WV");
+    const char * const witnessTableOp = "WV";
+    if (type->isAnyObject()) {
+      // Special-case for AnyObject, whose witness table is under the old name
+      // Builtin.UnknownObject, even though we don't use that as a Type anymore.
+      beginMangling();
+      appendOperator("BO");
+      appendOperator(witnessTableOp);
+      return finalize();
+    }
+    return mangleTypeSymbol(type, witnessTableOp);
   }
 
   std::string mangleTypeMetadataAccessFunction(Type type) {
@@ -382,7 +391,17 @@ public:
   }
 
   std::string mangleReflectionBuiltinDescriptor(Type type) {
-    return mangleTypeSymbol(type, "MB");
+    const char * const reflectionDescriptorOp = "MB";
+    if (type->isAnyObject()) {
+      // Special-case for AnyObject, whose reflection descriptor is under the
+      // old name Builtin.UnknownObject, even though we don't use that as a Type
+      // anymore.
+      beginMangling();
+      appendOperator("BO");
+      appendOperator(reflectionDescriptorOp);
+      return finalize();
+    }
+    return mangleTypeSymbol(type, reflectionDescriptorOp);
   }
 
   std::string mangleReflectionFieldDescriptor(Type type) {

@@ -607,23 +607,23 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC)
+// AnyObject (ObjC)
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
+// CHECK: bb0(%0 : $*Optional<AnyObject>):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<AnyObject>
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
+func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC) nonNull
+// AnyObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Builtin.UnknownObject):
+// CHECK: bb0(%0 : $*AnyObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*AnyObject
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
+func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 

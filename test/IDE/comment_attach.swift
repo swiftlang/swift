@@ -293,10 +293,10 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:166:6: Enum/decl_enum_1 RawComment=[/// decl_enum_1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:168:8: EnumElement/decl_enum_1.Case1 RawComment=[/// Case1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:171:8: EnumElement/decl_enum_1.Case2 RawComment=[/// Case2 Aaa.\n]
-// CHECK-NEXT: Param/decl_enum_1.<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
+// CHECK-NEXT: Param/<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
 // CHECK-NEXT: comment_attach.swift:174:8: EnumElement/decl_enum_1.Case3 RawComment=[/// Case3 Aaa.\n]
-// CHECK-NEXT: Param/decl_enum_1.<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
-// CHECK-NEXT: Param/decl_enum_1.<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
+// CHECK-NEXT: Param/<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
+// CHECK-NEXT: Param/<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
 // CHECK-NEXT: comment_attach.swift:177:8: EnumElement/decl_enum_1.Case4 RawComment=[/// Case4 Case5 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:177:15: EnumElement/decl_enum_1.Case5 RawComment=[/// Case4 Case5 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:181:7: Class/decl_class_1 RawComment=[/// decl_class_1 Aaa.\n]

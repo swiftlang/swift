@@ -68,8 +68,7 @@ public:
   TypeLoc clone(ASTContext &ctx) const;
   
   friend llvm::hash_code hash_value(const TypeLoc &owner) {
-    return hash_combine(llvm::hash_value(owner.Ty.getPointer()),
-                        llvm::hash_value(owner.TyR));
+    return llvm::hash_combine(owner.Ty.getPointer(), owner.TyR);
   }
 
   friend bool operator==(const TypeLoc &lhs,

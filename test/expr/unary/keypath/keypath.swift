@@ -180,8 +180,9 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
+  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`
+  // expected-error@+2 {{key path value type 'Prop?' cannot be converted to contextual type 'Prop'}}
+  // expected-error@+1 {{key path value type 'A' cannot be converted to contextual type 'Prop'}}
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
@@ -229,7 +230,9 @@ func testDisembodiedStringInterpolation(x: Int) {
 
 func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
+  // FIXME(diagnostics): This should be diagnosed as `missing generic parameter 'T'` instead of a contextual failure.
   let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<T>, A>'}}
 }
 
 struct TupleStruct {
@@ -504,8 +507,11 @@ func testLabeledSubscript() {
   let k = \AA.[labeled: 0]
 
   // TODO: These ought to work without errors.
-  let _ = \AA.[keyPath: k] // expected-error{{}}
-  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error{{}}
+  let _ = \AA.[keyPath: k] // expected-error {{extraneous argument label 'keyPath:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
+
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{extraneous argument label 'keyPath:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 }
 
 func testInvalidKeyPathComponents() {
@@ -828,6 +834,34 @@ func test_keypath_inference_with_optionals() {
 
     var foo: Int? = nil
   }
+}
+
+func sr11562() {
+  struct S1 {
+    subscript(x x: Int) -> Int { x }
+  }
+
+  _ = \S1.[5] // expected-error {{missing argument label 'x:' in call}} {{12-12=x: }}
+
+  struct S2 {
+    subscript(x x: Int) -> Int { x } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+    subscript(y y: Int) -> Int { y } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
+  }
+
+  _ = \S2.[5] // expected-error {{no exact matches in call to subscript}}
+
+  struct S3 {
+    subscript(x x: Int, y y: Int) -> Int { x }
+  }
+
+  _ = \S3.[y: 5, x: 5] // expected-error {{argument 'x' must precede argument 'y'}}
+
+  struct S4 {
+    subscript(x: (Int, Int)) -> Int { x.0 }
+  }
+
+  _ = \S4.[1, 4] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{12-12=(}} {{16-16=)}}
+  // expected-error@-1 {{subscript index of type '(Int, Int)' in a key path must be Hashable}}
 }
 
 func testSyntaxErrors() { // expected-note{{}}

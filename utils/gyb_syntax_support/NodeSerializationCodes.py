@@ -97,8 +97,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'CodeBlock': 93,
     'DeclNameArgument': 94,
     'DeclNameArguments': 95,
-    'FunctionCallArgument': 96,
-    'TupleElement': 97,
+    # removed: 'FunctionCallArgument': 96,
+    'TupleExprElement': 97,
     'ArrayElement': 98,
     'DictionaryElement': 99,
     'ClosureCaptureItem': 100,
@@ -165,8 +165,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AvailabilityVersionRestriction': 161,
     'VersionTuple': 162,
     'CodeBlockItemList': 163,
-    'FunctionCallArgumentList': 164,
-    'TupleElementList': 165,
+    # removed: 'FunctionCallArgumentList': 164,
+    'TupleExprElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
     'StringLiteralSegments': 168,
@@ -233,6 +233,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundAssertStmt': 229,
     'SomeType': 230,
     'CustomAttribute': 231,
+    'GenericRequirement': 232,
 }
 
 

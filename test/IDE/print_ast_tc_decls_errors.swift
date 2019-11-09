@@ -109,27 +109,27 @@ class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooN
 //===--- Inheritance list in enums.
 //===---
 
-enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{raw type}} expected-error {{an enum with no cases}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance1 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance1 : FooNonExistentProtocol {{{$}}
 
-enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
+enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}} expected-error {{raw type}} expected-error {{an enum with no cases}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
-enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not expressible by a string, integer, or floating-point literal}} expected-note {{do you want to add protocol stubs?}}
+enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not expressible by a string, integer, or floating-point literal}} 
 // expected-error@-1{{'EnumWithInheritance3' declares raw type 'FooClass', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2{{RawRepresentable conformance cannot be synthesized because raw type 'FooClass' is not Equatable}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance3 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance3 : FooClass {{{$}}
 
-enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not expressible by a string, integer, or floating-point literal}} expected-note {{do you want to add protocol stubs?}}
+enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not expressible by a string, integer, or floating-point literal}} 
 // expected-error@-1{{'EnumWithInheritance4' declares raw type 'FooClass', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2{{RawRepresentable conformance cannot be synthesized because raw type 'FooClass' is not Equatable}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance4 : <<error type>>, FooProtocol {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not expressible by a string, integer, or floating-point literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}} expected-note {{do you want to add protocol stubs?}}
+enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not expressible by a string, integer, or floating-point literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}} 
 // expected-error@-1{{'EnumWithInheritance5' declares raw type 'FooClass', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2{{RawRepresentable conformance cannot be synthesized because raw type 'FooClass' is not Equatable}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance5 : <<error type>>, <<error type>> {{{$}}

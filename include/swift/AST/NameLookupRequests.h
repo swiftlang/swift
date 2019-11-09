@@ -19,6 +19,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -29,6 +30,10 @@ class GenericContext;
 class GenericParamList;
 class TypeAliasDecl;
 class TypeDecl;
+namespace ast_scope {
+class ASTScopeImpl;
+class ScopeCreator;
+} // namespace ast_scope
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -271,6 +276,30 @@ public:
   bool isCached() const { return true; }
   Optional<GenericParamList *> getCachedResult() const;
   void cacheResult(GenericParamList *value) const;
+};
+
+/// Expand the given ASTScope. Requestified to detect recursion.
+class ExpandASTScopeRequest
+    : public SimpleRequest<ExpandASTScopeRequest,
+                           ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
+                                                     ast_scope::ScopeCreator *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ast_scope::ASTScopeImpl *>
+  evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
+           ast_scope::ScopeCreator *) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+  Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
+  void cacheResult(ast_scope::ASTScopeImpl *) const {}
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

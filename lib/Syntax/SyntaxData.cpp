@@ -105,26 +105,6 @@ RC<SyntaxData> SyntaxData::getFirstToken() const {
   return nullptr;
 }
 
-RC<SyntaxData> SyntaxData::getLastToken() const {
-  if (getRaw()->isToken()) {
-    // Get a reference counted version of this
-    assert(hasParent() && "The syntax tree should not conisist only of the root");
-    return getParent()->getChild(getIndexInParent());
-  }
-  for (size_t I = getNumChildren(); I != 0; --I) {
-    if (auto Child = getChild(I - 1)) {
-      if (Child->getRaw()->isMissing())
-        continue;
-      if (Child->getRaw()->isToken()) {
-        return Child;
-      } else if (auto Token = Child->getLastToken()) {
-        return Token;
-      }
-    }
-  }
-  return nullptr;
-}
-
 AbsolutePosition SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
   if (PositionCache.hasValue())
     return *PositionCache;

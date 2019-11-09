@@ -40,6 +40,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {
     return os << #NAME;
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
   }
+  llvm_unreachable("Unhandled PassPipelineKind in switch");
 }
 } // namespace llvm
 

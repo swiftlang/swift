@@ -117,9 +117,9 @@ func nine() throws {
   try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
 func ten_helper(_ x: Int) {}
-func ten_helper(_ x: Int, y: Int) throws {}
+func ten_helper(_ x: Int, y: Int) throws {} // expected-note {{'ten_helper(_:y:)' declared here}}
 func ten() throws {
-  try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}} {{18-21=}}
+  try ten_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}} {{18-18=<#Int#>, }}
 }
 
 // rdar://21074857

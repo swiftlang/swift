@@ -110,6 +110,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
+  Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
   computeHelpOptions();
 
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
@@ -160,6 +161,12 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (checkUnusedSupplementaryOutputPaths())
     return true;
+
+  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)
+      && Opts.SkipNonInlinableFunctionBodies) {
+    Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
+    return true;
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
@@ -219,6 +226,14 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
   Opts.DebugTimeExpressionTypeChecking |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
+  Opts.SkipNonInlinableFunctionBodies |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies);
+
+  // If asked to perform InstallAPI, go ahead and enable non-inlinable function
+  // body skipping.
+  Opts.SkipNonInlinableFunctionBodies |=
+      Args.hasArg(OPT_tbd_is_installapi);
+
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
     if (Args.getLastArg(OPT_trace_stats_events)) {
@@ -535,8 +550,14 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
+  // If we cannot emit module doc, we cannot emit source information file either.
+  if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleSourceInfoOutputPath()) {
+     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_source_info);
+     return true;
+   }
   if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
+      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }

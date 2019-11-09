@@ -129,7 +129,7 @@ class GenericRuncer<T> : Gizmo {
   }
 }
 
-// CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself) {{.*}} {
+// CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself) #0 {
 // CHECK: call swiftcc %swift.metadata_response @"$s10objc_super12PartialApplyCMa"([[INT]] 0)
 // CHECK: @"\01L_selector(frob)"
 // CHECK: call void bitcast (void ()* @objc_msgSendSuper2

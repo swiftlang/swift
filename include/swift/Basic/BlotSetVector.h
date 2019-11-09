@@ -67,14 +67,14 @@ public:
 
   ArrayRef<Optional<ValueT>> getArray() const { return vector; }
 
-  llvm::iterator_range<const_iterator> getRange() const {
+  iterator_range<const_iterator> getRange() const {
     return {begin(), end()};
   }
 
   using const_reverse_iterator = typename VectorT::const_reverse_iterator;
   const_reverse_iterator rbegin() const { return vector.rbegin(); }
   const_reverse_iterator rend() const { return vector.rend(); }
-  llvm::iterator_range<const_reverse_iterator> getReverseRange() const {
+  iterator_range<const_reverse_iterator> getReverseRange() const {
     return {rbegin(), rend()};
   }
 

@@ -507,10 +507,9 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-LinearLifetimeError swift::valueHasLinearLifetime(
+LinearLifetimeError LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
     ArrayRef<BranchPropagatedUser> nonConsumingUses,
-    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks, DeadEndBlocks &deBlocks,
     ErrorBehaviorKind errorBehavior,
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks) {
   assert(!consumingUses.empty() && "Must have at least one consuming user?!");
@@ -547,7 +546,7 @@ LinearLifetimeError swift::valueHasLinearLifetime(
     // same block, we would have flagged.
     if (llvm::any_of(nonConsumingUses, [&](BranchPropagatedUser user) {
           return user.getParent() != value->getParentBlock() &&
-            !deBlocks.isDeadEnd(user.getParent());
+                 !deadEndBlocks.isDeadEnd(user.getParent());
         })) {
       state.error.handleUseAfterFree([&] {
         llvm::errs() << "Function: '" << value->getFunction()->getName()
@@ -592,10 +591,10 @@ LinearLifetimeError swift::valueHasLinearLifetime(
 
   // Now that our algorithm is completely prepared, run the
   // dataflow... If we find a failure, return false.
-  state.performDataflow(deBlocks);
+  state.performDataflow(deadEndBlocks);
 
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
-  state.checkDataflowEndState(deBlocks);
+  state.checkDataflowEndState(deadEndBlocks);
   return state.error;
 }

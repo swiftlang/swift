@@ -159,6 +159,19 @@ public:
   }
 
   /// Returns the canonical AST type referenced by this SIL type.
+  ///
+  /// NOTE:
+  /// 1. The returned AST type may not be a proper formal type.
+  ///    For example, it may contain a SILFunctionType instead of a
+  ///    FunctionType.
+  /// 2. The returned type may not be the same as the original
+  ///    unlowered type that produced this SILType (even after
+  ///    canonicalization). If you need it, you must pass it separately.
+  ///    For example, `AnyObject.Type` may get lowered to
+  ///    `$@thick AnyObject.Type`, for which the AST type will be
+  ///    `@thick AnyObject.Type`.
+  ///    More generally, you cannot recover a formal type from
+  ///    a lowered type. See docs/SIL.rst for more details.
   CanType getASTType() const {
     return CanType(value.getPointer());
   }
@@ -268,19 +281,22 @@ public:
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(const SILFunction &F) const;
 
-  /// True if the type, or the referenced type of an address type, is trivial,
-  /// meaning it is loadable and can be trivially copied, moved or detroyed.
+  /// True if the underlying AST type is trivial, meaning it is loadable and can
+  /// be trivially copied, moved or detroyed. Returns false for address types
+  /// even though they are technically trivial.
   bool isTrivial(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
-  /// be a scalar reference-counted type.
+  /// be a scalar reference-counted type such as a class, box, or thick function
+  /// type. Returns false for non-trivial aggregates.
   bool isReferenceCounted(SILModule &M) const;
 
   /// Returns true if the referenced type is a function type that never
   /// returns.
-  bool isNoReturnFunction() const;
+  bool isNoReturnFunction(SILModule &M) const;
 
-  /// Returns true if the referenced type has reference semantics.
+  /// Returns true if the referenced AST type has reference semantics, even if
+  /// the lowered SIL type is known to be trivial.
   bool hasReferenceSemantics() const {
     return getASTType().hasReferenceSemantics();
   }
@@ -512,8 +528,6 @@ public:
   
   /// Get the NativeObject type as a SILType.
   static SILType getNativeObjectType(const ASTContext &C);
-  /// Get the UnknownObject type as a SILType.
-  static SILType getUnknownObjectType(const ASTContext &C);
   /// Get the BridgeObject type as a SILType.
   static SILType getBridgeObjectType(const ASTContext &C);
   /// Get the RawPointer type as a SILType.
@@ -576,11 +590,10 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(
     Lowering::TypeConverter &TC, Lowering::AbstractionPattern origType,
-    CanAnyFunctionType substType,
-    Optional<SILDeclRef> origConstant = None,
+    CanAnyFunctionType substType, Optional<SILDeclRef> origConstant = None,
     Optional<SILDeclRef> constant = None,
     Optional<SubstitutionMap> reqtSubs = None,
-    Optional<ProtocolConformanceRef> witnessMethodConformance = None);
+    ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

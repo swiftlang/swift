@@ -157,9 +157,9 @@ public:
     using RemarkT = decltype(RemarkBuilder());
     // Avoid building the remark unless remarks are enabled.
     if (isEnabled<RemarkT>() || Module.getOptRecordStream()) {
-      auto R = RemarkBuilder();
-      R.setPassName(PassName);
-      emit(R);
+      auto rb = RemarkBuilder();
+      rb.setPassName(PassName);
+      emit(rb);
     }
   }
 

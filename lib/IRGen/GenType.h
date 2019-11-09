@@ -208,7 +208,7 @@ private:
 
   /// Read a YAML legacy type layout dump. Returns false on success, true on
   /// error.
-  bool readLegacyTypeInfo(StringRef path);
+  bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
   Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
 

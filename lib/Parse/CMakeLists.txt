@@ -5,9 +5,7 @@ else()
 endif()
 
 add_swift_host_library(swiftParse STATIC
-  ASTGen.cpp
   Confusables.cpp
-  HiddenLibSyntaxAction.cpp
   Lexer.cpp
   ParseDecl.cpp
   ParsedRawSyntaxNode.cpp
@@ -32,7 +30,6 @@ add_swift_host_library(swiftParse STATIC
     ParsedSyntaxRecorder.cpp.gyb)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax
-  swiftSyntaxParse)
+  swiftSyntax)
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)

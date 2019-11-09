@@ -184,12 +184,14 @@ bb2:
   return %r1 : $()
 }
 
+sil @use_addr : $@convention(thin) (@inout Int32) -> ()
+
 // CHECK-LABEL:   sil @dont_hoist_aliased_stack_location
 // CHECK:         {{^}}bb0
 // CHECK-NOT:       load
 // CHECK:         {{^}}bb1:
 // CHECK:           store
-// CHECK:           load
+// CHECK:           apply
 // CHECK:         {{^}}bb2:
 // CHECK:           return
 sil @dont_hoist_aliased_stack_location : $@convention(thin) (Int32) -> () {
@@ -199,7 +201,8 @@ bb0(%0 : $Int32):
 
 bb1:
   store %0 to %313 : $*Int32
-  %l1 = load %313 : $*Int32
+  %f = function_ref @use_addr : $@convention(thin) (@inout Int32) -> ()
+  %a = apply %f(%313) : $@convention(thin) (@inout Int32) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -351,3 +354,210 @@ bb4:
   %10 = tuple ()
   return %10 : $()
 }
+
+// CHECK-LABEL: sil @hoist_load_and_store
+// CHECK:   [[V1:%[0-9]+]] = load %0
+// CHECK:   br bb1([[V1]] : $Int32)
+// CHECK: bb1([[V2:%[0-9]+]] : $Int32):
+// CHECK-NOT:   load
+// CHECK:   [[E:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   "sadd_with_overflow_Int64"([[E]]
+// CHECK:   [[V3:%[0-9]+]] = struct $Int32
+// CHECK-NOT:   store
+// CHECK: bb2:
+// CHECK:   br bb1([[V3]] : $Int32)
+// CHECK: bb3:
+// CHECK:   store [[V3]] to %0
+// CHECK: } // end sil function 'hoist_load_and_store'
+sil @hoist_load_and_store : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  store %20 to %0 : $*Int32
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// Just make sure the optimizer does not crash in case the operand of the
+// store is the load itself.
+sil @hoist_load_and_redundant_store : $@convention(thin) (@inout Int32) -> () {
+bb0(%0 : $*Int32):
+  br bb1
+
+bb1:
+  %1 = load %0 : $*Int32
+  store %1 to %0 : $*Int32
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @hoist_load_and_two_stores
+// CHECK:   [[V1:%[0-9]+]] = load %0
+// CHECK:   br bb1([[V1]] : $Int32)
+// CHECK: bb1([[V2:%[0-9]+]] : $Int32):
+// CHECK-NOT:   load
+// CHECK:   [[E:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   "sadd_with_overflow_Int64"([[E]]
+// CHECK:   [[V3:%[0-9]+]] = struct $Int32
+// CHECK: bb2:
+// CHECK-NOT:   store
+// CHECK:   br bb4([[V3]] : $Int32)
+// CHECK: bb3:
+// CHECK-NOT:   store
+// CHECK:   br bb4([[V3]] : $Int32)
+// CHECK: bb4([[V4:%[0-9]+]] : $Int32):
+// CHECK:   cond_br
+// CHECK: bb5:
+// CHECK:   br bb1([[V4]] : $Int32)
+// CHECK: bb6:
+// CHECK:   store [[V4]] to %0
+// CHECK: } // end sil function 'hoist_load_and_two_stores'
+sil @hoist_load_and_two_stores : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  cond_br undef, bb2, bb3
+bb2:
+  store %20 to %0 : $*Int32
+  br bb4
+bb3:
+  store %20 to %0 : $*Int32
+  br bb4
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @dont_hoist_stores_not_dominating_exit
+// CHECK: bb0(%0 : $*Int32, %1 : $Int32):
+// CHECK-NOT: load
+// CHECK: bb1:
+// CHECK:   load
+// CHECK: bb3:
+// CHECK:   store
+// CHECK: bb4:
+// CHECK: bb6:
+// CHECK-NOT: store
+// CHECK: } // end sil function 'dont_hoist_stores_not_dominating_exit'
+sil @dont_hoist_stores_not_dominating_exit : $@convention(thin) (@inout Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %8 = struct_element_addr %0 : $*Int32, #Int32._value
+  %9 = struct_extract %1 : $Int32, #Int32._value
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb1
+
+bb1:
+  %17 = load %8 : $*Builtin.Int32
+  %18 = builtin "sadd_with_overflow_Int64"(%17 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %19 = tuple_extract %18 : $(Builtin.Int32, Builtin.Int1), 0
+  %20 = struct $Int32 (%19 : $Builtin.Int32)
+  cond_br undef, bb2, bb3
+bb2:
+  br bb4
+bb3:
+  store %20 to %0 : $*Int32
+  br bb4
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @hoist_loads_and_stores_multiple_exits
+// CHECK:   [[V1:%[0-9]+]] = load %0
+// CHECK:   br bb1([[V1]] : $Int32)
+// CHECK: bb1([[V2:%[0-9]+]] : $Int32):
+// CHECK-NOT:   load
+// CHECK:   [[E:%[0-9]+]] = struct_extract [[V2]]
+// CHECK:   "sadd_with_overflow_Int64"([[E]]
+// CHECK:   [[V3:%[0-9]+]] = struct $Int32
+// CHECK: bb2:
+// CHECK-NOT:   store
+// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb3
+// CHECK: bb3:
+// CHECK:   store [[V3]] to %0
+// CHECK:   br bb6
+// CHECK: bb4:
+// CHECK-NOT:   store
+// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb5
+// CHECK: bb5:
+// CHECK:   store [[V3]] to %0
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK: } // end sil function 'hoist_loads_and_stores_multiple_exits'
+sil @hoist_loads_and_stores_multiple_exits : $@convention(thin) (@inout Int32, Int32) -> () {
+// %0                                             // users: %14, %17, %5, %2
+// %1                                             // user: %3
+bb0(%0 : $*Int32, %1 : $Int32):
+  %2 = struct_element_addr %0 : $*Int32, #Int32._value
+  %3 = struct_extract %1 : $Int32, #Int32._value  // user: %9
+  %4 = integer_literal $Builtin.Int1, 0           // user: %9
+  %5 = load %0 : $*Int32                          // user: %6
+  br bb1(%5 : $Int32)                             // id: %6
+
+// %7                                             // user: %8
+bb1(%7 : $Int32):                                 // Preds: bb0 bb2 bb4
+  %8 = struct_extract %7 : $Int32, #Int32._value  // user: %9
+  %9 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int32, %3 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %10
+  %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %11
+  %11 = struct $Int32 (%10 : $Builtin.Int32)      // users: %14, %17, %13, %16
+  cond_br undef, bb2, bb4                         // id: %12
+
+bb2:                                              // Preds: bb1
+  cond_br undef, bb1(%11 : $Int32), bb3           // id: %13
+
+bb3:                                              // Preds: bb2
+  store %11 to %0 : $*Int32                       // id: %14
+  br bb6                                          // id: %15
+
+bb4:                                              // Preds: bb1
+  cond_br undef, bb1(%11 : $Int32), bb5           // id: %16
+
+bb5:                                              // Preds: bb4
+  store %11 to %0 : $*Int32                       // id: %17
+  br bb6                                          // id: %18
+
+bb6:                                              // Preds: bb3 bb5
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
+} // end sil function 'hoist_loads_and_stores'
+

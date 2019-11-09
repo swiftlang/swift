@@ -854,7 +854,7 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   }
 }
 
-GenericSignature *ModuleFile::getGenericSignature(
+GenericSignature ModuleFile::getGenericSignature(
     serialization::GenericSignatureID ID) {
   auto signature = getGenericSignatureChecked(ID);
   if (!signature)
@@ -862,7 +862,7 @@ GenericSignature *ModuleFile::getGenericSignature(
   return signature.get();
 }
 
-Expected<GenericSignature *>
+Expected<GenericSignature>
 ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   using namespace decls_block;
 
@@ -1120,10 +1120,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 
     if (isType != isa<TypeDecl>(value))
       return true;
-    if (!value->hasInterfaceType())
-      return true;
-    if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
-      return true;
+
+    // If we're expecting a type, make sure this decl has the expected type.
+    if (canTy)  {
+      auto ifaceTy = value->getInterfaceType();
+      if (!ifaceTy || !ifaceTy->isEqual(canTy))
+        return true;
+    }
+
     if (value->isStatic() != isStatic)
       return true;
     if (value->hasClangNode() != importedFromClang)
@@ -1257,7 +1261,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     auto name = getIdentifier(DefiningDeclNameID);
     pathTrace.addOpaqueReturnType(name);
     
-    if (auto opaque = baseModule->lookupOpaqueResultType(name.str(), nullptr)) {
+    if (auto opaque = baseModule->lookupOpaqueResultType(name.str())) {
       values.push_back(opaque);
     }
     break;
@@ -1367,7 +1371,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   // Filters for values discovered in the remaining path pieces.
   ModuleDecl *M = nullptr;
-  CanGenericSignature genericSig = nullptr;
+  CanGenericSignature genericSig = CanGenericSignature();
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
@@ -1596,7 +1600,7 @@ giveUpFastPath:
 
       ValueDecl *base = values.front();
 
-      GenericSignature *currentSig = nullptr;
+      GenericSignature currentSig = GenericSignature();
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
@@ -1660,8 +1664,7 @@ giveUpFastPath:
       pathTrace.addOpaqueReturnType(name);
     
       auto lookupModule = M ? M : baseModule;
-      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str(),
-                                                               nullptr)) {
+      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
       }
       break;
@@ -1871,6 +1874,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     return AFD;
   if (auto SD = dyn_cast<SubscriptDecl>(D))
     return SD;
+  if (auto EED = dyn_cast<EnumElementDecl>(D))
+    return EED;
 
   llvm_unreachable("Unknown Decl : DeclContext kind");
 }
@@ -2241,8 +2246,6 @@ public:
       if (!filenameForPrivate.empty())
         MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
-
-    decl->setValidationToChecked();
   }
 
   /// Deserializes decl attribute and attribute-like records from
@@ -2287,10 +2290,12 @@ public:
                                               SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
-    alias->setGenericSignature(MF.getGenericSignature(genericSigID));
+    auto genericSig = MF.getGenericSignature(genericSigID);
+    alias->setGenericSignature(genericSig);
 
-    alias->setUnderlyingType(MF.getType(underlyingTypeID));
-
+    auto underlying = MF.getType(underlyingTypeID);
+    alias->setUnderlyingType(underlying);
+    
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
     else
@@ -2356,8 +2361,6 @@ public:
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), trailingWhere,
         &MF, defaultDefinitionID);
     declOrOffset = assocType;
-
-    assocType->computeType();
 
     assert(!assocType->getDeclaredInterfaceType()->hasError() &&
            "erroneous associated type");
@@ -2432,8 +2435,6 @@ public:
     if (isImplicit)
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
-
-    theStruct->computeType();
 
     handleInherited(theStruct,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -2548,7 +2549,8 @@ public:
     if (initKind.hasValue())
       ctx.evaluator.cacheOutput(InitKindRequest{ctor},
                                 std::move(initKind.getValue()));
-    ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
+                              std::move(needsNewVTableEntry));
 
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     if (auto *overridden = ctor->getOverriddenDecl()) {
@@ -2562,7 +2564,6 @@ public:
     }
 
     ctor->setImplicitlyUnwrappedOptional(isIUO);
-    ctor->computeType();
 
     return ctor;
   }
@@ -2709,8 +2710,9 @@ public:
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     if (opaqueReturnTypeID) {
-      var->setOpaqueResultTypeDecl(
-                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{var},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
     // If this is a lazy property, record its backing storage.
@@ -2724,7 +2726,19 @@ public:
 
     // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
-      VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
+      auto backingDecl = MF.getDeclChecked(backingPropertyIDs[0]);
+      if (!backingDecl) {
+        if (numBackingProperties > 1 &&
+            backingDecl.errorIsA<XRefNonLoadedModuleError>()) {
+            // A property wrapper defined behind an implementation-only import
+            // is safe to drop when it can't be deserialized.
+            // rdar://problem/56599179
+            consumeError(backingDecl.takeError());
+        } else
+          return backingDecl.takeError();
+      }
+
+      VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
       VarDecl *storageWrapperVar = nullptr;
       if (numBackingProperties > 1) {
         storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
@@ -2771,10 +2785,11 @@ public:
     if (!specifier)
       MF.fatal();
 
-    auto param = MF.createDecl<ParamDecl>(*specifier, SourceLoc(), SourceLoc(),
+    auto param = MF.createDecl<ParamDecl>(SourceLoc(), SourceLoc(),
                                           MF.getIdentifier(argNameID),
                                           SourceLoc(),
                                           MF.getIdentifier(paramNameID), DC);
+    param->setSpecifier(*specifier);
 
     declOrOffset = param;
 
@@ -2782,8 +2797,8 @@ public:
     if (paramTy->hasError()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
-      DC->dumpContext();
-      paramTy->dump();
+      DC->printContext(llvm::errs());
+      paramTy->dump(llvm::errs());
       MF.fatal();
     }
 
@@ -2818,8 +2833,8 @@ public:
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool needsNewVTableEntry, isTransparent;
-    DeclID opaqueResultTypeDeclID;
+    bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
+    DeclID opaqueReturnTypeID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2831,10 +2846,11 @@ public:
                                           resultInterfaceTypeID,
                                           isIUO,
                                           associatedDeclID, overriddenID,
+                                          overriddenAffectsABI,
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          opaqueResultTypeDeclID,
+                                          opaqueReturnTypeID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -2845,6 +2861,7 @@ public:
                                               resultInterfaceTypeID,
                                               isIUO,
                                               overriddenID,
+                                              overriddenAffectsABI,
                                               accessorStorageDeclID,
                                               rawAccessorKind,
                                               rawAccessLevel,
@@ -2910,20 +2927,11 @@ public:
       overridden = overriddenOrError.get();
     } else {
       llvm::consumeError(overriddenOrError.takeError());
-      // There's one case where we know it's safe to ignore a missing override:
-      // if this declaration is '@objc' and 'dynamic'.
-      bool canIgnoreMissingOverriddenDecl = false;
-      if (isObjC && ctx.LangOpts.EnableDeserializationRecovery) {
-        canIgnoreMissingOverriddenDecl =
-            std::any_of(DeclAttributes::iterator(DAttrs),
-                        DeclAttributes::iterator(nullptr),
-                        [](const DeclAttribute *attr) -> bool {
-          return isa<DynamicAttr>(attr);
-        });
-      }
-      if (!canIgnoreMissingOverriddenDecl)
+
+      if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
         return llvm::make_error<OverrideError>(
             name, errorFlags, numVTableEntries);
+      }
 
       overridden = nullptr;
     }
@@ -3023,14 +3031,14 @@ public:
       fn->setImplicit();
     fn->setIsObjC(isObjC);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
-    fn->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
+                              std::move(needsNewVTableEntry));
 
-    if (opaqueResultTypeDeclID)
-      fn->setOpaqueResultTypeDecl(
-                     cast<OpaqueTypeDecl>(MF.getDecl(opaqueResultTypeDeclID)));
-
-    // Set the interface type.
-    fn->computeType();
+    if (opaqueReturnTypeID) {
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{fn},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
 
     return fn;
   }
@@ -3210,8 +3218,6 @@ public:
       proto->setImplicit();
     proto->setIsObjC(isObjC);
 
-    proto->computeType();
-
     proto->setCircularityCheck(CircularityCheck::Checked);
 
     proto->setLazyRequirementSignature(&MF,
@@ -3289,9 +3295,12 @@ public:
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), SourceLoc(),
-        cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
-        ctx.AllocateCopy(designatedNominalTypes));
-
+        ArrayRef<Identifier>{}, ArrayRef<SourceLoc>{});
+    result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
+    ctx.evaluator.cacheOutput(
+        OperatorPrecedenceGroupRequest{result},
+        std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
+    
     declOrOffset = result;
     return result;
   }
@@ -3408,10 +3417,8 @@ public:
       theClass->setImplicit();
     theClass->setIsObjC(isObjC);
     theClass->setSuperclass(MF.getType(superclassID));
-    if (inheritsSuperclassInitializers)
-      theClass->setInheritsSuperclassInitializers();
-
-    theClass->computeType();
+    ctx.evaluator.cacheOutput(InheritsSuperclassInitializersRequest{theClass},
+                              std::move(inheritsSuperclassInitializers));
 
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -3476,13 +3483,16 @@ public:
       MF.fatal();
 
     theEnum->setAddedImplicitInitializers();
+    // @objc enums have all their raw values checked.
+    if (isObjC) {
+      theEnum->setHasFixedRawValues();
+    }
+    
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
 
     theEnum->setRawType(MF.getType(rawTypeID));
-
-    theEnum->computeType();
 
     auto rawInheritedIDs = rawInheritedAndDependencyIDs.slice(0, numInherited);
     handleInherited(theEnum, rawInheritedIDs);
@@ -3537,23 +3547,23 @@ public:
       }
     }
 
-    // Read payload parameter list, if it exists.
-    ParameterList *paramList = nullptr;
-    if (hasPayload) {
-      paramList = MF.readParameterList();
-    }
-
     DeclContext *DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = MF.createDecl<EnumElementDecl>(SourceLoc(),
                                                name,
-                                               paramList,
+                                               nullptr,
                                                SourceLoc(),
                                                nullptr,
                                                DC);
     declOrOffset = elem;
+
+    // Read payload parameter list, if it exists.
+    if (hasPayload) {
+      auto *paramList = MF.readParameterList();
+      elem->setParameterList(paramList);
+    }
 
     // Deserialize the literal raw value, if any.
     switch ((EnumElementRawValueKind)rawValueKindID) {
@@ -3568,8 +3578,6 @@ public:
       elem->setRawValueExpr(literal);
     }
     }
-
-    elem->computeType();
 
     if (isImplicit)
       elem->setImplicit();
@@ -3684,7 +3692,6 @@ public:
     auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
     subscript->getElementTypeLoc().setType(elemInterfaceType);
     subscript->setImplicitlyUnwrappedOptional(isIUO);
-    subscript->computeType();
 
     if (isImplicit)
       subscript->setImplicit();
@@ -3694,8 +3701,9 @@ public:
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     
     if (opaqueReturnTypeID) {
-      subscript->setOpaqueResultTypeDecl(
-                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{subscript},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
     
     return subscript;
@@ -3813,7 +3821,6 @@ public:
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    dtor->computeType();
 
     if (isImplicit)
       dtor->setImplicit();
@@ -3873,6 +3880,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
+      bool skipAttr = false;
       switch (recordID) {
       case decls_block::SILGenName_DECL_ATTR: {
         bool isImplicit;
@@ -4073,13 +4081,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
-          MF.fatal(deserialized.takeError());
-          break;
+          if (deserialized.errorIsA<XRefNonLoadedModuleError>()) {
+            // A custom attribute defined behind an implementation-only import
+            // is safe to drop when it can't be deserialized.
+            // rdar://problem/56599179
+            consumeError(deserialized.takeError());
+            skipAttr = true;
+          } else
+            return deserialized.takeError();
+        } else {
+          Attr = CustomAttr::create(ctx, SourceLoc(),
+                                    TypeLoc::withoutLoc(deserialized.get()),
+                                    isImplicit);
         }
-
-        Attr = CustomAttr::create(ctx, SourceLoc(),
-                                  TypeLoc::withoutLoc(deserialized.get()),
-                                  isImplicit);
         break;
       }
 
@@ -4110,10 +4124,12 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         MF.fatal();
       }
 
-      if (!Attr)
-        return llvm::Error::success();
+      if (!skipAttr) {
+        if (!Attr)
+          return llvm::Error::success();
 
-      AddAttribute(Attr);
+        AddAttribute(Attr);
+      }
 
     } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
       IdentifierID discriminatorID;
@@ -4395,7 +4411,7 @@ public:
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType();
+      return alias->getUnderlyingType();
     }
 
     return alias->getDeclaredInterfaceType();
@@ -4463,7 +4479,7 @@ public:
     if (alias &&
         alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      return alias->getUnderlyingType().subst(subMap);
     }
 
     auto parentType = parentTypeOrError.get();
@@ -4491,7 +4507,7 @@ public:
       // using the Type wrapper.
       const TypeBase *underlyingTy = nullptr;
       while (alias->isCompatibilityAlias()) {
-        underlyingTy = alias->getUnderlyingTypeLoc().getType().getPointer();
+        underlyingTy = alias->getUnderlyingType().getPointer();
 
         // If the underlying type is itself a typealias, it might be another
         // compatibility alias, meaning we need to go around the loop again.
@@ -4567,7 +4583,7 @@ public:
     TypeID resultID;
     uint8_t rawRepresentation;
     bool noescape = false, throws;
-    GenericSignature *genericSig = nullptr;
+    GenericSignature genericSig = GenericSignature();
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
@@ -4608,10 +4624,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure;
+      bool isVariadic, isAutoClosure, isNonEphemeral;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
+                                                   isNonEphemeral,
                                                    rawOwnership);
 
       auto ownership =
@@ -4626,15 +4643,15 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             *ownership));
+                                             isNonEphemeral, *ownership));
     }
 
     if (!isGeneric) {
-      assert(genericSig == nullptr);
+      assert(genericSig.isNull());
       return FunctionType::get(params, resultTy.get(), info);
     }
 
-    assert(genericSig != nullptr);
+    assert(!genericSig.isNull());
     return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
   }
 
@@ -5038,17 +5055,18 @@ public:
       errorResult = maybeErrorResult.get();
     }
 
-    Optional<ProtocolConformanceRef> witnessMethodConformance;
+    ProtocolConformanceRef witnessMethodConformance;
     if (*representation == SILFunctionTypeRepresentation::WitnessMethod) {
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
-    GenericSignature *genericSig = MF.getGenericSignature(rawGenericSig);
-
+    GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
-                                errorResult, ctx, witnessMethodConformance);
+                                errorResult,
+                                SubstitutionMap(), false,
+                                ctx, witnessMethodConformance);
   }
 
   Expected<Type> deserializeArraySliceType(ArrayRef<uint64_t> scratch,
@@ -5131,7 +5149,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
   if (typeOrOffset.get()->hasError()) {
-    typeOrOffset.get()->dump();
+    typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
   }
@@ -5387,9 +5405,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // conformance requirements are on Self. This isn't actually a /safe/ change
     // even in Objective-C, but we mostly just don't want to crash.
 
-    // FIXME: DenseMap requires that its value type be default-constructible,
-    // which ProtocolConformanceRef is not, hence the extra Optional.
-    llvm::SmallDenseMap<ProtocolDecl *, Optional<ProtocolConformanceRef>, 16>
+    llvm::SmallDenseMap<ProtocolDecl *, ProtocolConformanceRef, 16>
         conformancesForProtocols;
     while (conformanceCount--) {
       ProtocolConformanceRef nextConformance = readConformance(DeclTypeCursor);
@@ -5404,7 +5420,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           req.getSecondType()->castTo<ProtocolType>()->getDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
-        reqConformances.push_back(iter->getSecond().getValue());
+        reqConformances.push_back(iter->getSecond());
       } else {
         // Put in an abstract conformance as a placeholder. This is a lie, but
         // there's not much better we can do. We're relying on the fact that
@@ -5451,14 +5467,15 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // rest of the compiler.
       third = nullptr;
     }
-    typeWitnesses[first] = std::make_pair(second, third);
+    typeWitnesses[first] = {second, third};
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
-    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
-                                typeWitness.second.second);
+    conformance->setTypeWitness(typeWitness.first,
+                                typeWitness.second.getWitnessType(),
+                                typeWitness.second.getWitnessDecl());
   }
 
   // An imported requirement may have changed type between Swift versions.

@@ -21,7 +21,7 @@ ATTRIBUTE_NODES = [
                    description='The name of the attribute.'),
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
-             Child('ArgumentList', kind='FunctionCallArgumentList',
+             Child('ArgumentList', kind='TupleExprElementList',
                    collection_element_name='Argument', is_optional=True),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
@@ -63,8 +63,8 @@ ATTRIBUTE_NODES = [
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
-                   The arguments of the attribute. In case the attribute  \
-                   takes multiple arguments, they are gather in the \
+                   The arguments of the attribute. In case the attribute
+                   takes multiple arguments, they are gather in the
                    appropriate takes first.
                    '''),
              Child('RightParen', kind='RightParenToken', is_optional=True,
@@ -79,6 +79,7 @@ ATTRIBUTE_NODES = [
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
+         omit_when_empty=True,
          element='Syntax', element_name='Attribute',
          element_choices=[
              'Attribute',
@@ -104,7 +105,7 @@ ATTRIBUTE_NODES = [
     # labeled-specialize-entry -> identifier ':' token ','?
     Node('LabeledSpecializeEntry', kind='Syntax',
          description='''
-         A labeled argument for the `@_specialize` attribute like \
+         A labeled argument for the `@_specialize` attribute like
          `exported: true`
          ''',
          traits=['WithTrailingComma'],
@@ -124,8 +125,8 @@ ATTRIBUTE_NODES = [
     # named-attribute-string-arg -> 'name': string-literal
     Node('NamedAttributeStringArgument', kind='Syntax',
          description='''
-         The argument for the `@_dynamic_replacement` or `@_private` \
-         attribute of the form `for: "function()"` or `sourceFile: \
+         The argument for the `@_dynamic_replacement` or `@_private`
+         attribute of the form `for: "function()"` or `sourceFile:
          "Src.swift"`
          ''',
          children=[
@@ -148,7 +149,7 @@ ATTRIBUTE_NODES = [
                ]),
          Child('DeclNameArguments', kind='DeclNameArguments',
                is_optional=True, description='''
-               The argument labels of the protocol\'s requirement if it \
+               The argument labels of the protocol\'s requirement if it
                is a function requirement.
                '''),
          ]),
@@ -157,12 +158,12 @@ ATTRIBUTE_NODES = [
     #                              (identifier | operator) decl-name-arguments
     Node('ImplementsAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@_implements` attribute of the form \
+         The arguments for the `@_implements` attribute of the form
          `Type, methodName(arg1Label:arg2Label:)`
          ''',
          children=[
              Child('Type', kind='SimpleTypeIdentifier', description='''
-                   The type for which the method with this attribute \
+                   The type for which the method with this attribute
                    implements a requirement.
                    '''),
              Child('Comma', kind='CommaToken',
@@ -178,7 +179,7 @@ ATTRIBUTE_NODES = [
                    ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True, description='''
-                   The argument labels of the protocol\'s requirement if it \
+                   The argument labels of the protocol\'s requirement if it
                    is a function requirement.
                    '''),
          ]),
@@ -186,8 +187,8 @@ ATTRIBUTE_NODES = [
     # objc-selector-piece -> identifier? ':'?
     Node('ObjCSelectorPiece', kind='Syntax',
          description='''
-         A piece of an Objective-C selector. Either consisiting of just an \
-         identifier for a nullary selector, an identifier and a colon for a \
+         A piece of an Objective-C selector. Either consisiting of just an
+         identifier for a nullary selector, an identifier and a colon for a
          labeled argument or just a colon for an unlabeled argument
          ''',
          children=[

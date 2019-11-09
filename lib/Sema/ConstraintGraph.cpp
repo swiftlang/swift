@@ -1058,7 +1058,7 @@ namespace {
 
               // Add edges between this type variable and every other type
               // variable in the path.
-              for (auto otherTypeVar : reversed(currentPath)) {
+              for (auto otherTypeVar : llvm::reverse(currentPath)) {
                 // When we run into our own type variable, we're done.
                 if (otherTypeVar == typeVar)
                   break;
@@ -1121,7 +1121,7 @@ namespace {
       SmallVector<TypeVariableType *, 4> orderedReps;
       orderedReps.reserve(representativeTypeVars.size());
       SmallPtrSet<TypeVariableType *, 4> visited;
-      for (auto rep : reversed(representativeTypeVars)) {
+      for (auto rep : llvm::reverse(representativeTypeVars)) {
         // Perform a postorder depth-first search through the one-way digraph,
         // starting at this representative, to establish the dependency
         // ordering amongst components that are reachable
@@ -1255,7 +1255,7 @@ bool ConstraintGraph::contractEdges() {
           rep2->getImpl().canBindToLValue()) ||
          // Allow l-value contractions when binding parameter types.
          isParamBindingConstraint)) {
-      if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
         auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
         if (CS.solverState)
           log.indent(CS.solverState->depth * 2);
@@ -1319,7 +1319,7 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
 
 #pragma mark Debugging output
 
-void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
+void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) const {
   out.indent(indent);
   TypeVar->print(out);
   out << ":\n";
@@ -1351,7 +1351,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
      out << ' ';
      adj->print(out);
 
-     auto &info = AdjacencyInfo[adj];
+     const auto info = AdjacencyInfo.lookup(adj);
      auto degree = info.NumConstraints;
      if (degree > 1) {
        out << " (" << degree << ")";
@@ -1394,7 +1394,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
   }
 }
 
-void ConstraintGraphNode::dump() {
+void ConstraintGraphNode::dump() const {
   llvm::SaveAndRestore<bool>
     debug(TypeVar->getASTContext().LangOpts.DebugConstraintSolver, true);
   print(llvm::dbgs(), 0);

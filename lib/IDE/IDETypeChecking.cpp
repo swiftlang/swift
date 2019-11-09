@@ -10,19 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -165,7 +166,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature *GenericSig,
+    void addRequirement(GenericSignature GenericSig,
                         Type First, Type Second, RequirementKind Kind) {
       CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
       CanType CanSecond;
@@ -279,7 +280,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     auto handleRequirements = [&](SubstitutionMap subMap,
-                                  GenericSignature *GenericSig,
+                                  GenericSignature GenericSig,
                                   ArrayRef<Requirement> Reqs) {
       for (auto Req : Reqs) {
         auto Kind = Req.getKind();
@@ -303,15 +304,16 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         switch (Kind) {
-        case RequirementKind::Conformance:
-          // FIXME: This could be more accurate; check
-          // conformance instead of subtyping
-          if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
+        case RequirementKind::Conformance: {
+          auto *M = DC->getParentModule();
+          auto *Proto = Second->castTo<ProtocolType>()->getDecl();
+          if (!First->isTypeParameter() && !First->is<ArchetypeType>() &&
+              M->conformsToProtocol(First, Proto).isInvalid())
             return true;
-          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
-                                    *DC))
+          if (M->conformsToProtocol(First, Proto).isInvalid())
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
+        }
 
         case RequirementKind::Superclass:
           if (!Second->isBindableToSuperclassOf(First)) {

@@ -28,6 +28,8 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
@@ -68,7 +70,7 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(
     ValueDecl *D, DeclVisibilityKind reason,
     DynamicLookupInfo dynamicLookupInfo) {
-  if (D->isInvalid())
+  if (D->hasInterfaceType() && D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
@@ -192,11 +194,57 @@ static void recordShadowedDeclsAfterSignatureMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
+    bool firstTopLevel = firstDecl->getDeclContext()->isModuleScopeContext();
+
     auto name = firstDecl->getBaseName();
+
+    auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+      for (auto path : paths) {
+        if (ModuleDecl::matchesAccessPath(path, name))
+          return false;
+      }
+
+      return true;
+    };
+
+    auto isScopedImport = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+      for (auto path : paths) {
+        if (path.empty())
+          continue;
+        if (ModuleDecl::matchesAccessPath(path, name))
+          return true;
+      }
+
+      return false;
+    };
+
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
+      bool secondTopLevel = secondDecl->getDeclContext()->isModuleScopeContext();
+
+      // For member types, we skip most of the below rules. Instead, we allow
+      // member types defined in a subclass to shadow member types defined in
+      // a superclass.
+      if (isa<TypeDecl>(firstDecl) &&
+          isa<TypeDecl>(secondDecl) &&
+          !firstTopLevel &&
+          !secondTopLevel) {
+        auto *firstClass = firstDecl->getDeclContext()->getSelfClassDecl();
+        auto *secondClass = secondDecl->getDeclContext()->getSelfClassDecl();
+        if (firstClass && secondClass && firstClass != secondClass) {
+          if (firstClass->isSuperclassOf(secondClass)) {
+            shadowed.insert(firstDecl);
+            continue;
+          } else if (secondClass->isSuperclassOf(firstClass)) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
+        continue;
+      }
 
       // Top-level type declarations in a module shadow other declarations
       // visible through the module's imports.
@@ -204,24 +252,29 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // [Backward compatibility] Note that members of types have the same
       // shadowing check, but we do it after dropping unavailable members.
       if (firstModule != secondModule &&
-          firstDecl->getDeclContext()->isModuleScopeContext() &&
-          secondDecl->getDeclContext()->isModuleScopeContext()) {
-        // First, scoped imports shadow unscoped imports.
-        bool firstScoped = imports.isScopedImport(firstModule, name, dc);
-        bool secondScoped = imports.isScopedImport(secondModule, name, dc);
-        if (!firstScoped && secondScoped) {
+          firstTopLevel && secondTopLevel) {
+        auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
+          firstModule, secondModule, dc);
+        auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
+          secondModule, firstModule, dc);
+
+        // Check if one module shadows the other.
+        if (isShadowed(firstPaths)) {
           shadowed.insert(firstDecl);
           break;
-        } else if (firstScoped && !secondScoped) {
+        } else if (isShadowed(secondPaths)) {
           shadowed.insert(secondDecl);
           continue;
         }
 
-        // Now check if one module shadows the other.
-        if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
+        // We might be in a situation where neither module shadows the
+        // other, but one declaration is visible via a scoped import.
+        bool firstScoped = isScopedImport(firstPaths);
+        bool secondScoped = isScopedImport(secondPaths);
+        if (!firstScoped && secondScoped) {
           shadowed.insert(firstDecl);
           break;
-        } else if (imports.isShadowedBy(secondModule, firstModule, name, dc)) {
+        } else if (firstScoped && !secondScoped) {
           shadowed.insert(secondDecl);
           continue;
         }
@@ -276,12 +329,17 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // shadowing check is performed after unavailable candidates have
       // already been dropped.
       if (firstModule != secondModule &&
-          !firstDecl->getDeclContext()->isModuleScopeContext() &&
-          !secondDecl->getDeclContext()->isModuleScopeContext()) {
-        if (imports.isShadowedBy(firstModule, secondModule, dc)) {
+          !firstTopLevel && !secondTopLevel) {
+        auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
+          firstModule, secondModule, dc);
+        auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
+          secondModule, firstModule, dc);
+
+        // Check if one module shadows the other.
+        if (isShadowed(firstPaths)) {
           shadowed.insert(firstDecl);
           break;
-        } else if (imports.isShadowedBy(secondModule, firstModule, dc)) {
+        } else if (isShadowed(secondPaths)) {
           shadowed.insert(secondDecl);
           continue;
         }
@@ -400,8 +458,6 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   if (decls.size() < 2)
     return;
 
-  auto typeResolver = decls[0]->getASTContext().getLazyResolver();
-
   // Categorize all of the declarations based on their overload signatures.
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
   llvm::SmallVector<CanType, 2> collisionTypes;
@@ -429,19 +485,16 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     CanType signature;
 
     if (!isa<TypeDecl>(decl)) {
-      // We need an interface type here.
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
-
       // If the decl is currently being validated, this is likely a recursive
       // reference and we'll want to skip ahead so as to avoid having its type
       // attempt to desugar itself.
-      if (!decl->hasValidSignature())
+      if (decl->isRecursiveValidation())
         continue;
+      auto ifaceType = decl->getInterfaceType();
 
       // FIXME: the canonical type makes a poor signature, because we don't
       // canonicalize away default arguments.
-      signature = decl->getInterfaceType()->getCanonicalType();
+      signature = ifaceType->getCanonicalType();
 
       // FIXME: The type of a variable or subscript doesn't include
       // enough context to distinguish entities from different
@@ -449,9 +502,6 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       // type. This is layering a partial fix upon a total hack.
       if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
         signature = asd->getOverloadSignatureType();
-    } else if (decl->getDeclContext()->isTypeContext()) {
-      // Do not apply shadowing rules for member types.
-      continue;
     }
 
     // Record this declaration based on its signature.
@@ -599,6 +649,13 @@ void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
   nameTracker->addTopLevelName(name.getBaseName(), isCascading);
 }
 
+namespace {
+  /// Whether we're looking up outer results or not.
+  enum class LookupOuterResults {
+    Excluded,
+    Included
+  };
+}
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given parsed type representation.
@@ -795,8 +852,7 @@ public:
     os << "\n";
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     dump(llvm::errs());
   }
 
@@ -1133,6 +1189,7 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
+      (void)A;
       assert(A && A->getMemberName().matchesRef(name));
     }
   }
@@ -1460,6 +1517,34 @@ bool DeclContext::lookupQualified(Type type,
   return lookupQualified(nominalTypesToLookInto, member, options, decls);
 }
 
+static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
+                                                  DeclName member) {
+  auto &Context = target->getASTContext();
+  auto baseName = member.getBaseName();
+  if (!member.isSimpleName() || baseName.isSpecial())
+    return;
+
+  if ((!baseName.getIdentifier().str().startswith("$") &&
+       !baseName.getIdentifier().str().startswith("_")) ||
+      baseName.getIdentifier().str().size() <= 1) {
+    return;
+  }
+
+  // $- and _-prefixed variables can be generated by properties that have
+  // attached property wrappers.
+  auto originalPropertyName =
+      Context.getIdentifier(baseName.getIdentifier().str().substr(1));
+  for (auto member : target->lookupDirect(originalPropertyName)) {
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (var->hasAttachedPropertyWrapper()) {
+        auto sourceFile = var->getDeclContext()->getParentSourceFile();
+        if (sourceFile && sourceFile->Kind != SourceFileKind::Interface)
+          (void)var->getPropertyWrapperBackingProperty();
+      }
+    }
+  }
+}
+
 bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
@@ -1504,7 +1589,6 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   auto &ctx = getASTContext();
-  auto typeResolver = ctx.getLazyResolver();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
@@ -1514,11 +1598,9 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved implicit members, if we need them.
-    if (typeResolver) {
-      if (member.getBaseName() == DeclBaseName::createConstructor())
-        typeResolver->resolveImplicitConstructors(current);
-
-      typeResolver->resolveImplicitMember(current, member);
+    if (ctx.getLegacyGlobalTypeChecker()) {
+      current->synthesizeSemanticMembersIfNeeded(member);
+      installPropertyWrapperMembersIfNeeded(current, member);
     }
 
     // Look for results within the current nominal type and its extensions.
@@ -1779,7 +1861,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
         // TypeRepr version: Builtin.AnyObject
-        if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+        if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
             auto components = compound->getComponents();
             if (components.size() == 2 &&
@@ -1791,9 +1873,10 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         }
 
         // Type version: an empty class-bound existential.
-        if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
-          if (type->isAnyObject())
-            anyObject = true;
+        if (typealias->hasInterfaceType()) {
+          if (auto type = typealias->getUnderlyingType())
+            if (type->isAnyObject())
+              anyObject = true;
         }
       }
 
@@ -1827,11 +1910,15 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
 directReferencesForUnqualifiedTypeLookup(DeclName name,
-                                         SourceLoc loc, DeclContext *dc) {
+                                         SourceLoc loc, DeclContext *dc,
+                                         LookupOuterResults lookupOuter) {
   DirectlyReferencedTypeDecls results;
   UnqualifiedLookup::Options options =
       UnqualifiedLookup::Flags::TypeLookup |
       UnqualifiedLookup::Flags::AllowProtocolMembers;
+  if (lookupOuter == LookupOuterResults::Included)
+    options |= UnqualifiedLookup::Flags::IncludeOuterResults;
+
   UnqualifiedLookup lookup(name, dc, loc, options);
   for (const auto &result : lookup.Results) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
@@ -1906,7 +1993,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
       current =
         directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
                                                  component->getIdLoc(),
-                                                 dc);
+                                                 dc,
+                                                 LookupOuterResults::Excluded);
 
       // If we didn't find anything, fail now.
       if (current.empty())
@@ -2057,7 +2145,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
     Evaluator &evaluator,
     TypeAliasDecl *typealias) const {
   // Prefer syntactic information when we have it.
-  if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+  if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
     return directReferencesForTypeRepr(evaluator, typealias->getASTContext(),
                                        typeRepr, typealias);
   }
@@ -2065,7 +2153,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
   // Fall back to semantic types.
   // FIXME: In the long run, we shouldn't need this. Non-syntactic results
   // should be cached.
-  if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
+  if (auto type = typealias->getUnderlyingType()) {
     return directReferencesForType(type);
   }
 
@@ -2144,6 +2232,19 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   return nominalTypes.empty() ? nullptr : nominalTypes[0];
 }
 
+/// Whether there are only associated types in the set of declarations.
+static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
+  if (decls.empty())
+    return false;
+
+  for (auto decl : decls) {
+    if (!isa<AssociatedTypeDecl>(decl))
+      return false;
+  }
+
+  return true;
+}
+
 llvm::Expected<NominalTypeDecl *>
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
@@ -2165,6 +2266,48 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                             modulesFound, anyObject);
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
+
+  // If we found declarations that are associated types, look outside of
+  // the current context to see if we can recover.
+  if (declsAreAssociatedTypes(decls)) {
+    if (auto typeRepr = typeLoc.getTypeRepr()) {
+      if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
+        auto assocType = cast<AssociatedTypeDecl>(decls.front());
+
+        modulesFound.clear();
+        anyObject = false;
+        decls = directReferencesForUnqualifiedTypeLookup(
+            identTypeRepr->getIdentifier(), identTypeRepr->getIdLoc(), dc,
+            LookupOuterResults::Included);
+        nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+                                             modulesFound, anyObject);
+        if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front())) {
+          auto nominal = nominals.front();
+          if (nominal->getDeclContext()->isModuleScopeContext()) {
+            // Complain, producing module qualification in a Fix-It.
+            auto moduleName = nominal->getParentModule()->getName();
+            ctx.Diags.diagnose(typeRepr->getLoc(),
+                               diag::warn_property_wrapper_module_scope,
+                               identTypeRepr->getIdentifier(),
+                               moduleName)
+              .fixItInsert(typeRepr->getLoc(),
+                           moduleName.str().str() + ".");
+            ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
+                               assocType->getDescriptiveKind(),
+                               assocType->getFullName());
+
+            ComponentIdentTypeRepr *components[2] = {
+              new (ctx) SimpleIdentTypeRepr(typeRepr->getLoc(), moduleName),
+              identTypeRepr
+            };
+
+            typeLoc = TypeLoc(IdentTypeRepr::create(ctx, components));
+            return nominal;
+          }
+        }
+      }
+    }
+  }
 
   return nullptr;
 }

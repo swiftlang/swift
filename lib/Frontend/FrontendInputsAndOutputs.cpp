@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/Range.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -174,7 +175,7 @@ bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
 
   StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
   file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
-  return InputType == file_types::TY_SwiftParseableInterfaceFile;
+  return InputType == file_types::TY_SwiftModuleInterfaceFile;
 }
 
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
@@ -435,10 +436,16 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
         return outs.ModuleDocOutputPath;
       });
 }
-bool FrontendInputsAndOutputs::hasParseableInterfaceOutputPath() const {
+bool FrontendInputsAndOutputs::hasModuleSourceInfoOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ParseableInterfaceOutputPath;
+        return outs.ModuleSourceInfoOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleInterfaceOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasTBDPath() const {

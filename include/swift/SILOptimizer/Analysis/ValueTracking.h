@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_VALUETRACKING_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_VALUETRACKING_H
 
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -24,18 +25,33 @@ namespace swift {
 
 /// Returns true if \p V is a function argument which may not alias to
 /// any other pointer in the function.
-/// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
-/// the @inout convention. See swift::isNotAliasedIndirectParameter().
-bool isNotAliasingArgument(SILValue V, InoutAliasingAssumption isInoutAliasing =
-                                         InoutAliasingAssumption::Aliasing);
+///
+/// This does not look through any projections. The caller must do that.
+bool isExclusiveArgument(SILValue V);
 
-/// Returns true if \p V is local inside its function. This means its underlying
-/// object either is a non-aliasing function argument or a locally allocated
-/// object.
-/// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
-/// the @inout convention. See swift::isNotAliasedIndirectParameter().
-bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
-                                         InoutAliasingAssumption::Aliasing);
+/// Returns true if \p V is a locally allocated object.
+///
+/// Note: this may look through a single level of indirection (via
+/// ref_element_addr) when \p V is the address of a class property. However, it
+/// does not look through init/open_existential_addr.
+bool pointsToLocalObject(SILValue V);
+
+/// Returns true if \p V is a uniquely identified address or reference. It may
+/// be any of:
+///
+/// - an address projection based on a locally allocated address with no
+/// indirection
+///
+/// - a locally allocated reference, or an address projection based on that
+/// reference with one level of indirection (an address into the locally
+/// allocated object).
+///
+/// - an address projection based on an exclusive argument with no levels of
+/// indirection.
+inline bool isUniquelyIdentified(SILValue V) {
+  return pointsToLocalObject(V)
+         || isExclusiveArgument(getUnderlyingAddressRoot(V));
+}
 
 enum class IsZeroKind {
   Zero,

@@ -66,22 +66,25 @@ internal func osLog(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let argumentClosures = message.interpolation.arguments.argumentClosures
+
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
 
   // Code that will execute at runtime.
   guard logObject.isEnabled(type: logLevel) else { return }
 
-  let arguments = message.interpolation.arguments
+  // Allocate a byte buffer to store the arguments. The buffer could be stack
+  // allocated as it is local to this function and also its size is a
+  // compile-time constant.
+  let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+  // Array of references to auxiliary storage created during serialization of
+  // strings. This array can be stack allocated.
+  var stringStorageObjects: [AnyObject] = []
 
-  // Ideally, we could stack allocate the buffer as it is local to this
-  // function and also its size is a compile-time constant.
-  let bufferMemory =
-    UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-  var builder = OSLogByteBufferBuilder(bufferMemory)
-
-  builder.serialize(preamble)
-  builder.serialize(argumentCount)
-  arguments.serialize(into: &builder)
+  var currentBufferPosition = bufferMemory
+  serialize(preamble, at: &currentBufferPosition)
+  serialize(argumentCount, at: &currentBufferPosition)
+  argumentClosures.forEach { $0(&currentBufferPosition, &stringStorageObjects) }
 
   ___os_log_impl(UnsafeMutableRawPointer(mutating: #dsohandle),
                  logObject,
@@ -90,7 +93,9 @@ internal func osLog(
                  bufferMemory,
                  UInt32(bufferSize))
 
-  builder.destroy()
+  // The following operation extends the lifetime of stringStorageObjects
+  // and also of the objects stored in it till this point.
+  stringStorageObjects.removeAll()
   bufferMemory.deallocate()
 }
 
@@ -115,18 +120,21 @@ func _checkFormatStringAndBuffer(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let argumentClosures = message.interpolation.arguments.argumentClosures
 
   // Code that will execute at runtime.
   let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-  var builder = OSLogByteBufferBuilder(bufferMemory)
+  var stringStorageObjects: [AnyObject] = []
 
-  builder.serialize(preamble)
-  builder.serialize(argumentCount)
-  message.interpolation.arguments.serialize(into: &builder)
+  var currentBufferPosition = bufferMemory
+  serialize(preamble, at: &currentBufferPosition)
+  serialize(argumentCount, at: &currentBufferPosition)
+  argumentClosures.forEach { $0(&currentBufferPosition, &stringStorageObjects) }
 
   assertion(
     formatString,
     UnsafeBufferPointer(start: UnsafePointer(bufferMemory), count: bufferSize))
 
+  stringStorageObjects.removeAll()
   bufferMemory.deallocate()
 }

@@ -43,6 +43,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
 
   var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
   testfunc({$0+1})  // expected-error {{missing argument for parameter #2 in call}}
+  // expected-error@-1 {{cannot convert value of type '(Int) -> Int' to expected argument type '()'}}
 
   funcdecl5(1, 2) // recursion.
 
@@ -353,4 +354,10 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 
     cc = wc!
   }
+}
+
+// Don't expose @lvalue-ness in diagnostics.
+let closure = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> Bool in }}
+  var helper = true
+  return helper
 }

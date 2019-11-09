@@ -24,6 +24,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
@@ -124,11 +125,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   // Accessors are never visible directly in the source language.
   if (isa<AccessorDecl>(Member))
     return false;
-
-  if (!Member->hasInterfaceType()) {
-    Member->getASTContext().getLazyResolver()->resolveDeclSignature(Member);
-  }
-
+  
   // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
       !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member)) {
@@ -282,11 +279,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (!D->isObjC())
         return;
 
-      // Ensure that the declaration has a type.
-      if (!D->hasInterfaceType()) {
-        D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-        if (!D->hasInterfaceType()) return;
-      }
+      if (D->isRecursiveValidation())
+        return;
 
       switch (D->getKind()) {
 #define DECL(ID, SUPER) \
@@ -433,21 +427,16 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-          if (auto *TypeResolver = VD->getASTContext().getLazyResolver()) {
-            TypeResolver->resolveDeclSignature(VD);
-            if (!NormalConformance->hasWitness(VD) &&
-                (Conformance->getDeclContext()->getParentSourceFile() !=
-                FromContext->getParentSourceFile()))
-              TypeResolver->resolveWitness(NormalConformance, VD);
-          }
-          // Skip value requirements that have corresponding witnesses. This cuts
-          // down on duplicates.
-          if (!NormalConformance->hasWitness(VD) ||
-              !NormalConformance->getWitness(VD) ||
-              NormalConformance->getWitness(VD).getDecl()->getFullName()
-                != VD->getFullName()) {
-            Consumer.foundDecl(VD, ReasonForThisProtocol);
-          }
+          if (!VD->isProtocolRequirement())
+            continue;
+
+          // Skip value requirements that have corresponding witnesses. This
+          // cuts down on duplicates.
+          auto witness = NormalConformance->getWitness(VD);
+          if (witness && witness.getDecl()->getFullName() == VD->getFullName())
+            continue;
+
+          Consumer.foundDecl(VD, ReasonForThisProtocol);
         }
       }
     }
@@ -699,8 +688,10 @@ static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy)
   if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
     if (BaseTy->getClassOrBoundGenericClass()) {
       if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
-        auto *Superclass = Conformance->getConcrete()->getRootConformance()
-            ->getType()->getClassOrBoundGenericClass();
+        auto *Superclass = Conformance.getConcrete()
+                               ->getRootConformance()
+                               ->getType()
+                               ->getClassOrBoundGenericClass();
         return BaseTy->getSuperclassForDecl(Superclass);
       }
     }
@@ -713,9 +704,10 @@ namespace {
 
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
-  std::set<ValueDecl *> AllFoundDecls;
-  std::map<DeclBaseName, std::set<ValueDecl *>> FoundDecls;
-  llvm::SetVector<FoundDeclTy> DeclsToReport;
+  llvm::SetVector<FoundDeclTy> Results;
+  llvm::SmallVector<ValueDecl *, 8> Decls;
+  llvm::SetVector<FoundDeclTy> FilteredResults;
+  llvm::DenseMap<DeclBaseName, llvm::SmallVector<ValueDecl *, 2>> DeclsByName;
   Type BaseTy;
   const DeclContext *DC;
 
@@ -728,135 +720,127 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (!AllFoundDecls.insert(VD).second)
+    if (!Results.insert({VD, Reason, dynamicLookupInfo}))
       return;
 
-    // If this kind of declaration doesn't participate in overriding, there's
-    // no filtering to do here.
-    if (!isa<AbstractFunctionDecl>(VD) &&
-        !isa<AbstractStorageDecl>(VD) &&
-        !isa<AssociatedTypeDecl>(VD)) {
-      DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
-      return;
-    }
+    DeclsByName[VD->getBaseName()] = {};
+    Decls.push_back(VD);
+  }
 
-    if (!VD->hasInterfaceType()) {
-      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
-      if (!VD->hasInterfaceType())
-        return;
-    }
+  void filterDecls(VisibleDeclConsumer &Consumer) {
+    removeOverriddenDecls(Decls);
+    removeShadowedDecls(Decls, DC);
 
-    if (VD->isInvalid()) {
-      FoundDecls[VD->getBaseName()].insert(VD);
-      DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
-      return;
-    }
-    auto &PossiblyConflicting = FoundDecls[VD->getBaseName()];
+    size_t index = 0;
+    for (auto DeclAndReason : Results) {
+      if (index >= Decls.size())
+        break;
+      if (DeclAndReason.D != Decls[index])
+        continue;
 
-    // Check all overridden decls.
-    {
-      auto *CurrentVD = VD->getOverriddenDecl();
-      while (CurrentVD) {
-        if (!AllFoundDecls.insert(CurrentVD).second)
-          break;
-        if (PossiblyConflicting.count(CurrentVD)) {
-          PossiblyConflicting.erase(CurrentVD);
-          PossiblyConflicting.insert(VD);
+      index++;
 
-          bool Erased = DeclsToReport.remove(
-              FoundDeclTy(CurrentVD, DeclVisibilityKind::LocalVariable, {}));
-          assert(Erased);
-          (void)Erased;
+      auto *VD = DeclAndReason.D;
+      auto Reason = DeclAndReason.Reason;
+      auto dynamicLookupInfo = DeclAndReason.dynamicLookupInfo;
 
-          DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
-          return;
-        }
-        CurrentVD = CurrentVD->getOverriddenDecl();
-      }
-    }
-
-    // Does it make sense to substitute types?
-
-    // If the base type is AnyObject, we might be doing a dynamic
-    // lookup, so the base type won't match the type of the member's
-    // context type.
-    //
-    // If the base type is not a nominal type, we can't substitute
-    // the member type.
-    //
-    // If the member is a free function and not a member of a type,
-    // don't substitute either.
-    bool shouldSubst = (Reason != DeclVisibilityKind::DynamicLookup &&
-                        !BaseTy->isAnyObject() && !BaseTy->hasTypeVariable() &&
-                        !BaseTy->hasUnboundGenericType() &&
-                        (BaseTy->getNominalOrBoundGenericNominal() ||
-                         BaseTy->is<ArchetypeType>()) &&
-                        VD->getDeclContext()->isTypeContext());
-    ModuleDecl *M = DC->getParentModule();
-
-    // Hack; we shouldn't be filtering at this level anyway.
-    if (!VD->hasInterfaceType()) {
-      FoundDecls[VD->getBaseName()].insert(VD);
-      DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
-      return;
-    }
-
-    auto FoundSignature = VD->getOverloadSignature();
-    auto FoundSignatureType = VD->getOverloadSignatureType();
-    if (FoundSignatureType && shouldSubst) {
-      auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
-      auto CT = FoundSignatureType.subst(subs);
-      if (!CT->hasError())
-        FoundSignatureType = CT->getCanonicalType();
-    }
-
-    for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
-         I != E; ++I) {
-      auto *OtherVD = *I;
-      if (OtherVD->isInvalid() || !OtherVD->hasInterfaceType()) {
-        // For some invalid decls it might be impossible to compute the
-        // signature, for example, if the types could not be resolved.
+      // If this kind of declaration doesn't participate in overriding, there's
+      // no filtering to do here.
+      if (!isa<AbstractFunctionDecl>(VD) &&
+          !isa<AbstractStorageDecl>(VD) &&
+          !isa<AssociatedTypeDecl>(VD)) {
+        FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
         continue;
       }
 
-      auto OtherSignature = OtherVD->getOverloadSignature();
-      auto OtherSignatureType = OtherVD->getOverloadSignatureType();
-      if (OtherSignatureType && shouldSubst) {
-        auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
-        auto subs = ActualBaseTy->getMemberSubstitutionMap(M, OtherVD);
-        auto CT = OtherSignatureType.subst(subs);
-        if (!CT->hasError())
-          OtherSignatureType = CT->getCanonicalType();
+      if (VD->isRecursiveValidation())
+        continue;
+
+      auto &PossiblyConflicting = DeclsByName[VD->getBaseName()];
+
+      if (VD->isInvalid()) {
+        FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+        PossiblyConflicting.push_back(VD);
+        continue;
       }
 
-      if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
-                      OtherSignature, OtherSignatureType,
-                      /*wouldConflictInSwift5*/nullptr,
-                      /*skipProtocolExtensionCheck*/true)) {
-        if (VD->getFormalAccess() > OtherVD->getFormalAccess() ||
-            //Prefer available one.
-            (!AvailableAttr::isUnavailable(VD) &&
-             AvailableAttr::isUnavailable(OtherVD))) {
-          PossiblyConflicting.erase(I);
-          PossiblyConflicting.insert(VD);
+      // Does it make sense to substitute types?
 
-          bool Erased = DeclsToReport.remove(
-              FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
-          assert(Erased);
-          (void)Erased;
+      // If the base type is AnyObject, we might be doing a dynamic
+      // lookup, so the base type won't match the type of the member's
+      // context type.
+      //
+      // If the base type is not a nominal type, we can't substitute
+      // the member type.
+      //
+      // If the member is a free function and not a member of a type,
+      // don't substitute either.
+      bool shouldSubst = (Reason != DeclVisibilityKind::DynamicLookup &&
+                          !BaseTy->isAnyObject() && !BaseTy->hasTypeVariable() &&
+                          !BaseTy->hasUnboundGenericType() &&
+                          (BaseTy->getNominalOrBoundGenericNominal() ||
+                           BaseTy->is<ArchetypeType>()) &&
+                          VD->getDeclContext()->isTypeContext());
+      ModuleDecl *M = DC->getParentModule();
 
-          DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+      auto FoundSignature = VD->getOverloadSignature();
+      auto FoundSignatureType = VD->getOverloadSignatureType();
+      if (FoundSignatureType && shouldSubst) {
+        auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
+        auto CT = FoundSignatureType.subst(subs);
+        if (!CT->hasError())
+          FoundSignatureType = CT->getCanonicalType();
+      }
+
+      bool FoundConflicting = false;
+      for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
+           I != E; ++I) {
+        auto *OtherVD = *I;
+        if (OtherVD->isRecursiveValidation())
+          continue;
+
+        if (OtherVD->isInvalid())
+          continue;
+
+        auto OtherSignature = OtherVD->getOverloadSignature();
+        auto OtherSignatureType = OtherVD->getOverloadSignatureType();
+        if (OtherSignatureType && shouldSubst) {
+          auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
+          auto subs = ActualBaseTy->getMemberSubstitutionMap(M, OtherVD);
+          auto CT = OtherSignatureType.subst(subs);
+          if (!CT->hasError())
+            OtherSignatureType = CT->getCanonicalType();
         }
-        return;
+
+        if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
+                        OtherSignature, OtherSignatureType,
+                        /*wouldConflictInSwift5*/nullptr,
+                        /*skipProtocolExtensionCheck*/true)) {
+          FoundConflicting = true;
+          if (VD->getFormalAccess() > OtherVD->getFormalAccess() ||
+              //Prefer available one.
+              (!AvailableAttr::isUnavailable(VD) &&
+               AvailableAttr::isUnavailable(OtherVD))) {
+            FilteredResults.remove(
+                FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
+            FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+            *I = VD;
+          }
+        }
+      }
+
+      if (!FoundConflicting) {
+        FilteredResults.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+        PossiblyConflicting.push_back(VD);
       }
     }
 
-    PossiblyConflicting.insert(VD);
-    DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+    for (auto Result : FilteredResults)
+      Consumer.foundDecl(Result.D, Result.Reason, Result.dynamicLookupInfo);
   }
 
   bool seenBaseName(DeclBaseName name) {
-    return FoundDecls.find(name) != FoundDecls.end();
+    return DeclsByName.find(name) != DeclsByName.end();
   }
 };
 
@@ -1010,9 +994,7 @@ static void lookupVisibleMemberDecls(
       GSB, Visited, seenDynamicLookup);
 
   // Report the declarations we found to the real consumer.
-  for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
-    Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason,
-                       DeclAndReason.dynamicLookupInfo);
+  overrideConsumer.filterDecls(Consumer);
 }
 
 static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,

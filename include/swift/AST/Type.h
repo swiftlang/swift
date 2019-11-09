@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -38,7 +39,7 @@ class ArchetypeType;
 class ClassDecl;
 class CanType;
 class EnumDecl;
-class GenericSignature;
+class GenericSignatureImpl;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -93,7 +94,7 @@ struct QueryTypeSubstitutionMapOrIdentity {
 using GenericFunction = auto(CanType dependentType,
                              Type conformingReplacementType,
                              ProtocolDecl *conformedProtocol)
-  -> Optional<ProtocolConformanceRef>;
+                            -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -103,11 +104,10 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule(ModuleDecl *M)
     : M(M) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -115,24 +115,24 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
 /// conformances from a generic signature.
 class LookUpConformanceInSignature {
-  const GenericSignature &Sig;
+  const GenericSignatureImpl *Sig;
 public:
-  LookUpConformanceInSignature(const GenericSignature &Sig)
-    : Sig(Sig) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) const;
+  LookUpConformanceInSignature(const GenericSignatureImpl *Sig)
+    : Sig(Sig) {
+      assert(Sig && "Cannot lookup conformance in null signature!");
+    }
+
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.
@@ -315,7 +315,7 @@ public:
   
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
@@ -377,7 +377,7 @@ private:
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, GenericSignature *sig,
+  static bool isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
                                   bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
@@ -429,7 +429,7 @@ public:
   ///   - existentials with class or class protocol bounds
   /// But not:
   ///   - function types
-  bool allowsOwnership(GenericSignature *sig) const {
+  bool allowsOwnership(GenericSignatureImpl *sig) const {
     return isReferenceTypeImpl(*this, sig,
                                /*functions count*/ false);
   }
@@ -589,37 +589,6 @@ template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
 }
-  
-class GenericTypeParamType;
-  
-/// A reference to a canonical generic signature.
-class CanGenericSignature {
-  GenericSignature *Signature;
-  
-public:
-  CanGenericSignature() : Signature(nullptr) {}
-  CanGenericSignature(std::nullptr_t) : Signature(nullptr) {}
-  
-  // in Decl.h
-  explicit CanGenericSignature(GenericSignature *Signature);
-  ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-
-  GenericSignature *operator->() const {
-    return Signature;
-  }
-  
-  operator GenericSignature *() const {
-    return Signature;
-  }
-  
-  GenericSignature *getPointer() const {
-    return Signature;
-  }
-
-  bool operator==(const swift::CanGenericSignature &other) {
-    return Signature == other.Signature;
-  }
-};
 
 template <typename T>
 inline T *staticCastHelper(const Type &Ty) {
@@ -699,19 +668,6 @@ namespace llvm {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
-
-  template<>
-  struct PointerLikeTypeTraits<swift::CanGenericSignature> {
-  public:
-    static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
-      return swift::CanGenericSignature((swift::GenericSignature*)P);
-    }
-    static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
-      return (void*)S.getPointer();
-    }
-    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
-  };
-  
 } // end namespace llvm
 
 #endif

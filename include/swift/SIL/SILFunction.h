@@ -71,7 +71,7 @@ public:
   };
 
   static SILSpecializeAttr *create(SILModule &M,
-                                   GenericSignature *specializedSignature,
+                                   GenericSignature specializedSignature,
                                    bool exported, SpecializationKind kind);
 
   bool isExported() const {
@@ -90,7 +90,7 @@ public:
     return kind;
   }
 
-  GenericSignature *getSpecializedSignature() const {
+  GenericSignature getSpecializedSignature() const {
     return specializedSignature;
   }
 
@@ -103,11 +103,11 @@ public:
 private:
   SpecializationKind kind;
   bool exported;
-  GenericSignature *specializedSignature;
+  GenericSignature specializedSignature;
   SILFunction *F = nullptr;
 
   SILSpecializeAttr(bool exported, SpecializationKind kind,
-                    GenericSignature *specializedSignature);
+                    GenericSignature specializedSignature);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of

@@ -78,6 +78,30 @@ class Class17127126 {
   static var sharedInstance: AnyObject { get set }
 }
 
+@propertyWrapper
+public struct SomeWrapper {
+  private var value: Int
+
+
+  public init(wrappedValue: Int) {
+    value = wrappedValue
+  }
+
+
+  public var wrappedValue: Int {
+    get { value }
+    set { value = newValue }
+  }
+}
+
+class SomeWrapperTests {
+  @objc @SomeWrapper dynamic var someWrapper: Int = 0
+
+  func testAssignment() {
+    // This used to crash irgen.
+    someWrapper = 1000
+  }
+}
 // CHECK-NEW: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
 // CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [5 x i8] c"Tq,N\00"
 

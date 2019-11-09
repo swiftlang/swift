@@ -88,7 +88,13 @@ EXPECTED_DEFAULTS = {
     'build_swiftevolve': False,
     'build_indexstoredb': False,
     'build_sourcekitlsp': False,
+    'install_swiftpm': False,
+    'install_swiftsyntax': False,
+    'skip_install_swiftsyntax_module': False,
+    'swiftsyntax_verify_generated_files': False,
     'install_sourcekitlsp': False,
+    'install_skstresstester': False,
+    'install_swiftevolve': False,
     'build_toolchainbenchmarks': False,
     'build_tvos': True,
     'build_tvos_device': False,
@@ -123,6 +129,7 @@ EXPECTED_DEFAULTS = {
     'distcc': False,
     'dry_run': False,
     'enable_asan': False,
+    'enable_experimental_differentiable_programming': True,
     'enable_lsan': False,
     'enable_sanitize_coverage': False,
     'disable_guaranteed_normal_arguments': False,
@@ -166,6 +173,7 @@ EXPECTED_DEFAULTS = {
     'dump_config': False,
     'show_sdks': False,
     'skip_build': False,
+    'skip_local_build': False,
     'stdlib_deployment_targets': None,
     'stress_test': False,
     'swift_analyze_code_coverage': defaults.SWIFT_ANALYZE_CODE_COVERAGE,
@@ -201,8 +209,13 @@ EXPECTED_DEFAULTS = {
     'test_watchos': False,
     'test_watchos_host': False,
     'test_watchos_simulator': False,
+    'test_swiftpm': False,
+    'test_swiftsyntax': False,
     'test_indexstoredb': False,
     'test_sourcekitlsp': False,
+    'test_skstresstester': False,
+    'test_swiftevolve': False,
+    'test_toolchainbenchmarks': False,
     'tvos': False,
     'tvos_all': False,
     'validation_test': None,
@@ -340,6 +353,14 @@ class IgnoreOption(_BaseOption):
     pass
 
 
+class BuildScriptImplOption(_BaseOption):
+    """Option that gets forwarded to build-script-impl by migration.py and is
+    only listed for disambiguation by argparse.
+    """
+
+    pass
+
+
 # -----------------------------------------------------------------------------
 
 EXPECTED_OPTIONS = [
@@ -447,6 +468,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-stdlib-unittest-extra'),
     EnableOption('--distcc'),
     EnableOption('--enable-asan'),
+    EnableOption('--enable-experimental-differentiable-programming'),
     EnableOption('--enable-lsan'),
     EnableOption('--enable-sanitize-coverage'),
     EnableOption('--enable-tsan'),
@@ -460,11 +482,20 @@ EXPECTED_OPTIONS = [
     EnableOption('--libicu', dest='build_libicu'),
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
+    EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
+    EnableOption('--skip-install-swiftsyntax-module',
+                 dest='skip_install_swiftsyntax_module'),
+    EnableOption('--swiftsyntax-verify-generated-files',
+                 dest='swiftsyntax_verify_generated_files'),
+    EnableOption('--install-swiftpm', dest='install_swiftpm'),
     EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
+    EnableOption('--install-skstresstester', dest='install_skstresstester'),
+    EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
     EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
     EnableOption('--tsan-libdispatch-test'),
     EnableOption('--long-test'),
     EnableOption('--show-sdks'),
+    EnableOption('--skip-local-build'),
     EnableOption('--stress-test'),
     EnableOption('--test'),
     EnableOption('--test-optimize-for-size'),
@@ -514,8 +545,14 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-watchos-host', dest='test_watchos_host'),
     DisableOption('--skip-test-watchos-simulator',
                   dest='test_watchos_simulator'),
+    DisableOption('--skip-test-swiftpm', dest='test_swiftpm'),
+    DisableOption('--skip-test-swiftsyntax', dest='test_swiftsyntax'),
     DisableOption('--skip-test-indexstore-db', dest='test_indexstoredb'),
     DisableOption('--skip-test-sourcekit-lsp', dest='test_sourcekitlsp'),
+    DisableOption('--skip-test-skstresstester', dest='test_skstresstester'),
+    DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
+    DisableOption('--skip-test-toolchain-benchmarks',
+                  dest='test_toolchainbenchmarks'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),
@@ -581,6 +618,10 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-for-size'),
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
+
+    # Options forwared to build-script-impl
+    BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
+    BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 
     # NOTE: LTO flag is a special case that acts both as an option and has
     # valid choices
