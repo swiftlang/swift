@@ -10,6 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Declares the code needed to essentially "diff" the previously-compiled and
+// possibly-about-to-be-compiled versions of a source file.
+// Unlike Unix diff, it can go down to the granularity of characters within a
+// line.
+
 #ifndef SWIFT_DRIVER_SOURCECOMPARATOR_H
 #define SWIFT_DRIVER_SOURCECOMPARATOR_H
 
@@ -28,14 +33,22 @@ public:
   //==============================================================================
   // MARK: Packaging indices for both sides
   //==============================================================================
+
+  /// It is useful to have structures that hold both the left- and
+  /// right-hand-sides of a "diff" input Describes a side:
   enum class Side : size_t { L = 0, R = 1 };
 
+  /// A general class to hold something that exists on both sides:
   template <typename T> struct LR {
     T contents[2];
+    /// Get the contents on a particular side
     T &operator[](const Side side) { return contents[size_t(side)]; }
     const T &operator[](const Side side) const {
       return contents[size_t(side)];
     }
+
+    /// Get a side by name:
+    // TODO: Could get ride of these and just use the subscripting above
     T &lhs() { return contents[size_t(Side::L)]; }
     T &rhs() { return contents[size_t(Side::R)]; }
 
@@ -49,6 +62,9 @@ public:
       return lhs() == other.lhs() && rhs() == other.rhs();
     }
   };
+
+  /// A structure holding size_t's on both sides.
+  /// Zero-origin
   template <typename Derived> struct Indices : public LR<size_t> {
     Indices(size_t lhs, size_t rhs) : LR(lhs, rhs) {}
     Derived operator+(size_t x) const { return Derived(lhs() + x, rhs() + x); }
@@ -61,6 +77,8 @@ public:
       return lhs() <= other.lhs() && rhs() <= other.rhs();
     }
   };
+  /// Character indices into a line.
+  /// Zero-origin
   struct CharIndices : public Indices<CharIndices> {
     CharIndices(size_t lhs, size_t rhs) : Indices(lhs, rhs) {}
     CharIndices &operator++() {
@@ -73,6 +91,9 @@ public:
     }
     bool bothNonZero() const { return lhs() != 0 && rhs() != 0; }
   };
+
+  /// Indices into a collection of lines.
+  /// Zero-origin
   struct LineIndices : public Indices<LineIndices> {
     LineIndices() : Indices(~0, ~0) {}
     LineIndices(size_t lhs, size_t rhs) : Indices(lhs, rhs) {}
@@ -85,19 +106,25 @@ public:
       return *this;
     }
   };
+
+  /// Strings on both sides.
   struct StringRefs : LR<StringRef> {
     StringRefs(StringRef lhs, StringRef rhs) : LR(lhs, rhs) {}
     CharIndices size() const { return CharIndices(lhs().size(), rhs().size()); }
+    /// Do the strings match at the provided character indices?
     bool matchAt(const CharIndices &indices) const {
       return lhs()[indices.lhs()] == rhs()[indices.rhs()];
     }
   };
 
+  /// Optional strings on both sides
   struct OptStringRefs : LR<Optional<StringRef>> {
     OptStringRefs(Optional<StringRef> lhs, Optional<StringRef> rhs)
         : LR(lhs, rhs) {}
   };
 
+  /// A half-open span of lines on both sides, from start up to but not
+  /// including end.
   struct LineSpan {
     /// [start, end)
     LineIndices start, end;
@@ -113,20 +140,25 @@ public:
       return start.lhs() < end.lhs() || start.rhs() < end.rhs();
     }
     bool bothEmpty() const { return !eitherNonEmpty(); }
+
     LineIndices size() const {
       return LineIndices(end.lhs() - start.lhs(), end.rhs() - start.rhs());
     }
   };
 
+  /// A pair of collections of lines, one on each side
   struct Lines : LR<std::vector<StringRef>> {
     Lines(std::vector<StringRef> lhs, std::vector<StringRef> rhs)
         : LR(lhs, rhs) {}
+
     bool matchAt(LineIndices where) const {
       return lhs()[where.lhs()] == rhs()[where.rhs()];
     }
     StringRefs operator[](const LineIndices &indices) const {
       return StringRefs(lhs()[indices.lhs()], rhs()[indices.rhs()]);
     }
+    /// Cannot use subscripting to get a particular side here because used it
+    /// above for something else. So use a named function.
     const std::vector<StringRef> &side(Side s) const {
       return s == Side::L ? lhs() : rhs();
     }
@@ -138,11 +170,14 @@ public:
     }
   };
 
+  /// A pair of SerializableSourceRanges, one per side.
+  /// (SerializableSourceRanges are 1-origin, and semi-open.)
   struct LRSerializableRange : LR<SerializableSourceRange> {
     LRSerializableRange(const SerializableSourceRange &lhs,
                         const SerializableSourceRange &rhs)
         : LR(lhs, rhs) {}
   };
+  /// A pair of vectors of SerializableSourceRanges, one per side.
   struct LRRanges : LR<Ranges> {
     LRRanges() : LR({}, {}) {}
     void push_back(const LRSerializableRange &range) {
@@ -155,17 +190,23 @@ private:
   /// The inputs, separated into lines
   Lines linesToCompare;
 
-  /// The trimmed input regions to compare
+  /// The trimmed input regions to compare, after cutting away identical
+  /// beginnings and endings.
   LineSpan regionsToCompare;
 
+  /// If line i on the left matches line j on the right, match[i] == j.
+  /// If line i on the left has no match, match[i] == None.
   std::vector<Optional<size_t>> matches;
 
+  /// Chains matching lines together (I think)
   struct PRLink {
     LineIndices lines;
     PRLink *next;
   };
 
+  /// An allocation pool for the PRLinks.
   std::vector<PRLink> linkVec;
+  /// Next link to allocate in the linkVec
   size_t nextLink = 0;
 
   //==============================================================================
@@ -190,7 +231,7 @@ private:
     size_t size() const { return contents.size(); }
 
   private:
-    /// return index of first greater element
+    /// Return index of first greater element or the end index if there is none.
     size_t locationOfFirstGreaterOrEqualElement(const Elem x) const;
   };
 
@@ -208,6 +249,7 @@ private:
   // MARK: Comparing
   //==============================================================================
 public:
+  /// Run the actual diff algorithm
   void compare();
 
 private:
@@ -239,6 +281,7 @@ public:
 
   /// A region is zero-origin, semi-open. An SerializableRange is 1-origin,
   /// closed.
+  /// This function resolves changed regions to within lines. It's a bit tricky.
   LRSerializableRange convertAMismatch(LineSpan mismatch) const;
 
   LRRanges convertAllMismatches() const;

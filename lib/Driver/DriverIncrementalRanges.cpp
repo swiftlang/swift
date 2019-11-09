@@ -24,6 +24,10 @@
 #include <algorithm>
 #include <unordered_map>
 
+// These are the definitions for managing serializable source locations so that
+// the driver can implement incremental compilation based on
+// source ranges.
+
 using namespace swift;
 using namespace incremental_ranges;
 using namespace driver;

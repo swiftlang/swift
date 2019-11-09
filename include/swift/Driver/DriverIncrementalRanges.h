@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+// These are the declarations for managing serializable source locations so that
+// the driver can implement incremental compilation based on
+// source ranges.
+
 #ifndef SWIFT_DRIVER_DRIVERINCREMENTALRANGES_H
 #define SWIFT_DRIVER_DRIVERINCREMENTALRANGES_H
 
@@ -27,9 +31,15 @@ namespace incremental_ranges {
 // MARK: SourceRangeBasedInfo
 //==============================================================================
 
+/// A per-primary collection of information about its source ranges.
+
 class SourceRangeBasedInfo {
   SwiftRangesFileContents swiftRangesFileContents;
-  Ranges changedRanges; // really only need to know if any
+  /// All changed ranges in the primary as computed by the diff in the driver;
+  /// really only need to know if there are any
+  Ranges changedRanges;
+  /// All of the non-local changes: at present only those residing outside
+  /// function bodies.
   Ranges nonlocalChangedRanges;
 
   //==============================================================================

@@ -11,7 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TBD
+// These are the definitions for managing serializable source locations so that
+// the frontend and the driver can implement incremental compilation based on
+// source ranges.
 
 #include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/ASTWalker.h"

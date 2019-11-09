@@ -14,7 +14,9 @@
 #ifndef SWIFT_AST_INCREMENTALRANGES_H
 #define SWIFT_AST_INCREMENTALRANGES_H
 
-// Summary: TBD
+// These are the declarations for managing serializable source locations so that
+// the frontend and the driver can implement incremental compilation based on
+// source ranges.
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
@@ -50,7 +52,8 @@ typedef std::map<std::string, Ranges> RangesByFilename;
 namespace swift {
 namespace incremental_ranges {
 
-/// 1-origin
+/// A source location that can be written from the frontend and read by the
+/// driver. 1-origin: lines and columns start at 1
 struct SerializableSourceLocation {
   uint64_t line = 0;
   uint64_t column = 0;
@@ -95,7 +98,9 @@ struct llvm::yaml::MappingTraits<
 
 namespace swift {
 namespace incremental_ranges {
-/// half-open, to facilitate representing empty ranges
+/// A range in the source, that can be written by the frontend and read by the
+/// driver. Half-open, to facilitate representing empty ranges. In other words,
+/// an empty region will have start == end
 struct SerializableSourceRange {
   SerializableSourceLocation start, end;
 
@@ -159,7 +164,12 @@ struct llvm::yaml::MappingTraits<
 namespace swift {
 namespace incremental_ranges {
 
+/// The complete contents of the file written by the frontend and read by the
+/// driver containing source range information for one primary input file.
 struct SwiftRangesFileContents {
+  /// For each non-primary, the unparsed ranges in it.
+  /// At present these represent the bodies of types defined in the nonprimary
+  /// that are not used in the primary.
   RangesByFilename unparsedRangesByNonPrimary;
   Ranges noninlinableFunctionBodies;
 
@@ -203,7 +213,7 @@ LLVM_YAML_IS_STRING_MAP(swift::incremental_ranges::RangesByFilename)
 //==============================================================================
 namespace swift {
 namespace incremental_ranges {
-
+/// Gathers up the information from the frontend, processes it, and writes it.
 class SwiftRangesEmitter {
   const StringRef outputPath;
   SourceFile *const primaryFile;
@@ -254,7 +264,8 @@ private:
 //==============================================================================
 namespace swift {
 namespace incremental_ranges {
-
+/// The class that writes out the unchanged source code in the primary input so
+/// that the driver can diff it later, after the user has changed the file.
 class CompiledSourceEmitter {
   const StringRef outputPath;
   const SourceFile *const primaryFile;
