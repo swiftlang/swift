@@ -1048,7 +1048,10 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (!useAs && !useAsBang)
     return false;
 
-  auto *expr = getParentExpr();
+  auto *expr = findParentExpr(getAnchor());
+  if (!expr)
+    expr = getAnchor();
+
   // If we're performing pattern matching,
   // "as" means something completely different...
   if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
@@ -1146,8 +1149,9 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   // Figure out what we need to parenthesize.
   bool needsParensInside =
       exprNeedsParensBeforeAddingNilCoalescing(DC, expr);
+  auto parentExpr = findParentExpr(anchor);
   bool needsParensOutside =
-      exprNeedsParensAfterAddingNilCoalescing(DC, expr, getParentExpr());
+      exprNeedsParensAfterAddingNilCoalescing(DC, expr, parentExpr);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -1488,7 +1492,7 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  const auto *expr = getParentExpr();
+  const auto *expr = getRawAnchor();
   auto *callExpr = dyn_cast<CallExpr>(expr);
   if (!callExpr)
     return false;
@@ -1543,6 +1547,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
 AssignmentFailure::AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
                                      SourceLoc diagnosticLoc)
     : FailureDiagnostic(destExpr, cs, cs.getConstraintLocator(destExpr)),
+      DestExpr(destExpr),
       Loc(diagnosticLoc),
       DeclDiagnostic(findDeclDiagonstic(cs.getASTContext(), destExpr)),
       TypeDiagnostic(diag::assignment_lhs_not_lvalue) {}
@@ -1550,11 +1555,10 @@ AssignmentFailure::AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
 bool AssignmentFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *DC = getDC();
-  auto *destExpr = getParentExpr();
 
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
-  auto immInfo = resolveImmutableBase(destExpr);
+  auto immInfo = resolveImmutableBase(DestExpr);
 
   Optional<OverloadChoice> choice = immInfo.second;
 
@@ -1755,7 +1759,7 @@ bool AssignmentFailure::diagnoseAsError() {
     return true;
   }
 
-  emitDiagnostic(Loc, TypeDiagnostic, getType(destExpr))
+  emitDiagnostic(Loc, TypeDiagnostic, getType(DestExpr))
       .highlight(immInfo.first->getSourceRange());
   return true;
 }
@@ -3339,7 +3343,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     return true;
   }
 
-  Expr *expr = getParentExpr();
+  Expr *expr = findParentExpr(getAnchor());
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
   // If the base is an implicit self type reference, and we're in a

@@ -698,6 +698,7 @@ public:
 /// trying to assign something to immutable value, or trying
 /// to access mutating member on immutable base.
 class AssignmentFailure final : public FailureDiagnostic {
+  Expr *DestExpr;
   SourceLoc Loc;
   Diag<StringRef> DeclDiagnostic;
   Diag<Type> TypeDiagnostic;
@@ -710,7 +711,8 @@ public:
                     SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
                     Diag<Type> typeDiag)
       : FailureDiagnostic(destExpr, cs, cs.getConstraintLocator(destExpr)),
-        Loc(diagnosticLoc), DeclDiagnostic(declDiag), TypeDiagnostic(typeDiag) {
+        DestExpr(destExpr), Loc(diagnosticLoc), DeclDiagnostic(declDiag),
+        TypeDiagnostic(typeDiag) {
   }
 
   bool diagnoseAsError() override;
