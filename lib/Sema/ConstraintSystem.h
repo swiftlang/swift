@@ -2108,7 +2108,7 @@ public:
   void diagnoseFailureForExpr(Expr *expr);
 
   bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
-  bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(ArrayRef<Solution> solutions);
 
   /// Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer
