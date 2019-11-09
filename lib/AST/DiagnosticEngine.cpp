@@ -681,9 +681,8 @@ void DiagnosticEngine::formatDiagnosticText(
     }
     
     if (Modifier == "error") {
-      assert(false && "encountered %error in diagnostic text");
-      Out << StringRef("<<ERROR>>");
-      break;
+      Out << StringRef("<<INTERNAL ERROR: encountered %error in diagnostic text>>");
+      continue;
     }
 
     // Parse the optional argument list for a modifier, which is brace-enclosed.
@@ -696,11 +695,19 @@ void DiagnosticEngine::formatDiagnosticText(
     // Find the digit sequence, and parse it into an argument index.
     size_t Length = InText.find_if_not(isdigit);
     unsigned ArgIndex;      
-    bool Result = InText.substr(0, Length).getAsInteger(10, ArgIndex);
-    assert(!Result && "Unparseable argument index value?");
-    (void)Result;
-    assert(ArgIndex < Args.size() && "Out-of-range argument index");
+    bool IndexParseFailed = InText.substr(0, Length).getAsInteger(10, ArgIndex);
+
+    if (IndexParseFailed) {
+      Out << StringRef("<<INTERNAL ERROR: unparseable argument index in diagnostic text>>");
+      continue;
+    }
+
     InText = InText.substr(Length);
+
+    if (ArgIndex >= Args.size()) {
+      Out << StringRef("<<INTERNAL ERROR: out-of-range argument index in diagnostic text>>");
+      continue;
+    }
 
     // Convert the argument to a string.
     formatDiagnosticArgument(Modifier, ModifierArguments, Args, ArgIndex,
