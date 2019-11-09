@@ -286,9 +286,11 @@ extension __StringStorage {
 }
 
 extension __SharedStringStorage {
-  @objc(length) @_effects(readonly)
+  @objc(length)
   final internal var UTF16Length: Int {
-    return asString.utf16.count // UTF16View special-cases ASCII for us.
+    @_effects(readonly) get {
+      return asString.utf16.count // UTF16View special-cases ASCII for us.
+    }
   }
 
   @objc(hash)
