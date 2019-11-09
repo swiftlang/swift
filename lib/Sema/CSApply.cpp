@@ -7381,7 +7381,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
         ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
 
         auto *coalescedFix = primaryFix->coalescedWith(secondaryFixes);
-        auto diagnosed = coalescedFix->diagnose(root);
+        auto diagnosed = coalescedFix->diagnose();
         if (coalescedFix->isWarning()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;

@@ -537,7 +537,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
   state.recordFixes = allowFixes;
 
   SmallVector<Solution, 4> solutions;
-  solve(solutions);
+  solveImpl(solutions);
   filterSolutions(solutions);
 
   if (solutions.size() != 1)
@@ -629,7 +629,7 @@ bool ConstraintSystem::Candidate::solve(
 
     // Use solve which doesn't try to filter solution list.
     // Because we want the whole set of possible domain choices.
-    cs.solve(solutions);
+    cs.solveImpl(solutions);
   }
 
   if (ctx.LangOpts.DebugConstraintSolver) {
@@ -1243,21 +1243,20 @@ ConstraintSystem::solveImpl(Expr *&expr,
   }
 
   // Try to solve the constraint system using computed suggestions.
-  solve(expr, solutions, allowFreeTypeVariables);
+  solve(solutions, allowFreeTypeVariables);
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
   return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
-bool ConstraintSystem::solve(Expr *const expr,
-                             SmallVectorImpl<Solution> &solutions,
+bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // Set up solver state.
   SolverState state(*this, allowFreeTypeVariables);
 
   // Solve the system.
-  solve(solutions);
+  solveImpl(solutions);
 
   if (getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1281,7 +1280,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   return solutions.empty() || getExpressionTooComplex(solutions);
 }
 
-void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
+void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
   // If constraint system failed while trying to
