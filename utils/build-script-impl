@@ -2337,6 +2337,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFOUNDATION_BUILD_DIR:PATH="$(build_directory ${host} foundation)"
                     -DLIBDISPATCH_BUILD_DIR:PATH="$(build_directory ${host} libdispatch)"
                     -DLIBDISPATCH_SOURCE_DIR:PATH="${LIBDISPATCH_SOURCE_DIR}"
+
+                    -Ddispatch_DIR:PATH=$(build_directory ${host} libdispatch)/cmake/modules
+                    -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
                 )
                 ;;
             xctest)
