@@ -1979,7 +1979,13 @@ public:
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) const {
     auto e = ExprWeights.find(expr);
-    return e != ExprWeights.end() ? e->second.second : nullptr;
+    if (e != ExprWeights.end())
+      return e->second.second;
+
+    if (baseCS && baseCS != this)
+      return baseCS->getParentExpr(expr);
+
+    return nullptr;
   }
 
   /// Returns a locator describing the callee for the anchor of a given locator.
