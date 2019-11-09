@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift
-// REQUIRES: OS=macosx
+// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// REQUIRES: OS=macosx,no_asan
 
 import simd
 import CoreGraphics

@@ -1,6 +1,6 @@
 // RUN: %scale-test --begin 7 --end 12 --step 1 --select NumLeafScopes %s
-// REQUIRES: asserts
-// REQUIRES: rdar42650365
+// REQUIRES: asserts,no_asan
+// REQUIRES: rdar42650365,no_asan
 
 let a = [[0]]
 _ = a[0][0]
