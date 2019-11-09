@@ -115,10 +115,6 @@ def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   
 def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
   HelpText<"Show descriptive diagnostic information, if available.">;
-  
-def diagnostic_documentation_path
-  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
-  HelpText<"Path to diagnostic documentation resources">;
 
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;

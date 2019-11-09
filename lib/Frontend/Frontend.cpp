@@ -319,8 +319,6 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().EnableDescriptiveDiagnostics) {
     Diagnostics.setUseDescriptiveDiagnostics(true);
   }
-  Diagnostics.setDiagnosticDocumentationPath(
-      Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
 }
 
 // The ordering of ModuleLoaders is important!

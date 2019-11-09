@@ -116,18 +116,6 @@ static constexpr const char *const fixItStrings[] = {
     "<not a fix-it>",
 };
 
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  static constexpr const char *const DIAG##_educationalNotes[] = {__VA_ARGS__, \
-                                                                  nullptr};
-#include "swift/AST/EducationalNotes.def"
-
-static constexpr const char *const *educationalNotes[LocalDiagID::NumDiags]{
-    [LocalDiagID::invalid_diagnostic] = {},
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  [LocalDiagID::DIAG] = DIAG##_educationalNotes,
-#include "swift/AST/EducationalNotes.def"
-};
-
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
   perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
@@ -963,19 +951,6 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       }
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
-    
-    SmallVector<std::string, 1> educationalNotePaths;
-    if (useDescriptiveDiagnostics) {
-      auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
-      while (associatedNotes && *associatedNotes) {
-        SmallString<128> notePath(getDiagnosticDocumentationPath());
-        llvm::sys::path::append(notePath, *associatedNotes);
-        educationalNotePaths.push_back(notePath.str());
-        associatedNotes++;
-      }
-      info->EducationalNotePaths = educationalNotePaths;
-    }
-
     for (auto &consumer : Consumers) {
       consumer->handleDiagnostic(SourceMgr, *info);
     }
