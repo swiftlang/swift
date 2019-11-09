@@ -700,6 +700,7 @@ public:
     Parser.reset(
                  new ParserUnit(SM, SourceFileKind::Main, BufferID,
                      CompInv.getLangOptions(),
+                     CompInv.getTypeCheckerOptions(),
                      CompInv.getModuleName(),
                      SynTreeCreator,
                      CompInv.getMainFileSyntaxParsingCache())

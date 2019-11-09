@@ -201,8 +201,9 @@ class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
 
-  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+             SearchPathOptions &SearchPathOpts, SourceManager &SourceMgr,
+             DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -213,10 +214,9 @@ public:
 
   void operator delete(void *Data) throw();
 
-  static ASTContext *get(LangOptions &langOpts,
+  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
-                         SourceManager &SourceMgr,
-                         DiagnosticEngine &Diags);
+                         SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -227,6 +227,9 @@ public:
 
   /// The language options used for translation.
   LangOptions &LangOpts;
+
+  /// The type checker options.
+  TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;

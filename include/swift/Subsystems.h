@@ -66,6 +66,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   class TypeChecker;
+  class TypeCheckerOptions;
   struct TypeLoc;
   class UnifiedStatsReporter;
   enum class SourceFileKind;
@@ -183,16 +184,8 @@ namespace swift {
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
   /// source file.
-  ///
-  /// \param WarnLongFunctionBodies If non-zero, warn when a function body takes
-  /// longer than this many milliseconds to type-check
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                           OptionSet<TypeCheckingFlags> Options,
-                           unsigned StartElem = 0,
-                           unsigned WarnLongFunctionBodies = 0,
-                           unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0,
-                           unsigned SwitchCheckingInvocationThreshold = 0);
+                           unsigned StartElem = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method

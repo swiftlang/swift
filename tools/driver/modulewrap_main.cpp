@@ -166,10 +166,11 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SearchPathOpts.RuntimeResourcePath = RuntimeResourcePath.str();
 
   SourceManager SrcMgr;
+  TypeCheckerOptions TypeCheckOpts;
   LangOptions LangOpts;
   LangOpts.Target = Invocation.getTargetTriple();
-  ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
-                                        Instance.getDiags());
+  ASTContext &ASTCtx = *ASTContext::get(LangOpts, TypeCheckOpts, SearchPathOpts,
+                                        SrcMgr, Instance.getDiags());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   

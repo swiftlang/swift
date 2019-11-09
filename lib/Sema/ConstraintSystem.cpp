@@ -35,10 +35,10 @@ using namespace constraints;
 #define DEBUG_TYPE "ConstraintSystem"
 
 ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
-    : E(E), WarnLimit(CS.getTypeChecker().getWarnLongExpressionTypeChecking()),
+  : E(E),
       Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
-      PrintDebugTiming(CS.getTypeChecker().getDebugTimeExpressions()),
+      PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {
   if (auto *baseCS = CS.baseCS) {
     // If we already have a timer in the base constraint
@@ -66,6 +66,7 @@ ExpressionTimer::~ExpressionTimer() {
   if (!PrintWarning)
     return;
 
+  const auto WarnLimit = getWarnLimit();
   if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
     Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
                            elapsedMS, WarnLimit)

@@ -193,8 +193,8 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
         parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
                             &PersistentState);
   } while (!Done);
-  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext(),
-                      /*Options*/None);
+  llvm::SaveAndRestore<TypeCheckerOptions> clearTyOpts(Ctx.TypeCheckerOpts, {});
+  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext());
   return REPLModule;
 }
 

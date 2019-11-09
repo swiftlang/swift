@@ -124,7 +124,6 @@ public:
 
 class ExpressionTimer {
   Expr* E;
-  unsigned WarnLimit;
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
@@ -136,6 +135,9 @@ public:
 
   ~ExpressionTimer();
 
+  unsigned getWarnLimit() const {
+    return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
+  }
   llvm::TimeRecord startedAt() const { return StartTime; }
 
   /// Return the elapsed process time (including fractional seconds)
@@ -3723,7 +3725,7 @@ public:
     }
 
     const auto timeoutThresholdInMillis =
-        getTypeChecker().getExpressionTimeoutThresholdInSeconds();
+        getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
       // Disable warnings about expressions that go over the warning
       // threshold since we're arbitrarily ending evaluation and

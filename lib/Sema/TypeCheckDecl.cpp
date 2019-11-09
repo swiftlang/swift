@@ -3184,7 +3184,7 @@ public:
     auto &TC = *Ctx.getLegacyGlobalTypeChecker();
 
     // Make sure we're in the mode that's skipping function bodies.
-    if (!TC.canSkipNonInlinableBodies())
+    if (!getASTContext().TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       return false;
 
     // Make sure there even _is_ a body that we can skip.
