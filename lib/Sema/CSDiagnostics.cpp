@@ -1492,8 +1492,8 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *expr) {
 }
 
 bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
-  const auto *expr = getRawAnchor();
-  auto *callExpr = dyn_cast<CallExpr>(expr);
+  const auto *expr = findParentExpr(getAnchor());
+  auto *callExpr = dyn_cast_or_null<CallExpr>(expr);
   if (!callExpr)
     return false;
   if (!callExpr->hasTrailingClosure())
