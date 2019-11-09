@@ -1546,7 +1546,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
 
 AssignmentFailure::AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
                                      SourceLoc diagnosticLoc)
-    : FailureDiagnostic(destExpr, cs, cs.getConstraintLocator(destExpr)),
+    : FailureDiagnostic(cs, cs.getConstraintLocator(destExpr)),
       DestExpr(destExpr),
       Loc(diagnosticLoc),
       DeclDiagnostic(findDeclDiagonstic(cs.getASTContext(), destExpr)),
@@ -3556,7 +3556,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
     if (locator->isForKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(expr, cs, Member, locator);
+      InvalidStaticMemberRefInKeyPath failure(cs, Member, locator);
       return failure.diagnoseAsError();
     }
 
@@ -5536,7 +5536,7 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   auto *anchor = getRawAnchor();
 
   MissingArgumentsFailure failure(
-      getParentExpr(), cs, {param.withType(argType)},
+      cs, {param.withType(argType)},
       cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();

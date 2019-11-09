@@ -2627,7 +2627,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       ConstraintSystem::SolverScope scope(*this);
       applySolution(*viable.first);
       // All of the solutions supposed to produce a "candidate" note.
-      diagnosed &= viable.second->diagnose(expr, /*asNote*/ true);
+      diagnosed &= viable.second->diagnose(/*asNote*/ true);
     }
 
     // If not all of the fixes produced a note, we can't diagnose this.
@@ -2752,7 +2752,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    TrailingClosureAmbiguityFailure failure(expr, *this, anchor,
+    TrailingClosureAmbiguityFailure failure(*this, anchor,
                                             overload.choices);
     if (failure.diagnoseAsNote())
       return true;

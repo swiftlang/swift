@@ -968,7 +968,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
 
     InaccessibleMemberFailure failure(
-        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+        CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
     auto diagnosed = failure.diagnoseAsError();
     assert(diagnosed && "failed to produce expected diagnostic");
 
