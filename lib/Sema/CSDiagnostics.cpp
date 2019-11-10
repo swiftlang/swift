@@ -4891,7 +4891,6 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     Anchor anchor) const {
   auto &cs = getConstraintSystem();
-  auto &TC = getTypeChecker();
   auto *paramDC = getDeclContext();
 
   if (!paramDC)
@@ -4937,8 +4936,8 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
   SmallString<64> paramsAsString;
   auto baseType = anchor.get<TypeRepr *>();
-  if (TC.getDefaultGenericArgumentsString(paramsAsString, GTD,
-                                          getPreferredType)) {
+  if (TypeChecker::getDefaultGenericArgumentsString(paramsAsString, GTD,
+                                                    getPreferredType)) {
     auto diagnostic = emitDiagnostic(
         baseType->getLoc(), diag::unbound_generic_parameter_explicit_fix);
 

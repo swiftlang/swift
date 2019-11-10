@@ -740,15 +740,13 @@ public:
       return nullptr;
     }
 
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (TypeChecker::typeCheckPattern(S->getPattern(), DC, options)) {
       // FIXME: Handle errors better.
       S->getPattern()->setType(ErrorType::get(getASTContext()));
       return nullptr;
     }
 
-    if (TC.typeCheckForEachBinding(DC, S))
+    if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
 
     if (auto *Where = S->getWhere()) {
@@ -880,8 +878,8 @@ public:
       OpaqueValueExpr *elementExpr =
           new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType);
       Expr *convertElementExpr = elementExpr;
-      if (TC.convertToType(convertElementExpr, optPatternType, DC,
-                           S->getPattern())) {
+      if (TypeChecker::convertToType(convertElementExpr, optPatternType, DC,
+                                     S->getPattern())) {
         return nullptr;
       }
       S->setElementExpr(elementExpr);
@@ -2206,9 +2204,11 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
   BraceStmt *body = closure->getBody();
 
+  auto *TC = closure->getASTContext().getLegacyGlobalTypeChecker();
   Optional<FunctionBodyTimer> timer;
-  if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
-    timer.emplace(closure, DebugTimeFunctionBodies, WarnLongFunctionBodies);
+  if (TC->DebugTimeFunctionBodies || TC->WarnLongFunctionBodies)
+    timer.emplace(closure, TC->DebugTimeFunctionBodies,
+                  TC->WarnLongFunctionBodies);
 
   bool HadError = StmtChecker(closure).typeCheckBody(body);
   if (body) {

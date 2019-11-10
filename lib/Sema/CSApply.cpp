@@ -2818,7 +2818,7 @@ namespace {
       //
       // The result is that in Swift 5, 'try?' avoids producing nested optionals.
       
-      if (!cs.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+      if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
         // Nothing to do for Swift 4 and earlier!
         return simplifyExprType(expr);
       }
@@ -5408,7 +5408,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
           arg, closureType->getResult(),
           locator.withPathElement(ConstraintLocator::AutoclosureResult));
 
-      convertedArg = cs.getTypeChecker().buildAutoClosureExpr(dc, arg, closureType);
+      convertedArg = TypeChecker::buildAutoClosureExpr(dc, arg, closureType);
       cs.cacheExprTypes(convertedArg);
     } else {
       convertedArg = coerceToType(
@@ -7441,14 +7441,14 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   if (!skipClosures) {
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
-      hadError |= getTypeChecker().typeCheckClosureBody(closure);
+      hadError |= TypeChecker::typeCheckClosureBody(closure);
 
     // Tap expressions too; they should or should not be
     // type-checked under the same conditions as closure bodies.
     for (auto tuple : walker.getTapsToTypeCheck()) {
       auto tap = std::get<0>(tuple);
       auto tapDC = std::get<1>(tuple);
-      hadError |= getTypeChecker().typeCheckTapBody(tap, tapDC);
+      hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
     }
 
     // If any of them failed to type check, bail.

@@ -406,7 +406,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
-      TC.buildTypeRefinementContextHierarchy(SF, StartElem);
+      TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
     }
 
     // Resolve extensions. This has to occur first during type checking,
@@ -418,7 +418,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
-        TC.typeCheckTopLevelCodeDecl(TLCD);
+        TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
         TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
       } else {
         TypeChecker::typeCheckDecl(D);
@@ -428,7 +428,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TC.processREPLTopLevel(SF, TLC, StartElem);
+      TypeChecker::processREPLTopLevel(SF, TLC, StartElem);
 
     typeCheckFunctionsAndExternalDecls(SF, TC);
   }
@@ -713,8 +713,8 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-  TC.typeCheckTopLevelCodeDecl(TLCD);
+  (void)createTypeChecker(Ctx);
+  TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
   return true;
 }
 

@@ -2314,7 +2314,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       Expr *appliedSolution(constraints::Solution &solution,
                             Expr *expr) override {
         auto &cs = solution.getConstraintSystem();
-        auto *closure = cs.getTypeChecker().buildAutoClosureExpr(DC, expr, ParamType);
+        auto *closure = TypeChecker::buildAutoClosureExpr(DC, expr, ParamType);
         cs.cacheExprTypes(closure);
         return closure;
       }

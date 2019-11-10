@@ -946,19 +946,19 @@ public:
   static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                       BraceStmt *body,
                                                       Type builderType);
-  bool typeCheckClosureBody(ClosureExpr *closure);
+  static bool typeCheckClosureBody(ClosureExpr *closure);
 
-  bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
+  static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
   static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
                                         Type paramType,
                                         bool isAutoClosure = false,
                                         bool canFail = true);
 
-  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
+  static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                           unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
+                                  unsigned StartElem);
 
   static void typeCheckDecl(Decl *D);
 
@@ -1577,8 +1577,8 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
-  Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                             FunctionType *closureType);
+  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.
