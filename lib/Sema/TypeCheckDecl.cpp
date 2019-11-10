@@ -2585,16 +2585,13 @@ public:
 
     checkAccessControl(PBD);
 
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // If the initializers in the PBD aren't checked yet, do so now.
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
         continue;
 
       if (!PBD->isInitializerChecked(i)) {
-        TC.typeCheckPatternBinding(PBD, i);
+        TypeChecker::typeCheckPatternBinding(PBD, i);
       }
 
       if (!PBD->isInvalid()) {

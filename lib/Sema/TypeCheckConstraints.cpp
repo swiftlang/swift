@@ -2758,6 +2758,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
   };
 
+  auto &Context = DC->getASTContext();
   BindingListener listener(Context, pattern, initializer);
   if (!initializer)
     return true;
@@ -2858,7 +2859,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       DC = initContext;
   }
 
-  bool hadError = typeCheckBinding(pattern, init, DC);
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2967,7 +2968,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
-      auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(InitType);
       SequenceType = solution.simplifyType(SequenceType);
 
@@ -2982,8 +2982,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
-      if (tc.coercePatternToType(pattern, TypeResolution::forContextual(cs.DC),
-                                 InitType, options)) {
+      if (TypeChecker::coercePatternToType(pattern,
+                                           TypeResolution::forContextual(cs.DC),
+                                           InitType, options)) {
         return nullptr;
       }
 
@@ -3000,7 +3001,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   assert(seq && "type-checking an uninitialized for-each statement?");
 
   // Type-check the for-each loop sequence and element pattern.
-  auto resultTy = typeCheckExpression(seq, dc, &listener);
+  auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
   return !resultTy;
 }
 
@@ -3008,15 +3009,15 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has type Bool, then just
   // re-typecheck it.
   if (expr->getType() && expr->getType()->isBool()) {
-    auto resultTy = typeCheckExpression(expr, dc);
+    auto resultTy = TypeChecker::typeCheckExpression(expr, dc);
     return !resultTy;
   }
 
-  auto *boolDecl = Context.getBoolDecl();
+  auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
     return true;
 
-  auto resultTy = typeCheckExpression(
+  auto resultTy = TypeChecker::typeCheckExpression(
       expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
       CTP_Condition);
   return !resultTy;
@@ -3024,6 +3025,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
 bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
                                          Diag<> diagnosticForAlwaysTrue) {
+  auto &Context = dc->getASTContext();
   bool hadError = false;
   bool hadAnyFalsable = false;
   for (auto &elt : cond) {
@@ -3069,7 +3071,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    if (typeCheckPattern(pattern, dc, options)) {
+    if (TypeChecker::typeCheckPattern(pattern, dc, options)) {
       typeCheckPatternFailed();
       continue;
     }
@@ -3077,7 +3079,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    hadError |= typeCheckBinding(pattern, init, dc);
+    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
@@ -3097,6 +3099,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 /// value of a given type.
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
+  auto &Context = DC->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
@@ -3295,7 +3298,8 @@ bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
-  auto kind = typeCheckCheckedCast(t1, t2, CheckedCastContextKind::None, dc,
+  auto kind = TypeChecker::typeCheckCheckedCast(t1, t2,
+                                                CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange());
   return (kind != CheckedCastKind::Unresolved);
 }
@@ -3842,12 +3846,12 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
 /// Determine the semantics of a checked cast operation.
 CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
-                                 Type toType,
-                                 CheckedCastContextKind contextKind,
-                                 DeclContext *dc,
-                                 SourceLoc diagLoc,
-                                 Expr *fromExpr,
-                                 SourceRange diagToRange) {
+                                                  Type toType,
+                                                  CheckedCastContextKind contextKind,
+                                                  DeclContext *dc,
+                                                  SourceLoc diagLoc,
+                                                  Expr *fromExpr,
+                                                  SourceRange diagToRange) {
   SourceRange diagFromRange;
   if (fromExpr)
     diagFromRange = fromExpr->getSourceRange();
@@ -3928,6 +3932,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // If the unwrapped from/to types are equivalent or bridged, this isn't a real
   // downcast. Complain.
+  auto &Context = dc->getASTContext();
   if (extraFromOptionals > 0) {
     switch (typeCheckCheckedCast(fromType, toType,
                                  CheckedCastContextKind::None, dc,

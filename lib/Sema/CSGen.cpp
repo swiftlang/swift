@@ -2332,7 +2332,7 @@ namespace {
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
           if (!exnType)
             return false;
-          if (CS.TC.coercePatternToType(pattern,
+          if (TypeChecker::coercePatternToType(pattern,
                                         TypeResolution::forContextual(CS.DC),
                                         exnType,
                                         TypeResolverContext::InExpression)) {

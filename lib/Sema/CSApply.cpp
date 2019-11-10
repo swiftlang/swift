@@ -3124,7 +3124,7 @@ namespace {
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
                               : CheckedCastContextKind::IsExpr;
-      auto castKind = cs.getTypeChecker().typeCheckCheckedCast(
+      auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
 
@@ -3576,7 +3576,7 @@ namespace {
                               : CheckedCastContextKind::ForcedCast;
 
       auto fromType = cs.getType(sub);
-      auto castKind = cs.getTypeChecker().typeCheckCheckedCast(
+      auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
@@ -3657,7 +3657,7 @@ namespace {
             : CheckedCastContextKind::ConditionalCast;
 
       auto fromType = cs.getType(sub);
-      auto castKind = cs.getTypeChecker().typeCheckCheckedCast(
+      auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
@@ -5676,12 +5676,10 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
                                     ConstraintLocatorBuilder locator,
                                     Expr *element) {
   auto &cs = rewriter.getConstraintSystem();
-
-  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
   if (bridged &&
-      tc.typeCheckCheckedCast(srcType, destType,
-                              CheckedCastContextKind::None, cs.DC,
-                              SourceLoc(), nullptr, SourceRange())
+      TypeChecker::typeCheckCheckedCast(srcType, destType,
+                                        CheckedCastContextKind::None, cs.DC,
+                                        SourceLoc(), nullptr, SourceRange())
         != CheckedCastKind::Coercion) {
     if (auto conversion =
           rewriter.buildObjCBridgeExpr(element, destType, locator))

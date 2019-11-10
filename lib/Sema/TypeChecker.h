@@ -1227,7 +1227,7 @@ public:
   /// to return a logic value (builtin i1).
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckCondition(Expr *&expr, DeclContext *dc);
+  static bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
   /// Type check the given 'if' or 'while' statement condition, which
   /// either converts an expression to a logic value or bind variables to the
@@ -1236,8 +1236,8 @@ public:
   /// \param cond The condition to type-check, which will be modified in place.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                              Diag<> diagnosticForAlwaysTrue);
+  static bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
+                                     Diag<> diagnosticForAlwaysTrue);
 
   /// Determine the semantics of a checked cast operation.
   ///
@@ -1290,10 +1290,10 @@ public:
   /// \param options Options that control type resolution.
   ///
   /// \returns true if any errors occurred during type checking.
-  bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        TypeResolutionOptions options);
+  static bool typeCheckPattern(Pattern *P, DeclContext *dc,
+                               TypeResolutionOptions options);
 
-  bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
+  static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Coerce a pattern to the given type.
   ///
@@ -1303,11 +1303,11 @@ public:
   /// \param options Options describing how to perform this coercion.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
-                           TypeResolutionOptions options,
-                           TypeLoc tyLoc = TypeLoc());
-  bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
-                            Type type);
+  static bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
+                                  TypeResolutionOptions options,
+                                  TypeLoc tyLoc = TypeLoc());
+  static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
+                                   Type type);
 
   /// Coerce the specified parameter list of a ClosureExpr to the specified
   /// contextual type.
@@ -1315,11 +1315,11 @@ public:
                                         AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
+  static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
-  bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
+  static bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
   static void computeCaptures(AnyFunctionRef AFR);
@@ -1654,7 +1654,7 @@ public:
                                        FragileFunctionKind Kind,
                                        bool TreatUsableFromInlineAsPublic);
 
-  Expr *buildDefaultInitializer(Type type);
+  static Expr *buildDefaultInitializer(Type type);
   
 private:
   static bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,

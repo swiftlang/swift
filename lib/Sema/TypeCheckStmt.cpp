@@ -645,11 +645,8 @@ public:
   }
 
   Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     Expr *C = PA->getCondition();
-    TC.typeCheckCondition(C, DC);
+    TypeChecker::typeCheckCondition(C, DC);
     PA->setCondition(C);
     return PA;
   }
@@ -665,11 +662,8 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     StmtCondition C = IS->getCond();
-    TC.typeCheckStmtCondition(C, DC, diag::if_always_true);
+    TypeChecker::typeCheckStmtCondition(C, DC, diag::if_always_true);
     IS->setCond(C);
 
     AddLabeledStmt ifNest(*this, IS);
@@ -687,11 +681,8 @@ public:
   }
   
   Stmt *visitGuardStmt(GuardStmt *GS) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     StmtCondition C = GS->getCond();
-    TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
+    TypeChecker::typeCheckStmtCondition(C, DC, diag::guard_always_succeeds);
     GS->setCond(C);
     
     AddLabeledStmt ifNest(*this, GS);
@@ -711,11 +702,8 @@ public:
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     StmtCondition C = WS->getCond();
-    TC.typeCheckStmtCondition(C, DC, diag::while_always_true);
+    TypeChecker::typeCheckStmtCondition(C, DC, diag::while_always_true);
     WS->setCond(C);
 
     AddLabeledStmt loopNest(*this, WS);
@@ -733,11 +721,8 @@ public:
       RWS->setBody(S);
     }
 
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     Expr *E = RWS->getCond();
-    TC.typeCheckCondition(E, DC);
+    TypeChecker::typeCheckCondition(E, DC);
     RWS->setCond(E);
     return RWS;
   }
@@ -757,7 +742,7 @@ public:
 
     // FIXME: Remove TypeChecker dependency.
     auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-    if (TC.typeCheckPattern(S->getPattern(), DC, options)) {
+    if (TypeChecker::typeCheckPattern(S->getPattern(), DC, options)) {
       // FIXME: Handle errors better.
       S->getPattern()->setType(ErrorType::get(getASTContext()));
       return nullptr;
@@ -767,7 +752,7 @@ public:
       return nullptr;
 
     if (auto *Where = S->getWhere()) {
-      if (TC.typeCheckCondition(Where, DC))
+      if (TypeChecker::typeCheckCondition(Where, DC))
         return nullptr;
       S->setWhere(Where);
     }
@@ -1099,15 +1084,13 @@ public:
       return;
     }
 
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     pattern = newPattern;
     // Coerce the pattern to the subject's type.
     TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
     if (!subjectType ||
-        TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
-                               subjectType, patternOptions)) {
+        TypeChecker::coercePatternToType(pattern,
+                                         TypeResolution::forContextual(DC),
+                                         subjectType, patternOptions)) {
       limitExhaustivityChecks = true;
 
       // If that failed, mark any variables binding pieces of the pattern
@@ -1366,7 +1349,7 @@ public:
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          limitExhaustivityChecks |= TypeChecker::typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
@@ -1392,7 +1375,7 @@ public:
                                   subjectType, &prevCaseDecls, &nextCaseDecls);
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          limitExhaustivityChecks |= TypeChecker::typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
@@ -1460,15 +1443,12 @@ public:
   }
 
   void checkCatchStmt(CatchStmt *S) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // Check the catch pattern.
-    TC.typeCheckCatchPattern(S, DC);
+    TypeChecker::typeCheckCatchPattern(S, DC);
 
     // Check the guard expression, if present.
     if (Expr *guard = S->getGuardExpr()) {
-      TC.typeCheckCondition(guard, DC);
+      TypeChecker::typeCheckCondition(guard, DC);
       S->setGuardExpr(guard);
     }
       
@@ -1509,7 +1489,7 @@ public:
 
 bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
   // Grab the standard exception type.
-  Type exnType = Context.getErrorDecl()->getDeclaredType();
+  Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredType();
 
   Pattern *pattern = S->getErrorPattern();
   if (Pattern *newPattern = TypeChecker::resolvePattern(pattern, DC,

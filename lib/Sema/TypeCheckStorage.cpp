@@ -48,6 +48,7 @@ void swift::setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 
 /// Build a default initializer for the given type.
 Expr *TypeChecker::buildDefaultInitializer(Type type) {
+  auto &Context = type->getASTContext();
   // Default-initialize optional types and weak values to 'nil'.
   if (type->getReferenceStorageReferent()->getOptionalObjectType())
     return new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
@@ -59,7 +60,7 @@ Expr *TypeChecker::buildDefaultInitializer(Type type) {
       if (elt.isVararg())
         return nullptr;
 
-      auto eltInit = buildDefaultInitializer(elt.getType());
+      auto eltInit = TypeChecker::buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;
 
@@ -212,8 +213,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  auto *TC = binding->getASTContext().getLegacyGlobalTypeChecker();
-  if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
+  if (TypeChecker::typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
     pattern->setType(ErrorType::get(Context));
@@ -227,7 +227,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
       pattern->hasStorage() &&
       !pattern->getType()->hasError()) {
     auto type = pattern->getType();
-    if (auto defaultInit = TC->buildDefaultInitializer(type)) {
+    if (auto defaultInit = TypeChecker::buildDefaultInitializer(type)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
       binding->setInit(entryNumber, defaultInit);
@@ -237,7 +237,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (TC->typeCheckPatternBinding(binding, entryNumber)) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber)) {
       binding->setInvalid();
       return &pbe;
     }
@@ -1158,9 +1158,6 @@ namespace {
 static std::pair<BraceStmt *, bool>
 synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                          ASTContext &Ctx) {
-  // FIXME: Remove TypeChecker dependencies below.
-  auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
   //   get {
@@ -1231,7 +1228,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
     PBD->setInitializerSubsumed(entryIndex);
 
     if (!PBD->isInitializerChecked(entryIndex))
-      TC.typeCheckPatternBinding(PBD, entryIndex);
+      TypeChecker::typeCheckPatternBinding(PBD, entryIndex);
 
     InitValue = PBD->getInit(entryIndex);
   } else {
@@ -2383,16 +2380,14 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!parentPBD->isInitialized(patternNumber)
       && parentPBD->isDefaultInitializable(patternNumber)
       && !wrapperInfo.defaultInit) {
-    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     auto ty = parentPBD->getPattern(patternNumber)->getType();
-    if (auto defaultInit = tc.buildDefaultInitializer(ty))
+    if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty))
       parentPBD->setInit(patternNumber, defaultInit);
   }
   
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
-    auto &tc = *ctx.getLegacyGlobalTypeChecker();
-    tc.typeCheckPatternBinding(parentPBD, patternNumber);
+    TypeChecker::typeCheckPatternBinding(parentPBD, patternNumber);
   }
 
   Expr *originalInitialValue = nullptr;
