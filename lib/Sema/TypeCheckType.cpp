@@ -422,7 +422,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return Context.getBridgedToObjC(dc, valueType);
+  return dc->getASTContext().getBridgedToObjC(dc, valueType);
 }
 
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,

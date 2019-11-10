@@ -3821,14 +3821,6 @@ bool swift::areGenericRequirementsSatisfied(
   return CS.solveSingle().hasValue();
 }
 
-bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
-                       ConstraintKind kind, DeclContext *dc) {
-  auto *TC = dc->getASTContext().getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker to make semantic query!");
-  return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
-                                    /*unwrappedIUO=*/nullptr);
-}
-
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
   expr = expr->walk(SanitizeExpr(CS, /*eraseOEsOnly=*/true));
 }

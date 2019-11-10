@@ -2511,8 +2511,8 @@ static bool canBridgeThroughCast(ConstraintSystem &cs, Type fromType,
   if (fromType->isAnyObject() && toType->getClassOrBoundGenericClass())
     return true;
 
-  auto &TC = cs.getTypeChecker();
-  auto bridged = TC.getDynamicBridgedThroughObjCClass(cs.DC, fromType, toType);
+  auto bridged = TypeChecker::getDynamicBridgedThroughObjCClass(cs.DC,
+                                                                fromType, toType);
   if (!bridged)
     return false;
 

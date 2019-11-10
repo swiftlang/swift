@@ -870,7 +870,7 @@ public:
   /// \param dc The context of the check.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
+  static bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
   
   /// Determine whether one type is implicitly convertible to another.
   ///
@@ -884,8 +884,8 @@ public:
   /// conversion force-unwrapped an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 can be implicitly converted to \c t2.
-  bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
-                       bool *unwrappedIUO = nullptr);
+  static bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// Determine whether one type is explicitly convertible to another,
   /// i.e. using an 'as' expression.
@@ -897,7 +897,7 @@ public:
   /// \param dc The context of the conversion.
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
+  static bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
 
   /// Determine whether one type is bridged to another type.
   ///
@@ -911,8 +911,8 @@ public:
   /// conversion force-unwrapped an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
-                       bool *unwrappedIUO = nullptr);
+  static bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// Return true if performing a checked cast from one type to another
   /// with the "as!" operator could possibly succeed.
@@ -925,7 +925,7 @@ public:
   ///
   /// \returns true if a checked cast from \c t1 to \c t2 may succeed, and
   /// false if it will certainly fail, e.g. because the types are unrelated.
-  bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
+  static bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
 
   /// Determine whether a constraint of the given kind can be satisfied
   /// by the two types.
@@ -944,11 +944,11 @@ public:
   /// or bridge operation force-unwraps an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
-  bool typesSatisfyConstraint(Type t1, Type t2,
-                              bool openArchetypes,
-                              constraints::ConstraintKind kind,
-                              DeclContext *dc,
-                              bool *unwrappedIUO = nullptr);
+  static bool typesSatisfyConstraint(Type t1, Type t2,
+                                     bool openArchetypes,
+                                     constraints::ConstraintKind kind,
+                                     DeclContext *dc,
+                                     bool *unwrappedIUO = nullptr);
 
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
@@ -1251,13 +1251,13 @@ public:
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
   /// cast is invalid, Unresolved is returned. If the cast represents an implicit
   /// conversion, Coercion is returned.
-  CheckedCastKind typeCheckCheckedCast(Type fromType,
-                                       Type toType,
-                                       CheckedCastContextKind contextKind,
-                                       DeclContext *dc,
-                                       SourceLoc diagLoc,
-                                       Expr *fromExpr,
-                                       SourceRange diagToRange);
+  static CheckedCastKind typeCheckCheckedCast(Type fromType,
+                                              Type toType,
+                                              CheckedCastContextKind ctxKind,
+                                              DeclContext *dc,
+                                              SourceLoc diagLoc,
+                                              Expr *fromExpr,
+                                              SourceRange diagToRange);
 
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
@@ -1274,9 +1274,9 @@ public:
   /// type as an Objective-C class, e.g., \c NSString represents \c
   /// String, or a null type if there is no such type or if the
   /// dynamic type isn't something we can start from.
-  Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
-                                         Type dynamicType,
-                                         Type valueType);
+  static Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
+                                                Type dynamicType,
+                                                Type valueType);
 
   /// Resolve ambiguous pattern/expr productions inside a pattern using
   /// name lookup information. Must be done before type-checking the pattern.
@@ -2012,9 +2012,6 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
-
-bool canSatisfy(Type type1, Type type2, bool openArchetypes,
-                constraints::ConstraintKind kind, DeclContext *dc);
 
 bool hasDynamicMemberLookupAttribute(Type type,
   llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);

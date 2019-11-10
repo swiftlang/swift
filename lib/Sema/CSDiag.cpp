@@ -2234,7 +2234,7 @@ static bool diagnoseClosureExplicitParameterMismatch(
         isUnresolvedOrTypeVarType(argType))
       continue;
 
-    if (!CS.TC.isConvertibleTo(argType, paramType, CS.DC)) {
+    if (!TypeChecker::isConvertibleTo(argType, paramType, CS.DC)) {
       CS.getASTContext().Diags.diagnose(loc, diag::types_not_convertible,
                                         false, paramType, argType);
       return true;

@@ -846,7 +846,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
 
     // The kinds of overload choice match, but the contents don't.
-    auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
       continue;
@@ -905,9 +904,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
-              if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
+              if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
                 score1 += weight;
-              } else if (tc.isSubtypeOf(resType2, resType1, cs.DC)) {
+              } else if (TypeChecker::isSubtypeOf(resType2, resType1, cs.DC)) {
                 score2 += weight;
               }
             }
@@ -1046,7 +1045,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
-  auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
@@ -1072,8 +1070,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    auto type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
-    auto type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
+    auto type1Better = TypeChecker::isSubtypeOf(type1, type2, cs.DC);
+    auto type2Better = TypeChecker::isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;
