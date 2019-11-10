@@ -224,7 +224,7 @@ private:
   const bool EnableSourceRangeDependencies;
 
   /// May not actually use them if e.g. there is a new input
-  bool UseSourceRangeDependencies;
+  bool UseSourceRangeDependencies = false;
 
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
