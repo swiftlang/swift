@@ -1059,11 +1059,163 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     .withNoEscape(extInfo.isNoEscape());
   
+  // Extract the abstract generic calling convention of the function into a
+  // substituted generic signature for the function type.
+  //
+  // This signature only needs to consider the general calling convention,
+  // so it can reduce away protocol and base class constraints aside from
+  // `AnyObject`. We wanto similar-shaped generic function types to remain
+  // canonically equivalent, like `(T, U) -> ()`, `(T, T) -> ()`,
+  // `(U, T) -> ()` or `(T, T.A) -> ()` when given substitutions that produce
+  // the same function types, so we also introduce a new generic argument for
+  // each position where we see a dependent type, and canonicalize the order in
+  // which we see independent generic arguments.
+  //
+  bool impliedSignature = false;
+  SubstitutionMap substitutions;
+  if (TC.Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues
+      // We don't currently use substituted function types for generic function
+      // type lowering, though we should for generic methods on classes and
+      // protocols.
+      && !genericSig) {
+    class SubstFunctionTypeCollector {
+    public:
+      TypeConverter &TC;
+      const bool mapReplacementsOutOfContext;
+      
+      SmallVector<GenericTypeParamType *, 4> substGenericParams;
+      SmallVector<Requirement, 4> substRequirements;
+      SmallVector<Type, 4> substReplacements;
+      
+      SubstFunctionTypeCollector(TypeConverter &TC,
+                                 bool mapReplacementsOutOfContext)
+        : TC(TC), mapReplacementsOutOfContext(mapReplacementsOutOfContext) {}
+      SubstFunctionTypeCollector(const SubstFunctionTypeCollector &) = delete;
+
+      // TypeSubstitutionFn
+      Type operator()(SubstitutableType *t) {
+        ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
+        
+        // We should only substitute contextual archetypes here.
+        // Opened existential or opaque archetypes are not freely substitutable
+        // so ought to be left as is.
+        assert(isa<PrimaryArchetypeType>(archetype->getRoot()));
+        
+        if (!archetype)
+          archetype = TC.getCurGenericContext()->getGenericEnvironment()
+                                   ->mapTypeIntoContext(t)
+                                   ->castTo<ArchetypeType>();
+        
+        // Replace every dependent type we see with a fresh type variable in
+        // the substituted signature.
+        auto paramIndex = substGenericParams.size();
+        auto param = CanGenericTypeParamType::get(0, paramIndex, TC.Context);
+
+        substGenericParams.push_back(param);
+        Type replacementTy = t;
+        if (mapReplacementsOutOfContext) {
+          replacementTy = t->mapTypeOutOfContext();
+        }
+        substReplacements.push_back(replacementTy);
+        
+        // Preserve the layout constraint, if any, on the archetype in the
+        // generic signature, generalizing away some constraints that
+        // shouldn't affect ABI substitutability.
+        if (auto layout = archetype->getLayoutConstraint()) {
+          switch (layout->getKind()) {
+          // Keep these layout constraints as is.
+          case LayoutConstraintKind::RefCountedObject:
+          case LayoutConstraintKind::TrivialOfAtMostSize:
+            break;
+          
+          case LayoutConstraintKind::UnknownLayout:
+          case LayoutConstraintKind::Trivial:
+            // These constraints don't really constrain the ABI, so we can
+            // eliminate them.
+            layout = LayoutConstraint();
+            break;
+        
+          // Replace these specific constraints with one of the more general
+          // constraints above.
+          case LayoutConstraintKind::NativeClass:
+          case LayoutConstraintKind::Class:
+          case LayoutConstraintKind::NativeRefCountedObject:
+            // These can all be generalized to RefCountedObject.
+            layout = LayoutConstraint::getLayoutConstraint(
+                                       LayoutConstraintKind::RefCountedObject);
+            break;
+              
+          case LayoutConstraintKind::TrivialOfExactSize:
+            // Generalize to TrivialOfAtMostSize.
+            layout = LayoutConstraint::getLayoutConstraint(
+               LayoutConstraintKind::TrivialOfAtMostSize,
+               layout->getTrivialSizeInBits(),
+               layout->getAlignmentInBits(),
+               TC.Context);
+            break;
+          }
+          
+          if (layout)
+            substRequirements.push_back(
+                          Requirement(RequirementKind::Layout, param, layout));
+        }
+        
+        return param;
+      }
+      
+      // LookupConformanceFn
+      ProtocolConformanceRef operator()(CanType dependentType,
+                                        Type conformingReplacementType,
+                                        ProtocolDecl *conformedProtocol) {
+        // We should only substitute with other dependent types, so that an
+        // abstract conformance ref is sufficient.
+        assert(conformingReplacementType->isTypeParameter());
+        return ProtocolConformanceRef(conformedProtocol);
+      }
+    };
+    
+    SubstFunctionTypeCollector collector(TC,
+                                     substFnInterfaceType->hasTypeParameter());
+    auto contextSig = TC.getCurGenericContext();
+    
+    auto collectSubstitutions = [&](CanType t) -> CanType {
+      if (t->hasTypeParameter()) {
+        t = contextSig->getGenericEnvironment()
+                      ->mapTypeIntoContext(t)
+                      ->getCanonicalType(contextSig);
+      }
+      
+      return CanType(t.subst(collector, collector));
+    };
+    
+    for (auto &input : inputs) {
+      input = input.getWithInterfaceType(
+                               collectSubstitutions(input.getInterfaceType()));
+    }
+    for (auto &yield : yields) {
+      yield = yield.getWithInterfaceType(
+                               collectSubstitutions(yield.getInterfaceType()));
+    }
+    for (auto &result : results) {
+      result = result.getWithInterfaceType(
+                               collectSubstitutions(result.getInterfaceType()));
+    }
+    
+    if (!collector.substGenericParams.empty()) {
+      genericSig = GenericSignature::get(collector.substGenericParams,
+                                         collector.substRequirements)
+        ->getCanonicalSignature();
+      substitutions = SubstitutionMap::get(genericSig,
+                                           collector.substReplacements,
+                                           ArrayRef<ProtocolConformanceRef>());
+      impliedSignature = true;
+    }
+  }
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
                               results, errorResult,
-                              SubstitutionMap(), false,
+                              substitutions, impliedSignature,
                               TC.Context, witnessMethodConformance);
 }
 
@@ -3049,7 +3201,7 @@ SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
                           getExtInfo(), getCoroutineKind(),
                           getCalleeConvention(),
                           getParameters(), getYields(), getResults(),
-                          getErrorResult(),
+                          getOptionalErrorResult(),
                           subs, isGenericSignatureImplied(),
                           const_cast<SILFunctionType*>(this)->getASTContext());
 }

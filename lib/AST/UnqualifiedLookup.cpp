@@ -232,7 +232,7 @@ namespace {
     bool useASTScopesForLookup() const;
 
     /// For testing, assume this lookup is enabled:
-    bool useASTScopesForLookupIfEnabled() const;
+    bool wouldUseASTScopesForLookupIfItWereEnabled() const;
 
     void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
@@ -506,7 +506,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
       lookupNamesIntroducedBy(contextAndIsCascadingUse);
   }
 
-  if (crosscheckUnqualifiedLookup && useASTScopesForLookupIfEnabled()) {
+  if (crosscheckUnqualifiedLookup &&
+      wouldUseASTScopesForLookupIfItWereEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
     UnqualifiedLookupFactory altLookup(Name, DC, Loc, options, results,
@@ -550,10 +551,12 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForLookup() const {
-  return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
+  return Ctx.LangOpts.EnableASTScopeLookup &&
+         wouldUseASTScopesForLookupIfItWereEnabled();
 }
 
-bool UnqualifiedLookupFactory::useASTScopesForLookupIfEnabled() const {
+bool UnqualifiedLookupFactory::wouldUseASTScopesForLookupIfItWereEnabled()
+    const {
   if (!Loc.isValid())
     return false;
   const auto *const SF = DC->getParentSourceFile();

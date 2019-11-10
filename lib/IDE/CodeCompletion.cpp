@@ -1643,7 +1643,7 @@ public:
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
-    (void)createTypeChecker(Ctx);
+    (void)swift::createTypeChecker(Ctx);
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {

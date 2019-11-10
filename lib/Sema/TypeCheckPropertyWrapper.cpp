@@ -491,7 +491,7 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLazyResolver())
+  if (!ctx.getLegacyGlobalTypeChecker())
     return nullptr;
 
   auto resolution =
@@ -499,8 +499,8 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (TypeChecker::validateType(tc.Context, customAttr->getTypeLoc(),
+  if (TypeChecker::validateType(var->getASTContext(),
+                                customAttr->getTypeLoc(),
                                 resolution, options))
     return ErrorType::get(ctx);
 
@@ -527,13 +527,13 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLazyResolver())
+  if (!ctx.getLegacyGlobalTypeChecker())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
   if (binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
@@ -591,7 +591,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
                    propertyType, emptyLocator);
 
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
+  if (cs.solve(solutions) || solutions.size() != 1) {
     var->diagnose(diag::property_wrapper_incompatible_property,
                   propertyType, rawType);
     var->setInvalid();

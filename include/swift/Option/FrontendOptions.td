@@ -115,6 +115,10 @@ def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   
 def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
   HelpText<"Show descriptive diagnostic information, if available.">;
+  
+def diagnostic_documentation_path
+  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
+  HelpText<"Path to diagnostic documentation resources">;
 
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
@@ -344,6 +348,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_subst_sil_function_types_for_function_values :
+  Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
+  HelpText<"Use substituted function types for SIL type lowering of function values">;
+  
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;

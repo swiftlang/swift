@@ -1263,14 +1263,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    // Diagnose using @_semantics in a local scope.  These don't
-    // actually work.
-    if (CurDeclContext->isLocalContext()) {
-      // Emit an error, but do not discard the attribute.  This enables
-      // better recovery in the parser.
-      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
-    }
-
     if (!DiscardAttribute)
       Attributes.add(new (Context) SemanticsAttr(Value.getValue(), AtLoc,
                                                  AttrRange,
@@ -1944,6 +1936,53 @@ bool Parser::canParseTypeAttribute() {
                              /*justChecking*/ true);
 }
 
+/// Parses the '@differentiable' argument (no argument list, or '(linear)'),
+/// and sets the appropriate fields on `Attributes`.
+///
+/// \param emitDiagnostics - if false, doesn't emit diagnostics
+/// \returns true on error, false on success
+static bool parseDifferentiableAttributeArgument(Parser &P,
+                                                 TypeAttributes &Attributes,
+                                                 bool emitDiagnostics) {
+  Parser::BacktrackingScope backtrack(P);
+
+  // Match '( <identifier> )', and store the identifier token to `argument`.
+  if (!P.consumeIf(tok::l_paren))
+    return false;
+  auto argument = P.Tok;
+  if (!P.consumeIf(tok::identifier))
+    return false;
+  if (!P.consumeIf(tok::r_paren)) {
+    // Special case handling for '( <identifier> (' so that we don't produce the
+    // misleading diagnostic "expected ',' separator" when the real issue is
+    // that the user forgot the ')' closing the '@differentiable' argument list.
+    if (P.Tok.is(tok::l_paren)) {
+      backtrack.cancelBacktrack();
+      if (emitDiagnostics)
+        P.diagnose(P.Tok, diag::differentiable_attribute_expected_rparen);
+      return true;
+    }
+    return false;
+  }
+
+  // If the next token is an arrow, then the matched '( <identifier> )' is
+  // actually the parameter type list, not an argument to '@differentiable'.
+  if (P.Tok.is(tok::arrow))
+    return false;
+
+  backtrack.cancelBacktrack();
+
+  if (argument.getText() != "linear") {
+    if (emitDiagnostics)
+      P.diagnose(argument, diag::unexpected_argument_differentiable,
+                 argument.getText());
+    return true;
+  }
+
+  Attributes.linear = true;
+  return false;
+}
+
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -2154,6 +2193,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Tok, diag::opened_attribute_expected_lparen);
     }
 
+    break;
+  }
+
+  case TAK_differentiable: {
+    if (parseDifferentiableAttributeArgument(*this, Attributes,
+                                             /*emitDiagnostics=*/!justChecking))
+      return true;
     break;
   }
 
@@ -5340,11 +5386,16 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (SourceMgr.getCodeCompletionLoc().isInvalid() ||
-      SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
-    AFD->setBodyDelayed(BodyRange);
-  } else {
-    AFD->setBodySkipped(BodyRange);
+  AFD->setBodyDelayed(BodyRange);
+
+  if (isCodeCompletionFirstPass()) {
+    if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
+      State->delayDecl(PersistentParserState::DelayedDeclKind::FunctionBody,
+                       PD_Default, AFD, BodyRange,
+                       BeginParserPosition.PreviousLoc);
+    } else {
+      AFD->setBodySkipped(BodyRange);
+    }
   }
 }
 
@@ -5654,6 +5705,20 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
   return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
+}
+
+/// Parse a delayed function body from the 'PersistentParserState'.
+void Parser::parseAbstractFunctionBodyDelayed() {
+  auto DelayedState = State->takeDelayedDeclState();
+  assert(DelayedState.get() && "should have delayed state");
+  auto CD = DelayedState->ParentContext->getAsDecl();
+  auto AFD = cast<AbstractFunctionDecl>(CD);
+
+  // Eagarly parse local decls or nested function bodies inside the body.
+  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
+
+  auto body = parseAbstractFunctionBodyDelayed(AFD);
+  AFD->setBodyParsed(body);
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token

@@ -309,7 +309,7 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 // RUN: %refactor -source-filename %s -pos=68:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=69:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
-// RUN: %refactor -source-filename %s -pos=70:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
+// RUN: %refactor -source-filename %s -pos=70:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 // RUN: %refactor -source-filename %s -pos=74:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
 
 // RUN: %refactor -source-filename %s -pos=79:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
@@ -321,7 +321,7 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 // RUN: %refactor -source-filename %s -pos=91:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=95:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
-// RUN: %refactor -source-filename %s -pos=96:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
+// RUN: %refactor -source-filename %s -pos=96:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 // RUN: %refactor -source-filename %s -pos=100:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=104:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY

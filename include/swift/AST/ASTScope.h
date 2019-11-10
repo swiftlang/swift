@@ -431,12 +431,12 @@ protected:
 
 protected:
   /// Not const because may reexpand some scopes.
-  const ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
-                                                  NullablePtr<raw_ostream>);
-  const ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
-                                                      NullablePtr<raw_ostream>,
-                                                      SourceManager &,
-                                                      ScopeCreator &);
+  ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
+                                            NullablePtr<raw_ostream>);
+  ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
+                                                NullablePtr<raw_ostream>,
+                                                SourceManager &,
+                                                ScopeCreator &);
 
 private:
   NullablePtr<ASTScopeImpl> findChildContaining(SourceLoc loc,
@@ -566,6 +566,8 @@ public:
   void buildFullyExpandedTree();
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+
+  void expandFunctionBody(AbstractFunctionDecl *AFD);
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }

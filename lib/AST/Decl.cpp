@@ -2889,8 +2889,8 @@ Type ValueDecl::getInterfaceType() const {
 
   // N.B. This assertion exists to catch new broken callers. It can be removed
   // with the LazyResolver when the time comes.
-  assert(ctx.getLazyResolver()
-         && "The lazy resolver must be registered to make semantic queries!");
+  assert(ctx.getLegacyGlobalTypeChecker()
+         && "The type checker must be installed to make semantic queries!");
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
@@ -3954,6 +3954,47 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
   auto *mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
+}
+
+void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
+  // Silently break cycles here because we can't be sure when and where a
+  // request to synthesize will come from yet.
+  // FIXME: rdar://56844567
+  if (Bits.NominalTypeDecl.IsComputingSemanticMembers)
+    return;
+    
+  Bits.NominalTypeDecl.IsComputingSemanticMembers = true;
+  SWIFT_DEFER { Bits.NominalTypeDecl.IsComputingSemanticMembers = false; };
+
+  auto baseName = member.getBaseName();
+  auto &Context = getASTContext();
+  Optional<ImplicitMemberAction> action = None;
+  if (baseName == DeclBaseName::createConstructor())
+    action.emplace(ImplicitMemberAction::ResolveImplicitInit);
+
+  if (member.isSimpleName() && !baseName.isSpecial()) {
+    if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
+      action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+    }
+  } else {
+    auto argumentNames = member.getArgumentNames();
+    if (!member.isCompoundName() || argumentNames.size() == 1) {
+      if (baseName == DeclBaseName::createConstructor() &&
+          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+        action.emplace(ImplicitMemberAction::ResolveDecodable);
+      } else if (!baseName.isSpecial() &&
+                 baseName.getIdentifier() == Context.Id_encode &&
+                 (member.isSimpleName() ||
+                  argumentNames.front() == Context.Id_to)) {
+        action.emplace(ImplicitMemberAction::ResolveEncodable);
+      }
+    }
+  }
+
+  if (auto actionToTake = action) {
+    (void)evaluateOrDefault(Context.evaluator,
+        ResolveImplicitMemberRequest{this, actionToTake.getValue()}, false);
+  }
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -5645,8 +5686,9 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
+  if (!ctx.getLegacyGlobalTypeChecker()) {
     return { };
+  }
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
@@ -6085,13 +6127,25 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         if (!call->isImplicit())
           return { true, E };
 
-        // ... producing a value of the same nominal type as the innermost
-        // property wrapper.
+        // ... which may call the constructor of another property
+        // wrapper if there are multiple wrappers attached to the
+        // property.
+        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
+          if (tuple->getNumElements() > 0) {
+            auto elem = tuple->getElement(0);
+            if (elem->isImplicit() && isa<CallExpr>(elem)) {
+              return { true, E };
+            }
+          }
+        }
+
+        // ... producing a value of the same nominal type as the
+        // innermost property wrapper.
         if (!call->getType() ||
             call->getType()->getAnyNominal() != innermostNominal)
-          return { true, E };
+          return { false, E };
 
-        // Find the implicit initialValue argument.
+        // Find the implicit initialValue/wrappedValue argument.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
@@ -6501,7 +6555,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().getLazyResolver() && !skipIsObjCResolution)
+  if (getASTContext().getLegacyGlobalTypeChecker() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

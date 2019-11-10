@@ -221,8 +221,7 @@ namespace {
       ValueDecl *witness = nullptr;
       auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType)
-          .second;
+        witness = concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
       } else if (found->isProtocolRequirement()) {
         witness = concrete->getWitnessDecl(found);
 
@@ -520,8 +519,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto typeDecl =
-        concrete->getTypeWitnessAndDecl(assocType).second;
+      auto *typeDecl =
+        concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
 
       // Circularity.
       if (!typeDecl)
@@ -604,12 +603,11 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
-  if (NumTypoCorrections >= getLangOpts().TypoCorrectionLimit ||
-      (Diags.hasFatalErrorOccurred() &&
-       !Diags.getShowDiagnosticsAfterFatalError()))
+  auto &Ctx = DC->getASTContext();
+  if (!Ctx.shouldPerformTypoCorrection() ||
+      (Ctx.Diags.hasFatalErrorOccurred() &&
+       !Ctx.Diags.getShowDiagnosticsAfterFatalError()))
     return;
-
-  ++NumTypoCorrections;
 
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl *> entries(maxResults);
@@ -671,7 +669,7 @@ static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {
 }
 
 static InFlightDiagnostic
-noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
+noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
                    bool wasClaimed) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Suggest 'self' at the use point instead of pointing at the start
@@ -683,8 +681,9 @@ noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
         return InFlightDiagnostic();
       }
 
-      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         var->getName().str());
+      auto &Diags = decl->getASTContext().Diags;
+      return Diags.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
+                            var->getName().str());
     }
   }
 
@@ -694,24 +693,24 @@ noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
                       isa<FuncDecl>(decl) ? "method" :
                       "member");
 
-    return tc.diagnose(parentDecl,
+    return parentDecl->diagnose(
                        wasClaimed ? diag::implicit_member_declared_here
                                   : diag::note_typo_candidate_implicit_member,
                        decl->getBaseName().userFacingName(), kind);
   }
 
   if (wasClaimed) {
-    return tc.diagnose(decl, diag::decl_declared_here, decl->getBaseName());
+    return decl->diagnose(diag::decl_declared_here, decl->getBaseName());
   } else {
-    return tc.diagnose(decl, diag::note_typo_candidate,
-                       decl->getBaseName().userFacingName());
+    return decl->diagnose(diag::note_typo_candidate,
+                          decl->getBaseName().userFacingName());
   }
 }
 
 void TypoCorrectionResults::noteAllCandidates() const {
   for (auto candidate : Candidates) {
     auto &&diagnostic =
-      noteTypoCorrection(TC, Loc, candidate, ClaimedCorrection);
+      noteTypoCorrection(Loc, candidate, ClaimedCorrection);
 
     // Don't add fix-its if we claimed the correction for the primary
     // diagnostic.

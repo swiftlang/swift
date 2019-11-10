@@ -50,7 +50,6 @@ namespace swift {
   class ExtensionDecl;
   class Expr;
   class GenericParamList;
-  class LazyResolver;
   class LazyMemberLoader;
   class GenericSignature;
   class GenericTypeParamDecl;

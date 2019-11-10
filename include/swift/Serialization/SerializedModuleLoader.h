@@ -20,7 +20,6 @@
 
 namespace swift {
 class ModuleFile;
-class LazyResolver;
 
 /// Spceifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.

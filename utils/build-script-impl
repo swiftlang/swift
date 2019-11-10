@@ -2337,6 +2337,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFOUNDATION_BUILD_DIR:PATH="$(build_directory ${host} foundation)"
                     -DLIBDISPATCH_BUILD_DIR:PATH="$(build_directory ${host} libdispatch)"
                     -DLIBDISPATCH_SOURCE_DIR:PATH="${LIBDISPATCH_SOURCE_DIR}"
+
+                    -Ddispatch_DIR:PATH=$(build_directory ${host} libdispatch)/cmake/modules
+                    -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
                 )
                 ;;
             xctest)
@@ -3055,6 +3058,16 @@ done
 LIPO_SRC_DIRS=()
 
 for host in "${ALL_HOSTS[@]}"; do
+    # Calculate the directory to install products in to.
+    host_install_destdir=$(get_host_install_destdir ${host})
+    host_install_prefix=$(get_host_install_prefix ${host})
+
+    # Identify the destdirs to pass to lipo. Must happen even if the install action
+    # is to be skipped.
+    if [[ $(should_include_host_in_lipo ${host}) ]]; then
+        LIPO_SRC_DIRS+=( "${host_install_destdir}" )
+    fi
+
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} install) ]]; then
         continue
@@ -3063,14 +3076,6 @@ for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass if flag is set and we are cross compiling and it's the local host.
     if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
         continue
-    fi
-
-    # Calculate the directory to install products in to.
-    host_install_destdir=$(get_host_install_destdir ${host})
-    host_install_prefix=$(get_host_install_prefix ${host})
-
-    if [[ $(should_include_host_in_lipo ${host}) ]]; then
-        LIPO_SRC_DIRS+=( "${host_install_destdir}" )
     fi
 
     # Set the build options for this host
@@ -3131,6 +3136,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--install-destdir is required to install products."
                     exit 1
                 fi
+                INSTALL_TARGETS="install-distribution"
                 ;;
             xctest)
                 if [[ -z "${INSTALL_XCTEST}" ]] ; then
@@ -3479,15 +3485,10 @@ for host in "${ALL_HOSTS[@]}"; do
 done
 
 # Lipo those products which require it, optionally build and test an installable package.
-if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
+mergedHost="merged-hosts"
+if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]] && [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
     # This is from multiple hosts; Which host should we say it is?
     # Let's call it 'merged-hosts' so that we can identify it.
-    mergedHost="merged-hosts"
-
-    # Check if we should perform this action.
-    if ! [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
-        continue
-    fi
 
     echo "--- Merging and running lipo ---"
 

@@ -18,9 +18,9 @@
 #ifndef SWIFT_SIL_CONSTANTS_H
 #define SWIFT_SIL_CONSTANTS_H
 
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/Support/CommandLine.h"
-
 
 namespace swift {
 class SingleValueInstruction;
@@ -28,6 +28,7 @@ class SILValue;
 class SILBuilder;
 class SerializedSILLoader;
 
+struct AggregateSymbolicValue;
 struct SymbolicArrayStorage;
 struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
@@ -307,8 +308,8 @@ private:
     const char *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
-    /// information about the array elements and count.
-    const SymbolicValue *aggregate;
+    /// information about the aggregate elements, its type and count.
+    const AggregateSymbolicValue *aggregate;
 
     /// When this SymbolicValue is of "Enum" kind, this pointer stores
     /// information about the enum case type.
@@ -365,9 +366,6 @@ private:
 
     /// This is the number of bytes for an RK_String representation.
     unsigned stringNumBytes;
-
-    /// This is the number of elements for an RK_Aggregate representation.
-    unsigned aggregateNumElements;
   } auxInfo;
 
 public:
@@ -488,11 +486,15 @@ public:
   StringRef getStringValue() const;
 
   /// This returns an aggregate value with the specified elements in it.  This
-  /// copies the elements into the specified Allocator.
-  static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
+  /// copies the member values into the specified Allocator.
+  static SymbolicValue getAggregate(ArrayRef<SymbolicValue> members,
+                                    Type aggregateType,
                                     SymbolicValueAllocator &allocator);
 
-  ArrayRef<SymbolicValue> getAggregateValue() const;
+  ArrayRef<SymbolicValue> getAggregateMembers() const;
+
+  /// Return the type of this aggregate symbolic value.
+  Type getAggregateType() const;
 
   /// This returns a constant Symbolic value for the enum case in `decl`, which
   /// must not have an associated value.
@@ -570,6 +572,7 @@ public:
   static SymbolicValue makeClosure(
       SILFunction *target,
       ArrayRef<std::pair<SILValue, Optional<SymbolicValue>>> capturedArguments,
+      SubstitutionMap substMap, SILType closureType,
       SymbolicValueAllocator &allocator);
 
   SymbolicClosure *getClosure() const {
@@ -617,7 +620,12 @@ struct SymbolicValueMemoryObject {
   Type getType() const { return type; }
 
   SymbolicValue getValue() const { return value; }
-  void setValue(SymbolicValue newValue) { value = newValue; }
+  void setValue(SymbolicValue newValue) {
+    assert((newValue.getKind() != SymbolicValue::Aggregate ||
+            newValue.getAggregateType()->isEqual(type)) &&
+           "Memory object type does not match the type of the symbolic value");
+    value = newValue;
+  }
 
   /// Create a new memory object whose overall type is as specified.
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
@@ -673,19 +681,29 @@ private:
   // The number of SIL values captured by the closure.
   unsigned numCaptures;
 
-  // True iff there exists captured arguments whose constant value is not known.
+  // True iff there exists a captured argument whose constant value is not
+  // known.
   bool hasNonConstantCaptures = true;
+
+  // A substitution map that partially maps the generic paramters of the
+  // applied function to the generic arguments of passed to the call.
+  SubstitutionMap substitutionMap;
+
+  SILType closureType;
 
   SymbolicClosure() = delete;
   SymbolicClosure(const SymbolicClosure &) = delete;
   SymbolicClosure(SILFunction *callee, unsigned numArguments,
+                  SubstitutionMap substMap, SILType closureType,
                   bool nonConstantCaptures)
       : target(callee), numCaptures(numArguments),
-        hasNonConstantCaptures(nonConstantCaptures) {}
+        hasNonConstantCaptures(nonConstantCaptures), substitutionMap(substMap),
+        closureType(closureType) {}
 
 public:
   static SymbolicClosure *create(SILFunction *callee,
                                  ArrayRef<SymbolicClosureArgument> args,
+                                 SubstitutionMap substMap, SILType closureType,
                                  SymbolicValueAllocator &allocator);
 
   ArrayRef<SymbolicClosureArgument> getCaptures() const {
@@ -700,6 +718,10 @@ public:
   SILFunction *getTarget() {
     return target;
   }
+
+  SILType getClosureType() { return closureType; }
+
+  SubstitutionMap getCallSubstitutionMap() { return substitutionMap; }
 };
 
 } // end namespace swift

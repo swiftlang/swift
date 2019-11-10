@@ -1547,6 +1547,8 @@ CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
   //   - types are turned into their unbridged equivalents, depending
   //     on the abstract CC
   //   - ownership conventions are deduced
+  //   - a minimal substituted generic signature is extracted to represent
+  //     possible ABI-compatible substitutions
   if (auto substFnType = dyn_cast<AnyFunctionType>(substType)) {
     // If the formal type uses a C convention, it is not formally
     // abstractable, and it may be subject to implicit bridging.

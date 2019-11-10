@@ -39,8 +39,11 @@ struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
+class TrailingWhereClause;
 class TypeAliasDecl;
 struct TypeLoc;
+class Witness;
+struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
@@ -367,9 +370,10 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, Decl *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *, SpecializeAttr *> source;
 
-  WhereClauseOwner(Decl *decl);
+  WhereClauseOwner(GenericContext *genCtx);
+  WhereClauseOwner(AssociatedTypeDecl *atd);
 
   WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
       : dc(dc), source(genericParams) {}
@@ -380,13 +384,12 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
+    return llvm::hash_value(owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
                          const WhereClauseOwner &rhs) {
-    return lhs.dc == rhs.dc &&
-           lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
+    return lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
   }
 
   friend bool operator!=(const WhereClauseOwner &lhs,
@@ -1668,6 +1671,80 @@ public:
   void cacheResult(bool value) const;
 };
 
+// The actions this request takes are all huge layering violations.
+//
+// Please do not add any more.
+enum class ImplicitMemberAction : uint8_t {
+  ResolveImplicitInit,
+  ResolveCodingKeys,
+  ResolveEncodable,
+  ResolveDecodable,
+};
+
+class ResolveImplicitMemberRequest
+    : public SimpleRequest<ResolveImplicitMemberRequest,
+                           bool(NominalTypeDecl *, ImplicitMemberAction),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
+                                ImplicitMemberAction action) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+class TypeWitnessRequest
+    : public SimpleRequest<TypeWitnessRequest,
+                           TypeWitnessAndDecl(NormalProtocolConformance *,
+                                              AssociatedTypeDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TypeWitnessAndDecl>
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance,
+           AssociatedTypeDecl *ATD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<TypeWitnessAndDecl> getCachedResult() const;
+  void cacheResult(TypeWitnessAndDecl value) const;
+};
+
+class ValueWitnessRequest
+    : public SimpleRequest<ValueWitnessRequest,
+                           Witness(NormalProtocolConformance *, ValueDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Witness> evaluate(Evaluator &evaluator,
+                                   NormalProtocolConformance *conformance,
+                                   ValueDecl *VD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Witness> getCachedResult() const;
+  void cacheResult(Witness value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1689,6 +1766,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
+void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

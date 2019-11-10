@@ -51,6 +51,7 @@ TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
 TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
+TYPE_ATTR(differentiable)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -202,7 +203,7 @@ DECL_ATTR(inline, Inline,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   20)
 DECL_ATTR(_semantics, Semantics,
-  OnAbstractFunction | OnSubscript | OnNominalType |
+  OnAbstractFunction | OnSubscript | OnNominalType | OnVar |
   AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   21)

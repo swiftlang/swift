@@ -244,7 +244,9 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
-  return castLastElementTo<LocatorPathElt::GenericParameter>().getType();
+  // Check whether we have a path that terminates at a generic parameter.
+  return isForGenericParameter() ?
+      castLastElementTo<LocatorPathElt::GenericParameter>().getType() : nullptr;
 }
 
 void ConstraintLocator::dump(SourceManager *sm) const {
@@ -253,7 +255,7 @@ void ConstraintLocator::dump(SourceManager *sm) const {
 }
 
 void ConstraintLocator::dump(ConstraintSystem *CS) const {
-  dump(&CS->TC.Context.SourceMgr, llvm::errs());
+  dump(&CS->getASTContext().SourceMgr, llvm::errs());
   llvm::errs() << "\n";
 }
 

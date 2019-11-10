@@ -44,6 +44,13 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
   llvm::sys::path::append(LibPath, "lib", "swift");
   setRuntimeResourcePath(LibPath.str());
+
+  llvm::SmallString<128> DiagnosticDocsPath(Path);
+  llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /swift
+  llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /bin
+  llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
+                          "diagnostics");
+  DiagnosticOpts.DiagnosticDocumentationPath = DiagnosticDocsPath.str();
 }
 
 /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
@@ -274,6 +281,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
 
+  Opts.EnableSubstSILFunctionTypesForFunctionValues |=
+    Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
+
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 
@@ -357,6 +367,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
     Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
+
+  if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
+    Opts.EnableExperimentalDifferentiableProgramming = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -594,6 +607,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  if (Args.hasArg(OPT_warnings_as_errors))
+    Opts.ExtraArgs.push_back("-Werror");
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   return false;
 }
@@ -676,7 +691,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.EnableDescriptiveDiagnostics |=
       Args.hasArg(OPT_enable_descriptive_diagnostics);
-
+  if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
+    Opts.DiagnosticDocumentationPath = A->getValue();
+  }
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
 

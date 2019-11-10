@@ -232,7 +232,7 @@ func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
   // FIXME(diagnostics): This should be diagnosed as `missing generic parameter 'T'` instead of a contextual failure.
   let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
-  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<Any>, A>'}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<T>, A>'}}
 }
 
 struct TupleStruct {

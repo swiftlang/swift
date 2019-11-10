@@ -267,7 +267,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
 // The way we compute isEndOfSequence relies on the assumption that
 // the sequence-folding algorithm never recurses with a prefix of the
 // entire sequence.
-static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
+static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
                        PrecedenceGroupDecl *opPrecedence,
                        bool isEndOfSequence) {
   if (!LHS || !RHS)
@@ -330,16 +330,17 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
         (opPrecedence && opPrecedence->isAssignment())) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
-          TC.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
-                      static_cast<unsigned>(tryKind));
+          Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
+                             static_cast<unsigned>(tryKind));
         } else {
-          TC.diagnose(RHS->getStartLoc(), diag::try_assign_rhs_noncovering,
-                      static_cast<unsigned>(tryKind));
+          Ctx.Diags.diagnose(RHS->getStartLoc(),
+                             diag::try_assign_rhs_noncovering,
+                             static_cast<unsigned>(tryKind));
         }
       }
     } else {
-      TC.diagnose(RHS->getStartLoc(), diag::try_rhs,
-                  static_cast<unsigned>(tryKind));
+      Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_rhs,
+                         static_cast<unsigned>(tryKind));
     }
   }
 
@@ -390,9 +391,9 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
-  auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
-  TupleExpr *Arg = TupleExpr::create(TC.Context,
-                                     SourceLoc(), 
+  auto ArgElts2 = Ctx.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
+  TupleExpr *Arg = TupleExpr::create(Ctx,
+                                     SourceLoc(),
                                      ArgElts2, { }, { }, SourceLoc(),
                                      /*HasTrailingClosure=*/false,
                                      /*Implicit=*/true);
@@ -400,7 +401,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   
   
   // Build the operation.
-  return makeResultExpr(new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit()));
+  return makeResultExpr(new (Ctx) BinaryExpr(Op, Arg, Op->isImplicit()));
 }
 
 namespace {
@@ -411,12 +412,12 @@ namespace {
     PrecedenceBound(PrecedenceGroupDecl *decl, bool isStrict)
       : GroupAndIsStrict(decl, isStrict) {}
 
-    bool shouldConsider(TypeChecker &TC, PrecedenceGroupDecl *group) {
+    bool shouldConsider(PrecedenceGroupDecl *group) {
       auto storedGroup = GroupAndIsStrict.getPointer();
       if (!storedGroup) return true;
       if (!group) return false;
       if (storedGroup == group) return !GroupAndIsStrict.getInt();
-      return TC.Context.associateInfixOperators(group, storedGroup)
+      return group->getASTContext().associateInfixOperators(group, storedGroup)
                != Associativity::Right;
     }
   };
@@ -424,7 +425,7 @@ namespace {
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
-static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
+static Expr *foldSequence(DeclContext *DC,
                           Expr *LHS,
                           ArrayRef<Expr*> &S,
                           PrecedenceBound precedenceBound) {
@@ -446,7 +447,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
 
     // If the operator's precedence is lower than the minimum, stop here.
     auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, op);
-    if (!precedenceBound.shouldConsider(TC, opPrecedence))
+    if (!precedenceBound.shouldConsider(opPrecedence))
       return {nullptr, nullptr};
     return {op, opPrecedence};
   };
@@ -459,15 +460,16 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
   S = S.slice(2);
-  
+
+  auto &Ctx = DC->getASTContext();
   while (!S.empty()) {
     assert((S.size() & 1) == 0);
-    assert(precedenceBound.shouldConsider(TC, op1.precedence));
+    assert(precedenceBound.shouldConsider(op1.precedence));
 
     // If the operator is a cast operator, the RHS can't extend past the type
     // that's part of the cast production.
     if (isa<ExplicitCastExpr>(op1.op)) {
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
       op1 = getNextOperator();
       if (!op1) return LHS;
       RHS = S[1];
@@ -480,7 +482,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
 
     // If the second operator's precedence is lower than the
     // precedence bound, break out of the loop.
-    if (!precedenceBound.shouldConsider(TC, op2.precedence)) break;
+    if (!precedenceBound.shouldConsider(op2.precedence)) break;
 
     // If we're missing precedence info for either operator, treat them
     // as non-associative.
@@ -489,13 +491,13 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
       associativity = Associativity::None;
     } else {
       associativity =
-        TC.Context.associateInfixOperators(op1.precedence, op2.precedence);
+        Ctx.associateInfixOperators(op1.precedence, op2.precedence);
     }
 
     // Apply left-associativity immediately by folding the first two
     // operands.
     if (associativity == Associativity::Left) {
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
       op1 = op2;
       RHS = S[1];
       S = S.slice(2);
@@ -508,7 +510,7 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // repeat.
     if (associativity == Associativity::Right &&
         op1.precedence != op2.precedence) {
-      RHS = foldSequence(TC, DC, RHS, S,
+      RHS = foldSequence(DC, RHS, S,
                          PrecedenceBound(op1.precedence, /*strict*/ true));
       continue;
     }
@@ -516,15 +518,15 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     // Apply right-associativity by recursively folding operators
     // starting from this point, then immediately folding the LHS and RHS.
     if (associativity == Associativity::Right) {
-      RHS = foldSequence(TC, DC, RHS, S,
+      RHS = foldSequence(DC, RHS, S,
                          PrecedenceBound(op1.precedence, /*strict*/ false));
-      LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+      LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(TC, DC, LHS, S, precedenceBound);
+      return foldSequence(DC, LHS, S, precedenceBound);
     }
 
     // If we ended up here, it's because we're either:
@@ -540,52 +542,60 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
     } else if (op1.precedence == op2.precedence) {
       assert(op1.precedence->isNonAssociative());
       // FIXME: QoI ranges
-      TC.diagnose(op1.op->getLoc(), diag::non_associative_adjacent_operators,
-                  op1.precedence->getName())
+      Ctx.Diags.diagnose(op1.op->getLoc(),
+                         diag::non_associative_adjacent_operators,
+                         op1.precedence->getName())
         .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));
 
     } else {
-      TC.diagnose(op1.op->getLoc(), diag::unordered_adjacent_operators,
-                  op1.precedence->getName(), op2.precedence->getName())
+      Ctx.Diags.diagnose(op1.op->getLoc(),
+                         diag::unordered_adjacent_operators,
+                         op1.precedence->getName(), op2.precedence->getName())
         .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));      
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
-    return foldSequence(TC, DC, LHS, S, precedenceBound);
+    LHS = makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
+    return foldSequence(DC, LHS, S, precedenceBound);
   }
 
   // Fold LHS and RHS together and declare completion.
-  return makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
+  return makeBinOp(Ctx, op1.op, LHS, RHS, op1.precedence, S.empty());
 }
 
-bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
-  if (Context.hasOptionalIntrinsics()) return false;
+bool TypeChecker::requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc) {
+  if (ctx.hasOptionalIntrinsics())
+    return false;
 
-  diagnose(loc, diag::optional_intrinsics_not_found);
+  ctx.Diags.diagnose(loc, diag::optional_intrinsics_not_found);
   return true;
 }
 
-bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
-  if (Context.hasPointerArgumentIntrinsics()) return false;
+bool TypeChecker::requirePointerArgumentIntrinsics(ASTContext &ctx,
+                                                   SourceLoc loc) {
+  if (ctx.hasPointerArgumentIntrinsics())
+    return false;
 
-  diagnose(loc, diag::pointer_argument_intrinsics_not_found);
+  ctx.Diags.diagnose(loc, diag::pointer_argument_intrinsics_not_found);
   return true;
 }
 
-bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
-  if (Context.hasArrayLiteralIntrinsics()) return false;
-  
-  diagnose(loc, diag::array_literal_intrinsics_not_found);
+bool TypeChecker::requireArrayLiteralIntrinsics(ASTContext &ctx,
+                                                SourceLoc loc) {
+  if (ctx.hasArrayLiteralIntrinsics())
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;
 }
 
 Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
-  auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
+  auto type = TypeChecker::getUnopenedTypeOfReference(value, Type(), UseDC);
   auto semantics = value->getAccessSemanticsFromContext(UseDC,
                                                        /*isAccessOnSelf*/false);
-  return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
+  return new (value->getASTContext())
+      DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
@@ -593,6 +603,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 bool Implicit, FunctionRefKind functionRefKind) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
+  auto &Context = UseDC->getASTContext();
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
     auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
                                                        /*isAccessOnSelf*/false);
@@ -676,7 +687,7 @@ getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
     return evaluateOrDefault(
-        Context.evaluator,
+        protocol->getASTContext().evaluator,
         DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
   }
   return Type();
@@ -731,7 +742,7 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = ::foldSequence(*this, dc, LHS, Elts, PrecedenceBound());
+  Expr *Result = ::foldSequence(dc, LHS, Elts, PrecedenceBound());
   assert(Elts.empty());
 
   return Result;

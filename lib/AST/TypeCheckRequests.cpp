@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -336,12 +337,20 @@ void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const
 // Requirement computation.
 //----------------------------------------------------------------------------//
 
-WhereClauseOwner::WhereClauseOwner(Decl *decl)
-  : dc(decl->getInnermostDeclContext()), source(decl) { }
+WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx): dc(genCtx) {
+  if (const auto whereClause = genCtx->getTrailingWhereClause())
+    source = whereClause;
+  else
+    source = genCtx->getGenericParams();
+}
+
+WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
+    : dc(atd->getInnermostDeclContext()),
+      source(atd->getTrailingWhereClause()) {}
 
 SourceLoc WhereClauseOwner::getLoc() const {
-  if (auto decl = source.dyn_cast<Decl *>())
-    return decl->getLoc();
+  if (auto where = source.dyn_cast<TrailingWhereClause *>())
+    return where->getWhereLoc();
 
   if (auto attr = source.dyn_cast<SpecializeAttr *>())
     return attr->getLocation();
@@ -351,8 +360,8 @@ SourceLoc WhereClauseOwner::getLoc() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
-  if (auto decl = owner.source.dyn_cast<Decl *>()) {
-    simple_display(out, decl);
+  if (auto where = owner.source.dyn_cast<TrailingWhereClause *>()) {
+    simple_display(out, owner.dc->getAsDecl());
   } else if (owner.source.is<SpecializeAttr *>()) {
     out << "@_specialize";
   } else {
@@ -374,36 +383,13 @@ void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
-  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
+  if (const auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
-  }
-
-  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
-    
-    return { };
-  }
-
-  auto decl = source.dyn_cast<Decl *>();
-  if (!decl)
-    return { };
-
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (auto whereClause = proto->getTrailingWhereClause())
-      return whereClause->getRequirements();
-
-    return { };
-  }
-
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-    if (auto whereClause = assocType->getTrailingWhereClause())
-      return whereClause->getRequirements();
-  }
-
-  if (auto genericContext = decl->getAsGenericContext()) {
-    if (auto genericParams = genericContext->getGenericParams())
-      return genericParams->getRequirements();
+  } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
+    return whereClause->getRequirements();
   }
 
   return { };
@@ -1070,4 +1056,60 @@ Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
 void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setInheritsSuperclassInitializers(value);
+}
+
+//----------------------------------------------------------------------------//
+// ResolveImplicitMemberRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ImplicitMemberAction action) {
+  switch (action) {
+  case ImplicitMemberAction::ResolveImplicitInit:
+    out << "resolve implicit initializer";
+    break;
+  case ImplicitMemberAction::ResolveCodingKeys:
+    out << "resolve CodingKeys";
+    break;
+  case ImplicitMemberAction::ResolveEncodable:
+    out << "resolve Encodable.encode(to:)";
+    break;
+  case ImplicitMemberAction::ResolveDecodable:
+    out << "resolve Decodable.init(from:)";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// TypeWitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<TypeWitnessAndDecl> TypeWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->TypeWitnesses.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->TypeWitnesses[requirement];
+}
+
+void TypeWitnessRequest::cacheResult(TypeWitnessAndDecl typeWitAndDecl) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// WitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Witness> ValueWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->Mapping.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->Mapping[requirement];
+}
+
+void ValueWitnessRequest::cacheResult(Witness type) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
 }
