@@ -1175,14 +1175,14 @@ public:
   ///
   /// \returns the type of \p expr on success, Type() otherwise.
   /// FIXME: expr may still be modified...
-  Type getTypeOfExpressionWithoutApplying(
+  static Type getTypeOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc,
       ConcreteDeclRef &referencedDecl,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  void getPossibleTypesOfExpressionWithoutApplying(
+  static void getPossibleTypesOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
