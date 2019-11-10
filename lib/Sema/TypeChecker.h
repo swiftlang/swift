@@ -1135,7 +1135,7 @@ public:
   ///
   /// \returns The type of the top-level expression, or Type() if an
   ///          error occurred.
-  Type
+  static Type
   typeCheckExpression(Expr *&expr, DeclContext *dc,
                       TypeLoc convertType = TypeLoc(),
                       ContextualTypePurpose convertTypePurpose = CTP_Unused,
@@ -1143,10 +1143,10 @@ public:
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
 
-  Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           ExprTypeCheckListener *listener) {
-    return typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
-                               TypeCheckExprOptions(), listener);
+  static Type typeCheckExpression(Expr *&expr, DeclContext *dc,
+                                  ExprTypeCheckListener *listener) {
+    return TypeChecker::typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
+                                            TypeCheckExprOptions(), listener);
   }
 
 private:

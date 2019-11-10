@@ -2159,9 +2159,11 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
+  auto &Context = dc->getASTContext();
   FallbackDiagnosticListener diagListener(Context, options, listener);
-  return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
-                                 options, diagListener, baseCS);
+  auto *TC = Context.getLegacyGlobalTypeChecker();
+  return TC->typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
+                                     options, diagListener, baseCS);
 }
 
 Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,

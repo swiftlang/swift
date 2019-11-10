@@ -544,11 +544,9 @@ public:
       }
     }
 
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-    auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
-                                         ctp,
-                                         options);
+    auto exprTy = TypeChecker::typeCheckExpression(E, DC,
+                                                   TypeLoc::withoutLoc(ResultTy),
+                                                   ctp, options);
     RS->setResult(E);
 
     if (!exprTy) {
@@ -607,11 +605,9 @@ public:
         contextTypePurpose = CTP_YieldByValue;
       }
 
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      TC.typeCheckExpression(exprToCheck, DC,
-                             TypeLoc::withoutLoc(contextType),
-                             contextTypePurpose);
+      TypeChecker::typeCheckExpression(exprToCheck, DC,
+                                       TypeLoc::withoutLoc(contextType),
+                                       contextTypePurpose);
 
       // Propagate the change into the inout expression we stripped before.
       if (inout) {
@@ -641,8 +637,8 @@ public:
     if (!exnType) return TS;
 
     // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-    TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType), CTP_ThrowStmt);
+    TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
+                                     CTP_ThrowStmt);
     TS->setSubExpr(E);
     
     return TS;
@@ -659,13 +655,10 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
-    TC.typeCheckDecl(DS->getTempDecl());
+    TypeChecker::typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
-    TC.typeCheckExpression(theCall, DC);
+    TypeChecker::typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
 
     return DS;
@@ -1314,7 +1307,7 @@ public:
 
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
-    auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
+    auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
     auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr =
             TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
@@ -1331,7 +1324,7 @@ public:
     for (auto &node : switchStmt->getRawCases()) {
       if (!node.is<Decl *>())
         continue;
-      TC.typeCheckDecl(node.get<Decl *>());
+      TypeChecker::typeCheckDecl(node.get<Decl *>());
     }
 
     SmallVector<VarDecl *, 8> scratchMemory1;
@@ -1838,8 +1831,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     }
   }
 
-  // FIXME: Remove TypeChecker dependencies below.
-  auto &TC = *Ctx.getLegacyGlobalTypeChecker();
   for (auto &elem : BS->getElements()) {
     if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       SourceLoc Loc = SubExpr->getStartLoc();
@@ -1862,7 +1853,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       }
 
       auto resultTy =
-          TC.typeCheckExpression(SubExpr, DC, TypeLoc(), CTP_Unused, options);
+          TypeChecker::typeCheckExpression(SubExpr, DC, TypeLoc(),
+                                           CTP_Unused, options);
 
       // If a closure expression is unused, the user might have intended
       // to write "do { ... }".
@@ -1901,7 +1893,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
       break;
 
-    TC.typeCheckDecl(SubDecl);
+    TypeChecker::typeCheckDecl(SubDecl);
   }
 
   return BS;
@@ -1941,11 +1933,10 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
-  TypeChecker &tc = *Context.getLegacyGlobalTypeChecker();
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
   auto resultTy =
-      tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded);
+      TypeChecker::typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
+                                       TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   

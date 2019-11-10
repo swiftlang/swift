@@ -458,7 +458,7 @@ namespace {
                   refExpr = declRefExpr;
                 }
 
-                auto resultTy = cs.getTypeChecker().typeCheckExpression(
+                auto resultTy = TypeChecker::typeCheckExpression(
                     refExpr, cs.DC, TypeLoc::withoutLoc(expectedFnType),
                     CTP_CannotFail);
                 if (!resultTy)
@@ -3875,7 +3875,7 @@ namespace {
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
                                                 { Identifier() });
 
-      auto resultTy = cs.getTypeChecker().typeCheckExpression(
+      auto resultTy = TypeChecker::typeCheckExpression(
           callExpr, cs.DC, TypeLoc::withoutLoc(valueType), CTP_CannotFail);
       assert(resultTy && "Conversion cannot fail!");
       (void)resultTy;

@@ -823,12 +823,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     };
 
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
-    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
         nullptr, subscriptDecl, /*Implicit=*/true);
-    tc.typeCheckExpression(lookupExpr, accessor);
+    TypeChecker::typeCheckExpression(lookupExpr, accessor);
 
     // Make sure we produce an lvalue only when desired.
     if (isMemberLValue != lookupExpr->getType()->is<LValueType>()) {
@@ -2210,9 +2209,7 @@ static void typeCheckSynthesizedWrapperInitializer(
   }
 
   // Type-check the initialization.
-  ASTContext &ctx = pbd->getASTContext();
-  auto &tc = *ctx.getLegacyGlobalTypeChecker();
-  tc.typeCheckExpression(initializer, originalDC);
+  TypeChecker::typeCheckExpression(initializer, originalDC);
   const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {

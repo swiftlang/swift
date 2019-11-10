@@ -1081,8 +1081,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // if there is a closure in the subexpression, we can violate invariants.
   auto *DC = findDeclContext(subExpr);
   auto resultTy =
-      CS.TC.typeCheckExpression(subExpr, DC, TypeLoc::withoutLoc(convertType),
-                                convertTypePurpose, TCEOptions, listener, &CS);
+      TypeChecker::typeCheckExpression(subExpr, DC,
+                                       TypeLoc::withoutLoc(convertType),
+                                       convertTypePurpose, TCEOptions,
+                                       listener, &CS);
 
   CS.cacheExprTypes(subExpr);
 
