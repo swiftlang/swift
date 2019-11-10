@@ -260,8 +260,8 @@ namespace driver {
         return;
       if (ScheduledCommands.count(cmd))
         return;
-      llvm::outs() << (forRanges ? "Ranges" : "Dependencies") << " queuing "
-                   << reason << ": " << LogJob(cmd) << "\n";
+      llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd)
+                   << (forRanges ? " <Ranges>" : "") << "\n";
 
       if (Comp.getEnableExperimentalDependencies())
         ExpDepGraph.getValue().printPath(llvm::outs(), cmd);
