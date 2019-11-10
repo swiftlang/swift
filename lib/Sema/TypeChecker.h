@@ -975,7 +975,7 @@ public:
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
                            unsigned StartElem);
 
-  void typeCheckDecl(Decl *D);
+  static void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
   static void checkDeclAttributes(Decl *D);

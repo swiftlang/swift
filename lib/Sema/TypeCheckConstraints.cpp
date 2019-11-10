@@ -1116,8 +1116,8 @@ namespace {
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         // Validate the capture list.
         for (auto capture : captureList->getCaptureList()) {
-          TC.typeCheckDecl(capture.Init);
-          TC.typeCheckDecl(capture.Var);
+          TypeChecker::typeCheckDecl(capture.Init);
+          TypeChecker::typeCheckDecl(capture.Var);
         }
 
         // Since closure expression is contained by capture list

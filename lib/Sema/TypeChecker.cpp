@@ -311,7 +311,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
          currentSynthesizedDecl != n;
          ++currentSynthesizedDecl) {
       auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
-      TC.typeCheckDecl(decl);
+      TypeChecker::typeCheckDecl(decl);
     }
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
@@ -420,7 +420,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         TC.typeCheckTopLevelCodeDecl(TLCD);
         TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
       } else {
-        TC.typeCheckDecl(D);
+        TypeChecker::typeCheckDecl(D);
       }
     }
 
