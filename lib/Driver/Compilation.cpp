@@ -404,7 +404,7 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild();
-      for (const Job *Cmd : DeferredCommands)
+      for (const Job *Cmd : Comp.getJobs())
         scheduleCommandIfNecessaryAndPossible(Cmd);
       DeferredCommands.clear();
     }
