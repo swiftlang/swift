@@ -1190,10 +1190,10 @@ public:
 
   /// Return the type of operator function for specified LHS, or a null
   /// \c Type on error.
-  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                            Identifier opName,
-                                            DeclRefKind refKind,
-                                            ConcreteDeclRef &referencedDecl);
+  static FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                                   Identifier opName,
+                                                   DeclRefKind refKind,
+                                                   ConcreteDeclRef &refdDecl);
 
   /// Check the key-path expression.
   ///
@@ -1575,7 +1575,7 @@ public:
 
   /// Given an pre-folded expression, find LHS from the expression if a binary
   /// operator \c name appended to the expression.
-  Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
   /// @}
 

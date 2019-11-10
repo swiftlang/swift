@@ -2449,7 +2449,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 }
 
 static FunctionType *
-getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
+getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
                                 ConcreteDeclRef &referencedDecl) {
   auto &Context = DC->getASTContext();
 
@@ -2467,7 +2467,7 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
   if (!expr)
     return nullptr;
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (Context.LangOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -2481,7 +2481,7 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
     return nullptr;
 
   auto &solution = viable[0];
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (Context.LangOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
@@ -2516,7 +2516,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 
   // For the infix operator, find the actual LHS from pre-folded LHS.
   if (refKind == DeclRefKind::BinaryOperator)
-    LHS = findLHS(DC, LHS, opName);
+    LHS = TypeChecker::findLHS(DC, LHS, opName);
 
   if (!LHS)
     return nullptr;
@@ -2549,7 +2549,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     ParenExpr Args(SourceLoc(), LHS, SourceLoc(),
                    /*hasTrailingClosure=*/false);
     PostfixUnaryExpr postfixExpr(opExpr, &Args);
-    return getTypeOfCompletionOperatorImpl(*this, DC, &postfixExpr,
+    return getTypeOfCompletionOperatorImpl(DC, &postfixExpr,
                                            referencedDecl);
   }
 
@@ -2561,11 +2561,11 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
     auto Args = TupleExpr::create(
-        Context, SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
+        DC->getASTContext(), SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
         /*hasTrailingClosure=*/false, /*isImplicit=*/true);
     BinaryExpr binaryExpr(opExpr, Args, /*isImplicit=*/true);
 
-    return getTypeOfCompletionOperatorImpl(*this, DC, &binaryExpr,
+    return getTypeOfCompletionOperatorImpl(DC, &binaryExpr,
                                            referencedDecl);
   }
 

@@ -2038,7 +2038,7 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params) {
     auto *initContext = param->getDefaultArgumentInitContext();
 
     auto resultTy =
-        tc.typeCheckParameterDefault(e, initContext, param->getType(),
+        typeCheckParameterDefault(e, initContext, param->getType(),
                                     /*isAutoClosure=*/param->isAutoClosure());
 
     if (resultTy) {

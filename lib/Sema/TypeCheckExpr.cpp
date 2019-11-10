@@ -237,7 +237,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     if (!left)
       // LHS is not binary expression.
       return E;
-    switch (Context.associateInfixOperators(left, right)) {
+    switch (DC->getASTContext().associateInfixOperators(left, right)) {
       case swift::Associativity::None:
         return nullptr;
       case swift::Associativity::Left:

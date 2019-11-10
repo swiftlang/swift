@@ -686,9 +686,9 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
                                    ConcreteDeclRef &referencedDecl) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  TypeChecker &TC = createTypeChecker(ctx);
-  return TC.getTypeOfCompletionOperator(DC, LHS, opName, refKind,
-                                        referencedDecl);
+  (void)createTypeChecker(ctx);
+  return TypeChecker::getTypeOfCompletionOperator(DC, LHS, opName, refKind,
+                                                  referencedDecl);
 }
 
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {

@@ -313,8 +313,7 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
 
 /// Determine whether one protocol extension is at least as specialized as
 /// another.
-static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
-                                               DeclContext *dc1,
+static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
                                                DeclContext *dc2) {
   assert(dc1->getExtendedProtocolDecl());
   assert(dc2->getExtendedProtocolDecl());
@@ -390,9 +389,6 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  // FIXME: Remove dependency on the global type checker.
-      auto *tc = C.getLegacyGlobalTypeChecker();
-
   if (C.LangOpts.DebugConstraintSolver) {
     auto &log = C.TypeCheckerDebug->getStream();
     log << "Comparing declarations\n";
@@ -445,8 +441,8 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     // Both members are in protocol extensions.
     // Determine whether the 'Self' type from the first protocol extension
     // satisfies all of the requirements of the second protocol extension.
-    bool better1 = isProtocolExtensionAsSpecializedAs(*tc, outerDC1, outerDC2);
-    bool better2 = isProtocolExtensionAsSpecializedAs(*tc, outerDC2, outerDC1);
+    bool better1 = isProtocolExtensionAsSpecializedAs(outerDC1, outerDC2);
+    bool better2 = isProtocolExtensionAsSpecializedAs(outerDC2, outerDC1);
     if (better1 != better2) {
       return completeResult(better1);
     }
