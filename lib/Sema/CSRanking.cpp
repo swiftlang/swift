@@ -340,7 +340,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
-  ConstraintSystem cs(tc, dc1, None);
+  ConstraintSystem cs(dc1, None);
   OpenedTypeMap replacements;
   cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
@@ -507,7 +507,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
   };
 
   // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(*tc, dc, ConstraintSystemOptions());
+  ConstraintSystem cs(dc, ConstraintSystemOptions());
   bool knownNonSubtype = false;
 
   auto *locator = cs.getConstraintLocator(nullptr);

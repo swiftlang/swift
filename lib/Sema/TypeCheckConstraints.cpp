@@ -2197,7 +2197,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
-  ConstraintSystem cs(*this, dc, csOptions, expr);
+  ConstraintSystem cs(dc, csOptions, expr);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
@@ -2314,7 +2314,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       Expr *appliedSolution(constraints::Solution &solution,
                             Expr *expr) override {
         auto &cs = solution.getConstraintSystem();
-        auto *closure = cs.TC.buildAutoClosureExpr(DC, expr, ParamType);
+        auto *closure = cs.getTypeChecker().buildAutoClosureExpr(DC, expr, ParamType);
         cs.cacheExprTypes(closure);
         return closure;
       }
@@ -2337,12 +2337,13 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                    ConcreteDeclRef &referencedDecl,
                                  FreeTypeVariableBinding allowFreeTypeVariables,
                                    ExprTypeCheckListener *listener) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
   referencedDecl = nullptr;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::SuppressDiagnostics);
+  ConstraintSystem cs(dc, ConstraintSystemFlags::SuppressDiagnostics);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -2419,6 +2420,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "get-possible-types-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -2427,7 +2429,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
 
-  ConstraintSystem cs(*this, dc, options);
+  ConstraintSystem cs(dc, options);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -2460,7 +2462,7 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
   options |= ConstraintSystemFlags::ReusePrecheckedType;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem CS(TC, DC, options);
+  ConstraintSystem CS(DC, options);
   expr = CS.generateConstraints(expr);
   if (!expr)
     return nullptr;
@@ -3243,7 +3245,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
          "Unexpected type variable in constraint satisfaction testing");
 
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  ConstraintSystem cs(dc, ConstraintSystemOptions());
   if (openArchetypes) {
     type1 = replaceArchetypesWithTypeVariables(cs, type1);
     type2 = replaceArchetypesWithTypeVariables(cs, type2);
@@ -3438,7 +3440,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
                                 Optional<Pattern*> typeFromPattern) {
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
     
   // Cache the expression type on the system to ensure it is available
   // on diagnostics if the convertion fails.

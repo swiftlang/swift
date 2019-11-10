@@ -1017,8 +1017,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // expression (which may lead to infinite recursion).  If the client is
   // telling us that it knows what it is doing, then believe it.
   if (!options.contains(TCC_ForceRecheck)) {
-    if (CS.TC.isExprBeingDiagnosed(subExpr)) {
-      auto *savedExpr = CS.TC.getExprBeingDiagnosed(subExpr);
+    if (CS.getTypeChecker().isExprBeingDiagnosed(subExpr)) {
+      auto *savedExpr = CS.getTypeChecker().getExprBeingDiagnosed(subExpr);
       if (subExpr == savedExpr)
         return subExpr;
 
@@ -1028,7 +1028,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   }
 
   // Mark current expression as about to be diagnosed.
-  CS.TC.addExprForDiagnosis(subExpr, subExpr);
+  CS.getTypeChecker().addExprForDiagnosis(subExpr, subExpr);
 
   // Validate contextual type before trying to use it.
   std::tie(convertType, convertTypePurpose) =
@@ -1118,7 +1118,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   }
 
   if (preCheckedExpr != subExpr)
-    CS.TC.addExprForDiagnosis(preCheckedExpr, subExpr);
+    CS.getTypeChecker().addExprForDiagnosis(preCheckedExpr, subExpr);
 
   return subExpr;
 }
@@ -4068,7 +4068,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       if (hasUnresolvedParams)
         continue;
 
-      CS.TC.preCheckExpression(resultExpr, CS.DC);
+      CS.getTypeChecker().preCheckExpression(resultExpr, CS.DC);
 
       // Obtain type of the result expression without applying solutions,
       // because otherwise this might result in leaking of type variables,

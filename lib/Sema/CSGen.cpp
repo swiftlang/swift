@@ -3799,9 +3799,8 @@ bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, GenericSignature sig,
     SubstitutionMap Substitutions, bool isExtension) {
 
-  auto *TC = DC->getASTContext().getLegacyGlobalTypeChecker();
   ConstraintSystemOptions Options;
-  ConstraintSystem CS(*TC, const_cast<DeclContext *>(DC), Options);
+  ConstraintSystem CS(const_cast<DeclContext *>(DC), Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 
   // For every requirement, add a constraint.
@@ -3865,7 +3864,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   // If the current ast context has no type checker, create one for it.
   auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
   assert(TC && "Must have type checker to make global query!");
-  ConstraintSystem CS(*TC, &DC, None);
+  ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(

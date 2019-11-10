@@ -634,8 +634,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
 }
 
 RequirementMatch
-swift::matchWitness(TypeChecker &tc,
-                    WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                     ProtocolDecl *proto, ProtocolConformance *conformance,
                     DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   using namespace constraints;
@@ -713,7 +712,7 @@ swift::matchWitness(TypeChecker &tc,
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
-    cs.emplace(tc, dc, ConstraintSystemFlags::AllowFixes);
+    cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
     auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
     auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
@@ -981,9 +980,6 @@ bool WitnessChecker::findBestWitness(
 
   bool anyFromUnconstrainedExtension;
   numViable = 0;
-
-  // FIXME: Remove dependency on the global type checker.
-  auto *TC = requirement->getASTContext().getLegacyGlobalTypeChecker();
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
     SmallVector<ValueDecl *, 4> witnesses;
@@ -1031,7 +1027,7 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, conformance,
+      auto match = matchWitness(ReqEnvironmentCache, Proto, conformance,
                                 DC, requirement, witness);
       if (match.isViable()) {
         ++numViable;
@@ -1056,7 +1052,7 @@ bool WitnessChecker::findBestWitness(
     if (conformance && !conformance->isInvalid()) {
       if (auto *SF = DC->getParentSourceFile()) {
         if (SF->Kind == SourceFileKind::Interface) {
-          auto match = matchWitness(*TC, ReqEnvironmentCache, Proto,
+          auto match = matchWitness(ReqEnvironmentCache, Proto,
                                     conformance, DC, requirement, requirement);
           assert(match.isViable());
           numViable = 1;
@@ -3375,8 +3371,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto *TC = getASTContext().getLegacyGlobalTypeChecker();
-  auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, Conformance, DC,
+  auto match = matchWitness(ReqEnvironmentCache, Proto, Conformance, DC,
                             requirement, derived);
   if (match.isViable()) {
     recordWitness(requirement, match);
@@ -4544,9 +4539,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   // Describe why the witness didn't satisfy the requirement.
   WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  // FIXME: Remove dependency on the global type checker.
-  auto *TC = req->getASTContext().getLegacyGlobalTypeChecker();
-  auto match = matchWitness(*TC, oneUseCache, conformance->getProtocol(),
+  auto match = matchWitness(oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
   if (match.Kind == MatchKind::ExactMatch &&
       req->isObjC() && !witness->isObjC()) {
@@ -5176,9 +5169,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        auto *TC = ctx.getLegacyGlobalTypeChecker();
-        assert(TC && "Need a type checker to match witnesses");
-        if (matchWitness(*TC, reqEnvCache, proto, *conformance,
+        if (matchWitness(reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {

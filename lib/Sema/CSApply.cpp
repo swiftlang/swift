@@ -4494,8 +4494,8 @@ namespace {
       cs.cacheType(outerClosure);
 
       // The inner closure at least will definitely have a capture.
-      cs.TC.ClosuresWithUncomputedCaptures.push_back(outerClosure);
-      cs.TC.ClosuresWithUncomputedCaptures.push_back(closure);
+      cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(outerClosure);
+      cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(closure);
 
       // let outerApply = "\( outerClosure )( \(E) )"
       auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
@@ -5408,7 +5408,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
           arg, closureType->getResult(),
           locator.withPathElement(ConstraintLocator::AutoclosureResult));
 
-      convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
+      convertedArg = cs.getTypeChecker().buildAutoClosureExpr(dc, arg, closureType);
       cs.cacheExprTypes(convertedArg);
     } else {
       convertedArg = coerceToType(

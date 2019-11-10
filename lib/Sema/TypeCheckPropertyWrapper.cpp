@@ -533,7 +533,6 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
   if (binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
@@ -552,7 +551,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   using namespace constraints;
   auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(tc, dc, None);
+  ConstraintSystem cs(dc, None);
   auto emptyLocator = cs.getConstraintLocator(nullptr);
   
   auto wrapperAttrs = var->getAttachedPropertyWrappers();

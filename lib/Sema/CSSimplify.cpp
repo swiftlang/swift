@@ -4584,7 +4584,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
-    auto conformance = TC.containsProtocol(
+    auto conformance = TypeChecker::containsProtocol(
         type, protocol, DC,
         (ConformanceCheckFlags::InExpression |
          ConformanceCheckFlags::SkipConditionalRequirements));

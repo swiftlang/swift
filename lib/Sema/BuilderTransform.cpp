@@ -516,7 +516,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
 
   // Pre-check the closure body: pre-check any expressions in it and look
   // for return statements.
-  switch (TC.preCheckFunctionBuilderClosureBody(closure)) {
+  switch (getTypeChecker().preCheckFunctionBuilderClosureBody(closure)) {
   case FunctionBuilderClosurePreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
@@ -582,7 +582,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   // that CSGen might have.
   //
   // TODO: just build the AST the way we want it in the first place.
-  if (TC.preCheckExpression(singleExpr, closure))
+  if (getTypeChecker().preCheckExpression(singleExpr, closure))
     return getTypeMatchFailure(locator);
 
   singleExpr = generateConstraints(singleExpr, closure);
