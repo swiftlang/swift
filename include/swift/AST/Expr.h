@@ -5119,6 +5119,26 @@ public:
       }
       llvm_unreachable("unhandled kind");
     }
+    
+    void setIndexExpr(Expr *newExpr) {
+      switch (getKind()) {
+      case Kind::Subscript:
+      case Kind::UnresolvedSubscript:
+        SubscriptIndexExpr = newExpr;
+        return;
+
+      case Kind::Invalid:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::UnresolvedProperty:
+      case Kind::Property:
+      case Kind::Identity:
+      case Kind::TupleElement:
+        return;
+      }
+      llvm_unreachable("unhandled kind");
+    }
 
     ArrayRef<Identifier> getSubscriptLabels() const {
       switch (getKind()) {

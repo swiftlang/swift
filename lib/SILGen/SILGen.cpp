@@ -1063,7 +1063,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     auto arg = param->getDefaultValue();
     emitOrDelayFunction(*this, constant,
         [this,constant,arg,initDC](SILFunction *f) {
-//      preEmitFunction(constant, arg, f, arg);
+      preEmitFunction(constant, arg, f, arg);
       PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
       SILGenFunction SGF(*this, *f, initDC);
       SGF.emitGeneratorFunction(constant, arg);
