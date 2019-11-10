@@ -5119,7 +5119,7 @@ public:
       }
       llvm_unreachable("unhandled kind");
     }
-    
+
     void setIndexExpr(Expr *newExpr) {
       switch (getKind()) {
       case Kind::Subscript:

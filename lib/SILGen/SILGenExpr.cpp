@@ -462,8 +462,9 @@ namespace {
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
-    void generateDefaultArgsForKeyPathSubscript(SubscriptDecl *S,
-                                                KeyPathExpr::Component &component);
+    void
+    generateDefaultArgsForKeyPathSubscript(SubscriptDecl *S,
+                                           KeyPathExpr::Component &component);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -3539,44 +3540,44 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
 // There is some uglyness here because this function has to not only handle
 // the generation of default arguments but it also has to create a new TupleExpr
 // or ParenExpr depending on how many default args are found.
-void RValueEmitter::generateDefaultArgsForKeyPathSubscript(SubscriptDecl *S,
-                                                           KeyPathExpr::Component &component) {
+void RValueEmitter::generateDefaultArgsForKeyPathSubscript(
+    SubscriptDecl *S, KeyPathExpr::Component &component) {
   // Collect both all the args (default and not) into one place and
   // keep track of their types.
   llvm::SmallVector<TupleTypeElt, 4> newTypeEls;
   newTypeEls.reserve(S->getIndices()->size());
-  llvm::SmallVector<Expr*, 4> newArgs;
+  llvm::SmallVector<Expr *, 4> newArgs;
   newArgs.reserve(S->getIndices()->size());
   size_t index = 0;
   for (auto param : *S->getIndices()) {
     newTypeEls.push_back(TupleTypeElt(param->getType()));
-    
+
     if (param->isDefaultArgument()) {
       newArgs.push_back(param->getDefaultValue());
     } else {
       if (auto paren = dyn_cast<ParenExpr>(component.getIndexExpr())) {
         newArgs.push_back(paren->getSubExpr());
-      } else if (auto tupleExpr = dyn_cast<TupleExpr>(component.getIndexExpr())) {
+      } else if (auto tupleExpr =
+                     dyn_cast<TupleExpr>(component.getIndexExpr())) {
         newArgs.push_back(tupleExpr->getElement(index));
       }
     }
 
     (void)++index;
   }
-  
+
   // This looks it's going to give us a TypleType but it will give us a
   // ParenType when newTypeEls.size() == 1.
   auto newIndexType = TupleType::get(newTypeEls, SGF.getASTContext());
-  
+
   // Unconditionally recreate the index expr based on the new type.
   if (isa<ParenType>(newIndexType.getPointer())) {
-    assert(newArgs.size() == 1 &&
-           "If this was converted to a paren expr it should have exact one element");
+    assert(newArgs.size() == 1 && "If this was converted to a paren expr it "
+                                  "should have exact one element");
     auto newIndexExpr = new (SGF.getASTContext())
-                          ParenExpr(component.getIndexExpr()->getStartLoc(),
-                                    newArgs[0],
-                                    component.getIndexExpr()->getEndLoc(),
-                                    /*hasTrailingClosure=*/false);
+        ParenExpr(component.getIndexExpr()->getStartLoc(), newArgs[0],
+                  component.getIndexExpr()->getEndLoc(),
+                  /*hasTrailingClosure=*/false);
 
     component.setIndexExpr(newIndexExpr);
   } else if (isa<TupleType>(newIndexType.getPointer())) {
@@ -3584,23 +3585,19 @@ void RValueEmitter::generateDefaultArgsForKeyPathSubscript(SubscriptDecl *S,
     elementNames.reserve(newArgs.size());
     if (auto tupleExpr = dyn_cast<TupleExpr>(component.getIndexExpr())) {
       std::copy(tupleExpr->getElementNames().begin(),
-                tupleExpr->getElementNames().begin(),
-                elementNames.begin());
+                tupleExpr->getElementNames().begin(), elementNames.begin());
     } else {
-      std::transform(newArgs.begin(), newArgs.end(),
-                     elementNames.begin(),
-                     [](auto&&) {
-        return Identifier();
-      });
+      std::transform(newArgs.begin(), newArgs.end(), elementNames.begin(),
+                     [](auto &&) { return Identifier(); });
     }
-    
-    auto newIndexExpr = TupleExpr::createImplicit(SGF.getASTContext(),
-                                                  newArgs, elementNames);
+
+    auto newIndexExpr =
+        TupleExpr::createImplicit(SGF.getASTContext(), newArgs, elementNames);
     component.setIndexExpr(newIndexExpr);
   } else {
     llvm_unreachable("Created invalid type");
   }
-  
+
   component.getIndexExpr()->setType(newIndexType);
 }
 
@@ -3645,7 +3642,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           std::move(rv).forwardAsSingleValue(SGF, E));
       }
     };
-  
+
   for (auto &component : E->getMutableComponents()) {
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Property:
@@ -3726,7 +3723,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       llvm_unreachable("not resolved");
     }
   }
-  
+
   StringRef objcString;
   if (auto objcExpr = dyn_cast_or_null<StringLiteralExpr>
                                                 (E->getObjCStringLiteralExpr()))
