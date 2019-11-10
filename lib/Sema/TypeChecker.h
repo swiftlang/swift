@@ -530,17 +530,6 @@ enum class CheckedCastContextKind {
   EnumElementPattern,
 };
 
-enum class FunctionBuilderClosurePreCheck : uint8_t {
-  /// There were no problems pre-checking the closure.
-  Okay,
-
-  /// There was an error pre-checking the closure.
-  Error,
-
-  /// The closure has a return statement.
-  HasReturnStmt,
-};
-
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final {
@@ -599,11 +588,6 @@ private:
   /// Indicate that the type checker should skip type-checking non-inlinable
   /// function bodies.
   bool SkipNonInlinableFunctionBodies = false;
-
-  /// Closure expressions whose bodies have already been prechecked as
-  /// part of trying to apply a function builder.
-  llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
-    precheckedFunctionBuilderClosures;
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
@@ -1074,16 +1058,6 @@ public:
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// Pre-check the body of the given closure, which we are about to
-  /// generate constraints for.
-  ///
-  /// This mutates the body of the closure, but only in ways that should be
-  /// valid even if we end up not actually applying the function-builder
-  /// transform: it just does a normal pre-check of all the expressions in
-  /// the closure.
-  FunctionBuilderClosurePreCheck
-  preCheckFunctionBuilderClosureBody(ClosureExpr *closure);
 
   /// \name Name lookup
   ///
