@@ -1778,7 +1778,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   auto sig = vd->getInnermostDeclContext()->getGenericSignatureOfContext();
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(vd)) {
     auto *param = getParameterAt(afd, c.defaultArgIndex);
-    if (param->getDefaultValue()) {
+    if (param->hasDefaultExpr()) {
       auto captureInfo = param->getDefaultArgumentCaptureInfo();
       sig = getEffectiveGenericSignature(afd, captureInfo);
     }
@@ -2285,7 +2285,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     // captures for default arguments that are actually referenced.
     if (auto *AFD = curFn.getAbstractFunctionDecl()) {
       for (auto *P : *AFD->getParameters()) {
-        if (P->getDefaultValue())
+        if (P->hasDefaultExpr())
           collectCaptures(P->getDefaultArgumentCaptureInfo(), dc);
       }
     }
@@ -2298,7 +2298,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(afd, curFn.defaultArgIndex);
-        if (param->getDefaultValue()) {
+        if (param->hasDefaultExpr()) {
           auto dc = afd->getInnermostDeclContext();
           collectCaptures(param->getDefaultArgumentCaptureInfo(), dc);
         }

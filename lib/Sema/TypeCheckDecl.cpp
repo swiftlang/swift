@@ -1972,8 +1972,7 @@ getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
 }
 
 static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
-  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
-    return;
+  assert(PD->getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
 
   auto *DC = PD->getInnermostDeclContext();
   const SourceFile *SF = DC->getParentSourceFile();
@@ -2009,30 +2008,43 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
 
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(ParameterList *params) {
-  for (auto *param : *params) {
+  // Force the default values in case they produce diagnostics.
+  for (auto *param : *params)
+    (void)param->getTypeCheckedDefaultExpr();
+}
+
+llvm::Expected<Expr *>
+DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
+                                     ParamDecl *param) const {
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
+    // Inherited default arguments don't have expressions, but we need to
+    // perform a couple of semantic checks to make sure they're valid.
     checkInheritedDefaultValueRestrictions(param);
-    if (!param->getDefaultValue() ||
-        !param->hasInterfaceType() ||
-        param->getInterfaceType()->hasError())
-      continue;
-
-    Expr *e = param->getDefaultValue();
-    auto *initContext = param->getDefaultArgumentInitContext();
-
-    auto resultTy =
-        TypeChecker::typeCheckParameterDefault(e, initContext, param->getType(),
-                                               param->isAutoClosure());
-
-    if (resultTy) {
-      param->setDefaultValue(e);
-    }
-
-    TypeChecker::checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)TypeChecker::contextualizeInitializer(initContext, e);
+    return nullptr;
   }
+
+  auto &ctx = param->getASTContext();
+  auto paramTy = param->getType();
+  auto *initExpr = param->getStructuralDefaultExpr();
+  assert(initExpr);
+
+  if (paramTy->hasError())
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+
+  auto *dc = param->getDefaultArgumentInitContext();
+  assert(dc);
+
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+  }
+
+  TypeChecker::checkInitializerErrorHandling(dc, initExpr);
+
+  // Walk the checked initializer and contextualize any closures
+  // we saw there.
+  (void)TypeChecker::contextualizeInitializer(dc, initExpr);
+  return initExpr;
 }
 
 llvm::Expected<Initializer *>
@@ -2050,7 +2062,7 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     auto *otherParam = paramList->get(idx);
 
     // If this param doesn't need a context, we're done.
-    if (!otherParam->getDefaultValue() && !otherParam->getStoredProperty())
+    if (!otherParam->hasDefaultExpr() && !otherParam->getStoredProperty())
       continue;
 
     // If this param already has a context, continue using it.
@@ -4121,7 +4133,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {
     auto &ctx = param->getASTContext();
-    ctx.Diags.diagnose(param->getDefaultValue()->getLoc(),
+    ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
                        swift::diag::cannot_provide_default_value_inout,
                        param->getName());
     return ParamSpecifier::Default;

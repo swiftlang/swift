@@ -5176,6 +5176,7 @@ enum class ParamSpecifier : uint8_t {
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   friend class DefaultArgumentInitContextRequest;
+  friend class DefaultArgumentExprRequest;
 
   llvm::PointerIntPair<Identifier, 1, bool> ArgumentNameAndDestructured;
   SourceLoc ParameterNameLoc;
@@ -5186,7 +5187,11 @@ class ParamDecl : public VarDecl {
 
   struct StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
-    Initializer *InitContext = nullptr;
+
+    /// Stores the context for the default argument as well as a bit to
+    /// indicate whether the default expression has been type-checked.
+    llvm::PointerIntPair<Initializer *, 1, bool> InitContextAndIsTypeChecked;
+
     StringRef StringRepresentation;
     CaptureInfo Captures;
   };
@@ -5251,8 +5256,27 @@ public:
   void setDefaultArgumentKind(DefaultArgumentKind K) {
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
   }
-  
-  Expr *getDefaultValue() const {
+
+  /// Whether this parameter has a default argument expression available.
+  ///
+  /// Note that this will return false for deserialized declarations, which only
+  /// have a textual representation of their default expression.
+  bool hasDefaultExpr() const;
+
+  /// Retrieve the fully type-checked default argument expression for this
+  /// parameter, or \c nullptr if there is no default expression.
+  ///
+  /// Note that while this will produce a type-checked expression for
+  /// caller-side default arguments such as \c #function, this is done purely to
+  /// check whether the code is valid. Such default arguments get re-created
+  /// at the call site in order to have the correct context information.
+  Expr *getTypeCheckedDefaultExpr() const;
+
+  /// Retrieve the potentially un-type-checked default argument expression for
+  /// this parameter, which can be queried for information such as its source
+  /// range and textual representation. Returns \c nullptr if there is no
+  /// default expression.
+  Expr *getStructuralDefaultExpr() const {
     if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->DefaultArg.dyn_cast<Expr *>();
     return nullptr;
@@ -5264,7 +5288,13 @@ public:
     return nullptr;
   }
 
-  void setDefaultValue(Expr *E);
+  /// Sets a new default argument expression for this parameter. This should
+  /// only be called internally by ParamDecl and AST walkers.
+  ///
+  /// \param E The new default argument.
+  /// \param isTypeChecked Whether this argument should be used as the
+  /// parameter's fully type-checked default argument.
+  void setDefaultExpr(Expr *E, bool isTypeChecked);
 
   void setStoredProperty(VarDecl *var);
 

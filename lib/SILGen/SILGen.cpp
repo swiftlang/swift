@@ -1060,7 +1060,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal: {
-    auto arg = param->getDefaultValue();
+    auto arg = param->getTypeCheckedDefaultExpr();
     emitOrDelayFunction(*this, constant,
         [this,constant,arg,initDC](SILFunction *f) {
       preEmitFunction(constant, arg, f, arg);

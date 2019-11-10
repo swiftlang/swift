@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -1198,4 +1199,25 @@ DefaultArgumentInitContextRequest::getCachedResult() const {
 void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultArgumentInitContext(init);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  auto *defaultInfo = param->DefaultValueAndFlags.getPointer();
+  if (!defaultInfo)
+    return None;
+
+  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
+    return None;
+
+  return defaultInfo->DefaultArg.get<Expr *>();
+}
+
+void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultExpr(expr, /*isTypeChecked*/ true);
 }

@@ -2562,7 +2562,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::EnumElement:
-      if (ArgName.empty() && BodyName.empty() && !param->getDefaultValue()) {
+      if (ArgName.empty() && BodyName.empty() && !param->hasDefaultExpr()) {
         // Don't print anything, in the style of a tuple element.
         return;
       }

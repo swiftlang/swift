@@ -612,7 +612,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   // Compute captures for default argument expressions.
   if (auto *AFD = AFR.getAbstractFunctionDecl()) {
     for (auto *P : *AFD->getParameters()) {
-      if (auto E = P->getDefaultValue()) {
+      if (auto E = P->getTypeCheckedDefaultExpr()) {
         FindCapturedVars finder(Context,
                                 E->getLoc(),
                                 AFD,

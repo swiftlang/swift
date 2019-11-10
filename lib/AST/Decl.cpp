@@ -5999,7 +5999,7 @@ SourceRange ParamDecl::getSourceRange() const {
   // It would be nice to extend the front of the range to show where inout is,
   // but we don't have that location info.  Extend the back of the range to the
   // location of the default argument, or the typeloc if they are valid.
-  if (auto expr = getDefaultValue()) {
+  if (auto expr = getStructuralDefaultExpr()) {
     auto endLoc = expr->getEndLoc();
     if (endLoc.isValid())
       return SourceRange(startLoc, endLoc);
@@ -6048,14 +6048,14 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
 
 Initializer *ParamDecl::getDefaultArgumentInitContextCached() const {
   if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
-      return defaultInfo->InitContext;
+      return defaultInfo->InitContextAndIsTypeChecked.getPointer();
 
   return nullptr;
 }
 
 Initializer *ParamDecl::getDefaultArgumentInitContext() const {
   // If this param doesn't need a context, don't bother kicking off a request.
-  if (!getDefaultValue() && !getStoredProperty())
+  if (!hasDefaultExpr() && !getStoredProperty())
     return nullptr;
 
   auto &ctx = getASTContext();
@@ -6064,7 +6064,44 @@ Initializer *ParamDecl::getDefaultArgumentInitContext() const {
       ctx.evaluator, DefaultArgumentInitContextRequest{mutableThis}, nullptr);
 }
 
-void ParamDecl::setDefaultValue(Expr *E) {
+bool ParamDecl::hasDefaultExpr() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+    return false;
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::File:
+  case DefaultArgumentKind::Line:
+  case DefaultArgumentKind::Column:
+  case DefaultArgumentKind::Function:
+  case DefaultArgumentKind::DSOHandle:
+  case DefaultArgumentKind::NilLiteral:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    // Check if we have a structural default expr. This ensures we return false
+    // for deserialized decls.
+    return getStructuralDefaultExpr();
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
+  // Don't kick off a request if we know there's no default expr. The only
+  // exception is for inherited default args which we need to perform a couple
+  // of semantic checks for.
+  if (!hasDefaultExpr() &&
+      getDefaultArgumentKind() != DefaultArgumentKind::Inherited) {
+    return nullptr;
+  }
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)},
+      new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx)));
+}
+
+void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
   if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
 
@@ -6072,7 +6109,16 @@ void ParamDecl::setDefaultValue(Expr *E) {
         getASTContext().Allocate<StoredDefaultArgument>());
   }
 
-  DefaultValueAndFlags.getPointer()->DefaultArg = E;
+  auto *defaultInfo = DefaultValueAndFlags.getPointer();
+  assert(defaultInfo->DefaultArg.isNull() ||
+         defaultInfo->DefaultArg.is<Expr *>());
+
+  if (!isTypeChecked) {
+    assert(!defaultInfo->InitContextAndIsTypeChecked.getInt() &&
+           "Can't overwrite type-checked default with un-type-checked default");
+  }
+  defaultInfo->DefaultArg = E;
+  defaultInfo->InitContextAndIsTypeChecked.setInt(isTypeChecked);
 }
 
 void ParamDecl::setStoredProperty(VarDecl *var) {
@@ -6083,7 +6129,10 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
       getASTContext().Allocate<StoredDefaultArgument>());
   }
 
-  DefaultValueAndFlags.getPointer()->DefaultArg = var;
+  auto *defaultInfo = DefaultValueAndFlags.getPointer();
+  assert(defaultInfo->DefaultArg.isNull() ||
+         defaultInfo->DefaultArg.is<VarDecl *>());
+  defaultInfo->DefaultArg = var;
 }
 
 Type ValueDecl::getFunctionBuilderType() const {
@@ -6117,7 +6166,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 
   auto *defaultInfo = DefaultValueAndFlags.getPointer();
   assert(defaultInfo);
-  defaultInfo->InitContext = initContext;
+  defaultInfo->InitContextAndIsTypeChecked.setPointer(initContext);
 }
 
 void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {
@@ -6265,10 +6314,10 @@ ParamDecl::getDefaultValueStringRepresentation(
     if (!existing.empty())
       return existing;
 
-    assert(getDefaultValue()
+    assert(hasDefaultExpr()
            && "Normal default argument with no default expression?!");
-    return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
-                                scratch);
+    return extractInlinableText(getASTContext().SourceMgr,
+                                getStructuralDefaultExpr(), scratch);
   }
   case DefaultArgumentKind::StoredProperty: {
     assert(DefaultValueAndFlags.getPointer() &&
@@ -6368,7 +6417,7 @@ void DefaultArgumentInitializer::changeFunction(
   }
 
   auto param = paramList->get(getIndex());
-  if (param->getDefaultValue() || param->getStoredProperty())
+  if (param->hasDefaultExpr() || param->getStoredProperty())
     param->setDefaultArgumentInitContext(this);
 }
 

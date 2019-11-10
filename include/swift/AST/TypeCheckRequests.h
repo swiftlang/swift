@@ -1865,6 +1865,27 @@ public:
   void cacheResult(Initializer *init) const;
 };
 
+/// Computes the fully type-checked default argument expression for a given
+/// parameter.
+class DefaultArgumentExprRequest
+    : public SimpleRequest<DefaultArgumentExprRequest, Expr *(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Expr *> evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

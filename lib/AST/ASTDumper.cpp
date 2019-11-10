@@ -996,14 +996,14 @@ namespace {
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
       }
 
-      if (P->getDefaultValue() &&
-        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+      if (P->hasDefaultExpr() &&
+          !P->getDefaultArgumentCaptureInfo().isTrivial()) {
         OS << " ";
         P->getDefaultArgumentCaptureInfo().print(
           PrintWithColorRAII(OS, CapturesColor).getOS());
       }
 
-      if (auto init = P->getDefaultValue()) {
+      if (auto init = P->getStructuralDefaultExpr()) {
         OS << " expression=\n";
         printRec(init);
       }
