@@ -543,7 +543,6 @@ public:
 
 private:
   ASTContext &Context;
-  DiagnosticEngine &Diags;
 
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;

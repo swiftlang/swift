@@ -62,7 +62,7 @@ TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
 }
 
 TypeChecker::TypeChecker(ASTContext &Ctx)
-  : Context(Ctx), Diags(Ctx.Diags) {}
+  : Context(Ctx) {}
 
 TypeChecker::~TypeChecker() {}
 
