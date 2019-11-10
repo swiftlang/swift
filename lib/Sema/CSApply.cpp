@@ -5399,16 +5399,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
       // Otherwise, create a call of the default argument generator.
       } else {
-        const ParamDecl *defaultParam = getParameterAt(callee.getDecl(),
-                                                       newArgs.size());
-        defArg = defaultParam->getDefaultValue();
-
-        if (defArg == nullptr) {
-          defArg =
-              new (tc.Context) DefaultArgumentExpr(callee, paramIdx,
-                                                   arg->getStartLoc(),
-                                                   param.getParameterType());
-        }
+        defArg =
+            new (tc.Context) DefaultArgumentExpr(callee, paramIdx,
+                                                 arg->getStartLoc(),
+                                                 param.getParameterType());
       }
 
       cs.cacheType(defArg);
