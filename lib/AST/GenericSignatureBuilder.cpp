@@ -48,6 +48,8 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
+#include <iostream>
+
 using namespace swift;
 using llvm::DenseMap;
 
@@ -3625,6 +3627,8 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind,
                                     bool wantExactPotentialArchetype) {
+  type->dump();
+  
   // An error type is best modeled as an unresolved potential archetype, since
   // there's no way to be sure what it is actually meant to be.
   if (type->is<ErrorType>()) {
@@ -3633,12 +3637,16 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
 
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    std::cout << "0" << std::endl;
     unsigned index = GenericParamKey(genericParam).findIndexIn(
                                                             getGenericParams());
+    std::cout << "1" << std::endl;
     if (index < Impl->GenericParams.size()) {
+      std::cout << "2" << std::endl;
       return ResolvedType(Impl->PotentialArchetypes[index]);
     }
 
+    std::cout << "3" << std::endl;
     return ResolvedType::forUnresolved(nullptr);
   }
 
@@ -3646,6 +3654,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
   // base equivalence class, if there is one.
   if (auto depMemTy = type->getAs<DependentMemberType>()) {
     // Find the equivalence class of the base.
+    std::cout << "4" << std::endl;
     auto resolvedBase =
       maybeResolveEquivalenceClass(depMemTy->getBase(),
                                    resolutionKind,
@@ -4850,6 +4859,16 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
     FloatingRequirementSource source,
     UnresolvedHandlingKind unresolvedHandling,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
+  
+  if (paOrT1.is<Type>())
+    paOrT1.get<Type>()->dump();
+  if (paOrT1.is<PotentialArchetype*>())
+    paOrT1.get<PotentialArchetype*>()->dump();
+  
+  if (paOrT2.is<Type>())
+    paOrT2.get<Type>()->dump();
+  if (paOrT2.is<PotentialArchetype*>())
+    paOrT2.get<PotentialArchetype*>()->dump();
 
   auto resolved1 = resolve(paOrT1, source);
   if (!resolved1) {

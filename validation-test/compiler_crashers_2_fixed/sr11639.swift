@@ -1,4 +1,4 @@
-// RUN: not %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol ProtocolA {
     associatedtype T1

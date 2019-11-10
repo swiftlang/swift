@@ -47,6 +47,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include <iostream>
 
 using namespace swift;
 
@@ -565,7 +566,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AssociatedTypeDecl>(typeDecl)) {
+        if (isa<AssociatedTypeDecl>(typeDecl) ||
+            typeDecl->getAsGenericContext()) {
           // FIXME: We should use this lookup method for the Interface
           // stage too, but right now that causes problems with
           // Sequence.SubSequence vs Collection.SubSequence; the former
@@ -574,10 +576,16 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
           // because we use the Sequence.SubSequence default instead of
           // the Collection.SubSequence default, even when the conforming
           // type wants to conform to Collection.
+//          selfType->dump();
+//          typeDecl->dump();
+//          std::cout << typeDecl->getName().get() << std::endl;
+          
           if (resolution.getStage() == TypeResolutionStage::Structural) {
             return resolution.resolveSelfAssociatedType(selfType, foundDC,
                                                         typeDecl->getName());
-          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+          }
+          
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
             typeDecl = assocType->getAssociatedTypeAnchor();
           }
         }
