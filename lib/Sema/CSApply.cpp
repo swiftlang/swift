@@ -4787,7 +4787,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   // Convert the literal to the appropriate type.
   auto defArgType =
       param->getInterfaceType().subst(owner.getSubstitutions());
-  auto resultTy = cs.getTypeChecker().typeCheckParameterDefault(
+  auto resultTy = TypeChecker::typeCheckParameterDefault(
       init, dc, defArgType,
       /*isAutoClosure=*/param->isAutoClosure(),
       /*canFail=*/false);

@@ -2026,7 +2026,7 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc, ParameterList *params) {
+static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     checkInheritedDefaultValueRestrictions(param);
     if (!param->getDefaultValue() ||
@@ -2038,8 +2038,8 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params) {
     auto *initContext = param->getDefaultArgumentInitContext();
 
     auto resultTy =
-        typeCheckParameterDefault(e, initContext, param->getType(),
-                                    /*isAutoClosure=*/param->isAutoClosure());
+        TypeChecker::typeCheckParameterDefault(e, initContext, param->getType(),
+                                               param->isAutoClosure());
 
     if (resultTy) {
       param->setDefaultValue(e);
@@ -2658,9 +2658,7 @@ public:
 
     TypeChecker::checkParameterAttributes(SD->getIndices());
 
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-    checkDefaultArguments(TC, SD->getIndices());
+    checkDefaultArguments(SD->getIndices());
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -3282,7 +3280,7 @@ public:
     if (FD->getDeclContext()->getSelfClassDecl())
       checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
-    checkDefaultArguments(TC, FD->getParameters());
+    checkDefaultArguments(FD->getParameters());
 
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
@@ -3342,9 +3340,7 @@ public:
     if (auto *PL = EED->getParameterList()) {
       TypeChecker::checkParameterAttributes(PL);
 
-      // FIXME: Remove TypeChecker dependency.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-      checkDefaultArguments(TC, PL);
+      checkDefaultArguments(PL);
     }
 
     auto &DE = getASTContext().Diags;
@@ -3608,7 +3604,7 @@ public:
       TC.definedFunctions.push_back(CD);
     }
 
-    checkDefaultArguments(TC, CD->getParameters());
+    checkDefaultArguments(CD->getParameters());
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
