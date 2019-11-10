@@ -582,7 +582,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   // that CSGen might have.
   //
   // TODO: just build the AST the way we want it in the first place.
-  if (getTypeChecker().preCheckExpression(singleExpr, closure))
+  if (ConstraintSystem::preCheckExpression(singleExpr, closure))
     return getTypeMatchFailure(locator);
 
   singleExpr = generateConstraints(singleExpr, closure);
@@ -617,13 +617,12 @@ namespace {
 
 /// Pre-check all the expressions in the closure body.
 class PreCheckFunctionBuilderClosure : public ASTWalker {
-  TypeChecker &TC;
   ClosureExpr *Closure;
   bool HasReturnStmt = false;
   bool HasError = false;
 public:
-  PreCheckFunctionBuilderClosure(TypeChecker &tc, ClosureExpr *closure)
-    : TC(tc), Closure(closure) {}
+  PreCheckFunctionBuilderClosure(ClosureExpr *closure)
+    : Closure(closure) {}
 
   FunctionBuilderClosurePreCheck run() {
     Stmt *oldBody = Closure->getBody();
@@ -649,7 +648,7 @@ public:
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (TC.preCheckExpression(E, /*DC*/ Closure)) {
+    if (ConstraintSystem::preCheckExpression(E, /*DC*/ Closure)) {
       HasError = true;
       return std::make_pair(false, nullptr);
     }
@@ -682,7 +681,7 @@ TypeChecker::preCheckFunctionBuilderClosureBody(ClosureExpr *closure) {
   if (it != precheckedFunctionBuilderClosures.end())
     return it->second;
 
-  auto result = PreCheckFunctionBuilderClosure(*this, closure).run();
+  auto result = PreCheckFunctionBuilderClosure(closure).run();
 
   // Cache the result.
   precheckedFunctionBuilderClosures.insert(std::make_pair(closure, result));

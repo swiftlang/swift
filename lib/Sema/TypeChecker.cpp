@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -623,12 +624,11 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
-                        TypeChecker &TC,
                         DeclContext *DC,
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
-  if (TC.preCheckExpression(parsedExpr, DC))
+  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
     return None;
 
   switch (kind) {
@@ -672,10 +672,10 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
+  (void)createTypeChecker(Ctx);
 
   // Try to solve for the actual type of the expression.
-  return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
+  return ::getTypeOfCompletionContextExpr(DC, kind, parsedExpr,
                                           referencedDecl);
 }
 

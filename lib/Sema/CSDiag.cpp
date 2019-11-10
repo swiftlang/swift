@@ -4068,7 +4068,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       if (hasUnresolvedParams)
         continue;
 
-      CS.getTypeChecker().preCheckExpression(resultExpr, CS.DC);
+      ConstraintSystem::preCheckExpression(resultExpr, CS.DC);
 
       // Obtain type of the result expression without applying solutions,
       // because otherwise this might result in leaking of type variables,

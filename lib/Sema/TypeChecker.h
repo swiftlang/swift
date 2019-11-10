@@ -1075,10 +1075,6 @@ public:
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-  /// Pre-check the expression, validating any types that occur in the
-  /// expression and folding sequence expressions.
-  bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
   /// Pre-check the body of the given closure, which we are about to
   /// generate constraints for.
   ///
