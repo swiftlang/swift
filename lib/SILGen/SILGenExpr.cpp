@@ -3723,7 +3723,6 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       llvm_unreachable("not resolved");
     }
   }
-
   StringRef objcString;
   if (auto objcExpr = dyn_cast_or_null<StringLiteralExpr>
                                                 (E->getObjCStringLiteralExpr()))
