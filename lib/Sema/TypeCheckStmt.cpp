@@ -832,7 +832,7 @@ public:
             ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
 
       // Necessary type coersion for method application.
-      if (TC.convertToType(sequence, newSequenceType, DC, None)) {
+      if (TypeChecker::convertToType(sequence, newSequenceType, DC, None)) {
         return nullptr;
       }
       S->setSequence(sequence);

@@ -3531,7 +3531,7 @@ namespace {
 
         solution.setExprTypes(sub);
 
-        if (cs.getTypeChecker().convertToType(sub, toType, cs.DC))
+        if (TypeChecker::convertToType(sub, toType, cs.DC))
           return nullptr;
           
         cs.cacheExprTypes(sub);

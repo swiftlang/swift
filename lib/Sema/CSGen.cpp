@@ -3626,7 +3626,7 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
+          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
         }
       }
 

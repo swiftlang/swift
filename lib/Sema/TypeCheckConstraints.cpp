@@ -3451,7 +3451,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
                    cs.getConstraintLocator(expr));
 
-  if (getLangOpts().DebugConstraintSolver) {
+  auto &Context = dc->getASTContext();
+  if (Context.LangOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -3467,7 +3468,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   }
 
   auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.LangOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
@@ -3485,7 +3486,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   solution.setExprTypes(expr);
 
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.LangOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);

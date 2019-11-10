@@ -1199,8 +1199,8 @@ public:
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                      bool requireResultType = false);
+  static Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
+                                             bool requireResultType = false);
 
   /// Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
@@ -1397,8 +1397,8 @@ public:
   ///   from where the toType is derived, so that we can deliver better fixit.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool convertToType(Expr *&expr, Type type, DeclContext *dc,
-                     Optional<Pattern*> typeFromPattern = None);
+  static bool convertToType(Expr *&expr, Type type, DeclContext *dc,
+                            Optional<Pattern*> typeFromPattern = None);
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.

@@ -639,7 +639,8 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   case CompletionTypeCheckKind::KeyPath:
     referencedDecl = nullptr;
     if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
-      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResultType=*/true);
+      return TypeChecker::checkObjCKeyPathExpr(DC, keyPath,
+                                               /*requireResultType=*/true);
 
     return None;
   }
