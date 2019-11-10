@@ -588,9 +588,9 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_f4 = float.init(pi_f)
 
-  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{8-8=: Empty}}
   var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
-  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{9-9=: Empty}}
 }
 
 struct Rule {
