@@ -25,7 +25,6 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-  class AbstractFunctionDecl;
 
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
@@ -35,22 +34,6 @@ public:
     SourceLoc PrevLoc;
 
     bool isValid() const { return Loc.isValid(); }
-  };
-
-  class FunctionBodyState {
-    ParserPos BodyPos;
-    SavedScope Scope;
-    friend class Parser;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    FunctionBodyState(SourceRange BodyRange, SourceLoc PreviousLoc,
-                      SavedScope &&Scope)
-      : BodyPos{BodyRange.Start, PreviousLoc}, Scope(std::move(Scope))
-    {}
   };
 
   enum class DelayedDeclKind {
@@ -89,10 +72,6 @@ public:
   bool PerformConditionEvaluation = true;
 private:
   ScopeInfo ScopeInfo;
-  using DelayedFunctionBodiesTy =
-      llvm::DenseMap<AbstractFunctionDecl *,
-                     std::unique_ptr<FunctionBodyState>>;
-  DelayedFunctionBodiesTy DelayedFunctionBodies;
 
   /// Parser sets this if it stopped parsing before the buffer ended.
   ParserPosition MarkedPos;
