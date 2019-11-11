@@ -1338,7 +1338,7 @@ public:
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          TC.typeCheckCondition(guard, DC);
+          TypeChecker::typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
@@ -1366,7 +1366,7 @@ public:
                                   &prevCaseDecls, &nextCaseDecls);
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          TC.typeCheckCondition(guard, DC);
+          TypeChecker::typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
