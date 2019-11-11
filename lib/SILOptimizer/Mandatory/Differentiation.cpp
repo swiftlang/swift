@@ -1413,11 +1413,6 @@ private:
   /// (output) index.
   SmallVector<SmallDenseSet<SILValue>, 4> usefulValueSets;
 
-  /// The set of instructions that have propagated variedness, indexed by the
-  /// corresponding independent value (input) index.
-  SmallVector<SmallDenseSet<SILInstruction *>, 4>
-      propagatedVariedInstructionSets;
-
   /// The original function.
   SILFunction &getFunction();
 
@@ -1441,15 +1436,11 @@ private:
   /// Marks the given value as varied and propagates variedness to users.
   void setVariedAndPropagateToUsers(SILValue value,
                                     unsigned independentVariableIndex);
-  /// Marks the given instruction as having propagated variedness for the given
-  /// independent variable index.
-  void setDidPropagateVaried(SILInstruction *inst,
-                             unsigned independentVariableIndex);
-  /// Propagates variedness for the given instruction, from operands to results.
-  void propagateVaried(SILInstruction *inst, unsigned independentVariableIndex);
+  /// Propagates variedness for the given operand to its user's result.
+  void propagateVaried(Operand *operand, unsigned independentVariableIndex);
   /// Marks the given value as varied and recursively propagates variedness
   /// inwards (to operands) through projections. Skips `@noDerivative` struct
-  /// field projections and non-differentiable address projections.
+  /// field projections.
   void propagateVariedInwardsThroughProjections(
       SILValue value, unsigned independentVariableIndex);
 
@@ -1465,8 +1456,6 @@ public:
       GenericSignature derivativeGenericSignature);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
-  bool didPropagateVaried(
-      SILInstruction *inst, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
@@ -1891,51 +1880,41 @@ SILFunction &DifferentiableActivityInfo::getFunction() {
 
 void DifferentiableActivityInfo::setVariedAndPropagateToUsers(
     SILValue value, unsigned independentVariableIndex) {
+  // Skip already-varied values to prevent infinite recursion.
+  if (isVaried(value, independentVariableIndex))
+    return;
   setVaried(value, independentVariableIndex);
   for (auto *use : value->getUses())
-    propagateVaried(use->getUser(), independentVariableIndex);
+    propagateVaried(use, independentVariableIndex);
 }
 
 void DifferentiableActivityInfo::propagateVaried(
-    SILInstruction *inst, unsigned independentVariableIndex) {
-  // If instruction already propagated variedness, return.
-  if (didPropagateVaried(inst, independentVariableIndex))
-    return;
-  // Propagate variedness for the instruction.
-  //
-  // General rule: if operands are varied, mark results as varied and
-  // recursively propagate variedness to users of results.
-  //
-  // Note: call `setDidPropagateVaried(inst, i)` after propagating variedness if
-  // possible to prevent revisiting instructions that have already propagated
-  // variedness.
+    Operand *operand, unsigned independentVariableIndex) {
+  auto *inst = operand->getUser();
+  // Propagate variedness for the given operand.
+  // General rule: mark results as varied and recursively propagate variedness
+  // to users of results.
   auto i = independentVariableIndex;
   // Handle `apply`.
   if (auto *ai = dyn_cast<ApplyInst>(inst)) {
     // If callee is non-varying, skip.
     if (isWithoutDerivative(ai->getCallee()))
       return;
-    // If any argument is varied, set all direct and indirect results as
-    // varied.
-    for (auto arg : ai->getArgumentsWithoutIndirectResults()) {
-      if (isVaried(arg, i)) {
-        setDidPropagateVaried(ai, i);
-        for (auto indRes : ai->getIndirectSILResults())
-          setVariedAndPropagateToUsers(indRes, i);
-        forEachApplyDirectResult(ai, [&](SILValue directResult) {
-          setVariedAndPropagateToUsers(directResult, i);
-        });
-      }
+    // If operand is varied, set all direct and indirect results as varied.
+    if (isVaried(operand->get(), i)) {
+      for (auto indRes : ai->getIndirectSILResults())
+        propagateVariedInwardsThroughProjections(indRes, i);
+      forEachApplyDirectResult(ai, [&](SILValue directResult) {
+        setVariedAndPropagateToUsers(directResult, i);
+      });
     }
   }
   // Handle store-like instructions:
   //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
 #define PROPAGATE_VARIED_THROUGH_STORE(INST) \
   else if (auto *si = dyn_cast<INST##Inst>(inst)) { \
-    if (isVaried(si->getSrc(), i)) {\
-      setDidPropagateVaried(si, i);\
+    if (isVaried(si->getSrc(), i)) \
       propagateVariedInwardsThroughProjections(si->getDest(), i); \
-    }\
   }
   PROPAGATE_VARIED_THROUGH_STORE(Store)
   PROPAGATE_VARIED_THROUGH_STORE(StoreBorrow)
@@ -1945,7 +1924,8 @@ void DifferentiableActivityInfo::propagateVaried(
   // Handle `tuple_element_addr`.
   else if (auto *teai = dyn_cast<TupleElementAddrInst>(inst)) {
     if (isVaried(teai->getOperand(), i)) {
-      setDidPropagateVaried(teai, i);
+      // Propagate variedness only if the `tuple_element_addr` result has a
+      // tangent space. Otherwise, the result does not need a derivative.
       auto projType = teai->getType().getASTType();
       if (derivativeGenericSignature && projType->hasArchetype())
         projType = derivativeGenericSignature->getCanonicalTypeInContext(
@@ -1957,7 +1937,7 @@ void DifferentiableActivityInfo::propagateVaried(
   }
   // Handle `struct_extract` and `struct_element_addr` instructions.
   // - If the field is marked `@noDerivative`, do not set the result as
-  // varied because it is not in the set of differentiable variables.
+  //   varied because it does not need a derivative.
   // - Otherwise, propagate variedness from operand to result as usual.
 #define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
   else if (auto *sei = dyn_cast<INST##Inst>(inst)) { \
@@ -1970,46 +1950,28 @@ void DifferentiableActivityInfo::propagateVaried(
 #undef PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION
   // Handle `br`.
   else if (auto *bi = dyn_cast<BranchInst>(inst)) {
-    // Note: cannot call `setDidPropagateVaried` for `BranchInst` because
-    // variedness is propagated per operand. This has not yet shown issues in
-    // practice.
-    for (auto &op : bi->getAllOperands())
-      if (isVaried(op.get(), i))
-        setVariedAndPropagateToUsers(bi->getArgForOperand(&op), i);
+    if (isVaried(operand->get(), i))
+      setVariedAndPropagateToUsers(bi->getArgForOperand(operand), i);
   }
   // Handle `cond_br`.
   else if (auto *cbi = dyn_cast<CondBranchInst>(inst)) {
-    // Note: cannot call `setDidPropagateVaried` for `CondBranchInst` because
-    // variedness is propagated per operand. This has not yet shown issues in
-    // practice.
-    for (unsigned opIdx : indices(cbi->getTrueOperands())) {
-      auto &op = cbi->getTrueOperands()[opIdx];
-      if (isVaried(op.get(), i))
-        setVariedAndPropagateToUsers(cbi->getTrueBB()->getArgument(opIdx), i);
-    }
-    for (unsigned opIdx : indices(cbi->getFalseOperands())) {
-      auto &op = cbi->getFalseOperands()[opIdx];
-      if (isVaried(op.get(), i))
-        setVariedAndPropagateToUsers(cbi->getFalseBB()->getArgument(opIdx), i);
-    }
+    if (isVaried(operand->get(), i))
+      if (auto *destBBArg = cbi->getArgForOperand(operand))
+        setVariedAndPropagateToUsers(destBBArg, i);
   }
   // Handle `switch_enum`.
   else if (auto *sei = dyn_cast<SwitchEnumInst>(inst)) {
-    if (isVaried(sei->getOperand(), i)) {
-      setDidPropagateVaried(sei, i);
+    if (isVaried(sei->getOperand(), i))
       for (auto *succBB : sei->getSuccessorBlocks())
         for (auto *arg : succBB->getArguments())
           setVariedAndPropagateToUsers(arg, i);
-    }
   }
   // Handle everything else.
   else {
     for (auto &op : inst->getAllOperands()) {
-      if (isVaried(op.get(), i)) {
-        setDidPropagateVaried(inst, i);
+      if (isVaried(op.get(), i))
         for (auto result : inst->getResults())
           setVariedAndPropagateToUsers(result, i);
-      }
     }
   }
 }
@@ -2038,16 +2000,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       s << val << '\n';
   });
 
-  // Mark inputs as varied.
-  assert(variedValueSets.empty());
-  for (auto input : inputValues) {
-    variedValueSets.push_back({input});
-    propagatedVariedInstructionSets.push_back({});
-  }
   // Propagate variedness starting from the inputs.
+  assert(variedValueSets.empty());
   for (auto inputAndIdx : enumerate(inputValues)) {
     auto input = inputAndIdx.value();
     unsigned i = inputAndIdx.index();
+    variedValueSets.push_back({});
     setVariedAndPropagateToUsers(input, i);
   }
 
@@ -2186,11 +2144,6 @@ void DifferentiableActivityInfo::setVaried(SILValue value,
   setVariedAcrossArrayInitialization(value, independentVariableIndex);
 }
 
-void DifferentiableActivityInfo::setDidPropagateVaried(
-    SILInstruction *inst, unsigned independentVariableIndex) {
-  propagatedVariedInstructionSets[independentVariableIndex].insert(inst);
-}
-
 void DifferentiableActivityInfo::setUseful(SILValue value,
                                            unsigned dependentVariableIndex) {
   usefulValueSets[dependentVariableIndex].insert(value);
@@ -2199,9 +2152,6 @@ void DifferentiableActivityInfo::setUseful(SILValue value,
 
 void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     SILValue value, unsigned independentVariableIndex) {
-  // Check whether value is already varied to prevent infinite recursion.
-  if (isVaried(value, independentVariableIndex))
-    return;
   // Skip `@noDerivative` struct projections.
 #define SKIP_NODERIVATIVE(INST) \
   if (auto *sei = dyn_cast<INST##Inst>(value)) \
@@ -2210,29 +2160,11 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
   SKIP_NODERIVATIVE(StructExtract)
   SKIP_NODERIVATIVE(StructElementAddr)
 #undef SKIP_NODERIVATIVE
-  setVaried(value, independentVariableIndex);
+  // Set value as varied and propagate to users.
+  setVariedAndPropagateToUsers(value, independentVariableIndex);
   auto *inst = value->getDefiningInstruction();
   if (!inst || isa<ApplyInst>(inst))
     return;
-  // Recursively propagate varied through users that are projections or
-  // `begin_access` instructions.
-  for (auto use : value->getUses()) {
-    for (auto res : use->getUser()->getResults()) {
-      if (Projection::isAddressProjection(res)) {
-        // Skip non-differentiable projections and `begin_access` users.
-        // NOTE(TF-947): investigate why this check cannot be moved above the
-        // loop after the `@noDerivative` struct projection check.
-        // NOTE(TF-947): investigate why using
-        // `getAutoDiffAssociatedTangentSpace(getLookupConformanceFunction())`
-        // in this check instead of `isDifferentiable` causes a crash.
-        if (!res->getType().isDifferentiable(*res->getModule()))
-          continue;
-        propagateVariedInwardsThroughProjections(res,
-                                                 independentVariableIndex);
-      }
-    }
-    propagateVaried(use->getUser(), independentVariableIndex);
-  }
   // Standard propagation.
   for (auto &op : inst->getAllOperands())
     propagateVariedInwardsThroughProjections(
@@ -2274,14 +2206,6 @@ bool DifferentiableActivityInfo::isVaried(
          "Independent variable index out of range");
   auto &set = variedValueSets[independentVariableIndex];
   return set.count(value);
-}
-
-bool DifferentiableActivityInfo::didPropagateVaried(
-    SILInstruction *inst, unsigned independentVariableIndex) const {
-  assert(independentVariableIndex < propagatedVariedInstructionSets.size() &&
-         "Independent variable index out of range");
-  auto &set = propagatedVariedInstructionSets[independentVariableIndex];
-  return set.count(inst);
 }
 
 bool DifferentiableActivityInfo::isVaried(
