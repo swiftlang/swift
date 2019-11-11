@@ -567,6 +567,10 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
     return aggregateStructSubElts(SD, LoadTy, Address, FirstElt);
 
   // Otherwise, we have a non-aggregate primitive. Load or extract the value.
+  //
+  // NOTE: We should never call this when taking since when taking we know that
+  // our underlying value is always fully available.
+  assert(!isTake());
   return handlePrimitiveValue(LoadTy, Address, FirstElt);
 }
 
@@ -696,17 +700,18 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
   return B.createStruct(Loc, loadTy, resultElts);
 }
 
-// We have looked through all of the aggregate values and finally found a
-// "primitive value". If the value is available, use it (extracting if we need
-// to), otherwise emit a load of the value with the appropriate qualifier.
+// We have looked through all of the aggregate values and finally found a value
+// that is not available without transforming, i.e. a "primitive value". If the
+// value is available, use it (extracting if we need to), otherwise emit a load
+// of the value with the appropriate qualifier.
 SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
                                                         SILValue address,
                                                         unsigned firstElt) {
-  auto &val = AvailableValueList[firstElt];
+  assert(!isTake() && "Should only take fully available values?!");
 
   // If the value is not available, load the value and update our use list.
+  auto &val = AvailableValueList[firstElt];
   if (!val) {
-    assert(!isTake() && "Should only take fully available values?!");
     LoadInst *load = ([&]() {
       if (B.hasOwnership()) {
         return B.createTrivialLoadOr(Loc, address,
