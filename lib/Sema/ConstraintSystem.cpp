@@ -1708,7 +1708,7 @@ static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
 
   // FIXME(diagnostics): This check should be removed together with
   // expression based diagnostics.
-  if (cs.getTypeChecker().isExprBeingDiagnosed(anchor))
+  if (cs.isExprBeingDiagnosed(anchor))
     return false;
 
   // If this is a reference to instance method marked as 'mutating'
