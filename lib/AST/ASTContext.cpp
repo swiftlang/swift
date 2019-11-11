@@ -1368,12 +1368,6 @@ bool ASTContext::hasArrayLiteralIntrinsics() const {
     && getDeallocateUninitializedArray();
 }
 
-void ASTContext::addSynthesizedDecl(Decl *decl) {
-  auto *fileUnit = decl->getDeclContext()->getModuleScopeContext();
-  if (auto *sf = dyn_cast<SourceFile>(fileUnit))
-    sf->SynthesizedDecls.push_back(decl);
-}
-
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
   getImpl().Cleanups.push_back(std::move(cleanup));
 }
