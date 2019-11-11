@@ -35,12 +35,16 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
-void DerivedConformance::addMembersToConformanceContext(
+bool DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  bool anyInvalid = false;
   for (auto child : children) {
     IDC->addMember(child);
+    TypeChecker::typeCheckDecl(child);
+    anyInvalid |= child->isInvalid();
   }
+  return anyInvalid;
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -281,39 +285,28 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 AccessorDecl *DerivedConformance::
 addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
-  auto getter =
-    declareDerivedPropertyGetter(property, propertyContextType);
-
-  property->setImplInfo(StorageImplInfo::getImmutableComputed());
-  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
-
-  return getter;
-}
-
-AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
-                                                 Type propertyContextType) {
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
-  
-  auto getterDecl = AccessorDecl::create(C,
+
+  auto getter = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
     AccessorKind::Get, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
-  getterDecl->setImplicit();
-  getterDecl->setIsTransparent(false);
+  getter->setImplicit();
+  getter->setIsTransparent(false);
 
-  getterDecl->copyFormalAccessFrom(property);
+  getter->copyFormalAccessFrom(property);
 
-  C.addSynthesizedDecl(getterDecl);
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
-  return getterDecl;
+  return getter;
 }
 
 std::pair<VarDecl *, PatternBindingDecl *>

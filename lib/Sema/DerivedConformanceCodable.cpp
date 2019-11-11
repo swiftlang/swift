@@ -741,9 +741,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
-  C.addSynthesizedDecl(encodeDecl);
-
   derived.addMembersToConformanceContext({encodeDecl});
+
   return encodeDecl;
 }
 
@@ -1019,9 +1018,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
 
-  C.addSynthesizedDecl(initDecl);
-
   derived.addMembersToConformanceContext({initDecl});
+
   return initDecl;
 }
 
