@@ -911,7 +911,8 @@ namespace {
   class PreCheckExpression : public ASTWalker {
     ASTContext &Ctx;
     DeclContext *DC;
-
+    ConstraintSystem *BaseCS;
+    
     Expr *ParentExpr;
 
     /// A stack of expressions being walked, used to determine where to
@@ -1053,17 +1054,14 @@ namespace {
     }
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc, Expr *parent, ConstraintSystem *base)
+        : Ctx(dc->getASTContext()), DC(dc), BaseCS(base), ParentExpr(parent) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // FIXME: Remove TypeChecker dependencies below.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
         if (!isa<SelfApplyExpr>(expr)) {
@@ -1160,8 +1158,8 @@ namespace {
         if (expr->isImplicit())
           return finish(true, expr);
 
-        if (TC.isExprBeingDiagnosed(ParentExpr) ||
-            TC.isExprBeingDiagnosed(expr))
+        if (BaseCS && (BaseCS->isExprBeingDiagnosed(ParentExpr) ||
+                       BaseCS->isExprBeingDiagnosed(expr)))
           return finish(true, expr);
 
         auto parents = ParentExpr->getParentMap();
@@ -2013,8 +2011,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(dc, expr);
+bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
+                                          ConstraintSystem *baseCS) {
+  PreCheckExpression preCheck(dc, expr, baseCS);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -2177,7 +2176,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckExpression(expr, dc)) {
+  if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
     listener.preCheckFailed(expr);
     return Type();
   }

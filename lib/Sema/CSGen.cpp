@@ -1147,7 +1147,7 @@ namespace {
       // If this is a standalone `nil` literal expression e.g.
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
-      if (!CS.getTypeChecker().isExprBeingDiagnosed(expr)) {
+      if (!CS.isExprBeingDiagnosed(expr)) {
         auto *parentExpr = CS.getParentExpr(expr);
 
         // `_ = nil`

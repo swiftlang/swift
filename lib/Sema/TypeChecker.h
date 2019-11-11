@@ -544,9 +544,6 @@ public:
 private:
   ASTContext &Context;
 
-  /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
   /// If non-zero, warn when a function body takes longer than this many
   /// milliseconds to type-check.
   ///
@@ -1777,16 +1774,6 @@ public:
   static void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
   static void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                                 Expr *expr);
-
-  void addExprForDiagnosis(Expr *E1, Expr *Result) {
-    DiagnosedExprs[E1] = Result;
-  }
-  bool isExprBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs.count(E);
-  }
-  Expr *getExprBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs[E];
-  }
 
   /// If an expression references 'self.init' or 'super.init' in an
   /// initializer context, returns the implicit 'self' decl of the constructor.
