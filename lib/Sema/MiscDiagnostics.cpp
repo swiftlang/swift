@@ -3417,7 +3417,20 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName();
+        auto typeName = nominal->getName().str();
+        // If we're inside a type Foo (or an extension of it) and the suggestion
+        // is going to be #selector(Foo.bar) (or #selector(SuperclassOfFoo.bar),
+        // then suggest the more natural #selector(self.bar) instead.
+        if (auto containingTypeContext = DC->getInnermostTypeContext()) {
+          auto methodNominalType = nominal->getDeclaredType();
+          auto outerNomType = containingTypeContext->getSelfNominalTypeDecl()
+                                                   ->getDeclaredType();
+          if (methodNominalType->isEqual(outerNomType) ||
+              methodNominalType->isExactSuperclassOf(outerNomType))
+            typeName = "self";
+        }
+
+        out << typeName << "." << name.getBaseName();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument

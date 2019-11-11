@@ -4,6 +4,95 @@ import ObjectiveC
 
 // REQUIRES: objc_interop
 
+@objc class Selectors {
+  func takeSel(_: Selector) {}
+  @objc func mySel() {}
+  func test() {
+    takeSel("mySel")
+    takeSel(Selector("mySel"))
+  }
+}
+
+@objc class OtherClass {
+  func test(s: Selectors) {
+    s.takeSel("mySel")
+    s.takeSel(Selector("mySel"))
+  }
+}
+
+@objc class Base {
+  @objc func baseSel() {}
+}
+
+@objc class Outer {
+  func takeSel(_: Selector) {}
+  @objc func outerSel() {}
+
+  @objc class Inner: Base {
+    func takeSel(_: Selector) {}
+
+    @objc func innerSel() {}
+
+    func test(s: Selectors, o: Outer) {
+      s.takeSel("mySel")
+      s.takeSel(Selector("mySel"))
+
+      takeSel("innerSel")
+      takeSel(Selector("innerSel"))
+
+      takeSel("baseSel")
+      takeSel(Selector("baseSel"))
+
+      o.takeSel("outerSel")
+      o.takeSel(Selector("outerSel"))
+    }
+  }
+
+  func test(s: Selectors, i: Inner) {
+    s.takeSel("mySel")
+    s.takeSel(Selector("mySel"))
+
+    i.takeSel("innerSel")
+    i.takeSel(Selector("innerSel"))
+
+    i.takeSel("baseSel")
+    i.takeSel(Selector("baseSel"))
+
+    takeSel("outerSel")
+    takeSel(Selector("outerSel"))
+  }
+}
+
+extension Outer {
+  func test2(s: Selectors, i: Inner) {
+    s.takeSel("mySel")
+    s.takeSel(Selector("mySel"))
+
+    i.takeSel("innerSel")
+    i.takeSel(Selector("innerSel"))
+
+    i.takeSel("baseSel")
+    i.takeSel(Selector("baseSel"))
+
+    takeSel("outerSel")
+    takeSel(Selector("outerSel"))
+  }
+}
+
+func freeTest(s: Selectors, o: Outer, i: Outer.Inner) {
+  s.takeSel("mySel")
+  s.takeSel(Selector("mySel"))
+
+  i.takeSel("innerSel")
+  i.takeSel(Selector("innerSel"))
+
+  i.takeSel("baseSel")
+  i.takeSel(Selector("baseSel"))
+
+  o.takeSel("outerSel")
+  o.takeSel(Selector("outerSel"))
+}
+
 func foo(an : Any) {
   let a1 : AnyObject
   a1 = an
