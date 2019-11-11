@@ -1845,6 +1845,11 @@ public:
   /// reference equality operators `===` and `!==`.
   bool diagnoseUseOfReferenceEqualityOperator() const;
 
+  /// Tailored diagnostics for type mismatches associated with
+  /// property wrapper initialization via implicit `init(wrappedValue:)`
+  /// or now deprecated `init(initialValue:)`.
+  bool diagnosePropertyWrapperMismatch() const;
+
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
   unsigned getArgPosition() const { return Info->getArgPosition(); }

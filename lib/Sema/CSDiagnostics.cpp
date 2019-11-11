@@ -5303,6 +5303,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseUseOfReferenceEqualityOperator())
     return true;
 
+  if (diagnosePropertyWrapperMismatch())
+    return true;
+
   auto argType = getFromType();
   auto paramType = getToType();
 
@@ -5540,6 +5543,32 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
       cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();
+}
+
+bool ArgumentMismatchFailure::diagnosePropertyWrapperMismatch() const {
+  auto argType = getFromType();
+  auto paramType = getToType();
+
+  // Verify that this is an implicit call to a property wrapper initializer
+  // in a form of `init(wrappedValue:)` or deprecated `init(initialValue:)`.
+  auto *call = dyn_cast<CallExpr>(getRawAnchor());
+  if (!(call && call->isImplicit() && isa<TypeExpr>(call->getFn()) &&
+        call->getNumArguments() == 1 &&
+        (call->getArgumentLabels().front() == getASTContext().Id_wrappedValue ||
+         call->getArgumentLabels().front() == getASTContext().Id_initialValue)))
+    return false;
+
+  auto argExpr = cast<TupleExpr>(call->getArg())->getElement(0);
+  // If this is an attempt to initialize property wrapper with opaque value
+  // of error type, let's just ignore that problem since original mismatch
+  // has been diagnosed already.
+  if (argExpr->isImplicit() && isa<OpaqueValueExpr>(argExpr) &&
+      argType->is<ErrorType>())
+    return true;
+
+  emitDiagnostic(getLoc(), diag::cannot_convert_initializer_value, argType,
+                 paramType);
+  return true;
 }
 
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
