@@ -3078,16 +3078,6 @@ bool ConstraintSystem::repairFailures(
                        locator);
     }
 
-    // Let's not complain about argument type mismatch if we have a synthesized
-    // wrappedValue initializer, because we already emit a diagnostic for a
-    // type mismatch between the property's type and the wrappedValue type.
-    if (auto CE = dyn_cast<CallExpr>(loc->getAnchor())) {
-      if (CE->isImplicit() && !CE->getArgumentLabels().empty() &&
-          CE->getArgumentLabels().front() == getASTContext().Id_wrappedValue) {
-        break;
-      }
-    }
-
     // If either type has a hole, consider this fixed.
     if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
       return true;
