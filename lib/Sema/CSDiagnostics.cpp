@@ -3161,6 +3161,17 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (baseType->is<TupleType>())
       diagnostic = diag::could_not_find_tuple_member;
 
+    bool hasUnresolvedPattern = false;
+    anchor->forEachChildExpr([&](Expr *expr) {
+      hasUnresolvedPattern |= isa<UnresolvedPatternExpr>(expr);
+      return hasUnresolvedPattern ? nullptr : expr;
+    });
+    if (hasUnresolvedPattern && !baseType->getAs<EnumType>()) {
+      emitDiagnostic(anchor->getLoc(),
+          diag::cannot_match_unresolved_expr_pattern_with_value, baseType);
+      return;
+    }
+
     emitDiagnostic(anchor->getLoc(), diagnostic, baseType, getName())
         .highlight(baseExpr->getSourceRange())
         .highlight(nameLoc.getSourceRange());

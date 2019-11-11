@@ -734,10 +734,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
                                 constraint->getLocator()});
   }
 
-  // If we don't have any potential bindings, allow generic
-  // parameters and potential holes to default to `Unresolved`.
+  // If there are no bindings, typeVar may be a hole.
   if (shouldAttemptFixes() && result.Bindings.empty() &&
-      (isPotentialHole(typeVar) || result.isGenericParameter())) {
+      typeVar->getImpl().canBindToHole()) {
     result.IsHole = true;
     result.addPotentialBinding({getASTContext().TheUnresolvedType,
         AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,

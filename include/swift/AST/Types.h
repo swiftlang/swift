@@ -347,12 +347,10 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 4+32,
-    : NumPadBits,
-
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 5+32,
     /// Type variable options.
-    Options : 4,
-
+    Options : 5,
+    : NumPadBits,
     /// The unique number assigned to this type variable.
     ID : 32
   );
