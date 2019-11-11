@@ -232,9 +232,6 @@ namespace swift {
   /// of declarations in the module.
   void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
 
-  /// Incrementally type-check only added external definitions.
-  void typeCheckExternalDefinitions(SourceFile &SF);
-
   /// Recursively validate the specified type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
