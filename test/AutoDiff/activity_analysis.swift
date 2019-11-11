@@ -25,6 +25,38 @@ func testNoDerivativeStructProjection(_ s: HasNoDerivativeProperty) -> Float {
 // CHECK: [ACTIVE]   %13 = struct_element_addr %12 : $*HasNoDerivativeProperty, #HasNoDerivativeProperty.x
 // CHECK: [ACTIVE]   %14 = load [trivial] %13 : $*Float
 
+// Check that non-differentiable `tuple_element_addr` projections are non-varied.
+
+@differentiable(where T : Differentiable)
+func testNondifferentiableTupleElementAddr<T>(_ x: T) -> T {
+  var tuple = (1, 1, (x, 1), 1)
+  tuple.0 = 1
+  tuple.2.0 = x
+  tuple.3 = 1
+  return tuple.2.0
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testNondifferentiableTupleElementAddr{{.*}} at (source=0 parameters=(0))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*T
+// CHECK: [ACTIVE] %1 = argument of bb0 : $*T
+// CHECK: [ACTIVE]   %3 = alloc_stack $(Int, Int, (T, Int), Int), var, name "tuple"
+// CHECK: [USEFUL]   %4 = tuple_element_addr %3 : $*(Int, Int, (T, Int), Int), 0
+// CHECK: [USEFUL]   %5 = tuple_element_addr %3 : $*(Int, Int, (T, Int), Int), 1
+// CHECK: [ACTIVE]   %6 = tuple_element_addr %3 : $*(Int, Int, (T, Int), Int), 2
+// CHECK: [USEFUL]   %7 = tuple_element_addr %3 : $*(Int, Int, (T, Int), Int), 3
+// CHECK: [ACTIVE]   %18 = tuple_element_addr %6 : $*(T, Int), 0
+// CHECK: [USEFUL]   %19 = tuple_element_addr %6 : $*(T, Int), 1
+// CHECK: [ACTIVE]   %35 = begin_access [modify] [static] %3 : $*(Int, Int, (T, Int), Int)
+// CHECK: [USEFUL]   %36 = tuple_element_addr %35 : $*(Int, Int, (T, Int), Int), 0
+// CHECK: [ACTIVE]   %41 = begin_access [modify] [static] %3 : $*(Int, Int, (T, Int), Int)
+// CHECK: [ACTIVE]   %42 = tuple_element_addr %41 : $*(Int, Int, (T, Int), Int), 2
+// CHECK: [ACTIVE]   %43 = tuple_element_addr %42 : $*(T, Int), 0
+// CHECK: [ACTIVE]   %51 = begin_access [modify] [static] %3 : $*(Int, Int, (T, Int), Int)
+// CHECK: [USEFUL]   %52 = tuple_element_addr %51 : $*(Int, Int, (T, Int), Int), 3
+// CHECK: [ACTIVE]   %55 = begin_access [read] [static] %3 : $*(Int, Int, (T, Int), Int)
+// CHECK: [ACTIVE]   %56 = tuple_element_addr %55 : $*(Int, Int, (T, Int), Int), 2
+// CHECK: [ACTIVE]   %57 = tuple_element_addr %56 : $*(T, Int), 0
+
 // TF-781: check activity analysis for active local address + nested conditionals.
 
 @differentiable(wrt: x)
