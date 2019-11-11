@@ -64,7 +64,7 @@ func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
   return [x, y]
 }
 
-// CHECK: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsic{{.*}} at (source=0 parameters=(0 1))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsic{{.*}} at (source=0 parameters=(0 1))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
 // CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
@@ -76,18 +76,22 @@ func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
 // CHECK: [VARIED]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word
 
-// [AD] Activity info for $s5array31testArrayUninitializedIntrinsicySaySfGSf_SftF at (source=0 parameters=(0 1))
-// [ACTIVE] %0 = argument of bb0 : $Float
-// [ACTIVE] %1 = argument of bb0 : $Float
-// [USEFUL]   %4 = integer_literal $Builtin.Word, 2           // user: %6
-// [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
-//   %5 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %6
-// [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %7
-// [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer) // user: %14
-// [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer) // user: %9
-// [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float // users: %12, %10
-// [VARIED]   %11 = integer_literal $Builtin.Word, 1          // user: %12
-// [VARIED]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word // user: %13
+@differentiable(where T: Differentiable)
+func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
+  return [x, y]
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicGeneric{{.*}} at (source=0 parameters=(0 1))
+// CHECK: [VARIED] %0 = argument of bb0 : $*T
+// CHECK: [VARIED] %1 = argument of bb0 : $*T
+// CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
+// CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
+// CHECK: [ACTIVE]   %6 = apply %5<T>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<T>, Builtin.RawPointer)
+// CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<T>, Builtin.RawPointer)
+// CHECK: [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*T
+// CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
+// CHECK: [VARIED]   %12 = index_addr %9 : $*T, %11 : $Builtin.Word
 
 // TF-781: check activity analysis for active local address + nested conditionals.
 
