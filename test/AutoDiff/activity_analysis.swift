@@ -57,6 +57,38 @@ func testNondifferentiableTupleElementAddr<T>(_ x: T) -> T {
 // CHECK: [ACTIVE]   %56 = tuple_element_addr %55 : $*(Int, Int, (T, Int), Int), 2
 // CHECK: [ACTIVE]   %57 = tuple_element_addr %56 : $*(T, Int), 0
 
+// Check activity analysis for `array.uninitialized_intrinsic` applications.
+
+@differentiable
+func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
+  return [x, y]
+}
+
+// CHECK: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsic{{.*}} at (source=0 parameters=(0 1))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE] %1 = argument of bb0 : $Float
+// CHECK: [USEFUL]   %4 = integer_literal $Builtin.Word, 2
+// CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
+// CHECK: [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float
+// CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
+// CHECK: [VARIED]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word
+
+// [AD] Activity info for $s5array31testArrayUninitializedIntrinsicySaySfGSf_SftF at (source=0 parameters=(0 1))
+// [ACTIVE] %0 = argument of bb0 : $Float
+// [ACTIVE] %1 = argument of bb0 : $Float
+// [USEFUL]   %4 = integer_literal $Builtin.Word, 2           // user: %6
+// [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
+//   %5 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %6
+// [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %7
+// [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer) // user: %14
+// [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer) // user: %9
+// [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float // users: %12, %10
+// [VARIED]   %11 = integer_literal $Builtin.Word, 1          // user: %12
+// [VARIED]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word // user: %13
+
 // TF-781: check activity analysis for active local address + nested conditionals.
 
 @differentiable(wrt: x)
