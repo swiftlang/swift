@@ -1180,7 +1180,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
           return false;
       } else {
-          assert(0 && "Attribute's TokenNodes already consumed?");
+//          assert(0 && "Attribute's TokenNodes already consumed?");
       }
     } else {
         assert(0 && "No TokenNodes?");
