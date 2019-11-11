@@ -33,6 +33,7 @@
     "StringRangeReplaceableCollection.swift",
     "StringGutsRangeReplaceable.swift",
     "StringStorage.swift",
+    "StringStorageBridge.swift",
     "StringSwitch.swift",
     "StringTesting.swift",
     "StringUTF16View.swift",
