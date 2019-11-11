@@ -387,6 +387,12 @@ static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
 
 namespace {
 
+enum class AvailableValueExpectedOwnership {
+  Take,
+  Borrow,
+  Copy,
+};
+
 /// A class that aggregates available values, loading them if they are not
 /// available.
 class AvailableValueAggregator {
@@ -396,7 +402,7 @@ class AvailableValueAggregator {
   MutableArrayRef<AvailableValue> AvailableValueList;
   SmallVectorImpl<PMOMemoryUse> &Uses;
   DeadEndBlocks &deadEndBlocks;
-  bool isTake;
+  AvailableValueExpectedOwnership expectedOwnership;
 
   /// Keep track of all instructions that we have added. Once we are done
   /// promoting a value, we need to make sure that if we need to balance any
@@ -408,10 +414,11 @@ public:
   AvailableValueAggregator(SILInstruction *Inst,
                            MutableArrayRef<AvailableValue> AvailableValueList,
                            SmallVectorImpl<PMOMemoryUse> &Uses,
-                           DeadEndBlocks &deadEndBlocks, bool isTake)
+                           DeadEndBlocks &deadEndBlocks,
+                           AvailableValueExpectedOwnership expectedOwnership)
       : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
         AvailableValueList(AvailableValueList), Uses(Uses),
-        deadEndBlocks(deadEndBlocks), isTake(isTake) {}
+        deadEndBlocks(deadEndBlocks), expectedOwnership(expectedOwnership) {}
 
   // This is intended to be passed by reference only once constructed.
   AvailableValueAggregator(const AvailableValueAggregator &) = delete;
@@ -435,6 +442,19 @@ public:
 
   void print(llvm::raw_ostream &os) const;
   void dump() const LLVM_ATTRIBUTE_USED;
+
+  bool isTake() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Take;
+  }
+
+  bool isBorrow() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Borrow;
+  }
+
+  bool isCopy() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Copy;
+  }
+
 private:
   SILValue aggregateFullyAvailableValue(SILType loadTy, unsigned firstElt);
   SILValue aggregateTupleSubElts(TupleType *tt, SILType loadTy,
@@ -526,7 +546,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
                                                    bool isTopLevel) {
   // If we are performing a take, make sure that we have available values for
   // /all/ of our values. Otherwise, bail.
-  if (isTopLevel && isTake && !canTake(LoadTy, FirstElt)) {
+  if (isTopLevel && isTake() && !canTake(LoadTy, FirstElt)) {
     return SILValue();
   }
 
@@ -576,7 +596,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     SILBuilderWithScope builder(insertPts[0], &insertedInsts);
     SILLocation loc = insertPts[0]->getLoc();
     // If we have a take, just return the value.
-    if (isTake)
+    if (isTake())
       return firstVal.getValue();
     // Otherwise, return a copy of the value.
     return builder.emitCopyValueOperation(loc, firstVal.getValue());
@@ -597,7 +617,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     SILValue eltVal = firstVal.getValue();
 
     // If we are not taking, copy the element value.
-    if (!isTake) {
+    if (!isTake()) {
       eltVal = builder.emitCopyValueOperation(loc, eltVal);
     }
 
@@ -636,7 +656,7 @@ SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
     // compute an address to load from.
     SILValue EltAddr;
     if (anyMissing(FirstElt, NumSubElt, AvailableValueList)) {
-      assert(!isTake && "When taking, values should never be missing?!");
+      assert(!isTake() && "When taking, values should never be missing?!");
       EltAddr =
           B.createTupleElementAddr(Loc, Address, EltNo, EltTy.getAddressType());
     }
@@ -663,7 +683,7 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
     // compute an address to load from.
     SILValue eltAddr;
     if (anyMissing(firstElt, numSubElt, AvailableValueList)) {
-      assert(!isTake && "When taking, values should never be missing?!");
+      assert(!isTake() && "When taking, values should never be missing?!");
       eltAddr =
           B.createStructElementAddr(Loc, address, decl, eltTy.getAddressType());
     }
@@ -686,7 +706,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 
   // If the value is not available, load the value and update our use list.
   if (!val) {
-    assert(!isTake && "Should only take fully available values?!");
+    assert(!isTake() && "Should only take fully available values?!");
     LoadInst *load = ([&]() {
       if (B.hasOwnership()) {
         return B.createTrivialLoadOr(Loc, address,
@@ -1650,7 +1670,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   // not available. We are "propagating" a +1 available value from the store
   // points.
   AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
-                               false /*isTake*/);
+                               AvailableValueExpectedOwnership::Copy);
   SILValue newVal = agg.aggregateValues(loadTy, li->getOperand(), firstElt);
 
   LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *li << "\n");
@@ -1750,7 +1770,7 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
   // not available. We are "propagating" a +1 available value from the store
   // points.
   AvailableValueAggregator agg(lbi, availableValues, Uses, deadEndBlocks,
-                               false /*isTake*/);
+                               AvailableValueExpectedOwnership::Borrow);
   SILValue newVal = agg.aggregateValues(loadTy, lbi->getOperand(), firstElt);
 
   LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *lbi << "\n");
@@ -1829,7 +1849,7 @@ bool AllocOptimize::canPromoteTake(
   // available, we would need to split stores to promote this destroy_addr. We
   // do not support that yet.
   AvailableValueAggregator agg(inst, tmpList, Uses, deadEndBlocks,
-                               true /*isTake*/);
+                               AvailableValueExpectedOwnership::Take);
   if (!agg.canTake(loadTy, firstElt))
     return false;
 
@@ -1861,7 +1881,7 @@ void AllocOptimize::promoteDestroyAddr(
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   AvailableValueAggregator agg(dai, availableValues, Uses, deadEndBlocks,
-                               true /*isTake*/);
+                               AvailableValueExpectedOwnership::Take);
   SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
 
   ++NumDestroyAddrPromoted;
@@ -1889,7 +1909,7 @@ void AllocOptimize::promoteLoadTake(
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
-                               true /*isTake*/);
+                               AvailableValueExpectedOwnership::Take);
   SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
 
   ++NumLoadTakePromoted;

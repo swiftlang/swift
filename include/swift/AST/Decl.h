@@ -176,16 +176,6 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType
 };
 
-/// Keeps track of stage of circularity checking for the given protocol.
-enum class CircularityCheck {
-  /// Circularity has not yet been checked.
-  Unchecked,
-  /// We're currently checking circularity.
-  Checking,
-  /// Circularity has already been checked.
-  Checked
-};
-
 /// Describes which spelling was used in the source for the 'static' or 'class'
 /// keyword.
 enum class StaticSpellingKind : uint8_t {
@@ -489,7 +479,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -512,9 +502,6 @@ protected:
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
 
-    /// The stage of the circularity check for this protocol.
-    Circularity : 2,
-
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
 
@@ -531,10 +518,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+1+2+1+7+1+1+1+1+1+1,
-    /// The stage of the inheritance circularity check for this class.
-    Circularity : 2,
-
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1+1,
     /// Whether this class inherits its superclass's convenience initializers.
     InheritsSuperclassInits : 1,
     ComputedInheritsSuperclassInits : 1,
@@ -562,10 +546,7 @@ protected:
     HasUnreferenceableStorage : 1
   );
   
-  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2+1,
-    /// The stage of the raw type circularity check for this class.
-    Circularity : 2,
-
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
     /// True if the enum has cases and at least one case has associated values.
     HasAssociatedValues : 2,
     /// True if the enum has at least one case that has some availability
@@ -3601,16 +3582,9 @@ public:
     for (auto elt : getAllElements())
       elements.insert(elt);
   }
-  
-  /// Retrieve the status of circularity checking for class inheritance.
-  CircularityCheck getCircularityCheck() const {
-    return static_cast<CircularityCheck>(Bits.EnumDecl.Circularity);
-  }
-  
-  /// Record the current stage of circularity checking.
-  void setCircularityCheck(CircularityCheck circularity) {
-    Bits.EnumDecl.Circularity = static_cast<unsigned>(circularity);
-  }
+
+  /// Whether this enum has a raw value type that recursively references itself.
+  bool hasCircularRawValue() const;
   
   /// Record that this enum has had all of its raw values computed.
   void setHasFixedRawValues();
@@ -3869,15 +3843,8 @@ public:
   /// Set the superclass of this class.
   void setSuperclass(Type superclass);
 
-  /// Retrieve the status of circularity checking for class inheritance.
-  CircularityCheck getCircularityCheck() const {
-    return static_cast<CircularityCheck>(Bits.ClassDecl.Circularity);
-  }
-
-  /// Record the current stage of circularity checking.
-  void setCircularityCheck(CircularityCheck circularity) {
-    Bits.ClassDecl.Circularity = static_cast<unsigned>(circularity);
-  }
+  /// Whether this class has a circular reference in its inheritance hierarchy.
+  bool hasCircularInheritance() const;
 
   /// Walk this class and all of the superclasses of this class, transitively,
   /// invoking the callback function for each class.
@@ -4348,15 +4315,9 @@ public:
     return false;
   }
 
-  /// Retrieve the status of circularity checking for protocol inheritance.
-  CircularityCheck getCircularityCheck() const {
-    return static_cast<CircularityCheck>(Bits.ProtocolDecl.Circularity);
-  }
-
-  /// Record the current stage of circularity checking.
-  void setCircularityCheck(CircularityCheck circularity) {
-    Bits.ProtocolDecl.Circularity = static_cast<unsigned>(circularity);
-  }
+  /// Whether this protocol has a circular reference in its list of inherited
+  /// protocols.
+  bool hasCircularInheritedProtocols() const;
 
   /// Returns true if the protocol has requirements that are not listed in its
   /// members.
