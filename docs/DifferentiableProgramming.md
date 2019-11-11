@@ -971,21 +971,20 @@ public protocol Differentiable {
     
     /// A closure that produces a zero tangent vector and does not capture `self`.
     ///
-    /// A zero tangent vector of `self` is equal to `TangentVector.zero`
-    /// sometimes. In some cases, the zero tangent vector dependes on
-    /// information on `self`, such as shape. For differentiable programming, it
-    /// is more memory-efficient to define a custom
-    /// `zeroTangentVectorInitializer` to return a closure that captures and
-    /// uses such information to create a zero tangent vector. For example:
+    /// In some cases, the zero tangent vector of `self` is equal to
+    /// `TangentVector.zero`. In other cases, the zero tangent vector depends on
+    /// information in `self`, such as shape for an n-dimensional array type.
+    /// For differentiable programming, it is more memory-efficient to define a
+    /// custom `zeroTangentVectorInitializer` property which returns a closure
+    /// that captures and uses only the necessary information to create a zero
+    /// tangent vector. For example:
     ///
     /// ```swift
     /// struct Vector {
-    ///    var scalars: [Float]
-    ///    var count: Int { scalars.count }
-    ///    init(repeating repeatedElement: Float, count: Int) { ... }
+    ///     var scalars: [Float]
+    ///     var count: Int { scalars.count }
+    ///     init(repeating repeatedElement: Float, count: Int) { ... }
     /// }
-    ///
-    /// ...
     /// 
     /// extension Vector: Differentiable {
     ///     typealias TangentVector = Vector
