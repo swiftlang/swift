@@ -404,6 +404,9 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild();
+      if (Comp.getShowIncrementalBuildDecisions())
+         llvm::outs() << "Incremental compilation has been disabled due to "
+                      << "malformed swift dependencies file '" << DependenciesFile << "'.\n";
       for (const Job *Cmd : Comp.getJobs())
         scheduleCommandIfNecessaryAndPossible(Cmd);
       DeferredCommands.clear();
@@ -953,12 +956,12 @@ namespace driver {
         const Job *Cmd, DependencyGraphT &DepGraph) {
 
       Job::Condition Cond;
-      bool HasDependenciesFile;
-      std::tie(Cond, HasDependenciesFile) =
+      bool HasDependenciesFileName;
+      std::tie(Cond, HasDependenciesFileName) =
           loadDependenciesAndComputeCondition(Cmd, DepGraph);
 
       const bool shouldSched = shouldScheduleCompileJobAccordingToCondition(
-          Cmd, Cond, HasDependenciesFile, DepGraph);
+          Cmd, Cond, HasDependenciesFileName, DepGraph);
       if (ExpDepGraph.hasValue())
         assert(ExpDepGraph.getValue().emitDotFileAndVerify(Comp.getDiags()));
       return shouldSched;
@@ -973,21 +976,21 @@ namespace driver {
       // there should be one but it's not present or can't be loaded, we have to
       // run all the jobs.
       // FIXME: We can probably do better here!
-      if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        DepGraph.addIndependentNode(Cmd);
-        return {Job::Condition::NewlyAdded, false};
-      }
 
       const StringRef DependenciesFile =
           Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
       if (DependenciesFile.empty())
         return {Job::Condition::Always, false};
+      if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
+        DepGraph.addIndependentNode(Cmd);
+        return {Job::Condition::NewlyAdded, true};
+      }
 
       const auto loadResult =
           DepGraph.loadFromPath(Cmd, DependenciesFile, Comp.getDiags());
       switch (loadResult) {
       case DependencyGraphImpl::LoadResult::HadError:
-        dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
+        dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
         return {Job::Condition::Always, true};
       case DependencyGraphImpl::LoadResult::UpToDate:
         return {Cmd->getCondition(), true};
@@ -1004,11 +1007,11 @@ namespace driver {
     template <typename DependencyGraphT>
     bool shouldScheduleCompileJobAccordingToCondition(
         const Job *const Cmd, const Job::Condition Condition,
-        const bool hasDependenciesFile, DependencyGraphT &DepGraph) {
+        const bool hasDependenciesFileName, DependencyGraphT &DepGraph) {
       switch (Condition) {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:
-        if (Comp.getIncrementalBuildEnabled() && hasDependenciesFile) {
+        if (Comp.getIncrementalBuildEnabled() && hasDependenciesFileName) {
           // Ensure dependents will get recompiled.
           InitialCascadingCommands.push_back(Cmd);
           // Mark this job as cascading.
