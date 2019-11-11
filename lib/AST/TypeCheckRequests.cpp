@@ -1132,3 +1132,52 @@ void swift::simple_display(llvm::raw_ostream &out,
     break;
   }
 }
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritanceRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritanceRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
+}
+
+void HasCircularInheritanceRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritedProtocolsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void HasCircularInheritedProtocolsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularRawValueRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_enum_inheritance, decl->getName());
+}
+
+void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
