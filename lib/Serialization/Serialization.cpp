@@ -20,6 +20,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -2270,6 +2271,37 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       break;
     }
 
+    case DAK_Differentiable: {
+      auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
+      auto *attr = cast<DifferentiableAttr>(DA);
+
+      IdentifierID jvpName = 0;
+      DeclID jvpRef = 0;
+      if (auto jvp = attr->getJVP())
+        jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
+      if (auto jvpFunction = attr->getJVPFunction())
+        jvpRef = S.addDeclRef(jvpFunction);
+
+      IdentifierID vjpName = 0;
+      DeclID vjpRef = 0;
+      if (auto vjp = attr->getVJP())
+        vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
+      if (auto vjpFunction = attr->getVJPFunction())
+        vjpRef = S.addDeclRef(vjpFunction);
+
+      auto paramIndices = attr->getParameterIndices();
+      assert(paramIndices && "Checked parameter indices must be resolved");
+      SmallVector<bool, 4> indices;
+      for (unsigned i : range(paramIndices->getCapacity()))
+        indices.push_back(paramIndices->contains(i));
+
+      DifferentiableDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
+          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
+          indices);
+      return;
+    }
     }
   }
 
