@@ -4915,10 +4915,7 @@ public:
     const ProtocolConformanceRef *SubscriptHashableConformancesData;
     
     union {
-      struct {
-        unsigned numConformances;
-        unsigned numLabels;
-      } SubscriptSize;
+      unsigned SubscriptSize;
       unsigned TupleIndex;
     };
       
@@ -5124,7 +5121,7 @@ public:
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return {SubscriptLabelsData, (size_t)SubscriptSize.numLabels};
+        return {SubscriptLabelsData, (size_t)SubscriptSize};
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -5145,8 +5142,7 @@ public:
       case Kind::Subscript:
         if (!SubscriptHashableConformancesData)
           return {};
-        return {SubscriptHashableConformancesData,
-                (size_t)SubscriptSize.numConformances};
+        return {SubscriptHashableConformancesData, (size_t)SubscriptSize};
 
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
