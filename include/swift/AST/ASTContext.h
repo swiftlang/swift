@@ -553,10 +553,6 @@ public:
                                ForeignLanguage language,
                                const DeclContext *dc);
 
-  /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file.
-  void addSynthesizedDecl(Decl *decl);
-
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
 

@@ -769,8 +769,6 @@ deriveEquatable_eq(
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
 
-  C.addSynthesizedDecl(eqDecl);
-
   // Add the operator to the parent scope.
   derived.addMembersToConformanceContext({eqDecl});
 
@@ -890,9 +888,8 @@ deriveHashable_hashInto(
 
   hashDecl->copyFormalAccessFrom(derived.Nominal);
 
-  C.addSynthesizedDecl(hashDecl);
-
   derived.addMembersToConformanceContext({hashDecl});
+
   return hashDecl;
 }
 
@@ -1253,8 +1250,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
       parentDC);
-  C.addSynthesizedDecl(hashValueDecl);
-  C.addSynthesizedDecl(getterDecl);
 
   derived.addMembersToConformanceContext({hashValueDecl, patDecl});
   return hashValueDecl;

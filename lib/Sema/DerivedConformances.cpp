@@ -311,7 +311,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
 
   getterDecl->copyFormalAccessFrom(property);
 
-  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }

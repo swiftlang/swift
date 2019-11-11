@@ -318,8 +318,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
-  // FIXME: Horrible hack. Store this somewhere more appropriate.
-  SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {

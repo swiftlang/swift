@@ -434,8 +434,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   // an instance without function call overhead.
   maybeMarkAsInlinable(derived, initDecl);
 
-  C.addSynthesizedDecl(initDecl);
-
   derived.addMembersToConformanceContext({initDecl});
   return initDecl;
 }
