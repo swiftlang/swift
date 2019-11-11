@@ -2657,7 +2657,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   // possible and give a proper fix-it. See SE-0110 for more details.
   auto isTupleDestructuring = [](ParamDecl *param) -> bool {
     auto *typeRepr = param->getTypeRepr();
-    if (!(typeRepr && typeRepr->isInvalid()))
+    if (!(typeRepr && param->isDestructured()))
       return false;
     return !param->hasName() && isa<TupleTypeRepr>(typeRepr);
   };

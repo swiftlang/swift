@@ -192,8 +192,8 @@ func bogusDestructuring() {
     func registerCallback(_ callback: @escaping (Bar?) -> Void) {} // expected-note {{found this candidate}}
   }
 
-  Foo().registerCallback { ([Bar]) in } // expected-error {{'<<error type>>' is not convertible to '[Bar]'}}
-  Foo().registerCallback { ([String: Bar]) in } // expected-error {{'<<error type>>' is not convertible to '[Bar]'}}
+  Foo().registerCallback { ([Bar]) in } // expected-warning {{unnamed parameters must be written with the empty name '_'}} {{29-29=_: }}
+  Foo().registerCallback { ([String: Bar]) in }// expected-warning {{unnamed parameters must be written with the empty name '_'}} {{29-29=_: }}
   Foo().registerCallback { (Bar?) in } // expected-error {{ambiguous use of 'registerCallback'}}
   // expected-error@-1 {{expected parameter name followed by ':'}}
   // expected-error@-2 {{expected ',' separator}}

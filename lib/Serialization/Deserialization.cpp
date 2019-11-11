@@ -3218,8 +3218,6 @@ public:
       proto->setImplicit();
     proto->setIsObjC(isObjC);
 
-    proto->setCircularityCheck(CircularityCheck::Checked);
-
     proto->setLazyRequirementSignature(&MF,
                                        MF.DeclTypeCursor.GetCurrentBitNo());
     skipGenericRequirements(MF.DeclTypeCursor);
@@ -3429,8 +3427,6 @@ public:
       &MF,
       encodeLazyConformanceContextData(numConformances,
                                        MF.DeclTypeCursor.GetCurrentBitNo()));
-
-    theClass->setCircularityCheck(CircularityCheck::Checked);
     return theClass;
   }
 

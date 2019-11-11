@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: tools-release,no_asan
 
 struct P {
   let x: Float

@@ -98,12 +98,6 @@ using AssociativityCacheType =
   llvm::DenseMap<std::pair<PrecedenceGroupDecl *, PrecedenceGroupDecl *>,
                  Associativity>;
 
-#define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
-  MACRO(NSCopying, ProtocolDecl) \
-  MACRO(NSError, ClassDecl) \
-  MACRO(NSNumber, ClassDecl) \
-  MACRO(NSValue, ClassDecl)
-
 struct OverrideSignatureKey {
   GenericSignature baseMethodSig;
   GenericSignature derivedClassSig;
@@ -190,6 +184,11 @@ struct ASTContext::Implementation {
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
 
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS) \
+  /** The declaration of MODULE.NAME. */ \
+  DECL_CLASS *NAME##Decl = nullptr;
+#include "swift/AST/KnownObjCTypes.def"
+
   /// The declaration of '+' function for two RangeReplaceableCollection.
   FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
 
@@ -216,15 +215,6 @@ struct ASTContext::Implementation {
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
-  
-  /// The declaration of ObjectiveC.ObjCBool.
-  StructDecl *ObjCBoolDecl = nullptr;
-
-#define CACHE_FOUNDATION_DECL(NAME, DECLTYPE) \
-  /** The declaration of Foundation.NAME. */ \
-  DECLTYPE *NAME##Decl = nullptr;
-FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
-#undef CACHE_FOUNDATION_DECL
 
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -827,33 +817,12 @@ CanType ASTContext::getNeverType() const {
   return neverDecl->getDeclaredType()->getCanonicalType();
 }
 
-StructDecl *ASTContext::getObjCBoolDecl() const {
-  if (!getImpl().ObjCBoolDecl) {
-    SmallVector<ValueDecl *, 1> results;
-    auto *Context = const_cast<ASTContext *>(this);
-    if (ModuleDecl *M = Context->getModuleByName(Id_ObjectiveC.str())) {
-      M->lookupValue(getIdentifier("ObjCBool"), NLKind::UnqualifiedLookup,
-                     results);
-      for (auto result : results) {
-        if (auto structDecl = dyn_cast<StructDecl>(result)) {
-          if (structDecl->getGenericParams() == nullptr) {
-            getImpl().ObjCBoolDecl = structDecl;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  return getImpl().ObjCBoolDecl;
-}
-
-#define GET_FOUNDATION_DECL(NAME, DECLTYPE) \
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECLTYPE) \
 DECLTYPE *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
-    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
-      /* Note: lookupQualified() will search both the Foundation module \
-       * and the Clang Foundation module it imports. */ \
+    if (ModuleDecl *M = getLoadedModule(Id_##MODULE)) { \
+      /* Note: lookupQualified() will search both the Swift overlay \
+       * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
@@ -866,11 +835,16 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
   } \
   \
   return getImpl().NAME##Decl; \
+} \
+\
+Type ASTContext::get##NAME##Type() const { \
+  auto *decl = get##NAME##Decl(); \
+  if (!decl) \
+    return Type(); \
+  return decl->getDeclaredInterfaceType(); \
 }
 
-FOR_KNOWN_FOUNDATION_TYPES(GET_FOUNDATION_DECL)
-#undef GET_FOUNDATION_DECL
-#undef FOR_KNOWN_FOUNDATION_TYPES
+#include "swift/AST/KnownObjCTypes.def"
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
@@ -1390,12 +1364,6 @@ bool ASTContext::hasArrayLiteralIntrinsics() const {
   return getArrayDecl()
     && getAllocateUninitializedArray()
     && getDeallocateUninitializedArray();
-}
-
-void ASTContext::addSynthesizedDecl(Decl *decl) {
-  auto *fileUnit = decl->getDeclContext()->getModuleScopeContext();
-  if (auto *sf = dyn_cast<SourceFile>(fileUnit))
-    sf->SynthesizedDecls.push_back(decl);
 }
 
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
@@ -4291,12 +4259,12 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // Check whether the type is an existential that contains
   // Error. If so, it's bridged to NSError.
   if (type->isExistentialWithError()) {
-    if (auto nsErrorDecl = getNSErrorDecl()) {
+    if (auto nsErrorTy = getNSErrorType()) {
       // The corresponding value type is Error.
       if (bridgedValueType)
         *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
-      return nsErrorDecl->getDeclaredInterfaceType();
+      return nsErrorTy;
     }
   }
 
@@ -4334,8 +4302,8 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
     // Bridge to NSError.
-    if (auto nsErrorDecl = getNSErrorDecl())
-      return nsErrorDecl->getDeclaredInterfaceType();
+    if (auto nsErrorTy = getNSErrorType())
+      return nsErrorTy;
   }
 
   // No special bridging to Objective-C, but this can become an 'Any'.

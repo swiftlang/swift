@@ -58,6 +58,12 @@ SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
 SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
               GenericSignature (GenericContext *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasCircularInheritanceRequest,
+              bool(ClassDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasCircularInheritedProtocolsRequest,
+              bool(ProtocolDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
+              bool(EnumDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, GenericSignatureImpl *,
                                  GenericParamList *,
@@ -176,6 +182,9 @@ SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
               bool(StructDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PreCheckFunctionBuilderRequest,
+              FunctionBuilderClosurePreCheck(ClosureExpr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               bool(NominalTypeDecl *, ImplicitMemberAction), Uncached,
               NoLocationInfo)

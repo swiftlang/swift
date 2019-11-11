@@ -77,3 +77,11 @@ var x: Int
 // CHECK-FLOAT-NOT: Zip2Sequence
 // CHECK-FLOAT-NOT: struct Bool
 // CHECK-FLOAT-NOT: struct Int
+
+
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -group-name Misc -synthesized-extension > %t.Misc.response
+// RUN: %FileCheck -check-prefix=CHECK-ERROR -input-file %t.Misc.response %s
+// RUN: %sourcekitd-test -req=interface-gen -module Swift -interested-usr s:s5ErrorP -synthesized-extension > %t.Error.response
+// RUN: %FileCheck -check-prefix=CHECK-ERROR -input-file %t.Error.response %s
+
+// CHECK-ERROR: protocol Error

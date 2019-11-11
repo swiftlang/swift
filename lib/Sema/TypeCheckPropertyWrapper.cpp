@@ -533,12 +533,11 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
   if (binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
-      tc.typeCheckPatternBinding(binding, index);
+      TypeChecker::typeCheckPatternBinding(binding, index);
 
     Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
     assert(type || ctx.Diags.hadAnyError());
@@ -552,7 +551,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   using namespace constraints;
   auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(tc, dc, None);
+  ConstraintSystem cs(dc, None);
   auto emptyLocator = cs.getConstraintLocator(nullptr);
   
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
@@ -591,7 +590,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
                    propertyType, emptyLocator);
 
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
+  if (cs.solve(solutions) || solutions.size() != 1) {
     var->diagnose(diag::property_wrapper_incompatible_property,
                   propertyType, rawType);
     var->setInvalid();

@@ -530,24 +530,10 @@ enum class CheckedCastContextKind {
   EnumElementPattern,
 };
 
-enum class FunctionBuilderClosurePreCheck : uint8_t {
-  /// There were no problems pre-checking the closure.
-  Okay,
-
-  /// There was an error pre-checking the closure.
-  Error,
-
-  /// The closure has a return statement.
-  HasReturnStmt,
-};
-
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final {
 public:
-  ASTContext &Context;
-  DiagnosticEngine &Diags;
-
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
@@ -556,14 +542,7 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
-  Type MaxIntegerType;
-  Type NSObjectType;
-  Type NSNumberType;
-  Type NSValueType;
-  Type ObjCSelectorType;
-
-  /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
+  ASTContext &Context;
 
   /// If non-zero, warn when a function body takes longer than this many
   /// milliseconds to type-check.
@@ -605,11 +584,6 @@ private:
   /// Indicate that the type checker should skip type-checking non-inlinable
   /// function bodies.
   bool SkipNonInlinableFunctionBodies = false;
-
-  /// Closure expressions whose bodies have already been prechecked as
-  /// part of trying to apply a function builder.
-  llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
-    precheckedFunctionBuilderClosures;
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
@@ -714,29 +688,15 @@ public:
     this->InImmediateMode = InImmediateMode;
   }
 
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    return Diags.diagnose(std::forward<ArgTypes>(Args)...);
-  }
-
-  void diagnoseWithNotes(InFlightDiagnostic parentDiag,
-                         llvm::function_ref<void(void)> builder) {
-    CompoundDiagnosticTransaction transaction(Diags);
-    parentDiag.flush();
-    builder();
-  }
-
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
-  Type getStringType(DeclContext *dc);
-  Type getSubstringType(DeclContext *dc);
-  Type getIntType(DeclContext *dc);
-  Type getInt8Type(DeclContext *dc);
-  Type getUInt8Type(DeclContext *dc);
-  Type getNSObjectType(DeclContext *dc);
-  Type getObjCSelectorType(DeclContext *dc);
-  
+  static Type getStringType(ASTContext &ctx);
+  static Type getSubstringType(ASTContext &ctx);
+  static Type getIntType(ASTContext &ctx);
+  static Type getInt8Type(ASTContext &ctx);
+  static Type getUInt8Type(ASTContext &ctx);
+
   /// Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
   static Type resolveIdentifierType(TypeResolution resolution,
@@ -890,7 +850,7 @@ public:
   /// \param dc The context of the check.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
+  static bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
   
   /// Determine whether one type is implicitly convertible to another.
   ///
@@ -904,8 +864,8 @@ public:
   /// conversion force-unwrapped an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 can be implicitly converted to \c t2.
-  bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
-                       bool *unwrappedIUO = nullptr);
+  static bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// Determine whether one type is explicitly convertible to another,
   /// i.e. using an 'as' expression.
@@ -917,7 +877,7 @@ public:
   /// \param dc The context of the conversion.
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
+  static bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
 
   /// Determine whether one type is bridged to another type.
   ///
@@ -931,8 +891,8 @@ public:
   /// conversion force-unwrapped an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
-                       bool *unwrappedIUO = nullptr);
+  static bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// Return true if performing a checked cast from one type to another
   /// with the "as!" operator could possibly succeed.
@@ -945,7 +905,7 @@ public:
   ///
   /// \returns true if a checked cast from \c t1 to \c t2 may succeed, and
   /// false if it will certainly fail, e.g. because the types are unrelated.
-  bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
+  static bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
 
   /// Determine whether a constraint of the given kind can be satisfied
   /// by the two types.
@@ -964,11 +924,11 @@ public:
   /// or bridge operation force-unwraps an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
-  bool typesSatisfyConstraint(Type t1, Type t2,
-                              bool openArchetypes,
-                              constraints::ConstraintKind kind,
-                              DeclContext *dc,
-                              bool *unwrappedIUO = nullptr);
+  static bool typesSatisfyConstraint(Type t1, Type t2,
+                                     bool openArchetypes,
+                                     constraints::ConstraintKind kind,
+                                     DeclContext *dc,
+                                     bool *unwrappedIUO = nullptr);
 
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
@@ -982,20 +942,21 @@ public:
   static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                       BraceStmt *body,
                                                       Type builderType);
-  bool typeCheckClosureBody(ClosureExpr *closure);
+  static bool typeCheckClosureBody(ClosureExpr *closure);
 
-  bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
+  static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
-  Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                                 Type paramType, bool isAutoClosure = false,
-                                 bool canFail = true);
+  static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
+                                        Type paramType,
+                                        bool isAutoClosure = false,
+                                        bool canFail = true);
 
-  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
+  static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                           unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
+                                  unsigned StartElem);
 
-  void typeCheckDecl(Decl *D);
+  static void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
   static void checkDeclAttributes(Decl *D);
@@ -1094,20 +1055,6 @@ public:
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-  /// Pre-check the expression, validating any types that occur in the
-  /// expression and folding sequence expressions.
-  bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
-  /// Pre-check the body of the given closure, which we are about to
-  /// generate constraints for.
-  ///
-  /// This mutates the body of the closure, but only in ways that should be
-  /// valid even if we end up not actually applying the function-builder
-  /// transform: it just does a normal pre-check of all the expressions in
-  /// the closure.
-  FunctionBuilderClosurePreCheck
-  preCheckFunctionBuilderClosureBody(ClosureExpr *closure);
-
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -1155,7 +1102,7 @@ public:
   ///
   /// \returns The type of the top-level expression, or Type() if an
   ///          error occurred.
-  Type
+  static Type
   typeCheckExpression(Expr *&expr, DeclContext *dc,
                       TypeLoc convertType = TypeLoc(),
                       ContextualTypePurpose convertTypePurpose = CTP_Unused,
@@ -1163,10 +1110,10 @@ public:
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
 
-  Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           ExprTypeCheckListener *listener) {
-    return typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
-                               TypeCheckExprOptions(), listener);
+  static Type typeCheckExpression(Expr *&expr, DeclContext *dc,
+                                  ExprTypeCheckListener *listener) {
+    return TypeChecker::typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
+                                            TypeCheckExprOptions(), listener);
   }
 
 private:
@@ -1195,14 +1142,14 @@ public:
   ///
   /// \returns the type of \p expr on success, Type() otherwise.
   /// FIXME: expr may still be modified...
-  Type getTypeOfExpressionWithoutApplying(
+  static Type getTypeOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc,
       ConcreteDeclRef &referencedDecl,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  void getPossibleTypesOfExpressionWithoutApplying(
+  static void getPossibleTypesOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
@@ -1210,16 +1157,16 @@ public:
 
   /// Return the type of operator function for specified LHS, or a null
   /// \c Type on error.
-  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                            Identifier opName,
-                                            DeclRefKind refKind,
-                                            ConcreteDeclRef &referencedDecl);
+  static FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                                   Identifier opName,
+                                                   DeclRefKind refKind,
+                                                   ConcreteDeclRef &refdDecl);
 
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                      bool requireResultType = false);
+  static Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
+                                             bool requireResultType = false);
 
   /// Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
@@ -1247,7 +1194,7 @@ public:
   /// to return a logic value (builtin i1).
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckCondition(Expr *&expr, DeclContext *dc);
+  static bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
   /// Type check the given 'if' or 'while' statement condition, which
   /// either converts an expression to a logic value or bind variables to the
@@ -1256,8 +1203,8 @@ public:
   /// \param cond The condition to type-check, which will be modified in place.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                              Diag<> diagnosticForAlwaysTrue);
+  static bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
+                                     Diag<> diagnosticForAlwaysTrue);
 
   /// Determine the semantics of a checked cast operation.
   ///
@@ -1271,13 +1218,13 @@ public:
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
   /// cast is invalid, Unresolved is returned. If the cast represents an implicit
   /// conversion, Coercion is returned.
-  CheckedCastKind typeCheckCheckedCast(Type fromType,
-                                       Type toType,
-                                       CheckedCastContextKind contextKind,
-                                       DeclContext *dc,
-                                       SourceLoc diagLoc,
-                                       Expr *fromExpr,
-                                       SourceRange diagToRange);
+  static CheckedCastKind typeCheckCheckedCast(Type fromType,
+                                              Type toType,
+                                              CheckedCastContextKind ctxKind,
+                                              DeclContext *dc,
+                                              SourceLoc diagLoc,
+                                              Expr *fromExpr,
+                                              SourceRange diagToRange);
 
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
@@ -1294,9 +1241,9 @@ public:
   /// type as an Objective-C class, e.g., \c NSString represents \c
   /// String, or a null type if there is no such type or if the
   /// dynamic type isn't something we can start from.
-  Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
-                                         Type dynamicType,
-                                         Type valueType);
+  static Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
+                                                Type dynamicType,
+                                                Type valueType);
 
   /// Resolve ambiguous pattern/expr productions inside a pattern using
   /// name lookup information. Must be done before type-checking the pattern.
@@ -1310,10 +1257,10 @@ public:
   /// \param options Options that control type resolution.
   ///
   /// \returns true if any errors occurred during type checking.
-  bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        TypeResolutionOptions options);
+  static bool typeCheckPattern(Pattern *P, DeclContext *dc,
+                               TypeResolutionOptions options);
 
-  bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
+  static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Coerce a pattern to the given type.
   ///
@@ -1323,11 +1270,11 @@ public:
   /// \param options Options describing how to perform this coercion.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
-                           TypeResolutionOptions options,
-                           TypeLoc tyLoc = TypeLoc());
-  bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
-                            Type type);
+  static bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
+                                  TypeResolutionOptions options,
+                                  TypeLoc tyLoc = TypeLoc());
+  static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
+                                   Type type);
 
   /// Coerce the specified parameter list of a ClosureExpr to the specified
   /// contextual type.
@@ -1335,11 +1282,11 @@ public:
                                         AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
+  static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
-  bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
+  static bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
   static void computeCaptures(AnyFunctionRef AFR);
@@ -1416,8 +1363,8 @@ public:
   ///   from where the toType is derived, so that we can deliver better fixit.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool convertToType(Expr *&expr, Type type, DeclContext *dc,
-                     Optional<Pattern*> typeFromPattern = None);
+  static bool convertToType(Expr *&expr, Type type, DeclContext *dc,
+                            Optional<Pattern*> typeFromPattern = None);
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
@@ -1595,7 +1542,7 @@ public:
 
   /// Given an pre-folded expression, find LHS from the expression if a binary
   /// operator \c name appended to the expression.
-  Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
   /// @}
 
@@ -1626,8 +1573,8 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
-  Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                             FunctionType *closureType);
+  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.
@@ -1674,7 +1621,7 @@ public:
                                        FragileFunctionKind Kind,
                                        bool TreatUsableFromInlineAsPublic);
 
-  Expr *buildDefaultInitializer(Type type);
+  static Expr *buildDefaultInitializer(Type type);
   
 private:
   static bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
@@ -1827,16 +1774,6 @@ public:
   static void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
   static void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                                 Expr *expr);
-
-  void addExprForDiagnosis(Expr *E1, Expr *Result) {
-    DiagnosedExprs[E1] = Result;
-  }
-  bool isExprBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs.count(E);
-  }
-  Expr *getExprBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs[E];
-  }
 
   /// If an expression references 'self.init' or 'super.init' in an
   /// initializer context, returns the implicit 'self' decl of the constructor.
@@ -2032,9 +1969,6 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
-
-bool canSatisfy(Type type1, Type type2, bool openArchetypes,
-                constraints::ConstraintKind kind, DeclContext *dc);
 
 bool hasDynamicMemberLookupAttribute(Type type,
   llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);

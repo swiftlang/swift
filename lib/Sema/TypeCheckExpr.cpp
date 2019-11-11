@@ -237,7 +237,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     if (!left)
       // LHS is not binary expression.
       return E;
-    switch (Context.associateInfixOperators(left, right)) {
+    switch (DC->getASTContext().associateInfixOperators(left, right)) {
       case swift::Associativity::None:
         return nullptr;
       case swift::Associativity::Left:
@@ -619,6 +619,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
 
 Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
                                         FunctionType *closureType) {
+  auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC))
     isInDefaultArgumentContext =
@@ -636,7 +637,9 @@ Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
-  ClosuresWithUncomputedCaptures.push_back(closure);
+  // FIXME: Remove global type checker dependency.
+  auto *TC = Context.getLegacyGlobalTypeChecker();
+  TC->ClosuresWithUncomputedCaptures.push_back(closure);
 
   if (!newClosureType->isEqual(closureType)) {
     assert(isInDefaultArgumentContext);

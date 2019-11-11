@@ -336,8 +336,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     return *NSErrorConformanceToError;
 
   auto &ctx = getASTContext();
-  auto nsError = ctx.getNSErrorDecl();
-  if (!nsError) {
+  auto nsErrorTy = ctx.getNSErrorType();
+  if (!nsErrorTy) {
     NSErrorConformanceToError = nullptr;
     return nullptr;
   }
@@ -349,8 +349,7 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   }
 
   auto conformance =
-    SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
-                                   cast<ProtocolDecl>(error));
+    SwiftModule->lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
 
   if (conformance.isConcrete())
     NSErrorConformanceToError = conformance.getConcrete();

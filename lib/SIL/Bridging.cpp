@@ -232,9 +232,9 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
 
   case ForeignRepresentableKind::BridgedError: {
-    auto nsErrorDecl = M.getASTContext().getNSErrorDecl();
-    assert(nsErrorDecl && "Cannot bridge when NSError isn't available");
-    return nsErrorDecl->getDeclaredInterfaceType();
+    auto nsErrorTy = M.getASTContext().getNSErrorType();
+    assert(nsErrorTy && "Cannot bridge when NSError isn't available");
+    return nsErrorTy;
   }
   }
 

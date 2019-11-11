@@ -387,6 +387,12 @@ static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
 
 namespace {
 
+enum class AvailableValueExpectedOwnership {
+  Take,
+  Borrow,
+  Copy,
+};
+
 /// A class that aggregates available values, loading them if they are not
 /// available.
 class AvailableValueAggregator {
@@ -396,7 +402,7 @@ class AvailableValueAggregator {
   MutableArrayRef<AvailableValue> AvailableValueList;
   SmallVectorImpl<PMOMemoryUse> &Uses;
   DeadEndBlocks &deadEndBlocks;
-  bool isTake;
+  AvailableValueExpectedOwnership expectedOwnership;
 
   /// Keep track of all instructions that we have added. Once we are done
   /// promoting a value, we need to make sure that if we need to balance any
@@ -408,10 +414,11 @@ public:
   AvailableValueAggregator(SILInstruction *Inst,
                            MutableArrayRef<AvailableValue> AvailableValueList,
                            SmallVectorImpl<PMOMemoryUse> &Uses,
-                           DeadEndBlocks &deadEndBlocks, bool isTake)
+                           DeadEndBlocks &deadEndBlocks,
+                           AvailableValueExpectedOwnership expectedOwnership)
       : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
         AvailableValueList(AvailableValueList), Uses(Uses),
-        deadEndBlocks(deadEndBlocks), isTake(isTake) {}
+        deadEndBlocks(deadEndBlocks), expectedOwnership(expectedOwnership) {}
 
   // This is intended to be passed by reference only once constructed.
   AvailableValueAggregator(const AvailableValueAggregator &) = delete;
@@ -427,12 +434,27 @@ public:
   /// If as a result of us copying values, we may have unconsumed destroys, find
   /// the appropriate location and place the values there. Only used when
   /// ownership is enabled.
-  SingleValueInstruction *
-  addMissingDestroysForCopiedValues(SingleValueInstruction *li,
-                                    SILValue newVal);
+  SingleValueInstruction *addMissingDestroysForCopiedValues(LoadBorrowInst *li,
+                                                            SILValue newVal);
+
+  SingleValueInstruction *addMissingDestroysForCopiedValues(LoadInst *li,
+                                                            SILValue newVal);
 
   void print(llvm::raw_ostream &os) const;
   void dump() const LLVM_ATTRIBUTE_USED;
+
+  bool isTake() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Take;
+  }
+
+  bool isBorrow() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Borrow;
+  }
+
+  bool isCopy() const {
+    return expectedOwnership == AvailableValueExpectedOwnership::Copy;
+  }
+
 private:
   SILValue aggregateFullyAvailableValue(SILType loadTy, unsigned firstElt);
   SILValue aggregateTupleSubElts(TupleType *tt, SILType loadTy,
@@ -524,7 +546,7 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
                                                    bool isTopLevel) {
   // If we are performing a take, make sure that we have available values for
   // /all/ of our values. Otherwise, bail.
-  if (isTopLevel && isTake && !canTake(LoadTy, FirstElt)) {
+  if (isTopLevel && isTake() && !canTake(LoadTy, FirstElt)) {
     return SILValue();
   }
 
@@ -545,6 +567,10 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
     return aggregateStructSubElts(SD, LoadTy, Address, FirstElt);
 
   // Otherwise, we have a non-aggregate primitive. Load or extract the value.
+  //
+  // NOTE: We should never call this when taking since when taking we know that
+  // our underlying value is always fully available.
+  assert(!isTake());
   return handlePrimitiveValue(LoadTy, Address, FirstElt);
 }
 
@@ -574,7 +600,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     SILBuilderWithScope builder(insertPts[0], &insertedInsts);
     SILLocation loc = insertPts[0]->getLoc();
     // If we have a take, just return the value.
-    if (isTake)
+    if (isTake())
       return firstVal.getValue();
     // Otherwise, return a copy of the value.
     return builder.emitCopyValueOperation(loc, firstVal.getValue());
@@ -595,7 +621,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     SILValue eltVal = firstVal.getValue();
 
     // If we are not taking, copy the element value.
-    if (!isTake) {
+    if (!isTake()) {
       eltVal = builder.emitCopyValueOperation(loc, eltVal);
     }
 
@@ -611,8 +637,19 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
 
   // If we only are tracking a singular value, we do not need to construct
   // SSA. Just return that value.
-  if (auto val = singularValue.getValueOr(SILValue()))
+  if (auto val = singularValue.getValueOr(SILValue())) {
+    // This assert documents that we are expecting that if we are in ossa, have
+    // a non-trivial value, and are not taking, we should never go down this
+    // code path. If we did, we would need to insert a copy here. The reason why
+    // we know we will never go down this code path is since we have been
+    // inserting copy_values implying that our potential singular value would be
+    // of the copy_values which are guaranteed to all be different.
+    assert((!B.hasOwnership() || isTake() ||
+            val->getType().isTrivial(*B.getInsertionBB()->getParent())) &&
+           "Should never reach this code path if we are in ossa and have a "
+           "non-trivial value");
     return val;
+  }
 
   // Finally, grab the value from the SSA updater.
   SILValue result = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
@@ -634,7 +671,7 @@ SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
     // compute an address to load from.
     SILValue EltAddr;
     if (anyMissing(FirstElt, NumSubElt, AvailableValueList)) {
-      assert(!isTake && "When taking, values should never be missing?!");
+      assert(!isTake() && "When taking, values should never be missing?!");
       EltAddr =
           B.createTupleElementAddr(Loc, Address, EltNo, EltTy.getAddressType());
     }
@@ -661,7 +698,7 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
     // compute an address to load from.
     SILValue eltAddr;
     if (anyMissing(firstElt, numSubElt, AvailableValueList)) {
-      assert(!isTake && "When taking, values should never be missing?!");
+      assert(!isTake() && "When taking, values should never be missing?!");
       eltAddr =
           B.createStructElementAddr(Loc, address, decl, eltTy.getAddressType());
     }
@@ -674,17 +711,18 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
   return B.createStruct(Loc, loadTy, resultElts);
 }
 
-// We have looked through all of the aggregate values and finally found a
-// "primitive value". If the value is available, use it (extracting if we need
-// to), otherwise emit a load of the value with the appropriate qualifier.
+// We have looked through all of the aggregate values and finally found a value
+// that is not available without transforming, i.e. a "primitive value". If the
+// value is available, use it (extracting if we need to), otherwise emit a load
+// of the value with the appropriate qualifier.
 SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
                                                         SILValue address,
                                                         unsigned firstElt) {
-  auto &val = AvailableValueList[firstElt];
+  assert(!isTake() && "Should only take fully available values?!");
 
   // If the value is not available, load the value and update our use list.
+  auto &val = AvailableValueList[firstElt];
   if (!val) {
-    assert(!isTake && "Should only take fully available values?!");
     LoadInst *load = ([&]() {
       if (B.hasOwnership()) {
         return B.createTrivialLoadOr(Loc, address,
@@ -714,7 +752,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   }
 
   // If we have an available value, then we want to extract the subelement from
-  // the borrowed aggregate before each insertion point.
+  // the borrowed aggregate before each insertion point. Note that since we have
+  // inserted copies at each of these insertion points, we know that we will
+  // never have the same value along all paths unless we have a trivial value
+  // meaning the SSA updater given a non-trivial value must /always/ be used.
   SILSSAUpdater updater;
   updater.Initialize(loadTy);
 
@@ -737,13 +778,25 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     updater.AddAvailableValue(i->getParent(), eltVal);
   }
 
-  // If we only are tracking a singular value, we do not need to construct
-  // SSA. Just return that value.
-  if (auto val = singularValue.getValueOr(SILValue()))
+  SILBasicBlock *insertBlock = B.getInsertionBB();
+
+  // If we are not in ossa and have a singular value or if we are in ossa and
+  // have a trivial singular value, just return that value.
+  //
+  // This can never happen for non-trivial values in ossa since we never should
+  // visit this code path if we have a take implying that non-trivial values
+  // /will/ have a copy and thus are guaranteed (since each copy yields a
+  // different value) to not be singular values.
+  if (auto val = singularValue.getValueOr(SILValue())) {
+    assert((!B.hasOwnership() ||
+            val->getType().isTrivial(*insertBlock->getParent())) &&
+           "Should have inserted copies for each insertion point, so shouldn't "
+           "have a singular value if non-trivial?!");
     return val;
+  }
 
   // Finally, grab the value from the SSA updater.
-  SILValue eltVal = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  SILValue eltVal = updater.GetValueInMiddleOfBlock(insertBlock);
   assert(!B.hasOwnership() ||
          eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
   assert(eltVal->getType() == loadTy && "Subelement types mismatch");
@@ -751,14 +804,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 }
 
 SingleValueInstruction *
-AvailableValueAggregator::addMissingDestroysForCopiedValues(
-    SingleValueInstruction *svi, SILValue newVal) {
+AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadInst *li,
+                                                            SILValue newVal) {
   assert(B.hasOwnership() &&
          "We assume this is only called if we have ownership");
-
-  assert((isa<LoadBorrowInst>(svi) || isa<LoadInst>(svi)) &&
-         "Expected to have a /real/ load here since we assume that we have a "
-         "unary operand instruction");
 
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
@@ -783,7 +832,75 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     auto error = checker.checkValue(
-        cvi, {BranchPropagatedUser(&svi->getAllOperands()[0])}, {}, errorKind,
+        cvi, {BranchPropagatedUser(&li->getAllOperands()[0])}, {}, errorKind,
+        &leakingBlocks);
+    if (!error.getFoundError())
+      continue;
+
+    // Ok, we found some leaking blocks. Since we are using the linear lifetime
+    // checker with memory, we do not have any guarantees that the store is out
+    // side of a loop and a load is in a loop. In such a case, we want to
+    // replace the load with a copy_value.
+    foundLoop |= error.getFoundOverConsume();
+
+    // Ok, we found some leaking blocks. Insert destroys at the
+    // beginning of these blocks for our copy_value.
+    for (auto *bb : leakingBlocks) {
+      SILBuilderWithScope b(bb->begin());
+      b.emitDestroyValueOperation(loc, cvi);
+    }
+  }
+
+  // If we didn't find a loop, we are done, just return svi to get RAUWed.
+  if (!foundLoop) {
+    return li;
+  }
+
+  // If we found a loop, then we know that our leaking blocks are the exiting
+  // blocks of the loop and the value has been lifetime extended over the loop.
+
+  // If we have a load, we need to put in a copy so that the destroys within
+  // the loop are properly balanced.
+  newVal = SILBuilderWithScope(li).emitCopyValueOperation(loc, newVal);
+
+  li->replaceAllUsesWith(newVal);
+  SILValue addr = li->getOperand();
+  li->eraseFromParent();
+  if (auto *addrI = addr->getDefiningInstruction())
+    recursivelyDeleteTriviallyDeadInstructions(addrI);
+  return nullptr;
+}
+
+SingleValueInstruction *
+AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadBorrowInst *lbi,
+                                                            SILValue newVal) {
+  assert(B.hasOwnership() &&
+         "We assume this is only called if we have ownership");
+
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  SmallVector<SILBasicBlock *, 8> leakingBlocks;
+  bool foundLoop = false;
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  while (!insertedInsts.empty()) {
+    auto *cvi = dyn_cast<CopyValueInst>(insertedInsts.pop_back_val());
+    if (!cvi)
+      continue;
+
+    // Clear our state.
+    visitedBlocks.clear();
+    leakingBlocks.clear();
+    // The linear lifetime checker doesn't care if the passed in load is
+    // actually a user of our copy_value. What we care about is that the load is
+    // guaranteed to be in the block where we have reformed the tuple in a
+    // consuming manner. This means if we add it as the consuming use of the
+    // copy, we can find the leaking places if any exist.
+    //
+    // Then perform the linear lifetime check. If we succeed, continue. We have
+    // no further work to do.
+    auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
+    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+    auto error = checker.checkValue(
+        cvi, {BranchPropagatedUser(&lbi->getAllOperands()[0])}, {}, errorKind,
         &leakingBlocks);
     if (!error.getFoundError())
       continue;
@@ -808,34 +925,25 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // to borrow at the load point. This means we need to handle the destroying
     // of the value along paths reachable from the load_borrow. Luckily that
     // will exactly be after the end_borrows of the load_borrow.
-    if (isa<LoadBorrowInst>(svi)) {
-      for (auto *use : svi->getUses()) {
-        if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
-          auto next = std::next(ebi->getIterator());
-          SILBuilderWithScope(next).emitDestroyValueOperation(ebi->getLoc(),
-                                                              newVal);
-        }
+    for (auto *use : lbi->getUses()) {
+      if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+        auto next = std::next(ebi->getIterator());
+        SILBuilderWithScope(next).emitDestroyValueOperation(ebi->getLoc(),
+                                                            newVal);
       }
     }
-    return svi;
+    return lbi;
   }
 
   // If we found a loop, then we know that our leaking blocks are the exiting
   // blocks of the loop and the value has been lifetime extended over the loop.
-  if (isa<LoadInst>(svi)) {
-    // If we have a load, we need to put in a copy so that the destroys within
-    // the loop are properly balanced.
-    newVal = SILBuilderWithScope(svi).emitCopyValueOperation(loc, newVal);
-  } else {
-    // If we have a load_borrow, we create a begin_borrow for the end_borrows in
-    // the loop.
-    assert(isa<LoadBorrowInst>(svi));
-    newVal = SILBuilderWithScope(svi).createBeginBorrow(svi->getLoc(), newVal);
-  }
+  // If we have a load_borrow, we create a begin_borrow for the end_borrows in
+  // the loop.
+  newVal = SILBuilderWithScope(lbi).createBeginBorrow(lbi->getLoc(), newVal);
 
-  svi->replaceAllUsesWith(newVal);
-  SILValue addr = svi->getOperand(0);
-  svi->eraseFromParent();
+  lbi->replaceAllUsesWith(newVal);
+  SILValue addr = lbi->getOperand();
+  lbi->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
     recursivelyDeleteTriviallyDeadInstructions(addrI);
   return nullptr;
@@ -1593,7 +1701,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   // not available. We are "propagating" a +1 available value from the store
   // points.
   AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
-                               false /*isTake*/);
+                               AvailableValueExpectedOwnership::Copy);
   SILValue newVal = agg.aggregateValues(loadTy, li->getOperand(), firstElt);
 
   LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *li << "\n");
@@ -1693,7 +1801,7 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
   // not available. We are "propagating" a +1 available value from the store
   // points.
   AvailableValueAggregator agg(lbi, availableValues, Uses, deadEndBlocks,
-                               false /*isTake*/);
+                               AvailableValueExpectedOwnership::Borrow);
   SILValue newVal = agg.aggregateValues(loadTy, lbi->getOperand(), firstElt);
 
   LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *lbi << "\n");
@@ -1772,7 +1880,7 @@ bool AllocOptimize::canPromoteTake(
   // available, we would need to split stores to promote this destroy_addr. We
   // do not support that yet.
   AvailableValueAggregator agg(inst, tmpList, Uses, deadEndBlocks,
-                               true /*isTake*/);
+                               AvailableValueExpectedOwnership::Take);
   if (!agg.canTake(loadTy, firstElt))
     return false;
 
@@ -1804,7 +1912,7 @@ void AllocOptimize::promoteDestroyAddr(
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   AvailableValueAggregator agg(dai, availableValues, Uses, deadEndBlocks,
-                               true /*isTake*/);
+                               AvailableValueExpectedOwnership::Take);
   SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
 
   ++NumDestroyAddrPromoted;
@@ -1832,7 +1940,7 @@ void AllocOptimize::promoteLoadTake(
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
-                               true /*isTake*/);
+                               AvailableValueExpectedOwnership::Take);
   SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
 
   ++NumLoadTakePromoted;

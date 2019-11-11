@@ -31,23 +31,21 @@ using namespace swift;
 
 namespace {
 struct REPLContext {
-  TypeChecker &TC;
   ASTContext &Context;
   SourceFile &SF;
   SmallVector<ValueDecl *, 4> PrintDecls;
   SmallVector<ValueDecl *, 4> DebugPrintlnDecls;
 
-  REPLContext(TypeChecker &TC, SourceFile &SF)
-      : TC(TC), Context(TC.Context), SF(SF) {}
+  REPLContext(SourceFile &SF) : Context(SF.getASTContext()), SF(SF) {}
 
   bool requirePrintDecls() {
     if (!PrintDecls.empty() && !DebugPrintlnDecls.empty())
       return false;
 
+    auto *stdlib = TypeChecker::getStdlibModule(&SF);
     {
       Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
-      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
-                                                   SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -55,8 +53,7 @@ struct REPLContext {
     }
     {
       Identifier Id(Context.getIdentifier("_replDebugPrintln"));
-      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
-                                                   SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -191,8 +188,8 @@ namespace {
     unsigned NextResponseVariableIndex = 0;
 
   public:
-    REPLChecker(TypeChecker &TC, SourceFile &SF, TopLevelContext &TLC)
-      : REPLContext(TC, SF), TLC(TLC) {}
+    REPLChecker(SourceFile &SF, TopLevelContext &TLC)
+      : REPLContext(SF), TLC(TLC) {}
 
     void processREPLTopLevelExpr(Expr *E);
     void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
@@ -257,7 +254,10 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Typecheck the function.
   BraceStmt *Body = builder.createBodyStmt(Loc, EndLoc);
   CE->setBody(Body, false);
-  TC.typeCheckClosureBody(CE);
+
+  // FIXME: Remove TypeChecker dependency.
+  auto &TC = *Context.getLegacyGlobalTypeChecker();
+  TypeChecker::typeCheckClosureBody(CE);
   TC.ClosuresWithUncomputedCaptures.push_back(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
@@ -437,7 +437,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
   std::vector<Decl *> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
   SF.Decls.resize(FirstDecl);
 
-  REPLChecker RC(*this, SF, TLC);
+  REPLChecker RC(SF, TLC);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the Decls list.

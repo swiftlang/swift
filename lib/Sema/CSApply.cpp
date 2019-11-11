@@ -458,7 +458,7 @@ namespace {
                   refExpr = declRefExpr;
                 }
 
-                auto resultTy = cs.getTypeChecker().typeCheckExpression(
+                auto resultTy = TypeChecker::typeCheckExpression(
                     refExpr, cs.DC, TypeLoc::withoutLoc(expectedFnType),
                     CTP_CannotFail);
                 if (!resultTy)
@@ -1670,9 +1670,8 @@ namespace {
     Expr *bridgeErrorToObjectiveC(Expr *value) {
       auto &ctx = cs.getASTContext();
 
-      auto nsErrorDecl = ctx.getNSErrorDecl();
-      assert(nsErrorDecl && "Missing NSError?");
-      Type nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
+      auto nsErrorType = ctx.getNSErrorType();
+      assert(nsErrorType && "Missing NSError?");
 
       auto result = new (ctx) BridgeToObjCExpr(value, nsErrorType);
       return cs.cacheType(result);
@@ -2152,7 +2151,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, cs.getTypeChecker().getIntType(cs.DC));
+        cs.setType(expr, TypeChecker::getIntType(ctx));
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -2819,7 +2818,7 @@ namespace {
       //
       // The result is that in Swift 5, 'try?' avoids producing nested optionals.
       
-      if (!cs.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+      if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
         // Nothing to do for Swift 4 and earlier!
         return simplifyExprType(expr);
       }
@@ -3125,7 +3124,7 @@ namespace {
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
                               : CheckedCastContextKind::IsExpr;
-      auto castKind = cs.getTypeChecker().typeCheckCheckedCast(
+      auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
 
@@ -3532,7 +3531,7 @@ namespace {
 
         solution.setExprTypes(sub);
 
-        if (cs.getTypeChecker().convertToType(sub, toType, cs.DC))
+        if (TypeChecker::convertToType(sub, toType, cs.DC))
           return nullptr;
           
         cs.cacheExprTypes(sub);
@@ -3577,7 +3576,7 @@ namespace {
                               : CheckedCastContextKind::ForcedCast;
 
       auto fromType = cs.getType(sub);
-      auto castKind = cs.getTypeChecker().typeCheckCheckedCast(
+      auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
@@ -3658,7 +3657,7 @@ namespace {
             : CheckedCastContextKind::ConditionalCast;
 
       auto fromType = cs.getType(sub);
-      auto castKind = cs.getTypeChecker().typeCheckCheckedCast(
+      auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
@@ -3723,7 +3722,7 @@ namespace {
         // If we're performing an assignment to a weak or unowned variable from
         // a constructor call, emit a warning that the instance will be
         // immediately deallocated.
-        diagnoseUnownedImmediateDeallocation(cs.getTypeChecker(), expr);
+        diagnoseUnownedImmediateDeallocation(cs.getASTContext(), expr);
       }
       return expr;
     }
@@ -3876,7 +3875,7 @@ namespace {
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
                                                 { Identifier() });
 
-      auto resultTy = cs.getTypeChecker().typeCheckExpression(
+      auto resultTy = TypeChecker::typeCheckExpression(
           callExpr, cs.DC, TypeLoc::withoutLoc(valueType), CTP_CannotFail);
       assert(resultTy && "Conversion cannot fail!");
       (void)resultTy;
@@ -4495,8 +4494,8 @@ namespace {
       cs.cacheType(outerClosure);
 
       // The inner closure at least will definitely have a capture.
-      cs.TC.ClosuresWithUncomputedCaptures.push_back(outerClosure);
-      cs.TC.ClosuresWithUncomputedCaptures.push_back(closure);
+      cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(outerClosure);
+      cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(closure);
 
       // let outerApply = "\( outerClosure )( \(E) )"
       auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
@@ -4788,7 +4787,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   // Convert the literal to the appropriate type.
   auto defArgType =
       param->getInterfaceType().subst(owner.getSubstitutions());
-  auto resultTy = cs.getTypeChecker().typeCheckParameterDefault(
+  auto resultTy = TypeChecker::typeCheckParameterDefault(
       init, dc, defArgType,
       /*isAutoClosure=*/param->isAutoClosure(),
       /*canFail=*/false);
@@ -5126,9 +5125,8 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
   if (optTy->is<LValueType>())
     objTy = LValueType::get(objTy);
 
-  expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr,
-                                                          expr->getEndLoc(),
-                                                          /* forcedIUO=*/ true);
+  expr = new (cs.getASTContext()) ForceValueExpr(expr, expr->getEndLoc(),
+                                                 /* forcedIUO=*/ true);
   cs.setType(expr, objTy);
   expr->setImplicit();
   return expr;
@@ -5410,7 +5408,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
           arg, closureType->getResult(),
           locator.withPathElement(ConstraintLocator::AutoclosureResult));
 
-      convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
+      convertedArg = TypeChecker::buildAutoClosureExpr(dc, arg, closureType);
       cs.cacheExprTypes(convertedArg);
     } else {
       convertedArg = coerceToType(
@@ -5678,12 +5676,10 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
                                     ConstraintLocatorBuilder locator,
                                     Expr *element) {
   auto &cs = rewriter.getConstraintSystem();
-
-  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
   if (bridged &&
-      tc.typeCheckCheckedCast(srcType, destType,
-                              CheckedCastContextKind::None, cs.DC,
-                              SourceLoc(), nullptr, SourceRange())
+      TypeChecker::typeCheckCheckedCast(srcType, destType,
+                                        CheckedCastContextKind::None, cs.DC,
+                                        SourceLoc(), nullptr, SourceRange())
         != CheckedCastKind::Coercion) {
     if (auto conversion =
           rewriter.buildObjCBridgeExpr(element, destType, locator))
@@ -7382,7 +7378,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
         ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
 
         auto *coalescedFix = primaryFix->coalescedWith(secondaryFixes);
-        auto diagnosed = coalescedFix->diagnose(root);
+        auto diagnosed = coalescedFix->diagnose();
         if (coalescedFix->isWarning()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
@@ -7445,14 +7441,14 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   if (!skipClosures) {
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
-      hadError |= getTypeChecker().typeCheckClosureBody(closure);
+      hadError |= TypeChecker::typeCheckClosureBody(closure);
 
     // Tap expressions too; they should or should not be
     // type-checked under the same conditions as closure bodies.
     for (auto tuple : walker.getTapsToTypeCheck()) {
       auto tap = std::get<0>(tuple);
       auto tapDC = std::get<1>(tuple);
-      hadError |= getTypeChecker().typeCheckTapBody(tap, tapDC);
+      hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
     }
 
     // If any of them failed to type check, bail.

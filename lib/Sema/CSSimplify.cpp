@@ -930,12 +930,19 @@ public:
     }
 
     auto *anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor || Arguments.size() != newLabels.size())
+    if (!anchor)
       return true;
 
     unsigned numExtraneous = 0;
     unsigned numRenames = 0;
+    unsigned numOutOfOrder = 0;
+
     for (unsigned i : indices(newLabels)) {
+      // It's already known how many arguments are missing,
+      // it would be accounted for in the impact.
+      if (i >= Arguments.size())
+        continue;
+
       auto argLabel = Arguments[i].getLabel();
       auto paramLabel = newLabels[i];
 
@@ -943,10 +950,16 @@ public:
         continue;
 
       if (!argLabel.empty()) {
-        if (paramLabel.empty())
+        // Instead of this being a label mismatch which requires
+        // re-labeling, this could be an out-of-order argument
+        // instead which has a completely different impact.
+        if (llvm::count(newLabels, argLabel) == 1) {
+          ++numOutOfOrder;
+        } else if (paramLabel.empty()) {
           ++numExtraneous;
-        else
+        } else {
           ++numRenames;
+        }
       }
     }
 
@@ -955,8 +968,12 @@ public:
     // Re-labeling fixes with extraneous/incorrect labels should be
     // lower priority vs. other fixes on same/different overload(s)
     // where labels did line up correctly.
-    CS.recordFix(fix, /*impact=*/1 + numExtraneous * 2 + numRenames * 3);
-    return false;
+    //
+    // If there are not only labeling problems but also some of the
+    // arguments are missing, let's account of that in the impact.
+    auto impact = 1 + numOutOfOrder + numExtraneous * 2 + numRenames * 3 +
+                  NumSynthesizedArgs * 2;
+    return CS.recordFix(fix, impact);
   }
 
   bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
@@ -2181,15 +2198,14 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   return getTypeMatchSuccess();
 }
 
-static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
-                                              DeclContext *DC,
+static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(TC.getInt8Type(DC)))
+  if (baseType->isEqual(TypeChecker::getInt8Type(ctx)))
     return true;
-  if (baseType->isEqual(TC.getUInt8Type(DC)))
+  if (baseType->isEqual(TypeChecker::getUInt8Type(ctx)))
     return true;
-  if (baseType->isEqual(TC.Context.TheEmptyTupleType))
+  if (baseType->isEqual(ctx.TheEmptyTupleType))
     return true;
   
   return false;
@@ -2199,7 +2215,6 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
 /// is potentially more optional than the second type with its number of
 /// optionals.
 static bool isPotentiallyMoreOptionalThan(Type type1, Type type2) {
-
   SmallVector<Type, 2> optionals1;
   Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
   auto numOptionals1 = optionals1.size();
@@ -2496,8 +2511,8 @@ static bool canBridgeThroughCast(ConstraintSystem &cs, Type fromType,
   if (fromType->isAnyObject() && toType->getClassOrBoundGenericClass())
     return true;
 
-  auto &TC = cs.getTypeChecker();
-  auto bridged = TC.getDynamicBridgedThroughObjCClass(cs.DC, fromType, toType);
+  auto bridged = TypeChecker::getDynamicBridgedThroughObjCClass(cs.DC,
+                                                                fromType, toType);
   if (!bridged)
     return false;
 
@@ -3061,16 +3076,6 @@ bool ConstraintSystem::repairFailures(
       auto rhsEltTy = getArrayOrSetType(rhs)->lookThroughAllOptionalTypes();
       (void)matchTypes(lhs, rhsEltTy, ConstraintKind::Equal, TMF_ApplyingFix,
                        locator);
-    }
-
-    // Let's not complain about argument type mismatch if we have a synthesized
-    // wrappedValue initializer, because we already emit a diagnostic for a
-    // type mismatch between the property's type and the wrappedValue type.
-    if (auto CE = dyn_cast<CallExpr>(loc->getAnchor())) {
-      if (CE->isImplicit() && !CE->getArgumentLabels().empty() &&
-          CE->getArgumentLabels().front() == getASTContext().Id_wrappedValue) {
-        break;
-      }
     }
 
     // If either type has a hole, consider this fixed.
@@ -4135,11 +4140,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
-                if (type1->isEqual(TC.getStringType(DC))) {
+                auto &ctx = getASTContext();
+                if (type1->isEqual(TypeChecker::getStringType(ctx))) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
-                      isStringCompatiblePointerBaseType(TC, DC, baseTy))
+                      isStringCompatiblePointerBaseType(ctx, baseTy))
                     conversionsOrFixes.push_back(
                         ConversionRestrictionKind::StringToPointer);
                 }
@@ -4462,7 +4468,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
-  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
+  addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
                            DeclBaseName::createConstructor(),
                            memberType,
                            useDC, functionRefKind,
@@ -4568,7 +4574,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
-    auto conformance = TC.containsProtocol(
+    auto conformance = TypeChecker::containsProtocol(
         type, protocol, DC,
         (ConformanceCheckFlags::InExpression |
          ConformanceCheckFlags::SkipConditionalRequirements));
@@ -5160,6 +5166,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
+  auto &ctx = getASTContext();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     // Tuples don't have compound-name members.
     if (!memberName.isSimpleName() || memberName.isSpecial())
@@ -5198,7 +5205,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // anything else, because the cost of the general search is so
     // high.
     if (auto info = getArgumentInfo(memberLocator)) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(), info->Labels);
+      memberName = DeclName(ctx, memberName.getBaseName(),
+                            info->Labels);
     }
   }
 
@@ -5232,8 +5240,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == TC.Context.getStringDecl()) {
-    if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
+  if (baseObjTy->getAnyNominal() == ctx.getStringDecl()) {
+    if (Type classType = ctx.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }
   }
@@ -5500,7 +5508,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         if (!(info && info->Labels.size() == 1 &&
               info->Labels[0] == getASTContext().Id_dynamicMember)) {
           return OverloadChoice::getDynamicMemberLookup(
-              baseTy, subscript, TC.Context.getIdentifier("subscript"),
+              baseTy, subscript, ctx.getIdentifier("subscript"),
               /*isKeyPathBased=*/true);
         }
       }
@@ -5518,11 +5526,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
-  if (!TC.Context.isSwiftVersionAtLeast(5) &&
+  if (!ctx.isSwiftVersionAtLeast(5) &&
       memberName.getBaseName() == DeclBaseName::createConstructor() &&
       !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
-                                      TC.Context.getIdentifier("init"));
+                                      ctx.getIdentifier("init"));
     for (auto result : compatLookup)
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/false,
@@ -6392,12 +6400,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   }
 
   // Explicit bridging from a value type to an Objective-C class type.
+  auto &ctx = getASTContext();
   if (unwrappedFromType->isPotentiallyBridgedValueType() &&
       (unwrappedToType->isBridgeableObjectType() ||
        (unwrappedToType->isExistentialType() &&
         !unwrappedToType->isAny()))) {
     countOptionalInjections();
-    if (Type classType = TC.Context.getBridgedToObjC(DC, unwrappedFromType)) {
+    if (Type classType = ctx.getBridgedToObjC(DC, unwrappedFromType)) {
       return matchTypes(classType, unwrappedToType, ConstraintKind::Conversion,
                         subflags, locator);
     }
@@ -6409,51 +6418,52 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (unwrappedFromType->mayHaveSuperclass() &&
       unwrappedToType->isPotentiallyBridgedValueType()) {
     Type bridgedValueType;
-    if (auto objcClass = TC.Context.getBridgedToObjC(DC, unwrappedToType,
-                                                     &bridgedValueType)) {
+    if (auto objcClass = ctx.getBridgedToObjC(DC, unwrappedToType,
+                                              &bridgedValueType)) {
       // Bridging NSNumber to NSValue is one-way, since there are multiple Swift
       // value types that bridge to those object types. It requires a checked
       // cast to get back.
-      if (TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
+      if (ctx.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
         return SolutionKind::Error;
 
       // If the bridged value type is generic, the generic arguments
       // must either match or be bridged.
       // FIXME: This should be an associated type of the protocol.
+      auto &ctx = getASTContext();
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
-        if (fromBGT->getDecl() == TC.Context.getArrayDecl()) {
+        if (fromBGT->getDecl() == ctx.getArrayDecl()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        TC.Context.getAnyObjectType(),
+                        ctx.getAnyObjectType(),
                         getConstraintLocator(locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
-        } else if (fromBGT->getDecl() == TC.Context.getDictionaryDecl()) {
+        } else if (fromBGT->getDecl() == ctx.getDictionaryDecl()) {
           // [NSObject : AnyObject]
-          auto NSObjectType = TC.getNSObjectType(DC);
-          if (!NSObjectType) {
+          auto nsObjectType = ctx.getNSObjectType();
+          if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
             return SolutionKind::Error;
           }
 
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        NSObjectType,
+                        nsObjectType,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
 
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[1],
-                        TC.Context.getAnyObjectType(),
+                        ctx.getAnyObjectType(),
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(1))));
-        } else if (fromBGT->getDecl() == TC.Context.getSetDecl()) {
-          auto NSObjectType = TC.getNSObjectType(DC);
-          if (!NSObjectType) {
+        } else if (fromBGT->getDecl() == ctx.getSetDecl()) {
+          auto nsObjectType = ctx.getNSObjectType();
+          if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
             return SolutionKind::Error;
           }
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        NSObjectType,
+                        nsObjectType,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
@@ -6579,7 +6589,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     assert(instanceTy->isExistentialType());
     Type openedTy = OpenedArchetypeType::get(instanceTy);
     if (isMetatype)
-      openedTy = MetatypeType::get(openedTy, TC.Context);
+      openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
@@ -7661,11 +7671,17 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
-static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
-  auto pointeeTy = type->lookThroughSingleOptionalType()
-                       ->getAnyPointerElementType();
+static llvm::PointerIntPair<Type, 3, unsigned>
+getBaseTypeForPointer(TypeBase *type) {
+  unsigned unwrapCount = 0;
+  while (auto objectTy = type->getOptionalObjectType()) {
+    type = objectTy.getPointer();
+    ++unwrapCount;
+  }
+
+  auto pointeeTy = type->getAnyPointerElementType();
   assert(pointeeTy);
-  return pointeeTy;
+  return {pointeeTy, unwrapCount};
 }
 
 void ConstraintSystem::addRestrictedConstraint(
@@ -7858,36 +7874,43 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto t2 = type2->getDesugaredType();
 
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false);
-    auto baseType2 = getBaseTypeForPointer(*this, t2);
+    auto ptr2 = getBaseTypeForPointer(t2);
 
-    return matchPointerBaseTypes(baseType1, baseType2);
+    increaseScore(SK_ValueToOptional, ptr2.getInt());
+
+    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
   }
 
   // String ===> UnsafePointer<[U]Int8>
   case ConversionRestrictionKind::StringToPointer: {
     addContextualScore();
 
-    auto baseType2 = getBaseTypeForPointer(*this, type2->getDesugaredType());
-    
+    auto ptr2 = getBaseTypeForPointer(type2->getDesugaredType());
+
+    increaseScore(SK_ValueToOptional, ptr2.getInt());
+
     // The pointer element type must be void or a byte-sized type.
     // TODO: Handle different encodings based on pointer element type, such as
     // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
     // Int8 pointers using UTF8 encoding.
-    baseType2 = getFixedTypeRecursive(baseType2, false);
+    auto baseType2 = getFixedTypeRecursive(ptr2.getPointer(), false);
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
       if (flags.contains(TMF_GenerateConstraints)) {
         increaseScore(ScoreKind::SK_ValueToPointerConversion);
 
+        auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
-                                       baseType2, TC.getInt8Type(DC),
-                                       getConstraintLocator(locator));
+                                          baseType2,
+                                          TypeChecker::getInt8Type(ctx),
+                                          getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
-                                        baseType2, TC.getUInt8Type(DC),
-                                        getConstraintLocator(locator));
+                                           baseType2,
+                                           TypeChecker::getUInt8Type(ctx),
+                                           getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
-                                        baseType2, TC.Context.TheEmptyTupleType,
-                                        getConstraintLocator(locator));
+                                          baseType2, ctx.TheEmptyTupleType,
+                                          getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
         addDisjunctionConstraint(disjunctionChoices, locator);
@@ -7897,7 +7920,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Unsolved;
     }
     
-    if (!isStringCompatiblePointerBaseType(TC, DC, baseType2)) {
+    if (!isStringCompatiblePointerBaseType(getASTContext(), baseType2)) {
       return SolutionKind::Error;
     }
 
@@ -7910,22 +7933,24 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
 
     auto t2 = type2->getDesugaredType();
-    
-    auto baseType1 = type1->getInOutObjectType();
-    auto baseType2 = getBaseTypeForPointer(*this, t2);
 
-    return matchPointerBaseTypes(baseType1, baseType2);
+    auto baseType1 = type1->getInOutObjectType();
+    auto ptr2 = getBaseTypeForPointer(t2);
+
+    increaseScore(SK_ValueToOptional, ptr2.getInt());
+
+    return matchPointerBaseTypes(baseType1, ptr2.getPointer());
   }
       
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
   case ConversionRestrictionKind::PointerToPointer: {
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
-    
-    Type baseType1 = getBaseTypeForPointer(*this, t1);
-    Type baseType2 = getBaseTypeForPointer(*this, t2);
 
-    return matchPointerBaseTypes(baseType1, baseType2);
+    auto ptr1 = getBaseTypeForPointer(t1);
+    auto ptr2 = getBaseTypeForPointer(t2);
+
+    return matchPointerBaseTypes(ptr1.getPointer(), ptr2.getPointer());
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
@@ -8006,7 +8031,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     }
 
     auto hashableProtocol =
-      TC.Context.getProtocol(KnownProtocolKind::Hashable);
+      getASTContext().getProtocol(KnownProtocolKind::Hashable);
     if (!hashableProtocol)
       return SolutionKind::Error;
 

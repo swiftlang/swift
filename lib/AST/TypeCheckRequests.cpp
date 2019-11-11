@@ -337,12 +337,20 @@ void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const
 // Requirement computation.
 //----------------------------------------------------------------------------//
 
-WhereClauseOwner::WhereClauseOwner(Decl *decl)
-  : dc(decl->getInnermostDeclContext()), source(decl) { }
+WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx): dc(genCtx) {
+  if (const auto whereClause = genCtx->getTrailingWhereClause())
+    source = whereClause;
+  else
+    source = genCtx->getGenericParams();
+}
+
+WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
+    : dc(atd->getInnermostDeclContext()),
+      source(atd->getTrailingWhereClause()) {}
 
 SourceLoc WhereClauseOwner::getLoc() const {
-  if (auto decl = source.dyn_cast<Decl *>())
-    return decl->getLoc();
+  if (auto where = source.dyn_cast<TrailingWhereClause *>())
+    return where->getWhereLoc();
 
   if (auto attr = source.dyn_cast<SpecializeAttr *>())
     return attr->getLocation();
@@ -352,8 +360,8 @@ SourceLoc WhereClauseOwner::getLoc() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
-  if (auto decl = owner.source.dyn_cast<Decl *>()) {
-    simple_display(out, decl);
+  if (auto where = owner.source.dyn_cast<TrailingWhereClause *>()) {
+    simple_display(out, owner.dc->getAsDecl());
   } else if (owner.source.is<SpecializeAttr *>()) {
     out << "@_specialize";
   } else {
@@ -375,36 +383,13 @@ void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
-  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
+  if (const auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
-  }
-
-  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
-    
-    return { };
-  }
-
-  auto decl = source.dyn_cast<Decl *>();
-  if (!decl)
-    return { };
-
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (auto whereClause = proto->getTrailingWhereClause())
-      return whereClause->getRequirements();
-
-    return { };
-  }
-
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-    if (auto whereClause = assocType->getTrailingWhereClause())
-      return whereClause->getRequirements();
-  }
-
-  if (auto genericContext = decl->getAsGenericContext()) {
-    if (auto genericParams = genericContext->getGenericParams())
-      return genericParams->getRequirements();
+  } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
+    return whereClause->getRequirements();
   }
 
   return { };
@@ -1127,4 +1112,72 @@ Optional<Witness> ValueWitnessRequest::getCachedResult() const {
 
 void ValueWitnessRequest::cacheResult(Witness type) const {
   // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// PreCheckFunctionBuilderRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FunctionBuilderClosurePreCheck value) {
+  switch (value) {
+  case FunctionBuilderClosurePreCheck::Okay:
+    out << "okay";
+    break;
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+    out << "has return statement";
+    break;
+  case FunctionBuilderClosurePreCheck::Error:
+    out << "error";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritanceRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritanceRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
+}
+
+void HasCircularInheritanceRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritedProtocolsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void HasCircularInheritedProtocolsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularRawValueRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_enum_inheritance, decl->getName());
+}
+
+void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
 }

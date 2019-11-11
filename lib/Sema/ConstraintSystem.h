@@ -983,8 +983,9 @@ struct DynamicCallableMethods {
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
+  ASTContext &Context;
+
 public:
-  TypeChecker &TC;
   DeclContext *DC;
   ConstraintSystemOptions Options;
   Optional<ExpressionTimer> Timer;
@@ -1184,7 +1185,6 @@ private:
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
-    TypeChecker &TC;
     DeclContext *DC;
     llvm::BumpPtrAllocator &Allocator;
 
@@ -1197,7 +1197,7 @@ private:
   public:
     Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), TC(cs.TC), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), BaseCS(cs),
           CT(ct), CTP(ctp) {}
 
     /// Return underlying expression.
@@ -1655,19 +1655,21 @@ public:
     ~SolverScope();
   };
 
-  ConstraintSystem(TypeChecker &tc, DeclContext *dc,
+  ConstraintSystem(DeclContext *dc,
                    ConstraintSystemOptions options,
                    Expr *expr = nullptr);
   ~ConstraintSystem();
 
   /// Retrieve the type checker associated with this constraint system.
-  TypeChecker &getTypeChecker() const { return TC; }
+  TypeChecker &getTypeChecker() const {
+    return *Context.getLegacyGlobalTypeChecker();
+  }
 
   /// Retrieve the constraint graph associated with this constraint system.
   ConstraintGraph &getConstraintGraph() const { return CG; }
 
   /// Retrieve the AST context.
-  ASTContext &getASTContext() const { return TC.Context; }
+  ASTContext &getASTContext() const { return Context; }
 
   /// Determine whether this constraint system has any free type
   /// variables.
@@ -1980,7 +1982,13 @@ public:
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) const {
     auto e = ExprWeights.find(expr);
-    return e != ExprWeights.end() ? e->second.second : nullptr;
+    if (e != ExprWeights.end())
+      return e->second.second;
+
+    if (baseCS && baseCS != this)
+      return baseCS->getParentExpr(expr);
+
+    return nullptr;
   }
 
   /// Returns a locator describing the callee for the anchor of a given locator.
@@ -3580,6 +3588,11 @@ private:
                           = FreeTypeVariableBinding::Disallow);
 
 public:
+  /// Pre-check the expression, validating any types that occur in the
+  /// expression and folding sequence expressions.
+  static bool preCheckExpression(Expr *&expr, DeclContext *dc,
+                                 ConstraintSystem *baseCS = nullptr);
+        
   /// Solve the system of constraints generated from provided expression.
   ///
   /// The expression should have already been pre-checked with
@@ -3611,7 +3624,7 @@ public:
   /// \returns true if an error occurred, false otherwise.  Note that multiple
   /// ambiguous solutions for the same constraint system are considered to be
   /// success by this API.
-  bool solve(Expr *const expr, SmallVectorImpl<Solution> &solutions,
+  bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables =
                  FreeTypeVariableBinding::Disallow);
 
@@ -3635,7 +3648,7 @@ private:
   /// It doesn't filter solutions, that's the job of top-level `solve` methods.
   ///
   /// \param solutions The set of solutions to this system of constraints.
-  void solve(SmallVectorImpl<Solution> &solutions);
+  void solveImpl(SmallVectorImpl<Solution> &solutions);
 
   /// Compare two solutions to the same set of constraints.
   ///
@@ -3699,17 +3712,18 @@ public:
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto used = TC.Context.getSolverMemory();
+    auto used = getASTContext().getSolverMemory();
     for (auto const& s : solutions) {
       used += s.getTotalMemory();
     }
     MaxMemory = std::max(used, MaxMemory);
-    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    auto threshold = getASTContext().LangOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       return isExpressionAlreadyTooComplex= true;
     }
 
-    auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
+    const auto timeoutThresholdInMillis =
+        getTypeChecker().getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
       // Disable warnings about expressions that go over the warning
       // threshold since we're arbitrarily ending evaluation and
@@ -3721,7 +3735,7 @@ public:
 
     // Bail out once we've looked at a really large number of
     // choices.
-    if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold) {
+    if (CountScopes > getASTContext().LangOpts.SolverBindingThreshold) {
       return isExpressionAlreadyTooComplex = true;
     }
 
@@ -3809,6 +3823,36 @@ public:
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
 
+private:
+  /// The set of expressions currently being analyzed for failures.
+  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
+
+public:
+  void addExprForDiagnosis(Expr *E1, Expr *Result) {
+    DiagnosedExprs[E1] = Result;
+  }
+  bool isExprBeingDiagnosed(Expr *E) {
+    if (DiagnosedExprs.count(E)) {
+      return true;
+    }
+    
+    if (baseCS && baseCS != this) {
+      return baseCS->isExprBeingDiagnosed(E);
+    }
+    return false;
+  }
+  Expr *getExprBeingDiagnosed(Expr *E) {
+    if (auto *expr = DiagnosedExprs[E]) {
+      return expr;
+    }
+    
+    if (baseCS && baseCS != this) {
+      return baseCS->getExprBeingDiagnosed(E);
+    }
+    return nullptr;
+  }
+        
+public:
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 

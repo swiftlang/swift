@@ -35,10 +35,11 @@ using namespace constraints;
 #define DEBUG_TYPE "ConstraintSystem"
 
 ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
-    : E(E), WarnLimit(CS.TC.getWarnLongExpressionTypeChecking()),
+    : E(E), WarnLimit(CS.getTypeChecker().getWarnLongExpressionTypeChecking()),
       Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
-      PrintDebugTiming(CS.TC.getDebugTimeExpressions()), PrintWarning(true) {
+      PrintDebugTiming(CS.getTypeChecker().getDebugTimeExpressions()),
+      PrintWarning(true) {
   if (auto *baseCS = CS.baseCS) {
     // If we already have a timer in the base constraint
     // system, let's seed its start time to the child.
@@ -71,11 +72,11 @@ ExpressionTimer::~ExpressionTimer() {
       .highlight(E->getSourceRange());
 }
 
-ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
+ConstraintSystem::ConstraintSystem(DeclContext *dc,
                                    ConstraintSystemOptions options,
                                    Expr *expr)
-  : TC(tc), DC(dc), Options(options),
-    Arena(tc.Context, Allocator),
+  : Context(dc->getASTContext()), DC(dc), Options(options),
+    Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
   if (expr)
@@ -1707,7 +1708,7 @@ static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
 
   // FIXME(diagnostics): This check should be removed together with
   // expression based diagnostics.
-  if (cs.TC.isExprBeingDiagnosed(anchor))
+  if (cs.isExprBeingDiagnosed(anchor))
     return false;
 
   // If this is a reference to instance method marked as 'mutating'
@@ -2404,7 +2405,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     state.recordFixes = true;
 
     // Solve the system.
-    solve(viable);
+    solveImpl(viable);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
@@ -2627,7 +2628,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       ConstraintSystem::SolverScope scope(*this);
       applySolution(*viable.first);
       // All of the solutions supposed to produce a "candidate" note.
-      diagnosed &= viable.second->diagnose(expr, /*asNote*/ true);
+      diagnosed &= viable.second->diagnose(/*asNote*/ true);
     }
 
     // If not all of the fixes produced a note, we can't diagnose this.
@@ -2752,7 +2753,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    TrailingClosureAmbiguityFailure failure(expr, *this, anchor,
+    TrailingClosureAmbiguityFailure failure(*this, anchor,
                                             overload.choices);
     if (failure.diagnoseAsNote())
       return true;

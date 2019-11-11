@@ -814,6 +814,7 @@ getBestRequirementSource(GenericSignatureBuilder &builder,
     }
   }
 
+  assert(bestSource && "All sources were self-recursive?");
   return bestSource;
 }
 

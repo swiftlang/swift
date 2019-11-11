@@ -711,6 +711,20 @@ public:
   /// Check whether the current token starts with '>'.
   bool startsWithGreater(Token Tok) { return startsWithSymbol(Tok, '>'); }
 
+  /// Returns true if token is an identifier with the given value.
+  bool isIdentifier(Token Tok, StringRef value) {
+    return Tok.is(tok::identifier) && Tok.getText() == value;
+  }
+
+  /// Returns true if token is the identifier "wrt".
+  bool isWRTIdentifier(Token tok) { return isIdentifier(Tok, "wrt"); }
+
+  /// Returns true if token is the identifier "jvp".
+  bool isJVPIdentifier(Token Tok) { return isIdentifier(Tok, "jvp"); }
+
+  /// Returns true if token is the identifier "vjp".
+  bool isVJPIdentifier(Token Tok) { return isIdentifier(Tok, "vjp"); }
+
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
@@ -795,6 +809,12 @@ public:
                           Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseAnyIdentifier(Result, L, Diagnostic(ID, Args...));
   }
+
+  /// \brief Parse an unsigned integer and returns it in \p Result. On failure
+  /// emit the specified error diagnostic, and a note at the specified note
+  /// location.
+  bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
+                            const Diagnostic &D);
 
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
@@ -972,6 +992,20 @@ public:
   /// \p Attr is where to store the parsed attribute
   ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
+
+  /// Parse the @differentiable attribute.
+  ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
+                                                                SourceLoc Loc);
+
+  /// Parse the arguments inside the @differentiable attribute.
+  bool parseDifferentiableAttributeArguments(
+      bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
+      Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
+      TrailingWhereClause *&whereClause);
+
+  /// Parse a differentiation parameters clause.
+  bool parseDifferentiationParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1211,6 +1245,9 @@ public:
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
+
+    /// True if this parameter is potentially destructuring a tuple argument.
+    bool isPotentiallyDestructured = false;
   };
 
   /// Describes the context in which the given parameter is being parsed.

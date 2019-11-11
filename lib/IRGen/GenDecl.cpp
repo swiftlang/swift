@@ -1262,6 +1262,17 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
   if (!hasLazyMetadata(type))
     return;
 
+  // If the type can be generated in several TU with weak linkage we don't know
+  // which one will be picked up so we have to require the metadata. Otherwise,
+  // the situation can arise where one TU contains a type descriptor with a null
+  // metadata access function and the other TU which requires metadata has a
+  // type descriptor with a valid metadata access function but the linker picks
+  // the first one.
+  if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(
+          type->getDeclaredType()->getCanonicalType()))) {
+    requireMetadata = RequireMetadata;
+  }
+
   // Try to create a new record of the fact that we used this type.
   auto insertResult = LazyTypeGlobals.try_emplace(type);
   auto &entry = insertResult.first->second;

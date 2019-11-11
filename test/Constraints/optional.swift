@@ -373,3 +373,24 @@ func rdar_53238058() {
     // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }
+
+// SR-8411 - Inconsistent ambiguity with optional and non-optional inout-to-pointer
+func sr8411() {
+  struct S {
+    init(_ x: UnsafeMutablePointer<Int>) {}
+    init(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func foo(_ x: UnsafeMutablePointer<Int>) {}
+    static func foo(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func bar(_ x: UnsafeMutablePointer<Int>, _ y: Int) {}
+    static func bar(_ x: UnsafeMutablePointer<Int>?, _ y: Int) {}
+  }
+
+  var foo = 0
+
+  _ = S(&foo)      // Ok
+  _ = S.init(&foo) // Ok
+  _ = S.foo(&foo)  // Ok
+  _ = S.bar(&foo, 42) // Ok
+}
