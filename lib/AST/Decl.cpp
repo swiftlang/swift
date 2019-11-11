@@ -5914,7 +5914,8 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
               VarDecl::Introducer::Let,
               /*IsCaptureList*/ false, parameterNameLoc, parameterName, dc,
               StorageIsNotMutable),
-      ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
+      ArgumentNameAndDestructured(argumentName, false),
+      ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.SpecifierComputed = false;
   Bits.ParamDecl.defaultArgumentKind =
