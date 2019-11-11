@@ -245,7 +245,7 @@ struct Initialization {
   var y = true
 
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{Bool' is not convertible to 'Int}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
