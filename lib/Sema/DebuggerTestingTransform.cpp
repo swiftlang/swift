@@ -237,8 +237,8 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    auto &TC = swift::createTypeChecker(Ctx);
-    if (!TC.typeCheckExpression(FinalExpr, getCurrentDeclContext()))
+    (void)swift::createTypeChecker(Ctx);
+    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
     // Captures have to be computed after the closure is type-checked. This

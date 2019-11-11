@@ -138,8 +138,6 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
     return nullptr;
 
-  auto &TC = cs.getTypeChecker();
-
   auto *expr = locator->getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
     expr = assignExpr->getSrc();
@@ -149,9 +147,10 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
 
   auto subExpr = coerceExpr->getSubExpr();
   auto castKind =
-      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
-                              cs.DC, coerceExpr->getLoc(), subExpr,
-                              coerceExpr->getCastTypeLoc().getSourceRange());
+      TypeChecker::typeCheckCheckedCast(fromType, toType,
+                                        CheckedCastContextKind::None, cs.DC,
+                                        coerceExpr->getLoc(), subExpr,
+                                        coerceExpr->getCastTypeLoc().getSourceRange());
 
   // Invalid cast.
   if (castKind == CheckedCastKind::Unresolved)

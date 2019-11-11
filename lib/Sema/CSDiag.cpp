@@ -167,7 +167,7 @@ public:
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr) {
-    CS.TC.getPossibleTypesOfExpressionWithoutApplying(
+    TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
         expr, dc, types, allowFreeTypeVariables, listener);
     CS.cacheExprTypes(expr);
   }
@@ -177,8 +177,11 @@ public:
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr) {
-    auto type = CS.TC.getTypeOfExpressionWithoutApplying(expr, dc, referencedDecl,
-                                                         allowFreeTypeVariables, listener);
+    auto type =
+        TypeChecker::getTypeOfExpressionWithoutApplying(expr, dc,
+                                                        referencedDecl,
+                                                        allowFreeTypeVariables,
+                                                        listener);
     CS.cacheExprTypes(expr);
     return type;
   }
@@ -1014,8 +1017,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // expression (which may lead to infinite recursion).  If the client is
   // telling us that it knows what it is doing, then believe it.
   if (!options.contains(TCC_ForceRecheck)) {
-    if (CS.TC.isExprBeingDiagnosed(subExpr)) {
-      auto *savedExpr = CS.TC.getExprBeingDiagnosed(subExpr);
+    if (CS.getTypeChecker().isExprBeingDiagnosed(subExpr)) {
+      auto *savedExpr = CS.getTypeChecker().getExprBeingDiagnosed(subExpr);
       if (subExpr == savedExpr)
         return subExpr;
 
@@ -1025,7 +1028,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   }
 
   // Mark current expression as about to be diagnosed.
-  CS.TC.addExprForDiagnosis(subExpr, subExpr);
+  CS.getTypeChecker().addExprForDiagnosis(subExpr, subExpr);
 
   // Validate contextual type before trying to use it.
   std::tie(convertType, convertTypePurpose) =
@@ -1081,8 +1084,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // if there is a closure in the subexpression, we can violate invariants.
   auto *DC = findDeclContext(subExpr);
   auto resultTy =
-      CS.TC.typeCheckExpression(subExpr, DC, TypeLoc::withoutLoc(convertType),
-                                convertTypePurpose, TCEOptions, listener, &CS);
+      TypeChecker::typeCheckExpression(subExpr, DC,
+                                       TypeLoc::withoutLoc(convertType),
+                                       convertTypePurpose, TCEOptions,
+                                       listener, &CS);
 
   CS.cacheExprTypes(subExpr);
 
@@ -1113,7 +1118,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   }
 
   if (preCheckedExpr != subExpr)
-    CS.TC.addExprForDiagnosis(preCheckedExpr, subExpr);
+    CS.getTypeChecker().addExprForDiagnosis(preCheckedExpr, subExpr);
 
   return subExpr;
 }
@@ -1755,7 +1760,8 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
     for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i) {
       ConcreteDeclRef ref = nullptr;
       auto *el = argTuple->getElement(i);
-      auto typeResult = getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
+      auto typeResult =
+          TypeChecker::getTypeOfExpressionWithoutApplying(el, CS.DC, ref);
       if (!typeResult)
         return false;
       auto flags = ParameterTypeFlags().withInOut(typeResult->is<InOutType>());
@@ -2095,7 +2101,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
         ConcreteDeclRef decl = nullptr;
         message = diag::cannot_subscript_with_index;
 
-        if (getTypeOfExpressionWithoutApplying(expr, CS.DC, decl))
+        if (TypeChecker::getTypeOfExpressionWithoutApplying(expr, CS.DC, decl))
           return false;
 
         // If we are down to a single candidate but with an unresolved
@@ -2232,7 +2238,7 @@ static bool diagnoseClosureExplicitParameterMismatch(
         isUnresolvedOrTypeVarType(argType))
       continue;
 
-    if (!CS.TC.isConvertibleTo(argType, paramType, CS.DC)) {
+    if (!TypeChecker::isConvertibleTo(argType, paramType, CS.DC)) {
       CS.getASTContext().Diags.diagnose(loc, diag::types_not_convertible,
                                         false, paramType, argType);
       return true;
@@ -2585,7 +2591,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
              "unexpected declaration reference");
 
       ConcreteDeclRef decl = nullptr;
-      Type type = getTypeOfExpressionWithoutApplying(
+      Type type = TypeChecker::getTypeOfExpressionWithoutApplying(
           fnExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType,
           &listener);
 
@@ -3211,7 +3217,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // diagnose situations where contextual type expected one result
       // type but actual closure produces a different one without explicitly
       // declaring it (e.g. by using anonymous parameters).
-      auto type = getTypeOfExpressionWithoutApplying(
+      auto type = TypeChecker::getTypeOfExpressionWithoutApplying(
           closure, CS.DC, decl, FreeTypeVariableBinding::Disallow);
 
       if (type && resultTypeProcessor(type, expectedResultType))
@@ -4062,7 +4068,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       if (hasUnresolvedParams)
         continue;
 
-      CS.TC.preCheckExpression(resultExpr, CS.DC);
+      ConstraintSystem::preCheckExpression(resultExpr, CS.DC);
 
       // Obtain type of the result expression without applying solutions,
       // because otherwise this might result in leaking of type variables,
@@ -4070,7 +4076,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       // successfully type-checked its type cleanup is going to be disabled
       // (we are allowing unresolved types), and as a side-effect it might
       // also be transformed e.g. OverloadedDeclRefExpr -> DeclRefExpr.
-      auto type = getTypeOfExpressionWithoutApplying(
+      auto type = TypeChecker::getTypeOfExpressionWithoutApplying(
           resultExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType);
       if (type)
         resultType = type->getRValueType();

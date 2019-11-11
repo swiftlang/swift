@@ -1745,6 +1745,36 @@ public:
   void cacheResult(Witness value) const;
 };
 
+enum class FunctionBuilderClosurePreCheck : uint8_t {
+  /// There were no problems pre-checking the closure.
+  Okay,
+
+  /// There was an error pre-checking the closure.
+  Error,
+
+  /// The closure has a return statement.
+  HasReturnStmt,
+};
+
+class PreCheckFunctionBuilderRequest
+    : public SimpleRequest<PreCheckFunctionBuilderRequest,
+                           FunctionBuilderClosurePreCheck(ClosureExpr *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<FunctionBuilderClosurePreCheck>
+  evaluate(Evaluator &evaluator, ClosureExpr *closure) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1767,6 +1797,7 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
+void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

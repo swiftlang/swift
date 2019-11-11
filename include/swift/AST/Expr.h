@@ -5407,6 +5407,9 @@ Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
                               [](const Expr *E) -> Type {
                                 return E->getType();
                               });
+
+void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
+
 } // end namespace swift
 
 #endif

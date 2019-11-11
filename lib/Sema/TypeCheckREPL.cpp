@@ -257,7 +257,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   // FIXME: Remove TypeChecker dependency.
   auto &TC = *Context.getLegacyGlobalTypeChecker();
-  TC.typeCheckClosureBody(CE);
+  TypeChecker::typeCheckClosureBody(CE);
   TC.ClosuresWithUncomputedCaptures.push_back(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });

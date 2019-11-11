@@ -35,10 +35,11 @@ using namespace constraints;
 #define DEBUG_TYPE "ConstraintSystem"
 
 ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
-    : E(E), WarnLimit(CS.TC.getWarnLongExpressionTypeChecking()),
+    : E(E), WarnLimit(CS.getTypeChecker().getWarnLongExpressionTypeChecking()),
       Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
-      PrintDebugTiming(CS.TC.getDebugTimeExpressions()), PrintWarning(true) {
+      PrintDebugTiming(CS.getTypeChecker().getDebugTimeExpressions()),
+      PrintWarning(true) {
   if (auto *baseCS = CS.baseCS) {
     // If we already have a timer in the base constraint
     // system, let's seed its start time to the child.
@@ -71,11 +72,11 @@ ExpressionTimer::~ExpressionTimer() {
       .highlight(E->getSourceRange());
 }
 
-ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
+ConstraintSystem::ConstraintSystem(DeclContext *dc,
                                    ConstraintSystemOptions options,
                                    Expr *expr)
-  : TC(tc), DC(dc), Options(options),
-    Arena(tc.Context, Allocator),
+  : Context(dc->getASTContext()), DC(dc), Options(options),
+    Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
   if (expr)
@@ -1707,7 +1708,7 @@ static bool shouldCheckForPartialApplication(ConstraintSystem &cs,
 
   // FIXME(diagnostics): This check should be removed together with
   // expression based diagnostics.
-  if (cs.TC.isExprBeingDiagnosed(anchor))
+  if (cs.getTypeChecker().isExprBeingDiagnosed(anchor))
     return false;
 
   // If this is a reference to instance method marked as 'mutating'
