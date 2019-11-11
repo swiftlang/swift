@@ -45,10 +45,3 @@ void PersistentParserState::parseAllDelayedDeclLists() {
   for (auto IDC : DelayedDeclLists)
     IDC->loadAllMembers();
 }
-
-void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
-                                          SourceRange BodyRange,
-                                          SourceLoc PreviousLoc) {
-  delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
-            PreviousLoc);
-}

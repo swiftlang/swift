@@ -256,8 +256,9 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
-  State->delayTopLevel(TLCD, {BeginLoc, EndLoc},
-                       BeginParserPosition.PreviousLoc);
+  State->delayDecl(PersistentParserState::DelayedDeclKind::TopLevelCodeDecl,
+                   PD_Default, TLCD, {BeginLoc, EndLoc},
+                   BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.

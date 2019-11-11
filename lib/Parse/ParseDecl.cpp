@@ -3045,21 +3045,6 @@ void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
   }
 }
 
-void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
-                                           ParseDeclOptions Flags) {
-  auto CurLoc = Tok.getLoc();
-  backtrackToPosition(BeginParserPosition);
-  SourceLoc BeginLoc = Tok.getLoc();
-  SourceLoc EndLoc = CurLoc;
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl,
-                   Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
-
-  while (Tok.isNot(tok::eof))
-    consumeToken();
-}
-
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -3429,26 +3414,23 @@ Parser::parseDecl(ParseDeclOptions Flags,
     consumeToken(tok::code_complete);
   }
 
-  if (AttrStatus.hasCodeCompletion()) {
-    if (CodeCompletion) {
+  if (AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion()) {
+    if (isCodeCompletionFirstPass() &&
+        !CurDeclContext->isModuleScopeContext() &&
+        !isa<TopLevelCodeDecl>(CurDeclContext) &&
+        !isa<AbstractClosureExpr>(CurDeclContext)) {
+      // Only consume non-toplevel decls.
+      consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
+
+      return makeParserError();
+    }
+    if (AttrStatus.hasCodeCompletion() && CodeCompletion) {
       Optional<DeclKind> DK;
       if (DeclResult.isNonNull())
         DK = DeclResult.get()->getKind();
       CodeCompletion->setAttrTargetDeclKind(DK);
-    } else {
-      delayParseFromBeginningToHere(BeginParserPosition, Flags);
-      return makeParserError();
     }
-  }
-
-  if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleScopeContext() &&
-      !isa<TopLevelCodeDecl>(CurDeclContext) &&
-      !isa<AbstractClosureExpr>(CurDeclContext)) {
-    // Only consume non-toplevel decls.
-    consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
-
-    return makeParserError();
+    DeclResult.setHasCodeCompletion();
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {

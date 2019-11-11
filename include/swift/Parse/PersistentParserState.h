@@ -95,9 +95,6 @@ public:
 
   void delayDeclList(IterableDeclContext *D);
 
-  void delayTopLevel(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
-                     SourceLoc PreviousLoc);
-
   bool hasDelayedDecl() {
     return CodeCompletionDelayedDeclState.get() != nullptr;
   }
