@@ -212,7 +212,6 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
-  llvm::SaveAndRestore<TypeCheckerOptions> clearTyOpts(Ctx.TypeCheckerOpts, {});
   performTypeChecking(SF, PersistentState.getTopLevelContext(),
                       OriginalDeclCount);
 

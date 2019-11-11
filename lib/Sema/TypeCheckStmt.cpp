@@ -1280,9 +1280,6 @@ public:
   }
 
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
