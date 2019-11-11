@@ -253,9 +253,12 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
 
   for (auto Info : ReflectionInfos) {
     for (auto BuiltinTypeDescriptor : Info.Builtin) {
-      assert(BuiltinTypeDescriptor->Size > 0);
-      assert(BuiltinTypeDescriptor->getAlignment() > 0);
-      assert(BuiltinTypeDescriptor->Stride > 0);
+      if (BuiltinTypeDescriptor->Size <= 0)
+        continue;
+      if (BuiltinTypeDescriptor->getAlignment() <= 0)
+        continue;
+      if (BuiltinTypeDescriptor->Stride <= 0)
+        continue;
       if (!BuiltinTypeDescriptor->hasMangledTypeName())
         continue;
       auto CandidateMangledName =
