@@ -637,8 +637,19 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
 
   // If we only are tracking a singular value, we do not need to construct
   // SSA. Just return that value.
-  if (auto val = singularValue.getValueOr(SILValue()))
+  if (auto val = singularValue.getValueOr(SILValue())) {
+    // This assert documents that we are expecting that if we are in ossa, have
+    // a non-trivial value, and are not taking, we should never go down this
+    // code path. If we did, we would need to insert a copy here. The reason why
+    // we know we will never go down this code path is since we have been
+    // inserting copy_values implying that our potential singular value would be
+    // of the copy_values which are guaranteed to all be different.
+    assert((!B.hasOwnership() || isTake() ||
+            val->getType().isTrivial(*B.getInsertionBB()->getParent())) &&
+           "Should never reach this code path if we are in ossa and have a "
+           "non-trivial value");
     return val;
+  }
 
   // Finally, grab the value from the SSA updater.
   SILValue result = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
@@ -741,7 +752,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   }
 
   // If we have an available value, then we want to extract the subelement from
-  // the borrowed aggregate before each insertion point.
+  // the borrowed aggregate before each insertion point. Note that since we have
+  // inserted copies at each of these insertion points, we know that we will
+  // never have the same value along all paths unless we have a trivial value
+  // meaning the SSA updater given a non-trivial value must /always/ be used.
   SILSSAUpdater updater;
   updater.Initialize(loadTy);
 
@@ -764,13 +778,25 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     updater.AddAvailableValue(i->getParent(), eltVal);
   }
 
-  // If we only are tracking a singular value, we do not need to construct
-  // SSA. Just return that value.
-  if (auto val = singularValue.getValueOr(SILValue()))
+  SILBasicBlock *insertBlock = B.getInsertionBB();
+
+  // If we are not in ossa and have a singular value or if we are in ossa and
+  // have a trivial singular value, just return that value.
+  //
+  // This can never happen for non-trivial values in ossa since we never should
+  // visit this code path if we have a take implying that non-trivial values
+  // /will/ have a copy and thus are guaranteed (since each copy yields a
+  // different value) to not be singular values.
+  if (auto val = singularValue.getValueOr(SILValue())) {
+    assert((!B.hasOwnership() ||
+            val->getType().isTrivial(*insertBlock->getParent())) &&
+           "Should have inserted copies for each insertion point, so shouldn't "
+           "have a singular value if non-trivial?!");
     return val;
+  }
 
   // Finally, grab the value from the SSA updater.
-  SILValue eltVal = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
+  SILValue eltVal = updater.GetValueInMiddleOfBlock(insertBlock);
   assert(!B.hasOwnership() ||
          eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
   assert(eltVal->getType() == loadTy && "Subelement types mismatch");

@@ -16,7 +16,14 @@ struct NativeObjectPair {
   var y: Builtin.NativeObject
 }
 
+struct IntPair {
+  var x: Builtin.Int32
+  var y: Builtin.Int32
+}
+
 sil @guaranteed_object_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @intpair_user : $@convention(thin) (IntPair) -> ()
+sil @inout_int32_user : $@convention(thin) (@inout Builtin.Int32) -> ()
 
 /// Needed to avoid tuple scalarization code in the use gatherer.
 struct NativeObjectAndTuple {
@@ -683,6 +690,134 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
 
   destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
   dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_available_values_diamond_followed_by_loop_trivial : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK-NOT: load [trivial] %{{[0-9][0-9]*}} : $*IntPair
+// CHECK-NOT: bb{{[0-9][0-9]*}}(
+// CHECK: } // end sil function 'multiple_available_values_diamond_followed_by_loop_trivial'
+sil [ossa] @multiple_available_values_diamond_followed_by_loop_trivial : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0a : $Builtin.Int32, %0b : $Builtin.Int32):
+  %func = function_ref @intpair_user : $@convention(thin) (IntPair) -> ()
+  %1 = alloc_stack $IntPair
+  %1a = struct_element_addr %1 : $*IntPair, #IntPair.x
+  %1b = struct_element_addr %1 : $*IntPair, #IntPair.y
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0a to [trivial] %1a : $*Builtin.Int32
+  store %0b to [trivial] %1b : $*Builtin.Int32
+  br bb3
+
+bb2:
+  store %0a to [trivial] %1a : $*Builtin.Int32
+  store %0b to [trivial] %1b : $*Builtin.Int32
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  %2 = load [trivial] %1 : $*IntPair
+  cond_br undef, bb6, bb7
+
+bb6:
+  apply %func(%2) : $@convention(thin) (IntPair) -> ()
+  br bb5
+
+bb7:
+  apply %func(%2) : $@convention(thin) (IntPair) -> ()
+  dealloc_stack %1 : $*IntPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_available_values_diamond_followed_by_loop_trivial_reload : $@convention(thin) (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> () {
+// CHECK: bb0(
+// CHECK-NOT: load [trivial] %{{[0-9][0-9]*}} : $*IntPair
+// CHECK-NOT: bb{{[0-9][0-9]*}}(
+// CHECK: } // end sil function 'multiple_available_values_diamond_followed_by_loop_trivial_reload'
+sil [ossa] @multiple_available_values_diamond_followed_by_loop_trivial_reload : $@convention(thin) (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0a : $Builtin.Int32, %0b : $Builtin.Int32, %0c : $Builtin.Int32):
+  %func = function_ref @intpair_user : $@convention(thin) (IntPair) -> ()
+  %1 = alloc_stack $IntPair
+  %1a = struct_element_addr %1 : $*IntPair, #IntPair.x
+  %1b = struct_element_addr %1 : $*IntPair, #IntPair.y
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0a to [trivial] %1a : $*Builtin.Int32
+  store %0c to [trivial] %1b : $*Builtin.Int32
+  br bb3
+
+bb2:
+  store %0a to [trivial] %1a : $*Builtin.Int32
+  store %0b to [trivial] %1b : $*Builtin.Int32
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  %2 = load [trivial] %1 : $*IntPair
+  cond_br undef, bb6, bb7
+
+bb6:
+  apply %func(%2) : $@convention(thin) (IntPair) -> ()
+  br bb5
+
+bb7:
+  apply %func(%2) : $@convention(thin) (IntPair) -> ()
+  dealloc_stack %1 : $*IntPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @multiple_available_values_diamond_followed_by_loop_trivial_store_in_loop : $@convention(thin) (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0a : $Builtin.Int32, %0b : $Builtin.Int32, %0c : $Builtin.Int32):
+  %func = function_ref @intpair_user : $@convention(thin) (IntPair) -> ()
+  %1 = alloc_stack $IntPair
+  %1a = struct_element_addr %1 : $*IntPair, #IntPair.x
+  %1b = struct_element_addr %1 : $*IntPair, #IntPair.y
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0a to [trivial] %1a : $*Builtin.Int32
+  store %0b to [trivial] %1b : $*Builtin.Int32
+  br bb3
+
+bb2:
+  store %0a to [trivial] %1a : $*Builtin.Int32
+  store %0b to [trivial] %1b : $*Builtin.Int32
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  %2 = load [trivial] %1 : $*IntPair
+  cond_br undef, bb6, bb7
+
+bb6:
+  apply %func(%2) : $@convention(thin) (IntPair) -> ()
+  store %0b to [trivial] %1b : $*Builtin.Int32
+  br bb5
+
+bb7:
+  apply %func(%2) : $@convention(thin) (IntPair) -> ()
+  dealloc_stack %1 : $*IntPair
   %9999 = tuple()
   return %9999 : $()
 }
