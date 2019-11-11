@@ -1320,6 +1320,9 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
 
+    // Differentiation-related attributes.
+    UNINTERESTING_ATTR(Differentiable)
+
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
