@@ -46,7 +46,10 @@ public:
   DeclContext *getConformanceContext() const;
 
   /// Add \c children as members of the context that declares the conformance.
-  void addMembersToConformanceContext(ArrayRef<Decl *> children);
+  ///
+  /// \returns True if any of the added members were found to be invalid after type
+  /// checking.
+  bool addMembersToConformanceContext(ArrayRef<Decl *> children);
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;

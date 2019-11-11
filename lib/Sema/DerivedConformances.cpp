@@ -35,13 +35,16 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
-void DerivedConformance::addMembersToConformanceContext(
+bool DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  bool anyInvalid = false;
   for (auto child : children) {
     IDC->addMember(child);
     TypeChecker::typeCheckDecl(child);
+    anyInvalid |= child->isInvalid();
   }
+  return anyInvalid;
 }
 
 Type DerivedConformance::getProtocolType() const {
