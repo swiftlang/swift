@@ -1113,3 +1113,22 @@ Optional<Witness> ValueWitnessRequest::getCachedResult() const {
 void ValueWitnessRequest::cacheResult(Witness type) const {
   // FIXME: Refactor this to be the thing that warms the cache.
 }
+
+//----------------------------------------------------------------------------//
+// PreCheckFunctionBuilderRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FunctionBuilderClosurePreCheck value) {
+  switch (value) {
+  case FunctionBuilderClosurePreCheck::Okay:
+    out << "okay";
+    break;
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+    out << "has return statement";
+    break;
+  case FunctionBuilderClosurePreCheck::Error:
+    out << "error";
+    break;
+  }
+}

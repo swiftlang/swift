@@ -2332,7 +2332,7 @@ namespace {
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
           if (!exnType)
             return false;
-          if (CS.TC.coercePatternToType(pattern,
+          if (TypeChecker::coercePatternToType(pattern,
                                         TypeResolution::forContextual(CS.DC),
                                         exnType,
                                         TypeResolverContext::InExpression)) {
@@ -3626,7 +3626,7 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
+          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
         }
       }
 
@@ -3799,9 +3799,8 @@ bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, GenericSignature sig,
     SubstitutionMap Substitutions, bool isExtension) {
 
-  auto *TC = DC->getASTContext().getLegacyGlobalTypeChecker();
   ConstraintSystemOptions Options;
-  ConstraintSystem CS(*TC, const_cast<DeclContext *>(DC), Options);
+  ConstraintSystem CS(const_cast<DeclContext *>(DC), Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 
   // For every requirement, add a constraint.
@@ -3819,14 +3818,6 @@ bool swift::areGenericRequirementsSatisfied(
 
   // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
-}
-
-bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
-                       ConstraintKind kind, DeclContext *dc) {
-  auto *TC = dc->getASTContext().getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker to make semantic query!");
-  return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
-                                    /*unwrappedIUO=*/nullptr);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
@@ -3873,7 +3864,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   // If the current ast context has no type checker, create one for it.
   auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
   assert(TC && "Must have type checker to make global query!");
-  ConstraintSystem CS(*TC, &DC, None);
+  ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(

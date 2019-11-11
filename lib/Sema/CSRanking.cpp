@@ -313,8 +313,7 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
 
 /// Determine whether one protocol extension is at least as specialized as
 /// another.
-static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
-                                               DeclContext *dc1,
+static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
                                                DeclContext *dc2) {
   assert(dc1->getExtendedProtocolDecl());
   assert(dc2->getExtendedProtocolDecl());
@@ -340,7 +339,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
-  ConstraintSystem cs(tc, dc1, None);
+  ConstraintSystem cs(dc1, None);
   OpenedTypeMap replacements;
   cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
@@ -390,9 +389,6 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  // FIXME: Remove dependency on the global type checker.
-      auto *tc = C.getLegacyGlobalTypeChecker();
-
   if (C.LangOpts.DebugConstraintSolver) {
     auto &log = C.TypeCheckerDebug->getStream();
     log << "Comparing declarations\n";
@@ -445,8 +441,8 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     // Both members are in protocol extensions.
     // Determine whether the 'Self' type from the first protocol extension
     // satisfies all of the requirements of the second protocol extension.
-    bool better1 = isProtocolExtensionAsSpecializedAs(*tc, outerDC1, outerDC2);
-    bool better2 = isProtocolExtensionAsSpecializedAs(*tc, outerDC2, outerDC1);
+    bool better1 = isProtocolExtensionAsSpecializedAs(outerDC1, outerDC2);
+    bool better2 = isProtocolExtensionAsSpecializedAs(outerDC2, outerDC1);
     if (better1 != better2) {
       return completeResult(better1);
     }
@@ -507,7 +503,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
   };
 
   // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(*tc, dc, ConstraintSystemOptions());
+  ConstraintSystem cs(dc, ConstraintSystemOptions());
   bool knownNonSubtype = false;
 
   auto *locator = cs.getConstraintLocator(nullptr);
@@ -846,7 +842,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
 
     // The kinds of overload choice match, but the contents don't.
-    auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
       continue;
@@ -905,9 +900,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
-              if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
+              if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
                 score1 += weight;
-              } else if (tc.isSubtypeOf(resType2, resType1, cs.DC)) {
+              } else if (TypeChecker::isSubtypeOf(resType2, resType1, cs.DC)) {
                 score2 += weight;
               }
             }
@@ -1046,7 +1041,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
-  auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
@@ -1072,8 +1066,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    auto type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
-    auto type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
+    auto type1Better = TypeChecker::isSubtypeOf(type1, type2, cs.DC);
+    auto type2Better = TypeChecker::isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;

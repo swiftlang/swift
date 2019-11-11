@@ -901,10 +901,9 @@ RequirementMatch matchWitness(
                    > finalize);
 
 RequirementMatch
-  matchWitness(TypeChecker &tc,
-               WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-               ProtocolDecl *proto, ProtocolConformance *conformance,
-               DeclContext *dc, ValueDecl *req, ValueDecl *witness);
+matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+             ProtocolDecl *proto, ProtocolConformance *conformance,
+             DeclContext *dc, ValueDecl *req, ValueDecl *witness);
 
 /// If the given type is a direct reference to an associated type of
 /// the given protocol, return the referenced associated type.

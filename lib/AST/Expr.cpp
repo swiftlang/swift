@@ -2246,6 +2246,19 @@ SourceLoc TapExpr::getEndLoc() const {
   return SourceLoc();
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
+  if (!CE) {
+    out << "(null)";
+    return;
+  }
+
+  if (CE->hasSingleExpressionBody()) {
+    out << "single expression closure";
+  } else {
+    out << "closure";
+  }
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.

@@ -387,7 +387,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       // type is identical to the argument type, or substitutable via handling
       // of functions with primary archetypes in one or more parameters.
       // We can still do something more sophisticated with this.
-      // FIXME: Use TC.isConvertibleTo?
+      // FIXME: Use TypeChecker::isConvertibleTo?
       
       TypeSubstitutionMap archetypesMap;
       bool matched;

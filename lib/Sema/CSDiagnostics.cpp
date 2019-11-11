@@ -521,11 +521,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
   if (req.getKind() != RequirementKind::SameType) {
     if (auto wrappedType = lhs->getOptionalObjectType()) {
-      auto &tc = getTypeChecker();
       auto kind = (req.getKind() == RequirementKind::Superclass ?
                    ConstraintKind::Subtype : ConstraintKind::ConformsTo);
-      if (tc.typesSatisfyConstraint(wrappedType, rhs, /*openArchetypes=*/false,
-                                    kind, getDC()))
+      if (TypeChecker::typesSatisfyConstraint(wrappedType, rhs,
+                                              /*openArchetypes=*/false,
+                                              kind, getDC()))
         emitDiagnostic(getAnchor()->getLoc(),
                        diag::wrapped_type_satisfies_requirement, wrappedType);
     }
@@ -1029,8 +1029,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     return false;
 
   auto *DC = getDC();
-  auto &TC = getTypeChecker();
-
   auto *anchor = getAnchor();
   if (auto *assign = dyn_cast<AssignExpr>(anchor))
     anchor = assign->getSrc();
@@ -1043,9 +1041,8 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (!toType->hasTypeRepr())
     return false;
 
-  bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
-  bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType, DC);
-  if (!useAs && !useAsBang)
+  bool useAs = TypeChecker::isExplicitlyConvertibleTo(fromType, toType, DC);
+  if (!useAs && !TypeChecker::checkedCastMaySucceed(fromType, toType, DC))
     return false;
 
   auto *expr = findParentExpr(getAnchor());
@@ -2287,8 +2284,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 }
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
-  auto &TC = getTypeChecker();
-
   if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
     return false;
 
@@ -2297,7 +2292,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     return false;
 
   if (ToType->is<AnyFunctionType>() ||
-      !TC.isConvertibleTo(srcFT->getResult(), ToType, getDC()))
+      !TypeChecker::isConvertibleTo(srcFT->getResult(), ToType, getDC()))
     return false;
 
   auto *anchor = getAnchor();
@@ -2479,8 +2474,6 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     InFlightDiagnostic &diagnostic,
     KnownProtocolKind rawRepresentableProtocol) const {
   auto &CS = getConstraintSystem();
-  auto &TC = getTypeChecker();
-
   auto *expr = getAnchor();
   auto fromType = getFromType();
   auto toType = getToType();
@@ -2549,7 +2542,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
       convWrapBefore += "(rawValue: ";
       std::string convWrapAfter = ")";
       if (!isa<LiteralExpr>(expr) &&
-          !TC.isConvertibleTo(fromType, rawTy, getDC())) {
+          !TypeChecker::isConvertibleTo(fromType, rawTy, getDC())) {
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (rawRepresentableProtocol) {
@@ -2574,7 +2567,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     if (conformsToKnownProtocol(CS, toType, rawRepresentableProtocol)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
-      if (!TC.isConvertibleTo(rawTy, toType, getDC())) {
+      if (!TypeChecker::isConvertibleTo(rawTy, toType, getDC())) {
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (rawRepresentableProtocol) {
@@ -2621,8 +2614,7 @@ bool ContextualFailure::tryIntegerCastFixIts(
   auto *anchor = getAnchor();
   if (Expr *innerE = getInnerCastedExpr(anchor)) {
     Type innerTy = getType(innerE);
-    auto &TC = getTypeChecker();
-    if (TC.isConvertibleTo(innerTy, ToType, getDC())) {
+    if (TypeChecker::isConvertibleTo(innerTy, ToType, getDC())) {
       // Remove the unnecessary cast.
       diagnostic.fixItRemoveChars(anchor->getLoc(), innerE->getStartLoc())
           .fixItRemove(anchor->getEndLoc());
@@ -2682,10 +2674,10 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   if (!toType->hasTypeRepr())
     return false;
 
-  auto &TC = getTypeChecker();
   CheckedCastKind Kind =
-      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
-                              getDC(), SourceLoc(), nullptr, SourceRange());
+      TypeChecker::typeCheckCheckedCast(fromType, toType,
+                                        CheckedCastContextKind::None, getDC(),
+                                        SourceLoc(), nullptr, SourceRange());
 
   if (Kind != CheckedCastKind::Unresolved) {
     auto *anchor = getAnchor();
@@ -4140,8 +4132,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = cs.simplifyType(cs.getType(argument));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  auto &TC = cs.getTypeChecker();
-  return TC.isConvertibleTo(argType, paramType, cs.DC);
+  return TypeChecker::isConvertibleTo(argType, paramType, cs.DC);
 }
 
 std::tuple<Expr *, Expr *, unsigned, bool>
@@ -4900,7 +4891,6 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     Anchor anchor) const {
   auto &cs = getConstraintSystem();
-  auto &TC = getTypeChecker();
   auto *paramDC = getDeclContext();
 
   if (!paramDC)
@@ -4946,8 +4936,8 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
   SmallString<64> paramsAsString;
   auto baseType = anchor.get<TypeRepr *>();
-  if (TC.getDefaultGenericArgumentsString(paramsAsString, GTD,
-                                          getPreferredType)) {
+  if (TypeChecker::getDefaultGenericArgumentsString(paramsAsString, GTD,
+                                                    getPreferredType)) {
     auto diagnostic = emitDiagnostic(
         baseType->getLoc(), diag::unbound_generic_parameter_explicit_fix);
 
