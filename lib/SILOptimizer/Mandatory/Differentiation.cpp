@@ -1436,7 +1436,7 @@ private:
   /// Marks the given value as varied and propagates variedness to users.
   void setVariedAndPropagateToUsers(SILValue value,
                                     unsigned independentVariableIndex);
-  /// Propagates variedness for the given operand to its user's result.
+  /// Propagates variedness for the given operand to its user's results.
   void propagateVaried(Operand *operand, unsigned independentVariableIndex);
   /// Marks the given value as varied and recursively propagates variedness
   /// inwards (to operands) through projections. Skips `@noDerivative` struct
