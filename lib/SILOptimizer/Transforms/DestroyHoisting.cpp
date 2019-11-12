@@ -716,6 +716,10 @@ public:
     if (!F->hasOwnership())
       return;
 
+    // If we are not supposed to perform ossa optimizations, bail.
+    if (!F->getModule().getOptions().EnableOSSAOptimizations)
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "
                             << F->getName() << " ***\n");
 

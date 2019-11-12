@@ -254,6 +254,8 @@ def debugger_support : Flag<["-"], "debugger-support">,
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
+def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
+  HelpText<"Don't run SIL OSSA optimization passes.">;
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
