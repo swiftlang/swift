@@ -1199,8 +1199,8 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
-  assert((hasBeenBound() || canNeverBeBound()) &&
-         "Extension must have already been bound (by bindExtensions)");
+//  assert((hasBeenBound() || canNeverBeBound()) &&
+//         "Extension must have already been bound (by bindExtensions)");
   return ExtendedNominal.getPointer();
 }
 
