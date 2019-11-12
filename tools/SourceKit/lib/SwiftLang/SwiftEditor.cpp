@@ -110,6 +110,9 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
+  for (auto notePath : Info.EducationalNotePaths)
+    SKInfo.EducationalNotePaths.push_back(notePath);
+
   Optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
     BufferIDOpt = SM.findBufferContainingLoc(Info.Loc);
