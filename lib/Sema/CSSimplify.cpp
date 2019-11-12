@@ -5274,10 +5274,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
 
-    // FIXME: Deal with broken recursion
-    if (!decl->hasInterfaceType())
-      return;
-
     // Dig out the instance type and figure out what members of the instance type
     // we are going to see.
     auto baseTy = candidate.getBaseType();
@@ -5648,10 +5644,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         result.markErrorAlreadyDiagnosed();
         return result;
       }
-
-      // FIXME: Deal with broken recursion
-      if (!cand->hasInterfaceType())
-        continue;
 
       result.addUnviable(getOverloadChoice(cand, /*isBridged=*/false,
                                            /*isUnwrappedOptional=*/false),

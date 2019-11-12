@@ -3431,11 +3431,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
   }
 
-  Type interfaceType = getInterfaceType();
-  if (!interfaceType)
-    return ErrorType::get(getASTContext());
-
-  return interfaceType->getMetatypeInstanceType();
+  return getInterfaceType()->getMetatypeInstanceType();
 }
 
 int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
@@ -4775,10 +4771,6 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     return SelfReferenceKind::None();
 
   auto type = value->getInterfaceType();
-
-  // FIXME: Deal with broken recursion.
-  if (!type)
-    return SelfReferenceKind::None();
 
   // Skip invalid declarations.
   if (type->hasError())

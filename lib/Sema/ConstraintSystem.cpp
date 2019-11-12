@@ -1471,7 +1471,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
-  if (!type || type->hasError()) {
+  if (type->hasError()) {
     return Type();
   }
 

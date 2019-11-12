@@ -1163,8 +1163,7 @@ public:
         }
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        if (vd->getInterfaceType() && initialCaseVarDecl->getType() &&
-            !initialCaseVarDecl->isInvalid() &&
+        if (!initialCaseVarDecl->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           getASTContext().Diags.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
