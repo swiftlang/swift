@@ -766,7 +766,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -831,7 +831,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -908,7 +908,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 

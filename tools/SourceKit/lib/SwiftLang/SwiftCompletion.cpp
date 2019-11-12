@@ -212,7 +212,7 @@ static bool swiftCodeCompleteImpl(
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   SwiftConsumer.clearContext();
 
   return true;

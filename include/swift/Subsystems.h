@@ -199,6 +199,9 @@ namespace swift {
   /// \returns a reference to the type checker instance.
   TypeChecker &createTypeChecker(ASTContext &Ctx);
 
+  /// Bind all 'extension' visible from \p SF to the extended nominal.
+  void bindExtensions(SourceFile &SF);
+
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
   ///

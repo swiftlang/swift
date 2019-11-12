@@ -843,13 +843,13 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
 
-  // If the limiting AST stage is name binding, we're done.
-  if (limitStage <= SourceFile::NameBound) {
-    return;
-  }
-
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
+    if (limitStage == SourceFile::NameBound) {
+      bindExtensions(SF);
+      return;
+    }
+
     performTypeChecking(SF, PersistentState->getTopLevelContext(),
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
@@ -871,9 +871,16 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   });
 
   if (Invocation.isCodeCompletion()) {
+    assert(limitStage == SourceFile::NameBound);
     performCodeCompletionSecondPass(*PersistentState.get(),
                                     *Invocation.getCodeCompletionFactory());
   }
+
+  // If the limiting AST stage is name binding, we're done.
+  if (limitStage <= SourceFile::NameBound) {
+    return;
+  }
+
   finishTypeChecking(TypeCheckOptions);
 }
 
@@ -985,6 +992,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
         llvm_unreachable("invalid limit stage");
       case SourceFile::NameBound:
         performNameBinding(MainFile, CurTUElem);
+        bindExtensions(MainFile);
         break;
       case SourceFile::TypeChecked:
         const auto &options = Invocation.getFrontendOptions();
