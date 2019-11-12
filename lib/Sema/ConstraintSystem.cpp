@@ -2695,7 +2695,6 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   // Heuristically, all other things being equal, we should complain about the
   // ambiguous expression that (1) has the most overloads, (2) is deepest, or
   // (3) comes earliest in the expression.
-  auto depthMap = expr->getDepthMap();
   auto indexMap = expr->getPreorderIndexMap();
 
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
@@ -2711,10 +2710,10 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
       continue;
     unsigned index = it->second;
 
-    auto e = depthMap.find(anchor);
-    if (e == depthMap.end())
+    auto optDepth = getExprDepth(anchor);
+    if (!optDepth)
       continue;
-    unsigned depth = e->second.first;
+    unsigned depth = *optDepth;
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.
