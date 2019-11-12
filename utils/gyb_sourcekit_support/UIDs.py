@@ -95,6 +95,7 @@ UID_KEYS = [
     KEY('Ranges', 'key.ranges'),
     KEY('Fixits', 'key.fixits'),
     KEY('Diagnostics', 'key.diagnostics'),
+    KEY('EducationalNotes', 'key.educational_notes'),
     KEY('FormatOptions', 'key.editor.format.options'),
     KEY('CodeCompleteOptions', 'key.codecomplete.options'),
     KEY('FilterRules', 'key.codecomplete.filterrules'),

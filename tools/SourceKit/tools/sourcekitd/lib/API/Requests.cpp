@@ -2651,6 +2651,10 @@ static void fillDictionaryForDiagnosticInfoBase(
   if (!Info.Filename.empty())
     Elem.set(KeyFilePath, Info.Filename);
 
+  if (!Info.EducationalNotes.empty()) {
+    Elem.set(KeyEducationalNotes, Info.EducationalNotes);
+  }
+
   if (!Info.Ranges.empty()) {
     auto RangesArr = Elem.setArray(KeyRanges);
     for (auto R : Info.Ranges) {
