@@ -210,7 +210,7 @@ ATTRIBUTE_NODES = [
     # specifiers appear only once, in order.
     Node('DifferentiableAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@differentiable` attribute: an optional \
+         The arguments for the `@differentiable` attribute: an optional
          differentiation parameter list and associated functions.
          ''',
          children=[
@@ -220,10 +220,6 @@ ATTRIBUTE_NODES = [
                    The comma following the differentiation parameters clause,
                    if it exists.
                    ''', is_optional=True),
-             Child('MaybePrimal', kind='DifferentiableAttributeFuncSpecifier',
-                   is_optional=True),
-             Child('MaybeAdjoint', kind='DifferentiableAttributeFuncSpecifier',
-                   is_optional=True),
              Child('MaybeJVP', kind='DifferentiableAttributeFuncSpecifier',
                    is_optional=True),
              Child('MaybeVJP', kind='DifferentiableAttributeFuncSpecifier',
@@ -267,7 +263,7 @@ ATTRIBUTE_NODES = [
     # differentiation-param -> ('self' | identifer) ','?
     Node('DifferentiationParam', kind='Syntax',
          description='''
-         A differentiation parameter: either the "self" identifier or a \
+         A differentiation parameter: either the "self" identifier or a
          function parameter name.
          ''',
          traits=['WithTrailingComma'],
@@ -284,7 +280,7 @@ ATTRIBUTE_NODES = [
     #     ('jvp' | 'vjp') ':' func-decl-name ','?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
          description='''
-         A function specifier, consisting of an identifier, colon, and a \
+         A function specifier, consisting of an identifier, colon, and a
          function declaration name (e.g. `vjp: foo(_:_:)`).
          ''',
          traits=['WithTrailingComma'],
@@ -314,7 +310,7 @@ ATTRIBUTE_NODES = [
                    ]),
              Child('Arguments', kind='DeclNameArguments',
                    is_optional=True, description='''
-                   The argument labels of the referenced function, optionally \
+                   The argument labels of the referenced function, optionally
                    specified.
                    '''),
          ]),
