@@ -61,6 +61,7 @@ public:
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
     Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
                                 BufferID, CompInv.getLangOptions(),
+                                CompInv.getTypeCheckerOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     Parser->parse();

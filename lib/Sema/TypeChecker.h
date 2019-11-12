@@ -544,47 +544,6 @@ public:
 private:
   ASTContext &Context;
 
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, abort the expression type checker if it takes more
-  /// than this many seconds.
-  unsigned ExpressionTimeoutThreshold = 600;
-
-  /// If non-zero, abort the switch statement exhaustiveness checker if
-  /// the Space::minus function is called more than this many times.
-  ///
-  /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
-  // 4.2 GHz Intel Core i7.
-  // (It's arbitrary, but will keep the compiler from taking too much time.)
-  unsigned SwitchCheckingInvocationThreshold = 200000;
-
-  /// If true, the time it takes to type-check each function will be dumped
-  /// to llvm::errs().
-  bool DebugTimeFunctionBodies = false;
-
-  /// If true, the time it takes to type-check each expression will be
-  /// dumped to llvm::errs().
-  bool DebugTimeExpressions = false;
-
-  /// Indicate that the type checker is checking code that will be
-  /// immediately executed. This will suppress certain warnings
-  /// when executing scripts.
-  bool InImmediateMode = false;
-
-  /// Indicate that the type checker should skip type-checking non-inlinable
-  /// function bodies.
-  bool SkipNonInlinableFunctionBodies = false;
-
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
   friend class constraints::ConstraintSystem;
@@ -603,90 +562,6 @@ public:
   ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
-
-  /// Dump the time it takes to type-check each function to llvm::errs().
-  void enableDebugTimeFunctionBodies() {
-    DebugTimeFunctionBodies = true;
-  }
-
-  /// Dump the time it takes to type-check each function to llvm::errs().
-  void enableDebugTimeExpressions() {
-    DebugTimeExpressions = true;
-  }
-
-  bool getDebugTimeExpressions() {
-    return DebugTimeExpressions;
-  }
-
-  /// If \p timeInMS is non-zero, warn when a function body takes longer than
-  /// this many milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  void setWarnLongFunctionBodies(unsigned timeInMS) {
-    WarnLongFunctionBodies = timeInMS;
-  }
-
-  /// If \p timeInMS is non-zero, warn when type-checking an expression
-  /// takes longer than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  void setWarnLongExpressionTypeChecking(unsigned timeInMS) {
-    WarnLongExpressionTypeChecking = timeInMS;
-  }
-
-  /// Return the current setting for the number of milliseconds
-  /// threshold we use to determine whether to warn about an
-  /// expression taking a long time.
-  unsigned getWarnLongExpressionTypeChecking() {
-    return WarnLongExpressionTypeChecking;
-  }
-
-  /// Set the threshold that determines the upper bound for the number
-  /// of seconds we'll let the expression type checker run before
-  /// considering an expression "too complex".
-  void setExpressionTimeoutThreshold(unsigned timeInSeconds) {
-    ExpressionTimeoutThreshold = timeInSeconds;
-  }
-
-  /// Return the current setting for the threshold that determines
-  /// the upper bound for the number of seconds we'll let the
-  /// expression type checker run before considering an expression
-  /// "too complex".
-  /// If zero, do not limit the checking.
-  unsigned getExpressionTimeoutThresholdInSeconds() {
-    return ExpressionTimeoutThreshold;
-  }
-
-  /// Get the threshold that determines the upper bound for the number
-  /// of times we'll let the Space::minus routine run before
-  /// considering a switch statement "too complex".
-  /// If zero, do not limit the checking.
-  unsigned getSwitchCheckingInvocationThreshold() const {
-    return SwitchCheckingInvocationThreshold;
-  }
-
-  /// Set the threshold that determines the upper bound for the number
-  /// of times we'll let the Space::minus routine run before
-  /// considering a switch statement "too complex".
-  void setSwitchCheckingInvocationThreshold(unsigned invocationCount) {
-    SwitchCheckingInvocationThreshold = invocationCount;
-  }
-
-  void setSkipNonInlinableBodies(bool skip) {
-    SkipNonInlinableFunctionBodies = skip;
-  }
-
-  bool canSkipNonInlinableBodies() const {
-    return SkipNonInlinableFunctionBodies;
-  }
-
-  bool getInImmediateMode() {
-    return InImmediateMode;
-  }
-
-  void setInImmediateMode(bool InImmediateMode) {
-    this->InImmediateMode = InImmediateMode;
-  }
 
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
@@ -1184,8 +1059,9 @@ public:
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
-                                 bool limitChecking);
+  static void checkSwitchExhaustiveness(const SwitchStmt *stmt,
+                                        const DeclContext *DC,
+                                        bool limitChecking);
 
   /// Type check the given expression as a condition, which converts
   /// it to a logic value.

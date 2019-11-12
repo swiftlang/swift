@@ -3861,9 +3861,8 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  // If the current ast context has no type checker, create one for it.
-  auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker to make global query!");
+  assert(DC.getASTContext().getLegacyGlobalTypeChecker() &&
+         "Must have type checker to make global query!");
   ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.

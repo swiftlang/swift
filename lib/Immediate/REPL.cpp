@@ -193,8 +193,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
         parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
                             &PersistentState);
   } while (!Done);
-  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext(),
-                      /*Options*/None);
+  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext());
   return REPLModule;
 }
 

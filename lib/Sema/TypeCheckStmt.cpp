@@ -178,13 +178,9 @@ namespace {
   class FunctionBodyTimer {
     AnyFunctionRef Function;
     llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
-    unsigned WarnLimit;
-    bool ShouldDump;
 
   public:
-    FunctionBodyTimer(AnyFunctionRef Fn, bool shouldDump,
-                      unsigned warnLimit)
-        : Function(Fn), WarnLimit(warnLimit), ShouldDump(shouldDump) {}
+    FunctionBodyTimer(AnyFunctionRef Fn) : Function(Fn) {}
 
     ~FunctionBodyTimer() {
       llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
@@ -195,7 +191,7 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
       auto *AFD = Function.getAbstractFunctionDecl();
 
-      if (ShouldDump) {
+      if (ctx.TypeCheckerOpts.WarnLongFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
         llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
@@ -210,6 +206,7 @@ namespace {
         llvm::errs() << "\n";
       }
 
+      const auto WarnLimit = ctx.TypeCheckerOpts.DebugTimeFunctionBodies;
       if (WarnLimit != 0 && elapsedMS >= WarnLimit) {
         if (AFD) {
           ctx.Diags.diagnose(AFD, diag::debug_long_function_body,
@@ -1283,9 +1280,6 @@ public:
   }
 
   Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
@@ -1424,7 +1418,8 @@ public:
     }
 
     if (!switchStmt->isImplicit()) {
-      TC.checkSwitchExhaustiveness(switchStmt, DC, limitExhaustivityChecks);
+      TypeChecker::checkSwitchExhaustiveness(switchStmt, DC,
+                                             limitExhaustivityChecks);
     }
 
     return switchStmt;
@@ -2110,9 +2105,9 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
-  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
-  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
-    timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
+  const auto &tyOpts = ctx.TypeCheckerOpts;
+  if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
+    timer.emplace(AFD);
 
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())
@@ -2204,11 +2199,10 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
   BraceStmt *body = closure->getBody();
 
-  auto *TC = closure->getASTContext().getLegacyGlobalTypeChecker();
   Optional<FunctionBodyTimer> timer;
-  if (TC->DebugTimeFunctionBodies || TC->WarnLongFunctionBodies)
-    timer.emplace(closure, TC->DebugTimeFunctionBodies,
-                  TC->WarnLongFunctionBodies);
+  const auto &tyOpts = closure->getASTContext().TypeCheckerOpts;
+  if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
+    timer.emplace(closure);
 
   bool HadError = StmtChecker(closure).typeCheckBody(body);
   if (body) {

@@ -552,6 +552,46 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
+static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
+                                 DiagnosticEngine &Diags,
+                                 const FrontendOptions &FrontendOpts) {
+  using namespace options;
+
+  auto setUnsignedIntegerArgument = [&Args, &Diags](
+      options::ID optionID, unsigned radix, unsigned &valueToSet) {
+    if (const Arg *A = Args.getLastArg(optionID)) {
+      unsigned attempt;
+      if (StringRef(A->getValue()).getAsInteger(radix, attempt)) {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       A->getAsString(Args), A->getValue());
+      } else {
+        valueToSet = attempt;
+      }
+    }
+  };
+
+  setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
+                             Opts.WarnLongFunctionBodies);
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking, 10,
+                             Opts.WarnLongExpressionTypeChecking);
+  setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
+                             Opts.ExpressionTimeoutThreshold);
+  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
+                             Opts.SwitchCheckingInvocationThreshold);
+
+  Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
+  Opts.DebugTimeExpressions |=
+      Args.hasArg(OPT_debug_time_expression_type_checking);
+  Opts.SkipNonInlinableFunctionBodies |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies);
+
+  // If asked to perform InstallAPI, go ahead and enable non-inlinable function
+  // body skipping.
+  Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
+
+  return false;
+}
+
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                                    ArgList &Args,
                                    DiagnosticEngine &Diags,
@@ -1382,6 +1422,10 @@ bool CompilerInvocation::parseArgs(
   SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseTypeCheckerArgs(TypeCheckerOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
 

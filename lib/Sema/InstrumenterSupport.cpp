@@ -116,9 +116,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   DiagnosticSuppression suppression(Ctx.Diags);
   ErrorGatherer errorGatherer(Ctx.Diags);
 
-  auto *TC = Ctx.getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker installed!");
-  TC->typeCheckExpression(parsedExpr, DC);
+  TypeChecker::typeCheckExpression(parsedExpr, DC);
 
   if (parsedExpr) {
     ErrorFinder errorFinder;

@@ -2161,6 +2161,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   auto &Context = dc->getASTContext();
   FallbackDiagnosticListener diagListener(Context, options, listener);
   auto *TC = Context.getLegacyGlobalTypeChecker();
+  assert(TC && "Must have a global type checker set");
   return TC->typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
                                      options, diagListener, baseCS);
 }

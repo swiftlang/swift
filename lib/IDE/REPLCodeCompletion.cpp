@@ -212,7 +212,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
-  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
+  performTypeChecking(SF, PersistentState.getTopLevelContext(),
                       OriginalDeclCount);
 
   performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);

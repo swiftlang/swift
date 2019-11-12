@@ -1666,11 +1666,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     
     {
-      auto *TC = ED->getASTContext().getLegacyGlobalTypeChecker();
-      assert(TC && "Must have a global type checker set");
       Expr *exprToCheck = prevValue;
-      if (TC->typeCheckExpression(exprToCheck, ED, TypeLoc::withoutLoc(rawTy),
-                                  CTP_EnumCaseRawValue)) {
+      if (TypeChecker::typeCheckExpression(exprToCheck, ED,
+                                           TypeLoc::withoutLoc(rawTy),
+                                           CTP_EnumCaseRawValue)) {
         TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
       }
     }
@@ -3180,11 +3179,8 @@ public:
 
 
   bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // Make sure we're in the mode that's skipping function bodies.
-    if (!TC.canSkipNonInlinableBodies())
+    if (!getASTContext().TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       return false;
 
     // Make sure there even _is_ a body that we can skip.
