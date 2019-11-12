@@ -961,16 +961,11 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
-    if (auto vers = version::Version::parseVersionString(
-          A->getValue(), SourceLoc(), &Diags)) {
-      Opts.CompatibilityVersion = *vers;
-    }
+    Opts.CompatibilityVersion = A->getValue();
   }
+
   if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
-    if (auto vers = version::Version::parseVersionString(
-          A->getValue(), SourceLoc(), &Diags)) {
-      Opts.CurrentVersion = *vers;
-    }
+    Opts.CurrentVersion = A->getValue();
   }
   return false;
 }

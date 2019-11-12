@@ -232,6 +232,15 @@ ERROR(error_formatting_invalid_range,none,
 WARNING(stats_disabled,none,
         "compiler was not built with support for collecting statistics", ())
 
+WARNING(tbd_warn_truncating_version,none,
+        "truncating %select{current|compatibility}0 version '%1' in TBD file "
+        "to fit in 32-bit space used by old mach-o format",
+        (unsigned, StringRef))
+
+ERROR(tbd_err_invalid_version,none,
+      "invalid dynamic library %select{current|compatibility}0 version '%1'",
+      (unsigned, StringRef))
+
 WARNING(tbd_only_supported_in_whole_module,none,
         "TBD generation is only supported when the whole module can be seen",
         ())
