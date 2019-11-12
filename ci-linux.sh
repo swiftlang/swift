@@ -7,7 +7,7 @@ sudo apt install \
   libedit-dev libxml2-dev libsqlite3-dev swig \
   libpython-dev libncurses5-dev pkg-config \
   libblocksruntime-dev libcurl4-openssl-dev \
-  systemtap-sdt-dev tzdata rsync
+  systemtap-sdt-dev tzdata rsync wget
 
 export current_sha=`git rev-parse HEAD`
 ./utils/update-checkout --clone --scheme wasm

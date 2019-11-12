@@ -1,6 +1,6 @@
 #/bin/bash
 
-utils/build-script --release --wasm --verbose \
+./utils/build-script --release --wasm --verbose \
   --skip-build-benchmarks \
   --extra-cmake-options=" \
     -DSWIFT_SDKS='WASM;LINUX' \
