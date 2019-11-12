@@ -4615,12 +4615,10 @@ namespace {
         conformances.push_back(hashableConformance);
       }
 
-      auto component =
-          KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
-              ref, newIndexExpr, newLabels, resolvedTy, componentLoc, {});
-
-      component.setSubscriptIndexHashableConformances(conformances);
-      return component;
+      return KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+          ref, newIndexExpr, cs.getASTContext().AllocateCopy(newLabels),
+          resolvedTy, componentLoc,
+          cs.getASTContext().AllocateCopy(conformances));
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
