@@ -500,7 +500,8 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                                            const DeclContext *DC) {
   // Synthesize the memberwise initializer for structs or default initializer
   // for classes.
-  if (!NTD->hasInterfaceType())
+  if (!NTD->getASTContext().evaluator.hasActiveRequest(
+          SynthesizeMemberwiseInitRequest{NTD}))
     TypeChecker::addImplicitConstructors(NTD);
 
   // Check all conformances to trigger the synthesized decl generation.
