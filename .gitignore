@@ -24,6 +24,8 @@
 #==============================================================================#
 cscope.files
 cscope.out
+.vimrc
+tags
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
