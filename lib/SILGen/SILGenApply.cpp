@@ -6067,6 +6067,35 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
+void SILGenFunction::emitKeyPathSubscriptOperands(CanSILFunctionType fnType,
+                                                  Expr *indexExpr) {
+  SmallVector<ManagedValue, 4> argValues;
+  SmallVector<DelayedArgument, 2> delayedArgs;
+//  auto fnType = F.getLoweredFunctionType();
+  ArgEmitter emitter(*this, fnType.getPointer()->getRepresentation(), /*yield*/ true,
+                     /*isForCoroutine*/ false,
+                     ClaimedParamsRef(fnType, fnType.getPointer()->getParameters()),
+                     argValues, delayedArgs,
+                     /*foreign error*/ None, ImportAsMemberStatus());
+  
+  SmallVector<Expr*, 4> indexExprs;
+  if (auto paren = dyn_cast<ParenExpr>(indexExpr)) {
+    indexExprs.push_back(indexExpr);
+  } else if (auto tupleExpr = dyn_cast<TupleExpr>(indexExpr)) {
+    for (auto *tupleElement : tupleExpr->getElements()) {
+      indexExprs.push_back(tupleElement);
+    }
+  }
+  
+  for (auto *expr : indexExprs) {
+    emitter.emitSingleArg(ArgumentSource(expr),
+                          AbstractionPattern(expr->getType()));
+  }
+
+  if (!delayedArgs.empty())
+    emitDelayedArguments(*this, delayedArgs, argValues);
+}
+
 ManagedValue ArgumentScope::popPreservingValue(ManagedValue mv) {
   formalEvalScope.pop();
   return normalScope.popPreservingValue(mv);

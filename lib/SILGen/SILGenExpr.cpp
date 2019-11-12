@@ -3626,15 +3626,21 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                             component.getSubscriptIndexHashableConformances(),
                             baseTy,
                             /*for descriptor*/ false));
-      if (kind == KeyPathExpr::Component::Kind::Subscript) {
-        lowerSubscriptOperands(component);
-      } else {
-        lowerOperands(component);
-      }
+//      if (kind == KeyPathExpr::Component::Kind::Subscript) {
+//        lowerSubscriptOperands(component);
+//      } else {
+//        lowerOperands(component);
+//      }
 
-      assert(numOperands == operands.size()
-             && "operand count out of sync");
+//      assert(numOperands == operands.size()
+//             && "operand count out of sync");
       baseTy = loweredComponents.back().getComponentType();
+      baseTy.dump();
+//      loweredComponents.back().g
+      auto subscriptFn = loweredComponents.back().getComputedPropertyGetter();
+      SGF.prepareSubscriptIndices(<#SubscriptDecl *subscript#>, <#SubstitutionMap subs#>, <#AccessStrategy strategy#>, <#Expr *indices#>)
+      SGF.emitKeyPathSubscriptOperands(SGF.F.getLoweredFunctionType(), // subscriptFn->getLoweredFunctionType(),
+                                       component.getIndexExpr());
 
       break;
     }

@@ -665,6 +665,9 @@ public:
                            IsFreeFunctionWitness_t isFree,
                            bool isSelfConformance);
   
+  void emitKeyPathSubscriptOperands(CanSILFunctionType fnType,
+                                    Expr *indexExpr);
+  
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
                                ManagedValue block,
