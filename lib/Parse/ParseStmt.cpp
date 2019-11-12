@@ -22,6 +22,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParsedSyntaxBuilders.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -724,22 +725,35 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 ///   stmt-break:
 ///     'break' identifier?
 ///
-ParserResult<Stmt> Parser::parseStmtBreak() {
-  SyntaxContext->setCreateSyntax(SyntaxKind::BreakStmt);
-  SourceLoc Loc = consumeToken(tok::kw_break);
-  SourceLoc TargetLoc;
-  Identifier Target;
+ParsedSyntaxResult<ParsedStmtSyntax> Parser::parseStmtBreakSyntax() {
+  ParsedBreakStmtSyntaxBuilder builder(*SyntaxContext);
 
+  auto breakTok = consumeTokenSyntax(tok::kw_break);
+  builder.useBreakKeyword(std::move(breakTok));
+    
   // If we have an identifier after this, which is not the start of another
   // stmt or decl, we assume it is the label to break to, unless there is a
   // line break.  There is ambiguity with expressions (e.g. "break x+y") but
   // since the expression after the break is dead, we don't feel bad eagerly
   // parsing this.
   if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfDecl())
-    TargetLoc = consumeIdentifier(&Target);
+      !isStartOfStmt() && !isStartOfDecl()) {
+    auto labelTok = consumeIdentifierSyntax();
+    builder.useLabel(std::move(labelTok));
+  }
 
-  return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
+  return makeParsedResult(builder.build());
+}
+
+ParserResult<Stmt> Parser::parseStmtBreak() {
+  auto leadingLoc = leadingTriviaLoc();
+
+  auto parsed = parseStmtBreakSyntax();
+  SyntaxContext->addSyntax(parsed.get());
+    
+  auto syntax = SyntaxContext->topNode<BreakStmtSyntax>();
+  auto result = Generator.generate(syntax, leadingLoc);
+  return makeParserResult(result);
 }
 
 /// parseStmtContinue

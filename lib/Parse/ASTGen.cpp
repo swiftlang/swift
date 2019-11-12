@@ -229,6 +229,35 @@ TrailingWhereClause *ASTGen::generate(const GenericWhereClauseSyntax &syntax,
   return TrailingWhereClause::create(Context, whereLoc, requirements);
 }
 
+Stmt *ASTGen::generate(const StmtSyntax &S, const SourceLoc Loc) {
+  Stmt *StmtAST = nullptr;
+
+  if (auto breakStmt = S.getAs<BreakStmtSyntax>()) {
+    StmtAST = generate(*breakStmt, Loc);
+  } else {
+    #ifndef NDEBUG
+      S.dump();
+      llvm_unreachable("unsupported statement");
+    #endif
+  }
+
+  return StmtAST;
+}
+
+Stmt *ASTGen::generate(const BreakStmtSyntax &Stmt, const SourceLoc Loc) {
+  auto breakTok = Stmt.getBreakKeyword();
+  SourceLoc breakLoc = advanceLocBegin(Loc, breakTok);
+
+  SourceLoc TargetLoc;
+  Identifier Target;
+  if (auto labelTok = Stmt.getLabel()) {
+    TargetLoc = advanceLocBegin(Loc, *labelTok);
+    Target = Context.getIdentifier(labelTok->getText());
+  }
+
+  return new (Context) BreakStmt(breakLoc, Target, TargetLoc);
+}
+
 Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
   Expr *result = nullptr;
 
