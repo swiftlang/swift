@@ -1221,16 +1221,21 @@ bool ExtensionDecl::hasValidParent() const {
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
-  // Non-generic extension.
-  if (!getGenericSignature())
+  auto nominal = getExtendedNominal();
+  if (!nominal)
     return false;
 
-  auto nominal = getExtendedNominal();
-  assert(nominal);
+  auto typeSig = nominal->getGenericSignature();
+  if (!typeSig)
+    return false;
+
+  auto extSig = getGenericSignature();
+  if (!extSig)
+    return false;
 
   // If the generic signature differs from that of the nominal type, it's a
   // constrained extension.
-  return !getGenericSignature()->isEqual(nominal->getGenericSignature());
+  return !typeSig->isEqual(extSig);
 }
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
