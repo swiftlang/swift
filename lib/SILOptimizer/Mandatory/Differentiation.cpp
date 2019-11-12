@@ -1430,9 +1430,6 @@ private:
   /// Perform analysis and populate sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
-  void setVaried(SILValue value, unsigned independentVariableIndex);
-  void setVariedAcrossArrayInitialization(SILValue value,
-                                          unsigned independentVariableIndex);
   /// Marks the given value as varied and propagates variedness to users.
   void setVariedAndPropagateToUsers(SILValue value,
                                     unsigned independentVariableIndex);
@@ -1883,7 +1880,9 @@ void DifferentiableActivityInfo::setVariedAndPropagateToUsers(
   // Skip already-varied values to prevent infinite recursion.
   if (isVaried(value, independentVariableIndex))
     return;
-  setVaried(value, independentVariableIndex);
+  // Set the value as varied.
+  variedValueSets[independentVariableIndex].insert(value);
+  // Propagate variedness to users.
   for (auto *use : value->getUses())
     propagateVaried(use, independentVariableIndex);
 }
@@ -2100,16 +2099,6 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   }
 }
 
-void DifferentiableActivityInfo::setVariedAcrossArrayInitialization(
-    SILValue value, unsigned independentVariableIndex) {
-  auto uai = getAllocateUninitializedArrayIntrinsic(value);
-  if (!uai) return;
-  for (auto use : value->getUses())
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser()))
-      // The first tuple field of the intrinsic's return value is the array.
-      setVariedAndPropagateToUsers(dti->getResult(0), independentVariableIndex);
-}
-
 void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
     SILValue value, unsigned dependentVariableIndex) {
   // Array initializer syntax is lowered to an intrinsic and one or more
@@ -2136,12 +2125,6 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
       }
     }
   }
-}
-
-void DifferentiableActivityInfo::setVaried(SILValue value,
-                                           unsigned independentVariableIndex) {
-  variedValueSets[independentVariableIndex].insert(value);
-  setVariedAcrossArrayInitialization(value, independentVariableIndex);
 }
 
 void DifferentiableActivityInfo::setUseful(SILValue value,
