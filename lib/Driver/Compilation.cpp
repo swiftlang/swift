@@ -407,9 +407,6 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions())
          llvm::outs() << "Incremental compilation has been disabled due to "
                       << "malformed swift dependencies file '" << DependenciesFile << "'.\n";
-      for (const Job *Cmd : Comp.getJobs())
-        scheduleCommandIfNecessaryAndPossible(Cmd);
-      DeferredCommands.clear();
     }
 
     /// Helper that attempts to reload a job's .swiftdeps file after the job
@@ -464,6 +461,10 @@ namespace driver {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
+              // Better try compiling whatever was waiting on more info.
+              for (const Job *Cmd : DeferredCommands)
+                scheduleCommandIfNecessaryAndPossible(Cmd);
+              DeferredCommands.clear();
               Dependents.clear();
             } // else, let the next build handle it.
             break;
@@ -882,8 +883,11 @@ namespace driver {
         if (Cmd->getFirstSwiftPrimaryInput().empty() ||
             compileJobsToSchedule.count(Cmd))
           scheduleCommandIfNecessaryAndPossible(Cmd);
-        else
+        else {
+          assert(ScheduledCommands.count(Cmd) == 0 &&
+                 "Cannot defer already-scheduled command");
           DeferredCommands.insert(Cmd);
+        }
       }
     }
 
@@ -934,10 +938,18 @@ namespace driver {
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty())
           continue; // not Compile
-        const bool shouldSched =
+        const Optional<bool> shouldSched =
             isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
                 Cmd, DepGraph);
-        if (shouldSched)
+        if (!shouldSched) {
+          // Dependency load error, just run them all
+          for (const Job *Cmd : Comp.getJobs()) {
+            if (!Cmd->getFirstSwiftPrimaryInput().empty())
+              jobsToSchedule.insert(Cmd);
+          }
+          return jobsToSchedule;
+        }
+        if (shouldSched.getValue())
           jobsToSchedule.insert(Cmd);
       }
       {
@@ -951,14 +963,23 @@ namespace driver {
     }
 
     /// Schedule all jobs we can from the initial list provided by Compilation.
+    /// Return whether job should be scheduled when using dependencies.
+    /// Or if there was a dependency-read error, return None to indicate
+    /// don't-know.
     template <typename DependencyGraphT>
-    bool isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
+    Optional<bool>
+    isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
         const Job *Cmd, DependencyGraphT &DepGraph) {
+
+      auto CondAndHasDepsIfNoError =
+          loadDependenciesAndComputeCondition(Cmd, DepGraph);
+      if (!CondAndHasDepsIfNoError)
+        return None; // swiftdeps read error, abandon dependencies
 
       Job::Condition Cond;
       bool HasDependenciesFileName;
       std::tie(Cond, HasDependenciesFileName) =
-          loadDependenciesAndComputeCondition(Cmd, DepGraph);
+          CondAndHasDepsIfNoError.getValue();
 
       const bool shouldSched = shouldScheduleCompileJobAccordingToCondition(
           Cmd, Cond, HasDependenciesFileName, DepGraph);
@@ -967,8 +988,10 @@ namespace driver {
       return shouldSched;
     }
 
+    /// Returns job condition, and whether a dependency file was specified.
+    /// But returns None if there was a dependency read error.
     template <typename DependencyGraphT>
-    std::pair<Job::Condition, bool>
+    Optional<std::pair<Job::Condition, bool>>
     loadDependenciesAndComputeCondition(const Job *const Cmd,
                                         DependencyGraphT &DepGraph) {
       // Try to load the dependencies file for this job. If there isn't one, we
@@ -980,10 +1003,10 @@ namespace driver {
       const StringRef DependenciesFile =
           Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
       if (DependenciesFile.empty())
-        return {Job::Condition::Always, false};
+        return std::make_pair(Job::Condition::Always, false);
       if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
         DepGraph.addIndependentNode(Cmd);
-        return {Job::Condition::NewlyAdded, true};
+        return std::make_pair(Job::Condition::NewlyAdded, true);
       }
 
       const auto loadResult =
@@ -991,14 +1014,14 @@ namespace driver {
       switch (loadResult) {
       case DependencyGraphImpl::LoadResult::HadError:
         dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
-        return {Job::Condition::Always, true};
+        return None;
       case DependencyGraphImpl::LoadResult::UpToDate:
-        return {Cmd->getCondition(), true};
+        return std::make_pair(Cmd->getCondition(), true);
       case DependencyGraphImpl::LoadResult::AffectsDownstream:
         if (Comp.getEnableExperimentalDependencies()) {
           // The experimental graph reports a change, since it lumps new
           // files together with new "Provides".
-          return {Cmd->getCondition(), true};
+          return std::make_pair(Cmd->getCondition(), true);
         }
         llvm_unreachable("we haven't marked anything in this graph yet");
       }
