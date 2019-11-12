@@ -772,6 +772,10 @@ struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
     SILFunction &f = *getFunction();
 
+    // Return early if we are not performing OSSA optimizations.
+    if (!f.getModule().getOptions().EnableOSSAOptimizations)
+      return;
+
     // Make sure we are running with ownership verification enabled.
     assert(f.getModule().getOptions().VerifySILOwnership &&
            "Can not perform semantic arc optimization unless ownership "
