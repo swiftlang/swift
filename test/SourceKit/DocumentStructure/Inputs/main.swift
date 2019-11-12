@@ -139,3 +139,11 @@ class OneMore {
 class Chain<A> {
   func + (lhs: Chain<A>, rhs: Chain<A>) -> Chain<A> { fatalError() }
 }
+
+public init() {
+    fatalError()
+}
+
+deinit {
+    fatalError()
+}
