@@ -6923,8 +6923,8 @@ public:
         ? *applyInfo.originalPullbackType
         : pullbackType;
     for (auto indRes : actualPullbackType->getIndirectFormalResults()) {
-      auto *alloc =
-          builder.createAllocStack(loc, remapType(indRes.getSILStorageInterfaceType()));
+      auto *alloc = builder.createAllocStack(
+          loc, remapType(indRes.getSILStorageInterfaceType()));
       pullbackIndirectResults.push_back(alloc);
       args.push_back(alloc);
     }
@@ -6975,12 +6975,21 @@ public:
           addToAdjointBuffer(bb, origArg, tmpBuf, loc);
           builder.emitDestroyAddrAndFold(loc, tmpBuf);
           builder.createDeallocStack(loc, tmpBuf);
-        }
-        else {
+        } else {
           recordTemporary(tan);
           addAdjointValue(bb, origArg, makeConcreteAdjointValue(tan), loc);
         }
       }
+    }
+    // Destroy unused pullback direct results. Needed for pullback results from
+    // VJPs extracted from `@differentiable` function callees, where the
+    // `@differentiable` function's differentiation parameter indices are a
+    // superset of the active `apply` parameter indices.
+    while (allResultsIt != allResults.end()) {
+      auto unusedPullbackDirectResult = *allResultsIt++;
+      if (unusedPullbackDirectResult->getType().isAddress())
+        continue;
+      builder.emitDestroyValueOperation(loc, unusedPullbackDirectResult);
     }
     // Destroy and deallocate pullback indirect results.
     for (auto *alloc : llvm::reverse(pullbackIndirectResults)) {
