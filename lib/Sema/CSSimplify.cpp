@@ -1435,7 +1435,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   // (which might be anonymous), it's most likely used as a
   // tuple e.g. `$0.0`.
   Optional<TypeBase *> argumentTuple;
-  if (isa<ClosureExpr>(anchor) && isSingleTupleParam(ctx, args)) {
+  if (isSingleTupleParam(ctx, args)) {
     auto argType = args.back().getPlainType();
     // Let's unpack argument tuple into N arguments, this corresponds
     // to something like `foo { (bar: (Int, Int)) in }` where `foo`
@@ -1456,24 +1456,26 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
       };
 
       // Something like `foo { x in }` or `foo { $0 }`
-      anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-          if (!isParam(UDE->getBase()))
-            return expr;
+      if (isa<ClosureExpr>(anchor)) {
+        anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
+          if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+            if (!isParam(UDE->getBase()))
+              return expr;
 
-          auto name = UDE->getName().getBaseIdentifier();
-          unsigned index = 0;
-          if (!name.str().getAsInteger(10, index) ||
-              llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
-                return param.getLabel() == name;
-              })) {
-            argumentTuple.emplace(typeVar);
-            args.pop_back();
-            return nullptr;
+            auto name = UDE->getName().getBaseIdentifier();
+            unsigned index = 0;
+            if (!name.str().getAsInteger(10, index) ||
+                llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
+                  return param.getLabel() == name;
+                })) {
+              argumentTuple.emplace(typeVar);
+              args.pop_back();
+              return nullptr;
+            }
           }
-        }
-        return expr;
-      });
+          return expr;
+        });
+      }
     }
   }
 
