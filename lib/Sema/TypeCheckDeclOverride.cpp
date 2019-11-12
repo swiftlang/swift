@@ -234,6 +234,11 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
     return false;
   }
 
+  // Ignore declarations that are defined inside constrained extensions.
+  if (auto *ext = dyn_cast<ExtensionDecl>(parentDecl->getDeclContext()))
+    if (ext->isConstrainedExtension())
+      return false;
+
   // The declarations must be of the same kind.
   if (decl->getKind() != parentDecl->getKind())
     return false;
@@ -1168,6 +1173,11 @@ bool swift::checkOverrides(ValueDecl *decl) {
 
     // Otherwise, we have more checking to do.
   }
+
+  // Members of constrained extensions are not considered to be overrides.
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
+    if (ext->isConstrainedExtension())
+      return false;
 
   // Accessor methods get overrides through their storage declaration, and
   // all checking can be performed via that mechanism.
