@@ -4399,10 +4399,6 @@ public:
     if (D->isFinal())
       return;
 
-    // A 'class' member with an initial value cannot be overriden either.
-    if (D->isStatic() && isa<VarDecl>(D) && cast<VarDecl>(D)->hasInitialValue())
-      return;
-
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
                          hasTypealiasIntroducer;
