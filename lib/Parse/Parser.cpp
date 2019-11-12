@@ -1087,6 +1087,7 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
 struct ParserUnit::Implementation {
   std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
@@ -1094,19 +1095,16 @@ struct ParserUnit::Implementation {
   std::unique_ptr<Parser> TheParser;
 
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                 const LangOptions &Opts, StringRef ModuleName,
+                 const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
+                 StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions)
-    : SPActions(std::move(spActions)),
-      LangOpts(Opts),
-      Diags(SM),
-      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
-      SF(new (Ctx) SourceFile(
-            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
-            SFKind, BufferID,
-            SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectParsedToken,
-            Opts.BuildSyntaxTree)) {
-  }
+      : SPActions(std::move(spActions)),
+        LangOpts(Opts), TypeCheckerOpts(TyOpts), Diags(SM),
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM, Diags)),
+        SF(new (Ctx) SourceFile(
+            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
+            BufferID, SourceFile::ImplicitModuleImportKind::None,
+            Opts.CollectParsedToken, Opts.BuildSyntaxTree)) {}
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize
@@ -1117,15 +1115,18 @@ struct ParserUnit::Implementation {
 };
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
-  : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {
+  : ParserUnit(SM, SFKind, BufferID,
+               LangOptions(), TypeCheckerOptions(), "input") {
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                       const LangOptions &LangOpts, StringRef ModuleName,
+                       const LangOptions &LangOpts,
+                       const TypeCheckerOptions &TypeCheckOpts,
+                       StringRef ModuleName,
                        std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName,
-                               std::move(spActions))) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
+                               ModuleName, std::move(spActions))) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
@@ -1135,8 +1136,8 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input",
-                             nullptr)) {
+  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
+                             TypeCheckerOptions(), "input", nullptr)) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,

@@ -82,28 +82,6 @@ public:
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, overrides the default threshold for how long we let
-  /// the expression type checker run before we consider an expression
-  /// too complex.
-  unsigned SolverExpressionTimeThreshold = 0;
-  
-  /// If non-zero, overrides the default threshold for how many times
-  /// the Space::minus function is called before we consider switch statement
-  /// exhaustiveness checking to be too complex.
-  unsigned SwitchCheckingInvocationThreshold = 0;
-
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
@@ -182,8 +160,6 @@ public:
   ///
   /// \sa swift::SharedTimer
   bool DebugTimeCompilation = false;
-
-  bool SkipNonInlinableFunctionBodies = false;
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;

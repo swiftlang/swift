@@ -1666,11 +1666,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     
     {
-      auto *TC = ED->getASTContext().getLegacyGlobalTypeChecker();
-      assert(TC && "Must have a global type checker set");
       Expr *exprToCheck = prevValue;
-      if (TC->typeCheckExpression(exprToCheck, ED, TypeLoc::withoutLoc(rawTy),
-                                  CTP_EnumCaseRawValue)) {
+      if (TypeChecker::typeCheckExpression(exprToCheck, ED,
+                                           TypeLoc::withoutLoc(rawTy),
+                                           CTP_EnumCaseRawValue)) {
         TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
       }
     }
@@ -3180,11 +3179,8 @@ public:
 
 
   bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // Make sure we're in the mode that's skipping function bodies.
-    if (!TC.canSkipNonInlinableBodies())
+    if (!getASTContext().TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       return false;
 
     // Make sure there even _is_ a body that we can skip.
@@ -3939,11 +3935,8 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check the parameters for a reference to 'Self'.
   bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
   for (auto param : *decl->getParameters()) {
-    auto paramType = param->getInterfaceType();
-    if (!paramType) break;
-
     // Look through a metatype reference, if there is one.
-    paramType = paramType->getMetatypeInstanceType();
+    auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
 
     auto nominal = paramType->getAnyNominal();
     if (type.isNull()) {

@@ -27,6 +27,7 @@ namespace unittest {
 class TestContextBase {
 public:
   LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;

@@ -320,19 +320,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.definedFunctions.clear();
 }
 
-void swift::typeCheckExternalDefinitions(SourceFile &SF) {
-  assert(SF.ASTStage == SourceFile::TypeChecked);
-  auto &Ctx = SF.getASTContext();
-  typeCheckFunctionsAndExternalDecls(SF, createTypeChecker(Ctx));
-}
-
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                                OptionSet<TypeCheckingFlags> Options,
-                                unsigned StartElem,
-                                unsigned WarnLongFunctionBodies,
-                                unsigned WarnLongExpressionTypeChecking,
-                                unsigned ExpressionTimeoutThreshold,
-                                unsigned SwitchCheckingInvocationThreshold) {
+                                unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -340,12 +329,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // because type-checking expressions mutates the AST and that throws off the
   // scope-based lookups. Only the top-level scopes because extensions have not
   // been bound yet.
-  if (SF.getASTContext().LangOpts.EnableASTScopeLookup &&
-      SF.isSuitableForASTScopes())
+  auto &Ctx = SF.getASTContext();
+  if (Ctx.LangOpts.EnableASTScopeLookup && SF.isSuitableForASTScopes())
     SF.getScope()
         .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
-  auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
   // Make sure we have a type checker.
@@ -360,30 +348,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   {
     SharedTimer timer("Type checking and Semantic analysis");
 
-    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
-    TC.setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
-    if (ExpressionTimeoutThreshold != 0)
-      TC.setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
-
-    if (SwitchCheckingInvocationThreshold != 0)
-      TC.setSwitchCheckingInvocationThreshold(
-          SwitchCheckingInvocationThreshold);
-
-    if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
-      TC.enableDebugTimeFunctionBodies();
-
-    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
-      TC.enableDebugTimeExpressions();
-
-    if (Options.contains(TypeCheckingFlags::ForImmediateMode))
-      TC.setInImmediateMode(true);
-
-    if (Options.contains(TypeCheckingFlags::SkipNonInlinableFunctionBodies))
+    if (Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       // Disable this optimization if we're compiling SwiftOnoneSupport, because
       // we _definitely_ need to look inside every declaration to figure out
       // what gets prespecialized.
-      if (!SF.getParentModule()->isOnoneSupportModule())
-        TC.setSkipNonInlinableBodies(true);
+      if (SF.getParentModule()->isOnoneSupportModule())
+        Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies = false;
 
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
@@ -416,7 +386,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 
   // Checking that benefits from having the whole module available.
-  if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
+  if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking) {
     performWholeModuleTypeChecking(SF);
   }
 
@@ -439,7 +409,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // been cached, it will never be added to the ASTContext. The solution is to
     // skip verification and avoid caching it.
 #ifndef NDEBUG
-    if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking) &&
+    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
         SF.Kind != SourceFileKind::REPL &&
         SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {

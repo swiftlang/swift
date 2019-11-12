@@ -602,8 +602,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = TypeChecker::lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
-        if (ctor.getValueDecl()->getInterfaceType())
-          candidates.push_back({ ctor.getValueDecl(), 1 });
+        candidates.push_back({ ctor.getValueDecl(), 1 });
       }
     }
     
