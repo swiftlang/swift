@@ -4599,10 +4599,8 @@ namespace {
           cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
 
       auto fnType = overload.openedType->castTo<FunctionType>();
-      auto params = fnType->getParams();
       SmallVector<Identifier, 4> newLabels;
-      for (size_t index = 0; index < fnType->getNumParams(); ++index) {
-        auto param = params[index];
+      for (auto &param : fnType->getParams()) {
         newLabels.push_back(param.getLabel());
 
         auto indexType = simplifyType(param.getPlainType());
