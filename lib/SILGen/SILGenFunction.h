@@ -667,7 +667,7 @@ public:
 
   SmallVector<ManagedValue, 4>
   emitKeyPathSubscriptOperands(SubscriptDecl *subscript, SubstitutionMap subs,
-                               Expr *indexExpr, CanSILFunctionType fnType);
+                               Expr *indexExpr);
 
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,

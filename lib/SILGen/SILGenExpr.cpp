@@ -3576,12 +3576,10 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       if (kind == KeyPathExpr::Component::Kind::Property)
         break;
 
-      auto subscriptFn =
-          loweredComponents.back().getComputedPropertyId().getFunction();
       auto subscript = cast<SubscriptDecl>(decl);
       auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
           subscript, component.getDeclRef().getSubstitutions(),
-          component.getIndexExpr(), subscriptFn->getLoweredFunctionType());
+          component.getIndexExpr());
 
       for (auto &arg : loweredArgs) {
         operands.push_back(arg.forward(SGF));

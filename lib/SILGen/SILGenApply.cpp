@@ -6068,26 +6068,25 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 }
 
 SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
-    SubscriptDecl *subscript, SubstitutionMap subs, Expr *indexExpr,
-    CanSILFunctionType fnType) {
+    SubscriptDecl *subscript, SubstitutionMap subs, Expr *indexExpr) {
   Type interfaceType = subscript->getInterfaceType();
-  SmallVector<ManagedValue, 4> argValues;
-  SmallVector<DelayedArgument, 2> delayedArgs;
-  ArgEmitter emitter(
-      *this, fnType.getPointer()->getRepresentation(),
-      /*yield*/ true,
-      /*isForCoroutine*/ false,
-      ClaimedParamsRef(fnType, fnType.getPointer()->getParameters()), argValues,
-      delayedArgs,
-      /*foreign error*/ None, ImportAsMemberStatus());
-
   CanFunctionType substFnType =
       subs ? cast<FunctionType>(interfaceType->castTo<GenericFunctionType>()
                                     ->substGenericArgs(subs)
                                     ->getCanonicalType())
            : cast<FunctionType>(interfaceType->getCanonicalType());
-
   AbstractionPattern origFnType(substFnType);
+  auto fnType = getLoweredType(origFnType, substFnType).castTo<SILFunctionType>();
+  SmallVector<ManagedValue, 4> argValues;
+  SmallVector<DelayedArgument, 2> delayedArgs;
+  ArgEmitter emitter(
+      *this, fnType.getPointer()->getRepresentation(),
+      /*yield*/ false,
+      /*isForCoroutine*/ false,
+      ClaimedParamsRef(fnType, fnType.getPointer()->getParameters()), argValues,
+      delayedArgs,
+      /*foreign error*/ None, ImportAsMemberStatus());
+  
   auto prepared =
       prepareSubscriptIndices(subscript, subs,
                               // Strategy doesn't matter
