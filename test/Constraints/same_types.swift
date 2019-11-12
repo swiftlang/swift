@@ -320,3 +320,16 @@ struct Bar<A: P1, B: P1> where A.Assoc == B.Assoc {
     fatalError()
   }
 }
+
+protocol P7 {
+  associatedtype A
+  static func fn(args: A)
+}
+
+class R<T>: P7 where T: P7, T.A == T.Type { // expected-note {{'T' declared as parameter to type 'R'}}
+  typealias A = T.Type
+  static func fn(args: T.Type) {}
+}
+
+R.fn(args: R.self) // expected-error {{generic parameter 'T' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}

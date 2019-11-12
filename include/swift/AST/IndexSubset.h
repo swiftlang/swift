@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_INDEXSUBSET_H
 #define SWIFT_AST_INDEXSUBSET_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -206,9 +207,7 @@ public:
   }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(llvm::raw_ostream &s = llvm::errs())
-                                const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(llvm::raw_ostream &s = llvm::errs()));
 
   int findNext(int startIndex) const;
   int findFirst() const { return findNext(-1); }

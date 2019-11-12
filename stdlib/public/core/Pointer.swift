@@ -80,7 +80,7 @@ extension _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init(_ other: Self) {
+  public init(@_nonEphemeral _ other: Self) {
     self.init(other._rawValue)
   }
 
@@ -89,7 +89,7 @@ extension _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?(_ other: Self?) {
+  public init?(@_nonEphemeral _ other: Self?) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped._rawValue)
   }
@@ -267,17 +267,17 @@ extension UInt {
 // Pointer arithmetic operators (formerly via Strideable)
 extension Strideable where Self: _Pointer {
   @_transparent
-  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+  public static func + (@_nonEphemeral lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
   @_transparent
-  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+  public static func + (lhs: Self.Stride, @_nonEphemeral rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
   @_transparent
-  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+  public static func - (@_nonEphemeral lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 

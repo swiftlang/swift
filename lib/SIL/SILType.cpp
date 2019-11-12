@@ -304,12 +304,10 @@ static bool isBridgedErrorClass(ASTContext &ctx, Type t) {
     t = archetypeType->getSuperclass();
 
   // NSError (TODO: and CFError) can be bridged.
-  auto nsErrorType = ctx.getNSErrorDecl();
-  if (t && nsErrorType &&
-      nsErrorType->getDeclaredType()->isExactSuperclassOf(t)) {
+  auto nsErrorType = ctx.getNSErrorType();
+  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t))
     return true;
-  }
-  
+
   return false;
 }
 

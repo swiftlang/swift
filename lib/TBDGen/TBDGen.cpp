@@ -61,7 +61,7 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   SmallString<32> mangled;
   llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
 
-  Symbols.addSymbol(kind, mangled, Archs);
+  Symbols.addSymbol(kind, mangled, Targets);
 
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(mangled).second;
@@ -679,8 +679,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            const TBDGenOptions &opts) {
   auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
-  const auto &target = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
+  const auto &triple = ctx.LangOpts.Target;
+  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs, false,
                                 isWholeModule);
 
   llvm::MachO::InterfaceFile file;
@@ -698,27 +698,11 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
 
-  auto getPlatformKind =
-      [](const llvm::Triple &Target) -> llvm::MachO::PlatformKind {
-    switch (Target.getOS()) {
-    default:
-      return llvm::MachO::PlatformKind::unknown;
-    case llvm::Triple::MacOSX:
-      return llvm::MachO::PlatformKind::macOS;
-    case llvm::Triple::IOS:
-      return llvm::MachO::PlatformKind::iOS;
-    case llvm::Triple::TvOS:
-      return llvm::MachO::PlatformKind::tvOS;
-    case llvm::Triple::WatchOS:
-      return llvm::MachO::PlatformKind::watchOS;
-    }
-  };
-  auto arch = llvm::MachO::getArchitectureFromName(target.getArchName());
-  file.addArch(arch);
-  file.setPlatform(getPlatformKind(target));
+  llvm::MachO::Target target(triple);
+  file.addTarget(target);
 
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  TBDGenVisitor visitor(file, arch, symbols,
+  TBDGenVisitor visitor(file, {target}, symbols,
                         clang->getTargetInfo().getDataLayout(),
                         linkInfo, M, opts);
 

@@ -108,7 +108,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
     return false;
 
   auto *ConGraph = EA->getConnectionGraph(ARI->getFunction());
-  auto *Node = ConGraph->getNodeOrNull(ARI, EA);
+  auto *Node = ConGraph->getNodeOrNull(ARI);
   if (!Node)
     return false;
 

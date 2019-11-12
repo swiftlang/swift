@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: tools-release,no_asan
 
 func test(header_field_mark: Bool?, header_value_mark: Bool?,
   url_mark: Bool?, body_mark: Bool?, status_mark: Bool?) {

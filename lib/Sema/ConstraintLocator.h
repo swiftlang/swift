@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINTLOCATOR_H
 #define SWIFT_SEMA_CONSTRAINTLOCATOR_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -123,6 +124,10 @@ public:
     /// Does this path involve a function conversion, i.e. a
     /// FunctionArgument or FunctionResult node?
     IsFunctionConversion = 0x1,
+
+    /// Does this path involve an argument being applied to a non-ephemeral
+    /// parameter?
+    IsNonEphemeralParam = 0x2,
   };
 
   /// One element in the path of a locator, which can include both
@@ -331,6 +336,12 @@ public:
     return (getSummaryFlags() & IsFunctionConversion);
   }
 
+  /// Checks whether this locator is describing an argument application for a
+  /// non-ephemeral parameter.
+  bool isNonEphemeralParameterApplication() const {
+    return (getSummaryFlags() & IsNonEphemeralParam);
+  }
+
   /// Determine whether given locator points to the subscript reference
   /// e.g. `foo[0]` or `\Foo.[0]`
   bool isSubscriptMemberRef() const;
@@ -491,14 +502,10 @@ public:
   }
   
   /// Produce a debugging dump of this locator.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
-  void dump(SourceManager *SM, raw_ostream &OS) LLVM_ATTRIBUTE_USED;
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 
 private:
   /// Initialize a constraint locator with an anchor and a path.
@@ -864,6 +871,12 @@ public:
       return last->getKind() == ConstraintLocator::AutoclosureResult;
 
     return false;
+  }
+
+  /// Checks whether this locator is describing an argument application for a
+  /// non-ephemeral parameter.
+  bool isNonEphemeralParameterApplication() const {
+    return (getSummaryFlags() & ConstraintLocator::IsNonEphemeralParam);
   }
 
   /// Retrieve the base constraint locator, on which this builder's

@@ -63,7 +63,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
-  const auto innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
@@ -94,9 +94,9 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     name.print(llvm::errs());
     llvm::errs() << "' ";
     llvm::errs() << "loc: ";
-    loc.dump(sourceFile->getASTContext().SourceMgr);
+    loc.print(llvm::errs(), sourceFile->getASTContext().SourceMgr);
     llvm::errs() << "\nstarting context:\n ";
-    startingContext->dumpContext();
+    startingContext->printContext(llvm::errs());
     //    llvm::errs() << "\ninnermost: ";
     //    innermost->dump();
     //    llvm::errs() << "in: \n";
@@ -117,14 +117,14 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   return startingScope;
 }
 
-const ASTScopeImpl *
+ASTScopeImpl *
 ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
                                           NullablePtr<raw_ostream> os) {
   return findInnermostEnclosingScopeImpl(loc, os, getSourceManager(),
                                          getScopeCreator());
 }
 
-const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
+ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
     SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
     ScopeCreator &scopeCreator) {
   expandAndBeCurrentDetectingRecursion(scopeCreator);
@@ -152,13 +152,16 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
       ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      return sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
-                                        loc);
+      return -1 == ASTScopeImpl::compare(scope->getSourceRangeOfScope(), loc,
+                                         sourceMgr,
+                                         /*ensureDisjoint=*/false);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
       ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
-      return sourceMgr.isBeforeInBuffer(loc,
-                                        scope->getSourceRangeOfScope().End);
+      // Alternatively, we could check that loc < start-of-scope
+      return 0 >= ASTScopeImpl::compare(loc, scope->getSourceRangeOfScope(),
+                                        sourceMgr,
+                                        /*ensureDisjoint=*/false);
     }
   };
   auto *const *child = std::lower_bound(

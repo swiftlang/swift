@@ -185,7 +185,7 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '>';
 }
 
-void GenericParamList::dump() {
+void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
@@ -987,6 +987,9 @@ namespace {
 
       if (P->isAutoClosure())
         OS << " autoclosure";
+
+      if (P->isNonEphemeral())
+        OS << " nonEphemeral";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
@@ -3364,6 +3367,7 @@ namespace {
     void dumpParameterFlags(ParameterTypeFlags paramFlags) {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
+      printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;

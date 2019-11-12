@@ -762,8 +762,8 @@ namespace {
         LLVM_FALLTHROUGH;
       default:
         if (!underlyingResult.AbstractType->isEqual(mappedType)) {
-          underlyingResult.AbstractType->dump();
-          mappedType->dump();
+          underlyingResult.AbstractType->dump(llvm::errs());
+          mappedType->dump(llvm::errs());
         }
         assert(underlyingResult.AbstractType->isEqual(mappedType) &&
                "typedef without special typedef kind was mapped "
@@ -2082,7 +2082,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      swiftParamTy = SwiftContext.getNSCopyingDecl()->getDeclaredType();
+      swiftParamTy = SwiftContext.getNSCopyingType();
       if (optionalityOfParam != OTK_None)
         swiftParamTy = OptionalType::get(swiftParamTy);
 

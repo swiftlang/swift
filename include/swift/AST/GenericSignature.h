@@ -21,6 +21,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -89,7 +90,7 @@ public:
 
   void print(raw_ostream &OS) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 class GenericSignatureImpl;
@@ -136,7 +137,7 @@ public:
 
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
 
   // Support for FoldingSet.
@@ -408,7 +409,7 @@ public:
   
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
 };
 

@@ -1692,7 +1692,7 @@ findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
     return {};
 
   IfStmt *InnerIf =
-      dyn_cast_or_null<IfStmt>(Body->getElement(0).dyn_cast<Stmt *>());
+      dyn_cast_or_null<IfStmt>(Body->getFirstElement().dyn_cast<Stmt *>());
   if (!InnerIf)
     return {};
 
@@ -2119,8 +2119,8 @@ bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
   auto Body = dyn_cast_or_null<BraceStmt>(If->getThenStmt());
   
   // Get if-let then body.
-  auto firstElement = Body->getElements()[0];
-  auto lastElement = Body->getElements().back();
+  auto firstElement = Body->getFirstElement();
+  auto lastElement = Body->getLastElement();
   SourceRange bodyRange = firstElement.getSourceRange();
   bodyRange.widen(lastElement.getSourceRange());
   auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
@@ -2138,8 +2138,8 @@ bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
   
   // Get if-let else body.
   if (auto *ElseBody = dyn_cast_or_null<BraceStmt>(If->getElseStmt())) {
-    auto firstElseElement = ElseBody->getElements()[0];
-    auto lastElseElement = ElseBody->getElements().back();
+    auto firstElseElement = ElseBody->getFirstElement();
+    auto lastElseElement = ElseBody->getLastElement();
     SourceRange elseBodyRange = firstElseElement.getSourceRange();
     elseBodyRange.widen(lastElseElement.getSourceRange());
     auto ElseBodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, elseBodyRange);
@@ -2225,9 +2225,9 @@ bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
   // Get guard body
   auto Body = dyn_cast_or_null<BraceStmt>(Guard->getBody());
   
-  if (Body && Body->getElements().size() > 1) {
-    auto firstElement = Body->getElements()[0];
-    auto lastElement = Body->getElements().back();
+  if (Body && Body->getNumElements() > 1) {
+    auto firstElement = Body->getFirstElement();
+    auto lastElement = Body->getLastElement();
     SourceRange bodyRange = firstElement.getSourceRange();
     bodyRange.widen(lastElement.getSourceRange());
     auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
