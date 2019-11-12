@@ -56,6 +56,28 @@ ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
   expectEqual(Float(2), gradY)
 }
 
+ArrayAutoDiffTests.test("ExpressibleByArrayLiteralIndirect") {
+  struct Indirect<T: Differentiable>: Differentiable & ExpressibleByArrayLiteral {
+    var x: T
+
+    typealias ArrayLiteralElement = T
+    init(arrayLiteral: T...) {
+      assert(arrayLiteral.count > 1)
+      self.x = arrayLiteral[0]
+    }
+  }
+
+  func testArrayUninitializedIntrinsic<T>(_ x: T, _ y: T) -> Indirect<T> {
+    return [x, y]
+  }
+
+  let (gradX, gradY) = pullback(at: Float(1), Float(1), in: {
+    x, y in testArrayUninitializedIntrinsic(x, y)
+  })(Indirect<Float>.TangentVector(x: 1))
+  expectEqual(1, gradX)
+  expectEqual(0, gradY)
+}
+
 ArrayAutoDiffTests.test("ArrayConcat") {
   struct TwoArrays : Differentiable {
     var a: [Float]
