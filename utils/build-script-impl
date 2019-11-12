@@ -2388,15 +2388,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
-                    -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                    -DCMAKE_Swift_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
+                    -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
+                    -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
+                    -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
+
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
                     -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch)
-
                     -DXCTEST_PATH_TO_FOUNDATION_BUILD:PATH=${FOUNDATION_BUILD_DIR}
-
+                    -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DCMAKE_PREFIX_PATH:PATH=$(build_directory ${host} llvm)
 
                     -DENABLE_TESTING=YES
