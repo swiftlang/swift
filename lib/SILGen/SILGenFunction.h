@@ -664,10 +664,11 @@ public:
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
                            bool isSelfConformance);
-  
-  void emitKeyPathSubscriptOperands(CanSILFunctionType fnType,
-                                    Expr *indexExpr);
-  
+
+  SmallVector<ManagedValue, 4>
+  emitKeyPathSubscriptOperands(SubscriptDecl *subscript, SubstitutionMap subs,
+                               Expr *indexExpr, CanSILFunctionType fnType);
+
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
                                ManagedValue block,
