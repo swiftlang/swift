@@ -260,7 +260,7 @@ pieces of syntax that aren't really relevant to the semantics of the program,
 such as whitespace and comments. These are modeled as collections and, with the
 exception of comments, are sort of "run-length" encoded. For example, a sequence
 of four spaces is represented by `{ Kind: TriviaKind::Space, Count: 4 }`, not
-the literal text `"    "`.
+the literal text `"    "`.
 
 Some examples of the "atoms" of `Trivia`:
 
@@ -505,7 +505,7 @@ following fields:
 
 | Key | Type | Description |
 | --- | ---- | ----------- |
-| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind. |
+| `kind` | `String` | The `SyntaxKind` of this child. This must have a corresponding `Node` with that kind (or corresponding `Token` in both `include/swift/Syntax/TokenKinds.def` and `SYNTAX_TOKENS`). |
 | `is_optional` | `Bool?` | Whether this child is required in a fully-formed object, or if it is allowed to remain `missing`. Defaults to `false` if not present.
 | `token_choices` | `[String]?` | A list of `Token`s which are considered "valid" values for `Token` children. |
 | `text_choices` | `[String]?` | A list of valid textual values for tokens. If this is not provided, any textual value is accepted for tokens like `IdentifierToken`. |
@@ -513,7 +513,7 @@ following fields:
 #### Tokens
 
 A `Token` represents one of the `tok::` enums in
-`include/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
+`include/swift/Syntax/TokenKinds.def`. `Token.py` has a top-level array of token
 declarations. The `Token` class has the following fields.
 
 | Key | Type | Description |
