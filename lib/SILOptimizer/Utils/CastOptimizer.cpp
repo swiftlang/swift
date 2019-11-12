@@ -628,7 +628,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     std::tie(bridgedFunc, subMap) = result.getValue();
   }
 
-  SILType SubstFnTy = bridgedFunc->getLoweredType().substGenericArgs(M, subMap);
+  SILType SubstFnTy = bridgedFunc->getLoweredType().substGenericArgs(
+      M, subMap, TypeExpansionContext(*F));
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
 
   // Check that this is a case that the authors of this code thought it could

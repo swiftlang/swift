@@ -27,6 +27,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
@@ -582,7 +583,10 @@ public:
   bool hasOpaqueArchetype() const {
     return getRecursiveProperties().hasOpaqueArchetype();
   }
-  
+  /// Determine whether the type has any stored properties or enum cases that
+  /// involve an opaque type.
+  bool hasOpaqueArchetypePropertiesOrCases();
+
   /// Determine whether the type is an opened existential type.
   ///
   /// To determine whether there is an opened existential type
@@ -3687,6 +3691,17 @@ enum class SILCoroutineKind : uint8_t {
   
 class SILFunctionConventions;
 
+
+CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                            TypeExpansionContext context,
+                                            bool allowLoweredTypes = false);
+ProtocolConformanceRef
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+                                    TypeExpansionContext context);
+namespace Lowering {
+  class TypeConverter;
+};
+
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
 ///
@@ -4205,10 +4220,14 @@ public:
                       SILFunction &context) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      SubstitutionMap subs);
+                                      SubstitutionMap subs,
+                                      TypeExpansionContext context);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
-                                      LookupConformanceFn conformances);
+                                      LookupConformanceFn conformances,
+                                      TypeExpansionContext context);
+  CanSILFunctionType substituteOpaqueArchetypes(Lowering::TypeConverter &TC,
+                                                TypeExpansionContext context);
 
   SILType substInterfaceType(SILModule &M,
                              SILType interfaceType) const;
@@ -4963,9 +4982,12 @@ class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
   const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
+  bool isContextWholeModule;
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
-                                        ResilienceExpansion contextExpansion)
-      : inContext(inContext), contextExpansion(contextExpansion) {}
+                                        ResilienceExpansion contextExpansion,
+                                        bool isWholeModuleContext)
+      : inContext(inContext), contextExpansion(contextExpansion),
+        isContextWholeModule(isWholeModuleContext) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5752,5 +5774,5 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
 };
 
 }
-  
+
 #endif

@@ -918,7 +918,8 @@ namespace {
         auto sourceSomeDecl = Ctx.getOptionalSomeDecl();
 
         SILType loweredSourceObjectType =
-          source.Value->getType().getEnumElementType(sourceSomeDecl, M);
+            source.Value->getType().getEnumElementType(
+                sourceSomeDecl, M, B.getTypeExpansionContext());
 
         // Form the target for the optional object.
         EmitSomeState state;
@@ -991,8 +992,8 @@ namespace {
       auto someDecl = Ctx.getOptionalSomeDecl();
       state.SomeDecl = someDecl;
 
-      SILType loweredObjectType =
-        target.LoweredType.getEnumElementType(someDecl, M);
+      SILType loweredObjectType = target.LoweredType.getEnumElementType(
+          someDecl, M, B.getTypeExpansionContext());
 
       if (target.isAddress()) {
         SILValue objectAddr =

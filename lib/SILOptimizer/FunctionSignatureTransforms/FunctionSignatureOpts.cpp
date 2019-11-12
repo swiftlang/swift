@@ -581,8 +581,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // Produce a substitutions list and a set of substituted SIL types
     // required for creating a new SIL function.
     Subs = F->getForwardingSubstitutionMap();
-    auto SubstCalleeType =
-        GenCalleeType->substGenericArgs(M, Subs);
+    auto SubstCalleeType = GenCalleeType->substGenericArgs(
+        M, Subs, Builder.getTypeExpansionContext());
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
     SILFunctionConventions Conv(SubstCalleeType, M);
     ResultType = Conv.getSILResultType();

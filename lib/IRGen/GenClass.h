@@ -50,12 +50,10 @@ namespace irgen {
   
   enum class ClassDeallocationKind : unsigned char;
   enum class FieldAccess : uint8_t;
-  
-  OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
-                                                 llvm::Value *base,
-                                                 SILType baseType,
-                                                 SILType fieldType,
-                                                 VarDecl *field);
+
+  OwnedAddress projectPhysicalClassMemberAddress(
+      IRGenFunction &IGF, llvm::Value *base,
+      SILType baseType, SILType fieldType, VarDecl *field);
 
   /// Return a strategy for accessing the given stored class property.
   ///
@@ -180,11 +178,9 @@ namespace irgen {
 
   /// Emit the constant fragile offset of the given property inside an instance
   /// of the class.
-  llvm::Constant *
-  tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
-                                                  SILType baseType,
-                                                  VarDecl *field);
-                                                  
+  llvm::Constant *tryEmitConstantClassFragilePhysicalMemberOffset(
+      IRGenModule &IGM, SILType baseType, VarDecl *field);
+
   FieldAccess getClassFieldAccess(IRGenModule &IGM,
                                   SILType baseType,
                                   VarDecl *field);
@@ -208,10 +204,8 @@ namespace irgen {
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
-                                         llvm::Value *base,
-                                         SILType baseType,
-                                         SILDeclRef method,
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF, llvm::Value *base,
+                                         SILType baseType, SILDeclRef method,
                                          CanSILFunctionType methodType,
                                          bool useSuperVTable);
 
