@@ -157,15 +157,14 @@ cd "S:\b\foundation
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=clang-cl^
-  -DCMAKE_SWIFT_COMPILER=S:\b\toolchain\bin\swiftc.exe^
+  -DCMAKE_Swift_COMPILER=S:\b\toolchain\bin\swiftc.exe^
   -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib"^
   -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include"^
   -DENABLE_TESTING=YES^
   -DICU_ROOT="S:/Library/icu-64"^
   -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include"^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  -Ddispatch_DIR=S:\b\libdispatch\cmake\modules^
   -DFOUNDATION_PATH_TO_XCTEST_BUILD=S:\b\xctest^
    S:\swift-corelibs-foundation
 ninja
