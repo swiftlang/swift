@@ -1258,10 +1258,18 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
       decl->isOperator() &&
       dc->isTypeContext()) {
     auto operatorName = decl->getFullName().getBaseIdentifier();
-    decl->diagnose(diag::nonstatic_operator_in_type,
-                   operatorName, dc->getDeclaredInterfaceType())
-        .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
-                     "static ");
+    if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
+      decl->diagnose(diag::nonstatic_operator_in_extension,
+                     operatorName, ED->getExtendedTypeRepr())
+          .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+    } else {
+      auto *NTD = cast<NominalTypeDecl>(dc->getAsDecl());
+      decl->diagnose(diag::nonstatic_operator_in_nominal, operatorName,
+                     NTD->getName())
+          .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+    }
     result = true;
   }
 

@@ -135,3 +135,7 @@ class OneMore {
     fatalError()
   }
 }
+
+class Chain<A> {
+  func + (lhs: Chain<A>, rhs: Chain<A>) -> Chain<A> { fatalError() }
+}

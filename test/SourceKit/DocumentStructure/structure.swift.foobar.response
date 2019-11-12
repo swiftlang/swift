@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2259,
+  key.length: 2348,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1398,6 +1398,69 @@
               key.nameoffset: 2240,
               key.namelength: 10,
               key.bodyoffset: 2251,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Chain",
+      key.offset: 2260,
+      key.length: 87,
+      key.nameoffset: 2266,
+      key.namelength: 5,
+      key.bodyoffset: 2276,
+      key.bodylength: 70,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "A",
+          key.offset: 2272,
+          key.length: 1,
+          key.nameoffset: 2272,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.static,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "+(_:_:)",
+          key.offset: 2279,
+          key.length: 66,
+          key.typename: "Chain<A>",
+          key.nameoffset: 2284,
+          key.namelength: 32,
+          key.bodyoffset: 2330,
+          key.bodylength: 14,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "lhs",
+              key.offset: 2287,
+              key.length: 13,
+              key.typename: "Chain<A>",
+              key.nameoffset: 0,
+              key.namelength: 0
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "rhs",
+              key.offset: 2302,
+              key.length: 13,
+              key.typename: "Chain<A>",
+              key.nameoffset: 0,
+              key.namelength: 0
+            },
+            {
+              key.kind: source.lang.swift.expr.call,
+              key.name: "fatalError",
+              key.offset: 2331,
+              key.length: 12,
+              key.nameoffset: 2331,
+              key.namelength: 10,
+              key.bodyoffset: 2342,
               key.bodylength: 0
             }
           ]
