@@ -527,7 +527,14 @@ enum GenericEnum2<T> {
 sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
 
 // CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return2
-// CHECK: insertvalue {{.*}}$s24generic_indirect_return2TA
+// CHECK: [[CTX:%.]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK: store {{.*}}$s24generic_indirect_return2TA
+// CHECK: store %swift.refcounted* [[CTX]]
+// CHECK: [[FN:%.*]] = load i8*
+// CHECK: [[CTX2:%.*]] = load %swift.refcounted*
+// CHECK: [[R1:%.]] = insertvalue { i8*, %swift.refcounted* } undef, i8* [[FN]], 0
+// CHECK: [[R2:%.*]] = insertvalue { i8*, %swift.refcounted* } [[R1]], %swift.refcounted* [[CTX2]], 1
+// CHECK: ret { i8*, %swift.refcounted* } [[R2]]
 
 // CHECK-LABEL: define internal swiftcc void @"$s24generic_indirect_return2TA"(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret, %swift.refcounted* swiftself)
 // CHECK:  [[CASTED_ADDR:%.*]] = bitcast %T13partial_apply12GenericEnum2OySiG* %0 to %T13partial_apply12GenericEnum2O*

@@ -753,9 +753,11 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   StructDecl *structDecl = osLogMessageType.getStructOrBoundGenericStruct();
   assert(structDecl);
 
+  auto typeExpansionContext =
+      TypeExpansionContext(*osLogMessage->getFunction());
   VarDecl *interpolationPropDecl = structDecl->getStoredProperties().front();
-  SILType osLogInterpolationType =
-      osLogMessageType.getFieldType(interpolationPropDecl, module);
+  SILType osLogInterpolationType = osLogMessageType.getFieldType(
+      interpolationPropDecl, module, typeExpansionContext);
   StructDecl *interpolationStruct =
       osLogInterpolationType.getStructOrBoundGenericStruct();
   assert(interpolationStruct);

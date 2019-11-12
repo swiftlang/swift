@@ -230,8 +230,6 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
-PASS(OpaqueArchetypeSpecializer, "opaque-archetype-specializer",
-     "Opaque archetype specializer")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",

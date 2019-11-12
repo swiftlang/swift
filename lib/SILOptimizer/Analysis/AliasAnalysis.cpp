@@ -475,8 +475,8 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
 
   // If one type is an aggregate and it contains the other type then the record
   // reference may alias the aggregate reference.
-  if (LTy.aggregateContainsRecord(RTy, Mod) ||
-      RTy.aggregateContainsRecord(LTy, Mod))
+  if (LTy.aggregateContainsRecord(RTy, Mod, F.getTypeExpansionContext()) ||
+      RTy.aggregateContainsRecord(LTy, Mod, F.getTypeExpansionContext()))
     return true;
 
   // FIXME: All the code following could be made significantly more aggressive

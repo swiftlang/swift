@@ -142,9 +142,11 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   }
 }
 
-SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
-                                                           const ValueDecl *D) {
-  assert(isEntry() && "Function Arguments can only be in the entry block");
+SILFunctionArgument *
+SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
+                                      bool disableEntryBlockVerification) {
+  assert((disableEntryBlockVerification || isEntry()) &&
+         "Function Arguments can only be in the entry block");
   const SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
       *Parent, Ty,

@@ -715,3 +715,11 @@ bool SubstitutionMap::isIdentity() const {
 
   return !hasNonIdentityReplacement;
 }
+
+SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
+    TypeExpansionContext context) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  return this->subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+}

@@ -837,6 +837,8 @@ public:
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
 
+  TypeExpansionContext getMaximalTypeExpansionContext() const;
+
   bool isResilientConformance(const NormalProtocolConformance *conformance);
   bool isResilientConformance(const RootProtocolConformance *root);
   bool isDependentConformance(const RootProtocolConformance *conformance);

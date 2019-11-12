@@ -595,7 +595,7 @@ public:
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,
-                           ResilienceExpansion forExpansion);
+                           TypeExpansionContext forExpansion);
 
   /// Can type metadata for the given formal type be fetched in
   /// the given module?

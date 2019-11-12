@@ -596,6 +596,8 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::Type:
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
+    if (isa<OpaqueTypeArchetypeType>(getType()))
+      return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               ::getOptionalObjectType(getType()));
 
