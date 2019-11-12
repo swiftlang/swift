@@ -6076,7 +6076,8 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
                                     ->getCanonicalType())
            : cast<FunctionType>(interfaceType->getCanonicalType());
   AbstractionPattern origFnType(substFnType);
-  auto fnType = getLoweredType(origFnType, substFnType).castTo<SILFunctionType>();
+  auto fnType =
+      getLoweredType(origFnType, substFnType).castTo<SILFunctionType>();
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
   ArgEmitter emitter(
@@ -6086,7 +6087,7 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
       ClaimedParamsRef(fnType, fnType.getPointer()->getParameters()), argValues,
       delayedArgs,
       /*foreign error*/ None, ImportAsMemberStatus());
-  
+
   auto prepared =
       prepareSubscriptIndices(subscript, subs,
                               // Strategy doesn't matter
