@@ -638,6 +638,7 @@ public:
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {

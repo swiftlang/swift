@@ -2701,6 +2701,10 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       DE.diagnose(commonAnchor->getLoc(),
                   diag::could_not_find_subscript_member_did_you_mean,
                   getType(UDE->getBase()));
+    } else if (fix->getKind() == FixKind::TreatRValueAsLValue) {
+      DE.diagnose(commonAnchor->getLoc(),
+                  diag::no_overloads_match_exactly_in_assignment,
+                  decl->getBaseName());
     } else {
       auto name = decl->getFullName();
       // Three choices here:

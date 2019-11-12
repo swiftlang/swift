@@ -1440,6 +1440,17 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   return failure.diagnose();
 }
 
+bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
+  emitDiagnostic(decl, diag::candidate_is_not_assignable,
+                 decl->getDescriptiveKind(), decl->getFullName());
+  return true;
+}
+
 static Decl *findSimpleReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
     E = LE->getSubExpr();

@@ -2815,6 +2815,14 @@ bool ConstraintSystem::repairFailures(
       return true;
     }
 
+    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
+      if (lhs->is<LValueType>()) {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+        return true;
+      }
+    }
+
     if (auto *AE = dyn_cast<AssignExpr>(anchor)) {
       if (repairByInsertingExplicitCall(lhs, rhs))
         return true;
