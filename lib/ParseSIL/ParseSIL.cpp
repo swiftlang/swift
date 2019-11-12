@@ -7023,7 +7023,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     SourceLoc lBraceLoc;
     P.consumeIf(tok::l_brace, lBraceLoc);
     // Parse JVP (optional).
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
+    if (P.isJVPIdentifier(P.Tok)) {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
@@ -7032,7 +7032,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
         return true;
     }
     // Parse VJP (optional).
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "vjp") {
+    if (P.isVJPIdentifier(P.Tok)) {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
