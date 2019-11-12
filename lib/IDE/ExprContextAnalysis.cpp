@@ -288,9 +288,6 @@ static void collectPossibleCalleesByQualifiedLookup(
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
     Type declaredMemberType = VD->getInterfaceType();
-    if (!declaredMemberType) {
-      continue;
-    }
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
     if (VD->getDeclContext()->isTypeContext()) {

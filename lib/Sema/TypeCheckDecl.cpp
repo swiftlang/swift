@@ -3939,11 +3939,8 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check the parameters for a reference to 'Self'.
   bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
   for (auto param : *decl->getParameters()) {
-    auto paramType = param->getInterfaceType();
-    if (!paramType) break;
-
     // Look through a metatype reference, if there is one.
-    paramType = paramType->getMetatypeInstanceType();
+    auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
 
     auto nominal = paramType->getAnyNominal();
     if (type.isNull()) {

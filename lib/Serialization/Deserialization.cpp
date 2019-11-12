@@ -1122,11 +1122,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
       return true;
 
     // If we're expecting a type, make sure this decl has the expected type.
-    if (canTy)  {
-      auto ifaceTy = value->getInterfaceType();
-      if (!ifaceTy || !ifaceTy->isEqual(canTy))
-        return true;
-    }
+    if (canTy && !value->getInterfaceType()->isEqual(canTy))
+      return true;
 
     if (value->isStatic() != isStatic)
       return true;
