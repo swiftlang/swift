@@ -82,7 +82,7 @@ static bool swiftConformingMethodListImpl(
     return true;
   }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
 
   return true;
 }

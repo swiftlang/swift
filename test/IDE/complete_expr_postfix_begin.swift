@@ -75,8 +75,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_1 | %FileCheck %s -check-prefix=IN_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_2 | %FileCheck %s -check-prefix=IN_TUPLE_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
+// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
+// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_3 | %FileCheck %s -check-prefix=OWN_INIT_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_4 | %FileCheck %s -check-prefix=OWN_INIT_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_5 | %FileCheck %s -check-prefix=OWN_INIT_5

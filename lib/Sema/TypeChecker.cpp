@@ -385,10 +385,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       if (!SF.getParentModule()->isOnoneSupportModule())
         TC.setSkipNonInlinableBodies(true);
 
-    // Lookup the swift module.  This ensures that we record all known
-    // protocols in the AST.
-    (void) TC.getStdlibModule(&SF);
-
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
@@ -398,7 +394,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    bindExtensions(SF);
+    ::bindExtensions(SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
@@ -738,4 +734,8 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
+}
+
+void swift::bindExtensions(SourceFile &SF) {
+  ::bindExtensions(SF);
 }
