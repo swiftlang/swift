@@ -491,28 +491,35 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                                  const FrontendOptions &FrontendOpts) {
   using namespace options;
 
-  auto setUnsignedIntegerArgument = [&Args, &Diags](options::ID optionID,
-                                                    unsigned radix,
-                                                    unsigned &valueToSet) {
-    if (const Arg *A = Args.getLastArg(optionID)) {
-      unsigned attempt;
-      if (StringRef(A->getValue()).getAsInteger(radix, attempt)) {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-      } else {
-        valueToSet = attempt;
-      }
-    }
-  };
+  bool HadError = false;
+  auto setUnsignedIntegerArgument =
+      [&Args, &Diags, &HadError](options::ID optionID, unsigned &valueToSet) {
+        if (const Arg *A = Args.getLastArg(optionID)) {
+          unsigned attempt;
+          if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, attempt)) {
+            Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                           A->getAsString(Args), A->getValue());
+            HadError = true;
+          } else {
+            valueToSet = attempt;
+          }
+        }
+      };
 
-  setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
+  setUnsignedIntegerArgument(OPT_warn_long_function_bodies,
                              Opts.WarnLongFunctionBodies);
-  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking, 10,
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking,
                              Opts.WarnLongExpressionTypeChecking);
-  setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
+  setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ,
                              Opts.ExpressionTimeoutThreshold);
-  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
+  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ,
                              Opts.SwitchCheckingInvocationThreshold);
+  setUnsignedIntegerArgument(OPT_debug_constraints_attempt,
+                             Opts.DebugConstraintSolverAttempt);
+  setUnsignedIntegerArgument(OPT_solver_memory_threshold,
+                             Opts.SolverMemoryThreshold);
+  setUnsignedIntegerArgument(OPT_solver_shrink_unsolved_threshold,
+                             Opts.SolverShrinkUnsolvedThreshold);
 
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=
@@ -539,21 +546,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
-  bool HadError = false;
-  if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.DebugConstraintSolverAttempt = attempt;
-    }
-  }
-
   for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
     unsigned line;
-    if (StringRef(A->getValue()).getAsInteger(10, line)) {
+    if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, line)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
       HadError = true;
@@ -565,28 +560,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefix = A->getValue();
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.SolverMemoryThreshold = threshold;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.SolverShrinkUnsolvedThreshold = threshold;
-    }
   }
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
