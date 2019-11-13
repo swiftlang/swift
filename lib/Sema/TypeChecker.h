@@ -38,7 +38,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
-class TopLevelContext;
 class TypeChecker;
 class TypeResolution;
 class TypeResolutionOptions;
@@ -819,8 +818,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                                  unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
 
   static void typeCheckDecl(Decl *D);
 

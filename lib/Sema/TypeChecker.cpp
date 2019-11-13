@@ -375,7 +375,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(SF, TLC, StartElem);
+      TypeChecker::processREPLTopLevel(SF, StartElem);
 
     typeCheckFunctionsAndExternalDecls(SF, TC);
   }
