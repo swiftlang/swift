@@ -66,10 +66,10 @@ protocol Proto {
 // ObjC entry points for @objc and dynamic entry points
 
 // normal and @objc initializing ctors can be statically dispatched
-// CHECK-LABEL: sil hidden [ossa] @$s7dynamic3FooC{{.*}}tcfC
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic3FooC{{.*}}tcfC
 // CHECK:         function_ref @$s7dynamic3FooC{{.*}}tcfc
 
-// CHECK-LABEL: sil hidden [ossa] @$s7dynamic3FooC{{.*}}tcfC
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic3FooC{{.*}}tcfC
 // CHECK:         function_ref @$s7dynamic3FooC{{.*}}tcfc
 
 // CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
@@ -154,7 +154,7 @@ class Subclass: Foo {
   override init(native: Int) {
     super.init(native: native)
   }
-  // CHECK-LABEL: sil hidden [ossa] @$s7dynamic8SubclassC{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic8SubclassC{{[_0-9a-zA-Z]*}}fC
   // CHECK:         function_ref @$s7dynamic8SubclassC{{[_0-9a-zA-Z]*}}fc
 
   override func nativeMethod() {
@@ -512,7 +512,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // so after re-abstracting the signature we must dispatch to the dynamic
 // thunk.
 
-// CHECK-LABEL: sil private [ossa] @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
 // CHECK: bb0(%0 : $*Int, %1 : @guaranteed $ConcreteDerived):
 // CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
 // CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @$s7dynamic15ConcreteDerivedC6methodyySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
@@ -546,7 +546,7 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public @$s7dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : @$s7dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
 // CHECK: }
 
 // Check vtables for implicitly-inherited initializers
@@ -575,7 +575,7 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable [serialized] ConcreteDerived {
-// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
+// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
 // CHECK-NEXT: #GenericBase.init!allocator.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @$s7dynamic15ConcreteDerivedCACycfC [override]
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator.1: @$s7dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }

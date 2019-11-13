@@ -297,7 +297,8 @@ namespace {
                                   SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
-        SILType type = classType.getFieldType(var, IGM.getSILModule());
+        SILType type = classType.getFieldType(var, IGM.getSILModule(),
+                                              TypeExpansionContext::minimal());
 
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
@@ -500,23 +501,20 @@ Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
 }
 
 /// Emit a field l-value by applying the given offset to the given base.
-static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
-                                        SILType baseType,
-                                        llvm::Value *base,
-                                        llvm::Value *offset,
+static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF, SILType baseType,
+                                        llvm::Value *base, llvm::Value *offset,
                                         VarDecl *field) {
-  auto &fieldTI =
-    IGF.getTypeInfo(baseType.getFieldType(field, IGF.getSILModule()));
+  auto &fieldTI = IGF.getTypeInfo(baseType.getFieldType(
+      field, IGF.getSILModule(), IGF.IGM.getMaximalTypeExpansionContext()));
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
 }
 
-llvm::Constant *
-irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
-                                                       SILType baseType,
-                                                       VarDecl *field) {
-  auto fieldType = baseType.getFieldType(field, IGM.getSILModule());
+llvm::Constant *irgen::tryEmitConstantClassFragilePhysicalMemberOffset(
+    IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  auto fieldType = baseType.getFieldType(field, IGM.getSILModule(),
+                                         IGM.getMaximalTypeExpansionContext());
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGM.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -1211,7 +1209,6 @@ namespace {
       // hierarchy crosses resilience domains, we use a
       // slightly different query here.
       if (theClass->checkAncestry(AncestryFlags::ResilientOther)) {
-        assert(IGM.Context.LangOpts.EnableObjCResilientClassStubs);
         return IGM.getAddrOfObjCResilientClassStub(theClass, NotForDefinition,
                                              TypeMetadataAddress::AddressPoint);
       }
@@ -1467,7 +1464,7 @@ namespace {
       // If we have the destructor body, we know whether SILGen
       // generated a -dealloc body.
       if (auto braceStmt = destructor->getBody())
-        return braceStmt->getNumElements() != 0;
+        return !braceStmt->empty();
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
@@ -1790,7 +1787,7 @@ namespace {
         }
 
         // Don't emit descriptors for properties without accessors.
-        auto getter = var->getGetter();
+        auto getter = var->getOpaqueAccessor(AccessorKind::Get);
         if (!getter)
           return;
 
@@ -1801,7 +1798,7 @@ namespace {
         auto &methods = getMethodList(var);
         methods.push_back(getter);
 
-        if (auto setter = var->getSetter())
+        if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
           methods.push_back(setter);
       }
     }
@@ -1999,6 +1996,7 @@ namespace {
       case llvm::Triple::MachO:
         var->setSection("__DATA, __objc_const");
         break;
+      case llvm::Triple::XCOFF:
       case llvm::Triple::COFF:
         var->setSection(".data");
         break;
@@ -2027,13 +2025,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
 
-      auto getter = subscript->getGetter();
+      auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
       auto &methods = getMethodList(subscript);
       methods.push_back(getter);
 
-      if (auto setter = subscript->getSetter())
+      if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
   };
@@ -2072,9 +2070,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// does not have statically-emitted metadata.
 bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
   assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
-  return (!D->isGenericContext() &&
-          IGM.ObjCInterop &&
-          IGM.Context.LangOpts.EnableObjCResilientClassStubs);
+  return IGM.ObjCInterop && !D->isGenericContext();
 }
 
 void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
@@ -2241,7 +2237,6 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                                            MutableArrayRef<TypeLoc>(),
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
-  SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
     /*isNameImplicit=*/true));
@@ -2320,6 +2315,11 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   // If we have resiliently-sized fields, we might be able to use the
   // update pattern.
   if (resilientLayout.doesMetadataRequireUpdate()) {
+      
+    // FixedOrUpdate strategy does not work in JIT mode
+    if (IRGen.Opts.UseJIT)
+      return ClassMetadataStrategy::Singleton;
+      
     // The update pattern only benefits us on platforms with an Objective-C
     // runtime, otherwise just use the singleton pattern.
     if (!Context.LangOpts.EnableObjCInterop)
@@ -2421,12 +2421,13 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   return FunctionPointer(fnPtr, signature);
 }
 
-FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                                              llvm::Value *base,
-                                              SILType baseType,
-                                              SILDeclRef method,
-                                              CanSILFunctionType methodType,
-                                              bool useSuperVTable) {
+FunctionPointer
+irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                              llvm::Value *base,
+                              SILType baseType,
+                              SILDeclRef method,
+                              CanSILFunctionType methodType,
+                              bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {

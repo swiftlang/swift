@@ -13,3 +13,23 @@ public class K {
   public convenience init(c : Int) { self.init(i : c) }
   public final func finalFunction() {}
 }
+
+
+public protocol P {
+  var v: Int { get }
+  subscript(i: Int) -> Int { get }
+  func f()
+}
+
+extension P {
+  public var v: Int { return 0 }
+
+  public subscript(i: Int) -> Int {
+    get {
+      return 0
+    }
+  }
+
+  public func f() {
+  }
+}

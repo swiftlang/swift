@@ -5,6 +5,8 @@
 // Make this C-compatible by leaving out the type.
 #define CF_ENUM(_name) enum _name _name; enum _name
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmicrosoft-enum-forward-reference"
 typedef CF_ENUM(EnumWithDefaultExhaustivity) {
   EnumWithDefaultExhaustivityLoneCase
 };
@@ -14,3 +16,4 @@ typedef CF_ENUM(EnumWithDefaultExhaustivity) {
 typedef CF_ENUM(EnumWithSpecialAttributes) {
   EnumWithSpecialAttributesLoneCase
 } __CF_ENUM_ATTRIBUTES;
+#pragma clang diagnostic pop

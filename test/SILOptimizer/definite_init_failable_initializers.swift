@@ -416,7 +416,7 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV27failDuringOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowStruct
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV4failACyt_tKcfC
@@ -457,7 +457,7 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers11ThrowStructV27failBeforeOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowStruct
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF
@@ -958,7 +958,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitialization0h6DuringjK0ACSi_SitKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]] : $*ThrowDerivedClass
@@ -1028,7 +1028,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failAfterFullInitialization0h6DuringjK0ACSi_SitKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
 // CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]]
@@ -1075,7 +1075,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitialization0h5AfterjK0ACSi_SitKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %2 to [[SELF_BOX]]
@@ -1138,7 +1138,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeFullInitialization0h6DuringjK00h5AfterjK0ACSi_S2itKcfc
 // CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $ThrowDerivedClass):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         store %3 to [[SELF_BOX]]
@@ -1320,7 +1320,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failDuringOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK:         [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK:         [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
 // CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers17ThrowDerivedClassCACyKcfC
@@ -1361,7 +1361,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17ThrowDerivedClassC27failBeforeOrAfterDelegationACSi_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
+// CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [dynamic_lifetime] $ThrowDerivedClass
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$s35definite_init_failable_initializers6unwrapyS2iKF

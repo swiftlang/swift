@@ -20,16 +20,16 @@ fg({x in x}) // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 struct S {
-  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {}
+  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {} // expected-note {{in call to function 'f'}}
   func f(_ d: (Double) -> Double) -> Void {}
   func test() -> Void {
     f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
-  func g<T>(_ a: T, _ b: Int) -> Void {}
+  func g<T>(_ a: T, _ b: Int) -> Void {} // expected-note {{in call to function 'g'}}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
-    g(.notAThing, 7) // expected-error {{reference to member 'notAThing' cannot be resolved without a contextual type}}
+    g(.notAThing, 7) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
   func h(_ a: Int, _ b: Int) -> Void {}
@@ -71,14 +71,14 @@ _ = sr7918_Suit.foo(&myRNG) // expected-error {{cannot pass immutable value as i
 //=-------------- SR-7786 --------------=/
 struct sr7786 {
   func foo() -> UInt { return 0 }
-  func foo<T: UnsignedInteger>(bar: T) -> T {
+  func foo<T: UnsignedInteger>(bar: T) -> T { // expected-note {{where 'T' = 'Int'}}
     return bar
   }
 }
 
 let s = sr7786()
 let a = s.foo()
-let b = s.foo(bar: 123) // expected-error {{argument type 'Int' does not conform to expected type 'UnsignedInteger'}}
+let b = s.foo(bar: 123) // expected-error {{instance method 'foo(bar:)' requires that 'Int' conform to 'UnsignedInteger'}}
 let c: UInt = s.foo(bar: 123)
 let d = s.foo(bar: 123 as UInt)
 
@@ -93,6 +93,7 @@ class sr7440_Genre {
   static func fetch(_ iTunesGenre: sr7440_ITunesGenre) -> sr7440_Genre {
     return sr7440_Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
 // expected-error@-1 {{value of type 'sr7440_ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
+// expected-error@-2 {{cannot convert return expression of type '()' to return type 'sr7440_Genre'}}
   }
 }
 
@@ -113,7 +114,7 @@ struct Count { // expected-note {{'init(title:)' declared here}}
 func getCounts(_ scheduler: sr5154_Scheduler, _ handler: @escaping ([Count]) -> Void) {
   scheduler.inBackground(run: {
     return [Count()] // expected-error {{missing argument for parameter 'title' in call}}
-  }, completedBy: {
+  }, completedBy: { // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{20-20= _ in}}
   })
 }
 

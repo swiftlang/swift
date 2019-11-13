@@ -20,6 +20,15 @@
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+  
+class AvailabilityContext;
+class ASTContext;
+
+enum class RuntimeAvailability {
+  AlwaysAvailable,
+  AvailableByCompatibilityLibrary,
+  ConditionallyAvailable
+};
 
 /// Generate an llvm declaration for a runtime entry with a
 /// given name, return types, argument types, attributes and
@@ -28,6 +37,7 @@ llvm::Constant *getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       char const *name,
                       llvm::CallingConv::ID cc,
+                      RuntimeAvailability availability,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attrs);

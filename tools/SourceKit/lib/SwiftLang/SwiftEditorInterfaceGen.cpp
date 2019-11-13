@@ -191,10 +191,12 @@ public:
     }
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     unsigned StartOffset = OS.tell();
     Info.References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
@@ -467,6 +469,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
     ErrorMsg = "Error during invocation setup";
     return nullptr;
   }
+  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
@@ -775,7 +778,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
 }
 
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
@@ -834,7 +838,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
 
 void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
                                              ArrayRef<const char *> Args,
-                       std::function<void(const InterfaceDocInfo &)> Receiver) {
+                       std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) {
   InterfaceDocInfo Info;
 
   CompilerInstance CI;
@@ -846,8 +850,7 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   std::string Error;
   if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
                                              StringRef(), Error)) {
-    Info.Error = Error;
-    return Receiver(Info);
+    return Receiver(RequestResult<InterfaceDocInfo>::fromError(Error));
   }
 
   if (auto IFaceGenRef = IFaceGenContexts.find(ModuleName, Invocation))
@@ -905,5 +908,5 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   }
   Info.CompilerArgs = NewArgs;
 
-  return Receiver(Info);
+  return Receiver(RequestResult<InterfaceDocInfo>::fromResult(Info));
 }

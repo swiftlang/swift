@@ -79,8 +79,13 @@ namespace swift {
 SWIFT_RUNTIME_EXPORT
 void swift_rootObjCDealloc(HeapObject *self);
 
+// Uses Swift bridging to box a C string into an NSString without introducing
+// a link-time dependency on NSString.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+id swift_stdlib_NSStringFromUTF8(const char *cstr, int len);
+
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
-#endif /* SWIFT_ABI_OBJCBRIDGE_H */
+#endif // SWIFT_ABI_OBJCBRIDGE_H

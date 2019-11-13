@@ -47,7 +47,8 @@ public:
     ModuleWrapJob,
     AutolinkExtractJob,
     REPLJob,
-    LinkJob,
+    DynamicLinkJob,
+    StaticLinkJob,
     GenerateDSYMJob,
     VerifyDebugInfoJob,
     GeneratePCHJob,
@@ -305,21 +306,35 @@ public:
   }
 };
 
-class LinkJobAction : public JobAction {
+class DynamicLinkJobAction : public JobAction {
   virtual void anchor();
   LinkKind Kind;
 
 public:
-  LinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
-      : JobAction(Action::Kind::LinkJob, Inputs, file_types::TY_Image),
+  DynamicLinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
+      : JobAction(Action::Kind::DynamicLinkJob, Inputs, file_types::TY_Image),
         Kind(K) {
-    assert(Kind != LinkKind::None);
+    assert(Kind != LinkKind::None && Kind != LinkKind::StaticLibrary);
   }
 
   LinkKind getKind() const { return Kind; }
 
   static bool classof(const Action *A) {
-    return A->getKind() == Action::Kind::LinkJob;
+    return A->getKind() == Action::Kind::DynamicLinkJob;
+  }
+};
+
+class StaticLinkJobAction : public JobAction {
+  virtual void anchor();
+
+public:
+  StaticLinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
+      : JobAction(Action::Kind::StaticLinkJob, Inputs, file_types::TY_Image) {
+    assert(K == LinkKind::StaticLibrary);
+  }
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::Kind::StaticLinkJob;
   }
 };
 

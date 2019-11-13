@@ -13,7 +13,7 @@
 /// A wrapper around __RawSetStorage that provides most of the
 /// implementation of Set.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _NativeSet<Element: Hashable> {
   /// See the comments on __RawSetStorage and its subclasses to understand why we
   /// store an untyped storage here.
@@ -546,7 +546,7 @@ extension _NativeSet { // Deletion
 
 extension _NativeSet: Sequence {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Iterator {
     // The iterator is iterating over a frozen view of the collection state, so
     // it keeps its own reference to the set.

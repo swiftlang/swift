@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -sdk %S/../SILGen/Inputs %s -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -emit-sil -sdk %S/../SILGen/Inputs %s -o /dev/null -verify
 
 // <rdar://problem/18213320> enum with raw values that are too big are not diagnosed
 enum EnumWithTooLargeElements : UInt8 {

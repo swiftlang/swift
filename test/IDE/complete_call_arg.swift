@@ -74,6 +74,26 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_SELF_2 | %FileCheck %s -check-prefix=CURRIED_SELF_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_SELF_3 | %FileCheck %s -check-prefix=CURRIED_SELF_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_AFTERPAREN_1 | %FileCheck %s -check-prefix=STATIC_METHOD_AFTERPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_AFTERPAREN_2 | %FileCheck %s -check-prefix=STATIC_METHOD_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SECOND | %FileCheck %s -check-prefix=STATIC_METHOD_SECOND
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SKIPPED | %FileCheck %s -check-prefix=STATIC_METHOD_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -172,7 +192,7 @@ class C1 {
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: intGen()[#Int#]; name=intGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
-// EXPECT_INT-DAT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
+// EXPECT_INT-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule:      ointGen()[#Int?#]; name=ointGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi1[#Int?#]; name=oi1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
@@ -455,9 +475,8 @@ struct TestBoundGeneric1 {
   func test2() {
     takeArray(#^BOUND_GENERIC_1_2^#)
   }
-// FIXME: These should be convertible to [T]. rdar://problem/24570603
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: x[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: y[#[Int]#];
 }
 
 func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
@@ -611,5 +630,124 @@ class TestImplicitlyCurriedSelf {
 // CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
 // CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int, Int) -> ()#]{{; name=.+$}}
 // CURRIED_SELF_1: End completions
+  }
+}
+
+class TestStaticMemberCall {
+  static func create1(arg1: Int) -> TestStaticMemberCall {
+    return TestStaticMemberCall()
+  }
+  static func create2(_ arg1: Int, arg2: Int = 0, arg3: Int = 1, arg4: Int = 2) -> TestStaticMemberCall {
+    return TestStaticMemberCall()
+  }
+}
+func testStaticMemberCall() {
+  let _ = TestStaticMemberCall.create1(#^STATIC_METHOD_AFTERPAREN_1^#)
+// STATIC_METHOD_AFTERPAREN_1: Begin completions, 1 items
+// STATIC_METHOD_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// STATIC_METHOD_AFTERPAREN_1: End completions
+
+  let _ = TestStaticMemberCall.create2(#^STATIC_METHOD_AFTERPAREN_2^#)
+// STATIC_METHOD_AFTERPAREN_2: Begin completions
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Identical]: 0[#Int#];
+// STATIC_METHOD_AFTERPAREN_2: End completions
+
+  let _ = TestStaticMemberCall.create2(1, #^STATIC_METHOD_SECOND^#)
+// STATIC_METHOD_SECOND: Begin completions, 3 items
+// STATIC_METHOD_SECOND: Keyword/ExprSpecific:               arg2: [#Argument name#];
+// STATIC_METHOD_SECOND: Keyword/ExprSpecific:               arg3: [#Argument name#];
+// STATIC_METHOD_SECOND: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// STATIC_METHOD_SECOND: End completions
+
+  let _ = TestStaticMemberCall.create2(1, arg3: 2, #^STATIC_METHOD_SKIPPED^#)
+// STATIC_METHOD_SKIPPED: Begin completions, 2 items
+// FIXME: 'arg3' shouldn't be suggested.
+// STATIC_METHOD_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
+// STATIC_METHOD_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// STATIC_METHOD_SKIPPED: End completions
+}
+func testImplicitMember() {
+  let _: TestStaticMemberCall = .create1(#^IMPLICIT_MEMBER_AFTERPAREN_1^#)
+// IMPLICIT_MEMBER_AFTERPAREN_1: Begin completions, 1 items
+// IMPLICIT_MEMBER_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1: Int
+// IMPLICIT_MEMBER_AFTERPAREN_1: End completions
+
+  let _: TestStaticMemberCall = .create2(#^IMPLICIT_MEMBER_AFTERPAREN_2^#)
+// IMPLICIT_MEMBER_AFTERPAREN_2: Begin completions
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#];
+// IMPLICIT_MEMBER_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Identical]: 0[#Int#];
+// IMPLICIT_MEMBER_AFTERPAREN_2: End completions
+
+  let _: TestStaticMemberCall = .create2(1, #^IMPLICIT_MEMBER_SECOND^#)
+// IMPLICIT_MEMBER_SECOND: Begin completions, 3 items
+// IMPLICIT_MEMBER_SECOND: Keyword/ExprSpecific:               arg2: [#Argument name#];
+// IMPLICIT_MEMBER_SECOND: Keyword/ExprSpecific:               arg3: [#Argument name#];
+// IMPLICIT_MEMBER_SECOND: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// IMPLICIT_MEMBER_SECOND: End completions
+
+  let _: TestStaticMemberCall = .create2(1, arg3: 2, #^IMPLICIT_MEMBER_SKIPPED^#)
+// IMPLICIT_MEMBER_SKIPPED: Begin completions, 2 items
+// FIXME: 'arg3' shouldn't be suggested.
+// IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
+// IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
+// IMPLICIT_MEMBER_SKIPPED: End completions
+}
+func testImplicitMemberInArrayLiteral() {
+  struct Receiver {
+    init(_: [TestStaticMemberCall]) {}
+    init(arg1: Int, arg2: [TestStaticMemberCall]) {}
+  }
+
+  Receiver([
+    .create1(x: 1),
+    .create1(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1^#),
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
+  ])
+  Receiver([
+    .create2(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2^#),
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
+    .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND^#
+    // Same as IMPLICIT_MEMBER_SECOND.
+  ])
+  Receiver(arg1: 12, arg2: [
+    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_1_SKIPPED^#
+    // Same as IMPLICIT_MEMBER_SKIPPED.
+    .create1(x: 12)
+  ])
+  let _: [TestStaticMemberCall] = [
+    .create1(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1^#),
+    // Same as STATIC_METHOD_AFTERPAREN_1.
+    .create2(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2^#),
+    // Same as STATIC_METHOD_AFTERPAREN_2.
+    .create2(1, #^IMPLICIT_MEMBER_ARRAY_2_SECOND^#),
+    // Same as STATIC_METHOD_SECOND.
+    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_2_SKIPPED^#),
+    // Same as STATIC_METHOD_SKIPPED.
+  ]
+}
+
+struct Wrap<T> {
+  func method<U>(_ fn: (T) -> U) -> Wrap<U> {}
+}
+func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
+  value.method(#^ARCHETYPE_GENERIC_1^#)
+// ARCHETYPE_GENERIC_1: Begin completions
+// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
+}
+
+struct TestHasErrorAutoclosureParam {
+  func hasErrorAutoclosureParam(value: @autoclosure () -> Value) {
+    fatalError()
+  }
+  func test() {
+    hasErrorAutoclosureParam(#^PARAM_WITH_ERROR_AUTOCLOSURE^#
+// PARAM_WITH_ERROR_AUTOCLOSURE: Begin completions, 1 items
+// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal:   ['(']{#value: <<error type>>#}[')'][#Void#];
+// PARAM_WITH_ERROR_AUTOCLOSURE: End completions
   }
 }

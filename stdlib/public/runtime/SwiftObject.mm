@@ -58,17 +58,7 @@ using namespace swift;
 OBJC_EXPORT __attribute__((__weak_import__))
 const uintptr_t objc_debug_isa_class_mask;
 
-static uintptr_t computeISAMask() {
-  // The versions of the Objective-C runtime which use non-pointer
-  // ISAs also export this symbol.
-  if (auto runtimeSymbol = &objc_debug_isa_class_mask)
-    return *runtimeSymbol;
-  return ~uintptr_t(0);
-}
-
-SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
-uintptr_t swift::swift_isaMask = computeISAMask();
-SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+uintptr_t swift::swift_isaMask = SWIFT_ISA_MASK;
 #endif
 
 const ClassMetadata *swift::_swift_getClass(const void *object) {
@@ -183,28 +173,43 @@ Class _swift_classOfObjCHeapObject(OpaqueValue *value) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-NSString *swift_stdlib_getDescription(OpaqueValue *value,
+id swift_stdlib_getDescription(OpaqueValue *value,
                                       const Metadata *type);
 
-NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
-  auto result = swift_stdlib_getDescription(value, type);
+id swift::getDescription(OpaqueValue *value, const Metadata *type) {
+  id result = swift_stdlib_getDescription(value, type);
   type->vw_destroy(value);
   return [result autorelease];
 }
 
-static NSString *_getObjectDescription(SwiftObject *obj) {
+static id _getObjectDescription(SwiftObject *obj) {
   swift_retain((HeapObject*)obj);
   return getDescription((OpaqueValue*)&obj,
                         _swift_getClassOfAllocated(obj));
 }
 
-static NSString *_getClassDescription(Class cls) {
-  return NSStringFromClass(cls);
+static id _getClassDescription(Class cls) {
+  const char *name = class_getName(cls);
+  int len = strlen(name);
+  return [swift_stdlib_NSStringFromUTF8(name, len) autorelease];
 }
 
-
 @implementation SwiftObject
-+ (void)initialize {}
++ (void)initialize {
+#if SWIFT_HAS_ISA_MASKING && !NDEBUG
+  // Older OSes may not have this variable, or it may not match. This code only
+  // runs on older OSes in certain testing scenarios, so that doesn't matter.
+  // Only perform the check on newer OSes where the value should definitely
+  // match.
+#  if SWIFT_BUILD_HAS_BACK_DEPLOYMENT
+  if (!_swift_isBackDeploying())
+#  endif
+  {
+    assert(&objc_debug_isa_class_mask);
+    assert(objc_debug_isa_class_mask == SWIFT_ISA_MASK);
+  }
+#endif
+}
 
 + (instancetype)allocWithZone:(struct _NSZone *)zone {
   assert(zone == nullptr);
@@ -413,21 +418,21 @@ static NSString *_getClassDescription(Class cls) {
                                                                  object2);
 }
 
-- (NSString *)description {
+- (id /* NSString */)description {
   return _getObjectDescription(self);
 }
-- (NSString *)debugDescription {
+- (id /* NSString */)debugDescription {
   return _getObjectDescription(self);
 }
 
-+ (NSString *)description {
++ (id /* NSString */)description {
   return _getClassDescription(self);
 }
-+ (NSString *)debugDescription {
++ (id /* NSString */)debugDescription {
   return _getClassDescription(self);
 }
 
-- (NSString *)_copyDescription {
+- (id /* NSString */)_copyDescription {
   // The NSObject version of this pushes an autoreleasepool in case -description
   // autoreleases, but we're OK with leaking things if we're at the top level
   // of the main thread with no autorelease pool.
@@ -435,15 +440,7 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (CFTypeID)_cfTypeID {
-  // Adopt the same CFTypeID as NSObject.
-  static CFTypeID result;
-  static dispatch_once_t predicate;
-  dispatch_once_f(&predicate, &result, [](void *resultAddr) {
-    id obj = [[NSObject alloc] init];
-    *(CFTypeID*)resultAddr = [obj _cfTypeID];
-    [obj release];
-  });
-  return result;
+  return (CFTypeID)1; //NSObject's CFTypeID is constant
 }
 
 // Foundation collections expect these to be implemented.
@@ -1274,7 +1271,11 @@ Class swift::swift_getInitializedObjCClass(Class c) {
   // Used when we have class metadata and we want to ensure a class has been
   // initialized by the Objective-C runtime. We need to do this because the
   // class "c" might be valid metadata, but it hasn't been initialized yet.
-  return [c class];
+  // Send a message that's likely not to be overridden to minimize potential
+  // side effects. Ignore the return value in case it is overridden to
+  // return something different. See SR-10463 for an example.
+  [c self];
+  return c;
 }
 
 static const ClassMetadata *

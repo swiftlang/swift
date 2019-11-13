@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -102,6 +103,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       return ApplySite(cast<PartialApplyInst>(node));
     }
+    llvm_unreachable("covered switch");
   }
 
   ApplySiteKind getKind() const { return ApplySiteKind(Inst->getKind()); }
@@ -126,10 +128,16 @@ public:
     case ApplySiteKind::TryApplyInst:                                          \
       return cast<TryApplyInst>(Inst)->OPERATION;                              \
     }                                                                          \
+    llvm_unreachable("covered switch");                                        \
   } while (0)
 
+  /// Return the callee operand as a value.
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
+
   /// Return the callee operand.
-  SILValue getCallee() const { FOREACH_IMPL_RETURN(getCallee()); }
+  const Operand *getCalleeOperand() const {
+    FOREACH_IMPL_RETURN(getCalleeOperand());
+  }
 
   /// Return the callee value by looking through function conversions until we
   /// find a function_ref, partial_apply, or unrecognized callee value.
@@ -143,8 +151,21 @@ public:
 
   /// Return the referenced function if the callee is a function_ref
   /// instruction.
-  SILFunction *getReferencedFunction() const {
-    FOREACH_IMPL_RETURN(getReferencedFunction());
+  SILFunction *getReferencedFunctionOrNull() const {
+    FOREACH_IMPL_RETURN(getReferencedFunctionOrNull());
+  }
+
+  /// Return the referenced function if the callee is a function_ref like
+  /// instruction.
+  ///
+  /// WARNING: This not necessarily the function that will be called at runtime.
+  /// If the callee is a (prev_)dynamic_function_ref the actual function called
+  /// might be different because it could be dynamically replaced at runtime.
+  ///
+  /// If the client of this API wants to look at the content of the returned SIL
+  /// function it should call getReferencedFunctionOrNull() instead.
+  SILFunction *getInitiallyReferencedFunction() const {
+    FOREACH_IMPL_RETURN(getInitiallyReferencedFunction());
   }
 
   /// Should we optimize this call.
@@ -249,7 +270,8 @@ public:
   /// Returns true if \p oper is an argument operand and not the callee
   /// operand.
   bool isArgumentOperand(const Operand &oper) const {
-    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument();
+    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument() &&
+      oper.getOperandNumber() < getOperandIndexOfFirstArgument() + getNumArguments();
   }
 
   /// Return the applied argument index for the given operand.
@@ -280,6 +302,7 @@ public:
       // apply pa2(a)
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the callee's function argument index corresponding to the given
@@ -312,6 +335,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the applied 'self' argument value.
@@ -326,6 +350,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the 'self' apply operand.
@@ -340,6 +365,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled cast");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return a list of applied arguments without self.
@@ -354,6 +380,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return whether the given apply is of a formally-throwing function
@@ -368,6 +395,24 @@ public:
       return false;
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
+    }
+  }
+
+  /// If this is a terminator apply site, then pass the first instruction of
+  /// each successor to fun. Otherwise, pass std::next(Inst).
+  ///
+  /// The intention is that this abstraction will enable the compiler writer to
+  /// ignore whether or not an apply site is a terminator when inserting
+  /// instructions after an apply site. This results in eliminating unnecessary
+  /// if-else code otherwise required to handle such situations.
+  void insertAfter(llvm::function_ref<void(SILBasicBlock::iterator)> func) {
+    auto *ti = dyn_cast<TermInst>(Inst);
+    if (!ti) {
+      return func(std::next(Inst->getIterator()));
+    }
+
+    for (auto *succBlock : ti->getSuccessorBlocks()) {
+      func(succBlock->begin());
     }
   }
 
@@ -453,6 +498,7 @@ public:
     case FullApplySiteKind::TryApplyInst:
       return FullApplySite(cast<TryApplyInst>(node));
     }
+    llvm_unreachable("covered switch");
   }
 
   FullApplySiteKind getKind() const {

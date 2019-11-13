@@ -1,8 +1,8 @@
 // RUN: %target-resilience-test
 // REQUIRES: executable_test
 
-// Use swift-version 4.
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+// SR-10913
+// UNSUPPORTED: OS=windows-msvc
 
 import StdlibUnittest
 import protocol_add_requirements

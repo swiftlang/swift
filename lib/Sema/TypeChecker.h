@@ -217,6 +217,12 @@ enum ContextualTypePurpose {
   CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
   CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
   CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
+  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
+                             ///< result type.
+  CTP_Condition,        ///< Condition expression of various statements e.g.
+                        ///< `if`, `for`, `while` etc.
+  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
+                        ///< is expected to conform to 'Sequence' protocol.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
@@ -232,9 +238,6 @@ enum class TypeCheckExprFlags {
   /// Whether the client wants to disable the structural syntactic restrictions
   /// that we force for style or other reasons.
   DisableStructuralChecks = 0x02,
-
-  /// Set if the client wants diagnostics suppressed.
-  SuppressDiagnostics = 0x04,
 
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
@@ -488,29 +491,18 @@ enum class RequirementCheckResult {
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
   InExpression = 0x01,
-  /// Whether we will be using the conformance in the AST.
-  ///
-  /// This implies that the conformance will have to be complete.
-  Used = 0x02,
   /// Whether to suppress dependency tracking entirely.
   ///
   /// FIXME: This deals with some oddities with the
   /// _ObjectiveCBridgeable conformances.
-  SuppressDependencyTracking = 0x04,
+  SuppressDependencyTracking = 0x02,
   /// Whether to skip the check for any conditional conformances.
   ///
   /// When set, the caller takes responsibility for any
   /// conditional requirements required for the conformance to be
   /// correctly used. Otherwise (the default), all of the conditional
   /// requirements will be checked.
-  SkipConditionalRequirements = 0x08,
-
-  /// Whether to require that the conditional requirements have been computed.
-  ///
-  /// When set, if the conditional requirements aren't available, they are just
-  /// skipped, and the caller is responsible for detecting and handling this
-  /// case (likely via another call to getConditionalRequirementsIfAvailable).
-  AllowUnavailableConditionalRequirements = 0x10,
+  SkipConditionalRequirements = 0x04,
 };
 
 /// Options that control protocol conformance checking.
@@ -540,251 +532,41 @@ enum class CheckedCastContextKind {
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
-class TypeChecker final : public LazyResolver {
+class TypeChecker final {
 public:
-  ASTContext &Context;
-  DiagnosticEngine &Diags;
-
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
-
-  /// Declarations that need their conformances checked.
-  llvm::SmallVector<Decl *, 8> ConformanceContexts;
-
-  /// The list of protocol conformances that were "used" and will need to be
-  /// completed before type checking is considered complete.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
-
-  /// The list of protocol conformances whose requirements could not be
-  /// fully checked and, therefore, should be checked again at the top
-  /// level.
-  llvm::SetVector<NormalProtocolConformance *> PartiallyCheckedConformances;
-
-  /// The list of declarations that we've done at least partial validation
-  /// of during type-checking, but which will need to be finalized before
-  /// we can hand them off to SILGen etc.
-  llvm::SetVector<ValueDecl *> DeclsToFinalize;
-
-  /// Track the index of the next declaration that needs to be finalized,
-  /// from the \c DeclsToFinalize set.
-  unsigned NextDeclToFinalize = 0;
-
-  /// The list of protocols that need their requirement signatures computed,
-  /// because they were first validated by validateDeclForNameLookup(),
-  /// which skips this step.
-  llvm::SetVector<ProtocolDecl *> DelayedRequirementSignatures;
-
-  /// The list of types whose circularity checks were delayed.
-  SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
-
-  // Caches whether a given declaration is "as specialized" as another.
-  llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
-                            /*isDynamicOverloadComparison*/ unsigned>,
-                 bool>
-      specializedOverloadComparisonCache;
 
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
-  /// Local functions that have been captured before their definitions.
-  ///
-  /// We need this to guard against functions that would transitively capture
-  /// variables before their definition, e.g.:
-  ///
-  /// func outer() {
-  ///   func first() {
-  ///     second()
-  ///   }
-  ///   second()
-  ///   var x
-  ///   func second() {
-  ///     use(x)
-  ///   }
-  /// }
-
-  llvm::SmallDenseMap<AnyFunctionRef, SmallVector<AnyFunctionRef, 4>, 4>
-    ForwardCapturedFuncs;
-
-  /// A set of local functions from which C function pointers are derived.
-  ///
-  /// This is used to diagnose the use of local functions with captured context
-  /// as C function pointers when the function's captures have not yet been
-  /// computed.
-  llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
-
 private:
-  /// The # of times we have performed typo correction.
-  unsigned NumTypoCorrections = 0;
+  TypeChecker() = default;
+  ~TypeChecker() = default;
 
-private:
-  Type MaxIntegerType;
-  Type NSObjectType;
-  Type NSNumberType;
-  Type NSValueType;
-  Type ObjCSelectorType;
-
-  /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
-
-  ModuleDecl *StdlibModule = nullptr;
-
-  /// The index of the next response metavariable to bind to a REPL result.
-  unsigned NextResponseVariableIndex = 0;
-
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, abort the expression type checker if it takes more
-  /// than this many seconds.
-  unsigned ExpressionTimeoutThreshold = 600;
-
-  /// If non-zero, abort the switch statement exhaustiveness checker if
-  /// the Space::minus function is called more than this many times.
-  ///
-  /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
-  // 4.2 GHz Intel Core i7.
-  // (It's arbitrary, but will keep the compiler from taking too much time.)
-  unsigned SwitchCheckingInvocationThreshold = 200000;
-
-  /// If true, the time it takes to type-check each function will be dumped
-  /// to llvm::errs().
-  bool DebugTimeFunctionBodies = false;
-
-  /// If true, the time it takes to type-check each expression will be
-  /// dumped to llvm::errs().
-  bool DebugTimeExpressions = false;
-
-  /// Indicate that the type checker is checking code that will be
-  /// immediately executed. This will suppress certain warnings
-  /// when executing scripts.
-  bool InImmediateMode = false;
-
-  /// A helper to construct and typecheck call to super.init().
-  ///
-  /// \returns NULL if the constructed expression does not typecheck.
-  Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
-
-  TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
 
 public:
   /// Create a new type checker instance for the given ASTContext, if it
   /// doesn't already have one.
   ///
-  /// \returns a reference to the type vchecker.
+  /// \returns a reference to the type checker.
   static TypeChecker &createForContext(ASTContext &ctx);
 
+public:
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
-  ~TypeChecker();
-
-  LangOptions &getLangOpts() const { return Context.LangOpts; }
-
-  /// Dump the time it takes to type-check each function to llvm::errs().
-  void enableDebugTimeFunctionBodies() {
-    DebugTimeFunctionBodies = true;
-  }
-
-  /// Dump the time it takes to type-check each function to llvm::errs().
-  void enableDebugTimeExpressions() {
-    DebugTimeExpressions = true;
-  }
-
-  bool getDebugTimeExpressions() {
-    return DebugTimeExpressions;
-  }
-
-  /// If \p timeInMS is non-zero, warn when a function body takes longer than
-  /// this many milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  void setWarnLongFunctionBodies(unsigned timeInMS) {
-    WarnLongFunctionBodies = timeInMS;
-  }
-
-  /// If \p timeInMS is non-zero, warn when type-checking an expression
-  /// takes longer than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  void setWarnLongExpressionTypeChecking(unsigned timeInMS) {
-    WarnLongExpressionTypeChecking = timeInMS;
-  }
-
-  /// Return the current setting for the number of milliseconds
-  /// threshold we use to determine whether to warn about an
-  /// expression taking a long time.
-  unsigned getWarnLongExpressionTypeChecking() {
-    return WarnLongExpressionTypeChecking;
-  }
-
-  /// Set the threshold that determines the upper bound for the number
-  /// of seconds we'll let the expression type checker run before
-  /// considering an expression "too complex".
-  void setExpressionTimeoutThreshold(unsigned timeInSeconds) {
-    ExpressionTimeoutThreshold = timeInSeconds;
-  }
-
-  /// Return the current setting for the threshold that determines
-  /// the upper bound for the number of seconds we'll let the
-  /// expression type checker run before considering an expression
-  /// "too complex".
-  /// If zero, do not limit the checking.
-  unsigned getExpressionTimeoutThresholdInSeconds() {
-    return ExpressionTimeoutThreshold;
-  }
-
-  /// Get the threshold that determines the upper bound for the number
-  /// of times we'll let the Space::minus routine run before
-  /// considering a switch statement "too complex".
-  /// If zero, do not limit the checking.
-  unsigned getSwitchCheckingInvocationThreshold() const {
-    return SwitchCheckingInvocationThreshold;
-  }
-
-  /// Set the threshold that determines the upper bound for the number
-  /// of times we'll let the Space::minus routine run before
-  /// considering a switch statement "too complex".
-  void setSwitchCheckingInvocationThreshold(unsigned invocationCount) {
-    SwitchCheckingInvocationThreshold = invocationCount;
-  }
-
-  bool getInImmediateMode() {
-    return InImmediateMode;
-  }
-
-  void setInImmediateMode(bool InImmediateMode) {
-    this->InImmediateMode = InImmediateMode;
-  }
-
-  template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
-    return Diags.diagnose(std::forward<ArgTypes>(Args)...);
-  }
 
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
-  Type getUnsafePointerType(SourceLoc loc, Type pointeeType);
-  Type getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType);
-  Type getStringType(DeclContext *dc);
-  Type getSubstringType(DeclContext *dc);
-  Type getIntType(DeclContext *dc);
-  Type getInt8Type(DeclContext *dc);
-  Type getUInt8Type(DeclContext *dc);
-  Type getNSObjectType(DeclContext *dc);
-  Type getObjCSelectorType(DeclContext *dc);
-  Type getExceptionType(DeclContext *dc, SourceLoc loc);
-  
+  static Type getStringType(ASTContext &ctx);
+  static Type getSubstringType(ASTContext &ctx);
+  static Type getIntType(ASTContext &ctx);
+  static Type getInt8Type(ASTContext &ctx);
+  static Type getUInt8Type(ASTContext &ctx);
+
   /// Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
   static Type resolveIdentifierType(TypeResolution resolution,
@@ -794,7 +576,8 @@ public:
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
   /// for the lookup.
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+  static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                  DeclContext *Context);
 
   /// Validate the given type.
   ///
@@ -810,55 +593,25 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \returns true if type validation failed, or false otherwise.
-  bool validateType(TypeLoc &Loc, TypeResolution resolution,
-                    TypeResolutionOptions options);
+  static bool validateType(ASTContext &Ctx, TypeLoc &Loc,
+                           TypeResolution resolution,
+                           TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
-  void checkUnsupportedProtocolType(Decl *decl);
+  static void checkUnsupportedProtocolType(Decl *decl);
 
   /// Check for unsupported protocol types in the given statement.
-  void checkUnsupportedProtocolType(Stmt *stmt);
+  static void checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           TrailingWhereClause *whereClause);
 
   /// Check for unsupported protocol types in the given generic requirement
   /// list.
-  void checkUnsupportedProtocolType(GenericParamList *genericParams);
-
-  /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
-                                             DeclContext *DC);
-
-  void validateDecl(ValueDecl *D);
-  void validateDecl(OperatorDecl *decl);
-  void validateDecl(PrecedenceGroupDecl *decl);
-
-  /// Perform just enough validation for looking up names using the Decl.
-  void validateDeclForNameLookup(ValueDecl *D);
-
-  /// Validate the given extension declaration, ensuring that it
-  /// properly extends the nominal type it names.
-  void validateExtension(ExtensionDecl *ext);
-
-  /// Request that type containing the given member needs to have all
-  /// members validated after everythign in the translation unit has
-  /// been processed.
-  void requestMemberLayout(ValueDecl *member);
-
-  /// Request that the given class needs to have all members validated
-  /// after everything in the translation unit has been processed.
-  void requestNominalLayout(NominalTypeDecl *nominalDecl);
-
-  /// Request that the superclass of the given class, if any, needs to have
-  /// all members validated after everything in the translation unit has
-  /// been processed.
-  void requestSuperclassLayout(ClassDecl *classDecl);
-
-  /// Perform final validation of a declaration after everything in the
-  /// translation unit has been processed.
-  void finalizeDecl(ValueDecl *D);
+  static void checkUnsupportedProtocolType(ASTContext &ctx,
+                                           GenericParamList *genericParams);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
@@ -934,6 +687,28 @@ public:
   static Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member,
                                       Type baseTy, bool useArchetypes = true);
 
+  /// Determine whether this is a "pass-through" typealias, which has the
+  /// same type parameters as the nominal type it references and specializes
+  /// the underlying nominal type with exactly those type parameters.
+  /// For example, the following typealias \c GX is a pass-through typealias:
+  ///
+  /// \code
+  /// struct X<T, U> { }
+  /// typealias GX<A, B> = X<A, B>
+  /// \endcode
+  ///
+  /// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+  /// different type parameters and \c GX3 doesn't pass its type parameters
+  /// directly through.
+  ///
+  /// \code
+  /// typealias GX2<A> = X<A, A>
+  /// typealias GX3<A, B> = X<B, A>
+  /// \endcode
+  static bool isPassThroughTypealias(TypeAliasDecl *typealias,
+                                     Type underlyingType,
+                                     NominalTypeDecl *nominal);
+  
   /// Determine whether one type is a subtype of another.
   ///
   /// \param t1 The potential subtype.
@@ -941,7 +716,7 @@ public:
   /// \param dc The context of the check.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
+  static bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
   
   /// Determine whether one type is implicitly convertible to another.
   ///
@@ -955,8 +730,8 @@ public:
   /// conversion force-unwrapped an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 can be implicitly converted to \c t2.
-  bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
-                       bool *unwrappedIUO = nullptr);
+  static bool isConvertibleTo(Type t1, Type t2, DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// Determine whether one type is explicitly convertible to another,
   /// i.e. using an 'as' expression.
@@ -968,7 +743,7 @@ public:
   /// \param dc The context of the conversion.
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
+  static bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
 
   /// Determine whether one type is bridged to another type.
   ///
@@ -982,8 +757,8 @@ public:
   /// conversion force-unwrapped an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 can be explicitly converted to \c t2.
-  bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
-                       bool *unwrappedIUO = nullptr);
+  static bool isObjCBridgedTo(Type t1, Type t2, DeclContext *dc,
+                              bool *unwrappedIUO = nullptr);
 
   /// Return true if performing a checked cast from one type to another
   /// with the "as!" operator could possibly succeed.
@@ -996,7 +771,7 @@ public:
   ///
   /// \returns true if a checked cast from \c t1 to \c t2 may succeed, and
   /// false if it will certainly fail, e.g. because the types are unrelated.
-  bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
+  static bool checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc);
 
   /// Determine whether a constraint of the given kind can be satisfied
   /// by the two types.
@@ -1015,92 +790,58 @@ public:
   /// or bridge operation force-unwraps an implicitly-unwrapped optional.
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
-  bool typesSatisfyConstraint(Type t1, Type t2,
-                              bool openArchetypes,
-                              constraints::ConstraintKind kind,
-                              DeclContext *dc,
-                              bool *unwrappedIUO = nullptr);
+  static bool typesSatisfyConstraint(Type t1, Type t2,
+                                     bool openArchetypes,
+                                     constraints::ConstraintKind kind,
+                                     DeclContext *dc,
+                                     bool *unwrappedIUO = nullptr);
 
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
-  Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
+  static Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
-  bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                          SourceLoc EndTypeCheckLoc);
-  bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  bool typeCheckFunctionBodyUntil(FuncDecl *FD, SourceLoc EndTypeCheckLoc);
-  bool typeCheckConstructorBodyUntil(ConstructorDecl *CD,
-                                     SourceLoc EndTypeCheckLoc);
-  bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
-                                    SourceLoc EndTypeCheckLoc);
+  static bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                                 SourceLoc EndTypeCheckLoc);
+  static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  bool typeCheckClosureBody(ClosureExpr *closure);
+  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                                      BraceStmt *body,
+                                                      Type builderType);
+  static bool typeCheckClosureBody(ClosureExpr *closure);
 
-  bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
+  static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
-  Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                                 Type paramType, bool isAutoClosure = false,
-                                 bool canFail = true);
+  static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
+                                        Type paramType,
+                                        bool isAutoClosure = false,
+                                        bool canFail = true);
 
-  void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
+  static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                           unsigned StartElem);
-  Identifier getNextResponseVariableName(DeclContext *DC);
+  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
+                                  unsigned StartElem);
 
-  void typeCheckDecl(Decl *D);
+  static void typeCheckDecl(Decl *D);
 
-  void checkDeclAttributesEarly(Decl *D);
   static void addImplicitDynamicAttribute(Decl *D);
-  void checkDeclAttributes(Decl *D);
-  void checkParameterAttributes(ParameterList *params);
-  void checkDynamicReplacementAttribute(ValueDecl *D);
+  static void checkDeclAttributes(Decl *D);
+  static void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
-  void checkTypeModifyingDeclAttributes(VarDecl *var);
 
-  void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
-
-  /// Check the default arguments that occur within this value decl.
-  void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
-
-  virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDeclForNameLookup(VD);
-  }
-
-  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) override {
-    validateDecl(proto);
-  }
-
-  virtual void resolveExtension(ExtensionDecl *ext) override {
-    validateExtension(ext);
-  }
-
-  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
-    addImplicitConstructors(nominal);
-  }
-
-  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
-    synthesizeMemberForLookup(nominal, member);
-  }
+  static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
+                                          ReferenceOwnershipAttr *attr);
 
   /// Infer default value witnesses for all requirements in the given protocol.
-  void inferDefaultWitnesses(ProtocolDecl *proto);
-
-  /// Compute the generic signature, generic environment and interface type
-  /// of a generic function or subscript.
-  void validateGenericFuncOrSubscriptSignature(
-              PointerUnion<AbstractFunctionDecl *, SubscriptDecl *>
-                  funcOrSubscript,
-              ValueDecl *decl, GenericContext *genCtx);
+  static void inferDefaultWitnesses(ProtocolDecl *proto);
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
-  void checkProtocolSelfRequirements(ValueDecl *decl);
+  static void checkProtocolSelfRequirements(ValueDecl *decl);
 
   /// All generic parameters of a generic function must be referenced in the
   /// declaration's type, otherwise we have no way to infer them.
-  void checkReferencedGenericParams(GenericContext *dc);
+  static void checkReferencedGenericParams(GenericContext *dc);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1112,50 +853,22 @@ public:
   /// context, if not available as part of the \c dc argument (used
   /// for SIL parsing).
   ///
-  /// \param ext The extension for which we're checking the generic
-  /// environment, or null if we're not checking an extension.
+  /// \param allowConcreteGenericParams Whether or not to allow
+  /// same-type constraints between generic parameters and concrete types.
   ///
-  /// \param inferRequirements When non-empty, callback that will be invoked
-  /// to perform any additional requirement inference that contributes to the
-  /// generic environment..
+  /// \param additionalRequirements Additional requirements to add
+  /// directly to the GSB.
   ///
-  /// \returns the resulting generic environment.
-  GenericEnvironment *checkGenericEnvironment(
+  /// \param inferenceSources Additional types to infer requirements from.
+  ///
+  /// \returns the resulting generic signature.
+  static GenericSignature checkGenericSignature(
                         GenericParamList *genericParams,
                         DeclContext *dc,
-                        GenericSignature *outerSignature,
+                        GenericSignature outerSignature,
                         bool allowConcreteGenericParams,
-                        ExtensionDecl *ext,
-                        llvm::function_ref<void(GenericSignatureBuilder &)>
-                          inferRequirements,
-                        bool mustInferRequirements);
-
-  /// Construct a new generic environment for the given declaration context.
-  ///
-  /// \param genericParams The generic parameters to validate.
-  ///
-  /// \param dc The declaration context in which to perform the validation.
-  ///
-  /// \param outerSignature The generic signature of the outer
-  /// context, if not available as part of the \c dc argument (used
-  /// for SIL parsing).
-  /// \returns the resulting generic environment.
-  GenericEnvironment *checkGenericEnvironment(
-                        GenericParamList *genericParams,
-                        DeclContext *dc,
-                        GenericSignature *outerSignature,
-                        bool allowConcreteGenericParams,
-                        ExtensionDecl *ext) {
-    return checkGenericEnvironment(genericParams, dc, outerSignature,
-                                   allowConcreteGenericParams, ext,
-                                   [&](GenericSignatureBuilder &) { },
-                                   /*mustInferRequirements=*/false);
-  }
-
-  /// Validate the signature of a generic type.
-  ///
-  /// \param nominal The generic type.
-  void validateGenericTypeSignature(GenericTypeDecl *nominal);
+                        SmallVector<Requirement, 2> additionalRequirements = {},
+                        SmallVector<TypeLoc, 2> inferenceSources = {});
 
   /// Create a text string that describes the bindings of generic parameters
   /// that are relevant to the given set of types, e.g.,
@@ -1196,54 +909,29 @@ public:
       ArrayRef<Requirement> requirements,
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
-      ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
+      ConformanceCheckOptions conformanceOptions,
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
   /// Diagnose if the class has no designated initializers.
-  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 
   ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
-  void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// Synthesize the member with the given name on the target if applicable,
-  /// i.e. if the member is synthesizable and has not yet been added to the
-  /// target.
-  void synthesizeMemberForLookup(NominalTypeDecl *target, DeclName member);
-
-  /// The specified AbstractStorageDecl \c storage was just found to satisfy
-  /// the protocol property \c requirement.  Ensure that it has the full
-  /// complement of accessors.
-  void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
-                                            AbstractStorageDecl *storage);
-
-  /// Pre-check the expression, validating any types that occur in the
-  /// expression and folding sequence expressions.
-  bool preCheckExpression(Expr *&expr, DeclContext *dc);
-
-  /// \name Name lookup
-  ///
-  /// Routines that perform name lookup.
-  ///
-  /// During type checking, these routines should be used instead of
-  /// \c MemberLookup and \c UnqualifiedLookup, because these routines will
-  /// lazily introduce declarations and (FIXME: eventually) perform recursive
-  /// type-checking that the AST-level lookup routines don't.
-  ///
-  /// @{
-private:
-  Optional<Type> boolType;
+  static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
 public:
-  /// Define the default constructor for the given struct or class.
-  void defineDefaultConstructor(NominalTypeDecl *decl);
-
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
-  Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
+  static Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
 
+private:
+  /// Given an pre-folded expression, find LHS from the expression if a binary
+  /// operator \c name appended to the expression.
+  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+
+public:
   /// Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -1273,7 +961,7 @@ public:
   ///
   /// \returns The type of the top-level expression, or Type() if an
   ///          error occurred.
-  Type
+  static Type
   typeCheckExpression(Expr *&expr, DeclContext *dc,
                       TypeLoc convertType = TypeLoc(),
                       ContextualTypePurpose convertTypePurpose = CTP_Unused,
@@ -1281,10 +969,10 @@ public:
                       ExprTypeCheckListener *listener = nullptr,
                       constraints::ConstraintSystem *baseCS = nullptr);
 
-  Type typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           ExprTypeCheckListener *listener) {
-    return typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
-                               TypeCheckExprOptions(), listener);
+  static Type typeCheckExpression(Expr *&expr, DeclContext *dc,
+                                  ExprTypeCheckListener *listener) {
+    return TypeChecker::typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
+                                            TypeCheckExprOptions(), listener);
   }
 
 private:
@@ -1313,14 +1001,14 @@ public:
   ///
   /// \returns the type of \p expr on success, Type() otherwise.
   /// FIXME: expr may still be modified...
-  Type getTypeOfExpressionWithoutApplying(
+  static Type getTypeOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc,
       ConcreteDeclRef &referencedDecl,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  void getPossibleTypesOfExpressionWithoutApplying(
+  static void getPossibleTypesOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
@@ -1328,23 +1016,23 @@ public:
 
   /// Return the type of operator function for specified LHS, or a null
   /// \c Type on error.
-  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                            Identifier opName,
-                                            DeclRefKind refKind,
-                                            ConcreteDeclRef &referencedDecl);
+  static FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                                   Identifier opName,
+                                                   DeclRefKind refKind,
+                                                   ConcreteDeclRef &refdDecl);
 
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                      bool requireResultType = false);
+  static Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
+                                             bool requireResultType = false);
 
   /// Type check whether the given type declaration includes members of
   /// unsupported recursive value types.
   ///
   /// \param decl The declaration to be type-checked. This process will not
   /// modify the declaration.
-  void checkDeclCircularity(NominalTypeDecl *decl);
+  static void checkDeclCircularity(NominalTypeDecl *decl);
 
   /// Type check whether the given switch statement exhaustively covers
   /// its domain.
@@ -1355,8 +1043,9 @@ public:
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
-                                 bool limitChecking);
+  static void checkSwitchExhaustiveness(const SwitchStmt *stmt,
+                                        const DeclContext *DC,
+                                        bool limitChecking);
 
   /// Type check the given expression as a condition, which converts
   /// it to a logic value.
@@ -1365,7 +1054,7 @@ public:
   /// to return a logic value (builtin i1).
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckCondition(Expr *&expr, DeclContext *dc);
+  static bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
   /// Type check the given 'if' or 'while' statement condition, which
   /// either converts an expression to a logic value or bind variables to the
@@ -1374,8 +1063,8 @@ public:
   /// \param cond The condition to type-check, which will be modified in place.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
-                              Diag<> diagnosticForAlwaysTrue);
+  static bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
+                                     Diag<> diagnosticForAlwaysTrue);
 
   /// Determine the semantics of a checked cast operation.
   ///
@@ -1389,13 +1078,13 @@ public:
   /// \returns a CheckedCastKind indicating the semantics of the cast. If the
   /// cast is invalid, Unresolved is returned. If the cast represents an implicit
   /// conversion, Coercion is returned.
-  CheckedCastKind typeCheckCheckedCast(Type fromType,
-                                       Type toType,
-                                       CheckedCastContextKind contextKind,
-                                       DeclContext *dc,
-                                       SourceLoc diagLoc,
-                                       Expr *fromExpr,
-                                       SourceRange diagToRange);
+  static CheckedCastKind typeCheckCheckedCast(Type fromType,
+                                              Type toType,
+                                              CheckedCastContextKind ctxKind,
+                                              DeclContext *dc,
+                                              SourceLoc diagLoc,
+                                              Expr *fromExpr,
+                                              SourceRange diagToRange);
 
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
@@ -1412,14 +1101,14 @@ public:
   /// type as an Objective-C class, e.g., \c NSString represents \c
   /// String, or a null type if there is no such type or if the
   /// dynamic type isn't something we can start from.
-  Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
-                                         Type dynamicType,
-                                         Type valueType);
+  static Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
+                                                Type dynamicType,
+                                                Type valueType);
 
   /// Resolve ambiguous pattern/expr productions inside a pattern using
   /// name lookup information. Must be done before type-checking the pattern.
-  Pattern *resolvePattern(Pattern *P, DeclContext *dc,
-                          bool isStmtCondition);
+  static Pattern *resolvePattern(Pattern *P, DeclContext *dc,
+                                 bool isStmtCondition);
 
   /// Type check the given pattern.
   ///
@@ -1428,18 +1117,10 @@ public:
   /// \param options Options that control type resolution.
   ///
   /// \returns true if any errors occurred during type checking.
-  bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        TypeResolutionOptions options);
+  static bool typeCheckPattern(Pattern *P, DeclContext *dc,
+                               TypeResolutionOptions options);
 
-  bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
-
-  /// Request nominal layout for any types that could be sources of typemetadata
-  /// or conformances.
-  void requestRequiredNominalTypeLayoutForParameters(ParameterList *PL);
-
-  /// Type check a parameter list.
-  bool typeCheckParameterList(ParameterList *PL, TypeResolution resolution,
-                              TypeResolutionOptions options);
+  static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Coerce a pattern to the given type.
   ///
@@ -1449,29 +1130,29 @@ public:
   /// \param options Options describing how to perform this coercion.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
-                           TypeResolutionOptions options,
-                           TypeLoc tyLoc = TypeLoc());
-  bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
-                            Type type);
+  static bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
+                                  TypeResolutionOptions options,
+                                  TypeLoc tyLoc = TypeLoc());
+  static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
+                                   Type type);
 
   /// Coerce the specified parameter list of a ClosureExpr to the specified
   /// contextual type.
-  void coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
+  static void coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+                                        AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
+  static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
-  bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
-
-  /// Lazily diagnose conversions to C function pointers of closures
-  /// with captures.
-  void maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR);
+  static bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
-  void computeCaptures(AnyFunctionRef AFR);
+  static void computeCaptures(AnyFunctionRef AFR);
+
+  /// Check for invalid captures from stored property initializers.
+  static void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
 
   /// Change the context of closures in the given initializer
   /// expression to the given context.
@@ -1494,11 +1175,11 @@ public:
   /// \param wantInterfaceType Whether we want the interface type, if available.
   ///
   /// \param getType Optional callback to extract a type for given declaration.
-  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
-                                  llvm::function_ref<Type(VarDecl *)> getType,
-                                  const DeclRefExpr *base = nullptr,
-                                  bool wantInterfaceType = false);
+  static Type
+  getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
+                             llvm::function_ref<Type(VarDecl *)> getType,
+                             const DeclRefExpr *base = nullptr,
+                             bool wantInterfaceType = false);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -1511,18 +1192,13 @@ public:
   /// \param base The optional base expression of this value reference
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
-  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
-                                  const DeclRefExpr *base = nullptr,
-                                  bool wantInterfaceType = false) {
+  static Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                         DeclContext *UseDC,
+                                         const DeclRefExpr *base = nullptr,
+                                         bool wantInterfaceType = false) {
     return getUnopenedTypeOfReference(
         value, baseType, UseDC,
         [&](VarDecl *var) -> Type {
-          validateDecl(var);
-
-          if (!var->hasValidSignature() || var->isInvalid())
-            return ErrorType::get(Context);
-
           return wantInterfaceType ? value->getInterfaceType()
                                    : value->getType();
         },
@@ -1537,7 +1213,7 @@ public:
   ///
   /// \returns the default type, or null if there is no default type for
   /// this protocol.
-  Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
+  static Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
 
   /// Convert the given expression to the given type.
   ///
@@ -1547,81 +1223,26 @@ public:
   ///   from where the toType is derived, so that we can deliver better fixit.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool convertToType(Expr *&expr, Type type, DeclContext *dc,
-                     Optional<Pattern*> typeFromPattern = None);
+  static bool convertToType(Expr *&expr, Type type, DeclContext *dc,
+                            Optional<Pattern*> typeFromPattern = None);
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
-  Expr *coerceToRValue(Expr *expr,
-                       llvm::function_ref<Type(Expr *)> getType
-                         = [](Expr *expr) { return expr->getType(); },
-                       llvm::function_ref<void(Expr *, Type)> setType
-                         = [](Expr *expr, Type type) {
-                           expr->setType(type);
-                         });
+  static Expr *coerceToRValue(
+      ASTContext &Context, Expr *expr,
+      llvm::function_ref<Type(Expr *)> getType =
+          [](Expr *expr) { return expr->getType(); },
+      llvm::function_ref<void(Expr *, Type)> setType =
+          [](Expr *expr, Type type) { expr->setType(type); });
 
   /// Add implicit load expression to given AST, this is sometimes
   /// more complicated than simplify wrapping given root in newly created
   /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
   /// only at certain positions in AST.
-  Expr *addImplicitLoadExpr(Expr *expr,
-                            std::function<Type(Expr *)> getType,
-                            std::function<void(Expr *, Type)> setType);
-
-  /// Require that the library intrinsics for working with Optional<T>
-  /// exist.
-  bool requireOptionalIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for working with
-  /// UnsafeMutablePointer<T> exist.
-  bool requirePointerArgumentIntrinsics(SourceLoc loc);
-
-  /// Require that the library intrinsics for creating
-  /// array literals exist.
-  bool requireArrayLiteralIntrinsics(SourceLoc loc);
-
-  /// Retrieve the witness type with the given name.
-  ///
-  /// \param type The type that conforms to the given protocol.
-  ///
-  /// \param protocol The protocol through which we're looking.
-  ///
-  /// \param conformance The protocol conformance.
-  ///
-  /// \param name The name of the associated type.
-  ///
-  /// \param brokenProtocolDiag Diagnostic to emit if the type cannot be
-  /// accessed.
-  ///
-  /// \return the witness type, or null if an error occurs or the type
-  /// returned would contain an ErrorType.
-  Type getWitnessType(Type type, ProtocolDecl *protocol,
-                      ProtocolConformanceRef conformance,
-                      Identifier name,
-                      Diag<> brokenProtocolDiag);
-
-  /// Build a call to the witness with the given name and arguments.
-  ///
-  /// \param base The base expression, whose witness will be invoked.
-  ///
-  /// \param protocol The protocol to call through.
-  ///
-  /// \param conformance The conformance of the base type to the given
-  /// protocol.
-  ///
-  /// \param name The name of the method to call.
-  ///
-  /// \param arguments The arguments to the witness.
-  ///
-  /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
-  ///
-  /// \returns a fully type-checked call, or null if the protocol was broken.
-  Expr *callWitness(Expr *base, DeclContext *dc,
-                    ProtocolDecl *protocol,
-                    ProtocolConformanceRef conformance,
-                    DeclName name,
-                    ArrayRef<Expr *> arguments,
-                    Diag<> brokenProtocolDiag);
+  static Expr *
+  addImplicitLoadExpr(ASTContext &Context, Expr *expr,
+                      std::function<Type(Expr *)> getType,
+                      std::function<void(Expr *, Type)> setType);
 
   /// Determine whether the given type contains the given protocol.
   ///
@@ -1632,10 +1253,9 @@ public:
   ///
   /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
   /// an empty optional.
-  static Optional<ProtocolConformanceRef> containsProtocol(
-                                             Type T, ProtocolDecl *Proto,
-                                             DeclContext *DC,
-                                             ConformanceCheckOptions options);
+  static ProtocolConformanceRef
+  containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                   ConformanceCheckOptions options);
 
   /// Determine whether the given type conforms to the given protocol.
   ///
@@ -1654,17 +1274,10 @@ public:
   ///
   /// \returns The protocol conformance, if \c T conforms to the
   /// protocol \c Proto, or \c None.
-  static Optional<ProtocolConformanceRef> conformsToProtocol(
-                                           Type T,
-                                           ProtocolDecl *Proto,
-                                           DeclContext *DC,
-                                           ConformanceCheckOptions options,
-                                           SourceLoc ComplainLoc = SourceLoc());
-
-  /// Mark the given protocol conformance as "used" from the given declaration
-  /// context.
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override final;
+  static ProtocolConformanceRef
+  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                     ConformanceCheckOptions options,
+                     SourceLoc ComplainLoc = SourceLoc());
 
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
@@ -1675,31 +1288,20 @@ public:
   public:
     explicit LookUpConformance(DeclContext *dc) : dc(dc) { }
 
-    Optional<ProtocolConformanceRef>
-    operator()(CanType dependentType,
-               Type conformingReplacementType,
-               ProtocolDecl *conformedProtocol) const;
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformedProtocol) const;
   };
 
   /// Completely check the given conformance.
-  void checkConformance(NormalProtocolConformance *conformance);
-
-  /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance)
-         override ;
+  static void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
-  void checkConformancesInContext(DeclContext *dc,
-                                  IterableDeclContext *idc);
+  static void checkConformancesInContext(DeclContext *dc,
+                                         IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  ///
-  /// Return true if there was an error.
-  bool checkConformanceToNSCopying(VarDecl *var);
-
-  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
-  /// conformances in the given type as "used".
-  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
+  static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
@@ -1712,16 +1314,21 @@ public:
   /// \returns nullptr if the derivation failed, or the derived declaration
   ///          if it succeeded. If successful, the derived declaration is added
   ///          to TypeDecl's body.
-  ValueDecl *deriveProtocolRequirement(DeclContext *DC,
-                                       NominalTypeDecl *TypeDecl,
-                                       ValueDecl *Requirement);
+  static ValueDecl *deriveProtocolRequirement(DeclContext *DC,
+                                              NominalTypeDecl *TypeDecl,
+                                              ValueDecl *Requirement);
 
   /// Derive an implicit type witness for the given associated type in
   /// the conformance of the given nominal type to some known
   /// protocol.
-  Type deriveTypeWitness(DeclContext *DC,
-                         NominalTypeDecl *nominal,
-                         AssociatedTypeDecl *assocType);
+  static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
+                                AssociatedTypeDecl *assocType);
+
+  /// \name Name lookup
+  ///
+  /// Routines that perform name lookup.
+  ///
+  /// @{
 
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
@@ -1759,10 +1366,6 @@ public:
                                    NameLookupOptions options
                                      = defaultMemberLookupOptions);
 
-  /// Check whether the given declaration can be written as a
-  /// member of the given base type.
-  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
-
   /// Look up a member type within the given type.
   ///
   /// This routine looks for member types with the given name within the
@@ -1786,21 +1389,22 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns the constructors found for this type.
-  LookupResult lookupConstructors(DeclContext *dc, Type type,
-                                  NameLookupOptions options
-                                    = defaultConstructorLookupOptions);
+  static LookupResult lookupConstructors(DeclContext *dc, Type type,
+                                         NameLookupOptions options
+                                           = defaultConstructorLookupOptions);
 
   /// Given an expression that's known to be an infix operator,
   /// look up its precedence group.
-  PrecedenceGroupDecl *
+  static PrecedenceGroupDecl *
   lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
 
-  PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
-                                             SourceLoc nameLoc);
+  static PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc,
+                                                    Identifier name,
+                                                    SourceLoc nameLoc);
 
-  /// Given an pre-folded expression, find LHS from the expression if a binary
-  /// operator \c name appended to the expression.
-  Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+  /// Check whether the given declaration can be written as a
+  /// member of the given base type.
+  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
   /// @}
 
@@ -1816,24 +1420,23 @@ public:
   /// A declaration is more specialized than another declaration if its type
   /// is a subtype of the other declaration's type (ignoring the 'self'
   /// parameter of function declarations) and if
-  Comparison compareDeclarations(DeclContext *dc,
-                                 ValueDecl *decl1,
-                                 ValueDecl *decl2);
+  static Comparison compareDeclarations(DeclContext *dc, ValueDecl *decl1,
+                                        ValueDecl *decl2);
 
   /// Build a type-checked reference to the given value.
-  Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
-                            DeclNameLoc nameLoc, bool Implicit);
+  static Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
+                                   DeclNameLoc nameLoc, bool Implicit);
 
   /// Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
-  Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
-                     DeclNameLoc NameLoc, bool Implicit,
-                     FunctionRefKind functionRefKind);
+  static Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
+                            DeclNameLoc NameLoc, bool Implicit,
+                            FunctionRefKind functionRefKind);
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
-  Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                             FunctionType *closureType);
+  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.
@@ -1843,37 +1446,28 @@ public:
   ///
   /// \returns null if the protocol is not available. This represents a
   /// problem with the Standard Library.
-  ProtocolDecl *getProtocol(SourceLoc loc, KnownProtocolKind kind);
+  static ProtocolDecl *getProtocol(ASTContext &ctx, SourceLoc loc,
+                                   KnownProtocolKind kind);
 
   /// Retrieve the literal protocol for the given expression.
   ///
   /// \returns the literal protocol, if known and available, or null if the
   /// expression does not have an associated literal protocol.
-  ProtocolDecl *getLiteralProtocol(Expr *expr);
+  static ProtocolDecl *getLiteralProtocol(ASTContext &ctx, Expr *expr);
 
-  DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
+  static DeclName getObjectLiteralConstructorName(ASTContext &ctx,
+                                                  ObjectLiteralExpr *expr);
 
-  Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
-                                     ConstructorDecl *ctor);
+  static Type getObjectLiteralParameterType(ObjectLiteralExpr *expr,
+                                            ConstructorDecl *ctor);
 
   /// Get the module appropriate for looking up standard library types.
   ///
   /// This is "Swift", if that module is imported, or the current module if
   /// we're parsing the standard library.
-  ModuleDecl *getStdlibModule(const DeclContext *dc);
-
-  /// \name Lazy resolution.
-  ///
-  /// Routines that perform lazy resolution as required for AST operations.
-  /// @{
-  void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                          AssociatedTypeDecl *assocType) override;
-  void resolveWitness(const NormalProtocolConformance *conformance,
-                      ValueDecl *requirement) override;
+  static ModuleDecl *getStdlibModule(const DeclContext *dc);
 
   /// \name Resilience diagnostics
-
-  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
@@ -1884,23 +1478,25 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
-                                const DeclContext *DC,
-                                FragileFunctionKind Kind,
-                                bool TreatUsableFromInlineAsPublic);
+  static bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
+                                       const DeclContext *DC,
+                                       FragileFunctionKind Kind,
+                                       bool TreatUsableFromInlineAsPublic);
 
+  static Expr *buildDefaultInitializer(Type type);
+  
 private:
-  bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
-                                      const DeclContext *DC,
-                                      FragileFunctionKind Kind,
-                                      bool TreatUsableFromInlineAsPublic);
+  static bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
+                                             const DeclContext *DC,
+                                             FragileFunctionKind Kind,
+                                             bool TreatUsableFromInlineAsPublic);
 
   /// Given that a declaration is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if it cannot
   /// reasonably be shared.
-  bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
-                                    const DeclContext *DC,
-                                    FragileFunctionKind fragileKind);
+  static bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
+                                           const DeclContext *DC,
+                                           FragileFunctionKind fragileKind);
 
 public:
   /// Given that a type is used from a particular context which
@@ -1910,8 +1506,8 @@ public:
   ///
   /// This method \e only checks how generic arguments are used; it is assumed
   /// that the declarations involved have already been checked elsewhere.
-  void diagnoseGenericTypeExportability(const TypeLoc &TL,
-                                        const DeclContext *DC);
+  static void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
+                                               const DeclContext *DC);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
@@ -1920,7 +1516,7 @@ public:
   /// declarations are permitted.
   ///
   /// \see FragileFunctionKind
-  std::pair<FragileFunctionKind, bool>
+  static std::pair<FragileFunctionKind, bool>
   getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
@@ -1933,7 +1529,7 @@ public:
   /// is sufficient to safely conform to the requirement in the context
   /// the provided conformance. On return, requiredAvailability holds th
   /// availability levels required for conformance.
-  bool
+  static bool
   isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
                                    ValueDecl *witness, DeclContext *dc,
                                    AvailabilityContext &requiredAvailability);
@@ -1942,7 +1538,7 @@ public:
   /// that could the passed-in location could be executing upon for
   /// the target platform. If MostRefined != nullptr, set to the most-refined
   /// TRC found while approximating.
-  AvailabilityContext
+  static AvailabilityContext
   overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC,
                                         const TypeRefinementContext **MostRefined=nullptr);
 
@@ -1950,18 +1546,18 @@ public:
   ///
   /// \param StartElem Where to start for incremental building of refinement
   /// contexts
-  void buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                           unsigned StartElem);
+  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
+                                                  unsigned StartElem);
 
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root
   /// TypeRefinementContext for the source file.
-  TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+  static TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 
   /// Returns a diagnostic indicating why the declaration cannot be annotated
   /// with an @available() attribute indicating it is potentially unavailable
   /// or None if this is allowed.
-  Optional<Diag<>>
+  static Optional<Diag<>>
   diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
   /// Checks whether a declaration is available when referred to at the given
@@ -1971,15 +1567,15 @@ public:
   /// If the declaration is not available, return false and write the
   /// declaration's availability info to the out parameter
   /// \p OutAvailableRange.
-  bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
-                       const DeclContext *referenceDC,
-                       AvailabilityContext &OutAvailableRange);
+  static bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
+                              const DeclContext *referenceDC,
+                              AvailabilityContext &OutAvailableRange);
 
   /// Checks whether a declaration should be considered unavailable when
   /// referred to at the given location and, if so, returns the reason why the
   /// declaration is unavailable. Returns None is the declaration is
   /// definitely available.
-  Optional<UnavailabilityReason>
+  static Optional<UnavailabilityReason>
   checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
                                const DeclContext *referenceDC);
 
@@ -1987,26 +1583,30 @@ public:
   ///
   /// An ignored expression is one that is not nested within a larger
   /// expression or statement.
-  void checkIgnoredExpr(Expr *E);
+  static void checkIgnoredExpr(Expr *E);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.
-  void diagnosePotentialUnavailability(const ValueDecl *D,
-                                       SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
-                                       const UnavailabilityReason &Reason);
+  static void diagnosePotentialUnavailability(const ValueDecl *D,
+                                              SourceRange ReferenceRange,
+                                              const DeclContext *ReferenceDC,
+                                              const UnavailabilityReason &Reason);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location, using
   // Name as the diagnostic name.
-  void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
-                                       SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
-                                       const UnavailabilityReason &Reason);
+  static void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
+                                              SourceRange ReferenceRange,
+                                              const DeclContext *ReferenceDC,
+                                              const UnavailabilityReason &Reason);
 
+  static void diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
+                                           const DeclContext *ReferenceDC,
+                                           const UnavailabilityReason &Reason);
+  
   /// Emits a diagnostic for a reference to a storage accessor that is
   /// potentially unavailable.
-  void diagnosePotentialAccessorUnavailability(
+  static void diagnosePotentialAccessorUnavailability(
       const AccessorDecl *Accessor, SourceRange ReferenceRange,
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
@@ -2018,50 +1618,33 @@ public:
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   /// Callers can provide a lambda that adds additional information (such as a
   /// fixit hint) to the deprecation diagnostic, if it is emitted.
-  void diagnoseIfDeprecated(SourceRange SourceRange,
-                            const DeclContext *ReferenceDC,
-                            const ValueDecl *DeprecatedDecl,
-                            const ApplyExpr *Call);
+  static void diagnoseIfDeprecated(SourceRange SourceRange,
+                                   const DeclContext *ReferenceDC,
+                                   const ValueDecl *DeprecatedDecl,
+                                   const ApplyExpr *Call);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
-  /// has a name with that prefix, an llvm fatal_error is triggered.
+  /// name starts with that prefix, an llvm fatal_error is triggered.
   /// This is for testing purposes.
-  void checkForForbiddenPrefix(const Decl *D);
-  void checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E);
-  void checkForForbiddenPrefix(Identifier Ident);
-  void checkForForbiddenPrefix(StringRef Name);
-
-  bool hasEnabledForbiddenTypecheckPrefix() const {
-    return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
-  }
+  static void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
   /// Check error handling in the given type-checked top-level code.
-  void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
-  void checkFunctionErrorHandling(AbstractFunctionDecl *D);
-  void checkInitializerErrorHandling(Initializer *I, Expr *E);
-  void checkEnumElementErrorHandling(EnumElementDecl *D);
-  void checkPropertyDelegateErrorHandling(PatternBindingDecl *binding,
-                                          Expr *expr);
-
-  void addExprForDiagnosis(Expr *E1, Expr *Result) {
-    DiagnosedExprs[E1] = Result;
-  }
-  bool isExprBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs.count(E);
-  }
-  Expr *getExprBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs[E];
-  }
+  static void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
+  static void checkFunctionErrorHandling(AbstractFunctionDecl *D);
+  static void checkInitializerErrorHandling(Initializer *I, Expr *E);
+  static void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
+  static void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
+                                                Expr *expr);
 
   /// If an expression references 'self.init' or 'super.init' in an
   /// initializer context, returns the implicit 'self' decl of the constructor.
   /// Otherwise, return nil.
-  VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
-                                                 UnresolvedDotExpr *ctorRef);
+  static VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                                        UnresolvedDotExpr *UDE);
 
   /// Diagnose assigning variable to itself.
-  bool diagnoseSelfAssignment(const Expr *E);
+  static bool diagnoseSelfAssignment(const Expr *E);
 
   /// Builds a string representing a "default" generic argument list for
   /// \p typeDecl. In general, this means taking the bound of each generic
@@ -2081,10 +1664,10 @@ public:
           [](const GenericTypeParamDecl *) { return Type(); });
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+  static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
   /// Attempt to omit needless words from the name of the given declaration.
-  Optional<Identifier> omitNeedlessWords(VarDecl *var);
+  static Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
   /// Calculate edit distance between declaration names.
   static unsigned getCallEditDistance(DeclName writtenName,
@@ -2101,21 +1684,31 @@ public:
   };
 
   /// Check for a typo correction.
-  void performTypoCorrection(DeclContext *DC,
-                             DeclRefKind refKind,
-                             Type baseTypeOrNull,
-                             NameLookupOptions lookupOptions,
-                             TypoCorrectionResults &corrections,
-                             GenericSignatureBuilder *gsb = nullptr,
-                             unsigned maxResults = 4);
+  static void performTypoCorrection(DeclContext *DC,
+                                    DeclRefKind refKind,
+                                    Type baseTypeOrNull,
+                                    NameLookupOptions lookupOptions,
+                                    TypoCorrectionResults &corrections,
+                                    GenericSignatureBuilder *gsb = nullptr,
+                                    unsigned maxResults = 4);
 
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
-  DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-  
-  Type getOrCreateOpaqueResultType(TypeResolution resolution,
-                                   ValueDecl *originatingDecl,
-                                   OpaqueReturnTypeRepr *repr);
+  static DeclTypeCheckingSemantics
+  getDeclTypeCheckingSemantics(ValueDecl *decl);
+
+public:
+  /// Require that the library intrinsics for working with Optional<T>
+  /// exist.
+  static bool requireOptionalIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+  /// Require that the library intrinsics for working with
+  /// UnsafeMutablePointer<T> exist.
+  static bool requirePointerArgumentIntrinsics(ASTContext &ctx, SourceLoc loc);
+
+  /// Require that the library intrinsics for creating
+  /// array literals exist.
+  static bool requireArrayLiteralIntrinsics(ASTContext &ctx, SourceLoc loc);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -2139,13 +1732,13 @@ public:
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
-                                  TypeChecker &TC, bool hasKeywordArguments);
+                                  bool hasKeywordArguments);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
-                                         TypeChecker &TC);
+                                         bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
@@ -2153,15 +1746,34 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
-                                      TypeChecker &TC);
+                                      bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
 /// @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
+                                       bool ignoreLabel = false);
 
+/// Compute the wrapped value type for the given property that has attached
+/// property wrappers, when the backing storage is known to have the given type.
+///
+/// \param var A property that has attached property wrappers.
+/// \param backingStorageType The type of the backing storage property.
+/// \param limit How many levels of unwrapping to perform, where 0 means to return the
+/// \c backingStorageType directly and the maximum is the number of attached property wrappers
+/// (which will produce the original property type). If not specified, defaults to the maximum.
+Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
+                             Optional<unsigned> limit = None);
+  
+/// Build a call to the init(wrappedValue:) initializers of the property
+/// wrappers, filling in the given \c value as the original value.
+Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
+                                           Type backingStorageType,
+                                           Expr *value,
+                                           bool ignoreAttributeArgs);
+  
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.
@@ -2177,13 +1789,13 @@ OverrideRequiresKeyword overrideRequiresKeyword(ValueDecl *overridden);
 
 /// Compute the type of a member that will be used for comparison when
 /// performing override checking.
-Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
-                                ValueDecl *derivedDecl = nullptr);
+Type getMemberTypeForComparison(const ValueDecl *member,
+                                const ValueDecl *derivedDecl = nullptr);
 
 /// Determine whether the given declaration is an override by comparing type
 /// information.
-bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
-                           ValueDecl *parentDecl, Type parentDeclTy);
+bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
+                           const ValueDecl *parentDecl, Type parentDeclTy);
 
 /// Determine whether the given declaration is an operator defined in a
 /// protocol. If \p type is not null, check specifically whether \p decl
@@ -2215,26 +1827,13 @@ bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
 
-/// Attach Fix-Its to the given diagnostic that updates the name of the
-/// given declaration to the desired target name.
-///
-/// \returns false if the name could not be fixed.
-bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
-                        DeclName targetName);
+bool areGenericRequirementsSatisfied(const DeclContext *DC,
+                                     GenericSignature sig,
+                                     SubstitutionMap Substitutions,
+                                     bool isExtension);
 
-/// Fix the Objective-C name of the given declaration to match the provided
-/// Objective-C selector.
-///
-/// \param ignoreImpliedName When true, ignore the implied name of the
-/// given declaration, because it no longer applies.
-///
-/// For properties, the selector should be a zero-parameter selector of the
-/// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
-                            Optional<ObjCSelector> nameOpt,
-                            Optional<ObjCSelector> targetNameOpt,
-                            bool ignoreImpliedName = false);
-
+bool hasDynamicMemberLookupAttribute(Type type,
+  llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);
 } // end namespace swift
 
 #endif

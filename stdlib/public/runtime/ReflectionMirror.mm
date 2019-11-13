@@ -327,13 +327,14 @@ getFieldAt(const Metadata *base, unsigned index) {
   
   const FieldDescriptor &descriptor = *fields;
   auto &field = descriptor.getFields()[index];
-  auto name = field.getFieldName(0);
+  // Bounds are always valid as the offset is constant.
+  auto name = field.getFieldName();
 
   // Enum cases don't always have types.
   if (!field.hasMangledTypeName())
     return {name, FieldType().withIndirect(field.isIndirectCase())};
 
-  auto typeName = field.getMangledTypeName(0);
+  auto typeName = field.getMangledTypeName();
 
   SubstGenericParametersFromMetadata substitutions(base);
   auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
@@ -727,7 +728,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
     case MetadataKind::Opaque: {
 #if SWIFT_OBJC_INTEROP
-      // If this is the Builtin.UnknownObject type, use the dynamic type of the
+      // If this is the AnyObject type, use the dynamic type of the
       // object reference.
       if (type == &METADATA_SYM(BO).base) {
         return callClass();

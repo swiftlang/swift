@@ -23,10 +23,10 @@
 
 using namespace swift;
 
-DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+DerivedConformance::DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                                        NominalTypeDecl *nominal,
                                        ProtocolDecl *protocol)
-    : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
+    : Context(ctx), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
   assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
@@ -35,12 +35,16 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
-void DerivedConformance::addMembersToConformanceContext(
+bool DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  bool anyInvalid = false;
   for (auto child : children) {
     IDC->addMember(child);
+    TypeChecker::typeCheckDecl(child);
+    anyInvalid |= child->isInvalid();
   }
+  return anyInvalid;
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -137,8 +141,23 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
-ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
-                                                       NominalTypeDecl *nominal,
+void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
+                                                     NominalTypeDecl *nominal,
+                                                     ProtocolDecl *protocol) {
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return;
+
+  if (*knownProtocol == KnownProtocolKind::Equatable) {
+    tryDiagnoseFailedEquatableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    tryDiagnoseFailedHashableDerivation(DC, nominal);
+  }
+}
+
+ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
@@ -152,18 +171,18 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = tc.conformsToProtocol(
-            nominal->getDeclaredInterfaceType(), proto, nominal,
-            ConformanceCheckFlags::SkipConditionalRequirements)) {
-      auto DC = conformance->getConcrete()->getDeclContext();
+    auto conformance = TypeChecker::conformsToProtocol(
+        nominal->getDeclaredInterfaceType(), proto, nominal,
+        ConformanceCheckFlags::SkipConditionalRequirements);
+    if (conformance) {
+      auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
       if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
     }
 
     // Retrieve the requirement.
-    auto results = proto->lookupDirect(name);
-    return results.empty() ? nullptr : results.front();
+    return proto->getSingleRequirement(name);
   };
 
   // Properties.
@@ -225,7 +244,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
         return getRequirement(KnownProtocolKind::RawRepresentable);
 
       // CodingKey.init?(stringValue:), CodingKey.init?(intValue:)
-      if (ctor->getFailability() == OTK_Optional &&
+      if (ctor->isFailable() &&
+          !ctor->isImplicitlyUnwrappedOptional() &&
           (argumentNames[0] == ctx.Id_stringValue ||
            argumentNames[0] == ctx.Id_intValue))
         return getRequirement(KnownProtocolKind::CodingKey);
@@ -263,51 +283,30 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 }
 
 AccessorDecl *DerivedConformance::
-addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
-                                   VarDecl *property,
+addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
-  auto getter =
-    declareDerivedPropertyGetter(tc, property, propertyContextType);
-
-  property->setAccessors(StorageImplInfo::getImmutableComputed(),
-                         SourceLoc(), {getter}, SourceLoc());
-
-  return getter;
-}
-
-AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
-                                                 VarDecl *property,
-                                                 Type propertyContextType) {
-  bool isStatic = property->isStatic();
-
-  auto &C = tc.Context;
+  auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
-  
-  auto getterDecl = AccessorDecl::create(C,
+
+  auto getter = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
     AccessorKind::Get, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
-  getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
+  getter->setImplicit();
+  getter->setIsTransparent(false);
 
-  // Compute the interface type of the getter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
-  getterDecl->computeType();
+  getter->copyFormalAccessFrom(property);
 
-  getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationToChecked();
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
-  tc.Context.addSynthesizedDecl(getterDecl);
-
-  return getterDecl;
+  return getter;
 }
 
 std::pair<VarDecl *, PatternBindingDecl *>
@@ -315,25 +314,24 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
-  auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
-                                      /*IsCaptureList*/false, SourceLoc(), name,
-                                      parentDC);
+  VarDecl *propDecl = new (Context)
+      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
+              /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationToChecked();
 
-  Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
+  Pattern *propPat = new (Context) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  propPat = TypedPattern::createImplicit(C, propPat, propertyContextType);
+  propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
   propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
+      Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
+      parentDC);
   return {propDecl, pbDecl};
 }
 
@@ -352,11 +350,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (!allowCrossfileExtensions &&
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
-    TC.diagnose(ConformanceDecl->getLoc(),
-                diag::cannot_synthesize_in_crossfile_extension,
-                getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
-                DescriptiveDeclKind::Type);
+    ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
+                              getProtocolType());
+    Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
     return true;
   }
 
@@ -365,9 +361,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
         isa<ExtensionDecl>(ConformanceDecl)) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::cannot_synthesize_init_in_extension_of_nonfinal,
-                  getProtocolType(), synthesizing->getFullName());
+      ConformanceDecl->diagnose(
+          diag::cannot_synthesize_init_in_extension_of_nonfinal,
+          getProtocolType(), synthesizing->getFullName());
       return true;
     }
   }

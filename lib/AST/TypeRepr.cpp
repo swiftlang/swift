@@ -299,6 +299,14 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
 
+  if (hasAttr(TAK_differentiable)) {
+    if (Attrs.isLinear()) {
+      Printer.printSimpleAttr("@differentiable(linear)") << " ";
+    } else {
+      Printer.printSimpleAttr("@differentiable") << " ";
+    }
+  }
+
   if (hasAttr(TAK_thin))
     Printer.printSimpleAttr("@thin") << " ";
   if (hasAttr(TAK_thick))
@@ -555,7 +563,7 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 
 void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
                                      const PrintOptions &Opts) const {
-  Printer << "some ";
+  Printer.printKeyword("some", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
 }
 

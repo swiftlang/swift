@@ -6,6 +6,5 @@ target_link_libraries(lldb-moduleimport-test
                       PRIVATE
                         swiftASTSectionImporter
                         swiftClangImporter
-                        swiftDWARFImporter
                         swiftFrontend)
 

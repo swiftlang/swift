@@ -65,17 +65,17 @@ extension SubMultiConf {
 }
 class SubMultiConf: BaseMultiConf,P2,P1,P3 { // CHECK: [[@LINE]]:7 | class/Swift | SubMultiConf | [[SubMultiConf_USR:.*]] | Def
   // CHECK: [[@LINE-1]]:7 | instance-method/Swift | foo() | [[P2_ext_foo_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | foo() | [[P2_foo_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[P2_foo_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK: [[@LINE-4]]:7 | instance-method/Swift | foo() | [[P2_ext_foo_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | foo() | [[P1_foo_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[P1_foo_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK: [[@LINE-7]]:7 | instance-method/Swift | meth1() | [[SubMultiConf_ext_meth1_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | meth1() | [[P3_meth1_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | meth1() | [[P3_meth1_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK: [[@LINE-10]]:7 | instance-method/Swift | meth2() | [[BaseMultiConf_meth2_USR]] | Impl,RelOver,RelCont | rel: 2
-    // CHECK-NEXT RelOver | instance-method/Swift | meth2() | [[P3_meth2_USR]]
-    // CHECK-NEXT RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
+    // CHECK-NEXT: RelOver | instance-method/Swift | meth2() | [[P3_meth2_USR]]
+    // CHECK-NEXT: RelCont | class/Swift | SubMultiConf | [[SubMultiConf_USR]]
   // CHECK-NOT: [[@LINE-13]]:7 | instance-method
 }
 

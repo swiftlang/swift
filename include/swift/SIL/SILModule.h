@@ -260,7 +260,8 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
+  SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
+            SILOptions &Options, const DeclContext *associatedDC,
             bool wholeModule);
 
   SILModule(const SILModule&) = delete;
@@ -313,7 +314,7 @@ public:
   void serialize();
 
   /// This converts Swift types to SILTypes.
-  mutable Lowering::TypeConverter Types;
+  Lowering::TypeConverter &Types;
 
   /// Invalidate cached entries in SIL Loader.
   void invalidateSILLoaderCaches();
@@ -340,12 +341,14 @@ public:
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
+  constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
+               SILOptions &Options, FileUnit *sf = nullptr);
 
   /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, SILOptions &Options,
+  createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
+                    SILOptions &Options,
                     bool WholeModule = false);
 
   /// Get the Swift module associated with this SIL module.
@@ -592,7 +595,7 @@ public:
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,
-                           ResilienceExpansion forExpansion);
+                           TypeExpansionContext forExpansion);
 
   /// Can type metadata for the given formal type be fetched in
   /// the given module?

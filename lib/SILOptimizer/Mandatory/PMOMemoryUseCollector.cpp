@@ -34,7 +34,9 @@ PMOMemoryObjectInfo::PMOMemoryObjectInfo(AllocationInst *allocation)
   if (auto *abi = dyn_cast<AllocBoxInst>(MemoryInst)) {
     assert(abi->getBoxType()->getLayout()->getFields().size() == 1 &&
            "analyzing multi-field boxes not implemented");
-    MemorySILType = abi->getBoxType()->getFieldType(module, 0);
+    MemorySILType =
+        getSILBoxFieldType(TypeExpansionContext(*abi->getFunction()),
+                           abi->getBoxType(), module.Types, 0);
   } else {
     MemorySILType = cast<AllocStackInst>(MemoryInst)->getElementType();
   }
@@ -310,6 +312,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
           case StoreOwnershipQualifier::Trivial:
             return PMOUseKind::InitOrAssign;
           }
+          llvm_unreachable("covered switch");
         })();
         Uses.emplace_back(si, kind);
         continue;

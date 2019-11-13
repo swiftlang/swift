@@ -17,8 +17,10 @@ the Swift programming language. SIL accommodates the following use cases:
   such as definitive initialization of variables and constructors, code
   reachability, switch coverage.
 - High-level optimization passes, including retain/release optimization,
-  dynamic method devirtualization, closure inlining, memory allocation promotion,
-  and generic function instantiation.
+  dynamic method devirtualization, closure inlining, promoting heap allocations
+  to stack allocations, promoting stack allocations to SSA registers, scalar
+  replacement of aggregates (splitting aggregate allocations into multiple
+  smaller allocations), and generic function instantiation.
 - A stable distribution format that can be used to distribute "fragile"
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.
@@ -2333,17 +2335,17 @@ with a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
 
-assign_by_delegate
+assign_by_wrapper
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_delegate' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand 
+  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-  assign_by_delegate %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
+  assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
-  // $T must be the type of a property delegate.
-  // $F must be a function type, taking $S as a single argument and returning $T
-  // $G must be a function type, taking $S as a single argument and with not return value
+  // $T must be the type of a property wrapper.
+  // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
+  // $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
 
 Similar to the ``assign`` instruction, but the assignment is done via a
 delegate.
@@ -2525,7 +2527,10 @@ except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
 pointed-to value, leaving the memory uninitialized.
 
-If ``T`` is a trivial type, then ``destroy_addr`` is a no-op.
+If ``T`` is a trivial type, then ``destroy_addr`` can be safely
+eliminated. However, a memory location ``%a`` must not be accessed
+after ``destroy_addr %a`` (which has not yet been eliminated)
+regardless of its type.
 
 index_addr
 ``````````
@@ -2802,6 +2807,21 @@ It is expected that the strong reference count of the object is one.
 Furthermore, no other thread may increment the strong reference count during
 execution of this instruction.
 
+strong_copy_unowned_value
+`````````````````````````
+::
+
+  sil-instruction ::= 'strong_copy_unowned_value' sil-operand
+
+  %1 = strong_copy_unowned_value %0 : $@unowned T
+  // %1 will be a strong @owned value of type $T.
+  // $T must be a reference type
+
+Asserts that the strong reference count of the heap object referenced by ``%0``
+is still positive, then increments the reference count and returns a new strong
+reference to ``%0``. The intention is that this instruction is used as a "safe
+ownership conversion" from ``unowned`` to ``strong``.
+
 strong_retain_unowned
 `````````````````````
 ::
@@ -3052,6 +3072,73 @@ function_ref
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
+
+dynamic_function_ref
+````````````````````
+::
+
+  sil-instruction ::= 'dynamic_function_ref' sil-function-name ':' sil-type
+
+  %1 = dynamic_function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
+  // %1 has type $T -> U
+
+Creates a reference to a `dynamically_replacable` SIL function. A
+`dynamically_replacable` SIL function can be replaced at runtime.
+
+For the following Swift code::
+
+  dynamic func test_dynamically_replaceable() {}
+
+  func test_dynamic_call() {
+    test_dynamically_replaceable()
+  }
+
+We will generate::
+
+  sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+  bb0:
+    %0 = tuple ()
+    return %0 : $()
+  }
+
+  sil @test_dynamic_call : $@convention(thin) () -> () {
+  bb0:
+    %0 = dynamic_function_ref @test_dynamically_replaceable : $@convention(thin) () -> ()
+    %1 = apply %0() : $@convention(thin) () -> ()
+    %2 = tuple ()
+    return %2 : $()
+  }
+
+prev_dynamic_function_ref
+`````````````````````````
+::
+
+  sil-instruction ::= 'prev_dynamic_function_ref' sil-function-name ':' sil-type
+
+  %1 = prev_dynamic_function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
+  // %1 has type $T -> U
+
+Creates a reference to a previous implemenation of a `dynamic_replacement` SIL
+function.
+
+For the following Swift code::
+
+  @_dynamicReplacement(for: test_dynamically_replaceable())
+  func test_replacement() {
+    test_dynamically_replaceable() // calls previous implementation
+  }
+
+We  will generate::
+
+  sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_replacement : $@convention(thin) () -> () {
+  bb0:
+    %0 = prev_dynamic_function_ref @test_replacement : $@convention(thin) () -> ()
+    %1 = apply %0() : $@convention(thin) () -> ()
+    %2 = tuple ()
+    return %2 : $()
+  }
 
 global_addr
 ```````````
@@ -3417,13 +3504,14 @@ has an escaping function type (not ``[on_stack]``) the closure context will be
 allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
 separately before the ``partial_apply``. The closure does however take ownership
-of the partially applied arguments; when the closure reference count reaches
-zero, the contained values will be destroyed. If the ``partial_apply`` has a
-``@noescape`` function type (``partial_apply [on_stack]``) the closure context
-is allocated on the stack and initialized to contain the closed-over values. The
-closed-over values are not retained, lifetime of the closed-over values must be
-managed separately. The lifetime of the stack context of a ``partial_apply
-[on_stack]`` must be terminated with a ``dealloc_stack``.
+of the partially applied arguments (except for ``@inout_aliasable`` parameters);
+when the closure reference count reaches zero, the contained values will be
+destroyed. If the ``partial_apply`` has a ``@noescape`` function type
+(``partial_apply [on_stack]``) the closure context is allocated on the stack and
+initialized to contain the closed-over values. The closed-over values are not
+retained, lifetime of the closed-over values must be managed separately. The
+lifetime of the stack context of a ``partial_apply [on_stack]`` must be
+terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic
@@ -3431,6 +3519,11 @@ substitutions applied, and the resulting closure is of concrete function
 type with the given substitutions applied. The generic parameters themselves
 cannot be partially applied; all of them must be bound. The result is always
 a concrete function.
+
+If an address argument has ``@inout_aliasable`` convention, the closure
+obtained from ``partial_apply`` will not own its underlying value.
+The ``@inout_aliasable`` parameter convention is used when a ``@noescape``
+closure captures an ``inout`` argument.
 
 TODO: The instruction, when applied to a generic function,
 currently implicitly performs abstraction difference transformations enabled
@@ -3638,6 +3731,24 @@ This instruction has the same local semantics as ``retain_value`` but:
 
 The intention is that this instruction is used to implement unmanaged
 constructs.
+
+strong_copy_unmanaged_value
+```````````````````````````
+
+::
+
+  sil-instruction ::= 'strong_copy_unmanaged_value' sil-value
+
+  %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged A
+  // %1 will be a strong @owned $A.
+
+This instruction has the same semantics as ``copy_value`` except that its input
+is a trivial ``@sil_unmanaged`` type that doesn't require ref counting. This is
+intended to be used semantically as a "conversion" like instruction from
+``unmanaged`` to ``strong`` and thus should never be removed by the optimizer.
+Since the returned value is a strong owned value, this instruction semantically
+should be treated as performing a strong copy of the underlying value as if by
+the value's type lowering.
 
 copy_value
 ``````````
@@ -4812,7 +4923,7 @@ convert_escape_to_noescape
   //   (see convert_function)
   // %1 will be of the trivial type $@noescape T -> U
 
-Converts an escaping (non-trivial) function type to an ``@noescape`` trivial
+Converts an escaping (non-trivial) function type to a ``@noescape`` trivial
 function type. Something must guarantee the lifetime of the input ``%0`` for the
 duration of the use ``%1``.
 
@@ -5043,13 +5154,15 @@ cond_fail
 `````````
 ::
 
-  sil-instruction ::= 'cond_fail' sil-operand
+  sil-instruction ::= 'cond_fail' sil-operand, string-literal
 
-  cond_fail %0 : $Builtin.Int1
+  cond_fail %0 : $Builtin.Int1, "failure reason"
   // %0 must be of type $Builtin.Int1
 
 This instruction produces a `runtime failure`_ if the operand is one.
 Execution proceeds normally if the operand is zero.
+The second operand is a static failure message, which is displayed by the
+debugger in case the failure is triggered.
 
 Terminators
 ~~~~~~~~~~~

@@ -36,7 +36,7 @@ bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
 }
 
 // CHECK-LABEL: sil [ossa] @non_box_assign_init
-sil [ossa] @non_box_assign_init : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+sil [ossa] @non_box_assign_init : $@convention(thin) (@owned SomeClass) -> @out SomeClass {
 bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
   // Explicitly check that assign [init] is treated as store [init]
   //

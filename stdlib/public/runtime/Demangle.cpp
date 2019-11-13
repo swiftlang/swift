@@ -68,7 +68,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       return genericArgsList;
     };
   
-  for (auto component : reversed(descriptorPath)) {
+  for (auto component : llvm::reverse(descriptorPath)) {
     switch (auto kind = component->getKind()) {
     case ContextDescriptorKind::Module: {
       assert(node == nullptr && "module should be top level");
@@ -80,7 +80,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     case ContextDescriptorKind::Extension: {
       auto extension = llvm::cast<ExtensionContextDescriptor>(component);
       // Demangle the extension self type.
-      auto selfType = Dem.demangleType(extension->getMangledExtendedContext());
+      auto selfType = Dem.demangleType(extension->getMangledExtendedContext(),
+                                       ResolveToDemanglingForContext(Dem));
       if (selfType->getKind() == Node::Kind::Type)
         selfType = selfType->getChild(0);
       
@@ -666,13 +667,14 @@ char *swift_demangle(const char *mangledName,
     return strdup(result.c_str());
   }
 
-  // Indicate a failure if the result does not fit and will be truncated
-  // and set the required outputBufferSize.
+  // Copy into the provided buffer.
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+
+  // Indicate a failure if the result did not fit and was truncated
+  // by setting the required outputBufferSize.
   if (*outputBufferSize < result.length() + 1) {
     *outputBufferSize = result.length() + 1;
   }
 
-  // Copy into the provided buffer.
-  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
   return outputBuffer;
 }

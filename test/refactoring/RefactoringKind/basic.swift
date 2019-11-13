@@ -262,6 +262,20 @@ func testConvertToTernaryExpr() {
   }
 }
 
+func testConvertToGuardExpr(idxOpt: Int?) {
+  if let idx = idxOpt {
+    print(idx)
+  }
+}
+
+func testConvertToIfLetExpr(idxOpt: Int?) {
+  guard let idx = idxOpt else {
+    return
+  }
+  print(idx)
+}
+
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -295,7 +309,7 @@ func testConvertToTernaryExpr() {
 // RUN: %refactor -source-filename %s -pos=68:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=69:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
-// RUN: %refactor -source-filename %s -pos=70:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
+// RUN: %refactor -source-filename %s -pos=70:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 // RUN: %refactor -source-filename %s -pos=74:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
 
 // RUN: %refactor -source-filename %s -pos=79:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
@@ -307,7 +321,7 @@ func testConvertToTernaryExpr() {
 // RUN: %refactor -source-filename %s -pos=91:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=95:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
-// RUN: %refactor -source-filename %s -pos=96:12 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
+// RUN: %refactor -source-filename %s -pos=96:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 // RUN: %refactor -source-filename %s -pos=100:12 | %FileCheck %s -check-prefix=CHECK-RENAME-STUB
 
 // RUN: %refactor -source-filename %s -pos=104:8 | %FileCheck %s -check-prefix=CHECK-RENAME-ONLY
@@ -355,6 +369,10 @@ func testConvertToTernaryExpr() {
 
 // RUN: %refactor -source-filename %s -pos=257:3 -end-pos=262:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION
 
+// RUN: %refactor -source-filename %s -pos=266:3 -end-pos=268:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-GUARD-EXPRESSION
+
+// RUN: %refactor -source-filename %s -pos=272:3 -end-pos=275:13 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-IFLET-EXPRESSION
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -401,3 +419,7 @@ func testConvertToTernaryExpr() {
 // CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION: Expand Ternary Expression
 
 // CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION: Convert To Ternary Expression
+
+// CHECK-CONVERT-TO-GUARD-EXPRESSION: Convert To Guard Expression
+
+// CHECK-CONVERT-TO-IFLET-EXPRESSION: Convert To IfLet Expression

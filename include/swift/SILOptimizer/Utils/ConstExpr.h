@@ -38,25 +38,38 @@ class SILNode;
 class SymbolicValue;
 class SymbolicValueAllocator;
 class ConstExprFunctionState;
-enum class UnknownReason;
+class UnknownReason;
 
 /// This class is the main entrypoint for evaluating constant expressions.  It
 /// also handles caching of previously computed constexpr results.
 class ConstExprEvaluator {
   SymbolicValueAllocator &allocator;
 
+  // Assert configuration that must be used by the evaluator. This determines
+  // the result of the builtin "assert_configuration".
+  unsigned assertConfig;
+
   /// The current call stack, used for providing accurate diagnostics.
   llvm::SmallVector<SourceLoc, 4> callStack;
+
+  /// When set to true, keep track of all functions called during an evaluation.
+  bool trackCallees;
+  /// Functions called during the evaluation. This is an auxiliary information
+  /// provided to the clients.
+  llvm::SmallPtrSet<SILFunction *, 2> calledFunctions;
 
   void operator=(const ConstExprEvaluator &) = delete;
 
 public:
-  explicit ConstExprEvaluator(SymbolicValueAllocator &alloc);
+  explicit ConstExprEvaluator(SymbolicValueAllocator &alloc,
+                              unsigned assertConf, bool trackCallees = false);
   ~ConstExprEvaluator();
 
   explicit ConstExprEvaluator(const ConstExprEvaluator &other);
 
   SymbolicValueAllocator &getAllocator() { return allocator; }
+
+  unsigned getAssertConfig() { return assertConfig; }
 
   void pushCallStack(SourceLoc loc) { callStack.push_back(loc); }
 
@@ -75,16 +88,29 @@ public:
   /// This is done in code that is not necessarily itself a constexpr
   /// function.  The results are added to the results list which is a parallel
   /// structure to the input values.
-  ///
-  /// TODO: Return information about which callees were found to be
-  /// constexprs, which would allow the caller to delete dead calls to them
-  /// that occur after after folding them.
   void computeConstantValues(ArrayRef<SILValue> values,
                              SmallVectorImpl<SymbolicValue> &results);
+
+  void recordCalledFunctionIfEnabled(SILFunction *callee) {
+    if (trackCallees) {
+      calledFunctions.insert(callee);
+    }
+  }
+
+  /// If the evaluator was initialized with \c trackCallees enabled, return the
+  /// SIL functions encountered during the evaluations performed with this
+  /// evaluator. The returned functions include those that were called but
+  /// failed to complete successfully.
+  const SmallPtrSetImpl<SILFunction *> &getFuncsCalledDuringEvaluation() const {
+    assert(trackCallees && "evaluator not configured to track callees");
+    return calledFunctions;
+  }
 };
 
 /// A constant-expression evaluator that can be used to step through a control
 /// flow graph (SILFunction body) by evaluating one instruction at a time.
+/// This evaluator can also "skip" instructions without evaluating them and
+/// only track constant values of variables whose values could be computed.
 class ConstExprStepEvaluator {
 private:
   ConstExprEvaluator evaluator;
@@ -97,18 +123,15 @@ private:
   /// evaluation.
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
 
-  Optional<SymbolicValue>
-  incrementStepsAndCheckLimit(SILInstruction *inst,
-                              bool includeInInstructionLimit);
-
-  ConstExprStepEvaluator(const ConstExprEvaluator &) = delete;
-  void operator=(const ConstExprEvaluator &) = delete;
+  ConstExprStepEvaluator(const ConstExprStepEvaluator &) = delete;
+  void operator=(const ConstExprStepEvaluator &) = delete;
 
 public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a
   /// SILFunction.
   explicit ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
-                                  SILFunction *fun);
+                                  SILFunction *fun, unsigned assertConf,
+                                  bool trackCallees = false);
   ~ConstExprStepEvaluator();
 
   /// Evaluate an instruction in the current interpreter state.
@@ -122,13 +145,80 @@ public:
   ///   Second element is None, if the evaluation is successful.
   ///   Otherwise, is an unknown symbolic value that contains the error.
   std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-  evaluate(SILBasicBlock::iterator instI,
-           bool includeInInstructionLimit = true);
+  evaluate(SILBasicBlock::iterator instI);
+
+  /// Skip the instruction without evaluating it and conservatively account for
+  /// the effects of the instruction on the internal state. This operation
+  /// resets to an unknown symbolic value any portion of a
+  /// SymbolicValueMemoryObject that could possibly be mutated by the given
+  /// instruction. This function preserves the soundness of the interpretation.
+  /// \param instI instruction to be skipped.
+  /// \returns a pair where the first and second elements are defined as
+  /// follows:
+  ///   The first element, if is not None, is the iterator to the next
+  ///   instruction from the where the evaluation must continue.
+  ///   The first element is None if the next instruction from where the
+  ///   evaluation must continue cannot be determined.
+  ///   This would be the case if `instI` is a branch like a `condbr`.
+  ///
+  ///   Second element is None if skipping the instruction is successful.
+  ///   Otherwise, it is an unknown symbolic value containing the error.
+  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  skipByMakingEffectsNonConstant(SILBasicBlock::iterator instI);
+
+  /// Try evaluating an instruction and if the evaluation fails, skip the
+  /// instruction and make it effects non constant. Note that it may not always
+  /// be possible to skip an instruction whose evaluation failed and
+  /// continue evalution (e.g. a conditional branch).
+  /// See `evaluate` and `skipByMakingEffectsNonConstant` functions for their
+  /// semantics.
+  /// \param instI instruction to be evaluated in the current interpreter state.
+  /// \returns a pair where the first and second elements are defined as
+  /// follows:
+  ///   The first element, if is not None, is the iterator to the next
+  ///   instruction from the where the evaluation must continue.
+  ///   The first element is None iff both `evaluate` and `skip` functions
+  ///   failed to determine the next instruction to continue evaluation from.
+  ///
+  ///   Second element is None if the evaluation is successful.
+  ///   Otherwise, it is an unknown symbolic value containing the error.
+  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  tryEvaluateOrElseMakeEffectsNonConstant(SILBasicBlock::iterator instI);
 
   Optional<SymbolicValue> lookupConstValue(SILValue value);
 
-  bool isKnownFunction(SILFunction *fun);
+  /// Return the number of instructions evaluated for the last `evaluate`
+  /// operation. This could be used by the clients to limit the number of
+  /// instructions that should be evaluated by the step-wise evaluator.
+  /// Note that 'skipByMakingEffectsNonConstant' operation is not considered
+  /// as an evaluation.
+  unsigned instructionsEvaluatedByLastEvaluation() { return stepsEvaluated; }
+
+  /// If the evaluator was initialized with \c trackCallees enabled, return the
+  /// SIL functions encountered during the evaluations performed with this
+  /// evaluator. The returned functions include those that were called but
+  /// failed to complete successfully. Targets of skipped apply instructions
+  /// will not be included in the returned set.
+  const SmallPtrSetImpl<SILFunction *> &getFuncsCalledDuringEvaluation() {
+    return evaluator.getFuncsCalledDuringEvaluation();
+  }
+
+  /// Dump the internal state to standard error for debugging.
+  void dumpState();
 };
+
+bool isConstantEvaluable(SILFunction *fun);
+
+/// Return true if and only if the given function \p fun is specially modeled
+/// by the constant evaluator. These are typically functions in the standard
+/// library, such as String.+=, Array.append, whose semantics is built into the
+/// evaluator.
+bool isKnownConstantEvaluableFunction(SILFunction *fun);
+
+/// Return true if and only if \p errorVal denotes an error that requires
+/// aborting interpretation and returning the error. Skipping an instruction
+/// that produces such errors is not a valid behavior.
+bool isFailStopError(SymbolicValue errorVal);
 
 } // end namespace swift
 #endif

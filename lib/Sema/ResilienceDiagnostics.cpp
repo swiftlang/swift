@@ -21,6 +21,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
@@ -83,17 +84,6 @@ TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   llvm_unreachable("Context is not nested inside a fragile function");
 }
 
-void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
-  auto *DC = NTD->getDeclContext();
-  auto expansion = DC->getResilienceExpansion();
-  if (expansion == ResilienceExpansion::Minimal) {
-    auto kind = getFragileFunctionKind(DC);
-    diagnose(NTD, diag::local_type_in_inlinable_function,
-             NTD->getFullName(),
-             static_cast<unsigned>(kind.first));
-  }
-}
-
 /// A uniquely-typed boolean to reduce the chances of accidentally inverting
 /// a check.
 enum class DowngradeToWarning: bool {
@@ -142,6 +132,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                               TreatUsableFromInlineAsPublic).isPublic())
     return false;
 
+  auto &Context = DC->getASTContext();
+
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
@@ -153,8 +145,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Property initializers that are not exposed to clients are OK.
   if (auto pattern = dyn_cast<PatternBindingInitializer>(DC)) {
     auto bindingIndex = pattern->getBindingIndex();
-    auto &patternEntry = pattern->getBinding()->getPatternList()[bindingIndex];
-    auto varDecl = patternEntry.getAnchoringVarDecl();
+    auto *varDecl = pattern->getBinding()->getAnchoringVarDecl(bindingIndex);
     if (!varDecl->isInitExposedToClients())
       return false;
   }
@@ -193,18 +184,19 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
-  diagnose(loc, diagID,
+  Context.Diags.diagnose(
+           loc, diagID,
            D->getDescriptiveKind(), diagName,
            D->getFormalAccessScope().accessLevelForDiagnostics(),
            static_cast<unsigned>(Kind),
            isAccessor);
 
   if (TreatUsableFromInlineAsPublic) {
-    diagnose(D, diag::resilience_decl_declared_here,
-             D->getDescriptiveKind(), diagName, isAccessor);
+    Context.Diags.diagnose(D, diag::resilience_decl_declared_here,
+                           D->getDescriptiveKind(), diagName, isAccessor);
   } else {
-    diagnose(D, diag::resilience_decl_declared_here_public,
-             D->getDescriptiveKind(), diagName, isAccessor);
+    Context.Diags.diagnose(D, diag::resilience_decl_declared_here_public,
+                           D->getDescriptiveKind(), diagName, isAccessor);
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
@@ -228,7 +220,7 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
 
 static bool
 diagnoseGenericArgumentsExportability(SourceLoc loc,
-                                      const SubstitutionMap &subs,
+                                      SubstitutionMap subs,
                                       const SourceFile &userSF) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
@@ -249,49 +241,29 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
     ASTContext &ctx = M->getASTContext();
     ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                        rootConf->getType(),
-                       rootConf->getProtocol()->getFullName(), M->getName());
+                       rootConf->getProtocol()->getFullName(), 0, M->getName());
     hadAnyIssues = true;
   }
   return hadAnyIssues;
 }
 
-void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
+void TypeChecker::diagnoseGenericTypeExportability(SourceLoc Loc, Type T,
                                                    const DeclContext *DC) {
-  class GenericTypeFinder : public TypeDeclFinder {
-    using Callback = llvm::function_ref<void(SubstitutionMap)>;
-
-    const SourceFile &SF;
-    Callback callback;
-  public:
-    GenericTypeFinder(const SourceFile &SF, Callback callback)
-        : SF(SF), callback(callback) {}
-
-    Action visitBoundGenericType(BoundGenericType *ty) override {
-      ModuleDecl *useModule = SF.getParentModule();
-      SubstitutionMap subs = ty->getContextSubstitutionMap(useModule,
-                                                           ty->getDecl());
-      callback(subs);
-      return Action::Continue;
-    }
-
-    Action visitTypeAliasType(TypeAliasType *ty) override {
-      callback(ty->getSubstitutionMap());
-      return Action::Continue;
-    }
-  };
-
-  assert(TL.getType() && "type not validated yet");
-
   const SourceFile *SF = DC->getParentSourceFile();
   if (!SF)
     return;
 
-  TL.getType().walk(GenericTypeFinder(*SF, [&](SubstitutionMap subs) {
-    // FIXME: It would be nice to highlight just the part of the type that's
-    // problematic, but unfortunately the TypeRepr doesn't have the
-    // information we need and the Type doesn't easily map back to it.
-    (void)diagnoseGenericArgumentsExportability(TL.getLoc(), subs, *SF);
-  }));
+  // FIXME: It would be nice to highlight just the part of the type that's
+  // problematic, but unfortunately the TypeRepr doesn't have the
+  // information we need and the Type doesn't easily map back to it.
+  if (auto *BGT = dyn_cast<BoundGenericType>(T.getPointer())) {
+    ModuleDecl *useModule = SF->getParentModule();
+    auto subs = T->getContextSubstitutionMap(useModule, BGT->getDecl());
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+  } else if (auto *TAT = dyn_cast<TypeAliasType>(T.getPointer())) {
+    auto subs = TAT->getSubstitutionMap();
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+  }
 }
 
 bool

@@ -139,8 +139,10 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
+func makeTuple() -> (String, Int) { return ("foo", 42) }
 func errorRecovery() {
   testfunc2({ $0 + 1 }) // expected-error {{contextual closure type '((), Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
+  // expected-error@-1 {{cannot convert value of type '()' to expected argument type 'Int'}}
 
   enum union1 {
     case bar
@@ -149,12 +151,14 @@ func errorRecovery() {
   var a: Int = .hello // expected-error {{type 'Int' has no member 'hello'}}
   var b: union1 = .bar // ok
   var c: union1 = .xyz  // expected-error {{type 'union1' has no member 'xyz'}}
-  var d: (Int,Int,Int) = (1,2) // expected-error {{cannot convert value of type '(Int, Int)' to specified type '(Int, Int, Int)'}}
-  var e: (Int,Int) = (1, 2, 3) // expected-error {{cannot convert value of type '(Int, Int, Int)' to specified type '(Int, Int)'}}
-  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{cannot convert value of type '(Int, Int, f: Int)' to specified type '(Int, Int)'}}
+  var d: (Int,Int,Int) = (1,2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Int)', tuples have a different number of elements}}
+  var e: (Int,Int) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{'(Int, Int, f: Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
   
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
-  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(_, _, _)', tuples have a different number of elements}}
+  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
+  var (h1, h2) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var i: (Bool, Bool) = makeTuple() // expected-error {{tuple type '(String, Int)' is not convertible to tuple '(Bool, Bool)'}}
 }
 
 func acceptsInt(_ x: Int) {}
@@ -185,7 +189,7 @@ func test4() -> ((_ arg1: Int, _ arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)'}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{tuple type '(Int, Int)' is not convertible to tuple '((Int) -> Int, Int)'}}
 
 
   let c: (a: Int, b: Int) = (1,2)
@@ -272,7 +276,7 @@ func test_floating_point() {
 
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
+  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}}
 }
 
 // More realistic examples.
@@ -584,18 +588,21 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_f4 = float.init(pi_f)
 
-  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{8-8=: Empty}}
   var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
-  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{9-9=: Empty}}
 }
 
-struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
+struct Rule {
   var target: String
   var dependencies: String
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{missing argument for parameter 'dependencies' in call}}
+// FIXME(diagnostics): To be able to suggest different candidates here we need to teach the solver how to figure out to which parameter
+// does argument belong to in this case. If the `target` was of a different type, we currently suggest to add an argument for `dependencies:`
+// which is incorrect.
+ruleVar = Rule("a") // expected-error {{missing argument label 'target:' in call}}
 
 
 class C {
@@ -606,6 +613,7 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 
 //===----------------------------------------------------------------------===//
@@ -739,8 +747,10 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
-[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
+[4].joined(separator: [1]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
+[4].joined(separator: [[[1]]]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
@@ -767,6 +777,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
+  // expected-error@-1:12 {{cannot convert value of type 'Bool' to expected argument type 'Int?'}}
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
@@ -774,7 +785,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'ClosedRange<Int>'}}
+  // expected-error@-1 {{referencing operator function '...' on 'Comparable' requires that 'ClosedRange<Int>' conform to 'Comparable'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   
@@ -792,15 +804,14 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
-  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
-
-  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  //expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
-
-  
-  if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
+  if x & x {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization
@@ -829,7 +840,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
+  &x += y  // expected-error {{use of extraneous '&'}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -845,17 +856,18 @@ func inoutTests(_ arr: inout Int) {
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
 func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide default value to inout parameter 'z'}}
+  // expected-error@-1 {{use of extraneous '&'}}
   print(z)
 }
 
-_ = _.foo // expected-error {{type of expression is ambiguous without more context}}
+_ = _.foo // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
-    func f(_ x: Int, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
+    func f(_ x: Bool, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
     func g<T>(_ x: T, _ y: T, _ z: String = "") {} // expected-note 2 {{'g' declared here}}
 
-    f(1) // expected-error{{missing argument for parameter #2 in call}}
+    f(false) // expected-error{{missing argument for parameter #2 in call}}
     g(1) // expected-error{{missing argument for parameter #2 in call}}
     func h() -> Int { return 1 }
     f(h() == 1) // expected-error{{missing argument for parameter #2 in call}}

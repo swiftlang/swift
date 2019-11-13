@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -parse-stdlib  -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -314,19 +314,21 @@ func testStaticReport(_ b: Bool, ptr: Builtin.RawPointer) -> () {
 
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12testCondFail{{[_0-9a-zA-Z]*}}F"(i1, i1)
 func testCondFail(_ b: Bool, c: Bool) {
-  // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
-  Builtin.condfail(b)
-  // CHECK: <label>:[[CONT]]
-  // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
-  Builtin.condfail(c)
-  // CHECK: <label>:[[CONT]]
+  // CHECK: [[EXPECT:%.*]] = call i1 @llvm.expect.i1(i1 %0, i1 false)
+  // CHECK: br i1 [[EXPECT]], label %[[FAIL:.*]], label %[[CONT:.*]]
+  Builtin.condfail_message(b, StaticString("message").unsafeRawPointer)
+  // CHECK: [[CONT]]
+  // CHECK: [[EXPECT:%.*]] = call i1 @llvm.expect.i1(i1 %1, i1 false)
+  // CHECK: br i1 [[EXPECT]], label %[[FAIL2:.*]], label %[[CONT:.*]]
+  Builtin.condfail_message(c, StaticString("message").unsafeRawPointer)
+  // CHECK: [[CONT]]
   // CHECK: ret void
 
-  // CHECK: <label>:[[FAIL]]
+  // CHECK: [[FAIL]]:
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 
-  // CHECK: <label>:[[FAIL2]]
+  // CHECK: [[FAIL2]]:
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 }
@@ -335,14 +337,15 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
-// CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
-// CHECK-objc:  [[NOT_DONE]]:
-// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
-// CHECK-objc:    br label %[[DONE]]
+// CHECK-objc:    [[IS_DONE_X:%.*]] = call i1 @llvm.expect.i1(i1 [[IS_DONE]], i1 true)
+// CHECK-objc:    br i1 [[IS_DONE_X]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
 // CHECK-objc:  [[DONE]]:
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
+// CHECK-objc:  [[NOT_DONE]]:
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
+// CHECK-objc:    br label %[[DONE]]
 
 func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
   Builtin.once(p, f)
@@ -352,14 +355,15 @@ func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
 // CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
-// CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
-// CHECK-objc:  [[NOT_DONE]]:
-// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* %2)
-// CHECK-objc:    br label %[[DONE]]
+// CHECK-objc:    [[IS_DONE_X:%.*]] = call i1 @llvm.expect.i1(i1 [[IS_DONE]], i1 true)
+// CHECK-objc:    br i1 [[IS_DONE_X]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
 // CHECK-objc:  [[DONE]]:
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
+// CHECK-objc:  [[NOT_DONE]]:
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* %2)
+// CHECK-objc:    br label %[[DONE]]
 func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(c) (Builtin.RawPointer) -> (), k: Builtin.RawPointer) {
   Builtin.onceWithContext(p, f, k)
 }
@@ -613,30 +617,32 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins27acceptsBuiltinUnknownObjectyyBOSgzF"([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
-func acceptsBuiltinUnknownObject(_ ref: inout Builtin.UnknownObject?) {}
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"([[OPTIONAL_ANYOBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
+func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BOSgzF"({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast [[BUILTIN_UNKNOWN_OBJECT_TY]]* %0 to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
-// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %1
-// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC([[UNKNOWN_OBJECT]]* %2)
-// CHECK-native-NEXT: call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* %2)
-// CHECK-NEXT: ret i1 %3
-func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
+// CHECK-NEXT: [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY]], [[OPTIONAL_ANYOBJECT_TY]]* %0, i32 0, i32 0
+// CHECK-NEXT: [[CASTED:%.+]] = bitcast {{.+}}* [[ADDR]] to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
+// CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[CASTED]]
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferencedNonObjC([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-NEXT: ret i1 [[RESULT]]
+func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
 // ObjC nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BOzF"
-// CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
+// CHECK-SAME:    (%AnyObject* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
-// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
-// CHECK-native-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* %1)
-// CHECK-NEXT: ret i1 %2
-func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
+// CHECK-NEXT: [[ADDR:%.+]] = getelementptr inbounds %AnyObject, %AnyObject* %0, i32 0, i32 0
+// CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[ADDR]]
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-NEXT: ret i1 [[RESULT]]
+func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
@@ -804,7 +810,16 @@ enum MyError : Error {
 
 throw MyError.A
 
+/// Builtin.globalStringTablePointer must be reduced to a string_literal instruction before IRGen. IRGen
+/// should make this a trap.
+// CHECK-LABEL: define {{.*}}globalStringTablePointer
+// CHECK: call void @llvm.trap()
+// CHECK: ret i8* undef
+@_transparent
+func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
+  return Builtin.globalStringTablePointer(str);
+}
+
 
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
-

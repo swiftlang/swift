@@ -11,22 +11,37 @@ GENERIC_NODES = [
          ]),
 
     Node('GenericRequirementList', kind='SyntaxCollection',
-         element='Syntax',
+         element='GenericRequirement',
          element_name='GenericRequirement'),
+
+    # generic-requirement ->
+    #     (same-type-requrement|conformance-requirement) ','?
+    Node('GenericRequirement', kind='Syntax',
+         traits=['WithTrailingComma'],
+         children=[
+             Child('Body', kind='Syntax',
+                   node_choices=[
+                       Child('SameTypeRequirement',
+                             kind='SameTypeRequirement'),
+                       Child('ConformanceRequirement',
+                             kind='ConformanceRequirement'),
+                   ]),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+         ]),
 
     # same-type-requirement -> type-identifier == type
     Node('SameTypeRequirement', kind='Syntax',
-         traits=['WithTrailingComma'],
          children=[
              Child('LeftTypeIdentifier', kind='Type'),
              Child('EqualityToken', kind='Token',
                    token_choices=[
                        'SpacedBinaryOperatorToken',
                        'UnspacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
                    ]),
              Child('RightTypeIdentifier', kind='Type'),
-             Child('TrailingComma', kind='CommaToken',
-                   is_optional=True),
          ]),
 
     Node('GenericParameterList', kind='SyntaxCollection',
@@ -60,12 +75,9 @@ GENERIC_NODES = [
 
     # conformance-requirement -> type-identifier : type-identifier
     Node('ConformanceRequirement', kind='Syntax',
-         traits=['WithTrailingComma'],
          children=[
              Child('LeftTypeIdentifier', kind='Type'),
              Child('Colon', kind='ColonToken'),
              Child('RightTypeIdentifier', kind='Type'),
-             Child('TrailingComma', kind='CommaToken',
-                   is_optional=True),
          ]),
 ]

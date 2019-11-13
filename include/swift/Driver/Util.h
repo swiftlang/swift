@@ -34,7 +34,8 @@ namespace driver {
   enum class LinkKind {
     None,
     Executable,
-    DynamicLibrary
+    DynamicLibrary,
+    StaticLibrary
   };
 
   /// Used by a Job to request a "filelist": a file containing a list of all

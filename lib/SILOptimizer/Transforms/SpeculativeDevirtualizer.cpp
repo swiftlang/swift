@@ -192,7 +192,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILArgument *Arg =
       Continue->createPhiArgument(AI.getType(), ValueOwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
-    if (AI.getSubstCalleeType()->isNoReturnFunction()) {
+    if (AI.getSubstCalleeType()->isNoReturnFunction(F->getModule())) {
       IdenBuilder.createUnreachable(AI.getLoc());
       VirtBuilder.createUnreachable(AI.getLoc());
     } else {
@@ -275,7 +275,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
                                ClassDecl *CD,
                                ClassHierarchyAnalysis::ClassList &Subs) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
-  auto *Method = CMI->getMember().getFuncDecl();
+  auto *Method = CMI->getMember().getAbstractFunctionDecl();
+  assert(Method && "not a function");
+
   const DeclContext *DC = AI.getModule().getAssociatedContext();
 
   if (CD->isFinal())

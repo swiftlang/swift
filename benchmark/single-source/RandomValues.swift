@@ -63,7 +63,7 @@ public func run_RandomIntegersLCG(_ N: Int) {
     for _ in 0 ..< 100_000 {
       x &+= Int64.random(in: 0...10_000, using: &generator)
     }
-    CheckResults(x == 498214315)
+    blackHole(x)
   }
 }
 

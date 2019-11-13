@@ -33,17 +33,18 @@ enum LocalDiagID : uint32_t {
 static StringRef getCategoryName(uint32_t ID) {
   switch(ID) {
   case LocalDiagID::removed_decl:
-  case LocalDiagID::removed_setter:
     return "/* Removed Decls */";
   case LocalDiagID::moved_decl:
   case LocalDiagID::decl_kind_changed:
     return "/* Moved Decls */";
   case LocalDiagID::renamed_decl:
+  case LocalDiagID::objc_name_change:
     return "/* Renamed Decls */";
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
   case LocalDiagID::var_let_changed:
   case LocalDiagID::func_self_access_change:
+  case LocalDiagID::new_decl_without_intro:
     return "/* Decl Attribute changes */";
   case LocalDiagID::default_arg_removed:
   case LocalDiagID::decl_type_change:
@@ -63,6 +64,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::conformance_added:
   case LocalDiagID::conformance_removed:
   case LocalDiagID::optional_req_changed:
+  case LocalDiagID::existing_conformance_added:
     return "/* Protocol Conformance Change */";
   case LocalDiagID::default_associated_type_removed:
   case LocalDiagID::protocol_req_added:
@@ -71,6 +73,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::super_class_removed:
   case LocalDiagID::super_class_changed:
   case LocalDiagID::no_longer_open:
+  case LocalDiagID::desig_init_added:
     return "/* Class Inheritance Change */";
   default:
     return StringRef();
@@ -91,15 +94,10 @@ ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
 }
 
 void swift::ide::api::ModuleDifferDiagsConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    SourceManager &SM, const DiagnosticInfo &Info) {
   auto Category = getCategoryName((uint32_t)Info.ID);
   if (Category.empty()) {
-    PrintingDiagnosticConsumer::handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info,
-        bufferIndirectlyCausingDiagnostic);
+    PrintingDiagnosticConsumer::handleDiagnostic(SM, Info);
     return;
   }
   if (!DiagnoseModuleDiff)
@@ -107,7 +105,8 @@ void swift::ide::api::ModuleDifferDiagsConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
   AllDiags[Category].insert(Text.str().str());
 }

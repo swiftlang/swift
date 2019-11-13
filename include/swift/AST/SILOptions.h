@@ -50,11 +50,12 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Enable existential specializer optimization.
-  bool ExistentialSpecializer = false;
-
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
+
+  /// Controls whether specific OSSA optimizations are run. For benchmarking
+  /// purposes.
+  bool EnableOSSAOptimizations = true;
 
   /// Should we run any SIL performance optimizations
   ///
@@ -72,6 +73,9 @@ public:
 
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
+
+  /// Whether to skip emitting non-inlinable function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -128,6 +132,16 @@ public:
 
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
+
+  /// Calls to the replaced method inside of the replacement method will call
+  /// the previous implementation.
+  ///
+  /// @_dynamicReplacement(for: original())
+  /// func replacement() {
+  ///   if (...)
+  ///     original() // calls original() implementation if true
+  /// }
+  bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;

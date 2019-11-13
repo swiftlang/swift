@@ -64,20 +64,18 @@ public protocol Proto {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   var unwrappedProp: UnwrappedInt? { get set }
   // CHECK: var wrappedProp: WrappedInt? { get set }
-  // CHECK-RECOVERY: /* placeholder for _ */
-  // CHECK-RECOVERY: /* placeholder for _ */
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) */
   var wrappedProp: WrappedInt? { get set }
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
   func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK: func returnsWrappedMethod() -> WrappedInt
-  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() */
+  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
   func returnsWrappedMethod() -> WrappedInt
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   subscript(_: WrappedInt) -> () { get }
 
   // CHECK: init()
@@ -85,7 +83,7 @@ public protocol Proto {
   init()
 
   // CHECK: init(wrapped: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) (vtable entries: 1) */
   init(wrapped: WrappedInt)
 
   func lastMethod()

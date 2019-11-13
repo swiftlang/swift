@@ -50,8 +50,7 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   return CM;
 }
 
-SILCoverageMap::SILCoverageMap(uint64_t Hash)
-    : Hash(Hash), HasSymtabEntry(false) {}
+SILCoverageMap::SILCoverageMap(uint64_t Hash) : Hash(Hash) {}
 
 SILCoverageMap::~SILCoverageMap() {}
 

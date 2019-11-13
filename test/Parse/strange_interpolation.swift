@@ -6,47 +6,60 @@
 
 // REQUIRES: executable_test
 
- let x = 1
+print("Begin")
+// CHECK: Begin
 
- print("[\(x)]")
- // CHECK: [1]
+let x = 1
 
- print("[\(foo: x)]")
- // CHECK: [1]
- // expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
- // expected-note@-3{{remove 'foo' label to keep current behavior}} {{12-17=}}
+print("[\(x)]")
+// CHECK-NEXT: [1]
 
- print("[\(x, x)]")
- // CHECK: [(1, 1)]
- // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
- // expected-note@-3{{insert parentheses to keep current behavior}} {{12-12=(}} {{16-16=)}}
+print("[\(foo: x)]")
+// CHECK-NEXT: [1]
+// expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-3{{remove 'foo' label to keep current behavior}} {{11-16=}}
 
- print("[\(foo: x, x)]")
- // CHECK: [(foo: 1, 1)]
- // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
- // expected-note@-3{{insert parentheses to keep current behavior}} {{12-12=(}} {{21-21=)}}
+print("[\(x, x)]")
+// CHECK-NEXT: [(1, 1)]
+// expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
+// expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{15-15=)}}
 
- print("[\(x, foo: x)]")
- // CHECK: [(1, foo: 1)]
- // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
- // expected-note@-3{{insert parentheses to keep current behavior}} {11-11(}} {{20-20=)}}
+print("[\(foo: x, x)]")
+// CHECK-NEXT: [(foo: 1, 1)]
+// expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
+// expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{20-20=)}}
 
- print("[\(foo: x, foo: x)]")
- // CHECK: [(foo: 1, foo: 1)]
- // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
- // expected-note@-3{{insert parentheses to keep current behavior}} {11-11(}} {{25-25=)}}
+print("[\(x, foo: x)]")
+// CHECK-NEXT: [(1, foo: 1)]
+// expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
+// expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{20-20=)}}
 
- print("[\(describing: x)]")
- // CHECK: [1]
- // expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
- // expected-note@-3{{remove 'describing' label to keep current behavior}} {{12-24=}}
+print("[\(foo: x, bar: x)]")
+// CHECK-NEXT: [(foo: 1, bar: 1)]
+// expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
+// expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{25-25=)}}
 
- print("[\(x, radix: x)]")
- // CHECK: [(1, radix: 1)]
- // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
- // expected-note@-3{{insert parentheses to keep current behavior}} {11-11(}} {{25-25=)}}
+print("[\(describing: x)]")
+// CHECK-NEXT: [1]
+// expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-3{{remove 'describing' label to keep current behavior}} {{11-23=}}
 
- print("[\(stringInterpolationSegment: x)]")
- // CHECK: [1]
- // expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
- // expected-note@-3{{remove 'stringInterpolationSegment' label to keep current behavior}} {{12-40=}}
+print("[\(x, radix: x)]")
+// CHECK-NEXT: [(1, radix: 1)]
+// expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
+// expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{22-22=)}}
+
+print("[\(stringInterpolationSegment: x)]")
+// CHECK-NEXT: [1]
+// expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-3{{remove 'stringInterpolationSegment' label to keep current behavior}} {{11-39=}}
+
+print("[ \(foo: "[\(bar: x)]") ]")
+// CHECK-NEXT: [ [1] ]
+// expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-3{{remove 'foo' label to keep current behavior}} {{12-17=}}
+// expected-warning@-4{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-5{{remove 'bar' label to keep current behavior}} {{21-26=}}
+
+print("End")
+// CHECK-NEXT: End

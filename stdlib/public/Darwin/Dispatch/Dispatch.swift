@@ -121,7 +121,7 @@ public struct DispatchQoS : Equatable {
 }
 
 /// 
-@_frozen
+@frozen
 public enum DispatchTimeoutResult {
 	case success
 	case timedOut

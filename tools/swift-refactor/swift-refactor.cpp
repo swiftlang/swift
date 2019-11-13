@@ -53,6 +53,10 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                      "expand-ternary-expr", "Perform expand ternary expression"),
            clEnumValN(RefactoringKind::ConvertToTernaryExpr,
                       "convert-to-ternary-expr", "Perform convert to ternary expression"),
+		   clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
+					   "convert-to-guard", "Perform convert to guard expression"),
+           clEnumValN(RefactoringKind::ConvertGuardExprToIfLetExpr,
+                      "convert-to-iflet", "Perform convert to iflet expression"),
            clEnumValN(RefactoringKind::ExtractFunction,
                       "extract-function", "Perform extract function refactoring"),
            clEnumValN(RefactoringKind::MoveMembersToExtension,
@@ -159,29 +163,32 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
   }
 
   std::smatch Matches;
-  const std::regex LabelRegex("/\\*([^ *]+)\\*/|\\n");
+  // Intended to match comments like below where the "+offset" and ":usage"
+  // are defaulted to 0 and ref respectively
+  // /*name+offset:usage*/
+  const std::regex LabelRegex("/\\*([^ *:+]+)(?:\\+(\\d+))?(?:\\:([^ *]+))?\\*/|\\n");
 
   std::string::const_iterator SearchStart(Buffer.cbegin());
   unsigned Line = 1;
   unsigned Column = 1;
   while (std::regex_search(SearchStart, Buffer.cend(), Matches, LabelRegex)) {
-    auto EndOffset = Matches.position() + Matches.length();
-    if (Matches[1].matched) {
-      Column += EndOffset;
-      std::string MatchedStorage(Matches[1].str());
-      StringRef Matched(MatchedStorage);
-      size_t ColonPos = Matched.find(':');
-      if (Matched.slice(0, ColonPos) == LabelOrLineCol) {
-        NameUsage Usage = NameUsage::Reference;
-        if (ColonPos != StringRef::npos)
-          Usage = convertToNameUsage(Matched.substr(ColonPos + 1));
-        LocResults.push_back({Line, Column, Usage});
-      }
-    } else {
+    auto EndOffset = Matches.position(0) + Matches.length(0);
+    SWIFT_DEFER { SearchStart += EndOffset; };
+    if (!Matches[1].matched) {
       ++Line;
       Column = 1;
+      continue;
     }
-    SearchStart += EndOffset;
+    Column += EndOffset;
+    if (LabelOrLineCol == Matches[1].str()) {
+      unsigned ColumnOffset = 0;
+      if (Matches[2].length() > 0 && !llvm::to_integer(Matches[2].str(), ColumnOffset))
+        continue; // bad column offset
+      auto Usage = NameUsage::Reference;
+      if (Matches[3].length() > 0)
+        Usage = convertToNameUsage(Matches[3].str());
+      LocResults.push_back({Line, Column + ColumnOffset, Usage});
+    }
   }
   return LocResults;
 }
@@ -253,7 +260,7 @@ int main(int argc, char *argv[]) {
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:

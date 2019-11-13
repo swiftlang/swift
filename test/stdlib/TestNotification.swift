@@ -34,6 +34,8 @@ class TestNotification : TestNotificationSuper {
     }
 
     func test_hashing() {
+        guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
+
         let o1 = NSObject()
         let o2 = NSObject()
         let values: [Notification] = [

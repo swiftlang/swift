@@ -5,7 +5,7 @@
 
 import TestsUtils
 
-public var LuhnAlgoEager = BenchmarkInfo(
+public let LuhnAlgoEager = BenchmarkInfo(
   name: "LuhnAlgoEager",
   runFunction: run_LuhnAlgoEager,
   tags: [.algorithm]

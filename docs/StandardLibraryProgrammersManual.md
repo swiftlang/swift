@@ -50,6 +50,19 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 
 Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively, they can be `.unsafelyUnwrapped()`, which will check and trap in debug builds of user code. Internal to the standard library is `._unsafelyUnwrappedUnchecked()` which will only check and trap in debug builds of the standard library itself. These correspond directly with `_precondition`, `_debugPrecondition`, and `_sanityCheck`. See [that section](#precondition) for details.
 
+#### UnsafeBitCast and Casting References
+
+In general `unsafeBitCast` should be avoided because its correctness relies on subtle assumptions that will never be enforced, and it indicates a bug in Swift's type system that should be fixed. It's less bad for non-pointer trivial types. Pointer casting should go through one of the memory binding API instead as a last resort.
+
+Reference casting is more interesting. References casting can include converting to an Optional reference and converting from a class constrained existential.
+
+The regular `as` operator should be able to convert between reference types with full dynamic checking.
+
+`unsafeDownCast` is just as capable, but is only dynamically checked in debug mode or if the cast requires runtime support.
+
+`_unsafeUncheckedDowncast` is the same but is only dynamically checked in the stdlib asserts build, or if the cast requires runtime support.
+
+`_unsafeReferenceCast` is only dynamically checked if the cast requires runtime support. Additionally, it does not impose any static `AnyObject` constraint on the incoming reference. This is useful in a generic context where the object-ness can be determined dynamically, as done in some bridged containers.
 
 ### Builtins
 

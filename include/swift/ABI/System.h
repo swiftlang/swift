@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_ABI_SYSTEM_H__
-#define __SWIFT_ABI_SYSTEM_H__
+#ifndef SWIFT_ABI_SYSTEM_H
+#define SWIFT_ABI_SYSTEM_H
 
 #include "../../../stdlib/public/SwiftShims/System.h"
 
-#endif // __SWIFT_ABI_SYSTEM_H__
+#endif // SWIFT_ABI_SYSTEM_H

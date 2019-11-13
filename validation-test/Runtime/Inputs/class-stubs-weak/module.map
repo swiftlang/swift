@@ -1,0 +1,3 @@
+module first {
+  header "first.h"
+}

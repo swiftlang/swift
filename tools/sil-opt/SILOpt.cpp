@@ -81,6 +81,11 @@ static llvm::cl::opt<bool> DisableSILOwnershipVerifier(
     llvm::cl::desc(
         "Do not verify SIL ownership invariants during SIL verification"));
 
+static llvm::cl::opt<bool> EnableOwnershipLoweringAfterDiagnostics(
+    "enable-ownership-lowering-after-diagnostics",
+    llvm::cl::desc("Enable ownership lowering after diagnostics"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
@@ -169,11 +174,6 @@ SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
 
 static llvm::cl::opt<bool>
-SILExistentialSpecializer("enable-sil-existential-specializer", 
-                          llvm::cl::Hidden,
-                          llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
                    llvm::cl::init(true),
@@ -213,6 +213,11 @@ static llvm::cl::opt<bool>
 EnableExperimentalStaticAssert(
     "enable-experimental-static-assert", llvm::cl::Hidden,
     llvm::cl::init(false), llvm::cl::desc("Enable experimental #assert"));
+
+static llvm::cl::opt<bool> EnableExperimentalDifferentiableProgramming(
+    "enable-experimental-differentiable-programming", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("Enable experimental differentiable programming"));
 
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
@@ -329,16 +334,20 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableExperimentalStaticAssert =
       EnableExperimentalStaticAssert;
 
+  Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
+      EnableExperimentalDifferentiableProgramming;
+
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.ExistentialSpecializer = SILExistentialSpecializer;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
+  SILOpts.StripOwnershipAfterSerialization =
+      EnableOwnershipLoweringAfterDiagnostics;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -395,8 +404,7 @@ int main(int argc, char **argv) {
   if (Invocation.hasSerializedAST()) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(
-        CI.getMainModule(), CI.getSILOptions(), PerformWMO));
+    CI.createSILModule();
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

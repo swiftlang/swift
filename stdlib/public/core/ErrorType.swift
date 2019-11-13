@@ -135,32 +135,32 @@ extension Error {
 // Helper functions for the C++ runtime to have easy access to embedded error,
 // domain, code, and userInfo as Objective-C values.
 @_silgen_name("")
-internal func _getErrorDomainNSString<T : Error>(_ x: UnsafePointer<T>)
+internal func _getErrorDomainNSString<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @_silgen_name("")
-internal func _getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
+internal func _getErrorCode<T: Error>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
 
 @_silgen_name("")
-internal func _getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
+internal func _getErrorUserInfoNSDictionary<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
   return x.pointee._userInfo.map { $0 as AnyObject }
 }
 
 // Called by the casting machinery to extract an NSError from an Error value.
 @_silgen_name("")
-internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
+internal func _getErrorEmbeddedNSErrorIndirect<T: Error>(
     _ x: UnsafePointer<T>) -> AnyObject? {
   return x.pointee._getEmbeddedNSError()
 }
 
 /// Called by compiler-generated code to extract an NSError from an Error value.
 public // COMPILER_INTRINSIC
-func _getErrorEmbeddedNSError<T : Error>(_ x: T)
+func _getErrorEmbeddedNSError<T: Error>(_ x: T)
 -> AnyObject? {
   return x._getEmbeddedNSError()
 }
@@ -203,7 +203,7 @@ public func _errorInMain(_ error: Error) {
 /// Runtime function to determine the default code for an Error-conforming type.
 /// Called by the Foundation overlay.
 @_silgen_name("_swift_stdlib_getDefaultErrorCode")
-public func _getDefaultErrorCode<T : Error>(_ error: T) -> Int
+public func _getDefaultErrorCode<T: Error>(_ error: T) -> Int
 
 extension Error {
   public var _code: Int {

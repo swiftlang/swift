@@ -471,7 +471,7 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
     }
   }
 
-  if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
+  if (SILFunction *SingleCallee = fullApply.getReferencedFunctionOrNull()) {
     // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;
@@ -490,15 +490,20 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
     return;
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+#define UNCHECKED_REF_CAST(Name, ...)                                          \
+  case SILInstructionKind::Name##RetainValueInst:                              \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
     getEffectsOn(I->getOperand(0))->Retains = true;
     return;
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Name##ReleaseValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"

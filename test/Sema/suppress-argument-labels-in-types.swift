@@ -204,3 +204,21 @@ class C0 {
 
 // Check diagnostics changes.
 let _ = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+
+// SR-11429
+func testIntermediateCoercions() {
+  _ = (f1 as (Int, Int) -> Int)(a: 0, b: 1) // expected-error {{extraneous argument labels 'a:b:' in call}}
+  _ = (f1 as (Int, Int) -> Int)(0, 1)
+
+  typealias Magic<T> = T
+  _ = (f1 as Magic)(a: 0, b: 1) // expected-error {{extraneous argument labels 'a:b:' in call}}
+  _ = (f1 as Magic)(0, 1)
+
+  _ = (f4 as (Int, Int) -> Int)(0, 0)
+  _ = (f4 as (Double, Double) -> Double)(0, 0)
+
+  func iuoReturning() -> Int! {}
+  _ = (iuoReturning as () -> Int?)()
+  _ = (iuoReturning as Magic)()
+  _ = (iuoReturning as () -> Int)() // expected-error {{cannot convert value of type '() -> Int?' to type '() -> Int' in coercion}}
+}

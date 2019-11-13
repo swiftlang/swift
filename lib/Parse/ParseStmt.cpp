@@ -26,6 +26,7 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -122,6 +123,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
+    SyntaxParsingContext CCCtxt(SyntaxContext, SyntaxContextKind::Decl);
     consumeToken();
     if (CodeCompletion)
       CodeCompletion->completeAfterPoundDirective();
@@ -249,11 +251,14 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
+  SyntaxParsingContext Discarding(SyntaxContext);
+  Discarding.disable();
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
-  State->delayTopLevel(TLCD, {BeginLoc, EndLoc},
-                       BeginParserPosition.PreviousLoc);
+  State->setCodeCompletionDelayedDeclState(
+      PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl,
+      PD_Default, TLCD, {BeginLoc, EndLoc}, BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
@@ -356,7 +361,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
-    if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
+    const bool IsAtStartOfLineOrPreviousHadSemi =
+        PreviousHadSemi || Tok.isAtStartOfLine();
+    if (!IsAtStartOfLineOrPreviousHadSemi) {
       SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
         .fixItInsert(EndOfPreviousLoc, ";");
@@ -410,6 +417,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    IsAtStartOfLineOrPreviousHadSemi,
                     [&](Decl *D) {TmpDecls.push_back(D);});
       BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
@@ -465,7 +473,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SourceLoc StartLoc = Tok.getLoc();
       auto CD = cast<ConstructorDecl>(CurDeclContext);
       // Hint at missing 'self.' or 'super.' then skip this statement.
-      bool isSelf = !CD->isDesignatedInit() || !isa<ClassDecl>(CD->getParent());
+      bool isSelf = CD->getAttrs().hasAttribute<ConvenienceAttr>() ||
+                    !isa<ClassDecl>(CD->getParent());
       diagnose(StartLoc, diag::invalid_nested_init, isSelf)
         .fixItInsert(StartLoc, isSelf ? "self." : "super.");
       NeedParseErrorRecovery = true;
@@ -509,53 +518,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   }
 
   return BraceItemsStatus;
-}
-
-void Parser::parseTopLevelCodeDeclDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the top-level code.
-  restoreParserPosition(BeginParserPosition);
-
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-
-  // Re-enter the top-level decl context.
-  // FIXME: this can issue discriminators out-of-order?
-  auto *TLCD = cast<TopLevelCodeDecl>(DelayedState->ParentContext);
-  ContextChange CC(*this, TLCD, &State->getTopLevelContext());
-
-  SourceLoc StartLoc = Tok.getLoc();
-  ASTNode Result;
-
-  // Expressions can't begin with a closure literal at statement position. This
-  // prevents potential ambiguities with trailing closure syntax.
-  if (Tok.is(tok::l_brace)) {
-    diagnose(Tok, diag::statement_begins_with_closure);
-  }
-
-  parseExprOrStmt(Result);
-  if (!Result.isNull()) {
-    auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
-    TLCD->setBody(Brace);
-  }
 }
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to
@@ -966,7 +928,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        StaticSpellingKind::None,
                        /*FuncLoc=*/ SourceLoc(),
                        name,
-                       /*NameLoc=*/ SourceLoc(),
+                       /*NameLoc=*/ PreviousLoc,
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
@@ -985,10 +947,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     if (Body.isNull())
       return nullptr;
     Status |= Body;
-    tempDecl->setBody(Body.get());
+    tempDecl->setBodyParsed(Body.get());
   }
   
-  SourceLoc loc = tempDecl->getBody()->getStartLoc();
+  SourceLoc loc = tempDecl->getBodySourceRange().Start;
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
@@ -1081,29 +1043,19 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
+    auto CCE = new (P.Context) CodeCompletionExpr(P.Tok.getLoc());
+    result.ThePattern = new (P.Context) ExprPattern(CCE);
     if (P.CodeCompletion) {
       switch (parsingContext) {
       case GuardedPatternContext::Case:
-        P.CodeCompletion->completeCaseStmtBeginning();
+        P.CodeCompletion->completeCaseStmtBeginning(CCE);
         break;
       case GuardedPatternContext::Catch:
-        P.CodeCompletion->completePostfixExprBeginning(nullptr);
+        P.CodeCompletion->completePostfixExprBeginning(CCE);
         break;
       }
     }
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
-    status.setHasCodeCompletion();
-    return;
-  }
-  if (parsingContext == GuardedPatternContext::Case &&
-      P.Tok.isAny(tok::period_prefix, tok::period) &&
-      P.peekToken().is(tok::code_complete)) {
-    P.consumeToken();
-    if (P.CodeCompletion)
-      P.CodeCompletion->completeCaseStmtDotPrefix();
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
+    P.consumeToken(tok::code_complete);
     status.setHasCodeCompletion();
     return;
   }
@@ -1115,7 +1067,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto loc = P.Tok.getLoc();
     auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
-                                       VarDecl::Specifier::Let,
+                                       VarDecl::Introducer::Let,
                                        /*IsCaptureList*/false, loc, errorName,
                                        P.CurDeclContext);
     var->setImplicit();
@@ -1214,9 +1166,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   }
 }
 
-/// Validate availability spec list, emitting diagnostics if necessary.
+/// Validate availability spec list, emitting diagnostics if necessary and removing
+/// specs for unrecognized platforms.
 static void validateAvailabilitySpecList(Parser &P,
-                                         ArrayRef<AvailabilitySpec *> Specs) {
+    SmallVectorImpl<AvailabilitySpec *> &Specs) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   bool HasOtherPlatformSpec = false;
 
@@ -1228,7 +1181,9 @@ static void validateAvailabilitySpecList(Parser &P,
     return;
   }
 
+  SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
   for (auto *Spec : Specs) {
+    RecognizedSpecs.push_back(Spec);
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       HasOtherPlatformSpec = true;
       continue;
@@ -1243,6 +1198,13 @@ static void validateAvailabilitySpecList(Parser &P,
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+    // We keep specs for unrecognized platforms around for error recovery
+    // during parsing but remove them once parsing is completed.
+    if (VersionSpec->isUnrecognizedPlatform()) {
+      RecognizedSpecs.pop_back();
+      continue;
+    }
+
     bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
@@ -1260,6 +1222,8 @@ static void validateAvailabilitySpecList(Parser &P,
     P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
   }
+
+  Specs = RecognizedSpecs;
 }
 
 // #available(...)
@@ -2330,7 +2294,7 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (P.Context) VarDecl(
-          /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
       vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();

@@ -15,13 +15,12 @@ silopt_register_sources(
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
   DeadStoreElimination.cpp
+  DestroyHoisting.cpp
   Devirtualizer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp
-  MarkUninitializedFixup.cpp
   Outliner.cpp
   ObjectOutliner.cpp
-  OwnershipModelEliminator.cpp
   PerformanceInliner.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp

@@ -1421,3 +1421,44 @@ bb0(%0 : @guaranteed $@convention(block) () -> ()):
   %v = tuple ()
   return %v : $()
 }
+
+//-----------------------------------------------------------------------------
+// Test dynamically replaceable. Diagnostics should not be able to
+// make assumptions about the accesses in the callee function.
+
+struct TestDynamic {
+  @_hasStorage @_hasInitialValue var x: Builtin.Int64 { get set }
+  @_hasStorage @_hasInitialValue var y: Builtin.Int64 { get set }
+  public mutating func foo()
+  init(x: Builtin.Int64, y: Builtin.Int64)
+  init()
+}
+
+@_hasStorage @_hasInitialValue var s: S { get set }
+
+sil hidden [ossa] @testCallDynamic : $@convention(method) (@inout TestDynamic) -> () {
+bb0(%0 : $*TestDynamic):
+  %access = begin_access [modify] [unknown] %0 : $*TestDynamic // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %sea = struct_element_addr %access : $*TestDynamic, #TestDynamic.x
+  %f = dynamic_function_ref @testDynamicLocal : $@convention(thin) (@inout Builtin.Int64, @inout_aliasable TestDynamic) -> ()
+  %call = apply %f(%sea, %0) : $@convention(thin) (@inout Builtin.Int64, @inout_aliasable TestDynamic) -> () // expected-note {{conflicting access is here}}
+  end_access %access : $*TestDynamic
+  %v = tuple ()
+  return %v : $()
+}
+
+// This callee actually accesses different subpaths, but the caller's
+// diagnostic should not be able to see that.
+sil private [dynamically_replacable] [ossa] @testDynamicLocal : $@convention(thin) (@inout Builtin.Int64, @inout_aliasable TestDynamic) -> () {
+bb0(%0 : $*Builtin.Int64, %1 : $*TestDynamic):
+  %literal = integer_literal $Builtin.Int64, 1
+  %access1 = begin_access [modify] [unknown] %0 : $*Builtin.Int64
+  assign %literal to %access1 : $*Builtin.Int64
+  end_access %access1 : $*Builtin.Int64
+  %access2 = begin_access [modify] [unknown] %1 : $*TestDynamic
+  %sea = struct_element_addr %access2 : $*TestDynamic, #TestDynamic.y
+  assign %literal to %sea : $*Builtin.Int64
+  end_access %access2 : $*TestDynamic
+  %19 = tuple ()
+  return %19 : $()
+}

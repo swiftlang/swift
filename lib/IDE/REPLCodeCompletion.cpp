@@ -16,10 +16,11 @@
 
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
@@ -193,7 +194,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
                  CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
   ASTContext &Ctx = SF.getASTContext();
-  DiagnosticTransaction DelayedDiags(Ctx.Diags);
+  DiagnosticSuppression SuppressedDiags(Ctx.Diags);
 
   std::string AugmentedCode = EnteredCode.str();
   AugmentedCode += '\0';
@@ -206,23 +207,23 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
-  PersistentParserState PersistentState(Ctx);
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
-      new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
+  PersistentParserState PersistentState;
   bool Done;
   do {
-    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
-                        DelayedCB.get());
+    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
-  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
+  performTypeChecking(SF, PersistentState.getTopLevelContext(),
                       OriginalDeclCount);
 
-  performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
+  performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
   SF.Decls.resize(OriginalDeclCount);
-  DelayedDiags.abort();
+
+  // Reset the error state because it's only relevant to the code that we just
+  // processed, which now gets thrown away.
+  Ctx.Diags.resetHadAnyError();
 }
 
 void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {

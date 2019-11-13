@@ -9,7 +9,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-
+// REQUIRES: rdar55727144
 import Swift
 import Foundation
 
@@ -669,7 +669,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     encoder.keyEncodingStrategy = .convertToSnakeCase
     do {
       _ = try encoder.encode(toEncode)
-    } catch EncodingError.invalidValue(let (_, context)) {
+    } catch EncodingError.invalidValue(_, let context) {
       expectEqual(2, context.codingPath.count)
       expectEqual("key", context.codingPath[0].stringValue)
       expectEqual("someValue", context.codingPath[1].stringValue)
@@ -685,7 +685,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     encoder.keyEncodingStrategy = .convertToSnakeCase
     do {
       _ = try encoder.encode(toEncode)
-    } catch EncodingError.invalidValue(let (_, context)) {
+    } catch EncodingError.invalidValue(_, let context) {
       expectEqual(4, context.codingPath.count)
       expectEqual("key", context.codingPath[0].stringValue)
       expectEqual("sub_key", context.codingPath[1].stringValue)
@@ -838,7 +838,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     do {
       _ = try decoder.decode([String: Int].self, from: input)
-    } catch DecodingError.typeMismatch(let (_, context)) {
+    } catch DecodingError.typeMismatch(_, let context) {
       expectEqual(1, context.codingPath.count)
       expectEqual("leave_me_alone", context.codingPath[0].stringValue)
     } catch {
@@ -860,7 +860,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     do {
       _ = try decoder.decode([String: [String : DecodeFailureNested]].self, from: input)
-    } catch DecodingError.typeMismatch(let (_, context)) {
+    } catch DecodingError.typeMismatch(_, let context) {
       expectEqual(4, context.codingPath.count)
       expectEqual("top_level", context.codingPath[0].stringValue)
       expectEqual("sub_level", context.codingPath[1].stringValue)
@@ -1259,8 +1259,6 @@ func expectEqualPaths(_ lhs: [CodingKey], _ rhs: [CodingKey], _ prefix: String) 
             expectUnreachable("\(prefix) CodingKey.intValue mismatch: \(type(of: key1))(\(i1)) != \(type(of: key2))(\(i2))")
             return
         }
-
-        break
     }
 
     expectEqual(key1.stringValue, key2.stringValue, "\(prefix) CodingKey.stringValue mismatch: \(type(of: key1))('\(key1.stringValue)') != \(type(of: key2))('\(key2.stringValue)')")

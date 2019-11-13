@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -I %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_class.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_objc_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_objc_class.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -enable-resilient-objc-class-stubs %s > %t/out
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -target %target-next-stable-abi-triple %s > %t/out
 // RUN: %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize < %t/out
 // RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/out
 
@@ -12,6 +12,7 @@ import resilient_class
 import resilient_objc_class
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_stable_abi
 
 // -- Nominal type descriptor for ResilientSubclass
 // the interesting part is the 'extra class flags' field has a value of 1.
@@ -28,7 +29,7 @@ import resilient_objc_class
 // -- field descriptor
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMF"
 // -- superclass
-// CHECK-SAME: @"symbolic 15resilient_class22ResilientOutsideParentC"
+// CHECK-SAME: @"symbolic{{[^"]*}}15resilient_class22ResilientOutsideParentC"
 // -- metadata bounds
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMo"
 // -- extra class flags -- has Objective-C resilient class stub

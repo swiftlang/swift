@@ -156,7 +156,7 @@ sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 sil hidden [ossa] @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyStruct3
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack [dynamic_lifetime] $MyStruct3
 
   %2 = alloc_stack $MyStruct3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct3
@@ -209,7 +209,7 @@ sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 sil hidden [ossa] @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1, @owned MyClass3) -> () {
 bb0(%0 : $Builtin.Int1, %1 : @owned $MyClass3):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack [dynamic_lifetime] $MyClass3
 
   %2 = alloc_stack $MyClass3
   %3 = mark_uninitialized [delegatingselfallocated] %2 : $*MyClass3
@@ -274,4 +274,21 @@ bb2:
   dealloc_stack %2 : $*MyClass3
   %7 = tuple ()
   return %7 : $()
+}
+
+// <rdar://51198592> DI was crashing as it wrongly detected a `type(of: self)`
+// use in a delegating initializer, when there was none.
+class MyClass4 {
+}
+
+sil hidden [ossa] @test_self_uninit_use_in_delegating_init : $@convention(method) (@thick MyClass4.Type) -> @owned MyClass4 {
+bb0(%1 : $@thick MyClass4.Type):
+  %2 = alloc_stack $MyClass4, let, name "self"
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyClass4
+  %5 = load_borrow %3 : $*MyClass4 // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  end_borrow %5 : $MyClass4
+  %7 = load [copy] %3 : $*MyClass4 // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+  destroy_addr %3 : $*MyClass4
+  dealloc_stack %2 : $*MyClass4
+  return %7 : $MyClass4
 }

@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
 
@@ -51,6 +52,25 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsiOSSimulator(triple) ||
     tripleIsWatchSimulator(triple) ||
     tripleIsAppleTVSimulator(triple);
+}
+
+bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
+  if (triple.isMacOSX()) {
+    // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
+    // rpath-based install name until 10.15.
+    return triple.isMacOSXVersionLT(10, 15);
+  }
+
+  if (triple.isiOS()) {
+    return triple.isOSVersionLT(12, 2);
+  }
+
+  if (triple.isWatchOS()) {
+    return triple.isOSVersionLT(5, 2);
+  }
+
+  // Other platforms don't have Swift installed as part of the OS by default.
+  return false;
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
@@ -122,6 +142,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
+  case llvm::Triple::Emscripten:
   case llvm::Triple::Fuchsia:
   case llvm::Triple::KFreeBSD:
   case llvm::Triple::Lv2:
@@ -142,6 +163,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
+  case llvm::Triple::WASI:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -175,20 +197,16 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
 
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
   if (Triple.isOSLinux()) {
-    switch(Triple.getSubArch()) {
-    default:
-      return Triple.getArchName();
-      break;
+    switch (Triple.getSubArch()) {
     case llvm::Triple::SubArchType::ARMSubArch_v7:
       return "armv7";
-      break;
     case llvm::Triple::SubArchType::ARMSubArch_v6:
       return "armv6";
+    default:
       break;
     }
-  } else {
-    return Triple.getArchName();
   }
+  return Triple.getArchName();
 }
 
 // The code below is responsible for normalizing target triples into the form
@@ -309,7 +327,49 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
     return llvm::Triple(newArch, newVendor, newOS, *newEnvironment);
   }
 
+  // android - drop the API level.  That is not pertinent to the module; the API
+  // availability is handled by the clang importer.
+  if (triple.isAndroid()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        triple.getOSName(), environment);
+  }
+
   // Other platforms get no normalization.
   return triple;
 }
 
+Optional<llvm::VersionTuple>
+swift::getSwiftRuntimeCompatibilityVersionForTarget(
+    const llvm::Triple &Triple) {
+  unsigned Major, Minor, Micro;
+
+  if (Triple.isMacOSX()) {
+    Triple.getMacOSXVersion(Major, Minor, Micro);
+    if (Major == 10) {
+      if (Minor <= 14) {
+        return llvm::VersionTuple(5, 0);
+      } else if (Minor <= 15) {
+        return llvm::VersionTuple(5, 1);
+      }
+    }
+  } else if (Triple.isiOS()) { // includes tvOS
+    Triple.getiOSVersion(Major, Minor, Micro);
+    if (Major <= 12) {
+      return llvm::VersionTuple(5, 0);
+    } else if (Major <= 13) {
+      return llvm::VersionTuple(5, 1);
+    }
+  } else if (Triple.isWatchOS()) {
+    Triple.getWatchOSVersion(Major, Minor, Micro);
+    if (Major <= 5) {
+      return llvm::VersionTuple(5, 0);
+    } else if (Major <= 6) {
+      return llvm::VersionTuple(5, 1);
+    }
+  }
+
+  return None;
+}

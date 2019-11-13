@@ -3,6 +3,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_OVERLOAD_ARG | %FileCheck %s -check-prefix=CONDITIONAL_OVERLOAD_ARG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_OVERLOAD_INIT_ARG | %FileCheck %s -check-prefix=CONDITIONAL_OVERLOAD_ARG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_INAPPLICABLE_ARG | %FileCheck %s -check-prefix=CONDITIONAL_INAPPLICABLE_ARG
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITIONAL_DEPENDENT_TYPEALIAS | %FileCheck %s -check-prefix=CONDITIONAL_DEPENDENT_TYPEALIAS
 
 protocol SomeProto {
   associatedtype Assoc
@@ -126,4 +127,23 @@ func testVegetarian(chef: Chef<Vegetarian>) {
 
   chef.eat(.#^CONDITIONAL_INAPPLICABLE_ARG^#)
 // CONDITIONAL_INAPPLICABLE_ARG-NOT: Begin completion
+}
+
+// rdar://problem/53401609
+protocol MyProto {
+  associatedtype Index
+}
+extension MyProto where Index: Strideable, Index.Stride == Int {
+  func indices() {}
+}
+struct MyConcrete {}
+extension MyConcrete: MyProto {
+  typealias Index = Int
+}
+func testHasIndex(value: MyConcrete) {
+  value.#^CONDITIONAL_DEPENDENT_TYPEALIAS^#
+// CONDITIONAL_DEPENDENT_TYPEALIAS: Begin completions, 2 items
+// CONDITIONAL_DEPENDENT_TYPEALIAS-DAG: Keyword[self]/CurrNominal:          self[#MyConcrete#];
+// CONDITIONAL_DEPENDENT_TYPEALIAS-DAG: Decl[InstanceMethod]/Super:         indices()[#Void#];
+// CONDITIONAL_DEPENDENT_TYPEALIAS: End completions
 }

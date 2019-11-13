@@ -76,6 +76,21 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "ObjectiveCBridgeASCIIStringFromFile",
                 runFunction: run_ASCIIStringFromFile, tags: ts,
                 setUpFunction: setup_ASCIIStringFromFile),
+  BenchmarkInfo(name: "UnicodeStringFromCodable",
+                 runFunction: run_UnicodeStringFromCodable, tags: ts,
+                 setUpFunction: setup_UnicodeStringFromCodable),
+  BenchmarkInfo(name: "NSArray.bridged.objectAtIndex",
+                  runFunction: run_BridgedNSArrayObjectAtIndex, tags: t,
+                  setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSArray.bridged.mutableCopy.objectAtIndex",
+                  runFunction: run_BridgedNSArrayMutableCopyObjectAtIndex, tags: t,
+                  setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSArray.nonbridged.objectAtIndex",
+                  runFunction: run_RealNSArrayObjectAtIndex, tags: t,
+                  setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSArray.nonbridged.mutableCopy.objectAtIndex",
+                  runFunction: run_RealNSArrayMutableCopyObjectAtIndex, tags: t,
+                  setUpFunction: setup_bridgedArrays),
 ]
 
 #if _runtime(_ObjC)
@@ -740,6 +755,94 @@ public func run_ASCIIStringFromFile(_ N: Int) {
   #if _runtime(_ObjC)
   for _ in 0 ..< N {
     blackHole((ASCIIStringFromFile! + "").utf8.count)
+  }
+  #endif
+}
+
+var unicodeStringFromCodable:String? = nil
+var unicodeStringFromCodableDict = [String:Void]()
+public func setup_UnicodeStringFromCodable() {
+  do {
+    let jsonString = "[\(String(reflecting: "Nice string which works rather slöw."))]"
+    
+    let decoded = try JSONDecoder().decode([String].self, from: Data(jsonString.utf8))
+    let reEncoded = try JSONEncoder().encode(decoded)
+    let desc = try JSONDecoder().decode([String].self, from: reEncoded)
+    
+    unicodeStringFromCodable = desc[0]
+  } catch (_) {
+    
+  }
+}
+
+@inline(never)
+public func run_UnicodeStringFromCodable(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    for _ in 0..<100 {
+      unicodeStringFromCodableDict[identity(unicodeStringFromCodable!)] = ()
+    }
+  }
+  #endif
+}
+
+#if _runtime(_ObjC)
+var bridgedArray:NSArray! = nil
+var bridgedArrayMutableCopy:NSMutableArray! = nil
+var nsArray:NSArray! = nil
+var nsArrayMutableCopy:NSMutableArray! = nil
+#endif
+
+public func setup_bridgedArrays() {
+  #if _runtime(_ObjC)
+  var arr = Array(repeating: NSObject(), count: 100) as [AnyObject]
+  bridgedArray = arr as NSArray
+  bridgedArrayMutableCopy = (bridgedArray.mutableCopy() as! NSMutableArray)
+  nsArray = NSArray(objects: &arr, count: 100)
+  nsArrayMutableCopy = (nsArray.mutableCopy() as! NSMutableArray)
+  #endif
+}
+
+@inline(never)
+public func run_BridgedNSArrayObjectAtIndex(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N * 50 {
+    for i in 0..<100 {
+      blackHole(bridgedArray[i])
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_BridgedNSArrayMutableCopyObjectAtIndex(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N * 100 {
+    for i in 0..<100 {
+      blackHole(bridgedArrayMutableCopy[i])
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_RealNSArrayObjectAtIndex(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N * 100 {
+    for i in 0..<100 {
+      blackHole(nsArray[i])
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_RealNSArrayMutableCopyObjectAtIndex(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N * 100 {
+    for i in 0..<100 {
+      blackHole(nsArrayMutableCopy[i])
+    }
   }
   #endif
 }

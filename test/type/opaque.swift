@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -enable-opaque-result-types %s
+// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
 
 protocol P {
   func paul()
@@ -12,10 +12,9 @@ extension Array: P, Q { func paul() {}; mutating func priscilla() {}; func quinn
 class C {}
 class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
 
-// TODO: Should be valid
-
-let property: some P = 1 // TODO expected-error{{cannot convert}}
-let deflessProperty: some P // TODO e/xpected-error{{butz}}
+let property: some P = 1
+let deflessLet: some P // expected-error{{has no initializer}}
+var deflessVar: some P // expected-error{{has no initializer}}
 
 struct GenericProperty<T: P> {
   var x: T
@@ -27,7 +26,7 @@ struct GenericProperty<T: P> {
 let (bim, bam): some P = (1, 2) // expected-error{{'some' type can only be declared on a single property declaration}}
 var computedProperty: some P {
   get { return 1 }
-  set { _ = newValue + 1 } // TODO expected-error{{}} expected-note{{}}
+  set { _ = newValue + 1 } // expected-error{{cannot convert value of type 'some P' to expected argument type 'Int'}}
 }
 struct SubscriptTest {
   subscript(_ x: Int) -> some P {
@@ -159,7 +158,6 @@ func typeIdentity() {
 
   // The opaque type should expose the members implied by its protocol
   // constraints
-  // TODO: associated types
   do {
     var a = alice()
     a.paul()
@@ -174,8 +172,11 @@ func recursion(x: Int) -> some P {
   return recursion(x: x - 1)
 }
 
-// FIXME: We need to emit a better diagnostic than the failure to convert Never to opaque.
-func noReturnStmts() -> some P { fatalError() } // expected-error{{cannot convert return expression of type 'Never' to return type 'some P'}} expected-error{{no return statements}}
+func noReturnStmts() -> some P {} // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
+func returnUninhabited() -> some P { // expected-note {{opaque return type declared here}}
+    fatalError() // expected-error{{return type of global function 'returnUninhabited()' requires that 'Never' conform to 'P'}}
+}
 
 func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}}
   if x {
@@ -268,30 +269,17 @@ func associatedTypeIdentity() {
 
   sameType(cr, c.r_out())
   sameType(dr, d.r_out())
-  sameType(cr, dr) // expected-error{{}}
+  sameType(cr, dr) // expected-error{{}} expected-note {{}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
-  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
+  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}} expected-note {{}}
 }
 
-/* TODO: diagnostics
-struct DoesNotConform {}
-
-func doesNotConform() -> some P {
-  return DoesNotConform()
-}
-
-var doesNotConformProp: some P = DoesNotConform()
-
-var DoesNotConformComputedProp: some P {
-  return DoesNotConform()
-}
-*/
-
-func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
+func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
 func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
-func redeclaration() -> some Q { return 0 }
+func redeclaration() -> some Q { return 0 } // expected-error{{redeclaration}}
 func redeclaration() -> P { return 0 }
+func redeclaration() -> Any { return 0 }
 
 var redeclaredProp: some P { return 0 } // expected-note 3{{previously declared}}
 var redeclaredProp: some P { return 0 } // expected-error{{redeclaration}}
@@ -299,9 +287,9 @@ var redeclaredProp: some Q { return 0 } // expected-error{{redeclaration}}
 var redeclaredProp: P { return 0 } // expected-error{{redeclaration}}
 
 struct RedeclarationTest {
-  func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
+  func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
   func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
-  func redeclaration() -> some Q { return 0 }
+  func redeclaration() -> some Q { return 0 } // expected-error{{redeclaration}}
   func redeclaration() -> P { return 0 }
 
   var redeclaredProp: some P { return 0 } // expected-note 3{{previously declared}}
@@ -309,9 +297,9 @@ struct RedeclarationTest {
   var redeclaredProp: some Q { return 0 } // expected-error{{redeclaration}}
   var redeclaredProp: P { return 0 } // expected-error{{redeclaration}}
 
-  subscript(redeclared _: Int) -> some P { return 0 } // expected-note{{previously declared}}
+  subscript(redeclared _: Int) -> some P { return 0 } // expected-note 2{{previously declared}}
   subscript(redeclared _: Int) -> some P { return 0 } // expected-error{{redeclaration}}
-  subscript(redeclared _: Int) -> some Q { return 0 }
+  subscript(redeclared _: Int) -> some Q { return 0 } // expected-error{{redeclaration}}
   subscript(redeclared _: Int) -> P { return 0 }
 }
 
@@ -355,4 +343,134 @@ func recursive_func_is_invalid_opaque() {
     }
     return rec(x: x - 1)
   }
+}
+
+func closure() -> some P {
+  _ = {
+    return "test"
+  }
+  return 42
+}
+
+protocol HasAssocType {
+  associatedtype Assoc
+
+  func assoc() -> Assoc
+}
+
+struct GenericWithOpaqueAssoc<T>: HasAssocType {
+  func assoc() -> some Any { return 0 }
+}
+
+struct OtherGeneric<X, Y, Z> {
+  var x: GenericWithOpaqueAssoc<X>.Assoc
+  var y: GenericWithOpaqueAssoc<Y>.Assoc
+  var z: GenericWithOpaqueAssoc<Z>.Assoc
+}
+
+protocol P_51641323 {
+  associatedtype T
+
+  var foo: Self.T { get }
+}
+
+func rdar_51641323() {
+  struct Foo: P_51641323 {
+    var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only struct/enum/class types can conform to protocols}}
+    }
+  }
+}
+
+// Protocol requirements cannot have opaque return types
+protocol OpaqueProtocolRequirement {
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{20-26=<#AssocType#>}}
+  func method() -> some P
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{13-19=<#AssocType#>}}
+  var prop: some P { get }
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{18-24=<#AssocType#>}}
+  subscript() -> some P { get }
+}
+
+func testCoercionDiagnostics() {
+  var opaque = foo()
+  opaque = bar() // expected-error {{cannot assign value of type 'some P' (result of 'bar()') to type 'some P' (result of 'foo()')}} {{none}}
+  opaque = () // expected-error {{cannot assign value of type '()' to type 'some P'}} {{none}}
+  opaque = computedProperty // expected-error {{cannot assign value of type 'some P' (type of 'computedProperty') to type 'some P' (result of 'foo()')}} {{none}}
+  opaque = SubscriptTest()[0] // expected-error {{cannot assign value of type 'some P' (result of 'SubscriptTest.subscript(_:)') to type 'some P' (result of 'foo()')}} {{none}}
+
+  var opaqueOpt: Optional = opaque
+  opaqueOpt = bar() // expected-error {{cannot assign value of type 'some P' (result of 'bar()') to type 'some P' (result of 'foo()')}} {{none}}
+  opaqueOpt = () // expected-error {{cannot assign value of type '()' to type 'some P'}} {{none}}
+}
+
+var globalVar: some P = 17
+let globalLet: some P = 38
+
+struct Foo {
+  static var staticVar: some P = 17
+  static let staticLet: some P = 38
+
+  var instanceVar: some P = 17
+  let instanceLet: some P = 38
+}
+
+protocol P_52528543 {
+  init()
+
+  associatedtype A: Q_52528543
+
+  var a: A { get }
+}
+
+protocol Q_52528543 {
+  associatedtype B // expected-note 2 {{associated type 'B'}}
+
+  var b: B { get }
+}
+
+extension P_52528543 {
+  func frob(a_b: A.B) -> some P_52528543 { return self }
+}
+
+func foo<T: P_52528543>(x: T) -> some P_52528543 {
+  return x
+    .frob(a_b: x.a.b)
+    .frob(a_b: x.a.b) // expected-error {{cannot convert}}
+}
+
+struct GenericFoo<T: P_52528543, U: P_52528543> {
+  let x: some P_52528543 = T()
+  let y: some P_52528543 = U()
+
+  mutating func bump() {
+    var xab = f_52528543(x: x)
+    xab = f_52528543(x: y) // expected-error{{cannot assign}}
+  }
+}
+
+func f_52528543<T: P_52528543>(x: T) -> T.A.B { return x.a.b }
+
+func opaque_52528543<T: P_52528543>(x: T) -> some P_52528543 { return x }
+
+func invoke_52528543<T: P_52528543, U: P_52528543>(x: T, y: U) {
+  let x2 = opaque_52528543(x: x)
+  let y2 = opaque_52528543(x: y)
+  var xab = f_52528543(x: x2)
+  xab = f_52528543(x: y2) // expected-error{{cannot assign}}
+}
+
+protocol Proto {}
+
+struct I : Proto {}
+
+dynamic func foo<S>(_ s: S) -> some Proto {
+  return I()
+}
+
+@_dynamicReplacement(for: foo)
+func foo_repl<S>(_ s: S) -> some Proto {
+ return   I()
 }

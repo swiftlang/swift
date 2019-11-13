@@ -12,13 +12,17 @@
 
 #include "DocFormat.h"
 #include "Serialization.h"
-
+#include "SourceInfoFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -34,16 +38,12 @@ using swift::version::Version;
 using llvm::BCBlockRAII;
 
 using FileNameToGroupNameMap = llvm::StringMap<std::string>;
-using pFileNameToGroupNameMap = std::unique_ptr<FileNameToGroupNameMap>;
 
 namespace {
 class YamlGroupInputParser {
   ASTContext &Ctx;
   StringRef RecordPath;
   static constexpr const char * const Separator = "/";
-
-  // FIXME: This isn't thread-safe.
-  static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
                  StringRef ParentName) {
@@ -86,28 +86,23 @@ class YamlGroupInputParser {
     return false;
   }
 
+  FileNameToGroupNameMap diagnoseGroupInfoFile(bool FileMissing = false) {
+    Ctx.Diags.diagnose(SourceLoc(),
+      FileMissing ? diag::cannot_find_group_info_file:
+      diag::cannot_parse_group_info_file, RecordPath);
+    return {};
+  }
+
 public:
   YamlGroupInputParser(ASTContext &Ctx, StringRef RecordPath):
     Ctx(Ctx), RecordPath(RecordPath) {}
 
-  FileNameToGroupNameMap* getParsedMap() {
-    return AllMaps[RecordPath].get();
-  }
-
-  bool diagnoseGroupInfoFile(bool FileMissing = false) {
-    Ctx.Diags.diagnose(SourceLoc(),
-      FileMissing ? diag::cannot_find_group_info_file:
-      diag::cannot_parse_group_info_file, RecordPath);
-    return true;
-  }
-
-  // Parse the Yaml file that contains the group information.
-  // True on failure; false on success.
-  bool parse() {
-    // If we have already parsed this group info file, return false;
-    auto FindMap = AllMaps.find(RecordPath);
-    if (FindMap != AllMaps.end())
-      return false;
+  /// Parse the Yaml file that contains the group information.
+  ///
+  /// If the record path is empty, returns an empty map.
+  FileNameToGroupNameMap parse() {
+    if (RecordPath.empty())
+      return {};
 
     auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
     if (!Buffer) {
@@ -132,83 +127,58 @@ public:
     if (!Map) {
       return diagnoseGroupInfoFile();
     }
-    pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    std::string Empty;
-    if (parseRoot(*pMap, Root, Empty))
+    FileNameToGroupNameMap Result;
+    if (parseRoot(Result, Root, ""))
       return diagnoseGroupInfoFile();
 
-    // Save the parsed map to the owner.
-    AllMaps[RecordPath] = std::move(pMap);
-    return false;
+    // Return the parsed map.
+    return Result;
   }
 };
 
-llvm::StringMap<pFileNameToGroupNameMap> YamlGroupInputParser::AllMaps;
-
 class DeclGroupNameContext {
-  struct GroupNameCollector {
-    static const StringLiteral NullGroupName;
-    const bool Enable;
-    GroupNameCollector(bool Enable) : Enable(Enable) {}
-    virtual ~GroupNameCollector() = default;
-    virtual StringRef getGroupNameInternal(const Decl *VD) = 0;
-    StringRef getGroupName(const Decl *VD) {
-      return Enable ? getGroupNameInternal(VD) : StringRef(NullGroupName);
-    };
-  };
-
-  class GroupNameCollectorFromJson : public GroupNameCollector {
-    StringRef RecordPath;
-    FileNameToGroupNameMap* pMap = nullptr;
-    ASTContext &Ctx;
-
-  public:
-    GroupNameCollectorFromJson(StringRef RecordPath, ASTContext &Ctx) :
-      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath),
-      Ctx(Ctx) {}
-    StringRef getGroupNameInternal(const Decl *VD) override {
-      // We need the file path, so there has to be a location.
-      if (VD->getLoc().isInvalid())
-        return NullGroupName;
-      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
-      if (!PathOp.hasValue())
-        return NullGroupName;
-      StringRef FullPath =
-          Ctx.SourceMgr.getIdentifierForBuffer(PathOp.getValue());
-      if (!pMap) {
-        YamlGroupInputParser Parser(Ctx, RecordPath);
-        if (!Parser.parse()) {
-
-          // Get the file-name to group map if parsing correctly.
-          pMap = Parser.getParsedMap();
-        }
-      }
-      if (!pMap)
-        return NullGroupName;
-      StringRef FileName = llvm::sys::path::filename(FullPath);
-      auto Found = pMap->find(FileName);
-      if (Found == pMap->end()) {
-        Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
-        return NullGroupName;
-      }
-      return Found->second;
-    }
-  };
-
+  ASTContext &Ctx;
+  FileNameToGroupNameMap FileToGroupMap;
   llvm::MapVector<StringRef, unsigned> Map;
   std::vector<StringRef> ViewBuffer;
-  std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
   DeclGroupNameContext(StringRef RecordPath, ASTContext &Ctx) :
-    pNameCollector(new GroupNameCollectorFromJson(RecordPath, Ctx)) {}
+    Ctx(Ctx), FileToGroupMap(YamlGroupInputParser(Ctx, RecordPath).parse()) {}
+
   uint32_t getGroupSequence(const Decl *VD) {
-    return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
-                                     Map.size())).first->second;
+    if (FileToGroupMap.empty())
+      return 0;
+
+    // We need the file path, so there has to be a location.
+    if (VD->getLoc().isInvalid())
+      return 0;
+
+    // If the decl being serialized isn't actually from a source file, don't
+    // put it in a group.
+    // FIXME: How do we preserve group information through partial module
+    // merging for multi-frontend builds, then?
+    SourceFile *SF = VD->getDeclContext()->getParentSourceFile();
+    if (!SF)
+      return 0;
+
+    StringRef FullPath = SF->getFilename();
+    if (FullPath.empty())
+      return 0;
+    StringRef FileName = llvm::sys::path::filename(FullPath);
+    auto Found = FileToGroupMap.find(FileName);
+    if (Found == FileToGroupMap.end()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
+      return 0;
+    }
+
+    StringRef GroupName = Found->second;
+    return Map.insert(std::make_pair(GroupName, Map.size()+1)).first->second;
   }
 
   ArrayRef<StringRef> getOrderedGroupNames() {
     ViewBuffer.clear();
+    ViewBuffer.push_back(""); // 0 is always outside of any group.
     for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
@@ -216,12 +186,9 @@ public:
   }
 
   bool isEnable() {
-    return pNameCollector->Enable;
+    return !FileToGroupMap.empty();
   }
 };
-
-const StringLiteral
-DeclGroupNameContext::GroupNameCollector::NullGroupName = "";
 
 struct DeclCommentTableData {
   StringRef Brief;
@@ -241,8 +208,7 @@ public:
 
   hash_value_type ComputeHash(key_type_ref key) {
     assert(!key.empty());
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTDOC_HASH_SEED_5_1);
   }
 
   std::pair<unsigned, unsigned>
@@ -342,6 +308,51 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
   GroupNames.emit(Scratch, BlobStream.str());
 }
 
+static bool hasDoubleUnderscore(Decl *D) {
+  // Exclude decls with double-underscored names, either in arguments or
+  // base names.
+  static StringRef Prefix = "__";
+
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // If it's a function with a parameter with leading double underscore,
+    // it's a private function.
+    if (AFD->getParameters()->hasInternalParameter(Prefix))
+      return true;
+  }
+
+  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+    if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
+      return true;
+  }
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    auto Name = VD->getBaseName();
+    if (!Name.isSpecial() &&
+        Name.getIdentifier().str().startswith(Prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    // Skip the decl if it's not visible to clients. The use of
+    // getEffectiveAccess is unusual here; we want to take the testability
+    // state into account and emit documentation if and only if they are
+    // visible to clients (which means public ordinarily, but
+    // public+internal when testing enabled).
+    if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
+      return false;
+  }
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return shouldIncludeDecl(ED->getExtendedNominal(), ExcludeDoubleUnderscore);
+  }
+  if (ExcludeDoubleUnderscore && hasDoubleUnderscore(D)) {
+    return false;
+  }
+  return true;
+}
+
 static void writeDeclCommentTable(
     const comment_block::DeclCommentListLayout &DeclCommentList,
     const SourceFile *SF, const ModuleDecl *M,
@@ -354,7 +365,7 @@ static void writeDeclCommentTable(
     DeclGroupNameContext &GroupContext;
     unsigned SourceOrder;
 
-    DeclCommentTableWriter(DeclGroupNameContext &GroupContext) :
+    DeclCommentTableWriter(DeclGroupNameContext &GroupContext):
       GroupContext(GroupContext) {}
 
     void resetSourceOrder() {
@@ -368,16 +379,6 @@ static void writeDeclCommentTable(
     }
 
     bool shouldSerializeDoc(Decl *D) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        // Skip the decl if it's not visible to clients. The use of
-        // getEffectiveAccess is unusual here; we want to take the testability
-        // state into account and emit documentation if and only if they are
-        // visible to clients (which means public ordinarily, but
-        // public+internal when testing enabled).
-        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
-          return false;
-      }
-
       // When building the stdlib we intend to serialize unusual comments.
       // This situation is represented by GroupContext.isEnable().  In that
       // case, we perform more serialization to keep track of source order.
@@ -409,6 +410,8 @@ static void writeDeclCommentTable(
     }
 
     bool walkToDeclPre(Decl *D) override {
+      if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/true))
+        return false;
       if (!shouldSerializeDoc(D))
         return true;
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -424,7 +427,7 @@ static void writeDeclCommentTable(
       {
         USRBuffer.clear();
         llvm::raw_svector_ostream OS(USRBuffer);
-        if (ide::printDeclUSR(VD, OS))
+        if (ide::printValueDeclUSR(VD, OS))
           return true;
       }
 
@@ -511,6 +514,291 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 
       // FIXME: Multi-file compilation may cause group id collision.
       writeGroupNames(GroupNames, GroupContext.getOrderedGroupNames());
+    }
+  }
+
+  S.writeToStream(os);
+}
+namespace {
+struct DeclLocationsTableData {
+  uint32_t SourceFileOffset;
+  LineColumn Loc;
+  LineColumn StartLoc;
+  LineColumn EndLoc;
+};
+
+class USRTableInfo {
+public:
+  using key_type = StringRef;
+  using key_type_ref = key_type;
+  using data_type = uint32_t;
+  using data_type_ref = const data_type &;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  hash_value_type ComputeHash(key_type_ref key) {
+    assert(!key.empty());
+    return llvm::djbHash(key, SWIFTSOURCEINFO_HASH_SEED);
+  }
+
+  std::pair<unsigned, unsigned>
+  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+    const unsigned numLen = 4;
+    uint32_t keyLength = key.size();
+    uint32_t dataLength = numLen;
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(keyLength);
+    return { keyLength, dataLength };
+  }
+
+  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    out << key;
+  }
+
+  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                unsigned len) {
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(data);
+  }
+};
+
+class DeclUSRsTableWriter {
+  llvm::StringSet<> USRs;
+  llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
+public:
+  uint32_t peekNextId() const { return USRs.size(); }
+  Optional<uint32_t> getNewUSRId(StringRef USR) {
+    // Attempt to insert the USR into the StringSet.
+    auto It = USRs.insert(USR);
+    // If the USR exists in the StringSet, return None.
+    if (!It.second)
+      return None;
+    auto Id = USRs.size() - 1;
+    // We have to insert the USR from the StringSet because it's where the
+    // memory is owned.
+    generator.insert(It.first->getKey(), Id);
+    return Id;
+  }
+  void emitUSRsRecord(llvm::BitstreamWriter &out) {
+    decl_locs_block::DeclUSRSLayout USRsList(out);
+    SmallVector<uint64_t, 8> scratch;
+    llvm::SmallString<32> hashTableBlob;
+    uint32_t tableOffset;
+    {
+      llvm::raw_svector_ostream blobStream(hashTableBlob);
+      // Make sure that no bucket is at offset 0
+      endian::write<uint32_t>(blobStream, 0, little);
+      tableOffset = generator.Emit(blobStream);
+    }
+    USRsList.emit(scratch, tableOffset, hashTableBlob);
+  }
+};
+
+class StringWriter {
+  llvm::StringMap<uint32_t> IndexMap;
+  llvm::SmallString<1024> Buffer;
+public:
+  uint32_t getTextOffset(StringRef Text) {
+    auto IterAndIsNew = IndexMap.insert({Text, Buffer.size()});
+    if (IterAndIsNew.second) {
+      Buffer.append(Text);
+      Buffer.push_back('\0');
+    }
+    return IterAndIsNew.first->getValue();
+  }
+
+  void emitSourceFilesRecord(llvm::BitstreamWriter &Out) {
+    decl_locs_block::TextDataLayout TextBlob(Out);
+    SmallVector<uint64_t, 8> scratch;
+    TextBlob.emit(scratch, Buffer);
+  }
+};
+
+struct BasicDeclLocsTableWriter : public ASTWalker {
+  llvm::SmallString<1024> Buffer;
+  DeclUSRsTableWriter &USRWriter;
+  StringWriter &FWriter;
+  BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
+                           StringWriter &FWriter): USRWriter(USRWriter),
+                           FWriter(FWriter) {}
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
+  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+  bool walkToParameterListPre(ParameterList *PL) override { return false; }
+
+  void appendToBuffer(DeclLocationsTableData data) {
+    llvm::raw_svector_ostream out(Buffer);
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(data.SourceFileOffset);
+#define WRITE_LINE_COLUMN(X)                                                  \
+writer.write<uint32_t>(data.X.Line);                                          \
+writer.write<uint32_t>(data.X.Column);
+    WRITE_LINE_COLUMN(Loc)
+    WRITE_LINE_COLUMN(StartLoc);
+    WRITE_LINE_COLUMN(EndLoc);
+#undef WRITE_LINE_COLUMN
+  }
+
+  Optional<uint32_t> calculateNewUSRId(Decl *D) {
+    llvm::SmallString<512> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    if (ide::printDeclUSR(D, OS))
+      return None;
+    return USRWriter.getNewUSRId(OS.str());
+  }
+
+  LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
+    LineColumn Result;
+    if (Loc.isValid()) {
+      auto LC = SM.getLineAndColumn(Loc);
+      Result.Line = LC.first;
+      Result.Column = LC.second;
+    }
+    return Result;
+  }
+
+  Optional<DeclLocationsTableData> getLocData(Decl *D) {
+    auto *File = D->getDeclContext()->getModuleScopeContext();
+    auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
+    if (!Locs.hasValue())
+      return None;
+    DeclLocationsTableData Result;
+    llvm::SmallString<128> AbsolutePath = Locs->SourceFilePath;
+    llvm::sys::fs::make_absolute(AbsolutePath);
+    Result.SourceFileOffset = FWriter.getTextOffset(AbsolutePath.str());
+#define COPY_LINE_COLUMN(X)                                                   \
+Result.X.Line = Locs->X.Line;                                                 \
+Result.X.Column = Locs->X.Column;
+    COPY_LINE_COLUMN(Loc)
+    COPY_LINE_COLUMN(StartLoc)
+    COPY_LINE_COLUMN(EndLoc)
+#undef COPY_LINE_COLUMN
+    return Result;
+  }
+
+  bool shouldSerializeSourceLoc(Decl *D) {
+    if (D->isImplicit())
+      return false;
+    return true;
+  }
+
+  bool walkToDeclPre(Decl *D) override {
+    SWIFT_DEFER {
+      assert(USRWriter.peekNextId() * sizeof(DeclLocationsTableData)
+             == Buffer.size() &&
+            "USR Id has a one-to-one mapping with DeclLocationsTableData");
+    };
+    // .swiftdoc doesn't include comments for double underscored symbols, but
+    // for .swiftsourceinfo, having the source location for these symbols isn't
+    // a concern becuase these symbols are in .swiftinterface anyway.
+    if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
+      return false;
+    if (!shouldSerializeSourceLoc(D))
+      return true;
+    // If we cannot get loc data for D, don't proceed.
+    auto LocData = getLocData(D);
+    if (!LocData.hasValue())
+      return true;
+    // If we have handled this USR before, don't proceed.
+    auto USR = calculateNewUSRId(D);
+    if (!USR.hasValue())
+      return true;
+    appendToBuffer(*LocData);
+    return true;
+  }
+};
+
+static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
+                                ModuleOrSourceFile MSF,
+                                DeclUSRsTableWriter &USRWriter,
+                                StringWriter &FWriter) {
+  assert(MSF);
+  const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
+  BasicDeclLocsTableWriter Writer(USRWriter, FWriter);
+  if (auto *SF = MSF.dyn_cast<SourceFile*>()) {
+    SF->walk(Writer);
+  } else {
+    MSF.get<ModuleDecl*>()->walk(Writer);
+  }
+
+  SmallVector<uint64_t, 8> scratch;
+  DeclLocsList.emit(scratch, Writer.Buffer);
+}
+
+class SourceInfoSerializer : public SerializerBase {
+public:
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
+
+  using SerializerBase::Out;
+  using SerializerBase::M;
+  using SerializerBase::SF;
+  /// Writes the BLOCKINFO block for the module sourceinfo file.
+  void writeSourceInfoBlockInfoBlock() {
+    BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
+
+    SmallVector<unsigned char, 64> nameBuffer;
+#define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
+
+    BLOCK(MODULE_SOURCEINFO_BLOCK);
+
+    BLOCK(CONTROL_BLOCK);
+    BLOCK_RECORD(control_block, METADATA);
+    BLOCK_RECORD(control_block, MODULE_NAME);
+    BLOCK_RECORD(control_block, TARGET);
+
+    BLOCK(DECL_LOCS_BLOCK);
+    BLOCK_RECORD(decl_locs_block, BASIC_DECL_LOCS);
+    BLOCK_RECORD(decl_locs_block, DECL_USRS);
+    BLOCK_RECORD(decl_locs_block, TEXT_DATA);
+
+#undef BLOCK
+#undef BLOCK_RECORD
+  }
+  /// Writes the Swift sourceinfo file header and name.
+  void writeSourceInfoHeader() {
+    {
+      BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+      control_block::ModuleNameLayout ModuleName(Out);
+      control_block::MetadataLayout Metadata(Out);
+      control_block::TargetLayout Target(Out);
+
+      auto& LangOpts = M->getASTContext().LangOpts;
+      Metadata.emit(ScratchRecord, SWIFTSOURCEINFO_VERSION_MAJOR,
+                    SWIFTSOURCEINFO_VERSION_MINOR,
+                    /*short version string length*/0, /*compatibility length*/0,
+              version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion));
+
+      ModuleName.emit(ScratchRecord, M->getName().str());
+      Target.emit(ScratchRecord, LangOpts.Target.str());
+    }
+  }
+};
+}
+void serialization::writeSourceInfoToStream(raw_ostream &os,
+                                            ModuleOrSourceFile DC) {
+  assert(DC);
+  SourceInfoSerializer S{SWIFTSOURCEINFO_SIGNATURE, DC};
+  // FIXME: This is only really needed for debugging. We don't actually use it.
+  S.writeSourceInfoBlockInfoBlock();
+  {
+    BCBlockRAII moduleBlock(S.Out, MODULE_SOURCEINFO_BLOCK_ID, 2);
+    S.writeSourceInfoHeader();
+    {
+      BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
+      DeclUSRsTableWriter USRWriter;
+      StringWriter FPWriter;
+      emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
+      // Emit USR table mapping from a USR to USR Id.
+      // The basic locs record uses USR Id instead of actual USR, so that we
+      // don't need to repeat USR texts for newly added records.
+      USRWriter.emitUSRsRecord(S.Out);
+      // A blob of 0 terminated strings referenced by the location records,
+      // e.g. file paths.
+      FPWriter.emitSourceFilesRecord(S.Out);
     }
   }
 

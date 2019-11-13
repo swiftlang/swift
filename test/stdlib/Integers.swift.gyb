@@ -18,8 +18,6 @@
 // FIXME: this test runs forever on iOS arm64
 // REQUIRES: OS=macosx
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 %{
 word_bits = int(WORD_BITS) / 2
 from SwiftIntTypes import all_integer_types

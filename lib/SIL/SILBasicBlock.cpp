@@ -142,9 +142,11 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   }
 }
 
-SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
-                                                           const ValueDecl *D) {
-  assert(isEntry() && "Function Arguments can only be in the entry block");
+SILFunctionArgument *
+SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
+                                      bool disableEntryBlockVerification) {
+  assert((disableEntryBlockVerification || isEntry()) &&
+         "Function Arguments can only be in the entry block");
   const SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
       *Parent, Ty,
@@ -167,7 +169,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
   SILFunction *F = getParent();
   SILModule &M = F->getModule();
   if (Ty.isTrivial(*F))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old arg!");
 
@@ -193,7 +195,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
   SILFunction *F = getParent();
   SILModule &M = F->getModule();
   if (Ty.isTrivial(*F))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
@@ -210,12 +212,35 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
   return NewArg;
 }
 
+SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
+    unsigned i, SILType ty, ValueOwnershipKind kind, const ValueDecl *d) {
+  // Put in an undef placeholder before we do the replacement since
+  // replacePhiArgument() expects the replaced argument to not have
+  // any uses.
+  SmallVector<Operand *, 16> operands;
+  SILValue undef = SILUndef::get(ty, *getParent());
+  for (auto *use : getArgument(i)->getUses()) {
+    use->set(undef);
+    operands.push_back(use);
+  }
+
+  // Perform the replacement.
+  auto *newArg = replacePhiArgument(i, ty, kind, d);
+
+  // Wire back up the uses.
+  while (!operands.empty()) {
+    operands.pop_back_val()->set(newArg);
+  }
+
+  return newArg;
+}
+
 SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
   return new (getModule()) SILPhiArgument(this, Ty, Kind, D);
 }
 
@@ -224,7 +249,7 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(arg_iterator Iter, SILType Ty,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
   if (Ty.isTrivial(*getParent()))
-    Kind = ValueOwnershipKind::Any;
+    Kind = ValueOwnershipKind::None;
   return new (getModule()) SILPhiArgument(this, Iter, Ty, Kind, D);
 }
 

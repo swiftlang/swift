@@ -78,7 +78,7 @@ public:
                               Serialized, F),
         SubMap(SubMap), isReAbstracted(isReAbstracted), isInlined(isInlined) {}
 
-  std::string mangle(GenericSignature *Sig = nullptr);
+  std::string mangle(GenericSignature Sig = GenericSignature());
 };
 
 class PartialSpecializationMangler : public SpecializationMangler {

@@ -214,8 +214,7 @@ sil_vtable Derived {
 }
 
 // CHECK-LABEL: define{{.*}} @test_super_method_of_generic_base
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s5super4BaseCyAA3StrVGMa"([[INT]] 0)
-// CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK: [[METADATA:%.*]] = call {{.*}}@"$s5super4BaseCyAA3StrVGMD"
 // CHECK: [[BASEMETADATA:%.*]] = bitcast %swift.type* [[METADATA]] to void (%T5super4BaseC*)**
 // CHECK: [[GEP:%.*]] = getelementptr inbounds void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[BASEMETADATA]]
 // CHECK: [[SUPERMT:%.*]] = load void (%T5super4BaseC*)*, void (%T5super4BaseC*)** [[GEP]]

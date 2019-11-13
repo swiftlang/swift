@@ -2,9 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s -check-prefix=TSAN
 
-// TSan is currently only supported on 64 bit mac and simulators.
-// (We do not test the simulators here.)
-// REQUIRES: CPU=x86_64, OS=macosx
+// TSan is only supported on 64 bit.
+// REQUIRES: PTRSIZE=64
 
 // TSAN: define {{.*}} @"$s4main4testyyF"() [[DEFAULT_ATTRS:#[0-9]+]]
 public func test() {

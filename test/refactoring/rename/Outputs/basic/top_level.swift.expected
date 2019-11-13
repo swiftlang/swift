@@ -19,3 +19,11 @@ guard let bottom = Optional.some("top") else {
 }
 print(bottom)
 
+protocol P1 {}
+struct Test {
+  var test: P1 {
+    struct SP1: P1 {}
+    return SP1()
+  }
+}
+

@@ -11,7 +11,7 @@
 
 /// This type is used as a result of the _checkSubscript call to associate the
 /// call with the array access call it guards.
-@_fixed_layout
+@frozen
 public struct _DependenceToken {
   @inlinable
   public init() {

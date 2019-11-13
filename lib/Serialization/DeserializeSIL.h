@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILFormat.h"
+#include "ModuleFile.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -110,6 +110,9 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id,
                            SILType Type);
 
+    SILType getSILType(Type ty, SILValueCategory category,
+                       SILFunction *inContext);
+
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
@@ -141,7 +144,7 @@ public:
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
-    SILVTable *lookupVTable(Identifier Name);
+    SILVTable *lookupVTable(StringRef MangledClassName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);

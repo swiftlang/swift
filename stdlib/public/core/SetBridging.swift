@@ -14,24 +14,21 @@
 
 import SwiftShims
 
-@_silgen_name("swift_stdlib_CFSetGetValues")
-internal
-func _stdlib_CFSetGetValues(
-  _ nss: AnyObject,
-  _: UnsafeMutablePointer<AnyObject>)
-
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
 internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
   let nss = unsafeBitCast(object, to: _NSSet.self)
-  let storage = _BridgingBuffer(nss.count)
-  _stdlib_CFSetGetValues(nss, storage.baseAddress)
+  let count = nss.count
+  let storage = _BridgingBuffer(count)
+  nss.getObjects(storage.baseAddress, count: count)
   return storage
 }
 
 extension _NativeSet { // Bridging
   @usableFromInline
   internal __consuming func bridged() -> AnyObject {
+    _connectOrphanedFoundationSubclassesIfNeeded()
+    
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
@@ -70,19 +67,23 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   internal init(_ base: __owned _NativeSet<Element>) {
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = base
     self.bridgedElements = nil
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSSet<Element>) {
     _internalInvariant(!_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = deferred.native
     self.bridgedElements = deferred.bridgeElements()
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
@@ -290,7 +291,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 // classes, so it was renamed. The old names must not be used in the new
 // runtime.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct __CocoaSet {
   @usableFromInline
   internal let object: AnyObject
@@ -409,7 +410,7 @@ extension __CocoaSet: _SetBuffer {
 }
 
 extension __CocoaSet {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Index {
     internal var _storage: Builtin.BridgeObject

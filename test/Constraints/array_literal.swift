@@ -50,7 +50,7 @@ useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
 
 useIntDict(["Niners" => 31, "Ravens" => 34])
-useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type '(String, Double)' to expected element type '(String, Int)'}}
+useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
 // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 useDoubleDict(["Niners" => 31, "Ravens" => 34.0])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34])
@@ -102,13 +102,12 @@ func longArray() {
   var _=["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
 }
 
-[1,2].map // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+[1,2].map // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 // <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
-  var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
-  // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
+  var x: T = [1] // expected-error {{cannot convert value of type 'Int' to expected element type 'T.ArrayLiteralElement'}}
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T

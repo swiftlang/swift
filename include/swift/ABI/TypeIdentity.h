@@ -215,4 +215,4 @@ public:
 
 } // end namespace swift
 
-#endif  /* SWIFT_ABI_TYPEIDENTITY_H */
+#endif // SWIFT_ABI_TYPEIDENTITY_H

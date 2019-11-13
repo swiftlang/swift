@@ -194,12 +194,12 @@ internal extension Base {
 
 public class PublicSub: Base {
   private required init() {} // expected-error {{'required' initializer must be accessible wherever class 'PublicSub' can be subclassed}} {{3-10=internal}}
-  override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
-  override var bar: Int { // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{12-12=public }}
+  override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{3-3=public }}
+  override var bar: Int { // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{3-3=public }}
     get { return 0 }
     set {}
   }
-  override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{12-12=public }}
+  override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{3-3=public }}
 }
 
 public class PublicSubGood: Base {
@@ -434,6 +434,15 @@ public protocol PublicRefinesPrivate : PrivateProto {} // expected-error {{publi
 public protocol PublicRefinesInternal : InternalProto {} // expected-error {{public protocol cannot refine an internal protocol}}
 public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-error {{public protocol cannot refine a private protocol}}
 public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
+
+private typealias PrivateTypeAlias = PublicProto; // expected-note {{type declared here}}
+private typealias PrivateCompoundTypeAlias = PublicProto & AnyObject // expected-note {{type declared here}}
+
+protocol DefaultRefinesPrivateClass: PrivateClass {} // expected-error {{protocol must be declared private or fileprivate because it refines a private class}}
+public protocol PublicRefinesPrivateClass: PrivateClass {} // expected-error {{public protocol cannot refine a private class}}
+public protocol PublicRefinesPrivateTypeAlias: PrivateTypeAlias {} // expected-error {{public protocol cannot refine a private type alias}}
+public protocol PublicRefinesPrivateCompoundTypeAlias: PrivateCompoundTypeAlias {} // expected-error {{public protocol cannot refine a private type alias}}
+
 
 
 // expected-note@+1 * {{type declared here}}

@@ -154,7 +154,7 @@ func rdar22835966() {
   }
 }
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=INVALID_TYPE_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=RDAR_22834017
 struct Foo {
   let a: Anosuchtype
   let b: Bnosuchtype
@@ -164,8 +164,9 @@ struct Foo {
 func rdar22834017() {
   Foo(#^RDAR_22834017^#)
 }
-// FIXME: We could provide a useful completion here. rdar://problem/22846558
-// INVALID_TYPE_INIT-NOT: Begin completions
+// RDAR_22834017: Begin completions, 1 items
+// RDAR_22834017: Decl[Constructor]/CurrNominal:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#];
+// RDAR_22834017: End completions
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {
@@ -354,8 +355,8 @@ extension Foo {
 }
 #endif
 // RDAR_41234606: Begin completion
-// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Element; name=Element
-// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Iterator; name=Iterator
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Element; name=Element
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Iterator; name=Iterator
 // RDAR_41234606: End completions
 
 // rdar://problem/41071587
@@ -367,3 +368,13 @@ func test_41071587(x: Any) {
   }
 }
 // RDAR_41071587: Begin completions
+
+// rdar://problem/54215016
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_54215016 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_54215016
+struct test_54215016 {
+  func genericError<Value>()
+  func test() {
+    genericError(#^RDAR_54215016^#)
+// RDAR_54215016: Begin completions
+  }
+}

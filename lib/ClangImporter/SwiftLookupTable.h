@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 #define SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "clang/AST/Decl.h"
@@ -196,6 +197,8 @@ public:
       DC = omDecl->getCanonicalDecl();
     } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
       DC = fDecl->getCanonicalDecl();
+    } else if (auto nsDecl = dyn_cast<clang::NamespaceDecl>(dc)) {
+      DC = nsDecl->getCanonicalDecl();
     } else {
       assert(isa<clang::TranslationUnitDecl>(dc) ||
              isa<clang::ObjCContainerDecl>(dc) &&
@@ -307,8 +310,8 @@ public:
   static bool contextRequiresName(ContextKind kind);
 
   /// A single entry referencing either a named declaration or a macro.
-  typedef llvm::PointerUnion3<clang::NamedDecl *, clang::MacroInfo *, 
-                              clang::ModuleMacro *>
+  typedef llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                             clang::ModuleMacro *>
     SingleEntry;
 
   /// A stored version of the context of an entity, which is Clang
@@ -514,10 +517,13 @@ public:
   void deserializeAll();
 
   /// Dump the internal representation of this lookup table.
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
+
+  void dump(llvm::raw_ostream &os) const;
 };
 
 namespace importer {
+class ClangSourceBufferImporter;
 class NameImporter;
 
 /// Add the given named declaration as an entry to the given Swift name
@@ -531,7 +537,8 @@ void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
 
 /// Finalize a lookup table, handling any as-yet-unresolved entries
 /// and emitting diagnostics if necessary.
-void finalizeLookupTable(SwiftLookupTable &table, NameImporter &);
+void finalizeLookupTable(SwiftLookupTable &table, NameImporter &,
+                         ClangSourceBufferImporter &buffersForDiagnostics);
 }
 }
 

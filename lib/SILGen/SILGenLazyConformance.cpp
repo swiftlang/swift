@@ -53,16 +53,11 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   if (emittedWitnessTables.count(normal))
     return;
 
-  // If we delayed emitting this witness table, force it.
-  auto foundDelayed = delayedConformances.find(normal);
-  if (foundDelayed != delayedConformances.end()) {
-    forcedConformances.push_back(*foundDelayed);
-    delayedConformances.erase(foundDelayed);
+  // Check if we already forced this witness table but haven't emitted it yet.
+  if (!forcedConformances.insert(normal).second)
     return;
-  }
 
-  // Otherwise, just remember the fact we used this conformance.
-  usedConformances.insert(normal);
+  pendingConformances.push_back(normal);
 }
 
 void SILGenModule::useConformancesFromSubstitutions(
@@ -83,7 +78,7 @@ void SILGenModule::useConformancesFromType(CanType type) {
     if (isa<ProtocolDecl>(decl))
       return;
 
-    auto *genericSig = decl->getGenericSignature();
+    auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return;
 
@@ -114,17 +109,15 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
       return;
 
     if (objectiveCBridgeable) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, objectiveCBridgeable);
-      if (subConformance)
-        useConformance(*subConformance);
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, objectiveCBridgeable))
+        useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, bridgedStoredNSError);
-      if (subConformance)
-        useConformance(*subConformance);
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, bridgedStoredNSError))
+        useConformance(subConformance);
     }
   });
 }
@@ -329,7 +322,7 @@ void SILGenModule::emitLazyConformancesForFunction(SILFunction *F) {
 }
 
 void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
-  auto *genericSig = NTD->getGenericSignature();
+  auto genericSig = NTD->getGenericSignature();
 
   if (genericSig) {
     for (auto reqt : genericSig->getRequirements()) {

@@ -16,7 +16,7 @@
 #ifndef SWIFT_CLANGIMPORTER_CLANGMODULE_H
 #define SWIFT_CLANGIMPORTER_CLANGMODULE_H
 
-#include "swift/AST/Module.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
 
@@ -34,12 +34,10 @@ class ModuleLoader;
 class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
-  llvm::PointerIntPair<ModuleDecl *, 1, bool> adapterModule;
-  mutable ArrayRef<ModuleDecl::ImportedModule> importedModulesForLookup;
+  llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
+  mutable Optional<ArrayRef<ModuleDecl::ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
-
-  ~ClangModuleUnit() = default;
 
 public:
   /// True if the given Module contains an imported Clang module unit.
@@ -57,7 +55,7 @@ public:
   bool isTopLevel() const;
 
   /// Returns the Swift module that overlays this Clang module.
-  ModuleDecl *getAdapterModule() const override;
+  ModuleDecl *getOverlayModule() const override;
 
   /// Retrieve the "exported" name of the module, which is usually the module
   /// name, but might be the name of the public module through which this
@@ -66,8 +64,7 @@ public:
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
-                           DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *

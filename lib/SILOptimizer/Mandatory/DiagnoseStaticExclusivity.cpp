@@ -75,9 +75,9 @@ private:
   union {
    BeginAccessInst *Inst;
     struct {
-      SILAccessKind ClosureAccessKind;
-      SILLocation ClosureAccessLoc;
-    };
+      SILAccessKind AccessKind;
+      SILLocation AccessLoc;
+    } Closure;
   };
 
   const IndexTrieNode *SubPath;
@@ -89,7 +89,7 @@ public:
   RecordedAccess(SILAccessKind ClosureAccessKind,
                  SILLocation ClosureAccessLoc, const IndexTrieNode *SubPath) :
       RecordKind(RecordedAccessKind::NoescapeClosureCapture),
-      ClosureAccessKind(ClosureAccessKind), ClosureAccessLoc(ClosureAccessLoc),
+      Closure({ClosureAccessKind, ClosureAccessLoc}),
       SubPath(SubPath) { }
 
   RecordedAccessKind getRecordKind() const {
@@ -106,7 +106,7 @@ public:
       case RecordedAccessKind::BeginInstruction:
         return Inst->getAccessKind();
       case RecordedAccessKind::NoescapeClosureCapture:
-        return ClosureAccessKind;
+        return Closure.AccessKind;
     };
     llvm_unreachable("unhandled kind");
   }
@@ -116,7 +116,7 @@ public:
       case RecordedAccessKind::BeginInstruction:
         return Inst->getLoc();
       case RecordedAccessKind::NoescapeClosureCapture:
-        return ClosureAccessLoc;
+        return Closure.AccessLoc;
     };
     llvm_unreachable("unhandled kind");
   }
@@ -499,12 +499,14 @@ static void addSwapAtFixit(InFlightDiagnostic &Diag, CallExpr *&FoundCall,
 /// and tuple elements.
 static std::string getPathDescription(DeclName BaseName, SILType BaseType,
                                       const IndexTrieNode *SubPath,
-                                      SILModule &M) {
+                                      SILModule &M,
+                                      TypeExpansionContext context) {
   std::string sbuf;
   llvm::raw_string_ostream os(sbuf);
 
   os << "'" << BaseName;
-  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M);
+  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M,
+                                                     context);
   os << "'";
 
   return os.str();
@@ -542,12 +544,13 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
-  if (const ValueDecl *VD = Storage.getDecl(F)) {
+  if (const ValueDecl *VD = Storage.getDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
     SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
     SILModule &M = FirstAccess.getInstruction()->getModule();
     std::string PathDescription = getPathDescription(
-        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M);
+        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M,
+        TypeExpansionContext(*FirstAccess.getInstruction()->getFunction()));
 
     // Determine whether we can safely suggest replacing the violation with
     // a call to MutableCollection.swapAt().
@@ -594,7 +597,7 @@ static AccessedStorage findValidAccessedStorage(SILValue Source) {
 /// Used for fix-its to suggest replacing with Collection.swapAt()
 /// on exclusivity violations.
 static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
-  SILFunction *SF = AI->getReferencedFunction();
+  SILFunction *SF = AI->getReferencedFunctionOrNull();
   if (!SF)
     return false;
 
@@ -695,18 +698,10 @@ struct AccessState {
 };
 } // namespace
 
-/// For each argument in the range of the callee arguments being applied at the
-/// given apply site, use the summary analysis to determine whether the
-/// arguments will be accessed in a way that conflicts with any currently in
-/// progress accesses. If so, diagnose.
-static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
-  SILFunction *Callee = Apply.getCalleeFunction();
-  if (!Callee || Callee->empty())
-    return;
-
-  const AccessSummaryAnalysis::FunctionSummary &FS =
-      State.ASA->getOrCreateSummary(Callee);
-
+// Find conflicting access on each argument using AccessSummaryAnalysis.
+static void
+checkCaptureAccess(ApplySite Apply, AccessState &State,
+                   const AccessSummaryAnalysis::FunctionSummary &FS) {
   for (unsigned ArgumentIndex : range(Apply.getNumArguments())) {
 
     unsigned CalleeIndex =
@@ -724,7 +719,7 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     SILValue Argument = Apply.getArgument(ArgumentIndex);
     assert(Argument->getType().isAddress());
 
-    // A valid AccessedStorage should alway sbe found because Unsafe accesses
+    // A valid AccessedStorage should always be found because Unsafe accesses
     // are not tracked by AccessSummaryAnalysis.
     const AccessedStorage &Storage = findValidAccessedStorage(Argument);
     auto AccessIt = State.Accesses->find(Storage);
@@ -736,6 +731,50 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     const AccessInfo &Info = AccessIt->getSecond();
     if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info))
       State.ConflictingAccesses.push_back(*Conflict);
+  }
+}
+
+/// For each argument in the range of the callee arguments being applied at the
+/// given apply site, use the summary analysis to determine whether the
+/// arguments will be accessed in a way that conflicts with any currently in
+/// progress accesses. If so, diagnose.
+static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
+  // A callee may be nullptr or empty for various reasons, such as being
+  // dynamically replaceable.
+  SILFunction *Callee = Apply.getCalleeFunction();
+  if (Callee && !Callee->empty()) {
+    checkCaptureAccess(Apply, State, State.ASA->getOrCreateSummary(Callee));
+    return;
+  }
+  // In the absence of AccessSummaryAnalysis, conservatively assume by-address
+  // captures are fully accessed by the callee.
+  for (Operand &argOper : Apply.getArgumentOperands()) {
+    auto convention = Apply.getArgumentConvention(argOper);
+    if (convention != SILArgumentConvention::Indirect_InoutAliasable)
+      continue;
+
+    // A valid AccessedStorage should always be found because Unsafe accesses
+    // are not tracked by AccessSummaryAnalysis.
+    const AccessedStorage &Storage = findValidAccessedStorage(argOper.get());
+
+    // Are there any accesses in progress at the time of the call?
+    auto AccessIt = State.Accesses->find(Storage);
+    if (AccessIt == State.Accesses->end())
+      continue;
+
+    // The unknown argument access is considered a modify of the root subpath.
+    auto argAccess = RecordedAccess(SILAccessKind::Modify, Apply.getLoc(),
+                                    State.ASA->getSubPathTrieRoot());
+
+    // Construct a conflicting RecordedAccess if one doesn't already exist.
+    const AccessInfo &info = AccessIt->getSecond();
+    auto inProgressAccess =
+        shouldReportAccess(info, SILAccessKind::Modify, argAccess.getSubPath());
+    if (!inProgressAccess)
+      continue;
+
+    State.ConflictingAccesses.emplace_back(Storage, *inProgressAccess,
+                                           argAccess);
   }
 }
 

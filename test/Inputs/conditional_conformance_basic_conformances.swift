@@ -66,8 +66,7 @@ public func single_concrete() {
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances15single_concreteyyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMa"(i64 0)
-// CHECK-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    [[Single_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
 // CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Single_TYPE]], %swift.type* [[Single_TYPE]], i8** [[Single_P1]])
 // CHECK-NEXT:    ret void
@@ -203,8 +202,7 @@ public func double_concrete_concrete() {
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s42conditional_conformance_basic_conformances016double_concrete_F0yyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMa"(i64 0)
-// CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    [[Double_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMD")
 // CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGACyxq_GAA2P1A2A0G0RzAA0H0R_rlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
 // CHECK-NEXT:    ret void

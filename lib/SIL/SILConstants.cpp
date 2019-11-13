@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(512),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(2048),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
@@ -42,7 +42,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "uninit\n";
     return;
   case RK_Unknown: {
-    os << "unknown(" << (int)getUnknownReason() << "): ";
+    os << "unknown(" << (int)getUnknownReason().getKind() << "): ";
     getUnknownNode()->dump();
     return;
   }
@@ -66,7 +66,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "string: \"" << getStringValue() << "\"\n";
     return;
   case RK_Aggregate: {
-    ArrayRef<SymbolicValue> elements = getAggregateValue();
+    ArrayRef<SymbolicValue> elements = getAggregateMembers();
     switch (elements.size()) {
     case 0:
       os << "agg: 0 elements []\n";
@@ -101,11 +101,54 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_DerivedAddress: {
     SmallVector<unsigned, 4> accessPath;
     SymbolicValueMemoryObject *memObject = getAddressValue(accessPath);
-    os << "Address[" << memObject->getType() << "] ";
+    os << "address[" << memObject->getType() << "] ";
     interleave(accessPath.begin(), accessPath.end(),
                [&](unsigned idx) { os << idx; }, [&]() { os << ", "; });
     os << "\n";
     break;
+  }
+  case RK_ArrayStorage: {
+    CanType elementType;
+    ArrayRef<SymbolicValue> elements = getStoredElements(elementType);
+    os << "elements type: " << elementType << " size: " << elements.size();
+    switch (elements.size()) {
+    case 0:
+      os << " contents []\n";
+      return;
+    default:
+      os << " contents [\n";
+      for (auto elt : elements)
+        elt.print(os, indent + 2);
+      os.indent(indent) << "]\n";
+      return;
+    }
+  }
+  case RK_Array: {
+    os << getArrayType() << ": \n";
+    getStorageOfArray().print(os, indent);
+    return;
+  }
+  case RK_Closure: {
+    SymbolicClosure *clo = getClosure();
+    SILFunction *target = clo->getTarget();
+    std::string targetName = target->getName();
+    os << "closure: target: " << targetName;
+    ArrayRef<SymbolicClosureArgument> args = clo->getCaptures();
+    os << " captures [\n";
+    for (SymbolicClosureArgument closureArg : args) {
+      os.indent(indent + 2) << closureArg.first << "\n";
+    }
+    os.indent(indent) << "] values: [\n";
+    for (SymbolicClosureArgument closureArg : args) {
+      Optional<SymbolicValue> value = closureArg.second;
+      if (!value.hasValue()) {
+        os.indent(indent + 2) << "nil\n";
+        continue;
+      }
+      value->print(os, indent + 2);
+    }
+    os.indent(indent) << "]\n";
+    return;
   }
   }
 }
@@ -138,10 +181,17 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_DirectAddress:
   case RK_DerivedAddress:
     return Address;
+  case RK_ArrayStorage:
+    return ArrayStorage;
+  case RK_Array:
+    return Array;
+  case RK_Closure:
+    return Closure;
   }
+  llvm_unreachable("covered switch");
 }
 
-/// Clone this SymbolicValue into the specified ASTContext and return the new
+/// Clone this SymbolicValue into the specified allocator and return the new
 /// version.  This only works for valid constants.
 SymbolicValue
 SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
@@ -161,24 +211,48 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   case RK_String:
     return SymbolicValue::getString(getStringValue(), allocator);
   case RK_Aggregate: {
-    auto elts = getAggregateValue();
+    auto elts = getAggregateMembers();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
     for (auto elt : elts)
       results.push_back(elt.cloneInto(allocator));
-    return getAggregate(results, allocator);
+    return getAggregate(results, getAggregateType(), allocator);
   }
-  case RK_EnumWithPayload:
-    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), allocator);
+  case RK_EnumWithPayload: {
+    return getEnumWithPayload(
+        getEnumValue(), getEnumPayloadValue().cloneInto(allocator), allocator);
+  }
   case RK_DirectAddress:
   case RK_DerivedAddress: {
     SmallVector<unsigned, 4> accessPath;
     auto *memObject = getAddressValue(accessPath);
     auto *newMemObject = SymbolicValueMemoryObject::create(
-        memObject->getType(), memObject->getValue(), allocator);
+        memObject->getType(), memObject->getValue().cloneInto(allocator),
+        allocator);
     return getAddress(newMemObject, accessPath, allocator);
   }
+  case RK_ArrayStorage: {
+    CanType elementType;
+    ArrayRef<SymbolicValue> oldElements = getStoredElements(elementType);
+    SmallVector<SymbolicValue, 4> clonedElements;
+    clonedElements.reserve(oldElements.size());
+    for (auto elem : oldElements)
+      clonedElements.push_back(elem.cloneInto(allocator));
+    return getSymbolicArrayStorage(clonedElements, elementType, allocator);
   }
+  case RK_Array: {
+    SymbolicValue clonedStorage = getStorageOfArray().cloneInto(allocator);
+    return getArray(getArrayType(), clonedStorage, allocator);
+  }
+  case RK_Closure: {
+    SymbolicClosure *clo = getClosure();
+    ArrayRef<SymbolicClosureArgument> closureArgs = clo->getCaptures();
+    return SymbolicValue::makeClosure(clo->getTarget(), closureArgs,
+                                      clo->getCallSubstitutionMap(),
+                                      clo->getClosureType(), allocator);
+  }
+  }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -278,24 +352,71 @@ StringRef SymbolicValue::getStringValue() const {
 // Aggregates
 //===----------------------------------------------------------------------===//
 
-/// This returns a constant Symbolic value with the specified elements in it.
-/// This assumes that the elements lifetime has been managed for this.
-SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> elements,
-                                          SymbolicValueAllocator &allocator) {
-  // Copy the elements into the bump pointer.
-  auto *resultElts = allocator.allocate<SymbolicValue>(elements.size());
-  std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
+namespace swift {
 
+/// Representation of a constant aggregate namely a struct or a tuple.
+struct AggregateSymbolicValue final
+    : private llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue> {
+  friend class llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue>;
+
+  const Type aggregateType;
+
+  const unsigned numElements;
+
+  static AggregateSymbolicValue *create(ArrayRef<SymbolicValue> members,
+                                        Type aggregateType,
+                                        SymbolicValueAllocator &allocator) {
+    auto byteSize =
+        AggregateSymbolicValue::totalSizeToAlloc<SymbolicValue>(members.size());
+    auto rawMem = allocator.allocate(byteSize, alignof(AggregateSymbolicValue));
+
+    //  Placement initialize the object.
+    auto *aggregate =
+        ::new (rawMem) AggregateSymbolicValue(aggregateType, members.size());
+    std::uninitialized_copy(members.begin(), members.end(),
+                            aggregate->getTrailingObjects<SymbolicValue>());
+    return aggregate;
+  }
+
+  /// Return the type of the aggregate.
+  Type getAggregateType() const { return aggregateType; }
+
+  /// Return the symbolic values of members.
+  ArrayRef<SymbolicValue> getMemberValues() const {
+    return {getTrailingObjects<SymbolicValue>(), numElements};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
+    return numElements;
+  }
+
+private:
+  AggregateSymbolicValue() = delete;
+  AggregateSymbolicValue(const AggregateSymbolicValue &) = delete;
+  AggregateSymbolicValue(Type aggregateType, unsigned numElements)
+      : aggregateType(aggregateType), numElements(numElements) {}
+};
+} // namespace swift
+
+SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> members,
+                                          Type aggregateType,
+                                          SymbolicValueAllocator &allocator) {
   SymbolicValue result;
   result.representationKind = RK_Aggregate;
-  result.value.aggregate = resultElts;
-  result.auxInfo.aggregateNumElements = elements.size();
+  result.value.aggregate =
+      AggregateSymbolicValue::create(members, aggregateType, allocator);
   return result;
 }
 
-ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
+ArrayRef<SymbolicValue> SymbolicValue::getAggregateMembers() const {
   assert(getKind() == Aggregate);
-  return ArrayRef<SymbolicValue>(value.aggregate, auxInfo.aggregateNumElements);
+  return value.aggregate->getMemberValues();
+}
+
+Type SymbolicValue::getAggregateType() const {
+  assert(getKind() == Aggregate);
+  return value.aggregate->getAggregateType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -521,6 +642,148 @@ SymbolicValueMemoryObject *SymbolicValue::getAddressValueMemoryObject() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Arrays
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Representation of the internal storage of an array. This is a container for
+/// a sequence of symbolic values corresponding to the elements of an array.
+struct SymbolicArrayStorage final
+    : private llvm::TrailingObjects<SymbolicArrayStorage, SymbolicValue> {
+  friend class llvm::TrailingObjects<SymbolicArrayStorage, SymbolicValue>;
+
+  const CanType elementType;
+
+  const unsigned numElements;
+
+  static SymbolicArrayStorage *create(ArrayRef<SymbolicValue> elements,
+                                      CanType elementType,
+                                      SymbolicValueAllocator &allocator) {
+    auto byteSize =
+        SymbolicArrayStorage::totalSizeToAlloc<SymbolicValue>(elements.size());
+    auto rawMem = allocator.allocate(byteSize, alignof(SymbolicArrayStorage));
+
+    //  Placement initialize the object.
+    auto *storage =
+        ::new (rawMem) SymbolicArrayStorage(elementType, elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            storage->getTrailingObjects<SymbolicValue>());
+    return storage;
+  }
+
+  /// Return the stored elements.
+  ArrayRef<SymbolicValue> getElements() const {
+    return {getTrailingObjects<SymbolicValue>(), numElements};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
+    return numElements;
+  }
+
+private:
+  SymbolicArrayStorage() = delete;
+  SymbolicArrayStorage(const SymbolicArrayStorage &) = delete;
+  SymbolicArrayStorage(CanType elementType, unsigned numElements)
+      : elementType(elementType), numElements(numElements) {}
+};
+} // namespace swift
+// end namespace swift
+
+SymbolicValue
+SymbolicValue::getSymbolicArrayStorage(ArrayRef<SymbolicValue> elements,
+                                       CanType elementType,
+                                       SymbolicValueAllocator &allocator) {
+  // TODO: Could compress the empty array representation if there were a reason
+  // to.
+  auto *arrayStorage =
+      SymbolicArrayStorage::create(elements, elementType, allocator);
+  SymbolicValue result;
+  result.representationKind = RK_ArrayStorage;
+  result.value.arrayStorage = arrayStorage;
+  return result;
+}
+
+ArrayRef<SymbolicValue>
+SymbolicValue::getStoredElements(CanType &elementType) const {
+  assert(getKind() == ArrayStorage);
+  elementType = value.arrayStorage->elementType;
+  return value.arrayStorage->getElements();
+}
+
+SymbolicValue SymbolicValue::getArray(Type arrayType,
+                                      SymbolicValue arrayStorage,
+                                      SymbolicValueAllocator &allocator) {
+  assert(arrayStorage.getKind() == ArrayStorage);
+  SymbolicValue result;
+  result.representationKind = RK_Array;
+  result.value.array =
+      SymbolicValueMemoryObject::create(arrayType, arrayStorage, allocator);
+  return result;
+}
+
+SymbolicValue
+SymbolicValue::getAddressOfArrayElement(SymbolicValueAllocator &allocator,
+                                        unsigned index) const {
+  assert(getKind() == Array);
+  return SymbolicValue::getAddress(value.array, {index}, allocator);
+}
+
+SymbolicValue SymbolicValue::getStorageOfArray() const {
+  assert(getKind() == Array);
+  return value.array->getValue();
+}
+
+Type SymbolicValue::getArrayType() const {
+  assert(getKind() == Array);
+  return value.array->getType();
+}
+
+//===----------------------------------------------------------------------===//
+// Symbolic Closure
+//===----------------------------------------------------------------------===//
+
+SymbolicValue SymbolicValue::makeClosure(SILFunction *target,
+                                         ArrayRef<SymbolicClosureArgument> args,
+                                         SubstitutionMap substMap,
+                                         SILType closureType,
+                                         SymbolicValueAllocator &allocator) {
+  auto clo =
+      SymbolicClosure::create(target, args, substMap, closureType, allocator);
+  SymbolicValue result;
+  result.representationKind = RK_Closure;
+  result.value.closure = clo;
+  return result;
+}
+
+SymbolicClosure *SymbolicClosure::create(SILFunction *target,
+                                         ArrayRef<SymbolicClosureArgument> args,
+                                         SubstitutionMap substMap,
+                                         SILType closureType,
+                                         SymbolicValueAllocator &allocator) {
+  // Determine whether there are captured arguments without a symbolic value.
+  bool hasNonConstantCapture = false;
+  for (SymbolicClosureArgument closureArg : args) {
+    if (!closureArg.second) {
+      hasNonConstantCapture = true;
+      break;
+    }
+  }
+
+  auto byteSizeOfArgs =
+      SymbolicClosure::totalSizeToAlloc<SymbolicClosureArgument>(args.size());
+  auto rawMem = allocator.allocate(byteSizeOfArgs, alignof(SymbolicClosure));
+  //  Placement initialize the object.
+  auto closure = ::new (rawMem) SymbolicClosure(
+      target, args.size(), substMap, closureType, hasNonConstantCapture);
+  std::uninitialized_copy(
+      args.begin(), args.end(),
+      closure->getTrailingObjects<SymbolicClosureArgument>());
+  return closure;
+}
+
+//===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
 
@@ -561,11 +824,32 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   while (1) {
     if (result.getKind() != Aggregate)
       return result;
-    auto elts = result.getAggregateValue();
+    auto elts = result.getAggregateMembers();
     if (elts.size() != 1)
       return result;
     result = elts[0];
   }
+}
+
+bool SymbolicValue::isUnknownDueToUnevaluatedInstructions() {
+  auto unknownKind = getUnknownReason().getKind();
+  return (unknownKind == UnknownReason::ReturnedByUnevaluatedInstruction ||
+          unknownKind == UnknownReason::MutatedByUnevaluatedInstruction);
+}
+
+static void getWitnessMethodName(WitnessMethodInst *witnessMethodInst,
+                                 SmallVectorImpl<char> &methodName) {
+  assert(witnessMethodInst);
+  SILDeclRef witnessMember = witnessMethodInst->getMember();
+  if (witnessMember.hasDecl()) {
+    witnessMember.getDecl()->getFullName().getString(methodName);
+  }
+}
+
+/// A helper function to pretty print function names in diagnostics.
+static std::string demangleSymbolNameForDiagnostics(StringRef name) {
+  return Demangle::demangleSymbolAsString(
+      name, Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
 }
 
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
@@ -579,12 +863,20 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   ASTContext &ctx = unknownNode->getModule()->getASTContext();
 
   // Extract the location of the instruction/construct that triggered the error
-  // during interpretation, if available.
-  Optional<SourceLoc> triggerLoc = None;
-  if (auto badInst = dyn_cast<SILInstruction>(unknownNode)) {
-    triggerLoc = skipInternalLocations(badInst->getDebugLocation())
-                     .getLocation()
-                     .getSourceLoc();
+  // during interpretation, if available. If the instruction is internal to
+  // stdlib and has an invalid location, find the innermost call that has a
+  // valid location.
+  SourceLoc triggerLoc;
+  bool triggerLocSkipsInternalLocs = false;
+  if (auto *badInst = dyn_cast<SILInstruction>(unknownNode)) {
+    SILDebugLocation debugLoc = badInst->getDebugLocation();
+    SourceLoc initialSourceLoc = debugLoc.getLocation().getSourceLoc();
+    if (initialSourceLoc.isValid()) {
+      triggerLoc = initialSourceLoc;
+    } else {
+      triggerLocSkipsInternalLocs = true;
+      triggerLoc = skipInternalLocations(debugLoc).getLocation().getSourceLoc();
+    }
   }
 
   // Determine the top-level expression where the error happens and use it as
@@ -594,7 +886,7 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   // the faulty top-level expression location cannot be found.
   auto diagLoc =
       errorCallStack.empty()
-          ? (triggerLoc ? triggerLoc.getValue() : fallbackLoc.getSourceLoc())
+          ? (triggerLoc.isValid() ? triggerLoc : fallbackLoc.getSourceLoc())
           : errorCallStack.front();
   if (diagLoc.isInvalid()) {
     return;
@@ -603,79 +895,141 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   // Emit a note at the trigger location as well if it is different from the
   // top-level expression.
   bool emitTriggerLocInDiag =
-      triggerLoc ? diagLoc != triggerLoc.getValue() : false;
+      triggerLoc.isValid() ? diagLoc != triggerLoc : false;
 
-  switch (unknownReason) {
+  switch (unknownReason.getKind()) {
   case UnknownReason::Default:
     diagnose(ctx, diagLoc, diag::constexpr_unknown_reason_default);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_unevaluable_operation);
+      diagnose(ctx, triggerLoc, diag::constexpr_unevaluable_operation,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::TooManyInstructions:
     diagnose(ctx, diagLoc, diag::constexpr_too_many_instructions,
              ConstExprLimit);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_limit_exceeding_instruction);
+      diagnose(ctx, triggerLoc, diag::constexpr_limit_exceeding_instruction,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::Loop:
     diagnose(ctx, diagLoc, diag::constexpr_loop_found_note);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_loop_instruction);
+      diagnose(ctx, triggerLoc, diag::constexpr_loop_instruction,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::Overflow:
     diagnose(ctx, diagLoc, diag::constexpr_overflow);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_overflow_operation);
+      diagnose(ctx, triggerLoc, diag::constexpr_overflow_operation,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::Trap:
-    diagnose(ctx, diagLoc, diag::constexpr_trap);
+  case UnknownReason::Trap: {
+    const char *message = unknownReason.getTrapMessage();
+    diagnose(ctx, diagLoc, diag::constexpr_trap, StringRef(message));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_trap_operation);
+      diagnose(ctx, triggerLoc, diag::constexpr_trap_operation,
+               triggerLocSkipsInternalLocs);
     return;
+  }
   case UnknownReason::InvalidOperandValue:
     diagnose(ctx, diagLoc, diag::constexpr_invalid_operand_seen);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_operand_invalid_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_operand_invalid_here,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::NotTopLevelConstant: {
     // For top-level errors, trigger loc is better than diagLoc.
-    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    auto loc = emitTriggerLocInDiag ? triggerLoc : diagLoc;
     diagnose(ctx, loc, diag::constexpr_value_unknown_at_top_level);
     return;
   }
   case UnknownReason::MutipleTopLevelWriters: {
     // For top-level errors, trigger loc is better than diagLoc.
-    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    auto loc = emitTriggerLocInDiag ? triggerLoc : diagLoc;
     diagnose(ctx, loc, diag::constexpr_multiple_writers_found_at_top_level);
     return;
   }
-  case UnknownReason::UnsupportedInstruction:
-    diagnose(ctx, diagLoc, diag::constexpr_unsupported_instruction_found);
+  case UnknownReason::UnsupportedInstruction: {
+    // Get the name of the unsupported instruction.
+    auto *unsupportedInst = dyn_cast<SILInstruction>(unknownNode);
+    assert(unsupportedInst);
+    SmallString<4> instName(getSILInstructionName(unsupportedInst->getKind()));
+    if (auto *builtinInst = dyn_cast<BuiltinInst>(unsupportedInst)) {
+      instName.append(" ");
+      instName.append(builtinInst->getName().str());
+    }
+
+    diagnose(ctx, diagLoc, diag::constexpr_unsupported_instruction_found,
+             instName);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc,
-               diag::constexpr_unsupported_instruction_found_here);
+      diagnose(ctx, triggerLoc,
+               diag::constexpr_unsupported_instruction_found_here,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::CalleeImplementationUnknown:
-    diagnose(ctx, diagLoc, diag::constexpr_unknown_function_called);
+  }
+  case UnknownReason::CalleeImplementationUnknown: {
+    SILFunction *callee = unknownReason.getCalleeWithoutImplmentation();
+    std::string demangledCalleeName =
+        demangleSymbolNameForDiagnostics(callee->getName());
+    diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
+             StringRef(demangledCalleeName));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_unknown_function_called_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
+               triggerLocSkipsInternalLocs);
     return;
+  }
+  case UnknownReason::CallArgumentUnknown: {
+    unsigned argNumber = unknownReason.getArgumentIndex() + 1;
+    ApplyInst *call = dyn_cast<ApplyInst>(unknownNode);
+    assert(call);
+    SILFunction *callee = call->getCalleeFunction();
+    assert(callee);
+    std::string demangledCalleeName =
+        demangleSymbolNameForDiagnostics(callee->getName());
+    diagnose(ctx, diagLoc, diag::constexpr_found_call_with_unknown_arg,
+             demangledCalleeName,
+             (Twine(argNumber) + llvm::getOrdinalSuffix(argNumber)).str());
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, triggerLoc, diag::constexpr_call_with_unknown_arg,
+               triggerLocSkipsInternalLocs);
+    return;
+  }
   case UnknownReason::UntrackedSILValue:
     diagnose(ctx, diagLoc, diag::constexpr_untracked_sil_value_use_found);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_untracked_sil_value_used_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_untracked_sil_value_used_here,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::UnknownWitnessMethodConformance:
-    diagnose(ctx, diagLoc,
-             diag::constexpr_witness_call_with_no_conformance_found);
+  case UnknownReason::UnknownWitnessMethodConformance: {
+    SmallString<8> witnessMethodName;
+    getWitnessMethodName(dyn_cast<WitnessMethodInst>(unknownNode),
+                         witnessMethodName);
+    diagnose(ctx, diagLoc, diag::constexpr_unresolvable_witness_call,
+             witnessMethodName);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+      diagnose(ctx, triggerLoc,
+               diag::constexpr_witness_call_with_no_conformance,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::UnresolvableWitnessMethod:
-    diagnose(ctx, diagLoc, diag::constexpr_witness_call_with_no_target_found);
+  }
+  case UnknownReason::NoWitnesTableEntry: {
+    SmallString<8> witnessMethodName;
+    getWitnessMethodName(dyn_cast<WitnessMethodInst>(unknownNode),
+                         witnessMethodName);
+
+    diagnose(ctx, diagLoc, diag::constexpr_unresolvable_witness_call,
+             StringRef(witnessMethodName));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_no_witness_table_entry,
+               triggerLocSkipsInternalLocs);
     return;
+  }
+  case UnknownReason::ReturnedByUnevaluatedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_returned_by_unevaluated_instruction);
+    break;
+  case UnknownReason::MutatedByUnevaluatedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_mutated_by_unevaluated_instruction);
+    break;
   }
   // TODO: print the call-stack in a controlled way if needed.
 }
@@ -695,22 +1049,29 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
   if (aggregate.getKind() == SymbolicValue::UninitMemory)
     return SymbolicValue::getUninitMemory();
 
-  assert(aggregate.getKind() == SymbolicValue::Aggregate &&
+  assert((aggregate.getKind() == SymbolicValue::Aggregate ||
+          aggregate.getKind() == SymbolicValue::ArrayStorage) &&
          "the accessPath is invalid for this type");
 
   unsigned elementNo = accessPath.front();
 
-  SymbolicValue elt = aggregate.getAggregateValue()[elementNo];
+  SymbolicValue elt;
   Type eltType;
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
-  } else if (auto tuple = type->getAs<TupleType>()) {
-    assert(elementNo < tuple->getNumElements() && "invalid index");
-    eltType = tuple->getElement(elementNo).getType();
+
+  if (aggregate.getKind() == SymbolicValue::ArrayStorage) {
+    CanType arrayEltTy;
+    elt = aggregate.getStoredElements(arrayEltTy)[elementNo];
+    eltType = arrayEltTy;
   } else {
-    llvm_unreachable("the accessPath is invalid for this type");
+    elt = aggregate.getAggregateMembers()[elementNo];
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      eltType = decl->getStoredProperties()[elementNo]->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
   }
 
   return getIndexedElement(elt, accessPath.drop_front(), eltType);
@@ -747,8 +1108,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
     unsigned numMembers;
     // We need to have either a struct or a tuple type.
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      numMembers = std::distance(decl->getStoredProperties().begin(),
-                                 decl->getStoredProperties().end());
+      numMembers = decl->getStoredProperties().size();
     } else if (auto tuple = type->getAs<TupleType>()) {
       numMembers = tuple->getNumElements();
     } else {
@@ -757,25 +1117,32 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
     SmallVector<SymbolicValue, 4> newElts(numMembers,
                                           SymbolicValue::getUninitMemory());
-    aggregate = SymbolicValue::getAggregate(newElts, allocator);
+    aggregate = SymbolicValue::getAggregate(newElts, type, allocator);
   }
 
-  assert(aggregate.getKind() == SymbolicValue::Aggregate &&
+  assert((aggregate.getKind() == SymbolicValue::Aggregate ||
+          aggregate.getKind() == SymbolicValue::ArrayStorage) &&
          "the accessPath is invalid for this type");
 
   unsigned elementNo = accessPath.front();
 
-  ArrayRef<SymbolicValue> oldElts = aggregate.getAggregateValue();
+  ArrayRef<SymbolicValue> oldElts;
   Type eltType;
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
-  } else if (auto tuple = type->getAs<TupleType>()) {
-    assert(elementNo < tuple->getNumElements() && "invalid index");
-    eltType = tuple->getElement(elementNo).getType();
+
+  if (aggregate.getKind() == SymbolicValue::ArrayStorage) {
+    CanType arrayEltTy;
+    oldElts = aggregate.getStoredElements(arrayEltTy);
+    eltType = arrayEltTy;
   } else {
-    llvm_unreachable("the accessPath is invalid for this type");
+    oldElts = aggregate.getAggregateMembers();
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      eltType = decl->getStoredProperties()[elementNo]->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
   }
 
   // Update the indexed element of the aggregate.
@@ -784,7 +1151,15 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
       setIndexedElement(newElts[elementNo], accessPath.drop_front(), newElement,
                         eltType, allocator);
 
-  aggregate = SymbolicValue::getAggregate(newElts, allocator);
+  if (aggregate.getKind() == SymbolicValue::Aggregate) {
+    Type aggregateType = aggregate.getAggregateType();
+    assert(aggregateType->isEqual(type) &&
+           "input type does not match the type of the aggregate");
+    return SymbolicValue::getAggregate(newElts, aggregateType, allocator);
+  }
+
+  return aggregate = SymbolicValue::getSymbolicArrayStorage(
+             newElts, eltType->getCanonicalType(), allocator);
   return aggregate;
 }
 

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// FIR filtering with decimation and antialiasing; single-precision.
@@ -18,8 +19,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Single-precision output vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
                                         filter: T) -> [Float]
@@ -51,8 +51,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Single-precision output vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
                                            filter: T,
@@ -91,8 +90,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Double-precision output vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
                                         filter: T) -> [Double]
@@ -123,8 +121,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Double-precision output vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
                                            filter: T,

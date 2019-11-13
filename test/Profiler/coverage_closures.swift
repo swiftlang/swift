@@ -34,9 +34,10 @@ func foo() {
   f1 { left, right in left == 0 || right == 1 }
 }
 
-// SR-2615: Implicit constructor decl has no body, and shouldn't be mapped
+// SR-2615: Display coverage for implicit member initializers without crashing
 struct C1 {
-// CHECK-NOT: sil_coverage_map{{.*}}errors
+  // CHECK-LABEL: sil_coverage_map{{.*}}// variable initialization expression of coverage_closures.C1
+  // CHECK-NEXT: [[@LINE+1]]:24 -> [[@LINE+1]]:34 : 0
   private var errors = [String]()
 }
 

@@ -6,7 +6,7 @@ option(SOURCEKITD_BUILD_STATIC_INPROC
 set(sourcekitdInProc_args
   sourcekitdInProc.cpp
   LINK_LIBS SourceKitSwiftLang sourcekitdAPI
-  LLVM_COMPONENT_DEPENDS support coverage
+  LLVM_LINK_COMPONENTS support coverage
 )
 
 if (SOURCEKIT_INSTALLING_INPROC)

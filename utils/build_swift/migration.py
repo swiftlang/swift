@@ -13,8 +13,17 @@ Temporary module with functionaly used to migrate away from build-script-impl.
 
 from __future__ import absolute_import, unicode_literals
 
+import itertools
+
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
+
+
+try:
+    # Python 2
+    from itertools import imap
+except ImportError:
+    imap = map
 
 
 __all__ = [
@@ -41,44 +50,41 @@ class UnknownSDKError(Exception):
     triples.
     """
 
-    pass
+    def __init__(self, sdk):
+        self.sdk = sdk
 
-
-def _swift_sdks_to_stdlib_targets(swift_sdks):
-    stdlib_targets = []
-    for sdk in swift_sdks:
-        sdk_targets = _SDK_TARGETS.get(sdk, None)
-        if sdk_targets is None:
-            raise UnknownSDKError(sdk)
-        stdlib_targets += sdk_targets
-
-    return stdlib_targets
+        super(UnknownSDKError, self).__init__(
+            'Unknown SDK: {}'.format(self.sdk))
 
 
 def migrate_swift_sdks(args):
     """Migrate usages of the now deprecated `--swift-sdks` option to the new
     `--stdlib-deployment-targets` option, converting Swift SDKs to the
-    corresponding targets. Since argument parsing is a last-wins scenario, only
-    the last `--swift-sdks` option is migrated, all others are removed.
+    corresponding targets.
 
     This function is a stop-gap to replacing all instances of `--swift-sdks`.
     """
 
-    swift_sdks_args = [arg for arg in args if arg.startswith('--swift-sdks')]
+    def _flatten(iterable):
+        return itertools.chain.from_iterable(iterable)
 
-    if len(swift_sdks_args) < 1:
-        return args
+    def _swift_sdk_to_stdlib_targets(sdk):
+        targets = _SDK_TARGETS.get(sdk, None)
+        if targets is None:
+            raise UnknownSDKError(sdk)
 
-    # Only get the last --swift-sdks arg since last-wins
-    swift_sdks_arg = swift_sdks_args[-1]
+        return targets
 
-    sdk_list = swift_sdks_arg.split('=')[1].split(';')
-    stdlib_targets = _swift_sdks_to_stdlib_targets(sdk_list)
+    def _migrate_swift_sdks_arg(arg):
+        if not arg.startswith('--swift-sdks'):
+            return arg
 
-    target_names = ' '.join([target.name for target in stdlib_targets])
-    stdlib_targets_arg = '--stdlib-deployment-targets=' + target_names
+        sdks = arg.split('=')[1]
+        sdk_list = [] if sdks == '' else sdks.split(';')
 
-    args = [arg for arg in args if not arg.startswith('--swift-sdks')]
-    args.append(stdlib_targets_arg)
+        targets = _flatten(imap(_swift_sdk_to_stdlib_targets, sdk_list))
+        target_names = [target.name for target in targets]
 
-    return args
+        return '--stdlib-deployment-targets={}'.format(' '.join(target_names))
+
+    return list(imap(_migrate_swift_sdks_arg, args))

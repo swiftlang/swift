@@ -24,6 +24,7 @@
 
 from __future__ import print_function
 
+import copy
 import multiprocessing
 import os
 import platform
@@ -32,6 +33,7 @@ import sys
 from build_swift import argparse, defaults
 from swift_build_support.swift_build_support import (
     shell,
+    xcrun,
 )
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
     HOME,
@@ -40,10 +42,10 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
 )
 from swift_build_support.swift_build_support.toolchain import host_toolchain
 
-isMac = platform.system() == 'Darwin'
+isDarwin = platform.system() == 'Darwin'
 
 class Builder(object):
-    def __init__(self, toolchain, args):
+    def __init__(self, toolchain, args, host, arch, profile_data=None, native_build_dir=None):
         self.toolchain = toolchain
         self.ninja_path = args.ninja_path
         self.build_release = args.release
@@ -51,14 +53,17 @@ class Builder(object):
         self.lto_type = args.lto_type
         self.pgo_type = args.pgo_type
         self.profile_input = args.profile_input
+        self.profile_data = profile_data
         self.dry_run = args.dry_run
         self.jobs = args.build_jobs
         self.verbose = args.verbose
         self.build_dir = args.build_dir
-        self.install_symroot = args.install_symroot
         self.install_destdir = args.install_destdir
         self.install_prefix = args.install_prefix
         self.version = args.version
+        self.host = host
+        self.arch = arch
+        self.native_build_dir = native_build_dir
 
     def call(self, command, env=None, without_sleeping=False):
         if without_sleeping:
@@ -69,11 +74,96 @@ class Builder(object):
     def configure(self, enable_debuginfo, instrumentation=None, profile_data=None):
         cmake_args = [self.toolchain.cmake, '-G', 'Ninja']
         cmake_args += ['-DCMAKE_MAKE_PROGRAM='+self.ninja_path]
-        if isMac:
-            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET=10.12', '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX=10.12']
+
+        isEmbeddedHost = isDarwin and self.host != 'macosx'
+        host_triple = None
+        host_sdk = None
+        llvm_c_flags = "-arch "+self.arch
+
+        if self.host == 'macosx':
+            deployment_version = '10.12'
+            host_triple = '%s-apple-macosx%s' % (self.arch, deployment_version)
+            host_sdk = 'OSX'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX='+deployment_version]
+
+        elif self.host == 'linux':
+            host_triple = '%s-unknown-linux' % (self.arch)
+            host_sdk = 'LINUX'
+
+        elif self.host == 'iphonesimulator':
+            deployment_version = '10.0'
+            host_triple = '%s-apple-ios%s-simulator' % (self.arch, deployment_version)
+            host_sdk = 'IOS_SIMULATOR'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS='+deployment_version]
+            llvm_c_flags += ' -mios-simulator-version-min='+deployment_version
+
+        elif self.host == 'iphoneos':
+            deployment_version = '10.0'
+            host_triple = '%s-apple-ios%s' % (self.arch, deployment_version)
+            host_sdk = 'IOS'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS='+deployment_version]
+            llvm_c_flags += ' -miphoneos-version-min=='+deployment_version
+
+        elif self.host == 'appletvsimulator':
+            deployment_version = '10.0'
+            host_triple = '%s-apple-tvos%s-simulator' % (self.arch, deployment_version)
+            host_sdk = 'TVOS_SIMULATOR'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS='+deployment_version]
+            llvm_c_flags += ' -mtvos-simulator-version-min='+deployment_version
+
+        elif self.host == 'appletvos':
+            deployment_version = '10.0'
+            host_triple = '%s-apple-tvos%s' % (self.arch, deployment_version)
+            host_sdk = 'TVOS'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS='+deployment_version]
+            llvm_c_flags += ' -mtvos-version-min='+deployment_version
+
+        elif self.host == 'watchsimulator':
+            deployment_version = '3.0'
+            host_triple = '%s-apple-watchos%s-simulator' % (self.arch, deployment_version)
+            host_sdk = 'WATCHOS_SIMULATOR'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS='+deployment_version]
+            llvm_c_flags += ' -mwatchos-simulator-version-min='+deployment_version
+
+        elif self.host == 'watchos':
+            deployment_version = '3.0'
+            host_triple = '%s-apple-watchos%s' % (self.arch, deployment_version)
+            host_sdk = 'WATCHOS'
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET='+deployment_version, '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS='+deployment_version]
+            llvm_c_flags += ' -mwatchos-version-min='+deployment_version
+
+        assert host_triple
+        assert host_sdk
+        cmake_args += [
+            '-DLLVM_HOST_TRIPLE:STRING='+host_triple,
+            '-DLLVM_TARGET_ARCH='+self.arch,
+            '-DSWIFT_HOST_VARIANT='+self.host,
+            '-DSWIFT_HOST_VARIANT_SDK='+host_sdk,
+            '-DSWIFT_HOST_VARIANT_ARCH='+self.arch,
+            '-DCMAKE_C_FLAGS='+llvm_c_flags,
+            '-DCMAKE_CXX_FLAGS='+llvm_c_flags,
+        ]
+        if isEmbeddedHost:
+            cmake_args += [
+                '-DCMAKE_OSX_SYSROOT:PATH='+xcrun.sdk_path(self.host),
+                # For embedded hosts CMake runs the checks and triggers crashes because the test binary was built for embedded host.
+                '-DHAVE_POSIX_REGEX:BOOL=TRUE',
+                '-DHAVE_STEADY_CLOCK:BOOL=TRUE',
+            ]
+
+        if isDarwin:
+            if self.native_build_dir is not None:
+                cmake_args += [
+                    '-DLLVM_TABLEGEN='+os.path.join(self.native_build_dir, 'bin', 'llvm-tblgen'),
+                    '-DCLANG_TABLEGEN='+os.path.join(self.native_build_dir, 'bin', 'clang-tblgen'),
+                    '-DLLVM_NATIVE_BUILD='+self.native_build_dir,
+                    '-DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                    '-DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                    '-DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                ]
         else:
             dispatch_source_path = os.path.join(SWIFT_SOURCE_ROOT, 'swift-corelibs-libdispatch')
-            cmake_args += ['-DSWIFT_HOST_VARIANT=linux', '-DSWIFT_HOST_VARIANT_SDK=LINUX', '-DSWIFT_HOST_VARIANT_ARCH=x86_64',
+            cmake_args += [
                 '-DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH='+dispatch_source_path,
                 '-DLLVM_ENABLE_LLD=ON']
         cmake_args += ['-DLLVM_TARGETS_TO_BUILD=X86']
@@ -102,6 +192,7 @@ class Builder(object):
         cmake_args += ['-DSWIFT_BUILD_REMOTE_MIRROR=FALSE', '-DSWIFT_BUILD_DYNAMIC_STDLIB=FALSE',
             '-DSWIFT_BUILD_STATIC_STDLIB=FALSE', '-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE',
             '-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE']
+        cmake_args += ['-DLLVM_ENABLE_LIBXML2=FALSE']
         # We are not using cmark but initialize the CMARK variables to something so that configure can succeed.
         cmake_args += ['-DCMARK_MAIN_INCLUDE_DIR='+os.path.join(SWIFT_SOURCE_ROOT, 'cmark'), '-DCMARK_BUILD_INCLUDE_DIR='+os.path.join(self.build_dir, 'cmark')]
         cmake_args += ['-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE', '-DSWIFT_INCLUDE_TESTS=FALSE']
@@ -123,19 +214,7 @@ class Builder(object):
             env = {'DESTDIR': self.install_destdir}
         self.build_target(self.build_dir, 'tools/swift/tools/libSwiftSyntaxParser/install', env=env)
 
-    def extract_symbols(self):
-        if not isMac:
-            return
-        extract_script = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "darwin-extract-symbols")
-        print("--- Extracting symbols ---", file=sys.stderr)
-        env = {'INSTALL_DIR': self.install_destdir,
-               'INSTALL_PREFIX': self.install_prefix,
-               'INSTALL_SYMROOT': self.install_symroot,
-               'BUILD_JOBS': str(self.jobs)}
-        self.call([extract_script], env=env)
-
-    def get_profile_data(self):
-        profile_dir = os.path.join(self.build_dir, 'profiling')
+    def get_profile_data(self, profile_dir):
         shell.makedirs(profile_dir, dry_run=self.dry_run)
         instrumentation = 'IR' if self.pgo_type == 'ir' else 'Frontend'
         with shell.pushd(profile_dir, dry_run=self.dry_run):
@@ -145,24 +224,29 @@ class Builder(object):
             shell.rmtree("profiles", dry_run=self.dry_run)
             self.call([os.path.join("bin", "swift-syntax-parser-test"), self.profile_input, '-time'])
             self.call([self.toolchain.llvm_profdata, "merge", "-output=profdata.prof", "profiles"])
-        return os.path.join(profile_dir, "profdata.prof")
 
     def run(self):
         shell.makedirs(self.build_dir, dry_run=self.dry_run)
 
-        profile_data = None
-        if self.pgo_type:
-            profile_data = self.get_profile_data()
-
         with shell.pushd(self.build_dir, dry_run=self.dry_run):
-            self.configure(enable_debuginfo=True, profile_data=profile_data)
+            self.configure(enable_debuginfo=True, profile_data=self.profile_data)
 
         self.build_target(self.build_dir, 'swift-syntax-parser-test')
 
         if self.install_destdir:
             self.install()
-        if self.install_symroot:
-            self.extract_symbols()
+
+
+def extract_symbols(install_destdir, install_prefix, install_symroot, jobs):
+    if not isDarwin:
+        return
+    extract_script = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "darwin-extract-symbols")
+    print("--- Extracting symbols ---", file=sys.stderr)
+    env = {'INSTALL_DIR': install_destdir,
+           'INSTALL_PREFIX': install_prefix,
+           'INSTALL_SYMROOT': install_symroot,
+           'BUILD_JOBS': str(jobs)}
+    shell.call([extract_script], env=env)
 
 
 def main():
@@ -177,11 +261,13 @@ def main():
     store_path = optbuilder.actions.store_path
 
     toolchain = host_toolchain(xcrun_toolchain='default')
+    default_host = 'macosx' if isDarwin else 'linux'
+    default_architectures = platform.machine()
 
     default_profile_input = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift")
     default_jobs = multiprocessing.cpu_count()
     default_build_dir = os.path.join(SWIFT_BUILD_ROOT, 'parser-lib')
-    default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isMac else UNIX_INSTALL_PREFIX
+    default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isDarwin else UNIX_INSTALL_PREFIX
     default_ninja = toolchain.ninja
 
     option('--release', store_true,
@@ -215,10 +301,17 @@ def main():
     option('--build-dir', store_path,
            default=default_build_dir,
            help='the path where the build products will be placed. (default = %s)' % default_build_dir)
+    option('--host', store,
+           choices=['macosx', 'linux', 'iphonesimulator', 'iphoneos', 'appletvsimulator', 'appletvos', 'watchsimulator', 'watchos'],
+           default=default_host,
+           help='host platform to build for (default = %s)' % default_host)
+    option('--architectures', store,
+           default=default_architectures,
+           help='space-separated list of architectures to build for. (default = %s)' % default_architectures)
     option('--install-symroot', store_path,
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
-           help='the path to use as the filesystem root for the installation')
+           help='the path to use as the filesystem root for the installation (default = \'$(build_dir)/install\')')
     option('--install-prefix', store,
            default = default_install_prefix,
            help='the install prefix to use (default = %s)' % default_install_prefix)
@@ -231,7 +324,85 @@ def main():
     parser = optbuilder.build()
     args = parser.parse_args()
 
-    builder = Builder(toolchain, args)
+    if not args.install_destdir:
+        args.install_destdir = os.path.join(args.build_dir, 'install')
+
+    architectures = args.architectures.split(" ")
+    architectures = [arch for arch in architectures if arch != ""]
+    if platform.machine() in architectures:
+        # Make sure the machine architecture is at the front.
+        architectures.remove(platform.machine())
+        architectures = [platform.machine()] + architectures
+
+    if isDarwin:
+        objroot = args.build_dir
+        dstroot = args.install_destdir
+        symroot = args.install_symroot
+        prefix = args.install_prefix
+
+        native_build_dir = None
+        profile_data = None
+        dst_dirs = []
+
+        if args.host == 'macosx' and architectures[0] == platform.machine():
+            # Build for the native machine.
+            arch = architectures.pop(0)
+            tmpargs = copy.copy(args)
+            tmpargs.build_dir = os.path.join(objroot, arch, "obj")
+            tmpargs.install_destdir = os.path.join(objroot, arch, "dst")
+            tmpargs.install_prefix = "/"
+
+            native_build_dir = tmpargs.build_dir
+            dst_dirs.append(tmpargs.install_destdir)
+
+            if tmpargs.pgo_type:
+                profile_dir = os.path.join(objroot, platform.machine()+'-profiling')
+                builder = Builder(toolchain, tmpargs, tmpargs.host, arch)
+                builder.get_profile_data(profile_dir)
+                profile_data = os.path.join(profile_dir, "profdata.prof")
+
+            builder = Builder(toolchain, tmpargs, tmpargs.host, arch, profile_data=profile_data)
+            builder.run()
+
+        else:
+            tmpargs = copy.copy(args)
+            if tmpargs.pgo_type:
+                # Build for the machine and get profile data.
+                native_build_dir = os.path.join(objroot, platform.machine()+'-profiling')
+                builder = Builder(toolchain, tmpargs, 'macosx', platform.machine())
+                builder.get_profile_data(native_build_dir)
+                profile_data = os.path.join(native_build_dir, "profdata.prof")
+            else:
+                # Build the tablegen binaries so we can use them for the cross-compile build.
+                native_build_dir = os.path.join(objroot, platform.machine()+'-tblgen')
+                tmpargs.lto_type = None
+                builder = Builder(toolchain, tmpargs, 'macosx', platform.machine())
+                shell.makedirs(native_build_dir, dry_run=tmpargs.dry_run)
+                with shell.pushd(native_build_dir, dry_run=tmpargs.dry_run):
+                    builder.configure(enable_debuginfo=False)
+                    builder.build_target(native_build_dir, 'llvm-tblgen')
+                    builder.build_target(native_build_dir, 'clang-tblgen')
+
+        for arch in architectures:
+            args.build_dir = os.path.join(objroot, arch, "obj")
+            args.install_destdir = os.path.join(objroot, arch, "dst")
+            args.install_prefix = "/"
+
+            dst_dirs.append(args.install_destdir)
+
+            builder = Builder(toolchain, args, args.host, arch, profile_data=profile_data, native_build_dir=native_build_dir)
+            builder.run()
+
+        lipo = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "recursive-lipo")
+        shell.call([lipo, "-v", "--destination", os.path.join(dstroot, "./"+prefix)] + dst_dirs)
+
+        if args.install_symroot:
+            extract_symbols(dstroot, prefix, symroot, args.build_jobs)
+
+        return 0
+
+    assert args.architectures == platform.machine(), "building for non-machine architecture is not supported for non-darwin host"
+    builder = Builder(toolchain, args, args.host, args.architectures)
     builder.run()
     return 0
 

@@ -27,7 +27,7 @@ public struct NonFixedStruct {
 // CHECK: function_ref @$s22fixed_layout_attribute6globalSivau
 // CHECK: return
 
-@_fixed_layout
+@frozen
 public struct FixedStruct {
   public var storedProperty = global
 }
@@ -52,7 +52,7 @@ struct AnotherInternalStruct {
 
 // Static properties in fixed-layout type is still resilient
 
-@_fixed_layout
+@frozen
 public struct HasStaticProperty {
   public static var staticProperty: Int = 0
 }

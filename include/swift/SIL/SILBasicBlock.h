@@ -19,7 +19,6 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -215,7 +214,8 @@ public:
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr);
+                                              const ValueDecl *D = nullptr,
+                                              bool disableEntryBlockVerification = false);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,
@@ -232,11 +232,20 @@ public:
                                                const ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
-  /// ValueDecl
-  /// \p D.
-  SILPhiArgument *replacePhiArgument(unsigned i, SILType Ty,
-                                     ValueOwnershipKind Kind,
-                                     const ValueDecl *D = nullptr);
+  /// ValueDecl \p D.
+  ///
+  /// NOTE: This assumes that the current argument in position \p i has had its
+  /// uses eliminated. To replace/replace all uses with, use
+  /// replacePhiArgumentAndRAUW.
+  SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
+                                     ValueOwnershipKind kind,
+                                     const ValueDecl *decl = nullptr);
+
+  /// Replace phi argument \p i and RAUW all uses.
+  SILPhiArgument *
+  replacePhiArgumentAndReplaceAllUses(unsigned i, SILType type,
+                                      ValueOwnershipKind kind,
+                                      const ValueDecl *decl = nullptr);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.

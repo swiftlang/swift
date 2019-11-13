@@ -271,7 +271,6 @@ const
 
 /// True if two context descriptors in the currently running program describe
 /// the same context.
-SWIFT_RUNTIME_EXPORT
 bool equalContexts(const ContextDescriptor *a, const ContextDescriptor *b);
 
 /// Compute the bounds of class metadata with a resilient superclass.

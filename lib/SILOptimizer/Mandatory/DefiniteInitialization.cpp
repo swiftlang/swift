@@ -22,8 +22,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -457,7 +457,7 @@ namespace {
 
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(const DIMemoryUse &Use);
-    void handleLoadForTypeOfSelfUse(const DIMemoryUse &Use);
+    void handleLoadForTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -803,8 +803,15 @@ void LifetimeChecker::doIt() {
   SILValue ControlVariable;
   if (HasConditionalInitAssign ||
       HasConditionalDestroy ||
-      HasConditionalSelfInitialized)
+      HasConditionalSelfInitialized) {
     ControlVariable = handleConditionalInitAssign();
+    SILValue memAddr = TheMemory.MemoryInst->getOperand();
+    if (auto *ASI = dyn_cast<AllocStackInst>(memAddr)) {
+      ASI->setDynamicLifetime();
+    } else if (auto *ABI = dyn_cast<AllocBoxInst>(memAddr)) {
+      ABI->setDynamicLifetime();
+    }
+  }
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);
 
@@ -822,7 +829,7 @@ void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
 }
 
-void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
+void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
   bool IsSuperInitComplete, FailedSelfUse;
   // If the value is not definitively initialized, replace the
   // value_metatype instruction with the metatype argument that was passed into
@@ -861,8 +868,18 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
           valueMetatype->getLoc(), metatypeArgument,
           valueMetatype->getType());
     }
-    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
-                                     [](SILInstruction*) { });
+    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+
+    // Dead loads for type-of-self must be removed.
+    // Otherwise it's a violation of memory lifetime.
+    if (isa<LoadBorrowInst>(load)) {
+      assert(load->hasOneUse() && isa<EndBorrowInst>(load->getSingleUse()->getUser()));
+      load->getSingleUse()->getUser()->eraseFromParent();
+    }
+    assert(load->use_empty());
+    load->eraseFromParent();
+    // Clear the Inst pointer just to be sure to avoid use-after-free.
+    Use.Inst = nullptr;
   }
 }
 
@@ -979,7 +996,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       addr = copyAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
-    else if (auto *assign = dyn_cast<AssignByDelegateInst>(inst))
+    else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
       addr = assign->getDest();
     else
       return false;
@@ -1129,7 +1146,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
       
       // If this is a direct/devirt method application, check the location info.
-      if (auto *Fn = Apply.getReferencedFunction()) {
+      if (auto *Fn = Apply.getReferencedFunctionOrNull()) {
         if (Fn->hasLocation()) {
           auto SILLoc = Fn->getLocation();
           FD = SILLoc.getAsASTNode<FuncDecl>();
@@ -1407,7 +1424,7 @@ findMethodForStoreInitializationOfTemporary(const DIMemoryObjectInfo &TheMemory,
 
   // Otherwise, try to get the func decl from the referenced function if we can
   // find one.
-  auto *Fn = TheApply->getReferencedFunction();
+  auto *Fn = TheApply->getReferencedFunctionOrNull();
   if (!Fn->hasLocation())
     return nullptr;
 
@@ -1545,7 +1562,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
       Method = dyn_cast<FuncDecl>(OMI->getMember().getDecl());
 
     // If this is a direct/devirt method application, check the location info.
-    if (auto *Fn = cast<ApplyInst>(Inst)->getReferencedFunction()) {
+    if (auto *Fn = cast<ApplyInst>(Inst)->getReferencedFunctionOrNull()) {
       if (Fn->hasLocation())
         Method = Fn->getLocation().getAsASTNode<FuncDecl>();
     }
@@ -1825,7 +1842,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
     assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst) || isa<AssignByDelegateInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -1901,7 +1918,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
 
     return;
   }
-  if (auto *AI = dyn_cast<AssignByDelegateInst>(Inst)) {
+  if (auto *AI = dyn_cast<AssignByWrapperInst>(Inst)) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;

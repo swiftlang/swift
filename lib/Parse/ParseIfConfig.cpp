@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
@@ -37,13 +38,20 @@ namespace {
 static
 Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
   return llvm::StringSwitch<Optional<PlatformConditionKind>>(Name)
-    .Case("os", PlatformConditionKind::OS)
-    .Case("arch", PlatformConditionKind::Arch)
-    .Case("_endian", PlatformConditionKind::Endianness)
-    .Case("_runtime", PlatformConditionKind::Runtime)
-    .Case("canImport", PlatformConditionKind::CanImport)
-    .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+    .Case(IDENTIFIER, PlatformConditionKind::LABEL)
+#include "swift/AST/PlatformConditionKinds.def"
     .Default(None);
+}
+
+/// Get platform condition name from PlatformConditionKind.
+static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
+  switch (Kind) {
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+  case PlatformConditionKind::LABEL: return IDENTIFIER;
+#include "swift/AST/PlatformConditionKinds.def"
+  }
+  llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
 /// Extract source text of the expression.
@@ -264,9 +272,10 @@ public:
       return nullptr;
     }
 
-    std::vector<StringRef> suggestions;
+    PlatformConditionKind suggestedKind = *Kind;
+    std::vector<StringRef> suggestedValues;
     if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
-                                                      suggestions)) {
+                                                      suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
         D.diagnose(Arg->getLoc(),
@@ -293,7 +302,12 @@ public:
       auto Loc = Arg->getLoc();
       D.diagnose(Loc, diag::unknown_platform_condition_argument,
                  DiagName, *KindName);
-      for (auto suggestion : suggestions)
+      if (suggestedKind != *Kind) {
+        auto suggestedKindName = getPlatformConditionName(suggestedKind);
+        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
+          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+      }
+      for (auto suggestion : suggestedValues)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
     }
@@ -583,6 +597,12 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
+  bool shouldEvaluate =
+      // Don't evaluate if it's in '-parse' mode, etc.
+      State->PerformConditionEvaluation &&
+      // If it's in inactive #if ... #endif block, there's no point to do it.
+      !getScopeInfo().isInactiveConfigBlock();
+
   bool foundActive = false;
   bool isVersionCondition = false;
   while (1) {
@@ -594,10 +614,16 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     Expr *Condition = nullptr;
     bool isActive = false;
 
+    if (!Tok.isAtStartOfLine() && isElse && Tok.is(tok::kw_if)) {
+      diagnose(Tok, diag::unexpected_if_following_else_compilation_directive)
+          .fixItReplace(SourceRange(ClauseLoc, consumeToken()), "#elseif");
+      isElse = false;
+    }
+
     // Parse the condition.  Evaluate it to determine the active
     // clause unless we're doing a parse-only pass.
     if (isElse) {
-      isActive = !foundActive && State->PerformConditionEvaluation;
+      isActive = !foundActive && shouldEvaluate;
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
@@ -612,7 +638,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
-      } else if (!foundActive && State->PerformConditionEvaluation) {
+      } else if (!foundActive && shouldEvaluate) {
         // Evaluate the condition only if we haven't found any active one and
         // we're not in parse-only mode.
         isActive = evaluateIfConfigCondition(Condition, Context);
@@ -636,8 +662,16 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
     // Parse elements
     SmallVector<ASTNode, 16> Elements;
+    llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
+                                 InInactiveClauseEnvironment || !isActive);
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
+    } else if (SyntaxContext->isEnabled()) {
+      // We shouldn't skip code if we are building syntax tree.
+      // The parser will keep running and we just discard the AST part.
+      DiagnosticSuppression suppression(Context.Diags);
+      SmallVector<ASTNode, 16> dropedElements;
+      parseElements(dropedElements, false);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();

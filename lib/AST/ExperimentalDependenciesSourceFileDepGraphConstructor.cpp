@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
@@ -278,7 +279,8 @@ private:
       ConstPtrVec<ValueDecl> &classMembers;
       Collector(ConstPtrVec<ValueDecl> &classMembers)
           : classMembers(classMembers) {}
-      void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
+      void foundDecl(ValueDecl *VD, DeclVisibilityKind,
+                     DynamicLookupInfo) override {
         classMembers.push_back(VD);
       }
     } collector{classMembers};

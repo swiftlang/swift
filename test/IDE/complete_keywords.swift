@@ -93,6 +93,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_TOP | %FileCheck %s -check-prefix=KW_CASE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SWITCH_IN_CASE | %FileCheck %s -check-prefix=KW_CASE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_UINT32 | %FileCheck %s -check-prefix=CONTEXT_UINT32
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_STATICSTRING | %FileCheck %s -check-prefix=CONTEXT_STATICSTRING
+
 // KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
 // KW_NO_RETURN-NOT: Keyword[return]
 
@@ -191,10 +194,10 @@
 // KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -211,10 +214,10 @@
 // KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // let and var
 //
@@ -412,8 +415,27 @@ func inSwitch(val: Int) {
     foo()
   #^SWITCH_IN_CASE^#
   }
-// Begin completions
+// KW_CASE: Begin completions
 // KW_CASE-DAG: Keyword[case]/None:                 case; name=case
 // KW_CASE-DAG: Keyword[default]/None:              default; name=default
-// End completions
+// KW_CASE: End completions
+}
+func testContextualType() {
+  let _: UInt32 = #^CONTEXT_UINT32^#
+// CONTEXT_UINT32: Begin completions
+// CONTEXT_UINT32-DAG: Keyword[#function]/None:            #function[#String#]; name=#function
+// CONTEXT_UINT32-DAG: Keyword[#file]/None:                #file[#String#]; name=#file
+// CONTEXT_UINT32-DAG: Keyword[#line]/None/TypeRelation[Identical]: #line[#UInt32#]; name=#line
+// CONTEXT_UINT32-DAG: Keyword[#column]/None/TypeRelation[Identical]: #column[#UInt32#]; name=#column
+// CONTEXT_UINT32-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
+// CONTEXT_UINT32: End completions
+
+  let _: StaticString = #^CONTEXT_STATICSTRING^#
+// CONTEXT_STATICSTRING: Begin completions
+// CONTEXT_STATICSTRING-DAG: Keyword[#function]/None/TypeRelation[Identical]: #function[#StaticString#]; name=#function
+// CONTEXT_STATICSTRING-DAG: Keyword[#file]/None/TypeRelation[Identical]: #file[#StaticString#]; name=#file
+// CONTEXT_STATICSTRING-DAG: Keyword[#line]/None:                #line[#Int#]; name=#line
+// CONTEXT_STATICSTRING-DAG: Keyword[#column]/None:              #column[#Int#]; name=#column
+// CONTEXT_STATICSTRING-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
+// CONTEXT_STATICSTRING: End completions
 }

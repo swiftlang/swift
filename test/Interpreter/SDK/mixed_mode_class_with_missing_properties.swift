@@ -11,9 +11,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import UsingObjCStuff
 
 print("Let's go") // CHECK: Let's go

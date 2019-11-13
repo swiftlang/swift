@@ -233,7 +233,7 @@ SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
          "Expected C function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
-    return FR->getReferencedFunction();
+    return FR->getReferencedFunctionOrNull();
 
   return nullptr;
 }
@@ -309,4 +309,15 @@ swift::getVariableOfStaticInitializer(SILFunction *InitFunc,
   if (!InitVal)
     return nullptr;
   return GVar;
+}
+
+SILType
+SILGlobalVariable::getLoweredTypeInContext(TypeExpansionContext context) const {
+  auto ty = getLoweredType();
+  if (!ty.getASTType()->hasOpaqueArchetype() ||
+      !context.shouldLookThroughOpaqueTypeArchetypes())
+    return ty;
+  auto resultTy =
+      getModule().Types.getTypeLowering(ty, context).getLoweredType();
+  return resultTy.getCategoryType(ty.getCategory());
 }

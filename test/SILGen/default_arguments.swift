@@ -199,7 +199,7 @@ func takeDSOHandle(_ handle: UnsafeRawPointer = #dsohandle) { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments13testDSOHandleyyF
 func testDSOHandle() {
-  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*Builtin.RawPointer
+  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr {{@__dso_handle|@__ImageBase}} : $*Builtin.RawPointer
   takeDSOHandle()
 }
 
@@ -383,3 +383,9 @@ func stupidGames(x: Int = 3) -> Int {
   return x
 }
 stupidGames(x:)()
+
+func genericMagic<T : ExpressibleByStringLiteral>(x: T = #file) -> T {
+  return x
+}
+
+let _: String = genericMagic()

@@ -24,9 +24,9 @@ enum E0 {
 class C0 {
   func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func g(_ ds: Self) { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 
-  func h(_ ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func h(_ ds: Self) -> Self { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 protocol P0 {
@@ -62,7 +62,7 @@ extension P1 {
 // ----------------------------------------------------------------------------
 // The 'self' type of a Self method is based on Self
 class C1 {
-  required init(int i: Int) {}
+  required init(int i: Int) {} // expected-note {{'init(int:)' declared here}}
 
   // Instance methods have a self of type Self.
   func f(_ b: Bool) -> Self {
@@ -72,8 +72,8 @@ class C1 {
     // One can use `type(of:)` to attempt to construct an object of type Self.
     if !b { return type(of: self).init(int: 5) }
 
-    // Can't utter Self within the body of a method.
-    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
+    // Can utter Self within the body of a method.
+    var _: Self = self
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -89,7 +89,7 @@ class C1 {
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{non-nominal type 'Self' does not support explicit initialization}}
+    return Self() // expected-error{{missing argument for parameter 'int' in call}} {{17-17=int: <#Int#>}}
   }
 
   // This used to crash because metatype construction went down a
@@ -345,13 +345,14 @@ class Runce : Runcible {
 // ----------------------------------------------------------------------------
 // Forming a type with 'Self' in invariant position
 
-struct Generic<T> { init(_: T) {} }
+struct Generic<T> { init(_: T) {} } // expected-note {{arguments to generic parameter 'T' ('Self' and 'InvariantSelf') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('Self' and 'FinalInvariantSelf') are expected to be equal}}
 
 class InvariantSelf {
   func me() -> Self {
     let a = Generic(self)
     let _: Generic<InvariantSelf> = a
-    // expected-error@-1 {{cannot convert value of type 'Generic<Self>' to specified type 'Generic<InvariantSelf>'}}
+    // expected-error@-1 {{cannot assign value of type 'Generic<Self>' to type 'Generic<InvariantSelf>'}}
 
     return self
   }
@@ -363,7 +364,7 @@ final class FinalInvariantSelf {
   func me() -> Self {
     let a = Generic(self)
     let _: Generic<FinalInvariantSelf> = a
-    // expected-error@-1 {{cannot convert value of type 'Generic<Self>' to specified type 'Generic<FinalInvariantSelf>'}}
+    // expected-error@-1 {{cannot assign value of type 'Generic<Self>' to type 'Generic<FinalInvariantSelf>'}}
 
     return self
   }
@@ -385,8 +386,7 @@ class Factory : FactoryPattern {
 
   convenience init(string: String) {
     self.init(factory: Factory(_string: string))
-    // expected-error@-1 {{incorrect argument label in call (have 'factory:', expected '_string:')}}
-    // FIXME: Bogus diagnostic
+    // expected-error@-1 {{cannot convert value of type 'Factory' to expected argument type 'Self'}}
   }
 }
 
@@ -418,4 +418,29 @@ class SelfOperator {
 func useSelfOperator() {
   let s = SelfOperator()
   _ = s + s
+}
+
+// for ... in loops
+
+struct DummyIterator : IteratorProtocol {
+  func next() -> Int? { return nil }
+}
+
+class Iterable : Sequence {
+  func returnsSelf() -> Self {
+    for _ in self {}
+    return self
+  }
+
+  func makeIterator() -> DummyIterator {
+    return DummyIterator()
+  }
+}
+
+// Default arguments of methods cannot capture 'Self' or 'self'
+class MathClass {
+  func invalidDefaultArg(s: Int = Self.intMethod()) {}
+  // expected-error@-1 {{covariant 'Self' type cannot be referenced from a default argument expression}}
+
+  static func intMethod() -> Int { return 0 }
 }

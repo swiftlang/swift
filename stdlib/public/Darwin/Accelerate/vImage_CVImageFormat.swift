@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImageCVImageFormat {
     
     /// Creates the description of how an image is encoded in a Core Video pixel buffer.
@@ -144,7 +144,7 @@ extension vImageCVImageFormat {
     
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImage {
     /// Type codes for what is in a `vImage_Buffer`, such as red or luminance.
     public enum BufferType: Int {
@@ -364,7 +364,7 @@ extension vImage {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImageCVImageFormat {
     /// Core Video pixel format type enum.
     public enum Format {

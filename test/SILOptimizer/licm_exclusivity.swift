@@ -1,16 +1,16 @@
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST1
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm  -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST2
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TESTLICM
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TESTLICM2
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm  -whole-module-optimization %s 2>&1 | %FileCheck %s --check-prefix=TEST3
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSIL2
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -whole-module-optimization %s 2>&1 | %FileCheck %s --check-prefix=TESTLICMWMO
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSILWMO
 
 // REQUIRES: optimized_stdlib,asserts
 // REQUIRES: PTRSIZE=64
 
-// TEST1-LABEL: Processing loops in {{.*}}run_ReversedArray{{.*}}
-// TEST1: Hoist and Sink pairs attempt
-// TEST1: Hoisted
-// TEST1: Successfully hosited and sank pair
+// TESTLICM-LABEL: Processing loops in {{.*}}run_ReversedArray{{.*}}
+// TESTLICM: Hoist and Sink pairs attempt
+// TESTLICM: Hoisted
+// TESTLICM: Successfully hoisted and sank pair
 
 // TESTSIL-LABEL: sil hidden @$s16licm_exclusivity17run_ReversedArrayyySiF : $@convention(thin) (Int) -> () {
 // TESTSIL: bb
@@ -32,9 +32,9 @@ func run_ReversedArray(_ N: Int) {
   }
 }
 
-// TEST2-LABEL: Processing loops in {{.*}}count_unicodeScalars{{.*}}
-// TEST2: Hoist and Sink pairs attempt
-// TEST2: Hoisted
+// TESTLICM2-LABEL: Processing loops in {{.*}}count_unicodeScalars{{.*}}
+// TESTLICM2: Hoist and Sink pairs attempt
+// TESTLICM2: Hoisted
 
 // TESTSIL-LABEL: sil @$s16licm_exclusivity20count_unicodeScalarsyySS17UnicodeScalarViewVF : $@convention(thin) (@guaranteed String.UnicodeScalarView) -> () {
 // TESTSIL: bb0(%0 : $String.UnicodeScalarView)
@@ -52,34 +52,34 @@ public func count_unicodeScalars(_ s: String.UnicodeScalarView) {
 
 
 public class ClassWithArrs {
-    var N: Int = 0
-    var A: [Int]
-    var B: [Int]
+  var N: Int = 0
+  var A: [Int]
+  var B: [Int]
 
-    init(N: Int) {
-        self.N = N
+  init(N: Int) {
+    self.N = N
 
-        A = [Int](repeating: 0, count: N)
-        B = [Int](repeating: 0, count: N)
+    A = [Int](repeating: 0, count: N)
+    B = [Int](repeating: 0, count: N)
+  }
+
+// TESTLICMWMO-LABEL: Processing loops in {{.*}}ClassWithArrsC7readArr{{.*}}
+// TESTLICMWMO: Hoist and Sink pairs attempt
+// TESTLICMWMO: Hoisted
+// TESTLICMWMO: Successfully hoisted and sank pair
+// TESTLICMWMO: Hoisted
+// TESTLICMWMO: Successfully hoisted and sank pair
+// TESTSILWMO-LABEL: sil @$s16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
+// TESTSILWMO: [[R1:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.A
+// TESTSILWMO: [[R2:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.B
+// TESTSILWMO:  begin_access [read] [static] [no_nested_conflict] [[R1]]
+// TESTSILWMO:  begin_access [read] [static] [no_nested_conflict] [[R2]]
+  public func readArr() {
+    for i in 0..<self.N {
+      for j in 0..<i {
+	let _ = A[j]
+	let _ = B[j]
+      }
     }
-
-// TEST3-LABEL: Processing loops in {{.*}}ClassWithArrsC7readArr{{.*}}
-// TEST3: Hoist and Sink pairs attempt
-// TEST3: Hoisted
-// TEST3: Successfully hosited and sank pair
-// TEST3: Hoisted
-// TEST3: Successfully hosited and sank pair
-// TESTSIL2-LABEL: sil @$s16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
-// TESTSIL2: [[R1:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.A
-// TESTSIL2: [[R2:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.B
-// TESTSIL2:  begin_access [read] [static] [no_nested_conflict] [[R1]]
-// TESTSIL2:  begin_access [read] [static] [no_nested_conflict] [[R2]]
-    public func readArr() {
-        for i in 0..<self.N {
-            for j in 0..<i {
-				let _ = A[j]
-				let _ = B[j]
-			}
-        }
-    }
+  }
 }

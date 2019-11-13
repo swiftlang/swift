@@ -35,7 +35,7 @@
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_1 > %t.enum.txt
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS_INVALID < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_1 < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
@@ -85,16 +85,19 @@
 enum FooEnum: CaseIterable {
   case Foo1
   case Foo2
+  static var alias1: FooEnum { return .Foo1 }
 }
 
 // FOO_ENUM_TYPE_CONTEXT: Begin completions
 // FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_TYPE_CONTEXT: End completions
 
 // FOO_ENUM_NO_DOT: Begin completions
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal: .alias1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal: .AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal: .allCases[#[FooEnum]#]{{; name=.+$}}
@@ -107,6 +110,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT-NEXT: Decl[StaticVar]/CurrNominal: alias1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
@@ -117,14 +121,16 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_INVALID-NEXT: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-NEXT: Decl[StaticVar]/CurrNominal: alias1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: End completions
 
-// FOO_ENUM_DOT_ELEMENTS: Begin completions, 2 items
+// FOO_ENUM_DOT_ELEMENTS: Begin completions, 3 items
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_DOT_ELEMENTS-NEXT: End completions
 
 enum BarEnum {
@@ -295,12 +301,8 @@ enum QuxEnum : Int {
 func freeFunc() {}
 
 // WITH_GLOBAL_RESULTS: Begin completions
-// WITH_GLOBAL_RESULTS: Decl[FreeFunction]/CurrModule: freeFunc()[#Void#]{{; name=.+$}}
+// WITH_GLOBAL_RESULTS: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: freeFunc()[#Void#]{{; name=.+$}}
 // WITH_GLOBAL_RESULTS: End completions
-
-// WITH_GLOBAL_RESULTS_INVALID: Begin completions
-// WITH_GLOBAL_RESULTS_INVALID: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: freeFunc()[#Void#]{{; name=.+$}}
-// WITH_GLOBAL_RESULTS_INVALID: End completions
 
 //===--- Complete enum elements in 'switch'.
 

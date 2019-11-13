@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-ownership-stripping-after-serialization -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -1578,4 +1579,13 @@ class WeakCycle {
     self.c = self // expected-error {{variable 'self.d' used before being initialized}}
     self.d = 10
   }
+}
+
+// <rdar://51198592> DI was crashing as it wrongly detected a `type(of: self)`
+// use in a delegating initializer, when there was none.
+class DelegatingInitTest {
+  convenience init(x: Int) {
+    self // expected-warning {{expression of type 'DelegatingInitTest' is unused}}
+      // expected-error@-1 {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }

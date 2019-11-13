@@ -20,8 +20,9 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -32,7 +33,8 @@ using namespace swift::Lowering;
 CanType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
   assert(!origType.isTypeParameter());
-  return getLoweredRValueType(origType, origType.getType());
+  return getLoweredRValueType(TypeExpansionContext::minimal(), origType,
+                              origType.getType());
 }
 
 AnyFunctionType::Param
@@ -211,7 +213,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
 
   auto foreignRepresentation =
-    t->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, M.TheSwiftModule);
+    t->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, &M);
   switch (foreignRepresentation.first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Trivial:
@@ -223,20 +225,17 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     auto conformance = foreignRepresentation.second;
     assert(conformance && "Missing conformance?");
     Type bridgedTy =
-      ProtocolConformanceRef::getTypeWitnessByName(
-        t, ProtocolConformanceRef(conformance),
-        M.getASTContext().Id_ObjectiveCType,
-        M.getASTContext().getLazyResolver());
-    assert(bridgedTy && "Missing _ObjectiveCType witness?");
+      ProtocolConformanceRef(conformance).getTypeWitnessByName(
+        t, M.getASTContext().Id_ObjectiveCType);
     if (purpose == BridgedTypePurpose::ForResult && clangTy)
       bridgedTy = OptionalType::get(bridgedTy);
     return bridgedTy;
   }
 
   case ForeignRepresentableKind::BridgedError: {
-    auto nsErrorDecl = M.getASTContext().getNSErrorDecl();
-    assert(nsErrorDecl && "Cannot bridge when NSError isn't available");
-    return nsErrorDecl->getDeclaredInterfaceType();
+    auto nsErrorTy = M.getASTContext().getNSErrorType();
+    assert(nsErrorTy && "Cannot bridge when NSError isn't available");
+    return nsErrorTy;
   }
   }
 

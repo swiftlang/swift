@@ -8,6 +8,7 @@
 
 
 import os.path
+import platform
 
 from ..utils import TestCase
 from ...argparse import ArgumentTypeError, types
@@ -139,13 +140,16 @@ class TestPathType(TestCase):
         path_type = types.PathType()
 
         path = path_type('/some/random/path/../')
-        self.assertEqual('/some/random', path)
+        self.assertEqual(self._platform_path('/some/random'), path)
 
         path = path_type('~/path/to/some/file.txt')
-        self.assertEqual(self.home_dir + '/path/to/some/file.txt', path)
+        self.assertEqual(
+            self._platform_path(self.home_dir + '/path/to/some/file.txt'),
+            path)
 
         path = path_type('~/path/to/some/../file.txt')
-        self.assertEqual(self.home_dir + '/path/to/file.txt', path)
+        self.assertEqual(
+            self._platform_path(self.home_dir + '/path/to/file.txt'), path)
 
     def test_assert_exists(self):
         path_type = types.PathType(assert_exists=True)
@@ -155,9 +159,14 @@ class TestPathType(TestCase):
 
         with self.assertRaises(ArgumentTypeError):
             path_type('/nonsensisal/path/')
+
+        with self.assertRaises(ArgumentTypeError):
             path_type('~/not-a-real/path to a file')
 
     def test_assert_executable(self):
+        if platform.system() == 'Windows':
+            self.skipTest("All files are considered executable in Windows")
+
         path_type = types.PathType(assert_executable=True)
 
         bash_path = '/bin/bash'
@@ -167,6 +176,12 @@ class TestPathType(TestCase):
 
         with self.assertRaises(ArgumentTypeError):
             path_type(__file__)
+
+    def _platform_path(self, path):
+        if platform.system() == 'Windows':
+            return os.path.abspath(os.path.normpath(path))
+        else:
+            return path
 
 
 class TestRegexType(TestCase):

@@ -87,8 +87,17 @@ public:
     Immediate,
   };
 
+  enum class MSVCRuntime {
+    MultiThreaded,
+    MultiThreadedDebug,
+    MultiThreadedDLL,
+    MultiThreadedDebugDLL,
+  };
+
   /// The mode in which the driver should invoke the frontend.
   Mode CompilerMode = Mode::StandardCompile;
+
+  Optional<MSVCRuntime> RuntimeVariant = llvm::None;
 
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
@@ -149,7 +158,7 @@ public:
     Interactive,     // swift
     Batch,           // swiftc
     AutolinkExtract, // swift-autolink-extract
-    SwiftFormat      // swift-format
+    SwiftIndent      // swift-indent
   };
 
   class InputInfoMap;
@@ -345,10 +354,15 @@ private:
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
 
-  void chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
-                                    StringRef workingDirectory,
-                                    llvm::SmallString<128> &buffer,
-                                    CommandOutput *output) const;
+  void chooseSwiftSourceInfoOutputPath(Compilation &C,
+                                       const TypeToPathMap *OutputMap,
+                                       StringRef workingDirectory,
+                                       CommandOutput *Output) const;
+
+  void chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
+                                 StringRef workingDirectory,
+                                 llvm::SmallString<128> &buffer,
+                                 CommandOutput *output) const;
 
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;

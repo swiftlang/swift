@@ -65,15 +65,60 @@ static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
   "simulator",
 };
 
-template <size_t N>
-bool contains(const StringRef (&Array)[N], const StringRef &V,
-              std::vector<StringRef> &suggestions) {
+static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
+#define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
+#include "swift/AST/PlatformConditionKinds.def"
+};
+
+ArrayRef<StringRef> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+  switch (Kind) {
+  case PlatformConditionKind::OS:
+    return SupportedConditionalCompilationOSs;
+  case PlatformConditionKind::Arch:
+    return SupportedConditionalCompilationArches;
+  case PlatformConditionKind::Endianness:
+    return SupportedConditionalCompilationEndianness;
+  case PlatformConditionKind::Runtime:
+    return SupportedConditionalCompilationRuntimes;
+  case PlatformConditionKind::CanImport:
+    return { };
+  case PlatformConditionKind::TargetEnvironment:
+    return SupportedConditionalCompilationTargetEnvironments;
+  }
+  llvm_unreachable("Unhandled PlatformConditionKind in switch");
+}
+
+PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
+                                                     std::vector<StringRef> &suggestedValues) {
+  std::string lower = V.lower();
+  for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
+    if (candidateKind != Kind) {
+      auto supportedValues = getSupportedConditionalCompilationValues(candidateKind);
+      for (const StringRef& candidateValue : supportedValues) {
+        if (candidateValue.lower() == lower) {
+          suggestedValues.clear();
+          if (candidateValue != V) {
+            suggestedValues.emplace_back(candidateValue);
+          }
+          return candidateKind;
+        }
+      }
+    }
+  }
+  return Kind;
+}
+
+bool isMatching(PlatformConditionKind Kind, const StringRef &V,
+                PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
   // Compare against known values, ignoring case to avoid penalizing
   // characters with incorrect case.
   unsigned minDistance = std::numeric_limits<unsigned>::max();
   std::string lower = V.lower();
-  for (const StringRef& candidate : Array) {
+  auto supportedValues = getSupportedConditionalCompilationValues(Kind);
+  for (const StringRef& candidate : supportedValues) {
     if (candidate == V) {
+      suggestedKind = Kind;
       suggestions.clear();
       return true;
     }
@@ -85,28 +130,21 @@ bool contains(const StringRef (&Array)[N], const StringRef &V,
     if (distance == minDistance)
       suggestions.emplace_back(candidate);
   }
+  suggestedKind = suggestedPlatformConditionKind(Kind, V, suggestions);
   return false;
 }
 
 bool LangOptions::
 checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
-                                std::vector<StringRef> &suggestions) {
+                                PlatformConditionKind &suggestedKind,
+                                std::vector<StringRef> &suggestedValues) {
   switch (Kind) {
   case PlatformConditionKind::OS:
-    return contains(SupportedConditionalCompilationOSs, Value,
-                    suggestions);
   case PlatformConditionKind::Arch:
-    return contains(SupportedConditionalCompilationArches, Value,
-                    suggestions);
   case PlatformConditionKind::Endianness:
-    return contains(SupportedConditionalCompilationEndianness, Value,
-                    suggestions);
   case PlatformConditionKind::Runtime:
-    return contains(SupportedConditionalCompilationRuntimes, Value,
-                    suggestions);
   case PlatformConditionKind::TargetEnvironment:
-    return contains(SupportedConditionalCompilationTargetEnvironments, Value,
-                    suggestions);
+    return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
     // FIXME: Perform some kind of validation of the string?
@@ -118,7 +156,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
 StringRef
 LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
   // Last one wins.
-  for (auto &Opt : reversed(PlatformConditionValues)) {
+  for (auto &Opt : llvm::reverse(PlatformConditionValues)) {
     if (Opt.first == Kind)
       return Opt.second;
   }
@@ -131,7 +169,7 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
 
-  for (auto &Opt : reversed(PlatformConditionValues)) {
+  for (auto &Opt : llvm::reverse(PlatformConditionValues)) {
     if (Opt.first == Kind)
       if (Opt.second == Value)
         return true;
@@ -284,11 +322,24 @@ bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
   if (Target.isWatchOS())
     return !Target.isOSVersionLT(5, 2);
 
-  // If we're running on a non-Apple platform, we still want to allow running
-  // tests that -enable-objc-interop.
+  // Don't assert if we're running on a non-Apple platform; we still
+  // want to allow running tests that -enable-objc-interop.
   return false;
 }
 
 bool LangOptions::doesTargetSupportObjCGetClassHook() const {
   return doesTargetSupportObjCMetadataUpdateCallback();
+}
+
+bool LangOptions::doesTargetSupportObjCClassStubs() const {
+  if (Target.isMacOSX())
+    return !Target.isMacOSXVersionLT(10, 15);
+  if (Target.isiOS()) // also returns true on tvOS
+    return !Target.isOSVersionLT(13);
+  if (Target.isWatchOS())
+    return !Target.isOSVersionLT(6);
+
+  // Don't assert if we're running on a non-Apple platform; we still
+  // want to allow running tests that -enable-objc-interop.
+  return false;
 }

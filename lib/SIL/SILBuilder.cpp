@@ -49,15 +49,14 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   return createTuple(loc, tupleType, elts);
 }
 
-SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
-                                        SILModule &M,
-                                        SubstitutionMap subs,
-                                        ParameterConvention calleeConvention,
-                                        PartialApplyInst::OnStackKind onStack) {
+SILType SILBuilder::getPartialApplyResultType(
+    TypeExpansionContext context, SILType origTy, unsigned argCount,
+    SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
+    PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
-    FTI = FTI->substGenericArgs(M, subs);
-  
+    FTI = FTI->substGenericArgs(M, subs, context);
+
   assert(!FTI->isPolymorphic()
          && "must provide substitutions for generic partial_apply");
   auto params = FTI->getParameters();
@@ -79,9 +78,11 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   results.append(FTI->getResults().begin(), FTI->getResults().end());
   for (auto &result : results) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
-      result = SILResultInfo(result.getType(), ResultConvention::Unowned);
+      result = SILResultInfo(result.getReturnValueType(M, FTI),
+                             ResultConvention::Unowned);
     else if (result.getConvention() == ResultConvention::Autoreleased)
-      result = SILResultInfo(result.getType(), ResultConvention::Owned);
+      result = SILResultInfo(result.getReturnValueType(M, FTI),
+                             ResultConvention::Owned);
   }
 
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
@@ -91,9 +92,22 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                             FTI->getYields(),
                                             results,
                                             FTI->getOptionalErrorResult(),
+                                            SubstitutionMap(),
+                                            false,
                                             M.getASTContext());
 
   return SILType::getPrimitiveObjectType(appliedFnType);
+}
+
+ProjectBoxInst *SILBuilder::createProjectBox(SILLocation Loc,
+                                             SILValue boxOperand,
+                                             unsigned index) {
+  auto boxTy = boxOperand->getType().castTo<SILBoxType>();
+  auto fieldTy = getSILBoxFieldType(getTypeExpansionContext(), boxTy,
+                                    getModule().Types, index);
+
+  return insert(new (getModule()) ProjectBoxInst(
+      getSILDebugLocation(Loc), boxOperand, index, fieldTy));
 }
 
 // If legal, create an unchecked_ref_cast from the given operand and result
@@ -280,6 +294,9 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst: \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:                        \
+    return false;
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::StoreInst:
@@ -287,7 +304,6 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
-  case SILInstructionKind::CopyUnownedValueInst:
     return false;
   default:
     break;
@@ -495,11 +511,11 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
 ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
                                                    SILType MetatypeTy,
                                                    SILValue Base) {
-  assert(
-      Base->getType().isLoweringOf(
-          getModule(), MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
-      "value_metatype result must be formal metatype of the lowered operand "
-      "type");
+  assert(Base->getType().isLoweringOf(
+             getTypeExpansionContext(), getModule(),
+             MetatypeTy.castTo<MetatypeType>().getInstanceType()) &&
+         "value_metatype result must be formal metatype of the lowered operand "
+         "type");
   return insert(new (getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
                                                       MetatypeTy, Base));
 }
@@ -519,17 +535,18 @@ void SILBuilder::emitDestructureValueOperation(
   // Otherwise, we want to destructure add the destructure and return.
   if (getFunction().hasOwnership()) {
     auto *i = emitDestructureValueOperation(loc, v);
-    copy(i->getResults(), std::back_inserter(results));
+    llvm::copy(i->getResults(), std::back_inserter(results));
     return;
   }
 
   // In non qualified ownership SIL, drop back to using projection code.
   SmallVector<Projection, 16> projections;
-  Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
-  transform(projections, std::back_inserter(results),
-            [&](const Projection &p) -> SILValue {
-              return p.createObjectProjection(*this, loc, v).get();
-            });
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
+  llvm::transform(projections, std::back_inserter(results),
+                  [&](const Projection &p) -> SILValue {
+                    return p.createObjectProjection(*this, loc, v).get();
+                  });
 }
 
 // TODO: Can we put this on type lowering? It would take a little bit of work
@@ -546,11 +563,12 @@ void SILBuilder::emitDestructureAddressOperation(
   }
 
   SmallVector<Projection, 16> projections;
-  Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
-  transform(projections, std::back_inserter(results),
-            [&](const Projection &p) -> SILValue {
-              return p.createAddressProjection(*this, loc, v).get();
-            });
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
+  llvm::transform(projections, std::back_inserter(results),
+                  [&](const Projection &p) -> SILValue {
+                    return p.createAddressProjection(*this, loc, v).get();
+                  });
 }
 
 void SILBuilder::emitDestructureValueOperation(
@@ -599,4 +617,16 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
   fun(original);
 
   createEndBorrow(loc, original);
+}
+
+CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
+    SILLocation Loc, bool isExact, SILValue op, SILType destTy,
+    SILBasicBlock *successBB, SILBasicBlock *failureBB,
+    ProfileCounter target1Count, ProfileCounter target2Count) {
+  assert((!hasOwnership() || !failureBB->getNumArguments() ||
+          failureBB->getArgument(0)->getType() == op->getType()) &&
+         "failureBB's argument doesn't match incoming argument type");
+  return insertTerminator(CheckedCastBranchInst::create(
+      getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
+      getFunction(), C.OpenedArchetypes, target1Count, target2Count));
 }

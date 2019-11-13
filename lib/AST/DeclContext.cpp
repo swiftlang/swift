@@ -15,11 +15,15 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParseRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -104,10 +108,8 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
 }
 
 Type DeclContext::getDeclaredTypeInContext() const {
-  if (auto *ED = dyn_cast<ExtensionDecl>(this))
-    return ED->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->getDeclaredTypeInContext();
+  if (auto declaredType = getDeclaredInterfaceType())
+    return mapTypeIntoContext(declaredType);
   return Type();
 }
 
@@ -152,7 +154,7 @@ unsigned DeclContext::getGenericContextDepth() const {
   return depth;
 }
 
-GenericSignature *DeclContext::getGenericSignatureOfContext() const {
+GenericSignature DeclContext::getGenericSignatureOfContext() const {
   auto dc = this;
   do {
     if (auto decl = dc->getAsDecl())
@@ -172,17 +174,6 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   } while ((dc = dc->getParent()));
 
   return nullptr;
-}
-
-bool DeclContext::contextHasLazyGenericEnvironment() const {
-  auto dc = this;
-  do {
-    if (auto decl = dc->getAsDecl())
-      if (auto GC = decl->getAsGenericContext())
-        return GC->hasLazyGenericEnvironment();
-  } while ((dc = dc->getParent()));
-
-  return false;
 }
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
@@ -236,6 +227,17 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
     if (auto decl = DC->getAsDecl())
       return isa<ModuleDecl>(decl) ? nullptr : decl;
   } while ((DC = DC->getParent()));
+
+  return nullptr;
+}
+
+DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
+  auto dc = this;
+  do {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
+      if (afd->isBodySkipped())
+        return afd;
+  } while ((dc = dc->getParent()));
 
   return nullptr;
 }
@@ -309,21 +311,24 @@ bool DeclContext::isGenericContext() const {
 /// domains, this ensures that only sufficiently-conservative access patterns
 /// are used.
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
-  for (const auto *dc = getLocalContext(); dc && dc->isLocalContext();
+  auto &context = getASTContext();
+  return evaluateOrDefault(context.evaluator,
+                           ResilienceExpansionRequest { const_cast<DeclContext *>(this) },
+                           ResilienceExpansion::Minimal);
+}
+
+llvm::Expected<ResilienceExpansion>
+swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
+                                            DeclContext *context) const {
+  for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();
        dc = dc->getParent()) {
     // Default argument initializer contexts have their resilience expansion
     // set when they're type checked.
     if (isa<DefaultArgumentInitializer>(dc)) {
       dc = dc->getParent();
 
-      const ValueDecl *VD;
-      if (auto *FD = dyn_cast<AbstractFunctionDecl>(dc)) {
-        VD = FD;
-      } else if (auto *EED = dyn_cast<EnumElementDecl>(dc)) {
-        VD = EED;
-      } else {
-        VD = cast<SubscriptDecl>(dc);
-      }
+      auto *VD = cast<ValueDecl>(dc->getAsDecl());
+      assert(VD->hasParameterList());
 
       auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
@@ -468,6 +473,24 @@ unsigned DeclContext::getSemanticDepth() const {
     return 0;
 
   return 1 + getParent()->getSemanticDepth();
+}
+
+bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
+  // Members of non-generic classes and class extensions can be found by
+  /// dynamic lookup.
+  if (auto *CD = getSelfClassDecl())
+    return !CD->isGenericContext();
+
+  // Members of @objc protocols (but not protocol extensions) can be
+  // found by dynamic lookup.
+  if (auto *PD = dyn_cast<ProtocolDecl>(this))
+      return PD->getAttrs().hasAttribute<ObjCAttr>();
+
+  return false;
+}
+
+bool DeclContext::canBeParentOfExtension() const {
+  return isa<SourceFile>(this);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
@@ -721,6 +744,7 @@ DeclRange IterableDeclContext::getMembers() const {
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
+  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -744,6 +768,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
 }
 
 void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
+  assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
   assert(!member->NextDecl && "Already added to a container");
 
   // If there is a hint decl that specifies where to add this, just
@@ -785,15 +810,51 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
     ++s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
   }
 }
+bool IterableDeclContext::hasUnparsedMembers() const {
+  if (AddedParsedMembers)
+    return false;
+
+  if (!getDecl()->getDeclContext()->getParentSourceFile()) {
+    // There will never be any parsed members to add, so set the flag to say
+    // we are done so we can short-circuit next time.
+    const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
+    return false;
+  }
+
+  return true;
+}
+
+unsigned IterableDeclContext::getMemberCount() const {
+  if (hasUnparsedMembers())
+    loadAllMembers();
+  return MemberCount;
+}
 
 void IterableDeclContext::loadAllMembers() const {
-  // Lazily parse members.
-  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
+  ASTContext &ctx = getASTContext();
+
+  // For contexts within a source file, get the list of parsed members.
+  if (getDecl()->getDeclContext()->getParentSourceFile()) {
+    // Retrieve the parsed members. Even if we've already added the parsed
+    // members to this context, this call is important for recording the
+    // dependency edge.
+    auto mutableThis = const_cast<IterableDeclContext *>(this);
+    auto members = evaluateOrDefault(
+        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
+
+    // If we haven't already done so, add these members to this context.
+    if (!AddedParsedMembers) {
+      mutableThis->AddedParsedMembers = 1;
+      for (auto member : members) {
+        mutableThis->addMember(member);
+      }
+    }
+  }
+
   if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
     /*lazyLoader=*/nullptr);
   auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;
@@ -974,6 +1035,48 @@ DeclContextKind DeclContext::getContextKind() const {
   llvm_unreachable("Unhandled DeclContext ASTHierarchy");
 }
 
+bool DeclContext::hasValueSemantics() const {
+  if (getExtendedProtocolDecl())
+    return !isClassConstrainedProtocolExtension();
+  return !getDeclaredInterfaceType()->hasReferenceSemantics();
+}
+
+bool DeclContext::isClassConstrainedProtocolExtension() const {
+  if (getExtendedProtocolDecl()) {
+    auto ED = cast<ExtensionDecl>(this);
+    return ED->getGenericSignature()->requiresClass(ED->getSelfInterfaceType());
+  }
+  return false;
+}
+
+SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
+  switch (dc->getContextKind()) {
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::Module:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+    return extractNearestSourceLoc(dc->getAsDecl());
+
+  case DeclContextKind::AbstractClosureExpr: {
+    SourceLoc loc = cast<AbstractClosureExpr>(dc)->getLoc();
+    if (loc.isValid())
+      return loc;
+    return extractNearestSourceLoc(dc->getParent());
+  }
+
+  case DeclContextKind::FileUnit:
+    return SourceLoc();
+
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    return extractNearestSourceLoc(dc->getParent());
+  }
+  llvm_unreachable("Unhandled DeclCopntextKindin switch");
+}
+
 #define DECL(Id, Parent) \
   static_assert(!std::is_base_of<DeclContext, Id##Decl>::value, \
                 "Non-context Decl node has context?");
@@ -1020,3 +1123,12 @@ static void verify_DeclContext_is_start_of_node() {
 #include "swift/AST/ExprNodes.def"
 }
 #endif
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const IterableDeclContext *idc) {
+  simple_display(out, idc->getDecl());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const IterableDeclContext *idc) {
+  return extractNearestSourceLoc(idc->getDecl());
+}

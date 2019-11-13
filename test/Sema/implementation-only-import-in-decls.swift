@@ -86,19 +86,27 @@ public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (
 public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
-extension BadStruct { // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  public func testExtensionOfBadType() {} // FIXME: Should complain here instead of at the extension decl.
+extension BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
+  public func testExtensionOfBadType() {}
+  public var testExtensionVarBad: Int { 0 }
+  public subscript(bad _: Int) -> Int { 0 }
 }
 extension BadStruct {
   func testExtensionOfOkayType() {}
+  var testExtensionVarOkay: Int { 0 }
+  subscript(okay _: Int) -> Int { 0 }
 }
 
-extension Array where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  public func testExtensionWithBadRequirement() {} // FIXME: Should complain here instead of at the extension decl.
+extension Array where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
+  public func testExtensionWithBadRequirement() {}
+  public var testExtensionVarBad: Int { 0 }
+  public subscript(bad _: Int) -> Int { 0 }
 }
 
 extension Array where Element == BadStruct {
   func testExtensionWithOkayRequirement() {} // okay
+  var testExtensionVarOkay: Int { 0 } // okay
+  subscript(okay _: Int) -> Int { 0 } // okay
 }
 
 extension Int: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
@@ -106,7 +114,7 @@ struct TestExtensionConformanceOkay {}
 extension TestExtensionConformanceOkay: BadProto {} // okay
 
 public protocol TestConstrainedExtensionProto {}
-extension Array: TestConstrainedExtensionProto where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+extension Array: TestConstrainedExtensionProto where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with conditional conformances; 'BADLibrary' has been imported as implementation-only}}
 }
 
 
@@ -165,7 +173,7 @@ public class SubclassOfNormalClass: NormalClass {}
 public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalClass>) {} // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 public func testSpecializedConformance(_: NormalProtoAssocHolder<GenericStruct<Int>>) {} // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
   public func testConstrainedExtensionUsingBadConformance() {}
 }
 

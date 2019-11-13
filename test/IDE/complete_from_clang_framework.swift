@@ -28,6 +28,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=TYPE_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=EXPR_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
+
 import Foo
 // Don't import FooHelper directly in this test!
 // import FooHelper
@@ -331,4 +334,16 @@ func testCompleteInstanceMembers1(fooObject: FooClassDerived) {
 // CLANG_INSTANCE_MEMBERS_1-NEXT: Decl[InstanceMethod]/Super:         .nonInternalMeth()[#Any!#]
 // CLANG_INSTANCE_MEMBERS_1-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1()[#Any!#]
 // CLANG_INSTANCE_MEMBERS_1-NOT: Instance
+}
+
+// Check the FooHelper module is suggested even though it's not imported directly
+func testExportedModuleCompletion() -> #^TYPE_MODULE_QUALIFIER^# {
+  let x = #^EXPR_MODULE_QUALIFIER^#
+// MODULE_QUALIFIER: Begin completions
+// MODULE_QUALIFIER-DAG: Decl[Module]/None: swift_ide_test[#Module#]; name=swift_ide_test
+// MODULE_QUALIFIER-DAG: Decl[Module]/None: Swift[#Module#]; name=Swift
+// MODULE_QUALIFIER-DAG: Decl[Module]/None: Foo[#Module#]; name=Foo
+// MODULE_QUALIFIER-DAG: Decl[Module]/None: FooHelper[#Module#]; name=FooHelper
+// MODULE_QUALIFIER-DAG: Decl[Module]/None: Bar[#Module#]; name=Bar
+// MODULE_QUALIFIER: End completions
 }

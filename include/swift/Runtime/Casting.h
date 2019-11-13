@@ -246,4 +246,4 @@ const WitnessTable *swift_conformsToProtocol(const Metadata *type,
 
 } // end namespace swift
 
-#endif /* SWIFT_RUNTIME_CASTING_H */
+#endif // SWIFT_RUNTIME_CASTING_H

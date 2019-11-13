@@ -610,7 +610,7 @@ func test_isa_class_2(x: B) -> AnyObject {
     return y
 
   // CHECK: [[NO_CASE3]]:
-  // CHECK    destroy_value [[CAST_E_COPY]]
+  // CHECK:    destroy_value [[CAST_E_COPY]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):

@@ -16,7 +16,7 @@
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each element of the source container.
 public protocol _ObjectiveCBridgeable {
-  associatedtype _ObjectiveCType : AnyObject
+  associatedtype _ObjectiveCType: AnyObject
 
   /// Convert `self` to Objective-C.
   func _bridgeToObjectiveC() -> _ObjectiveCType
@@ -84,6 +84,48 @@ public protocol _ObjectiveCBridgeable {
 }
 
 #if _runtime(_ObjC)
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedArray")
+@usableFromInline
+internal func _SwiftCreateBridgedArray(
+  values: UnsafePointer<AnyObject>,
+  numValues: Int
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = Array(bufPtr)._bridgeToObjectiveCImpl()
+  return Unmanaged<AnyObject>.passRetained(bridged)
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedMutableArray")
+@usableFromInline
+internal func _SwiftCreateBridgedMutableArray(
+  values: UnsafePointer<AnyObject>,
+  numValues: Int
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = _SwiftNSMutableArray(Array(bufPtr))
+  return Unmanaged<AnyObject>.passRetained(bridged)
+}
+
+@_silgen_name("swift_stdlib_connectNSBaseClasses")
+internal func _connectNSBaseClasses() -> Bool
+
+
+private let _bridgeInitializedSuccessfully = _connectNSBaseClasses()
+internal var _orphanedFoundationSubclassesReparented: Bool = false
+
+/// Reparents the SwiftNativeNS*Base classes to be subclasses of their respective
+/// Foundation types, or is false if they couldn't be reparented. Must be run
+/// in order to bridge Swift Strings, Arrays, Dictionarys, Sets, or Enumerators to ObjC.
+ internal func _connectOrphanedFoundationSubclassesIfNeeded() -> Void {
+  let bridgeWorks = _bridgeInitializedSuccessfully
+  _debugPrecondition(bridgeWorks)
+  _orphanedFoundationSubclassesReparented = true
+}
 
 //===--- Bridging for metatypes -------------------------------------------===//
 
@@ -336,7 +378,10 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-/// A mutable pointer-to-ObjC-pointer argument.
+/// A mutable pointer addressing an Objective-C reference that doesn't own its
+/// target.
+///
+/// `Pointee` must be a class type or `Optional<C>` where `C` is a class.
 ///
 /// This type has implicit conversions to allow passing any of the following
 /// to a C or ObjC API:
@@ -356,7 +401,7 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-@_fixed_layout
+@frozen
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   :  _Pointer {
 
@@ -368,41 +413,50 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     self._rawValue = _rawValue
   }
 
-  /// Access the `Pointee` instance referenced by `self`.
+  /// Retrieve or set the `Pointee` instance referenced by `self`.
+  ///
+  /// `AutoreleasingUnsafeMutablePointer` is assumed to reference a value with
+  /// `__autoreleasing` ownership semantics, like `NSFoo **` declarations in
+  /// ARC. Setting the pointee autoreleases the new value before trivially
+  /// storing it in the referenced memory.
   ///
   /// - Precondition: the pointee has been initialized with an instance of type
   ///   `Pointee`.
   @inlinable
   public var pointee: Pointee {
-    @_transparent _read {
-      // We can do a strong load normally.
-      yield UnsafePointer(self).pointee
+    @_transparent get {
+      // The memory addressed by this pointer contains a non-owning reference,
+      // therefore we *must not* point an `UnsafePointer<AnyObject>` to
+      // it---otherwise we would allow the compiler to assume it has a +1
+      // refcount, enabling some optimizations that wouldn't be valid.
+      //
+      // Instead, we need to load the pointee as a +0 unmanaged reference. For
+      // an extra twist, `Pointee` is allowed (but not required) to be an
+      // optional type, so we actually need to load it as an optional, and
+      // explicitly handle the nil case.
+      let unmanaged =
+        UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
+      return _unsafeReferenceCast(
+        unmanaged?.takeUnretainedValue(),
+        to: Pointee.self)
     }
-    /// Set the value the pointer points to, copying over the previous value.
-    ///
-    /// AutoreleasingUnsafeMutablePointers are assumed to reference a
-    /// value with __autoreleasing ownership semantics, like 'NSFoo**'
-    /// in ARC. This autoreleases the argument before trivially
-    /// storing it to the referenced memory.
+
     @_transparent nonmutating set {
       // Autorelease the object reference.
-      typealias OptionalAnyObject = AnyObject?
-      let newAnyObject = unsafeBitCast(newValue, to: OptionalAnyObject.self)
-      Builtin.retain(newAnyObject)
-      Builtin.autorelease(newAnyObject)
-      // Trivially assign it as an OpaquePointer; the pointer references an
-      // autoreleasing slot, so retains/releases of the original value are
-      // unneeded.
-      typealias OptionalUnmanaged = Unmanaged<AnyObject>?
-      UnsafeMutablePointer<Pointee>(_rawValue).withMemoryRebound(
-        to: OptionalUnmanaged.self, capacity: 1) {
-        if let newAnyObject = newAnyObject {
-          $0.pointee = Unmanaged.passUnretained(newAnyObject)
-        }
-        else {
-          $0.pointee = nil
-        }
+      let object = _unsafeReferenceCast(newValue, to: Optional<AnyObject>.self)
+      Builtin.retain(object)
+      Builtin.autorelease(object)
+
+      // Convert it to an unmanaged reference and trivially assign it to the
+      // memory addressed by this pointer.
+      let unmanaged: Optional<Unmanaged<AnyObject>>
+      if let object = object {
+        unmanaged = Unmanaged.passUnretained(object)
+      } else {
+        unmanaged = nil
       }
+      UnsafeMutablePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee =
+        unmanaged
     }
   }
 
@@ -413,9 +467,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Pointee {
     @_transparent
-    _read {
-      // We can do a strong load normally.
-      yield ((UnsafePointer<Pointee>(self) + i).pointee)
+    get {
+      return self.advanced(by: i).pointee
     }
   }
 
@@ -456,7 +509,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @usableFromInline @_transparent
-  internal init<U>(_ from: UnsafePointer<U>) {
+  internal init<U>(
+    @_nonEphemeral _ from: UnsafePointer<U>
+  ) {
     self._rawValue = from._rawValue
   }
 
@@ -470,7 +525,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @usableFromInline @_transparent
-  internal init?<U>(_ from: UnsafePointer<U>?) {
+  internal init?<U>(
+    @_nonEphemeral _ from: UnsafePointer<U>?
+  ) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -482,7 +539,9 @@ extension UnsafeMutableRawPointer {
   ///
   /// - Parameter other: The pointer to convert.
   @_transparent
-  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+  public init<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>
+  ) {
     _rawValue = other._rawValue
   }
 
@@ -492,7 +551,9 @@ extension UnsafeMutableRawPointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+  public init?<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>?
+  ) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }
@@ -504,7 +565,9 @@ extension UnsafeRawPointer {
   ///
   /// - Parameter other: The pointer to convert.
   @_transparent
-  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+  public init<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>
+  ) {
     _rawValue = other._rawValue
   }
 
@@ -514,7 +577,9 @@ extension UnsafeRawPointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+  public init?<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>?
+  ) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }

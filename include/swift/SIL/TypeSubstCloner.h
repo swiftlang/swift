@@ -21,10 +21,10 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/Support/Debug.h"
 
@@ -69,14 +69,14 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
+        if (FRI && FRI->getInitiallyReferencedFunction() == AI.getFunction() &&
             Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions
           // are the same.
           auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
           auto RecursiveSubstCalleeSILType = LoweredFnTy;
-          auto GenSig = LoweredFnTy->getGenericSignature();
+          auto GenSig = LoweredFnTy->getInvocationGenericSignature();
           if (GenSig) {
             // Compute substitutions for the specialized function. These
             // substitutions may be different from the original ones, e.g.
@@ -84,13 +84,14 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             RecursiveSubs = SubstitutionMap::get(
               AI.getFunction()
                 ->getLoweredFunctionType()
-                ->getGenericSignature(),
+                ->getInvocationGenericSignature(),
               Subs);
 
             // Use the new set of substitutions to compute the new
             // substituted callee type.
             RecursiveSubstCalleeSILType = LoweredFnTy->substGenericArgs(
-                AI.getModule(), RecursiveSubs);
+                AI.getModule(), RecursiveSubs,
+                Builder.getTypeExpansionContext());
           }
 
           // The specialized recursive function may have different calling
@@ -109,7 +110,8 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       assert(Subs.empty() ||
              SubstCalleeSILType ==
-                 Callee->getType().substGenericArgs(AI.getModule(), Subs));
+                 Callee->getType().substGenericArgs(
+                     AI.getModule(), Subs, Builder.getTypeExpansionContext()));
     }
 
     ArrayRef<SILValue> getArguments() const {
@@ -168,17 +170,40 @@ protected:
     SILType &Sty = TypeCache[Ty];
     if (!Sty) {
       Sty = Ty.subst(Original.getModule(), SubsMap);
+      if (!Sty.getASTType()->hasOpaqueArchetype() ||
+          !getBuilder()
+               .getTypeExpansionContext()
+               .shouldLookThroughOpaqueTypeArchetypes())
+        return Sty;
+      // Remap types containing opaque result types in the current context.
+      Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
+          Sty.getCategory());
     }
     return Sty;
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SubsMap)->getCanonicalType();
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    if (!substTy->hasOpaqueArchetype() ||
+        !getBuilder().getTypeExpansionContext()
+            .shouldLookThroughOpaqueTypeArchetypes())
+      return substTy;
+    // Remap types containing opaque result types in the current context.
+    return getBuilder().getModule().Types.getLoweredRValueType(
+        TypeExpansionContext(getBuilder().getFunction()), substTy);
   }
 
-  ProtocolConformanceRef remapConformance(Type type,
+  ProtocolConformanceRef remapConformance(Type ty,
                                           ProtocolConformanceRef conf) {
-    return conf.subst(type, SubsMap);
+    auto conformance = conf.subst(ty, SubsMap);
+    auto substTy = ty.subst(SubsMap)->getCanonicalType();
+    auto context = getBuilder().getTypeExpansionContext();
+    if (substTy->hasOpaqueArchetype() &&
+        context.shouldLookThroughOpaqueTypeArchetypes()) {
+      conformance =
+          substOpaqueTypesWithUnderlyingTypes(conformance, substTy, context);
+    }
+    return conformance;
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
@@ -193,6 +218,13 @@ protected:
                                  Helper.getArguments(), Inst->isNonThrowing(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
+    // Specialization can return noreturn applies that were not identified as
+    // such before.
+    if (N->isCalleeNoReturn() &&
+        !isa<UnreachableInst>(*std::next(SILBasicBlock::iterator(Inst)))) {
+      noReturnApplies.push_back(N);
+    }
+
     recordClonedInstruction(Inst, N);
   }
 
@@ -290,7 +322,7 @@ protected:
   /// to clone a unique copy of the function declaration with the substitutions
   /// applied for the debug info.
   static bool substitutionsChangeGenericTypeParameters(SubstitutionMap SubsMap,
-                                                       GenericSignature *Sig) {
+                                                       GenericSignature Sig) {
 
     // If there are no substitutions, just reuse
     // the original decl.
@@ -317,7 +349,7 @@ protected:
                                           SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
-                                          GenericSignature *RemappedSig,
+                                          GenericSignature RemappedSig,
                                           bool ForInlining = false) {
     // If the original, non-inlined version of the function had no generic
     // environment, there is no need to remap it.
@@ -381,6 +413,9 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
+  // Generic specialization can create noreturn applications that where
+  // previously not identifiable as such.
+  SmallVector<ApplyInst *, 16> noReturnApplies;
 };
 
 } // end namespace swift

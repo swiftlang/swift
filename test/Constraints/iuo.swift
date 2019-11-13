@@ -210,10 +210,8 @@ func conditionalDowncastToOptional(b: B?) -> D? {
 }
 
 func conditionalDowncastToObject(b: B?) -> D {
-  return b as? D! // expected-error {{value of optional type 'D?' must be unwrapped}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
-  // expected-warning@-3 {{using '!' here is deprecated and will be removed in a future release}}
+  return b as? D! // expected-error {{cannot convert return expression of type 'D??' to return type 'D'}}
+  // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
 }
 
 // Ensure that we select the overload that does *not* involve forcing an IUO.

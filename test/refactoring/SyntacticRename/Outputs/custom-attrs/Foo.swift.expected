@@ -1,0 +1,59 @@
+@propertyWrapper
+struct /*wrapper:def*/Foo2<T> {
+    public var wrappedValue: T
+    init(initialValue: T) {
+        wrappedValue = initialValue
+    }
+    init(initialValue: T, otherThing: Bool) {
+        self.init(initialValue: initialValue)
+    }
+    var projectedValue: Projection<T> {
+      get { Projection(item: wrappedValue) }
+    }
+}
+
+struct Projection<T> {
+    var item: T
+}
+
+@_functionBuilder
+struct /*builder:def*/Other {
+    public static func buildBlock(_ components: String...) -> String {
+        return components.joined()
+    }
+}
+
+struct Bar {
+    @/*wrapper*/Foo2
+    var /*wrapped:def*/foo: Int = 10
+    @/*wrapper*/Foo2(initialValue: "hello")
+    var bar: String
+    @/*wrapper*/Foo2
+    var jim: String = {
+        struct Bar {
+            @/*wrapper*/Foo2
+            var inner: String = "It's 42"
+        }
+        return Bar().inner
+    }()
+
+    func combined(@/*builder*/Other _ a: () -> String) -> String {
+        return a()
+    }
+
+     @/*builder*/Other
+    func hello() -> String {
+        "hello"
+        "there"
+    }
+
+    func baz() {
+        let _: /*wrapper*/Foo2<Int> = /*wrapped+1*/_foo
+        let _: Int = /*wrapped+1*/_foo.wrappedValue
+        let _: Int = /*wrapped*/foo
+        let _: Projection<Int> = /*wrapped+1*/$foo
+        let _: /*wrapper*/Foo2<String> = _bar
+    }
+}
+
+

@@ -12,7 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -551,7 +551,7 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   for (auto &BB : *Callee)
     for (auto &I : BB)
       if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getReferencedFunction() == Callee)
+        if (Apply.getReferencedFunctionOrNull() == Callee)
           return true;
   return false;
 }
@@ -563,7 +563,9 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (!AI.hasSubstitutions())
     return false;
 
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "Trying to optimize a dynamic function?!");
+
   auto SubsMap = AI.getSubstitutionMap();
 
   // Bail if there are no open existentials in the list of substitutions.
@@ -610,7 +612,7 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
   if (ASC && !ASC.canInlineEarly())
     return true;
 
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
   if (!Callee)
     return false;
 
@@ -628,8 +630,11 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
 
 /// Checks if a generic callee and caller have compatible layout constraints.
 static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
-  SILFunction *Callee = AI.getReferencedFunction();
-  auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "Trying to optimize a dynamic function!?");
+
+  auto CalleeSig = Callee->getLoweredFunctionType()
+                         ->getInvocationGenericSignature();
   auto AISubs = AI.getSubstitutionMap();
 
   SmallVector<GenericTypeParamType *, 4> SubstParams;
@@ -665,7 +670,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
   if (!Callee) {
     return nullptr;
@@ -763,20 +768,16 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
-    // Inlining of generics is not allowed unless it is an @inline(__always)
-    // or transparent function.
-    if (Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
-      return nullptr;
-  }
-
   // We cannot inline function with layout constraints on its generic types
   // if the corresponding substitution type does not have the same constraints.
   // The reason for this restriction is that we'd need to be able to express
   // in SIL something like casting a value of generic type T into a value of
   // generic type T: _LayoutConstraint, which is impossible currently.
-  if (EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
-    if (!isCallerAndCalleeLayoutConstraintsCompatible(AI))
+  if (AI.hasSubstitutions()) {
+    if (!isCallerAndCalleeLayoutConstraintsCompatible(AI) &&
+        // TODO: revisit why we can make an exception for inline-always
+        // functions. Some tests depend on it.
+        Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
       return nullptr;
   }
 

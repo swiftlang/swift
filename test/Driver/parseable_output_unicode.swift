@@ -8,8 +8,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c -primary-file {{.*[\\/]}}你好.swift{{(\\")? .*}} -o {{.*[\\/]}}你好-[[OUTPUT:.*]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*[\\/]}}你好.swift{{(\\")? .*}} -o {{.*[\\/]}}你好-[[OUTPUT:.*]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -39,6 +39,10 @@
 // CHECK-NEXT:       "path": "{{.*[\\/]}}你好-[[OUTPUT]].swiftdoc"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}你好-[[OUTPUT]].swiftsourceinfo"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "diagnostics",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}你好-[[OUTPUT]].dia"
 // CHECK-NEXT:     }
@@ -65,8 +69,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}你好-[[OUTPUT]].swiftmodule{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftmodule{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}你好-[[OUTPUT]].swiftmodule{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftmodule{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-merge-modules",
@@ -86,6 +90,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftsourceinfo"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "objc-header",
@@ -114,8 +122,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "link",
-// CHECK-NEXT:   "command": "{{.*[\\/](ld|clang\+\+.exe)(\\")?}} {{.*[\\/]}}你好-[[OUTPUT]].o{{(\\")?}}{{.*}}-o {{.*[\\/]}}parseable_output_unicode.swift.tmp.out{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/](ld|clang\+\+.exe)(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/](ld|clang.exe)(\\")?}} {{.*[\\/]}}你好-[[OUTPUT]].o{{(\\")?}}{{.*}}-o {{.*[\\/]}}parseable_output_unicode.swift.tmp.out{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/](ld|clang.exe)(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK:          "{{.*[\\/]}}你好-[[OUTPUT]].o",
 // CHECK:          "-o",

@@ -135,7 +135,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   // the implementation, including checkGenericArguments, needs to be taught to
   // recognize that types with archetypes may potentially succeed.
   if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
-    assert(!conformance->getConditionalRequirements().empty());
+    assert(!conformance.getConditionalRequirements().empty());
     return DynamicCastFeasibility::MaySucceed;
   }
 
@@ -217,8 +217,7 @@ bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
-    auto conformance = M->lookupConformance(Ty, bridgedProto);
-    return conformance.hasValue();
+    return (bool)M->lookupConformance(Ty, bridgedProto);
   }
   return false;
 }
@@ -232,8 +231,7 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
   if (errorTypeProto) {
     // Find the conformance of the value type to Error.
     // Check whether the type conforms to Error.
-    auto conformance = M->lookupConformance(Ty, errorTypeProto);
-    return conformance.hasValue();
+    return (bool)M->lookupConformance(Ty, errorTypeProto);
   }
   return false;
 }
@@ -292,10 +290,16 @@ CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
 
 static bool isCFBridgingConversion(ModuleDecl *M, SILType sourceType,
                                    SILType targetType) {
-  return (sourceType.getASTType() ==
-            getNSBridgedClassOfCFClass(M, targetType.getASTType()) ||
-          targetType.getASTType() ==
-            getNSBridgedClassOfCFClass(M, sourceType.getASTType()));
+  if (auto bridgedTarget =
+        getNSBridgedClassOfCFClass(M, targetType.getASTType())) {
+    return bridgedTarget->isExactSuperclassOf(sourceType.getASTType());
+  }
+  if (auto bridgedSource =
+        getNSBridgedClassOfCFClass(M, sourceType.getASTType())) {
+    return targetType.getASTType()->isExactSuperclassOf(bridgedSource);
+  }
+  
+  return false;
 }
 
 /// Try to classify the dynamic-cast relationship between two types.
@@ -306,6 +310,10 @@ swift::classifyDynamicCast(ModuleDecl *M,
                            bool isSourceTypeExact,
                            bool isWholeModuleOpts) {
   if (source == target) return DynamicCastFeasibility::WillSucceed;
+
+  // Return a conservative answer for opaque archetypes for now.
+  if (source->hasOpaqueArchetype() || target->hasOpaqueArchetype())
+    return DynamicCastFeasibility::MaySucceed;
 
   auto sourceObject = source.getOptionalObjectType();
   auto targetObject = target.getOptionalObjectType();
@@ -864,7 +872,7 @@ namespace {
         value = getOwnedScalar(source, srcTL);
       }
       auto targetTy = target.LoweredType;
-      if (isCFBridgingConversion(SwiftModule, targetTy, value->getType())) {
+      if (isCFBridgingConversion(SwiftModule, value->getType(), targetTy)) {
         value = B.createUncheckedRefCast(Loc, value, targetTy.getObjectType());
       } else {
         value = B.createUpcast(Loc, value, targetTy.getObjectType());
@@ -910,7 +918,8 @@ namespace {
         auto sourceSomeDecl = Ctx.getOptionalSomeDecl();
 
         SILType loweredSourceObjectType =
-          source.Value->getType().getEnumElementType(sourceSomeDecl, M);
+            source.Value->getType().getEnumElementType(
+                sourceSomeDecl, M, B.getTypeExpansionContext());
 
         // Form the target for the optional object.
         EmitSomeState state;
@@ -983,8 +992,8 @@ namespace {
       auto someDecl = Ctx.getOptionalSomeDecl();
       state.SomeDecl = someDecl;
 
-      SILType loweredObjectType =
-        target.LoweredType.getEnumElementType(someDecl, M);
+      SILType loweredObjectType = target.LoweredType.getEnumElementType(
+          someDecl, M, B.getTypeExpansionContext());
 
       if (target.isAddress()) {
         SILValue objectAddr =

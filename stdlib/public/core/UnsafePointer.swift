@@ -204,7 +204,7 @@
 ///       var number = 5
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct UnsafePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
@@ -215,7 +215,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 
   /// Creates an `UnsafePointer` from a builtin raw pointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
@@ -317,7 +317,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   }
 
   @inlinable // unsafe-performance
-  internal static var _max : UnsafePointer {
+  internal static var _max: UnsafePointer {
     return UnsafePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
@@ -510,7 +510,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 ///       var number = 5
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
@@ -521,7 +521,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
@@ -530,7 +530,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// - Parameter other: The immutable pointer to convert.
   @_transparent
-  public init(mutating other: UnsafePointer<Pointee>) {
+  public init(@_nonEphemeral mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
@@ -540,7 +540,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
   @_transparent
-  public init?(mutating other: UnsafePointer<Pointee>?) {
+  public init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
@@ -550,7 +550,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///		
   /// - Parameter other: The pointer to convert.		
   @_transparent		
-  public init(_ other: UnsafeMutablePointer<Pointee>) {		
+  public init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
    self._rawValue = other._rawValue		
   }		
 
@@ -560,7 +560,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the		
   ///   result is `nil`.		
   @_transparent		
-  public init?(_ other: UnsafeMutablePointer<Pointee>?) {		
+  public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
    guard let unwrapped = other else { return nil }		
    self.init(unwrapped)		
   }		
@@ -784,7 +784,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveInitialize(from source: UnsafeMutablePointer, count: Int) {
+  public func moveInitialize(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
@@ -855,7 +857,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(from source: UnsafeMutablePointer, count: Int) {
+  public func moveAssign(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
     _debugPrecondition(
@@ -974,7 +978,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   }
 
   @inlinable // unsafe-performance
-  internal static var _max : UnsafeMutablePointer {
+  internal static var _max: UnsafeMutablePointer {
     return UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked

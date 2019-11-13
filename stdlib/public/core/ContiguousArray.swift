@@ -33,7 +33,7 @@
 ///
 /// For more information about using arrays, see `Array` and `ArraySlice`, with
 /// which `ContiguousArray` shares most properties and methods.
-@_fixed_layout
+@frozen
 public struct ContiguousArray<Element>: _DestructorSafeContainer {
   @usableFromInline
   internal typealias _Buffer = _ContiguousArrayBuffer<Element>
@@ -801,7 +801,10 @@ extension ContiguousArray: RangeReplaceableCollection {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    _buffer.count += writtenCount
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if writtenCount > 0 {
+      _buffer.count += writtenCount
+    }
 
     if writtenUpTo == buf.endIndex {
       // there may be elements that didn't fit in the existing buffer,
@@ -1006,7 +1009,7 @@ extension ContiguousArray {
   ///     of the new array.
   ///     - Parameters:
   ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///         specified number of of elements.
+  ///         specified number of elements.
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.

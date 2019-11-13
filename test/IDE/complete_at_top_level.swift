@@ -167,6 +167,11 @@ func fooFunc2(_ a: Int, _ b: Double) {}
 
 func erroneous1(_ x: Undeclared) {}
 
+// FIXME: Hides all other string interpolation completion.
+//extension DefaultStringInterpolation {
+//  mutating func appendInterpolation(interpolate: Double) {}
+//}
+
 //===--- Test code completions of expressions that can be typechecked.
 
 // Although the parser can recover in most of these test cases, we resync it
@@ -465,6 +470,7 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3^#)"
 _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP: Begin completions
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(value): _#}[')'][#Void#]; name=value: _
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: fooFunc1()[#Void#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];

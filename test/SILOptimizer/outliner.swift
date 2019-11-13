@@ -184,3 +184,27 @@ extension Operation {
 public func dontCrash(a: Any)  {
   (a as AnyObject).treeishChildren()
 }
+
+public class Foo : NSObject {
+  var x: MyView? = nil
+
+  public func dontCrash(_ pt: MyPoint) -> Bool {
+    guard let somView = x,
+          let window = somView.window else {
+      return false
+    }
+
+    guard let event = MyEvent.mouseEvent(with: .A,
+                                         location: pt,
+                                         windowNumber: window.windowNumber,
+                                         context: nil,
+                                         eventNumber: 0,
+                                         clickCount: 1,
+                                         pressure:1) else {
+      print("failure")
+      return false
+    }
+    print(event)
+    return true
+  }
+}

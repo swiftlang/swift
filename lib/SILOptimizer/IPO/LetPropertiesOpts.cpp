@@ -26,7 +26,8 @@
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -375,7 +376,7 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
 
   // FIXME: Expansion
   auto &TL = Module->Types.getTypeLowering(Property->getType(),
-                                           ResilienceExpansion::Minimal);
+                                           TypeExpansionContext::minimal());
   if (!TL.isTrivial()) {
      LLVM_DEBUG(llvm::dbgs() << "Property '" << *Property
                              << "' is not of trivial type\n");

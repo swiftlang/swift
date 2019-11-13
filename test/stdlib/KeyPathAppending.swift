@@ -49,32 +49,39 @@ func mismatchedAppends<T, U, V>(readOnlyLeft: KeyPath<T, U>,
                                 readOnlyRight: KeyPath<U, V>,
                                 writableRight: WritableKeyPath<U, V>,
                                 referenceRight: ReferenceWritableKeyPath<U, V>){
-  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: readOnlyLeft)
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<T, U>' to expected argument type 'KeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 
-  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: writableLeft)
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<T, U>' to expected argument type 'KeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 
-  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: referenceLeft)
+  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<T, U>' to expected argument type 'ReferenceWritableKeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 
-  // expected-error@+1{{}}
   _ = writableRight.appending(path: readOnlyLeft)
+  // expected-error@-1 {{instance method 'appending(path:)' requires that 'KeyPath<U, V>' inherit from 'KeyPath<U, T>'}}
 
-  // expected-error@+1{{}}
   _ = writableRight.appending(path: writableLeft)
+  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<T, U>' to expected argument type 'WritableKeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 
-  // expected-error@+1{{}}
   _ = writableRight.appending(path: referenceLeft)
+  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<T, U>' to expected argument type 'ReferenceWritableKeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 
-  // expected-error@+1{{}}
   _ = referenceRight.appending(path: readOnlyLeft)
+  // expected-error@-1 {{instance method 'appending(path:)' requires that 'KeyPath<U, V>' inherit from 'KeyPath<U, T>'}}
 
-  // expected-error@+1{{}}
   _ = referenceRight.appending(path: writableLeft)
+  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<T, U>' to expected argument type 'WritableKeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 
-  // expected-error@+1{{}}
   _ = referenceRight.appending(path: referenceLeft)
+  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<T, U>' to expected argument type 'WritableKeyPath<V, U>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('T' and 'V') are expected to be equal}}
 }
 
 func partialAppends<T, U, V>(partial: PartialKeyPath<T>,

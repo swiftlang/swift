@@ -1,4 +1,6 @@
-// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
+// RUN: %empty-directory(%t)
+// RUN: cp %s %t/main.swift
+// RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %t/main.swift %S/../Inputs/SmallStringTestUtilities.swift -o %t.out -O
 // RUN: %target-run %t.out
 
 // REQUIRES: executable_test
@@ -13,87 +15,7 @@ import StdlibUnittest
 import Foundation
 #endif
 var SmallStringTests = TestSuite("SmallStringTests")
-
-extension String: Error {}
-
-func verifySmallString(_ small: _SmallString, _ input: String) {
-  expectEqual(_SmallString.capacity, small.count + small.unusedCapacity)
-  let tiny = Array(input.utf8)
-  expectEqual(tiny.count, small.count)
-  for (lhs, rhs) in zip(tiny, small) {
-    expectEqual(lhs, rhs)
-  }
-
-  let smallFromUTF16 = _SmallString(Array(input.utf16))
-  expectNotNil(smallFromUTF16)
-  expectEqualSequence(small, smallFromUTF16!)
-
-  // Test slicing
-  //
-  for i in 0..<small.count {
-    for j in i...small.count {
-      expectEqualSequence(tiny[i..<j], small[i..<j])
-      if j < small.count {
-        expectEqualSequence(tiny[i...j], small[i...j])
-      }
-    }
-  }
-
-  // Test RAC and Mutable
-  var copy = small
-  for i in 0..<small.count / 2 {
-    let tmp = copy[i]
-    copy[i] = copy[copy.count - 1 - i]
-    copy[copy.count - 1 - i] = tmp
-  }
-  expectEqualSequence(small.reversed(), copy)
-}
-
-// Testing helper inits
-extension _SmallString {
-  init?(_ codeUnits: Array<UInt8>) {
-    guard let smol = codeUnits.withUnsafeBufferPointer({
-      return _SmallString($0)
-    }) else {
-      return nil
-    }
-    self = smol
-  }
-
-  init?(_ codeUnits: Array<UInt16>) {
-    let str = codeUnits.withUnsafeBufferPointer {
-      return String._uncheckedFromUTF16($0)
-    }
-    if !str._guts.isSmall {
-      return nil
-    }
-    self.init(str._guts._object)
-  }
-
-#if _runtime(_ObjC)
-  init?(_cocoaString ns: NSString) {
-    guard _isObjCTaggedPointer(ns) else { return nil }
-    self.init(taggedCocoa: ns)
-  }
-#endif
-
-  func _appending(_ other: _SmallString) -> _SmallString? {
-    return _SmallString(self, appending: other)
-  }
-
-  func _repeated(_ n: Int) -> _SmallString? {
-    var base = self
-    let toAppend = self
-    for _ in 0..<(n &- 1) {
-      guard let s = _SmallString(
-        base, appending: toAppend)
-      else { return nil }
-      base = s
-    }
-    return base
-  }
-}
-
+  
 SmallStringTests.test("FitsInSmall") {
   func runTest(_ input: String) throws {
     let tiny = Array(input.utf8)
@@ -131,47 +53,6 @@ SmallStringTests.test("FitsInSmall") {
   }
 
 }
-
-#if _runtime(_ObjC)
-SmallStringTests.test("Bridging") {
-  // Test bridging retains small string form
-  func bridge(_ small: _SmallString) -> String {
-    return String(_StringGuts(small))._bridgeToObjectiveCImpl() as! String
-  }
-  func runTestSmall(_ input: String) throws {
-    // Constructed through CF
-    guard let fromCocoaSmall = _SmallString(
-      _cocoaString: input as NSString
-    ) else {
-        throw "Didn't fit"
-    }
-    verifySmallString(fromCocoaSmall, input)
-    verifySmallString(fromCocoaSmall, bridge(fromCocoaSmall))
-  }
-
-  // Pass tests
-
-  if #available(macOS 10.10, iOS 9, *) {
-    expectDoesNotThrow({ try runTestSmall("abc") })
-    expectDoesNotThrow({ try runTestSmall("defghijk") })
-    expectDoesNotThrow({ try runTestSmall("aaaaaaaaaaa") })
-  } else {
-    // OS X 10.9, iOS 7/8 did not have tagged strings
-    expectThrows("Didn't fit", { try runTestSmall("abc") })
-    expectThrows("Didn't fit", { try runTestSmall("defghijk") })
-    expectThrows("Didn't fit", { try runTestSmall("aaaaaaaaaaa") })
-  }
-
-  // Fail tests
-  //
-  expectThrows("Didn't fit", { try runTestSmall("\u{0}") })
-  expectThrows("Didn't fit", { try runTestSmall("0123456789abcde") })
-  expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcd") })
-  expectThrows("Didn't fit", { try runTestSmall("👨‍👦") })
-  expectThrows("Didn't fit", { try runTestSmall("👨‍👩‍👦") })
-  expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcde") })
-}
-#endif
 
 SmallStringTests.test("Append, repeating") {
   let strings = [

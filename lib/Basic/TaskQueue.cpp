@@ -25,6 +25,8 @@ using namespace swift::sys;
 // Include the correct TaskQueue implementation.
 #if LLVM_ON_UNIX && !defined(__CYGWIN__) && !defined(__HAIKU__)
 #include "Unix/TaskQueue.inc"
+#elif defined(_WIN32)
+#include "Windows/TaskQueue.inc"
 #else
 #include "Default/TaskQueue.inc"
 #endif

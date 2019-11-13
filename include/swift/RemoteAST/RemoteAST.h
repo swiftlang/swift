@@ -240,6 +240,17 @@ public:
   Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(remote::RemoteAddress address,
                                          Type staticType);
+  
+  /// Given a reference to an opaque type descriptor, an ordinal, and a set
+  /// of substitutions, get the underlying type for the opaque type.
+  ///
+  /// This does not recursively apply the transformation if the underlying
+  /// type in turn refers to another opaque type.
+  Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal);
+  
 };
 
 } // end namespace remoteAST

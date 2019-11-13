@@ -3,7 +3,7 @@
   return x
 }
 
-@_fixed_layout
+@frozen
 public struct NoInlineInitStruct {
   @usableFromInline
   var x: Bool

@@ -349,7 +349,7 @@ class Derived : Base {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
-  // CHECK; [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @synamic_self Derived.Type
+  // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @dynamic_self Derived.Type
   // CHECK: [[SUPER:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Derived.Type to $@thick Base.Type
   // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC17returnsSelfStaticACXDyFZ
   // CHECK: apply [[METHOD]]([[SUPER]])

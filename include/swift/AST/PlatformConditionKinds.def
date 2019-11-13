@@ -1,0 +1,44 @@
+//===--- PlatformConditionKinds.def - Kinds of Platform Conditions - C++ ---*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with the kinds of
+// platform conditions that can be used for conditional compilation.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef PLATFORM_CONDITION
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER)
+#endif
+#ifndef PLATFORM_CONDITION_
+#define PLATFORM_CONDITION_(LABEL, IDENTIFIER) PLATFORM_CONDITION(LABEL, "_" IDENTIFIER)
+#endif
+
+/// The active os target (OSX, iOS, Linux, etc.)
+PLATFORM_CONDITION(OS, "os")
+
+/// The active arch target (x86_64, i386, arm, arm64, etc.)
+PLATFORM_CONDITION(Arch, "arch")
+
+/// The active endianness target (big or little)
+PLATFORM_CONDITION_(Endianness, "endian")
+
+/// Runtime support (_ObjC or _Native)
+PLATFORM_CONDITION_(Runtime, "runtime")
+
+/// Conditional import of module
+PLATFORM_CONDITION(CanImport, "canImport")
+
+/// Target Environment (currently just 'simulator' or absent)
+PLATFORM_CONDITION(TargetEnvironment, "targetEnvironment")
+
+#undef PLATFORM_CONDITION
+#undef PLATFORM_CONDITION_

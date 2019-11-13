@@ -27,8 +27,9 @@
 using namespace swift;
 using namespace swift::objc_translation;
 
-static void deriveBodyBridgedNSError_enum_nsErrorDomain(
-                    AbstractFunctionDecl *domainDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyBridgedNSError_enum_nsErrorDomain(AbstractFunctionDecl *domainDecl,
+                                            void *) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -50,11 +51,11 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
     new (C) ReturnStmt(SourceLoc(), initReflectingCall, /*implicit*/ true);
 
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc());
-
-  domainDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
-static void deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
+static std::pair<BraceStmt *, bool>
+deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
                     AbstractFunctionDecl *domainDecl, void *) {
   // enum SomeEnum {
   //   @derived
@@ -75,12 +76,13 @@ static void deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(ret),
                                 SourceLoc());
-  domainDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 static ValueDecl *
-deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived,
-                        void (*synthesizer)(AbstractFunctionDecl *, void*)) {
+deriveBridgedNSError_enum_nsErrorDomain(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void*)) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -88,23 +90,21 @@ deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived,
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
-
-  auto stringTy = C.getStringDecl()->getDeclaredType();
+  auto stringTy = derived.Context.getStringDecl()->getDeclaredType();
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
+      derived.Context.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
       /*isFinal=*/true);
 
   // Define the getter.
   auto getterDecl = derived.addGetterToReadOnlyDerivedProperty(
-      derived.TC, propDecl, stringTy);
+      propDecl, stringTy);
   getterDecl->setBodySynthesizer(synthesizer);
 
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }
@@ -113,7 +113,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
   if (!isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == TC.Context.Id_nsErrorDomain) {
+  if (requirement->getBaseName() == Context.Id_nsErrorDomain) {
     auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
 
     auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
@@ -125,6 +125,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
     return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
   }
 
-  TC.diagnose(requirement->getLoc(), diag::broken_errortype_requirement);
+  Context.Diags.diagnose(requirement->getLoc(),
+                         diag::broken_errortype_requirement);
   return nullptr;
 }

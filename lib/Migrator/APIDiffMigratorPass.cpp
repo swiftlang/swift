@@ -15,7 +15,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Index/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
@@ -73,7 +73,7 @@ public:
 
     for (auto *Param: *Parent->getParameters()) {
       if (!--NextIndex) {
-        return findChild(Param->getTypeLoc());
+        return findChild(Param->getTypeRepr());
       }
     }
     llvm_unreachable("child index out of bounds");
@@ -291,15 +291,16 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto addDiffItems = [&](ValueDecl *VD) {
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
-      if (swift::ide::printDeclUSR(VD, OS))
+      if (swift::ide::printValueDeclUSR(VD, OS))
         return;
       auto Items = DiffStore.getDiffItems(Buffer.str());
       results.insert(results.end(), Items.begin(), Items.end());
     };
 
     addDiffItems(VD);
-    for (auto *Overridden: getOverriddenDecls(VD, /*IncludeProtocolReqs=*/true,
-                                              /*Transitive=*/true)) {
+    for (auto *Overridden: collectAllOverriddenDecls(VD,
+                                                     /*IncludeProtocolReqs=*/true,
+                                                     /*Transitive=*/true)) {
       addDiffItems(Overridden);
     }
     return results;
@@ -1333,15 +1334,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       DiffItem->RightComment, /*From String*/false,
       /*No expression to wrap*/nullptr);
 
-    if (auto *BD = AFD->getBody()) {
-      auto BL = BD->getLBraceLoc();
-      if (BL.isValid()) {
-        // Insert the local variable declaration after the opening brace.
-        Editor.insertAfterToken(BL,
-          (llvm::Twine("\n// Local variable inserted by Swift 4.2 migrator.") +
-           "\nlet " + VariableName + " = " + Info.getFuncName() + "(" +
-           VariableName + ")\n").str());
-      }
+    auto BL = AFD->getBodySourceRange().Start;
+    if (BL.isValid()) {
+      // Insert the local variable declaration after the opening brace.
+      Editor.insertAfterToken(BL,
+        (llvm::Twine("\n// Local variable inserted by Swift 4.2 migrator.") +
+         "\nlet " + VariableName + " = " + Info.getFuncName() + "(" +
+         VariableName + ")\n").str());
     }
   }
 
@@ -1385,7 +1384,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto *OD = AFD->getOverriddenDecl();
     llvm::SmallString<64> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
-    if (swift::ide::printDeclUSR(OD, OS))
+    if (swift::ide::printValueDeclUSR(OD, OS))
       return SourceLoc();
     return OverridingRemoveNames.find(OS.str()) == OverridingRemoveNames.end() ?
       SourceLoc() : OverrideLoc;
@@ -1407,7 +1406,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           llvm::SmallString<64> Buffer;
           llvm::raw_svector_ostream OS(Buffer);
           auto *RD = DSC->getFn()->getReferencedDecl().getDecl();
-          if (swift::ide::printDeclUSR(RD, OS))
+          if (swift::ide::printValueDeclUSR(RD, OS))
             return false;
           return USRs.find(OS.str()) != USRs.end();
         }

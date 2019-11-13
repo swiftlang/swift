@@ -35,12 +35,8 @@ public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs()) :
     Stream(stream) { }
 
-  virtual void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  virtual void handleDiagnostic(SourceManager &SM,
+                                const DiagnosticInfo &Info) override;
 
   void forceColors() {
     ForceColors = true;
@@ -50,6 +46,9 @@ public:
   bool didErrorOccur() {
     return DidErrorOccur;
   }
+
+private:
+  void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
 };
   
 }

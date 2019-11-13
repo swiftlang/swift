@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#if defined(__CYGWIN__) || defined(__HAIKU__)
 #define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
 #define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
@@ -56,6 +56,10 @@
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
+#endif
+
+#if defined(__ELF__)
+#include <unwind.h>
 #endif
 
 namespace FatalErrorFlags {
@@ -188,6 +192,35 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
 #endif
 }
 
+#if defined(__ELF__)
+struct UnwindState {
+  void **current;
+  void **end;
+};
+
+static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, void *arg) {
+  struct UnwindState *state = static_cast<struct UnwindState *>(arg);
+  if (state->current == state->end) {
+    return _URC_END_OF_STACK;
+  }
+
+  uintptr_t pc;
+#if defined(__arm__)
+  // ARM r15 is PC.  UNW_REG_PC is *not* the same value, and using that will
+  // result in abnormal behaviour.
+  _Unwind_VRS_Get(context, _UVRSC_CORE, 15, _UVRSD_UINT32, &pc);
+  // Clear the ISA bit during the reporting.
+  pc &= ~(uintptr_t)0x1;
+#else
+  pc = _Unwind_GetIP(context);
+#endif
+  if (pc) {
+    *state->current++ = reinterpret_cast<void *>(pc);
+  }
+  return _URC_NO_REASON;
+}
+#endif
+
 LLVM_ATTRIBUTE_NOINLINE
 void swift::printCurrentBacktrace(unsigned framesToSkip) {
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
@@ -195,6 +228,10 @@ void swift::printCurrentBacktrace(unsigned framesToSkip) {
   void *addrs[maxSupportedStackDepth];
 #if defined(_WIN32)
   int symbolCount = CaptureStackBackTrace(0, maxSupportedStackDepth, addrs, NULL);
+#elif defined(__ELF__)
+  struct UnwindState state = {&addrs[0], &addrs[maxSupportedStackDepth]};
+  _Unwind_Backtrace(SwiftUnwindFrame, &state);
+  int symbolCount = state.current - addrs;
 #else
   int symbolCount = backtrace(addrs, maxSupportedStackDepth);
 #endif

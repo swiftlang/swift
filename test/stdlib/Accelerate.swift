@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: rdar50301438
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -74,7 +75,7 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
   
     let n = 1024
     
@@ -115,11 +116,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         }
     }
 
-    //===----------------------------------------------------------------------===//
-    //
-    //  Sliding window summation
-    //
-    //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//
+//  Sliding window summation
+//
+//===----------------------------------------------------------------------===//
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
   
     AccelerateTests.test("vDSP/SinglePrecisionSlidingWindowSum") {
         let source: [Float] = [1, 10, 12, 9, 3, 7, 2, 6]
@@ -151,11 +153,17 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
     }
   
-    //===----------------------------------------------------------------------===//
-    //
-    //  Linear interpolation
-    //
-    //===----------------------------------------------------------------------===//
+}
+
+//===----------------------------------------------------------------------===//
+//
+//  Linear interpolation
+//
+//===----------------------------------------------------------------------===//
+
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+    
+    let n = 1024
     
     AccelerateTests.test("vDSP/SinglePrecisionInterpolateBetweenVectors") {
         var result = [Float](repeating: 0, count: n)
@@ -297,6 +305,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     //
     //===----------------------------------------------------------------------===//
 
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+    
     AccelerateTests.test("vDSP/DifferenceEquationSinglePrecision") {
         let n = 256
         
@@ -379,6 +389,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     //
     //===----------------------------------------------------------------------===//
 
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     AccelerateTests.test("vDSP/DownsampleSinglePrecision") {
         let decimationFactor = 2
         let filterLength: vDSP_Length = 2
@@ -465,6 +476,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     //
     //===----------------------------------------------------------------------===//
 
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+    
     AccelerateTests.test("vDSP/PolynomialEvaluationSinglePrecision") {
         let coefficients: [Float] = [2, 3, 4, 5, 6, 7, 8, 9, 10]
         let variables = (0 ... 100).map { return Float($0) }

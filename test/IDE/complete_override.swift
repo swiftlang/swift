@@ -724,9 +724,10 @@ class Override26 : OverrideBase, OverrideP {
   // Same as MODIFIER24
 }
 
-// MODIFIER1: Begin completions, 9 items
+// MODIFIER1: Begin completions, 10 items
 // MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
 // MODIFIER1-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
+// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar: Int
 // MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
@@ -736,7 +737,8 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
 // MODIFIER1: End completions
 
-// MODIFIER2: Begin completions, 5 items
+// MODIFIER2: Begin completions, 6 items
+// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classVar: Int; name=classVar: Int
 // MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER2-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
@@ -760,7 +762,8 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
 // MODIFIER6: End completions
 
-// MODIFIER7: Begin completions, 7 items
+// MODIFIER7: Begin completions, 8 items
+// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classVar: Int; name=classVar: Int
 // MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER7-DAG: Decl[StaticMethod]/Super:           class func classMethod() {|}; name=classMethod()
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func defaultMethod() {|}; name=defaultMethod()
@@ -785,11 +788,13 @@ class Override26 : OverrideBase, OverrideP {
 
 // MODIFIER13-NOT: Begin completions
 
-// MODIFIER15: Begin completions, 1 items
+// MODIFIER15: Begin completions, 2 items
+// MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classVar: Int; name=classVar: Int
 // MODIFIER15-DAG: Decl[StaticVar]/Super/Erase[4]:    override var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER15: End completions
 
-// MODIFIER17: Begin completions, 1 items
+// MODIFIER17: Begin completions, 2 items
+// MODIFIER17-DAG: Decl[StaticVar]/Super:             classVar: Int; name=classVar: Int
 // MODIFIER17-DAG: Decl[StaticVar]/Super:             classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER17: End completions
 
@@ -801,13 +806,15 @@ class Override26 : OverrideBase, OverrideP {
 // MODIFIER22: Decl[StaticMethod]/Super/Erase[5]:     override func classMethod() {|}; name=classMethod()
 // MODIFIER22: End completions
 
-// MODIFIER23: Begin completions, 2 items
+// MODIFIER23: Begin completions, 3 items
 // MODIFIER23-DAG: Decl[StaticMethod]/Super:          override func classMethod() {|}; name=classMethod()
+// MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classVar: Int; name=classVar: Int
 // MODIFIER23-DAG: Decl[StaticVar]/Super:             override var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER23: End completions
 
-// MODIFIER24: Begin completions, 2 items
+// MODIFIER24: Begin completions, 3 items
 // MODIFIER24-DAG: Decl[StaticMethod]/Super:          func classMethod() {|}; name=classMethod()
+// MODIFIER24-DAG: Decl[StaticVar]/Super:             var classVar: Int; name=classVar: Int
 // MODIFIER24-DAG: Decl[StaticVar]/Super:             var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER24: End completions
 

@@ -13,12 +13,15 @@ import MoreSwiftNewtypes
 
 func acceptEquatable<T: Equatable>(_: T) {}
 func acceptHashable<T: Hashable>(_: T) {}
+// expected-note@-1 {{where 'T' = 'WrappedRef'}}
+// expected-note@-2 {{where 'T' = 'WrappedValue'}}
 func acceptComparable<T: Comparable>(_: T) {}
+// expected-note@-1 {{where 'T' = 'NSNotification.Name'}}
 
 func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
   acceptEquatable(x)
   acceptHashable(x)
-  acceptComparable(x) // expected-error {{does not conform to expected type 'Comparable'}}
+  acceptComparable(x) // expected-error {{global function 'acceptComparable' requires that 'NSNotification.Name' conform to 'Comparable'}}
 
   _ = x == y
   _ = x != y
@@ -30,6 +33,6 @@ func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
 func testCustomWrappers(wrappedRef: WrappedRef, wrappedValue: WrappedValue) {
   acceptEquatable(wrappedRef)
   acceptEquatable(wrappedValue)
-  acceptHashable(wrappedRef) // expected-error {{does not conform to expected type 'Hashable'}}
-  acceptHashable(wrappedValue) // expected-error {{does not conform to expected type 'Hashable'}}
+  acceptHashable(wrappedRef) // expected-error {{global function 'acceptHashable' requires that 'WrappedRef' conform to 'Hashable'}}
+  acceptHashable(wrappedValue) // expected-error {{global function 'acceptHashable' requires that 'WrappedValue' conform to 'Hashable'}}
 }

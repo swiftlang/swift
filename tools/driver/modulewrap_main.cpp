@@ -22,8 +22,9 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Bitcode/BitstreamReader.h"
@@ -146,13 +147,11 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   // Superficially verify that the input is a swift module file.
-  llvm::BitstreamCursor Cursor(ErrOrBuf.get()->getMemBufferRef());
-  for (unsigned char Byte : serialization::SWIFTMODULE_SIGNATURE)
-    if (Cursor.AtEndOfStream() || Cursor.Read(8) != Byte) {
-      Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
-                                   Filename, "signature mismatch");
-      return 1;
-    }
+  if (!serialization::isSerializedAST(ErrOrBuf.get()->getBuffer())) {
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
+                                 Filename, "signature mismatch");
+    return 1;
+  }
 
   // Wrap the bitstream in a module object file. To use the ClangImporter to
   // create the module loader, we need to properly set the runtime library path.
@@ -167,10 +166,12 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SearchPathOpts.RuntimeResourcePath = RuntimeResourcePath.str();
 
   SourceManager SrcMgr;
+  TypeCheckerOptions TypeCheckOpts;
   LangOptions LangOpts;
   LangOpts.Target = Invocation.getTargetTriple();
-  ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
-                                        Instance.getDiags());
+  ASTContext &ASTCtx = *ASTContext::get(LangOpts, TypeCheckOpts, SearchPathOpts,
+                                        SrcMgr, Instance.getDiags());
+  registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   
   ClangImporterOptions ClangImporterOpts;
@@ -178,7 +179,8 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                          true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;
-  std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, SILOpts);
+  std::unique_ptr<Lowering::TypeConverter> TC(new Lowering::TypeConverter(*M));
+  std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, *TC, SILOpts);
   createSwiftModuleObjectFile(*SM, (*ErrOrBuf)->getBuffer(),
                               Invocation.getOutputFilename());
   return 0;

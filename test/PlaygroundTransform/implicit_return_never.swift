@@ -2,7 +2,7 @@
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -Xfrontend -playground -Xfrontend -disable-playground-transform -o %t/main %t/main.swift
 // RUN: %target-codesign %t/main
-// RUN: %{python} %S/Inputs/not.py "%target-run %t/main --crash" 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
+// RUN: %{python} %S/../Inputs/not.py "%target-run %t/main --crash" 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
 // REQUIRES: executable_test
 
 // NOTE: not.py is used above instead of "not --crash" because simctl's exit

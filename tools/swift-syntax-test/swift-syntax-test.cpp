@@ -735,8 +735,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
         return EXIT_FAILURE;
       }
 
-      swift::ExponentialGrowthAppendingBinaryByteStream Stream(
-          llvm::support::endianness::little);
+      auto Stream = ExponentialGrowthAppendingBinaryByteStream();
       Stream.reserve(32 * 1024);
       std::map<void *, void *> UserInfo;
       UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;

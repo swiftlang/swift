@@ -74,7 +74,8 @@ namespace {
     }
     
     SILType getType(IRGenModule &IGM, SILType T) const {
-      return T.getFieldType(Field, IGM.getSILModule());
+      return T.getFieldType(Field, IGM.getSILModule(),
+                            IGM.getMaximalTypeExpansionContext());
     }
   };
 
@@ -95,7 +96,8 @@ namespace {
 
     SILType getType(IRGenModule &IGM, SILType T) const {
       if (Field)
-        return T.getFieldType(Field, IGM.getSILModule());
+        return T.getFieldType(Field, IGM.getSILModule(),
+                              IGM.getMaximalTypeExpansionContext());
 
       // The Swift-field-less cases use opaque storage, which is
       // guaranteed to ignore the type passed to it.
@@ -185,6 +187,7 @@ namespace {
       switch (fieldInfo.getKind()) {
       case ElementLayout::Kind::Fixed:
       case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::EmptyTailAllocatedCType:
         return MemberAccessStrategy::getDirectFixed(
                                                fieldInfo.getFixedByteOffset());
       case ElementLayout::Kind::InitialNonFixedSize:
@@ -278,6 +281,7 @@ namespace {
           break;
         }
         case ElementLayout::Kind::Empty:
+        case ElementLayout::Kind::EmptyTailAllocatedCType:
         case ElementLayout::Kind::InitialNonFixedSize:
         case ElementLayout::Kind::NonFixed:
           continue;
@@ -590,7 +594,9 @@ namespace {
     SILType getType(VarDecl *field) {
       assert(field->getDeclContext() == TheStruct->getAnyNominal());
       auto silType = SILType::getPrimitiveAddressType(TheStruct);
-      return silType.getFieldType(field, IGM.getSILModule());
+      return silType.getFieldType(
+          field, IGM.getSILModule(),
+          IGM.getMaximalTypeExpansionContext());
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
@@ -626,7 +632,6 @@ public:
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
       TotalAlignment(IGM.getCappedAlignment(
                                        Alignment(ClangLayout.getAlignment()))) {
-    SpareBits.reserve(TotalStride.getValue() * 8);
   }
 
   void collectRecordFields() {
@@ -732,8 +737,9 @@ private:
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
-      auto &fieldTI = cast<LoadableTypeInfo>(
-        IGM.getTypeInfo(SwiftType.getFieldType(swiftField, IGM.getSILModule())));
+      auto &fieldTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(
+          SwiftType.getFieldType(swiftField, IGM.getSILModule(),
+                                 IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI);
       return;
     }
@@ -790,7 +796,8 @@ private:
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
-      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal));
+      layout.completeEmptyTailAllocatedCType(
+          fieldType.isPOD(ResilienceExpansion::Maximal), NextOffset);
     else
       layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
@@ -879,19 +886,18 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   emitNestedTypeDecls(st->getMembers());
 }
 
-void IRGenModule::emitFuncDecl(FuncDecl *fd) {
-  // If there's an opaque return type for this function, emit its descriptor.
-  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.hasLazyMetadata(opaque))
+void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (IRGen.Opts.EnableAnonymousContextMangledNames) {
+    // If we're emitting anonymous context mangled names for debuggability,
+    // then emit all opaque type descriptors and make them runtime-discoverable
+    // so that remote ast/mirror can recover them.
+    addRuntimeResolvableType(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    else
       emitOpaqueTypeDecl(opaque);
-  }
-}
-
-void IRGenModule::emitAbstractStorageDecl(AbstractStorageDecl *fd) {
-  // If there's an opaque return type for this function, emit its descriptor.
-  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.hasLazyMetadata(opaque))
-      emitOpaqueTypeDecl(opaque);
+  } else if (!IRGen.hasLazyMetadata(opaque)) {
+    emitOpaqueTypeDecl(opaque);
   }
 }
 
@@ -946,14 +952,12 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
 
     } else if (isa<clang::EnumDecl>(clangDecl)) {
       // Fall back to Swift lowering for the enum's representation as a struct.
-      assert(std::distance(D->getStoredProperties().begin(),
-                           D->getStoredProperties().end()) == 1 &&
+      assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a Clang enum should wrap one value");
     } else if (clangDecl->hasAttr<clang::SwiftNewtypeAttr>()) {
       // Fall back to Swift lowering for the underlying type's
       // representation as a struct member.
-      assert(std::distance(D->getStoredProperties().begin(),
-                           D->getStoredProperties().end()) == 1 &&
+      assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a swift_newtype should wrap one value");
     } else {
       llvm_unreachable("Swift struct represents unexpected imported type");

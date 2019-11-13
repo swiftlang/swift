@@ -21,7 +21,6 @@
 #include "swift/Basic/Compiler.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
 using namespace swift;
@@ -66,6 +65,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::OneWayEqual:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -134,6 +134,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::OneWayEqual:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -237,6 +238,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::OneWayEqual:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::BindOverload:
@@ -262,6 +264,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
+  // Print all type variables as $T0 instead of _ here.
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  
   if (Kind == ConstraintKind::Disjunction) {
     Out << "disjunction";
     if (shouldRememberChoice())
@@ -283,7 +289,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     return;
   }
 
-  getFirstType()->print(Out);
+  Out << getFirstType()->getString(PO);
 
   bool skipSecond = false;
 
@@ -309,19 +315,20 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
+  case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
   case ConstraintKind::KeyPath:
       Out << " key path from ";
-      getSecondType()->print(Out);
+      Out << getSecondType()->getString(PO);
       Out << " -> ";
-      getThirdType()->print(Out);
+      Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
 
   case ConstraintKind::KeyPathApplication:
       Out << " key path projecting ";
-      getSecondType()->print(Out);
+      Out << getSecondType()->getString(PO);
       Out << " -> ";
-      getThirdType()->print(Out);
+      Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
   case ConstraintKind::OptionalObject:
@@ -392,7 +399,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   }
 
   if (!skipSecond)
-    getSecondType()->print(Out);
+    Out << getSecondType()->getString(PO);
 
   if (auto restriction = getRestriction()) {
     Out << ' ' << getName(*restriction);
@@ -416,9 +423,6 @@ void Constraint::dump(SourceManager *sm) const {
 }
 
 void Constraint::dump(ConstraintSystem *CS) const {
-  // Print all type variables as $T0 instead of _ here.
-  llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
-                               DebugConstraintSolver, true);
   // Disable MSVC warning: only for use within the debugger.
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
@@ -517,6 +521,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::OneWayEqual:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
@@ -583,9 +588,11 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                Type first, Type second, Type third,
-                               ConstraintLocator *locator) {
+                               ConstraintLocator *locator,
+                               ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallVector<TypeVariableType *, 4> typeVars(extraTypeVars.begin(),
+                                              extraTypeVars.end());
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())

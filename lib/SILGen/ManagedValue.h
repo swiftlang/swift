@@ -78,7 +78,7 @@ public:
     : valueAndFlag(value, false), cleanup(cleanup) {
     assert(value && "No value specified?!");
     assert((!getType().isObject() ||
-            value.getOwnershipKind() != ValueOwnershipKind::Any ||
+            value.getOwnershipKind() != ValueOwnershipKind::None ||
             !hasCleanup()) &&
            "Objects with trivial ownership should never have a cleanup");
   }
@@ -98,7 +98,7 @@ public:
     assert(value && "No value specified");
     assert(value->getType().isObject() &&
            "Expected borrowed rvalues to be objects");
-    assert(value.getOwnershipKind() != ValueOwnershipKind::Any);
+    assert(value.getOwnershipKind() != ValueOwnershipKind::None);
     return ManagedValue(value, false, cleanup);
   }
 
@@ -109,7 +109,7 @@ public:
                                             CleanupHandle cleanup) {
     assert(value && "No value specified");
     assert(value->getType().isAddress() && "Expected value to be an address");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Any &&
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None &&
            "Addresses always have any ownership");
     return ManagedValue(value, false, cleanup);
   }
@@ -127,7 +127,7 @@ public:
     assert(value && "No value specified");
     assert(value->getType().isObject() &&
            "Expected borrowed rvalues to be objects");
-    assert(value.getOwnershipKind() != ValueOwnershipKind::Any);
+    assert(value.getOwnershipKind() != ValueOwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
@@ -136,7 +136,7 @@ public:
   forBorrowedAddressRValue(SILValue value) {
     assert(value && "No value specified");
     assert(value->getType().isAddress() && "Expected value to be an address");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Any &&
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None &&
            "Addresses always have trivial ownership");
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
@@ -152,14 +152,14 @@ public:
   /// Create a managed value for a +0 trivial object rvalue.
   static ManagedValue forTrivialObjectRValue(SILValue value) {
     assert(value->getType().isObject() && "Expected an object");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Any);
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
   /// Create a managed value for a +0 trivial address rvalue.
   static ManagedValue forTrivialAddressRValue(SILValue value) {
     assert(value->getType().isAddress() && "Expected an address");
-    assert(value.getOwnershipKind() == ValueOwnershipKind::Any);
+    assert(value.getOwnershipKind() == ValueOwnershipKind::None);
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
 
@@ -268,10 +268,6 @@ public:
   /// formal evaluation scope.
   ManagedValue formalAccessCopy(SILGenFunction &SGF, SILLocation loc);
 
-  /// Store a copy of this value with independent ownership into the given
-  /// uninitialized address.
-  void copyInto(SILGenFunction &SGF, SILValue dest, SILLocation loc);
-
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &SGF, SILLocation loc);
@@ -333,7 +329,15 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void assignInto(SILGenFunction &SGF, SILLocation loc, SILValue address);
-  
+
+  /// Store a copy of this value with independent ownership into the given
+  /// uninitialized address.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, SILValue dest);
+
+  /// Store a copy of this value with independent ownership into the given
+  /// initialization \p dest.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, Initialization *dest);
+
   explicit operator bool() const {
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();

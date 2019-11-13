@@ -79,19 +79,18 @@ static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
     case '\n': printer << "\\n"; break;
     case '\r': printer << "\\r"; break;
     case '"': printer << "\\\""; break;
-    case '\'': printer << '\''; break; // no need to escape these
     case '\0': printer << "\\0"; break;
     default:
-      auto c = static_cast<char>(C);
-      // Other ASCII control characters should get escaped.
-      if (c < 0x20 || c == 0x7F) {
+      auto c = static_cast<unsigned char>(C);
+      // Other control or high-bit characters should get escaped.
+      if (c < 0x20 || c >= 0x7F) {
         static const char Hexdigit[] = {
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
           'A', 'B', 'C', 'D', 'E', 'F'
         };
         printer << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
       } else {
-        printer << c;
+        printer << (char)c;
       }
       break;
     }
@@ -228,6 +227,13 @@ private:
     Printer << ">";
   }
 
+  void printOptionalIndex(NodePointer node) {
+    assert(node->getKind() == Node::Kind::Index ||
+           node->getKind() == Node::Kind::UnknownIndex);
+    if (node->hasIndex())
+      Printer << "#" << node->getIndex() << " ";
+  }
+
   static bool isSwiftModule(NodePointer node) {
     return (node->getKind() == Node::Kind::Module &&
             node->getText() == STDLIB_NAME);
@@ -349,6 +355,7 @@ private:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
     case Node::Kind::EscapingAutoClosureType:
+    case Node::Kind::EscapingObjCBlock:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
@@ -390,6 +397,7 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::KeyPathGetterThunkHelper:
     case Node::Kind::KeyPathSetterThunkHelper:
     case Node::Kind::KeyPathEqualsThunkHelper:
@@ -464,11 +472,13 @@ private:
     case Node::Kind::TypeMetadataInstantiationCache:
     case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataSingletonInitializationCache:
+    case Node::Kind::TypeMetadataDemanglingCache:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
     case Node::Kind::Name:
 #include "swift/AST/ReferenceStorage.def"
+    case Node::Kind::UnknownIndex:
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
     case Node::Kind::ValueWitness:
@@ -1115,6 +1125,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Initializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "variable initialization expression");
+  case Node::Kind::PropertyWrapperBackingInitializer:
+    return printEntity(
+         Node, asPrefixContext, TypePrinting::NoType,
+         /*hasName*/false, "property wrapper backing initializer");
   case Node::Kind::DefaultArgumentInitializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "default argument ",
@@ -1172,6 +1186,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Index:
     Printer << Node->getIndex();
+    return nullptr;
+  case Node::Kind::UnknownIndex:
+    Printer << "unknown index";
     return nullptr;
   case Node::Kind::NoEscapeFunctionType:
     printFunctionType(nullptr, Node);
@@ -1470,7 +1487,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::PartialApplyObjCForwarder:
@@ -1481,7 +1498,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
@@ -1667,6 +1684,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type metadata completion function for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::TypeMetadataDemanglingCache:
+    Printer << "demangling cache variable for type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
     Printer << "lazy cache variable for type metadata for ";
     print(Node->getChild(0));
@@ -1785,6 +1806,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  }
+  case Node::Kind::EscapingObjCBlock: {
+    Printer << "@escaping @convention(block) ";
     printFunctionType(nullptr, Node);
     return nullptr;
   }
@@ -2120,7 +2146,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentAssociatedTypeRef: {
-    Printer << Node->getFirstChild()->getText();
+    if (Node->getNumChildren() > 1) {
+      print(Node->getChild(1));
+      Printer << '.';
+    }
+    print(Node->getChild(0));
     return nullptr;
   }
   case Node::Kind::ReflectionMetadataBuiltinDescriptor:
@@ -2231,20 +2261,21 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::DependentProtocolConformanceAssociated:
     Printer << "dependent associated protocol conformance ";
-    if (Node->hasIndex())
-      Printer << "#" << Node->getIndex() << " ";
-    printChildren(Node);
+    printOptionalIndex(Node->getChild(2));
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::DependentProtocolConformanceInherited:
     Printer << "dependent inherited protocol conformance ";
-    if (Node->hasIndex())
-      Printer << "#" << Node->getIndex() << " ";
-    printChildren(Node);
+    printOptionalIndex(Node->getChild(2));
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::DependentProtocolConformanceRoot:
-    Printer << "dependent root protocol conformance #" << Node->getIndex()
-      << " ";
-    printChildren(Node);
+    Printer << "dependent root protocol conformance ";
+    printOptionalIndex(Node->getChild(2));
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:
     Printer << "protocol conformance ref (type's module) ";
@@ -2420,7 +2451,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   if (!asPrefixContext && PostfixContext) {
     // Print any left over context which couldn't be printed in prefix form.
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
-        Entity->getKind() == Node::Kind::Initializer) {
+        Entity->getKind() == Node::Kind::Initializer ||
+        Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer) {
       Printer << " of ";
     } else {
       Printer << " in ";

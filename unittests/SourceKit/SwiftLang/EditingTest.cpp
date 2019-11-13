@@ -154,7 +154,7 @@ public:
             EditorConsumer &Consumer) {
     auto Args = makeArgs(DocName, CArgs);
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
   }
 
   void close(const char *DocName) {
@@ -241,15 +241,27 @@ void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
 
   DiagConsumer Consumer;
   open(DocName, Contents, Args, Consumer);
-  ASSERT_EQ(0u, Consumer.Diags.size());
+  ASSERT_LE(Consumer.Diags.size(), 1u);
+  if (Consumer.Diags.size() > 0) {
+    EXPECT_EQ(SemaDiagStage, Consumer.DiagStage);
+    Consumer.Diags.clear();
+    Consumer.DiagStage = UIdent();
+  }
+
   // Open again without closing; this reinitializes the semantic info on the doc
   if (delay > std::chrono::microseconds(0))
     std::this_thread::sleep_for(delay);
   if (closeDoc)
     close(DocName);
   reset(Consumer);
+
   open(DocName, Contents, Args, Consumer);
-  ASSERT_EQ(0u, Consumer.Diags.size());
+  ASSERT_LE(Consumer.Diags.size(), 1u);
+  if (Consumer.Diags.size() > 0) {
+    EXPECT_EQ(SemaDiagStage, Consumer.DiagStage);
+    Consumer.Diags.clear();
+    Consumer.DiagStage = UIdent();
+  }
 
   // Wait for the document update from the second time we open the document. We
   // may or may not get a notification from the first time it was opened, but

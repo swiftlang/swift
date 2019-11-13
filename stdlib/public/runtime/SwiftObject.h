@@ -72,13 +72,13 @@ SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
 - (instancetype)autorelease;
 - (NSUInteger)retainCount;
 
-- (NSString *)description;
-- (NSString *)debugDescription;
+- (id /* NSString */)description;
+- (id /* NSString */)debugDescription;
 @end
 
 namespace swift {
 
-NSString *getDescription(OpaqueValue *value, const Metadata *type);
+id getDescription(OpaqueValue *value, const Metadata *type);
 
 }
 

@@ -57,7 +57,8 @@ class SwiftTestCase(unittest.TestCase):
             benchmark_num_o_iterations=3,
             disable_guaranteed_normal_arguments=True,
             force_optimized_typechecker=False,
-            enable_stdlibcore_exclusivity_checking=False)
+            enable_stdlibcore_exclusivity_checking=False,
+            enable_experimental_differentiable_programming=False)
 
         # Setup shell
         shell.dry_run = True
@@ -86,8 +87,9 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         expected = [
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE',
-            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=FALSE'
+            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
+            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -101,8 +103,9 @@ class SwiftTestCase(unittest.TestCase):
         flags_set = [
             '-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
             '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE',
-            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=FALSE'
+            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
+            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -286,7 +289,7 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE'],
+            ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_FORCE_OPTIMIZED_TYPECHECKER' in x])
 
@@ -298,6 +301,20 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=TRUE'],
+            ['-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL='
+             'TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING' in x])
+
+    def test_experimental_differentiable_programming_flags(self):
+        self.args.enable_experimental_differentiable_programming = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING' in x])

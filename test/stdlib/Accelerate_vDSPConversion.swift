@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: rdar50301438
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -15,7 +16,7 @@ var AccelerateTests_vDSPConversion = TestSuite("Accelerate_vDSPConversion")
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     AccelerateTests_vDSPConversion.test("vDSP/SinglePrecisionRectToPolar") {
         let source: [Float] = [2, 4,
@@ -124,7 +125,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let n = vDSP_Length(10)
     
@@ -850,7 +851,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     AccelerateTests_vDSPConversion.test("vDSP/PowerToDecibelsSinglePrecision") {
         let source: [Float] = [1, 10, 100, 2, 4, 8, 16, 101,
@@ -963,7 +964,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     AccelerateTests_vDSPConversion.test("vDSP/ComplexFormatConversionSinglePrecision") {
         var real: [Float] = [4, 5, 6]

@@ -43,13 +43,12 @@ public enum Privacy {
 /// Maximum number of arguments i.e., interpolated expressions that can
 /// be used in the string interpolations passed to the log APIs.
 /// This limit is imposed by the ABI of os_log.
-public var maxOSLogArgumentCount: Int {
-  return 48
-}
+@_transparent
+public var maxOSLogArgumentCount: UInt8 { return 48 }
 
-internal var bitsPerByte: Int {
-  return 8
-}
+@usableFromInline
+@_transparent
+internal var logBitsPerByte: Int { return 3 }
 
 /// Represents a string interpolation passed to the log APIs.
 ///
@@ -61,9 +60,11 @@ internal var bitsPerByte: Int {
 /// when you pass a string interpolation to the log APIs.
 /// Extend this type with more `appendInterpolation` overloads to enable
 /// interpolating additional types.
+@frozen
 public struct OSLogInterpolation : StringInterpolationProtocol {
   /// A format string constructed from the given string interpolation to be
   /// passed to the os_log ABI.
+  @usableFromInline
   internal var formatString: String
 
   /// A representation of a sequence of arguments that must be serialized
@@ -86,163 +87,183 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   ///                 |     2nd argument bytes    |
   ///                 ----------------------------
   ///                         ...
+  @usableFromInline
   internal var arguments: OSLogArguments
 
   /// The possible values for the argument flag, as defined by the os_log ABI,
   /// which occupies four least significant bits of the first byte of the
   /// argument header. The first two bits are used to indicate privacy and
   /// the other two are reserved.
-  internal enum ArgumentFlag: UInt8 {
-    case privateFlag = 0x1
-    case publicFlag = 0x2
+  @usableFromInline
+  @frozen
+  internal enum ArgumentFlag {
+    case privateFlag
+    case publicFlag
+
+    @inlinable
+    internal var rawValue: UInt8 {
+      switch self {
+      case .privateFlag:
+        return 0x1
+      case .publicFlag:
+        return 0x2
+      }
+    }
   }
 
   /// The possible values for the argument type, as defined by the os_log ABI,
   /// which occupies four most significant bits of the first byte of the
-  /// argument header.
-  internal enum ArgumentType: UInt8 {
-    case scalar = 0
-    // TODO: more types will be added here.
+  /// argument header. The rawValue of this enum must be constant evaluable.
+  /// (Note that an auto-generated rawValue is not constant evaluable because
+  /// it cannot be annotated so.)
+  @usableFromInline
+  @frozen
+  internal enum ArgumentType {
+    case scalar, count, string, pointer, object
+
+    @inlinable
+    internal var rawValue: UInt8 {
+      switch self {
+      case .scalar:
+        return 0
+      case .count:
+        return 1
+      case .string:
+        return 2
+      case .pointer:
+        return 3
+      case .object:
+        return 4
+      }
+    }
   }
 
   /// The first summary byte in the byte buffer passed to the os_log ABI that
   /// summarizes the privacy and nature of the arguments.
+  @usableFromInline
   internal var preamble: UInt8
 
   /// Bit mask for setting bits in the peamble. The bits denoted by the bit
   /// mask indicate whether there is an argument that is private, and whether
   /// there is an argument that is non-scalar: String, NSObject or Pointer.
-  internal enum PreambleBitMask: UInt8 {
-    case privateBitMask = 0x1
-    case nonScalarBitMask = 0x2
+  @usableFromInline
+  @frozen
+  internal enum PreambleBitMask {
+    case privateBitMask
+    case nonScalarBitMask
+
+    @inlinable
+    internal var rawValue: UInt8 {
+      switch self {
+      case .privateBitMask:
+        return 0x1
+      case .nonScalarBitMask:
+        return 0x2
+      }
+    }
   }
 
   /// The second summary byte that denotes the number of arguments, which is
   /// also the number of interpolated expressions. This will be determined
   /// on the fly in order to support concatenation and interpolation of
   /// instances of `OSLogMessage`.
+  @usableFromInline
   internal var argumentCount: UInt8
 
+  /// Sum total of all the bytes (including header bytes) needed for
+  /// serializing the arguments.
+  @usableFromInline
+  internal var totalBytesForSerializingArguments: Int
+
+  // Some methods defined below are marked @_optimize(none) to prevent inlining
+  // of string internals (such as String._StringGuts) which will interfere with
+  // constant evaluation and folding. Note that these methods will be inlined,
+  // constant evaluated/folded and optimized in the context of a caller.
+
+  @_semantics("oslog.interpolation.init")
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   public init(literalCapacity: Int, interpolationCount: Int) {
-    // TODO: format string must be fully constructed at compile time.
-    // The parameters `literalCapacity` and `interpolationCount` are ignored.
+    // Since the format string and the arguments array are fully constructed
+    // at compile time, the parameters are ignored.
     formatString = ""
     arguments = OSLogArguments()
     preamble = 0
     argumentCount = 0
+    totalBytesForSerializingArguments = 0
   }
 
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   public mutating func appendLiteral(_ literal: String) {
     formatString += literal.percentEscapedString
   }
 
-  /// Define interpolation for expressions of type Int. This definition enables
-  /// passing a formatting option and a privacy qualifier along with the
-  /// interpolated expression as shown below:
-  ///
-  ///         "\(x, format: .hex, privacy: .private\)"
-  ///
-  /// - Parameters:
-  ///  - number: the interpolated expression of type Int, which is autoclosured.
-  ///  - format: a formatting option available for Int types, defined by the
-  ///    enum `IntFormat`.
-  ///  - privacy: a privacy qualifier which is either private or public.
-  ///    The default is public.
-  public mutating func appendInterpolation(
-    _ number: @autoclosure @escaping () -> Int,
-    format: IntFormat = .decimal,
-    privacy: Privacy = .public
-  ) {
-    guard argumentCount < maxOSLogArgumentCount else { return }
+  /// `appendInterpolation` conformances will be added by extensions to this type.
 
-    addIntHeadersAndFormatSpecifier(
-      format,
-      isPrivate: privacy == .private,
-      bitWidth: Int.bitWidth,
-      isSigned: true)
-    arguments.append(number)
+  /// Return true if and only if the parameter is .private.
+  /// This function must be constant evaluable.
+  @inlinable
+  @_semantics("constant_evaluable")
+  @_effects(readonly)
+  @_optimize(none)
+  internal func isPrivate(_ privacy: Privacy) -> Bool {
+    // Do not use equality comparisons on enums as it is not supported by
+    // the constant evaluator.
+    if case .private = privacy {
+      return true
+    }
+    return false
   }
 
-  /// Construct/update format string and headers from the qualifiers (of the
-  /// interpolated expression) passed as parameters.
-  ///
-  /// All arguments to this function must be known at compile time.
-  public mutating func addIntHeadersAndFormatSpecifier(
-    _ format: IntFormat,
+  /// Compute a byte-sized argument header consisting of flag and type.
+  /// Flag and type take up the least and most significant four bits
+  /// of the header byte, respectively.
+  /// This function should be constant evaluable.
+  @inlinable
+  @_semantics("constant_evaluable")
+  @_effects(readonly)
+  @_optimize(none)
+  internal func getArgumentHeader(
     isPrivate: Bool,
-    bitWidth: Int,
-    isSigned: Bool
-  ) {
-    formatString += getIntegerFormatSpecifier(
-      format,
-      isPrivate: isPrivate,
-      bitWidth: bitWidth,
-      isSigned: isSigned)
-
-    addArgumentHeaders(
-      flag: isPrivate ? .privateFlag : .publicFlag,
-      type: .scalar,
-      size: UInt8(bitWidth / bitsPerByte))
-
-    updateSummaryBytes(isPrivate: isPrivate)
+    type: ArgumentType
+  ) -> UInt8 {
+    let flag: ArgumentFlag = isPrivate ? .privateFlag : .publicFlag
+    let flagAndType: UInt8 = (type.rawValue &<< 4) | flag.rawValue
+    return flagAndType
   }
 
-  /// Set the private bit of the preamble if the `isPrivate` parameter is true
-  /// and increment the argument count. Note that the private bit in the
-  /// preamable is set if any of the arguments is private.
-  internal mutating func updateSummaryBytes(isPrivate: Bool) {
-    if (isPrivate) {
+  /// Compute the new preamble based whether the current argument is private
+  /// or not. This function must be constant evaluable.
+  @inlinable
+  @_semantics("constant_evaluable")
+  @_effects(readonly)
+  @_optimize(none)
+  internal func getUpdatedPreamble(
+    isPrivate: Bool,
+    isScalar: Bool
+  ) -> UInt8 {
+    var preamble = self.preamble
+    if isPrivate {
       preamble |= PreambleBitMask.privateBitMask.rawValue
     }
-    argumentCount += 1
-  }
-
-  /// Append the given argument headers and size.
-  internal mutating func addArgumentHeaders(
-    flag: ArgumentFlag,
-    type: ArgumentType,
-    size: UInt8
-  ) {
-    // Flag and type take up one byte where the least significant four bits
-    // is flag and most significant four bits is the type.
-    let flagAndType: UInt8 = (type.rawValue << 4) | flag.rawValue
-    arguments.append(flagAndType)
-    arguments.append(size)
-  }
-
-  /// Construct an os_log format specifier from the given parameters.
-  /// All arguments to this function must be known at compile time.
-  internal func getIntegerFormatSpecifier(
-    _ format: IntFormat,
-    isPrivate: Bool,
-    bitWidth: Int,
-    isSigned: Bool
-  ) -> String {
-    var formatSpecifier: String = isPrivate ? "%{private}" : "%{public}"
-
-    // Add a length modifier, if needed, to the specifier
-    // TODO: more length modifiers will be added.
-    if (bitWidth == CLongLong.bitWidth) {
-      formatSpecifier += "ll"
+    if !isScalar {
+      preamble |= PreambleBitMask.nonScalarBitMask.rawValue
     }
-
-    // TODO: more format specifiers will be added.
-    switch (format) {
-    case .hex:
-      formatSpecifier += "x"
-    case .octal:
-      formatSpecifier += "o"
-    default:
-      formatSpecifier += isSigned ? "d" : "u"
-    }
-    return formatSpecifier
+    return preamble
   }
 }
 
 extension String {
   /// Replace all percents "%" in the string by "%%" so that the string can be
-  /// interpreted as a C format string.
+  /// interpreted as a C format string. This function is constant evaluable
+  /// and its semantics is modeled within the evaluator.
   public var percentEscapedString: String {
+    @_semantics("string.escapePercent.get")
+    @_effects(readonly)
+    @_optimize(none)
     get {
       return self
         .split(separator: "%", omittingEmptySubsequences: false)
@@ -251,117 +272,93 @@ extension String {
   }
 }
 
+@frozen
 public struct OSLogMessage :
   ExpressibleByStringInterpolation, ExpressibleByStringLiteral
 {
   public let interpolation: OSLogInterpolation
 
-  /// Initializer for accepting string interpolations.
+  /// Initializer for accepting string interpolations. This function must be
+  /// constant evaluable.
+  @inlinable
+  @_optimize(none)
+  @_semantics("oslog.message.init_interpolation")
+  @_semantics("constant_evaluable")
   public init(stringInterpolation: OSLogInterpolation) {
-    interpolation = stringInterpolation
+    self.interpolation = stringInterpolation
   }
 
-  /// Initializer for accepting string literals.
+  /// Initializer for accepting string literals. This function must be
+  /// constant evaluable.
+  @inlinable
+  @_optimize(none)
+  @_semantics("oslog.message.init_stringliteral")
+  @_semantics("constant_evaluable")
   public init(stringLiteral value: String) {
-    // Note that the actual value of `literalCapacity` is not important as it
-    // is ignored by `OSLogInterpolation.init`. However, it must be a literal.
     var s = OSLogInterpolation(literalCapacity: 1, interpolationCount: 0)
     s.appendLiteral(value)
-    self.init(stringInterpolation: s)
+    self.interpolation = s
   }
 
-  /// Format string constructed from the string interpolation.
-  public var formatString: String {
-    get { return interpolation.formatString }
-  }
-
-  /// The byte size of the buffer that will passed to the C os_log ABI.
-  /// It will contain the elements of interpolation.arguments and the two
+  /// The byte size of the buffer that will be passed to the C os_log ABI.
+  /// It will contain the elements of `interpolation.arguments` and the two
   /// summary bytes: preamble and argument count.
+  @_transparent
+  @_optimize(none)
   public var bufferSize: Int {
-    get { return interpolation.arguments.byteCount + 2 }
-  }
-
-  /// Serialize the summary bytes and arguments into the given byte-buffer
-  /// builder. The summary bytes are serailized first followed by the arguments.
-  internal func serializeArguments(
-    into bufferBuilder: inout OSLogByteBufferBuilder
-  ) {
-    bufferBuilder.serialize(interpolation.preamble)
-    bufferBuilder.serialize(interpolation.argumentCount)
-    interpolation.arguments.serialize(into: &bufferBuilder)
+    return interpolation.totalBytesForSerializingArguments + 2
   }
 }
+
+public typealias ByteBufferPointer = UnsafeMutablePointer<UInt8>
+public typealias StorageObjects = [AnyObject]
 
 /// A representation of a sequence of arguments and headers (of possibly
 /// different types) that have to be serialized to a byte buffer. The arguments
 /// are captured within closures and stored in an array. The closures accept an
 /// instance of `OSLogByteBufferBuilder`, and when invoked, serialize the
 /// argument using the passed `OSLogByteBufferBuilder` instance.
+@frozen
+@usableFromInline
 internal struct OSLogArguments {
   /// An array of closures that captures arguments of possibly different types.
-  internal var argumentClosures: [(inout OSLogByteBufferBuilder) -> ()]
-  /// Sum total of the byte size of the arguments that are tracked.
-  internal var byteCount: Int
+  /// Each closure accepts a pointer into a byte buffer and serializes the
+  /// captured arguments at the pointed location. The closures also accept an
+  /// array of AnyObject to store references to auxiliary storage created during
+  /// serialization.
+  @usableFromInline
+  internal var argumentClosures: [(inout ByteBufferPointer,
+    inout StorageObjects) -> ()]
 
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal init() {
     argumentClosures = []
-    byteCount = 0
   }
 
   /// Append a byte-sized header, constructed by
   /// `OSLogMessage.appendInterpolation`, to the tracked array of closures.
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal mutating func append(_ header: UInt8) {
-    argumentClosures.append({ $0.serialize(header) })
-    byteCount += OSLogByteBufferBuilder.sizeForEncoding(UInt8.self)
+    argumentClosures.append({ (position, _) in
+      serialize(header, at: &position)
+    })
   }
 
-  /// Append an (autoclosured) interpolated expression of type Int, passed to
-  /// `OSLogMessage.appendInterpolation`, to the tracked array of closures.
-  internal mutating func append(_ value: @escaping () -> Int) {
-    argumentClosures.append({ $0.serialize(value()) })
-    byteCount += OSLogByteBufferBuilder.sizeForEncoding(Int.self)
-  }
-
-  internal func serialize(into bufferBuilder: inout OSLogByteBufferBuilder) {
-    argumentClosures.forEach { $0(&bufferBuilder) }
-  }
+  /// `append` for other types must be implemented by extensions.
 }
 
-/// A struct that manages serialization of instances of specific types to a
-/// byte buffer. The byte buffer is provided as an argument to the initializer
-/// so that its lifetime can be managed by the caller.
-internal struct OSLogByteBufferBuilder {
-  internal var position: UnsafeMutablePointer<UInt8>
-
-  /// Initializer that accepts a pointer to a preexisting buffer.
-  /// - Parameter bufferStart: the starting pointer to a byte buffer
-  ///   that must contain the serialized bytes.
-  internal init(_ bufferStart: UnsafeMutablePointer<UInt8>) {
-    position = bufferStart
-  }
-
-  /// Serialize a UInt8 value at the buffer location pointed to by `position`.
-  internal mutating func serialize(_ value: UInt8) {
-    position[0] = value
-    position += 1
-  }
-
-  /// Serialize an Int at the buffer location pointed to by `position`.
-  internal mutating func serialize(_ value: Int) {
-    let byteCount = OSLogByteBufferBuilder.sizeForEncoding(Int.self)
-    let dest = UnsafeMutableRawBufferPointer(start: position, count: byteCount)
-    withUnsafeBytes(of: value) { dest.copyMemory(from: $0) }
-    position += byteCount
-  }
-
-  /// Return the number of bytes needed for serializing an UInt8 value.
-  internal static func sizeForEncoding(_ type: UInt8.Type) -> Int {
-    return 1
-  }
-
-  /// Return the number of bytes needed for serializing an Int value.
-  internal static func sizeForEncoding(_ type: Int.Type) -> Int {
-    return Int.bitWidth / bitsPerByte
-  }
+/// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
+/// and increment the `bufferPosition` with the byte size of the serialized value.
+@usableFromInline
+@_alwaysEmitIntoClient
+internal func serialize(
+  _ value: UInt8,
+  at bufferPosition: inout ByteBufferPointer)
+{
+  bufferPosition[0] = value
+  bufferPosition += 1
 }

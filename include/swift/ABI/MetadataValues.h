@@ -1752,4 +1752,4 @@ public:
 
 } // end namespace swift
 
-#endif /* SWIFT_ABI_METADATAVALUES_H */
+#endif // SWIFT_ABI_METADATAVALUES_H

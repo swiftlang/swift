@@ -251,3 +251,24 @@ public struct EnumStructWithOwnership {
   public let multiPayloadConcrete: MultiPayloadConcreteNotBitwiseTakable
   public let multiPayloadGeneric: MultiPayloadGenericNotBitwiseTakable<Int8>
 }
+
+public protocol AssocType {
+  associatedtype A
+  func foo() -> A
+}
+
+public struct OpaqueWitness: AssocType {
+  public func foo() -> some Any {
+    return 0 as Int32
+  }
+}
+
+public struct GenericOnAssocType<T: AssocType> {
+  var x: T.A
+  var y: T.A
+}
+
+public struct RefersToOtherAssocType {
+  var x: OpaqueWitness.A
+  var y: OpaqueWitness.A
+}

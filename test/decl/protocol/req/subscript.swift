@@ -78,7 +78,7 @@ protocol Initable {
 
 protocol GenericSubscriptProtocol {
   subscript<T : Initable>(t: T.Type) -> T { get set }
-  // expected-note@-1 {{protocol requires subscript with type '<T where T : Initable> (T.Type) -> T'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires subscript with type '<T> (T.Type) -> T'; do you want to add a stub?}}
 }
 
 struct GenericSubscriptWitness : GenericSubscriptProtocol {

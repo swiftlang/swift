@@ -4,8 +4,7 @@
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 > %t.simple.txt
-// RUN: %FileCheck -check-prefix SIMPLE_STATIC -implicit-check-not -rpath %s < %t.simple.txt
+// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
@@ -106,21 +105,7 @@
 // SIMPLE: -o linker
 
 
-// SIMPLE_STATIC: swift
-// SIMPLE_STATIC: -o [[OBJECTFILE:.*]]
-
-// SIMPLE_STATIC-NEXT: {{(bin/)?}}ld{{"? }}
-// SIMPLE_STATIC: [[OBJECTFILE]]
-// SIMPLE_STATIC: -lobjc
-// SIMPLE_STATIC: -lSystem
-// SIMPLE_STATIC: -arch x86_64
-// SIMPLE_STATIC: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift_static(/|\\\\)macosx]]
-// SIMPLE_STATIC: -lc++
-// SIMPLE_STATIC: -framework Foundation
-// SIMPLE_STATIC: -force_load_swift_libs
-// SIMPLE_STATIC: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
-// SIMPLE_STATIC: -no_objc_category_merging
-// SIMPLE_STATIC: -o linker
+// SIMPLE_STATIC: error: -static-stdlib is no longer supported on Apple platforms
 
 
 // IOS_SIMPLE: swift
@@ -162,7 +147,7 @@
 // LINUX-x86_64: swift
 // LINUX-x86_64: -o [[OBJECTFILE:.*]]
 
-// LINUX-x86_64: clang++{{(\.exe)?"? }}
+// LINUX-x86_64: clang{{(\.exe)?"? }}
 // LINUX-x86_64-DAG: -pie
 // LINUX-x86_64-DAG: [[OBJECTFILE]]
 // LINUX-x86_64-DAG: -lswiftCore
@@ -178,7 +163,7 @@
 // LINUX-armv6: swift
 // LINUX-armv6: -o [[OBJECTFILE:.*]]
 
-// LINUX-armv6: clang++{{(\.exe)?"? }}
+// LINUX-armv6: clang{{(\.exe)?"? }}
 // LINUX-armv6-DAG: -pie
 // LINUX-armv6-DAG: [[OBJECTFILE]]
 // LINUX-armv6-DAG: -lswiftCore
@@ -195,7 +180,7 @@
 // LINUX-armv7: swift
 // LINUX-armv7: -o [[OBJECTFILE:.*]]
 
-// LINUX-armv7: clang++{{(\.exe)?"? }}
+// LINUX-armv7: clang{{(\.exe)?"? }}
 // LINUX-armv7-DAG: -pie
 // LINUX-armv7-DAG: [[OBJECTFILE]]
 // LINUX-armv7-DAG: -lswiftCore
@@ -212,7 +197,7 @@
 // LINUX-thumbv7: swift
 // LINUX-thumbv7: -o [[OBJECTFILE:.*]]
 
-// LINUX-thumbv7: clang++{{(\.exe)?"? }}
+// LINUX-thumbv7: clang{{(\.exe)?"? }}
 // LINUX-thumbv7-DAG: -pie
 // LINUX-thumbv7-DAG: [[OBJECTFILE]]
 // LINUX-thumbv7-DAG: -lswiftCore
@@ -229,12 +214,12 @@
 // ANDROID-armv7: swift
 // ANDROID-armv7: -o [[OBJECTFILE:.*]]
 
-// ANDROID-armv7: clang++{{(\.exe)?"? }}
+// ANDROID-armv7: clang{{(\.exe)?"? }}
 // ANDROID-armv7-DAG: -pie
 // ANDROID-armv7-DAG: [[OBJECTFILE]]
 // ANDROID-armv7-DAG: -lswiftCore
 // ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift]]
-// ANDROID-armv7-DAG: -target armv7-none-linux-androideabi
+// ANDROID-armv7-DAG: -target armv7-unknown-linux-androideabi
 // ANDROID-armv7-DAG: -F foo -iframework car -F cdr
 // ANDROID-armv7-DAG: -framework bar
 // ANDROID-armv7-DAG: -L baz
@@ -246,7 +231,7 @@
 // CYGWIN-x86_64: swift
 // CYGWIN-x86_64: -o [[OBJECTFILE:.*]]
 
-// CYGWIN-x86_64: clang++{{(\.exe)?"? }}
+// CYGWIN-x86_64: clang{{(\.exe)?"? }}
 // CYGWIN-x86_64-DAG: [[OBJECTFILE]]
 // CYGWIN-x86_64-DAG: -lswiftCore
 // CYGWIN-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift]]
@@ -261,7 +246,7 @@
 // WINDOWS-x86_64: swift
 // WINDOWS-x86_64: -o [[OBJECTFILE:.*]]
 
-// WINDOWS-x86_64: clang++{{(\.exe)?"? }}
+// WINDOWS-x86_64: clang{{(\.exe)?"? }}
 // WINDOWS-x86_64-DAG: [[OBJECTFILE]]
 // WINDOWS-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)windows(/|\\\\)x86_64]]
 // WINDOWS-x86_64-DAG: -F foo -iframework car -F cdr
@@ -287,7 +272,7 @@
 // LINUX_DYNLIB-x86_64: -o [[OBJECTFILE:.*]]
 // LINUX_DYNLIB-x86_64: -o {{"?}}[[AUTOLINKFILE:.*]]
 
-// LINUX_DYNLIB-x86_64: clang++{{(\.exe)?"? }}
+// LINUX_DYNLIB-x86_64: clang{{(\.exe)?"? }}
 // LINUX_DYNLIB-x86_64-DAG: -shared
 // LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
 // LINUX_DYNLIB-x86_64-NOT: -pie
@@ -312,7 +297,7 @@
 // LINUX-linker-order: swift
 // LINUX-linker-order: -o [[OBJECTFILE:.*]]
 
-// LINUX-linker-order: clang++{{(\.exe)?"? }}
+// LINUX-linker-order: clang{{(\.exe)?"? }}
 // LINUX-linker-order: -Xlinker -rpath -Xlinker {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux}}
 // LINUX-linker-order: -L foo
 // LINUX-linker-order: -Xlinker -rpath -Xlinker customrpath
@@ -321,14 +306,14 @@
 // LINUX-clang-linker-order: swift
 // LINUX-clang-linker-order: -o [[OBJECTFILE:.*]]
 
-// LINUX-clang-linker-order: clang++{{"? }}
+// LINUX-clang-linker-order: clang{{"? }}
 // LINUX-clang-linker-order: -foo foopath
 // LINUX-clang-linker-order: -o {{.*}}
 
 // WINDOWS-clang-linker-order: swift
 // WINDOWS-clang-linker-order: -o [[OBJECTFILE:.*]]
 
-// WINDOWS-clang-linker-order: clang++{{"? }}
+// WINDOWS-clang-linker-order: clang{{"? }}
 // WINDOWS-clang-linker-order: -foo foopath
 // WINDOWS-clang-linker-order: -o {{.*}}
 

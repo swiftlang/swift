@@ -16,6 +16,10 @@
 
 // REQUIRES: executable_test
 
+// FIXME: Fetching metadata by mangled name does not consider the provenance of
+// retroactive conformances. rdar://problem/53828345
+// REQUIRES: 53828345
+
 import A
 import B
 import C

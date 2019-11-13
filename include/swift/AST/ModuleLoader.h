@@ -24,6 +24,10 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
+namespace llvm {
+class FileCollector;
+}
+
 namespace clang {
 class DependencyCollector;
 }
@@ -35,6 +39,7 @@ class ClangImporterOptions;
 class ClassDecl;
 class ModuleDecl;
 class NominalTypeDecl;
+class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -53,8 +58,9 @@ enum class Bridgeability : unsigned {
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
-
-  explicit DependencyTracker(bool TrackSystemDeps);
+  explicit DependencyTracker(
+      bool TrackSystemDeps,
+      std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
   ///
@@ -81,6 +87,13 @@ protected:
 
 public:
   virtual ~ModuleLoader() = default;
+
+  /// Collect visible module names.
+  ///
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  virtual void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const = 0;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.

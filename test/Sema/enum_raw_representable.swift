@@ -188,3 +188,4 @@ enum ArrayOfNewEquatable : Array<NotEquatable> { }
 // expected-error@-1{{raw type 'Array<NotEquatable>' is not expressible by a string, integer, or floating-point literal}}
 // expected-error@-2{{'ArrayOfNewEquatable' declares raw type 'Array<NotEquatable>', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-3{{RawRepresentable conformance cannot be synthesized because raw type 'Array<NotEquatable>' is not Equatable}}
+// expected-error@-4{{an enum with no cases cannot declare a raw type}}

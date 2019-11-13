@@ -12,7 +12,7 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftTypeContextInfo.cpp
   LINK_LIBS
     SourceKitCore swiftDriver swiftFrontend
-    swiftDWARFImporter swiftClangImporter swiftIDE
+    swiftClangImporter swiftIDE
     swiftAST swiftMarkup swiftParse swiftParseSIL swiftSIL swiftSILGen
     swiftSILOptimizer swiftIRGen swiftSema swiftBasic swiftSerialization
     swiftSyntax swiftOption libcmark_static
@@ -35,7 +35,7 @@ add_sourcekit_library(SourceKitSwiftLang
       clangAST
       clangAPINotes
       clangBasic
-  LLVM_COMPONENT_DEPENDS ${LLVM_TARGETS_TO_BUILD}
+    LLVM_LINK_COMPONENTS ${LLVM_TARGETS_TO_BUILD}
       bitreader
       bitwriter
       coverage
@@ -49,3 +49,5 @@ add_sourcekit_library(SourceKitSwiftLang
       objcarcopts
       profiledata
 )
+
+add_dependencies(SourceKitSwiftLang clang-tablegen-targets)

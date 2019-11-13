@@ -181,8 +181,7 @@ variadicWithTrailingClosure(fn: +)
 func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
-  (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
-  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (Int, Int), (Int16, Int16), (Int32, Int32), (Int64, Int64), (Int8, Int8), (Self, Self.Scalar), (Self.Scalar, Self), (UInt, UInt), (UInt16, UInt16), (UInt32, UInt32), (UInt64, UInt64), (UInt8, UInt8)}}
+  (a, b) = (b, a % b)  // expected-error {{protocol 'BinaryInteger' requires that 'T' conform to 'BinaryInteger'}}
 }
 
 // <rdar://problem/24210190>
@@ -191,14 +190,14 @@ protocol Kingdom {
   associatedtype King
 }
 struct Victory<General> {
-  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = '(Int, Int)'}}
+  init<K: Kingdom>(_ king: K) where K.King == General {} // expected-note {{where 'General' = '(x: Int, y: Int)', 'K.King' = 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)')}}
 }
 struct MagicKingdom<K> : Kingdom {
   typealias King = K
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
+  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and 'MagicKingdom<(Int, Int)>.King' (aka '(Int, Int)') be equivalent}}
 }
 
 
@@ -219,13 +218,13 @@ extension r25271859 {
   func map<U>(f: (T) -> U) -> r25271859<U> {
   }
 
-  func andThen<U>(f: (T) -> r25271859<U>) {
+  func andThen<U>(f: (T) -> r25271859<U>) { // expected-note {{in call to function 'andThen(f:)'}}
   }
 }
 
 func f(a : r25271859<(Float, Int)>) {
-  a.map { $0.0 }
-    .andThen { _ in   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{18-18=-> r25271859<String> }}
+  a.map { $0.0 } // expected-error {{generic parameter 'U' could not be inferred}} (This is related to how solver is setup with multiple statements)
+    .andThen { _ in
       print("hello") // comment this out and it runs, leave any form of print in and it doesn't
       return r25271859<String>()
   }
@@ -289,3 +288,33 @@ func singleElementTuple() {
   let _ = ((label: 123)) // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
   let _ = ((label: 123)).label // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
 }
+
+// Tuples with duplicate labels
+
+let dupLabel1: (foo: Int, foo: Int) = (foo: 1, foo: 2) // expected-error 2{{cannot create a tuple with a duplicate element label}}
+
+func dupLabel2(x a: Int, x b: Int) -> (y: Int, y: Int) { // expected-error {{cannot create a tuple with a duplicate element label}}
+  return (a, b)
+}
+
+let _ = (bar: 0, bar: "") // expected-error {{cannot create a tuple with a duplicate element label}}
+
+let zeroTuple = (0,0)
+
+if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{cannot create a tuple with a duplicate element label}} 
+// expected-warning@-1 {{'if' condition is always true}}
+
+enum BishBash { case bar(foo: Int, foo: String) }
+let enumLabelDup: BishBash = .bar(foo: 0, foo: "") // expected-error {{cannot create a tuple with a duplicate element label}}
+
+func dupLabelClosure(_ fn: () -> Void) {}
+dupLabelClosure { print((bar: "", bar: 5).bar) } // expected-error {{cannot create a tuple with a duplicate element label}}
+
+struct DupLabelSubscript {
+  subscript(foo x: Int, foo y: Int) -> Int {
+    return 0
+  }
+}
+
+let dupLabelSubscriptStruct = DupLabelSubscript()
+let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok

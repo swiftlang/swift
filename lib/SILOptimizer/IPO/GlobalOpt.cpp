@@ -17,14 +17,16 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
@@ -199,7 +201,7 @@ public:
 
 // If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
-  SILFunction *F = AI->getReferencedFunction();
+  SILFunction *F = AI->getReferencedFunctionOrNull();
   if (!F || !F->isGlobalInit() || !ApplySite(AI).canOptimize())
     return;
 
@@ -262,7 +264,8 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
     Serialized = IsSerialized;
   }
 
-  auto refType = M.Types.getLoweredRValueType(varDecl->getInterfaceType());
+  auto refType = M.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                              varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType,
@@ -274,6 +277,7 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
                          SILCoroutineKind::None,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
+                         SubstitutionMap(), false,
                          M.getASTContext());
   auto getterName = M.allocateCopy(getterNameTmp);
   return FunctionBuilder.getOrCreateFunction(
@@ -413,7 +417,7 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   if (!AI)
     return false;
 
-  SILFunction *F = AI->getReferencedFunction();
+  SILFunction *F = AI->getReferencedFunctionOrNull();
   if (!F || !F->hasSemanticsAttrs())
     return false;
 
@@ -454,10 +458,9 @@ ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
   // Found a replacement for this init call. Ensure the replacement dominates
   // the original call site.
   ApplyInst *CommonAI = PFI->second;
-  assert(
-      cast<FunctionRefInst>(CommonAI->getCallee())->getReferencedFunction() ==
-          InitF &&
-      "ill-formed global init call");
+  assert(cast<FunctionRefInst>(CommonAI->getCallee())
+                 ->getReferencedFunctionOrNull() == InitF &&
+         "ill-formed global init call");
   SILBasicBlock *DomBB =
       DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
 
@@ -496,8 +499,10 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
   llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
   for (auto *AI : Calls) {
     assert(AI->getNumArguments() == 0 && "ill-formed global init call");
-    assert(cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction()
-           == InitF && "wrong init call");
+    assert(
+        cast<FunctionRefInst>(AI->getCallee())->getReferencedFunctionOrNull() ==
+            InitF &&
+        "wrong init call");
     SILFunction *ParentF = AI->getFunction();
     DominanceInfo *DT = DA->get(ParentF);
     ApplyInst *HoistAI =
@@ -737,6 +742,16 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   SingleValueInstruction *InitVal;
   SILGlobalVariable *SILG = getVariableOfStaticInitializer(InitF, InitVal);
   if (!SILG)
+    return;
+
+  auto expansion = ResilienceExpansion::Maximal;
+  if (hasPublicVisibility(SILG->getLinkage()))
+    expansion = ResilienceExpansion::Minimal;
+
+  auto &tl = Module->Types.getTypeLowering(
+      SILG->getLoweredType(),
+      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
+  if (!tl.isLoadable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "

@@ -52,7 +52,8 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                ArrayRef<ManagedValue> args,
                                                ParameterConvention calleeConvention) {
   llvm::SmallVector<SILValue, 8> values;
-  transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
+  llvm::transform(args, std::back_inserter(values),
+                  [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
   SILValue result =
@@ -148,7 +149,7 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
          "value");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::Any) {
+      originalValue.getOwnershipKind() == ValueOwnershipKind::None) {
     return originalValue;
   }
 
@@ -157,36 +158,32 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  ManagedValue \
-  SILGenBuilder::createCopy##Name##Value(SILLocation loc, \
-                                         ManagedValue originalValue) { \
-    auto ty = originalValue.getType().castTo<Name##StorageType>(); \
-    assert(ty->isLoadable(ResilienceExpansion::Maximal)); \
-    (void)ty; \
-    SILValue result = createCopy##Name##Value(loc, originalValue.getValue()); \
-    return SGF.emitManagedRValueWithCleanup(result); \
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
+  ManagedValue SILGenBuilder::createStrongCopy##Name##Value(                   \
+      SILLocation loc, ManagedValue originalValue) {                           \
+    auto ty = originalValue.getType().castTo<Name##StorageType>();             \
+    assert(ty->isLoadable(ResilienceExpansion::Maximal));                      \
+    (void)ty;                                                                  \
+    SILValue result =                                                          \
+        createStrongCopy##Name##Value(loc, originalValue.getValue());          \
+    return SGF.emitManagedRValueWithCleanup(result);                           \
   }
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  ManagedValue \
-  SILGenBuilder::createCopy##Name##Value(SILLocation loc, \
-                                         ManagedValue originalValue) { \
-    SILValue result = createCopy##Name##Value(loc, originalValue.getValue()); \
-    return SGF.emitManagedRValueWithCleanup(result); \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  ManagedValue SILGenBuilder::createStrongCopy##Name##Value(                   \
+      SILLocation loc, ManagedValue originalValue) {                           \
+    SILValue result =                                                          \
+        createStrongCopy##Name##Value(loc, originalValue.getValue());          \
+    return SGF.emitManagedRValueWithCleanup(result);                           \
   }
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  ManagedValue \
-  SILGenBuilder::createUnsafeCopy##Name##Value(SILLocation loc, \
-                                               ManagedValue originalValue) { \
-    /* *NOTE* The reason why this is unsafe is that we are converting and */ \
-    /* unconditionally retaining, rather than before converting from */ \
-    /* type->ref checking that our value is not yet uninitialized. */ \
-    auto type = originalValue.getType().getAs<Name##StorageType>(); \
-    SILValue result = create##Name##ToRef( \
-        loc, originalValue.getValue(), \
-        SILType::getPrimitiveObjectType(type.getReferentType())); \
-    result = createCopyValue(loc, result); \
-    return SGF.emitManagedRValueWithCleanup(result); \
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  ManagedValue SILGenBuilder::createStrongCopy##Name##Value(                   \
+      SILLocation loc, ManagedValue originalValue) {                           \
+    /* *NOTE* The reason why this is unsafe is that we are converting and */   \
+    /* unconditionally retaining, rather than before converting from */        \
+    /* type->ref checking that our value is not yet uninitialized. */          \
+    SILValue result =                                                          \
+        createStrongCopy##Name##Value(loc, originalValue.getValue());          \
+    return SGF.emitManagedRValueWithCleanup(result);                           \
   }
 #include "swift/AST/ReferenceStorage.def"
 
@@ -209,10 +206,9 @@ ManagedValue SILGenBuilder::createAllocRef(
   llvm::SmallVector<SILType, 8> elementTypes(inputElementTypes.begin(),
                                              inputElementTypes.end());
   llvm::SmallVector<SILValue, 8> elementCountOperands;
-  std::transform(std::begin(inputElementCountOperands),
-                 std::end(inputElementCountOperands),
-                 std::back_inserter(elementCountOperands),
-                 [](ManagedValue mv) -> SILValue { return mv.getValue(); });
+  llvm::transform(inputElementCountOperands,
+                  std::back_inserter(elementCountOperands),
+                  [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefInst *i = createAllocRef(loc, refType, objc, canAllocOnStack,
                                    elementTypes, elementCountOperands);
@@ -226,10 +222,9 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(
   llvm::SmallVector<SILType, 8> elementTypes(inputElementTypes.begin(),
                                              inputElementTypes.end());
   llvm::SmallVector<SILValue, 8> elementCountOperands;
-  std::transform(std::begin(inputElementCountOperands),
-                 std::end(inputElementCountOperands),
-                 std::back_inserter(elementCountOperands),
-                 [](ManagedValue mv) -> SILValue { return mv.getValue(); });
+  llvm::transform(inputElementCountOperands,
+                  std::back_inserter(elementCountOperands),
+                  [](ManagedValue mv) -> SILValue { return mv.getValue(); });
 
   AllocRefDynamicInst *i =
       createAllocRefDynamic(loc, operand.getValue(), refType, objc,
@@ -289,7 +284,7 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                       "address only type");
 
   if (ty.isObject() &&
-      originalValue.getOwnershipKind() == ValueOwnershipKind::Any) {
+      originalValue.getOwnershipKind() == ValueOwnershipKind::None) {
     return originalValue;
   }
 
@@ -664,7 +659,7 @@ ManagedValue SILGenBuilder::createStore(SILLocation loc, ManagedValue value,
                                         StoreOwnershipQualifier qualifier) {
   CleanupCloner cloner(*this, value);
   if (value.getType().isTrivial(SGF.F) ||
-      value.getOwnershipKind() == ValueOwnershipKind::Any)
+      value.getOwnershipKind() == ValueOwnershipKind::None)
     qualifier = StoreOwnershipQualifier::Trivial;
   createStore(loc, value.forward(SGF), address, qualifier);
   return cloner.clone(address);
@@ -702,7 +697,7 @@ void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
 void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
                                                ManagedValue value,
                                                SILValue address) {
-  if (value.getOwnershipKind() == ValueOwnershipKind::Any) {
+  if (value.getOwnershipKind() == ValueOwnershipKind::None) {
     createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
     return;
   }
@@ -743,8 +738,8 @@ BranchInst *SILGenBuilder::createBranch(SILLocation loc,
                                         SILBasicBlock *targetBlock,
                                         ArrayRef<ManagedValue> args) {
   llvm::SmallVector<SILValue, 8> newArgs;
-  transform(args, std::back_inserter(newArgs),
-            [&](ManagedValue mv) -> SILValue { return mv.forward(SGF); });
+  llvm::transform(args, std::back_inserter(newArgs),
+                  [&](ManagedValue mv) -> SILValue { return mv.forward(SGF); });
   return createBranch(loc, targetBlock, newArgs);
 }
 
@@ -771,10 +766,10 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // If we have all trivial values, then just create the tuple and return. No
   // cleanups need to be cloned.
   if (iter == elements.end()) {
-    transform(elements, std::back_inserter(forwardedValues),
-              [&](ManagedValue mv) -> SILValue {
-                return mv.forward(getSILGenFunction());
-              });
+    llvm::transform(elements, std::back_inserter(forwardedValues),
+                    [&](ManagedValue mv) -> SILValue {
+                      return mv.forward(getSILGenFunction());
+                    });
     SILValue result = createTuple(loc, type, forwardedValues);
     return ManagedValue::forUnmanaged(result);
   }
@@ -783,10 +778,10 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
   // instructions that forward ownership requiring that all input values have
   // the same ownership if they are non-trivial.
   CleanupCloner cloner(*this, *iter);
-  transform(elements, std::back_inserter(forwardedValues),
-            [&](ManagedValue mv) -> SILValue {
-              return mv.forward(getSILGenFunction());
-            });
+  llvm::transform(elements, std::back_inserter(forwardedValues),
+                  [&](ManagedValue mv) -> SILValue {
+                    return mv.forward(getSILGenFunction());
+                  });
   return cloner.clone(createTuple(loc, type, forwardedValues));
 }
 

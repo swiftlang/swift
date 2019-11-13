@@ -33,12 +33,12 @@ class VarDecl;
 
 class DerivedConformance {
 public:
-  TypeChecker &TC;
+  ASTContext &Context;
   Decl *ConformanceDecl;
   NominalTypeDecl *Nominal;
   ProtocolDecl *Protocol;
 
-  DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+  DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                      NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
   /// Retrieve the context in which the conformance is declared (either the
@@ -46,7 +46,10 @@ public:
   DeclContext *getConformanceContext() const;
 
   /// Add \c children as members of the context that declares the conformance.
-  void addMembersToConformanceContext(ArrayRef<Decl *> children);
+  ///
+  /// \returns True if any of the added members were found to be invalid after type
+  /// checking.
+  bool addMembersToConformanceContext(ArrayRef<Decl *> children);
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
@@ -69,10 +72,20 @@ public:
                                          NominalTypeDecl *nominal,
                                          ProtocolDecl *protocol);
 
+  /// Diagnose problems, if any, preventing automatic derivation of protocol
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void tryDiagnoseFailedDerivation(DeclContext *DC,
+                                          NominalTypeDecl *nominal,
+                                          ProtocolDecl *protocol);
+
   /// Determine the derivable requirement that would satisfy the given
   /// requirement, if there is one.
-  ///
-  /// \param tc The type checker.
   ///
   /// \param nominal The nominal type for which we are determining whether to
   /// derive a witness.
@@ -84,8 +97,7 @@ public:
   ///
   /// \returns The requirement whose witness could be derived to potentially
   /// satisfy this given requirement, or NULL if there is no such requirement.
-  static ValueDecl *getDerivableRequirement(TypeChecker &tc,
-                                            NominalTypeDecl *nominal,
+  static ValueDecl *getDerivableRequirement(NominalTypeDecl *nominal,
                                             ValueDecl *requirement);
 
   /// Derive a CaseIterable requirement for an enum if it has no associated
@@ -128,6 +140,14 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveEquatable(ValueDecl *requirement);
 
+  /// Diagnose problems, if any, preventing automatic derivation of Equatable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedEquatableDerivation(DeclContext *DC,
+                                                   NominalTypeDecl *nominal);
+
   /// Determine if a Hashable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Hashable
@@ -143,6 +163,14 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveHashable(ValueDecl *requirement);
+
+  /// Diagnose problems, if any, preventing automatic derivation of Hashable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedHashableDerivation(DeclContext *DC,
+                                                  NominalTypeDecl *nominal);
 
   /// Derive a _BridgedNSError requirement for an @objc enum type.
   ///
@@ -171,14 +199,8 @@ public:
 
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
-  addGetterToReadOnlyDerivedProperty(TypeChecker &tc, VarDecl *property,
-                                     Type propertyContextType);
-
-  /// Declare a getter for a derived property.
-  /// The getter will not be added to the property yet.
-  static AccessorDecl *declareDerivedPropertyGetter(TypeChecker &tc,
-                                                    VarDecl *property,
-                                                    Type propertyContextType);
+  addGetterToReadOnlyDerivedProperty(VarDecl *property,
+                                            Type propertyContextType);
 
   /// Build a reference to the 'self' decl of a derived function.
   static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);

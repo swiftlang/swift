@@ -1,4 +1,10 @@
 
+# TODO(compnerd) once we have a newer CMake we should be able to use the new
+# `Swift` LANGUAGE support in CMake to simplify the build.  For now, just add
+# the project so that it is possible to start working on extracting the Swift
+# standard library from the Swift compiler build.
+project(swift-stdlib LANGUAGES C CXX)
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -6,6 +12,17 @@ list(APPEND CMAKE_MODULE_PATH
 include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.
+
+# NOTE(compnerd) this will pass the *build* configuration to the *host*
+# libraries.  Explicitly indicate to CMake that it should **NOT** track the
+# implicit language runtimes.  This can go away once we migrate to an external
+# project with its own configure with the CMAKE_SYSTEM_NAME set rather than
+# using the custom cross-compilation solution
+set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 
 # NOTE(compnerd) save the original compiler for the host swiftReflection that
 # we build
@@ -40,7 +57,7 @@ else()
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
   # now.
-  append("-fno-sanitize=all" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+  add_compile_options(-fno-sanitize=all)
 endif()
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.
@@ -49,14 +66,23 @@ endif()
 # on the presence of symbols in libSupport to identify how the code was
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
-append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+if(CMAKE_VERSION VERSION_LESS 3.12)
+  append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+else()
+  add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
+endif()
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 endif()
 if(SWIFT_BUILD_STATIC_STDLIB)
-  list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
+    message(SEND_ERROR "cannot build static standard library for Darwin SDKs")
+  else()
+    list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
+  endif()
 endif()
 
 function(swift_create_stdlib_targets name variant define_all_alias)
@@ -113,48 +139,9 @@ if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
 endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
-foreach(sdk ${SWIFT_SDKS})
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(platform "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-    set(input "${SWIFT_SOURCE_DIR}/stdlib/public/legacy_layouts/${platform}/layouts-${arch}.yaml")
-    set(output "${SWIFTLIB_DIR}/${platform}/layouts-${arch}.yaml")
-
-    if(EXISTS "${input}")
-      # Copy the input file to the build directory.
-      add_custom_command(
-        OUTPUT "${output}"
-        DEPENDS "${input}"
-        COMMAND
-          "${CMAKE_COMMAND}" -E copy
-          "${input}"
-          "${output}")
-
-      # Define a target for this so that we can depend on it when
-      # building Swift sources.
-      add_custom_target(
-        "copy-legacy-layouts-${platform}-${arch}"
-        DEPENDS "${output}"
-        SOURCES "${input}")
-
-      # Make sure we ultimately always do this as part of building the
-      # standard library. In practice we'll do this earlier if at least
-      # one Swift source file has changed.
-      add_dependencies(
-        "swift-stdlib-${platform}-${arch}"
-        "copy-legacy-layouts-${platform}-${arch}")
-
-      swift_install_in_component(FILES ${input}
-                                 DESTINATION "lib/swift/${platform}/"
-                                 COMPONENT compiler)
-    else()
-      # Add a dummy target that does nothing so we can still depend on it
-      # later without checking if the input files exist.
-      add_custom_target(
-        "copy-legacy-layouts-${platform}-${arch}")
-    endif()
-  endforeach()
-endforeach()
-
+# FIXME: Include the toolchain directory before the public directory. Otherwise
+# the clang resource directory symlink stops installing correctly.
+add_subdirectory(toolchain)
 add_subdirectory(public)
 add_subdirectory(private)
 add_subdirectory(tools)

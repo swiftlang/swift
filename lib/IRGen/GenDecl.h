@@ -56,4 +56,6 @@ namespace irgen {
 }
 }
 
+extern llvm::cl::opt<bool> UseBasicDynamicReplacement;
+
 #endif

@@ -37,3 +37,8 @@ func testVarLetPattern(a : SimpleEnum) {
   // expected-warning @+1 {{'if' condition is always true}}
   if case let _ = "str" {}  // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
 }
+
+class SR10903 {
+  static var _: Int { 0 } //expected-error {{getter/setter can only be defined for a single variable}}
+  //expected-error@-1 {{property declaration does not bind any variables}}
+}

@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
 

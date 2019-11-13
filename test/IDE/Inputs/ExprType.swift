@@ -20,3 +20,9 @@ struct S {
 func DictS(_ a: [Int: S]) {
   _ = a[2]?.val.advanced(by: 1).byteSwapped
 }
+
+typealias MyInt = Int
+
+func calculateAdd(a: MyInt, b: MyInt) -> MyInt {
+	return a + b
+}

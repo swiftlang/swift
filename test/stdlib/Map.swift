@@ -12,9 +12,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 // Check that the generic parameters are called 'Base' and 'Element'.
 protocol TestProtocol1 {}
 

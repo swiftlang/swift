@@ -16,8 +16,8 @@
 using namespace swift;
 
 static ValueOwnershipKind getOwnershipKindForUndef(SILType type, const SILFunction &f) {
-  if (type.isTrivial(f))
-    return ValueOwnershipKind::Any;
+  if (type.isAddress() || type.isTrivial(f))
+    return ValueOwnershipKind::None;
   return ValueOwnershipKind::Owned;
 }
 

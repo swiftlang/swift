@@ -18,6 +18,7 @@
 #define SWIFT_AST_PARAMETERLIST_H
 
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -97,7 +98,8 @@ public:
 
   const ParamDecl *operator[](unsigned i) const { return get(i); }
   ParamDecl *&operator[](unsigned i) { return get(i); }
-  
+  bool hasInternalParameter(StringRef prefix) const;
+
   /// Change the DeclContext of any contained parameters to the specified
   /// DeclContext.
   void setDeclContextOfParamDecls(DeclContext *DC);
@@ -110,8 +112,6 @@ public:
     /// The cloned pattern is for an inherited constructor; mark default
     /// arguments as inherited, and mark unnamed arguments as named.
     Inherited = 0x02,
-    /// The cloned pattern will strip type information.
-    WithoutTypes = 0x04,
   };
 
   friend OptionSet<CloneFlags> operator|(CloneFlags flag1, CloneFlags flag2) {
@@ -127,18 +127,12 @@ public:
   /// based on the interface types of the parameters in this list.
   void getParams(SmallVectorImpl<AnyFunctionType::Param> &params) const;
 
-  /// Return a list of function parameters for this parameter list,
-  /// based on types provided by a callback.
-  void getParams(SmallVectorImpl<AnyFunctionType::Param> &params,
-                 llvm::function_ref<Type(ParamDecl *)> getType) const;
-
-
   /// Return the full source range of this parameter.
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   
   //  void print(raw_ostream &OS) const;

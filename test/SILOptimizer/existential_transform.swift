@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -O -sil-existential-specializer -Xllvm -sil-disable-pass=GenericSpecializer -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=SILCombine -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -enable-existential-specializer -Xllvm -sil-disable-pass=GenericSpecializer -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=SILCombine -emit-sil -sil-verify-all %s | %FileCheck %s
+// REQUIRES: optimized_stdlib
 
 internal protocol SomeProtocol : class {
   func foo()  -> Int
@@ -243,20 +244,9 @@ internal class KKKClass : PPP {
  return a.foo()
 }
 
+// Cannot specialize an @inout argument.
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
-// CHECK: bb0:
-// CHECK: alloc_stack
-// CHECK: alloc_ref
-// CHECK: debug_value
-// CHECK: init_existential_addr
-// CHECK: store
-// CHECK: function_ref @$s21existential_transform14wrap_inout_ncp1aSiAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int
-// CHECK: open_existential_addr
-// CHECK: apply
-// CHECK: destroy_addr 
-// CHECK: dealloc_stack
-// CHECK: tuple
-// CHECK: return
+// CHECK: function_ref @$s21existential_transform14wrap_inout_ncp1aSiAA3PPP_pz_tF : $@convention(thin) (@inout PPP) -> Int
 // CHECK-LABEL: } // end sil function '$s21existential_transform9inout_ncpyyF'
 @inline(never) func inout_ncp() {
 var magic6:PPP = KKKClass()
@@ -277,19 +267,9 @@ internal struct SSSS : PPPP {
  return a.foo()
 }
 
+// Cannot specialize an @inout argument.
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
-// CHECK: bb0:
-// CHECK: alloc_stack
-// CHECK: struct
-// CHECK: init_existential_addr
-// CHECK: store
-// CHECK: function_ref @$s21existential_transform21wrap_struct_inout_ncp1aSiAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int 
-// CHECK: open_existential_addr
-// CHECK: apply
-// CHECK: destroy_addr
-// CHECK: dealloc_stack
-// CHECK: tuple
-// CHECK: return
+// CHECK: function_ref @$s21existential_transform21wrap_struct_inout_ncp1aSiAA4PPPP_pz_tF : $@convention(thin) (@inout PPPP) -> Int
 // CHECK-LABEL: } // end sil function '$s21existential_transform16struct_inout_ncpyyF'
 @inline(never) func struct_inout_ncp() {
 var magic7:PPPP = SSSS()
@@ -322,8 +302,8 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
 // CHECK: strong_retain 
 // CHECK: apply
 // CHECK: destroy_addr 
-// CHECK: dealloc_stack
 // CHECK: strong_release 
+// CHECK: dealloc_stack
 // CHECK: return 
 // CHECK: } // end sil function '$s21existential_transform3gcpySixAA2GPRzlF'
 @inline(never) func gcp<T:GP>(_ a:T) -> Int {
@@ -349,8 +329,8 @@ func wrap_gcp_arch<T:GP>(_ a:T,_ b:GP, _ c:inout Array<T>) -> Int {
 // CHECK: strong_retain
 // CHECK: apply
 // CHECK: destroy_addr
-// CHECK: dealloc_stack
 // CHECK: strong_release
+// CHECK: dealloc_stack
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF'
 @inline(never) func gcp_arch<T:GP>(_ a:T, _ b:inout Array<T>) -> Int {

@@ -217,6 +217,10 @@ public func spawnChild(_ args: [String])
   if pid == 0 {
     // pid of 0 means we are now in the child process.
     // Capture the output before executing the program.
+    close(childStdout.readFD)
+    close(childStdin.writeFD)
+    close(childStderr.readFD)
+    close(childToParentPipe.readFD)
     dup2(childStdout.writeFD, STDOUT_FILENO)
     dup2(childStdin.readFD, STDIN_FILENO)
     dup2(childStderr.writeFD, STDERR_FILENO)
@@ -261,6 +265,41 @@ public func spawnChild(_ args: [String])
 
     // Close the pipe when we're done writing the error.
     close(childToParentPipe.writeFD)
+  } else {
+    close(childToParentPipe.writeFD)
+
+    // Figure out if the child’s call to execve was successful or not.
+    var readfds = _stdlib_fd_set()
+    readfds.set(childToParentPipe.readFD)
+    var writefds = _stdlib_fd_set()
+    var errorfds = _stdlib_fd_set()
+    errorfds.set(childToParentPipe.readFD)
+
+    var ret: CInt
+    repeat {
+      ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
+    } while ret == -1 && errno == EINTR
+    if ret <= 0 {
+      fatalError("select() returned an error: \(errno)")
+    }
+
+    if readfds.isset(childToParentPipe.readFD) || errorfds.isset(childToParentPipe.readFD) {
+      var childErrno: CInt = 0
+      let readResult: ssize_t = withUnsafeMutablePointer(to: &childErrno) {
+        return read(childToParentPipe.readFD, $0, MemoryLayout.size(ofValue: $0.pointee))
+      }
+      if readResult == 0 {
+        // We read an EOF indicating that the child's call to execve was successful.
+      } else if readResult < 0 {
+        fatalError("read() returned error: \(errno)")
+      } else {
+        // We read an error from the child.
+        print(String(cString: strerror(childErrno)))
+        preconditionFailure("execve() failed")
+      }
+    }
+
+    close(childToParentPipe.readFD)
   }
 #else
   var fileActions = _make_posix_spawn_file_actions_t()

@@ -15,7 +15,7 @@
 // MEMBER: End completions
 
 // ATTR: Begin completions
-// ATTR: available[#Func Attribute#]; name=available
+// ATTR: available[#Declaration Attribute#]; name=available
 // ATTR: End completions
 
 // GLOBAL: Begin completions

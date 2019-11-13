@@ -51,6 +51,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
+    single-source/ChaCha
     single-source/ChainedFilterMap
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
@@ -78,6 +79,8 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/Diffing
+    single-source/DiffingMyers
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -85,6 +88,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FindStringNaive
     single-source/FlattenList
     single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
@@ -92,6 +96,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/Histogram
     single-source/InsertCharacter  
+    single-source/IntegerParsing
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -107,6 +112,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSError
     single-source/NSStringConversion
     single-source/NibbleSort
+    single-source/NIOChannelPipeline
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging
@@ -126,6 +132,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Prefix
     single-source/PrefixWhile
     single-source/Prims
+    single-source/PrimsNonStrongRef
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
     single-source/Queue
@@ -147,6 +154,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
+    single-source/SortArrayInClass
     single-source/SortIntPyramids
     single-source/SortLargeExistentials
     single-source/SortLettersInPlace
@@ -162,6 +170,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringInterpolation
     single-source/StringMatch
     single-source/StringRemoveDupes
+    single-source/StringReplaceSubrange
     single-source/StringTests
     single-source/StringWalk
     single-source/Substring

@@ -2,6 +2,7 @@
 
 struct X { }
 struct Y { }
+protocol Z { }
 
 struct WithOverloadedSubscript {
   subscript(i: Int) -> X {
@@ -9,6 +10,13 @@ struct WithOverloadedSubscript {
     set {}
   }
   subscript(i: Int) -> Y {
+    get {}
+    set {}
+  }
+}
+
+struct WithProtocolSubscript {
+  subscript(i: Int) -> Z {
     get {}
     set {}
   }
@@ -26,6 +34,7 @@ var f: Y
 func getXY() -> (X, Y) {}
 var ift : (X, Y)
 var ovl = WithOverloadedSubscript()
+var ps = WithProtocolSubscript()
 
 var slice: [X]
 
@@ -40,7 +49,11 @@ i = j
 _ = (i, f)
 slice[7] = i
 
-slice[7] = f // expected-error{{cannot assign value of type 'Y' to type 'X'}}
+slice[7] = f // expected-error{{cannot assign value of type 'Y' to subscript of type 'X'}}
+
+slice[7] = nil // expected-error{{'nil' cannot be assigned to subscript of type 'X'}}
+
+ps[7] = i // expected-error{{value of type 'X' does not conform to 'Z' in subscript assignment}}
 
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 

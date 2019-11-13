@@ -10,7 +10,7 @@
 import Foundation
 
 // CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, FrozenEnum, closed) {
-@objc @_frozen public enum FrozenEnum: Int {
+@objc @frozen public enum FrozenEnum: Int {
   case yes
   case no
 }

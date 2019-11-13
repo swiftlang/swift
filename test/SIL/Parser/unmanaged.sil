@@ -16,7 +16,7 @@ bb0(%0 : $*Optional<U>):
 }
 
 sil [ossa] @retain_release : $@convention(thin) (@sil_unmanaged Optional<C>) -> () {
-bb0(%0 : @unowned $@sil_unmanaged Optional<C>):
+bb0(%0 : $@sil_unmanaged Optional<C>):
   %1 = unmanaged_to_ref %0 : $@sil_unmanaged Optional<C> to $Optional<C>
   unmanaged_retain_value %1 : $Optional<C>
   unmanaged_autorelease_value %1 : $Optional<C>

@@ -513,6 +513,10 @@ void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataDemanglingCache(Node *node) {
+  unreachable("not supported");
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Buffer << "ML";
   mangleSingleChildNode(node); // type
@@ -790,6 +794,11 @@ void Remangler::mangleAccessor(Node *storageNode, StringRef accessorCode,
 
 void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "i", ctx);
+}
+
+void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
+                                                        EntityContext &ctx) {
+  mangleSimpleEntity(node, 'I', "P", ctx);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
@@ -1127,6 +1136,11 @@ void Remangler::mangleUncurriedFunctionType(Node *node) {
 void Remangler::mangleObjCBlock(Node *node) {
   Buffer << 'b';
   mangleChildNodes(node); // argument tuple, result type
+}
+
+void Remangler::mangleEscapingObjCBlock(Node *node) {
+  // We shouldn't ever be remangling anything with a DWARF-only mangling.
+  Buffer << "<escaping block type>";
 }
 
 void Remangler::mangleCFunctionPointer(Node *node) {
@@ -1602,6 +1616,10 @@ void Remangler::mangleDependentGenericParamType(Node *node) {
 
 void Remangler::mangleIndex(Node *node) {
   mangleIndex(node->getIndex());
+}
+
+void Remangler::mangleUnknownIndex(Node *node) {
+  unreachable("should not be reached in an arbitrary context");
 }
 
 void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {

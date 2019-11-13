@@ -457,6 +457,7 @@ template <typename Runtime> struct TargetStructMetadata;
 template <typename Runtime> struct TargetOpaqueMetadata;
 template <typename Runtime> struct TargetValueMetadata;
 template <typename Runtime> struct TargetForeignClassMetadata;
+template <typename Runtime> struct TargetContextDescriptor;
 template <typename Runtime> class TargetTypeContextDescriptor;
 template <typename Runtime> class TargetClassDescriptor;
 template <typename Runtime> class TargetValueTypeDescriptor;
@@ -997,8 +998,6 @@ struct TargetClassMetadata : public TargetAnyClassMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
-  friend class ReflectionContext;
-
   TargetClassMetadata() = default;
   constexpr TargetClassMetadata(const TargetAnyClassMetadata<Runtime> &base,
              ClassFlags flags,
@@ -1494,7 +1493,11 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Type;
 
     /// The offset of the tuple element within the tuple.
+#if __APPLE__
     StoredSize Offset;
+#else
+    uint32_t Offset;
+#endif
 
     OpaqueValue *findIn(OpaqueValue *tuple) const {
       return (OpaqueValue*) (((char*) tuple) + Offset);
@@ -1504,6 +1507,9 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
       return Type->getTypeLayout();
     }
   };
+
+  static_assert(sizeof(Element) == sizeof(StoredSize) * 2,
+                "element size should be two words");
 
   Element *getElements() {
     return reinterpret_cast<Element*>(this + 1);
@@ -2085,12 +2091,12 @@ struct TargetTypeMetadataRecord {
 private:
   union {
     /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime>,
+    RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
                                  TypeReferenceKind>
       DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetTypeContextDescriptor<Runtime> * const,
+    RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime> * const,
                                  TypeReferenceKind>
       IndirectNominalTypeDescriptor;
 
@@ -2103,8 +2109,8 @@ public:
     return DirectNominalTypeDescriptor.getInt();
   }
   
-  const TargetTypeContextDescriptor<Runtime> *
-  getTypeContextDescriptor() const {
+  const TargetContextDescriptor<Runtime> *
+  getContextDescriptor() const {
     switch (getTypeKind()) {
     case TypeReferenceKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
@@ -2332,6 +2338,12 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  const TargetContextDescriptor<Runtime> **_getTypeDescriptorLocation() const {
+    if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
+      return nullptr;
+    return TypeRef.IndirectTypeDescriptor.get();
+  }
+
   /// Retrieve the context of a retroactive conformance.
   const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
@@ -2477,6 +2489,12 @@ struct TargetContextDescriptor {
               ? genericContext->getGenericContextHeader().NumParams
               : 0;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
+#endif
+
 private:
   TargetContextDescriptor(const TargetContextDescriptor &) = delete;
   TargetContextDescriptor(TargetContextDescriptor &&) = delete;
@@ -3043,11 +3061,16 @@ public:
     return getNumUnderlyingTypeArguments();
   }
   
+  const RelativeDirectPointer<const char> &
+  getUnderlyingTypeArgumentMangledName(unsigned i) const {
+    assert(i < getNumUnderlyingTypeArguments());
+    return (this
+         ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+  }
+  
   StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    const char *ptr =
-    (this->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
-    
+    const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
   
@@ -3115,10 +3138,6 @@ struct MetadataCompletionContext {
 /// it may be called many times as successive dependencies are resolved.
 /// If the function ever completes successfully (by returning null), it
 /// will not be called again for the same type.
-///
-/// \return null to indicate that the type has been completed, or a non-null
-///   pointer to indicate that completion is blocked on the completion of
-///   some other type
 using MetadataCompleter =
   SWIFT_CC(swift)
   MetadataDependency(const Metadata *type,
@@ -3355,6 +3374,11 @@ public:
   
   explicit operator bool() const {
     return Function != nullptr;
+  }
+
+  /// For debugging purposes only.
+  explicit operator void*() const {
+    return reinterpret_cast<void *>(Function);
   }
   
   /// Invoke with an array of arguments of dynamic size.
@@ -4236,6 +4260,11 @@ public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Enum;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "Only meant for use in the debugger");
+#endif
 };
 
 using EnumDescriptor = TargetEnumDescriptor<InProcess>;
@@ -4440,4 +4469,4 @@ public:
 
 #pragma clang diagnostic pop
 
-#endif /* SWIFT_ABI_METADATA_H */
+#endif // SWIFT_ABI_METADATA_H

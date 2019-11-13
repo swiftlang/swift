@@ -107,6 +107,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"
@@ -115,6 +116,7 @@
 #include "llvm/Support/Compiler.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
+#include "BitPatternBuilder.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenProto.h"
@@ -140,17 +142,6 @@ static llvm::Constant *emitEnumLayoutFlags(IRGenModule &IGM, bool isVWTMutable){
   if (isVWTMutable) flags |= EnumLayoutFlags::IsVWTMutable;
 
   return IGM.getSize(Size(uintptr_t(flags)));
-}
-
-static SpareBitVector
-getBitVectorFromAPInt(const APInt &bits, unsigned startBit = 0) {
-  if (startBit == 0) {
-    return SpareBitVector::fromAPInt(bits);
-  }
-  SpareBitVector result;
-  result.appendClearBits(startBit);
-  result.append(SpareBitVector::fromAPInt(bits));
-  return result;
 }
 
 static IsABIAccessible_t
@@ -324,9 +315,10 @@ namespace {
 
     SILType getSingletonType(IRGenModule &IGM, SILType T) const {
       assert(!ElementsWithPayload.empty());
-      
+
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  IGM.getSILModule());
+                                  IGM.getSILModule(),
+                                  IGM.getMaximalTypeExpansionContext());
     }
 
   public:
@@ -623,8 +615,9 @@ namespace {
       assert(ElementsWithPayload.size() == 1 &&
              "empty singleton enum should not be dynamic!");
 
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            IGM.getSILModule());
+      auto payloadTy = T.getEnumElementType(
+          ElementsWithPayload[0].decl, IGM.getSILModule(),
+          IGM.getMaximalTypeExpansionContext());
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
       IGF.Builder.CreateCall(
@@ -804,7 +797,6 @@ namespace {
                              std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
     }
 
     bool needsPayloadSizeInMetadata() const override { return false; }
@@ -981,10 +973,9 @@ namespace {
 
     ClusteredBitVector
     getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
-      auto bits
-        = getBitVectorFromAPInt(getDiscriminatorIdxConst(theCase)->getValue());
-      bits.extendWithClearBits(cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
-      return bits;
+      Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
+      auto val = getDiscriminatorIdxConst(theCase)->getValue();
+      return ClusteredBitVector::fromAPInt(val.zextOrSelf(size.getValueInBits()));
     }
 
     ClusteredBitVector
@@ -1138,10 +1129,12 @@ namespace {
   protected:
     int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
-      // raw values from C.
-      assert(target->hasRawValueExpr()
-             && "c-compatible enum elt has no raw value?!");
-      auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
+      // raw values from C. An invalid raw value is assigned the error index -1.
+      auto intExpr =
+          dyn_cast_or_null<IntegerLiteralExpr>(target->getRawValueExpr());
+      if (!intExpr) {
+        return -1;
+      }
       auto intType = getDiscriminatorType();
 
       APInt intValue =
@@ -1164,7 +1157,6 @@ namespace {
                                       std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
@@ -1333,11 +1325,6 @@ namespace {
         // The bit count is dynamic.
         PayloadBitCount = ~0u;
       }
-    }
-    
-    ~PayloadEnumImplStrategyBase() override {
-      if (auto schema = PayloadSchema.getSchema())
-        delete schema;
     }
 
     void getSchema(ExplosionSchema &schema) const override {
@@ -1582,7 +1569,8 @@ namespace {
 
     SILType getPayloadType(IRGenModule &IGM, SILType T) const {
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  IGM.getSILModule());
+                                  IGM.getSILModule(),
+                                  IGM.getMaximalTypeExpansionContext());
     }
 
     const TypeInfo &getPayloadTypeInfo() const {
@@ -2972,8 +2960,9 @@ namespace {
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            IGM.getSILModule());
+      auto payloadTy =
+          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
+                               IGM.getMaximalTypeExpansionContext());
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto emptyCasesVal = llvm::ConstantInt::get(IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -3194,70 +3183,64 @@ namespace {
         return APInt::getAllOnesValue(totalSize);
       auto baseMask =
         getFixedPayloadTypeInfo().getFixedExtraInhabitantMask(IGM);
-      
-      if (baseMask.getBitWidth() < totalSize)
-        baseMask = baseMask.zext(totalSize)
-         | APInt::getHighBitsSet(totalSize, totalSize - baseMask.getBitWidth());
-      
-      return baseMask;
+      auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+      mask.append(baseMask);
+      mask.padWithSetBitsTo(totalSize);
+      return mask.build().getValue();
     }
 
     ClusteredBitVector
     getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       APInt payloadPart, extraPart;
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(theCase);
-      ClusteredBitVector bits;
-
+      auto value = BitPatternBuilder(IGM.Triple.isLittleEndian());
       if (PayloadBitCount > 0)
-        bits = getBitVectorFromAPInt(payloadPart);
+        value.append(payloadPart);
 
-      unsigned totalSize
-        = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
+      Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
       if (ExtraTagBitCount > 0) {
-        ClusteredBitVector extraBits = getBitVectorFromAPInt(extraPart,
-                                                             bits.size());
-        bits.extendWithClearBits(totalSize);
-        extraBits.extendWithClearBits(totalSize);
-        bits |= extraBits;
-      } else {
-        assert(totalSize == bits.size());
+        auto paddedWidth = size.getValueInBits() - PayloadBitCount;
+        value.append(extraPart.zextOrSelf(paddedWidth));
       }
-      return bits;
+      return value.build();
     }
 
     ClusteredBitVector
     getBitMaskForNoPayloadElements() const override {
       // Use the extra inhabitants mask from the payload.
       auto &payloadTI = getFixedPayloadTypeInfo();
-      ClusteredBitVector extraInhabitantsMask;
-      
-      if (!payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        extraInhabitantsMask =
-          getBitVectorFromAPInt(payloadTI.getFixedExtraInhabitantMask(IGM));
-      // Extend to include the extra tag bits, which are always significant.
-      unsigned totalSize
-        = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
-      extraInhabitantsMask.extendWithSetBits(totalSize);
-      return extraInhabitantsMask;
+
+      Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
+      auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+      if (Size payloadSize = payloadTI.getFixedSize()) {
+        auto payloadMask = APInt::getNullValue(payloadSize.getValueInBits());
+        if (getNumExtraInhabitantTagValues() > 0)
+          payloadMask |= payloadTI.getFixedExtraInhabitantMask(IGM);
+        if (ExtraTagBitCount > 0)
+          payloadMask |= 0xffffffffULL;
+        mask.append(std::move(payloadMask));
+      }
+      if (ExtraTagBitCount > 0) {
+        mask.padWithSetBitsTo(size.getValueInBits());
+      }
+      return mask.build();
     }
 
     ClusteredBitVector getTagBitsForPayloads() const override {
       // We only have tag bits if we spilled extra bits.
-      ClusteredBitVector result;
-      unsigned payloadSize
-        = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
-      result.appendClearBits(payloadSize);
+      auto tagBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
+      Size payloadSize = getFixedPayloadTypeInfo().getFixedSize();
+      tagBits.appendClearBits(payloadSize.getValueInBits());
 
-      unsigned totalSize
-        = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
-
+      Size totalSize = cast<FixedTypeInfo>(TI)->getFixedSize();
       if (ExtraTagBitCount) {
-        result.appendSetBits(ExtraTagBitCount);
-        result.extendWithClearBits(totalSize);
+        Size extraTagSize = totalSize - payloadSize;
+        tagBits.append(APInt(extraTagSize.getValueInBits(),
+                             (1U << ExtraTagBitCount) - 1));
       } else {
         assert(payloadSize == totalSize);
       }
-      return result;
+      return tagBits.build();
     }
   };
 
@@ -3580,12 +3563,8 @@ namespace {
       if (CommonSpareBits.empty())
         return APInt();
       
-      APInt v = interleaveSpareBits(IGM, PayloadTagBits,
-                                    PayloadTagBits.size(),
-                                    tag, 0);
-      v |= interleaveSpareBits(IGM, CommonSpareBits,
-                               CommonSpareBits.size(),
-                               0, tagIndex);
+      APInt v = scatterBits(PayloadTagBits.asAPInt(), tag);
+      v |= scatterBits(~CommonSpareBits.asAPInt(), tagIndex);
       return v;
     }
 
@@ -3593,18 +3572,14 @@ namespace {
     EnumPayload getEmptyCasePayload(IRGenFunction &IGF,
                                     llvm::Value *tag,
                                     llvm::Value *tagIndex) const {
-      SpareBitVector commonSpareBits = CommonSpareBits;
-      commonSpareBits.flipAll();
-
-      EnumPayload result = interleaveSpareBits(IGF, PayloadSchema,
-                                               commonSpareBits, tagIndex);
-      result.emitApplyOrMask(IGF,
-                             interleaveSpareBits(IGF, PayloadSchema,
-                                                 PayloadTagBits, tag));
-
+      auto result = EnumPayload::zero(IGF.IGM, PayloadSchema);
+      if (!CommonSpareBits.empty())
+        result.emitScatterBits(IGF, ~CommonSpareBits.asAPInt(), tagIndex);
+      if (!PayloadTagBits.empty())
+        result.emitScatterBits(IGF, PayloadTagBits.asAPInt(), tag);
       return result;
     }
-    
+
     struct DestructuredLoadableEnum {
       EnumPayload payload;
       llvm::Value *extraTagBits;
@@ -4130,9 +4105,7 @@ namespace {
       // If we have spare bits, pack tag bits into them.
       unsigned numSpareBits = PayloadTagBits.count();
       if (numSpareBits > 0) {
-        APInt tagMaskVal
-          = interleaveSpareBits(IGM, PayloadTagBits,
-                                PayloadTagBits.size(), tag, 0);
+        APInt tagMaskVal = scatterBits(PayloadTagBits.asAPInt(), tag);
         payload.emitApplyOrMask(IGF, tagMaskVal);
       }
 
@@ -4217,17 +4190,10 @@ namespace {
         payload = getEmptyCasePayload(IGF, tag, tagIndex);
       } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
+        auto mask = APInt::getLowBitsSet(CommonSpareBits.size(),
+                                         std::min(32U, numCaseBits));
         payload = EnumPayload::zero(IGM, PayloadSchema);
-        if (!IGF.IGM.Triple.isLittleEndian()) {
-          if (IGF.IGM.Triple.isArch64Bit() && numCaseBits >= 64) {
-            // Need to set the full 64-bit chunk on big-endian systems.
-            tagIndex = IGF.Builder.CreateZExt(tagIndex, IGM.SizeTy);
-          }
-	}
-        // We know we won't use more than numCaseBits from tagIndex's value:
-        // We made sure of this in the logic above.
-        payload.insertValue(IGF, tagIndex, 0,
-                            numCaseBits >= 32 ? -1 : numCaseBits);
+        payload.emitScatterBits(IGF, mask, tagIndex);
       }
 
       // If the tag bits do not fit in the spare bits, the remaining tag bits
@@ -4613,8 +4579,9 @@ namespace {
 
         unsigned tagIndex = 0;
         for (auto &payloadCasePair : ElementsWithPayload) {
-          SILType PayloadT = T.getEnumElementType(payloadCasePair.decl,
-                                                  IGF.getSILModule());
+          SILType PayloadT =
+              T.getEnumElementType(payloadCasePair.decl, IGF.getSILModule(),
+                                   IGF.IGM.getMaximalTypeExpansionContext());
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
@@ -4730,9 +4697,9 @@ namespace {
       }
 
       for (auto &payloadCasePair : ElementsWithPayload) {
-        SILType payloadT =
-          T.getEnumElementType(payloadCasePair.decl,
-                               collector.IGF.getSILModule());
+        SILType payloadT = T.getEnumElementType(
+            payloadCasePair.decl, collector.IGF.getSILModule(),
+            collector.IGF.IGM.getMaximalTypeExpansionContext());
         auto &payloadTI = *payloadCasePair.ti;
         payloadTI.collectMetadataForOutlining(collector, payloadT);
       }
@@ -4775,8 +4742,9 @@ namespace {
                 // Destroy the data.
                 Address dataAddr = IGF.Builder.CreateBitCast(
                     addr, elt.ti->getStorageType()->getPointerTo());
-                SILType payloadT =
-                    T.getEnumElementType(elt.decl, IGF.getSILModule());
+                SILType payloadT = T.getEnumElementType(
+                    elt.decl, IGF.getSILModule(),
+                    IGF.IGM.getMaximalTypeExpansionContext());
                 elt.ti->destroy(IGF, dataAddr, payloadT, true /*isOutlined*/);
               });
           return;
@@ -4806,9 +4774,7 @@ namespace {
         // enum containing this enum as a payload. Single payload layout
         // unfortunately assumes that tagging the payload case is a no-op.
         auto spareBitMask = ~CommonSpareBits.asAPInt();
-        APInt tagBitMask
-          = interleaveSpareBits(IGM, PayloadTagBits, PayloadTagBits.size(),
-                                spareTagBits, 0);
+        APInt tagBitMask = scatterBits(PayloadTagBits.asAPInt(), spareTagBits);
 
         payload.emitApplyAndMask(IGF, spareBitMask);
         payload.emitApplyOrMask(IGF, tagBitMask);
@@ -4851,10 +4817,7 @@ namespace {
         payload.emitApplyAndMask(IGF, spareBitMask);
 
         // Store the tag into the spare bits.
-        payload.emitApplyOrMask(IGF,
-                                interleaveSpareBits(IGF, PayloadSchema,
-                                                    PayloadTagBits,
-                                                    spareTagBits));
+        payload.emitScatterBits(IGF, PayloadTagBits.asAPInt(), spareTagBits);
 
         // Store the payload back.
         payload.store(IGF, payloadAddr);
@@ -5020,9 +4983,11 @@ namespace {
         Address eltAddr = IGF.Builder.CreateStructGEP(metadataBuffer, i,
                                                   IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
-        
-        auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
-        
+
+        auto payloadTy =
+            T.getEnumElementType(elt.decl, IGF.getSILModule(),
+                                 IGF.IGM.getMaximalTypeExpansionContext());
+
         auto metadata = emitTypeLayoutRef(IGF, payloadTy, collector);
         
         IGF.Builder.CreateStore(metadata, eltAddr);
@@ -5211,8 +5176,8 @@ namespace {
       if (CommonSpareBits.count()) {
         // Factor the index value into parts to scatter into the payload and
         // to store in the extra tag bits, if any.
-        EnumPayload payload =
-          interleaveSpareBits(IGF, PayloadSchema, CommonSpareBits, indexValue);
+        auto payload = EnumPayload::zero(IGM, PayloadSchema);
+        payload.emitScatterBits(IGF, CommonSpareBits.asAPInt(), indexValue);
         payload.store(IGF, projectPayload(IGF, dest));
         if (getExtraTagBitCountForExtraInhabitants() > 0) {
           auto tagBits = IGF.Builder.CreateLShr(indexValue,
@@ -5267,11 +5232,10 @@ namespace {
       auto tagBits = CommonSpareBits.asAPInt();
       auto fixedTI = cast<FixedTypeInfo>(TI);
       if (getExtraTagBitCountForExtraInhabitants() > 0) {
-        auto bitSize = fixedTI->getFixedSize().getValueInBits();
-        tagBits = tagBits.zext(bitSize);
-        auto extraTagMask = APInt::getAllOnesValue(bitSize)
-          .shl(CommonSpareBits.size());
-        tagBits |= extraTagMask;
+        auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+        mask.append(CommonSpareBits);
+        mask.padWithSetBitsTo(fixedTI->getFixedSize().getValueInBits());
+        tagBits = mask.build().getValue();
       }
       return tagBits;
     }
@@ -5316,30 +5280,28 @@ namespace {
       auto extraTagMask = getExtraTagBitCountForExtraInhabitants() >= 32
         ? ~0u : (1 << getExtraTagBitCountForExtraInhabitants()) - 1;
 
+      auto value = BitPatternBuilder(IGM.Triple.isLittleEndian());
       if (auto payloadBitCount = CommonSpareBits.count()) {
         auto payloadTagMask = payloadBitCount >= 32
           ? ~0u : (1 << payloadBitCount) - 1;
         auto payloadPart = mask & payloadTagMask;
-        auto payloadBits = interleaveSpareBits(IGM, CommonSpareBits,
-                                               bits, payloadPart, 0);
+        auto payloadBits = scatterBits(CommonSpareBits.asAPInt(),
+                                       payloadPart);
+        value.append(payloadBits);
         if (getExtraTagBitCountForExtraInhabitants() > 0) {
-          auto extraBits = APInt(bits,
-                                 (mask >> payloadBitCount) & extraTagMask)
-            .shl(CommonSpareBits.size());
-          payloadBits |= extraBits;
+          value.append(APInt(bits - CommonSpareBits.size(),
+                             (mask >> payloadBitCount) & extraTagMask));
         }
-        return payloadBits;
       } else {
-        auto value = APInt(bits, mask & extraTagMask);
-        return value.shl(CommonSpareBits.size());
+        value.appendClearBits(CommonSpareBits.size());
+        value.append(APInt(bits - CommonSpareBits.size(), mask & extraTagMask));
       }
+      return value.build().getValue();
     }
 
     ClusteredBitVector
     getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       assert(TIK >= Fixed);
-
-      APInt payloadPart, extraPart;
 
       auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
                                  ElementsWithNoPayload.end(),
@@ -5348,24 +5310,19 @@ namespace {
 
       unsigned index = emptyI - ElementsWithNoPayload.begin();
 
+      APInt payloadPart, extraPart;
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(index);
-      ClusteredBitVector bits;
+      auto value = BitPatternBuilder(IGM.Triple.isLittleEndian());
+      if (PayloadBitCount > 0)
+        value.append(payloadPart);
 
-      if (!CommonSpareBits.empty())
-        bits = getBitVectorFromAPInt(payloadPart);
-
-      unsigned totalSize
-        = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
+      Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
       if (ExtraTagBitCount > 0) {
-        ClusteredBitVector extraBits =
-          getBitVectorFromAPInt(extraPart, bits.size());
-        bits.extendWithClearBits(totalSize);
-        extraBits.extendWithClearBits(totalSize);
-        bits |= extraBits;
-      } else {
-        assert(totalSize == bits.size());
+        auto paddedWidth = size.getValueInBits() - PayloadBitCount;
+        auto extraPadded = extraPart.zextOrSelf(paddedWidth);
+        value.append(std::move(extraPadded));
       }
-      return bits;
+      return value.build();
     }
 
     ClusteredBitVector
@@ -5381,19 +5338,22 @@ namespace {
 
     ClusteredBitVector getTagBitsForPayloads() const override {
       assert(TIK >= Fixed);
-      
-      ClusteredBitVector result = PayloadTagBits;
+      Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
 
-      unsigned totalSize
-        = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
-
-      if (ExtraTagBitCount) {
-        result.appendSetBits(ExtraTagBitCount);
-        result.extendWithClearBits(totalSize);
-      } else {
-        assert(PayloadTagBits.size() == totalSize);
+      if (ExtraTagBitCount == 0) {
+        assert(PayloadTagBits.size() == size.getValueInBits());
+        return PayloadTagBits;
       }
-      return result;
+
+      // Build a mask containing the tag bits for the payload and those
+      // spilled into the extra tag.
+      auto tagBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
+      tagBits.append(PayloadTagBits);
+
+      // Set tag bits in extra tag to 1.
+      unsigned extraTagSize = size.getValueInBits() - PayloadTagBits.size();
+      tagBits.append(APInt(extraTagSize, (1U << ExtraTagBitCount) - 1U));
+      return tagBits.build();
     }
   };
 
@@ -5445,8 +5405,7 @@ namespace {
       llvm::BasicBlock *conditionalBlock = nullptr;
       llvm::BasicBlock *afterConditionalBlock = nullptr;
       llvm::BasicBlock *beforeNullPtrCheck = nullptr;
-      if (Case->isWeakImported(IGM.getSwiftModule(),
-                               IGM.getAvailabilityContext())) {
+      if (Case->isWeakImported(IGM.getSwiftModule())) {
         beforeNullPtrCheck = IGF.Builder.GetInsertBlock();
         auto address = IGM.getAddrOfEnumCase(Case, NotForDefinition);
         conditionalBlock = llvm::BasicBlock::Create(C);
@@ -5792,6 +5751,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
 
+  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
+    alwaysFixedSize = IsNotFixedSize;
+
   // Resilient enums are manipulated as opaque values, except we still
   // make the following assumptions:
   // 1) The indirect-ness of cases won't change
@@ -5813,14 +5775,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
 
-    // Compute whether this gives us an apparent payload or dynamic layout.
-    // Note that we do *not* apply substitutions from a bound generic instance
-    // yet. We want all instances of a generic enum to share an implementation
-    // strategy. If the abstract layout of the enum is dependent on generic
-    // parameters, then we additionally need to constrain any layout
-    // optimizations we perform to things that are reproducible by the runtime.
-    Type origArgType = elt->getArgumentInterfaceType();
-    if (origArgType.isNull()) {
+    if (!elt->hasAssociatedValues()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
     }
@@ -5832,7 +5787,14 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
-
+    
+    // Compute whether this gives us an apparent payload or dynamic layout.
+    // Note that we do *not* apply substitutions from a bound generic instance
+    // yet. We want all instances of a generic enum to share an implementation
+    // strategy. If the abstract layout of the enum is dependent on generic
+    // parameters, then we additionally need to constrain any layout
+    // optimizations we perform to things that are reproducible by the runtime.
+    Type origArgType = elt->getArgumentInterfaceType();
     origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
@@ -5855,7 +5817,8 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       // *Now* apply the substitutions and get the type info for the instance's
       // payload type, since we know this case carries an apparent payload in
       // the generic case.
-      SILType fieldTy = type.getEnumElementType(elt, TC.IGM.getSILModule());
+      SILType fieldTy = type.getEnumElementType(
+          elt, TC.IGM.getSILModule(), TC.IGM.getMaximalTypeExpansionContext());
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});
@@ -5888,6 +5851,13 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
                                          numElements,
                                          std::move(elementsWithPayload),
                                          std::move(elementsWithNoPayload)));
+  }
+
+  // namespace-like enums must be imported as empty decls.
+  if (theEnum->hasClangNode() && numElements == 0 && !theEnum->isObjC()) {
+    return std::unique_ptr<EnumImplStrategy>(new SingletonEnumImplStrategy(
+        TC.IGM, tik, alwaysFixedSize, numElements,
+        std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
@@ -6258,16 +6228,15 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   // Unused tag bits in the physical size can be used as spare bits.
   // TODO: We can use all values greater than the largest discriminator as
   // extra inhabitants, not just those made available by spare bits.
-  SpareBitVector spareBits;
-  spareBits.appendClearBits(usedTagBits);
-  spareBits.extendWithSetBits(tagSize.getValueInBits());
+  auto spareBits = SpareBitVector::fromAPInt(
+      APInt::getBitsSetFrom(tagSize.getValueInBits(), usedTagBits));
 
   Alignment alignment(tagSize.getValue());
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
-                                   enumTy, tagSize, std::move(spareBits),
-                                   alignment, IsPOD, AlwaysFixedSize));
+                              enumTy, tagSize, std::move(spareBits),
+                              alignment, IsPOD, AlwaysFixedSize));
 }
 
 TypeInfo *
@@ -6366,18 +6335,19 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   // sets to be able to reason about how many spare bits from the payload type
   // we can forward. If we spilled tag bits, however, we can offer the unused
   // bits we have in that byte.
-  SpareBitVector spareBits;
-  spareBits.appendClearBits(payloadTI.getFixedSize().getValueInBits());
-  if (ExtraTagBitCount > 0) {
-    spareBits.appendClearBits(ExtraTagBitCount);
-    spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
+  auto spareBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
+  if (auto size = payloadTI.getFixedSize().getValueInBits()) {
+    spareBits.appendClearBits(size);
   }
-  
+  if (ExtraTagBitCount > 0) {
+    auto paddedSize = extraTagByteCount * 8;
+    spareBits.append(APInt::getBitsSetFrom(paddedSize, ExtraTagBitCount));
+  }
   auto alignment = payloadTI.getFixedAlignment();
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
   getFixedEnumTypeInfo(
-      enumTy, Size(sizeWithTag), std::move(spareBits), alignment,
+      enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       payloadTI.isPOD(ResilienceExpansion::Maximal),
       payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
@@ -6463,8 +6433,11 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     // if the type is layout-dependent. (Even when the runtime does, it will
     // likely only track a subset of the spare bits.)
     if (!AllowFixedLayoutOptimizations || TIK < Loadable) {
-      if (CommonSpareBits.size() < payloadBits)
+      if (CommonSpareBits.size() < payloadBits) {
+        // All bits are zero so we don't have to worry about endianness.
+        assert(CommonSpareBits.none());
         CommonSpareBits.extendWithClearBits(payloadBits);
+      }
       continue;
     }
 
@@ -6476,7 +6449,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     // they can contain Obj-C tagged pointers. To handle this case
     // correctly, we get spare bits from the unsubstituted type.
     auto &fixedOrigTI = cast<FixedTypeInfo>(*elt.origTI);
-    fixedOrigTI.applyFixedSpareBitsMask(CommonSpareBits);
+    fixedOrigTI.applyFixedSpareBitsMask(IGM, CommonSpareBits);
   }
 
   unsigned commonSpareBitCount = CommonSpareBits.count();
@@ -6527,12 +6500,19 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   if (numTagBits >= commonSpareBitCount) {
     PayloadTagBits = CommonSpareBits;
 
+    auto builder = BitPatternBuilder(IGM.Triple.isLittleEndian());
     // We're using all of the common spare bits as tag bits, so none
     // of them are spare; nor are the extra tag bits.
-    spareBits.appendClearBits(CommonSpareBits.size() + ExtraTagBitCount);
+    builder.appendClearBits(CommonSpareBits.size());
 
     // The remaining bits in the extra tag bytes are spare.
-    spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
+    if (ExtraTagBitCount) {
+      builder.append(APInt::getBitsSetFrom(extraTagByteCount * 8,
+                                           ExtraTagBitCount));
+    }
+
+    // Set the spare bit mask.
+    spareBits = builder.build();
 
   // Otherwise, we need to construct a new bitset that doesn't
   // include the bits we aren't using.
@@ -6679,7 +6659,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
                llvm::dbgs() << ":\n";);
 
     SpareBitVector spareBits;
-    fixedTI->applyFixedSpareBitsMask(spareBits);
+    fixedTI->applyFixedSpareBitsMask(IGM, spareBits);
 
     auto bitMask = strategy->getBitMaskForNoPayloadElements();
     assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
@@ -6783,147 +6763,204 @@ void irgen::emitStoreEnumTagToAddress(IRGenFunction &IGF,
     .storeTag(IGF, enumTy, enumAddr, theCase);
 }
 
-/// Scatter spare bits from the low bits of an integer value.
-llvm::Value *irgen::emitScatterSpareBits(IRGenFunction &IGF,
-                                         const SpareBitVector &spareBitMask,
-                                         llvm::Value *packedBits,
-                                         unsigned packedLowBit) {
-  auto destTy
-    = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), spareBitMask.size());
-  llvm::Value *result = nullptr;
-  unsigned usedBits = packedLowBit;
-
-  // Expand the packed bits to the destination type.
-  packedBits = IGF.Builder.CreateZExtOrTrunc(packedBits, destTy);
-
-  auto spareBitEnumeration = spareBitMask.enumerateSetBits();
-  for (auto nextSpareBit = spareBitEnumeration.findNext();
-       nextSpareBit.hasValue();
-       nextSpareBit = spareBitEnumeration.findNext()) {
-    unsigned u = nextSpareBit.getValue(), startBit = u;
-    assert(u >= usedBits - packedLowBit
-           && "used more bits than we've processed?!");
-
-    // Shift the selected bits into place.
-    llvm::Value *newBits;
-    if (u > usedBits)
-      newBits = IGF.Builder.CreateShl(packedBits, u - usedBits);
-    else if (u < usedBits)
-      newBits = IGF.Builder.CreateLShr(packedBits, usedBits - u);
-    else
-      newBits = packedBits;
-
-    // See how many consecutive bits we have.
-    unsigned numBits = 1;
-    ++u;
-    for (unsigned e = spareBitMask.size(); u < e && spareBitMask[u]; ++u) {
-      ++numBits;
-      auto nextBit = spareBitEnumeration.findNext(); (void) nextBit;
-      assert(nextBit.hasValue());
-    }
-
-    // Mask out the selected bits.
-    auto val = APInt::getAllOnesValue(numBits);
-    if (numBits < spareBitMask.size())
-      val = val.zext(spareBitMask.size());
-    val = val.shl(startBit);
-    auto mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
-    newBits = IGF.Builder.CreateAnd(newBits, mask);
-
-    // Accumulate the result.
-    if (result)
-      result = IGF.Builder.CreateOr(result, newBits);
-    else
-      result = newBits;
-
-    usedBits += numBits;
+/// Extract the rightmost run of contiguous set bits from the
+/// provided integer or zero if there are no set bits in the
+/// provided integer. For example:
+///
+///   rightmostMask(0x0f0f_0f0f) = 0x0000_000f
+///   rightmostMask(0xf0f0_f0f0) = 0x0000_00f0
+///   rightmostMask(0xffff_ff10) = 0x0000_0010
+///   rightmostMask(0xffff_ff80) = 0xffff_ff80
+///   rightmostMask(0x0000_0000) = 0x0000_0000
+///
+static inline llvm::APInt rightmostMask(const llvm::APInt& mask) {
+  if (mask.isShiftedMask()) {
+    return mask;
   }
-
+  // This formula is derived from the formula to "turn off the
+  // rightmost contiguous string of 1's" in Chapter 2-1 of
+  // Hacker's Delight (Second Edition) by Henry S. Warren and
+  // attributed to Luther Woodrum.
+  llvm::APInt result = -mask;
+  result &= mask; // isolate rightmost set bit
+  result += mask; // clear rightmost contiguous set bits
+  result &= mask; // mask out carry bit leftover from add
+  result ^= mask; // extract desired bits
   return result;
 }
 
-/// Interleave the occupiedValue and spareValue bits, taking a bit from one
-/// or the other at each position based on the spareBits mask.
-APInt
-irgen::interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
-                           unsigned bits,
-                           unsigned spareValue, unsigned occupiedValue) {
-  // FIXME: endianness.
-  SmallVector<llvm::APInt::WordType, 2> valueParts;
-  valueParts.push_back(0);
+/// Pack masked bits into the low bits of an integer value.
+/// Equivalent to a parallel bit extract instruction (PEXT),
+/// although we don't currently emit PEXT directly.
+llvm::Value *irgen::emitGatherBits(IRGenFunction &IGF,
+                                   llvm::APInt mask,
+                                   llvm::Value *source,
+                                   unsigned resultLowBit,
+                                   unsigned resultBitWidth) {
+  auto &B = IGF.Builder;
+  auto &C = IGF.IGM.getLLVMContext();
+  assert(mask.getBitWidth() == source->getType()->getIntegerBitWidth()
+    && "source and mask must have same width");
 
-  llvm::APInt::WordType valueBit = 1;
-  auto advanceValueBit = [&]{
-    valueBit <<= 1;
-    if (valueBit == 0) {
-      valueParts.push_back(0);
-      valueBit = 1;
-    }
-  };
-
-  for (unsigned i = 0, e = spareBits.size();
-       (occupiedValue || spareValue) && i < e;
-       ++i, advanceValueBit()) {
-    if (spareBits[i]) {
-      if (spareValue & 1)
-        valueParts.back() |= valueBit;
-      spareValue >>= 1;
-    } else {
-      if (occupiedValue & 1)
-        valueParts.back() |= valueBit;
-      occupiedValue >>= 1;
-    }
+  // The source and mask need to be at least as wide as the result so
+  // that bits can be shifted into the correct position.
+  auto destTy = llvm::IntegerType::get(C, resultBitWidth);
+  if (mask.getBitWidth() < resultBitWidth) {
+    source = B.CreateZExt(source, destTy);
+    mask = mask.zext(resultBitWidth);
   }
-  
-  // Create the value.
-  return llvm::APInt(bits, valueParts);
+
+  // Shift each set of contiguous set bits into position and
+  // accumulate them into the result.
+  int64_t usedBits = resultLowBit;
+  llvm::Value *result = nullptr;
+  while (mask != 0) {
+    // Isolate the rightmost run of contiguous set bits.
+    // Example: 0b0011_01101_1100 -> 0b0000_0001_1100
+    llvm::APInt partMask = rightmostMask(mask);
+
+    // Update the bits we need to mask next.
+    mask ^= partMask;
+
+    // Shift the selected bits into position.
+    llvm::Value *part = source;
+    int64_t offset = int64_t(partMask.countTrailingZeros()) - usedBits;
+    if (offset > 0) {
+      uint64_t shift = uint64_t(offset);
+      part = B.CreateLShr(part, shift);
+      partMask.lshrInPlace(shift);
+    } else if (offset < 0) {
+      uint64_t shift = uint64_t(-offset);
+      part = B.CreateShl(part, shift);
+      partMask <<= shift;
+    }
+
+    // Truncate the output to the result size.
+    if (partMask.getBitWidth() > resultBitWidth) {
+      partMask = partMask.trunc(resultBitWidth);
+      part = B.CreateTrunc(part, destTy);
+    }
+
+    // Mask out selected bits.
+    part = B.CreateAnd(part, partMask);
+
+    // Accumulate the result.
+    result = result ? B.CreateOr(result, part) : part;
+
+    // Update the offset and remaining mask.
+    usedBits += partMask.countPopulation();
+  }
+  return result;
 }
 
-/// A version of the above where the tag value is dynamic.
-EnumPayload irgen::interleaveSpareBits(IRGenFunction &IGF,
-                                       const EnumPayloadSchema &schema,
-                                       const SpareBitVector &spareBitVector,
-                                       llvm::Value *value) {
-  EnumPayload result;
-  APInt spareBits = spareBitVector.asAPInt();
-
-  unsigned usedBits = 0;
-
+/// Unpack bits from the low bits of an integer value and
+/// move them to the bit positions indicated by the mask.
+/// Equivalent to a parallel bit deposit instruction (PDEP),
+/// although we don't currently emit PDEP directly.
+llvm::Value *irgen::emitScatterBits(IRGenFunction &IGF,
+                                    llvm::APInt mask,
+                                    llvm::Value *source,
+                                    unsigned packedLowBit) {
   auto &DL = IGF.IGM.DataLayout;
-  schema.forEachType(IGF.IGM, [&](llvm::Type *type) {
-    unsigned bitSize = DL.getTypeSizeInBits(type);
+  auto &B = IGF.Builder;
+  auto &C = IGF.IGM.getLLVMContext();
 
-    // Take some bits off of the bottom of the pattern.
-    auto spareBitsChunk = SpareBitVector::fromAPInt(
-        spareBits.zextOrTrunc(bitSize));
+  // Expand or contract the packed bits to the destination type.
+  auto bitSize = mask.getBitWidth();
+  auto sourceTy = dyn_cast<llvm::IntegerType>(source->getType());
+  if (!sourceTy) {
+    auto numBits = DL.getTypeSizeInBits(source->getType());
+    sourceTy = llvm::IntegerType::get(C, numBits);
+    source = B.CreateBitOrPointerCast(source, sourceTy);
+  }
+  assert(packedLowBit < sourceTy->getBitWidth() &&
+      "packedLowBit out of range");
 
-    if (usedBits >= 32 || spareBitsChunk.count() == 0) {
-      result.PayloadValues.push_back(type);
-    } else {
-      llvm::Value *payloadValue = value;
-      if (usedBits > 0) {
-        payloadValue = IGF.Builder.CreateLShr(payloadValue,
-                       llvm::ConstantInt::get(IGF.IGM.Int32Ty, usedBits));
-      }
-      payloadValue = emitScatterSpareBits(IGF, spareBitsChunk,
-                                          payloadValue, 0);
-      if (payloadValue->getType() != type) {
-        if (type->isPointerTy())
-          payloadValue = IGF.Builder.CreateIntToPtr(payloadValue, type);
-        else
-          payloadValue = IGF.Builder.CreateBitCast(payloadValue, type);
-      }
+  auto destTy = llvm::IntegerType::get(C, bitSize);
+  auto usedBits = int64_t(packedLowBit);
+  if (usedBits > 0 && sourceTy->getBitWidth() > bitSize) {
+    // Need to shift before truncation if the packed value is wider
+    // than the mask.
+    source = B.CreateLShr(source, uint64_t(usedBits));
+    usedBits = 0;
+  }
+  if (sourceTy->getBitWidth() != bitSize) {
+    source = B.CreateZExtOrTrunc(source, destTy);
+  }
 
-      result.PayloadValues.push_back(payloadValue);
+  // No need to AND with the mask if the whole source can just be
+  // shifted into place.
+  // TODO: could do more to avoid inserting unnecessary ANDs. For
+  // example we could take into account the packedLowBit.
+  auto unknownBits = std::min(sourceTy->getBitWidth(), bitSize);
+  bool needMask = !(mask.isShiftedMask() &&
+                    mask.countPopulation() >= unknownBits);
+
+  // Shift each set of contiguous set bits into position and
+  // accumulate them into the result.
+  llvm::Value *result = nullptr;
+  while (mask != 0) {
+    // Isolate the rightmost run of contiguous set bits.
+    // Example: 0b0011_01101_1100 -> 0b0000_0001_1100
+    llvm::APInt partMask = rightmostMask(mask);
+
+    // Update the bits we need to mask next.
+    mask ^= partMask;
+
+    // Shift the selected bits into position.
+    llvm::Value *part = source;
+    int64_t offset = int64_t(partMask.countTrailingZeros()) - usedBits;
+    if (offset > 0) {
+      part = B.CreateShl(part, uint64_t(offset));
+    } else if (offset < 0) {
+      part = B.CreateLShr(part, uint64_t(-offset));
     }
-    
-    // Shift the remaining bits down.
-    spareBits = spareBits.lshr(bitSize);
 
-    // Consume bits from the input value.
-    usedBits += spareBitsChunk.count();
-  });
+    // Mask out selected bits.
+    if (needMask) {
+      part = B.CreateAnd(part, partMask);
+    }
 
+    // Accumulate the result.
+    result = result ? B.CreateOr(result, part) : part;
+
+    // Update the offset and remaining mask.
+    usedBits += partMask.countPopulation();
+  }
+  return result;
+}
+
+/// Pack masked bits into the low bits of an integer value.
+llvm::APInt irgen::gatherBits(const llvm::APInt &mask,
+                              const llvm::APInt &value) {
+  assert(mask.getBitWidth() == value.getBitWidth());
+  llvm::APInt result = llvm::APInt(mask.countPopulation(), 0);
+  unsigned j = 0;
+  for (unsigned i = 0; i < mask.getBitWidth(); ++i) {
+    if (!mask[i]) {
+      continue;
+    }
+    if (value[i]) {
+      result.setBit(j);
+    }
+    ++j;
+  }
+  return result;
+}
+
+/// Unpack bits from the low bits of an integer value and
+/// move them to the bit positions indicated by the mask.
+llvm::APInt irgen::scatterBits(const llvm::APInt &mask, unsigned value) {
+  llvm::APInt result(mask.getBitWidth(), 0);
+  for (unsigned i = 0; i < mask.getBitWidth() && value != 0; ++i) {
+    if (!mask[i]) {
+      continue;
+    }
+    if (value & 1) {
+      result.setBit(i);
+    }
+    value >>= 1;
+  }
   return result;
 }
 

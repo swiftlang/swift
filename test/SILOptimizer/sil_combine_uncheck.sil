@@ -39,6 +39,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-LABEL: sil @test_unconditional_checked_cast_addr_fail
 // CHECK: bb0
 // CHECK-NEXT: store undef
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: builtin "int_trap"
 // CHECK: unreachable
 // CHECK: }

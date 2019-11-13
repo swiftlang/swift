@@ -32,6 +32,10 @@ struct SymbolicMangling {
   std::string String;
   std::vector<std::pair<Mangle::ASTMangler::SymbolicReferent, unsigned>>
     SymbolicReferences;
+  
+  unsigned runtimeSizeInBytes() const {
+    return String.size();
+  }
 };
 
 /// The mangler for all kind of symbols produced in IRGen.
@@ -76,7 +80,16 @@ public:
   std::string mangleValueWitness(Type type, ValueWitness witness);
 
   std::string mangleValueWitnessTable(Type type) {
-    return mangleTypeSymbol(type, "WV");
+    const char * const witnessTableOp = "WV";
+    if (type->isAnyObject()) {
+      // Special-case for AnyObject, whose witness table is under the old name
+      // Builtin.UnknownObject, even though we don't use that as a Type anymore.
+      beginMangling();
+      appendOperator("BO");
+      appendOperator(witnessTableOp);
+      return finalize();
+    }
+    return mangleTypeSymbol(type, witnessTableOp);
   }
 
   std::string mangleTypeMetadataAccessFunction(Type type) {
@@ -85,6 +98,10 @@ public:
 
   std::string mangleTypeMetadataLazyCacheVariable(Type type) {
     return mangleTypeSymbol(type, "ML");
+  }
+
+  std::string mangleTypeMetadataDemanglingCacheVariable(Type type) {
+    return mangleTypeSymbol(type, "MD");
   }
 
   std::string mangleTypeFullMetadataFull(Type type) {
@@ -123,13 +140,6 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
   
-  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
-    beginMangling();
-    appendOpaqueDeclName(decl);
-    appendOperator("MQ");
-    return finalize();
-  }
-
   std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
     beginMangling();
     appendOpaqueDeclName(decl);
@@ -193,9 +203,27 @@ public:
     return finalize();
   }
   
-  std::string mangleAnonymousDescriptor(const DeclContext *DC) {
+  void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
+    if (auto DC = Name.dyn_cast<DeclContext *>()) {
+      return appendContext(DC);
+    }
+    if (auto VD = Name.dyn_cast<VarDecl *>()) {
+      return appendEntity(VD);
+    }
+    llvm_unreachable("unknown kind");
+  }
+  
+  std::string mangleAnonymousDescriptorName(
+                                    PointerUnion<DeclContext*, VarDecl*> Name) {
     beginMangling();
-    appendContext(DC);
+    appendAnonymousDescriptorName(Name);
+    return finalize();
+  }
+  
+  std::string mangleAnonymousDescriptor(
+                                    PointerUnion<DeclContext*, VarDecl*> Name) {
+    beginMangling();
+    appendAnonymousDescriptorName(Name);
     appendOperator("MXX");
     return finalize();
   }
@@ -363,7 +391,17 @@ public:
   }
 
   std::string mangleReflectionBuiltinDescriptor(Type type) {
-    return mangleTypeSymbol(type, "MB");
+    const char * const reflectionDescriptorOp = "MB";
+    if (type->isAnyObject()) {
+      // Special-case for AnyObject, whose reflection descriptor is under the
+      // old name Builtin.UnknownObject, even though we don't use that as a Type
+      // anymore.
+      beginMangling();
+      appendOperator("BO");
+      appendOperator(reflectionDescriptorOp);
+      return finalize();
+    }
+    return mangleTypeSymbol(type, reflectionDescriptorOp);
   }
 
   std::string mangleReflectionFieldDescriptor(Type type) {
@@ -485,7 +523,12 @@ public:
                                   CanType associatedType,
                                   const ProtocolDecl *proto);
 
-  std::string mangleSymbolNameForKeyPathMetadata(
+  std::string mangleSymbolNameForMangledMetadataAccessorString(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type);
+
+  std::string mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
                                            CanType type,

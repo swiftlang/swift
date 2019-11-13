@@ -313,17 +313,25 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     limit = Limit::NeverPublic;
   }
 
+  // The property wrapper backing initializer is never public for resilient
+  // properties.
+  if (kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+    if (cast<VarDecl>(d)->isResilient())
+      limit = Limit::NeverPublic;
+  }
+
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
     // Three cases:
     //
-    // 1) Type is formally @_fixed_layout. Root initializers can be declared
-    //    @inlinable. The property initializer must only reference
+    // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
+    //    declared @inlinable. The property initializer must only reference
     //    public symbols, and is serialized, so we give it PublicNonABI linkage.
     //
-    // 2) Type is not formally @_fixed_layout and the module is not resilient.
-    //    Root initializers can be declared @inlinable. This is the annoying
-    //    case. We give the initializer public linkage if the type is public.
+    // 2) Type is not formally @_fixed_layout/@frozen and the module is not
+    //    resilient. Root initializers can be declared @inlinable. This is the 
+    //    annoying case. We give the initializer public linkage if the type is
+    //    public.
     //
     // 3) Type is resilient. The property initializer is never public because
     //    root initializers cannot be @inlinable.
@@ -491,7 +499,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Stored property initializers are inlinable if the type is explicitly
-  // marked as @_fixed_layout.
+  // marked as @frozen.
   if (isStoredPropertyInitializer()) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
@@ -683,10 +691,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
             std::string s(1, '\01');
             s += asmLabel->getLabel();
             return s;
-          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>() ||
+                     getDecl()->getASTContext().LangOpts.EnableCXXInterop) {
             std::string storage;
             llvm::raw_string_ostream SS(storage);
-            // FIXME: When we can import C++, use Clang's mangler all the time.
             mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
             return SS.str();
           }
@@ -787,6 +795,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     assert(!isCurried);
     return mangler.mangleInitializerEntity(cast<VarDecl>(getDecl()), SKind);
+
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    assert(!isCurried);
+    return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
+                                                  SKind);
   }
 
   llvm_unreachable("bad entity kind!");
@@ -845,6 +858,8 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (overridden.kind == SILDeclRef::Kind::Initializer) {
       return SILDeclRef();
     }
+
+    // Overrides of @objc dynamic declarations are not in the vtable.
     if (overridden.getDecl()->isObjCDynamic()) {
       return SILDeclRef();
     }
@@ -975,12 +990,13 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
-  // Only non-final methods in non-final classes go in the vtable.
+  // Only methods in non-final classes go in the vtable.
   auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
-  if (decl->isFinal())
+  // Final methods only go in the vtable if they override something.
+  if (decl->isFinal() && !decl->getOverriddenDecl())
     return SubclassScope::NotApplicable;
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
@@ -1015,10 +1031,10 @@ unsigned SILDeclRef::getParameterListCount() const {
 
   auto *vd = getDecl();
 
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    return func->hasImplicitSelfDecl() ? 2 : 1;
-  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    return ed->hasAssociatedValues() ? 2 : 1;
+  if (isa<AbstractFunctionDecl>(vd) || isa<EnumElementDecl>(vd)) {
+    // For functions and enum elements, the number of parameter lists is the
+    // same as in their interface type.
+    return vd->getNumCurryLevels();
   } else if (isa<ClassDecl>(vd)) {
     return 2;
   } else if (isa<VarDecl>(vd)) {

@@ -66,6 +66,10 @@ RANGE_REFACTORING(ExpandTernaryExpr, "Expand Ternary Expression", expand.ternary
 
 RANGE_REFACTORING(ConvertToTernaryExpr, "Convert To Ternary Expression", convert.ternary.expr)
 
+RANGE_REFACTORING(ConvertIfLetExprToGuardExpr, "Convert To Guard Expression", convert.iflet.to.guard.expr)
+
+RANGE_REFACTORING(ConvertGuardExprToIfLetExpr, "Convert To IfLet Expression", convert.to.iflet.expr)
+
 // These internal refactorings are designed to be helpful for working on
 // the compiler/standard library, etc., but are likely to be just confusing and
 // noise for general development.

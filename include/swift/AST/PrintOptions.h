@@ -170,8 +170,15 @@ struct PrintOptions {
   /// Whether to print variable initializers.
   bool VarInitializers = false;
 
+  /// Choices for how to print enum raw values.
+  enum class EnumRawValueMode {
+    Skip,
+    PrintObjCOnly,
+    Print
+  };
+
   /// Whether to print enum raw value expressions.
-  bool EnumRawValues = false;
+  EnumRawValueMode EnumRawValues = EnumRawValueMode::Skip;
 
   /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
@@ -263,6 +270,10 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
+  /// Prints type variables and unresolved types in an expanded notation suitable
+  /// for debugging.
+  bool PrintTypesForDebugging = false;
+  
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.
@@ -285,12 +296,14 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
                                               DAK_FixedLayout,
-                                              DAK_ShowInInterface,
-                                              DAK_ImplicitlyUnwrappedOptional};
+                                              DAK_ShowInInterface};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
   std::vector<AnyAttrKind> ExclusiveAttrList;
+
+  /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
+  std::vector<const Decl*> TreatAsExplicitDeclList;
 
   /// Whether to print function @convention attribute on function types.
   bool PrintFunctionRepresentationAttrs = true;
@@ -342,7 +355,7 @@ struct PrintOptions {
 
   /// Whether to print the doc-comment from the conformance if a member decl
   /// has no associated doc-comment by itself.
-  bool ElevateDocCommentFromConformance = false;
+  bool CascadeDocComment = false;
 
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
@@ -473,22 +486,26 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_DiscardableResult);
     result.EmptyLineBetweenMembers = true;
-    result.ElevateDocCommentFromConformance = true;
+    result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
     result.SkipUnderscoredKeywords = true;
+    result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
     return result;
   }
 
-  /// Retrieve the set of options suitable for parseable module interfaces.
+  /// Retrieve the set of options suitable for module interfaces.
   ///
   /// This is a format that will be parsed again later, so the output must be
   /// consistent and well-formed.
   ///
-  /// \see swift::emitParseableInterface
-  static PrintOptions printParseableInterfaceFile();
+  /// \see swift::emitSwiftInterface
+  static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr);
 
+  /// Retrieve the set of options suitable for "Generated Interfaces", which
+  /// are a prettified representation of the public API of a module, to be
+  /// displayed to users in an editor.
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
 
@@ -498,10 +515,10 @@ struct PrintOptions {
 
   void clearSynthesizedExtension();
 
-  bool shouldPrint(const Decl* D) {
+  bool shouldPrint(const Decl* D) const {
     return CurrentPrintabilityChecker->shouldPrint(D, *this);
   }
-  bool shouldPrint(const Pattern* P) {
+  bool shouldPrint(const Pattern* P) const {
     return CurrentPrintabilityChecker->shouldPrint(P, *this);
   }
 
@@ -565,7 +582,7 @@ struct PrintOptions {
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
     PO.SkipUnderscoredKeywords = true;
-    PO.EnumRawValues = true;
+    PO.EnumRawValues = EnumRawValueMode::Print;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;

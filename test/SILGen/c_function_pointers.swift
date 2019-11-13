@@ -1,5 +1,33 @@
 // RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
 
+if true {
+  var x = 0
+  func local() -> Int { return 0 }
+  func localWithContext() -> Int { return x }
+  func transitiveWithoutContext() -> Int { return local() }
+
+  // Can't convert a closure with context to a C function pointer
+  let _: @convention(c) () -> Int = { x } // expected-error{{cannot be formed from a closure that captures context}}
+  let _: @convention(c) () -> Int = { [x] in x } // expected-error{{cannot be formed from a closure that captures context}}
+  let _: @convention(c) () -> Int = localWithContext // expected-error{{cannot be formed from a local function that captures context}}
+
+  let _: @convention(c) () -> Int = local
+  let _: @convention(c) () -> Int = transitiveWithoutContext
+}
+
+class C {
+  static func staticMethod() -> Int { return 0 }
+  class func classMethod() -> Int { return 0 }
+}
+
+class Generic<X : C> {
+  func f<Y : C>(_ y: Y) {
+    let _: @convention(c) () -> Int = { return 0 }
+    let _: @convention(c) () -> Int = { return X.staticMethod() } // expected-error{{cannot be formed from a closure that captures generic parameters}}
+    let _: @convention(c) () -> Int = { return Y.staticMethod() } // expected-error{{cannot be formed from a closure that captures generic parameters}}
+  }
+}
+
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
@@ -72,4 +100,8 @@ func pointers_to_nested_local_functions_in_generics<T>(x: T) -> Int{
   func foo(y: Int) -> Int { return y }
 
   return calls(foo, 0)
+}
+
+func capture_list_no_captures(x: Int) {
+  calls({ [x] in $0 }, 0) // expected-warning {{capture 'x' was never used}}
 }

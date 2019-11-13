@@ -80,7 +80,8 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
     // FIXME: error?
     return true;
   }
-  CI.performSema();
+  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
+  CI.performParseAndResolveImportsOnly();
 
   return true;
 }

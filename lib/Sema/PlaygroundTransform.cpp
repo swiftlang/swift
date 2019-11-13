@@ -22,6 +22,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 
 #include <random>
 #include <forward_list>
@@ -38,8 +39,6 @@ namespace {
 class Instrumenter : InstrumenterBase {
 private:
   std::mt19937_64 &RNG;
-  ASTContext &Context;
-  DeclContext *TypeCheckDC;
   unsigned &TmpNameIndex;
   bool HighPerformance;
 
@@ -117,7 +116,7 @@ private:
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
                unsigned &TmpNameIndex)
-      : RNG(RNG), Context(C), TypeCheckDC(DC), TmpNameIndex(TmpNameIndex),
+      : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
         HighPerformance(HP) {}
 
   Stmt *transformStmt(Stmt *S) {
@@ -280,7 +279,7 @@ public:
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -742,11 +741,10 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setType(MaybeLoadInitExpr->getType());
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
@@ -811,9 +809,22 @@ public:
     Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
     Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
+    Expr *ModuleExpr =
+        !ModuleIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+
+    Expr *FileExpr =
+        !FileIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+
     llvm::SmallVector<Expr *, 6> ArgsWithSourceRange(Args.begin(), Args.end());
 
-    ArgsWithSourceRange.append({StartLine, EndLine, StartColumn, EndColumn});
+    ArgsWithSourceRange.append(
+        {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
         UnresolvedDeclRefExpr(Context.getIdentifier(LoggerName),
@@ -821,7 +832,7 @@ public:
 
     LoggerRef->setImplicit(true);
 
-    SmallVector<Identifier, 4> ArgLabels(ArgsWithSourceRange.size(),
+    SmallVector<Identifier, 6> ArgLabels(ArgsWithSourceRange.size(),
                                          Identifier());
     ApplyExpr *LoggerCall = CallExpr::createImplicit(
         Context, LoggerRef, ArgsWithSourceRange, ArgLabels);
@@ -873,23 +884,26 @@ public:
 void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
   class ExpressionFinder : public ASTWalker {
   private:
+    ASTContext &ctx;
     std::mt19937_64 RNG;
     bool HighPerformance;
     unsigned TmpNameIndex = 0;
 
   public:
-    ExpressionFinder(bool HP) : HighPerformance(HP) {}
+    ExpressionFinder(ASTContext &ctx, bool HP) : ctx(ctx), HighPerformance(HP) {}
+
+    // FIXME: Remove this
+    bool shouldWalkAccessorsTheOldWay() override { return true; }
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
-            ASTContext &ctx = FD->getASTContext();
             Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
-              TypeChecker::createForContext(ctx).checkFunctionErrorHandling(FD);
+              TypeChecker::checkFunctionErrorHandling(FD);
             }
             return false;
           }
@@ -897,13 +911,11 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            ASTContext &ctx = static_cast<Decl *>(TLCD)->getASTContext();
             Instrumenter I(ctx, TLCD, RNG, HighPerformance, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker::createForContext(ctx)
-                .checkTopLevelErrorHandling(TLCD);
+              TypeChecker::checkTopLevelErrorHandling(TLCD);
             }
             return false;
           }
@@ -913,8 +925,6 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     }
   };
 
-  ExpressionFinder EF(HighPerformance);
-  for (Decl *D : SF.Decls) {
-    D->walk(EF);
-  }
+  ExpressionFinder EF(SF.getASTContext(), HighPerformance);
+  SF.walk(EF);
 }

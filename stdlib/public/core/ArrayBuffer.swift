@@ -23,8 +23,8 @@ internal typealias _ArrayBridgeStorage
   = _BridgeStorage<__ContiguousArrayStorageBase>
 
 @usableFromInline
-@_fixed_layout
-internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
+@frozen
+internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Create an empty buffer.
   @inlinable

@@ -20,7 +20,7 @@ struct E {
 
 func foo(arr: [E], other: P) -> Bool {
   return arr.compactMap { i in
-    // expected-error@-1 {{unable to infer complex closure return type; add explicit type to disambiguate}} {{29-29=-> B? }}
+    // expected-error@-1 {{generic parameter 'ElementOfResult' could not be inferred}}
     var flag = false
     return try? i.getB(&flag)
   }.compactMap { u -> P? in

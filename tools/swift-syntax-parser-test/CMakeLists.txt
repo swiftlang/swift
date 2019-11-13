@@ -3,10 +3,13 @@ swift_swap_compiler_if_needed("SwiftSyntaxParserTest")
 
 add_swift_host_tool(swift-syntax-parser-test
   swift-syntax-parser-test.cpp
-  LLVM_COMPONENT_DEPENDS
+  LLVM_LINK_COMPONENTS
     Support
   SWIFT_COMPONENT tools
 )
+if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  add_dependencies(swift-syntax-parser-test clang)
+endif()
 target_link_libraries(swift-syntax-parser-test
   PRIVATE
     libSwiftSyntaxParser

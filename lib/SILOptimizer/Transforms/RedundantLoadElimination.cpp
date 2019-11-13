@@ -76,15 +76,15 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/BitVector.h"
@@ -146,9 +146,12 @@ static bool inline isPerformingRLE(RLEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isRLEInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
@@ -157,7 +160,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::FixLifetimeInst:
-  case SILInstructionKind::CopyUnownedValueInst:
     return true;
   default:
     return false;
@@ -675,7 +677,8 @@ SILValue BlockState::reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L) {
   LSLocationValueMap Values;
 
   LSLocationList Locs;
-  LSLocation::expand(L, &BB->getModule(), Locs, Ctx.getTE());
+  LSLocation::expand(L, &BB->getModule(),
+                     TypeExpansionContext(*BB->getParent()), Locs, Ctx.getTE());
 
   // Find the values that this basic block defines and the locations which
   // we do not have a concrete value in the current basic block.
@@ -687,8 +690,8 @@ SILValue BlockState::reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L) {
   // Second, reduce the available values into a single SILValue we can use to
   // forward.
   SILValue TheForwardingValue;
-  TheForwardingValue = LSValue::reduce(L, &BB->getModule(), Values,
-                                       BB->getTerminator());
+  TheForwardingValue =
+      LSValue::reduce(L, &BB->getModule(), Values, BB->getTerminator());
   /// Return the forwarding value.
   return TheForwardingValue;
 }
@@ -854,7 +857,9 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // Expand the given location and val into individual fields and process
   // them as separate writes.
   LSLocationList Locs;
-  LSLocation::expand(L, &I->getModule(), Locs, Ctx.getTE());
+  LSLocation::expand(L, &I->getModule(),
+                     TypeExpansionContext(*I->getFunction()), Locs,
+                     Ctx.getTE());
 
   if (isComputeAvailSetMax(Kind)) {
     for (unsigned i = 0; i < Locs.size(); ++i) {
@@ -873,7 +878,8 @@ void BlockState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
 
   // Are we computing available value or performing RLE?
   LSValueList Vals;
-  LSValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
+  LSValue::expand(Val, &I->getModule(), TypeExpansionContext(*I->getFunction()),
+                  Vals, Ctx.getTE());
   if (isComputeAvailValue(Kind) || isPerformingRLE(Kind)) {
     for (unsigned i = 0; i < Locs.size(); ++i) {
       updateForwardSetAndValForWrite(Ctx, Ctx.getLocationBit(Locs[i]),
@@ -905,7 +911,9 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // Expand the given LSLocation and Val into individual fields and process
   // them as separate reads.
   LSLocationList Locs;
-  LSLocation::expand(L, &I->getModule(), Locs, Ctx.getTE());
+  LSLocation::expand(L, &I->getModule(),
+                     TypeExpansionContext(*I->getFunction()), Locs,
+                     Ctx.getTE());
 
   if (isComputeAvailSetMax(Kind)) {
     for (unsigned i = 0; i < Locs.size(); ++i) {
@@ -925,7 +933,8 @@ void BlockState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
   // Are we computing available values ?.
   bool CanForward = true;
   LSValueList Vals;
-  LSValue::expand(Val, &I->getModule(), Vals, Ctx.getTE());
+  LSValue::expand(Val, &I->getModule(), TypeExpansionContext(*I->getFunction()),
+                  Vals, Ctx.getTE());
   if (isComputeAvailValue(Kind) || isPerformingRLE(Kind)) {
     for (unsigned i = 0; i < Locs.size(); ++i) {
       if (isTrackingLocation(ForwardSetIn, Ctx.getLocationBit(Locs[i])))
@@ -1243,7 +1252,8 @@ BlockState::ValueState BlockState::getValueStateAtEndOfBlock(RLEContext &Ctx,
   // expanded from the given location.
   unsigned CSCount = 0, CTCount = 0;
   LSLocationList Locs;
-  LSLocation::expand(L, &BB->getModule(), Locs, Ctx.getTE());
+  LSLocation::expand(L, &BB->getModule(),
+                     TypeExpansionContext(*BB->getParent()), Locs, Ctx.getTE());
 
   ValueTableMap &OTM = getForwardValOut();
   for (auto &X : Locs) {
@@ -1317,12 +1327,15 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
     // Reduce the available values into a single SILValue we can use to forward
     SILInstruction *IPt = CurBB->getTerminator();
-    Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
+    Values.push_back(
+        {CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
   }
 
   // Finally, collect all the values for the SILArgument, materialize it using
   // the SSAUpdater.
-  Updater.Initialize(L.getType(&BB->getModule()).getObjectType());
+  Updater.Initialize(
+      L.getType(&BB->getModule(), TypeExpansionContext(*BB->getParent()))
+          .getObjectType());
   for (auto V : Values) {
     Updater.AddAvailableValue(V.first, V.second);
   }
@@ -1335,7 +1348,8 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
                                        ValueTableMap &VM) {
   LSLocationList CSLocs;
   LSLocationList Locs;
-  LSLocation::expand(L, &BB->getModule(), Locs, TE);
+  LSLocation::expand(L, &BB->getModule(),
+                     TypeExpansionContext(*BB->getParent()), Locs, TE);
 
   auto *Mod = &BB->getModule();
   // Find the locations that this basic block defines and the locations which
@@ -1350,7 +1364,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
   // For locations which we do not have concrete values for in this basic
   // block, try to reduce it to the minimum # of locations possible, this
   // will help us to generate as few SILArguments as possible.
-  LSLocation::reduce(L, Mod, CSLocs);
+  LSLocation::reduce(L, Mod, TypeExpansionContext(*BB->getParent()), CSLocs);
 
   // To handle covering value, we need to go to the predecessors and
   // materialize them there.
@@ -1363,8 +1377,9 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
     // collect the newly created forwardable values.
     LSLocationList Locs;
     LSValueList Vals;
-    LSLocation::expand(X, Mod, Locs, TE);
-    LSValue::expand(V, Mod, Vals, TE);
+    auto expansionContext = TypeExpansionContext(*BB->getParent());
+    LSLocation::expand(X, Mod, expansionContext, Locs, TE);
+    LSValue::expand(V, Mod, expansionContext, Vals, TE);
 
     for (unsigned i = 0; i < Locs.size(); ++i) {
       Values[Locs[i]] = Vals[i];
@@ -1568,7 +1583,8 @@ bool RLEContext::run() {
 
   LLVM_DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {
     llvm::dbgs() << "LSLocation #" << i;
-    getLocation(i).print(llvm::dbgs(), &Fn->getModule());
+    getLocation(i).print(llvm::dbgs(), &Fn->getModule(),
+                         TypeExpansionContext(*Fn));
   });
 
   if (Optimistic)

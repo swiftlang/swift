@@ -111,7 +111,7 @@ func testConversion() {
 
   // Conversions among existential types.
   var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{12-53=SuperREPLPrintable & FooProtocol}}
-  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'FooProtocol & SuperREPLPrintable' in assignment}}
+  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'SuperREPLPrintable' in assignment}}
   x = x2
 
   // Subtyping

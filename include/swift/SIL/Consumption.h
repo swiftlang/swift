@@ -66,6 +66,7 @@ inline bool shouldDestroyOnFailure(CastConsumptionKind kind) {
   case CastConsumptionKind::BorrowAlways:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Should the source value be taken if the cast succeeds?
@@ -78,6 +79,7 @@ inline IsTake_t shouldTakeOnSuccess(CastConsumptionKind kind) {
   case CastConsumptionKind::BorrowAlways:
     return IsNotTake;
   }
+  llvm_unreachable("covered switch");
 }
 
 } // end namespace swift

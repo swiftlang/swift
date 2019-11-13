@@ -63,18 +63,19 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/ADT/SmallString.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -183,15 +184,18 @@ public:
   CallSiteDescriptor &operator=(CallSiteDescriptor &&) =default;
 
   SILFunction *getApplyCallee() const {
-    return cast<FunctionRefInst>(AI.getCallee())->getReferencedFunction();
+    return cast<FunctionRefInst>(AI.getCallee())
+        ->getInitiallyReferencedFunction();
   }
 
   SILFunction *getClosureCallee() const {
     if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
-      return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
+      return cast<FunctionRefInst>(PAI->getCallee())
+          ->getInitiallyReferencedFunction();
 
     auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
-    return cast<FunctionRefInst>(TTTFI->getCallee())->getReferencedFunction();
+    return cast<FunctionRefInst>(TTTFI->getCallee())
+        ->getInitiallyReferencedFunction();
   }
 
   bool closureHasRefSemanticContext() const {
@@ -280,7 +284,7 @@ public:
 
   bool isTrivialNoEscapeParameter() const {
     auto ClosureParmFnTy =
-        getClosureParameterInfo().getType()->getAs<SILFunctionType>();
+        getClosureParameterInfo().getInterfaceType()->getAs<SILFunctionType>();
     return ClosureParmFnTy->isTrivialNoEscape();
   }
 
@@ -553,7 +557,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
   // function_ref).
   //
   // TODO: We can probably handle other partial applies here.
-  auto *FRI = dyn_cast<FunctionRefInst>(Callee);
+  auto *FRI = dyn_cast_or_null<FunctionRefInst>(Callee);
   if (!FRI)
     return false;
 
@@ -561,7 +565,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     // Bail if any of the arguments are passed by address and
     // are not @inout.
     // This is a temporary limitation.
-    auto ClosureCallee = FRI->getReferencedFunction();
+    auto ClosureCallee = FRI->getReferencedFunctionOrNull();
     assert(ClosureCallee);
     auto ClosureCalleeConv = ClosureCallee->getConventions();
     unsigned ClosureArgIdx =
@@ -650,7 +654,7 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
                       : ParameterConvention::Direct_Owned;
     }
 
-    SILParameterInfo NewPInfo(PInfo.getType(), ParamConv);
+    SILParameterInfo NewPInfo(PInfo.getInterfaceType(), ParamConv);
     NewParameterInfoList.push_back(NewPInfo);
   }
 
@@ -661,11 +665,14 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      ClosureUserFunTy->getGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getSubstGenericSignature(), ExtInfo,
       ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
       ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
-      ClosureUserFunTy->getOptionalErrorResult(), M.getASTContext());
+      ClosureUserFunTy->getOptionalErrorResult(),
+      ClosureUserFunTy->getSubstitutions(),
+      ClosureUserFunTy->isGenericSignatureImplied(),
+      M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
@@ -730,8 +737,9 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     SILValue origCalleeValue = calleeValue;
     calleeValue = cloneCalleeConversion(PAI->getArgument(0), NewClosure,
                                         Builder, NeedsRelease, CapturedMap);
-    auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(),
-                                            PAI->getReferencedFunction());
+    auto origRef = PAI->getReferencedFunctionOrNull();
+    assert(origRef);
+    auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(), origRef);
     auto NewPA = Builder.createPartialApply(
         CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
@@ -784,18 +792,17 @@ void ClosureSpecCloner::populateCloned() {
   entryArgs.reserve(ClosureUserEntryBB->getArguments().size());
 
   // Remove the closure argument.
-  SILArgument *ClosureArg = nullptr;
   for (size_t i = 0, e = ClosureUserEntryBB->args_size(); i != e; ++i) {
     SILArgument *Arg = ClosureUserEntryBB->getArgument(i);
     if (i == CallSiteDesc.getClosureIndex()) {
-      ClosureArg = Arg;
       entryArgs.push_back(SILValue());
       continue;
     }
 
     // Otherwise, create a new argument which copies the original argument
+    auto typeInContext = Cloned->getLoweredType(Arg->getType());
     SILValue MappedValue =
-        ClonedEntryBB->createFunctionArgument(Arg->getType(), Arg->getDecl());
+        ClonedEntryBB->createFunctionArgument(typeInContext, Arg->getDecl());
     entryArgs.push_back(MappedValue);
   }
 
@@ -815,6 +822,8 @@ void ClosureSpecCloner::populateCloned() {
   unsigned idx = 0;
   for (auto &PInfo : ClosedOverFunConv.getParameters().slice(NumNotCaptured)) {
     auto paramTy = ClosedOverFunConv.getSILType(PInfo);
+    // Get the type in context of the new function.
+    paramTy = Cloned->getLoweredType(paramTy);
     SILValue MappedValue = ClonedEntryBB->createFunctionArgument(paramTy);
     NewPAIArgs.push_back(MappedValue);
     auto CapturedVal =
@@ -1022,12 +1031,12 @@ static bool isClosureAppliedIn(SILFunction *Callee, unsigned closureArgIdx,
       assert(UserAI.isArgumentOperand(*ArgUse) &&
              "any other non-argument operands than the callee?");
 
-      SILFunction *ApplyCallee = UserAI.getReferencedFunction();
+      SILFunction *ApplyCallee = UserAI.getReferencedFunctionOrNull();
       if (ApplyCallee && !ApplyCallee->isExternalDeclaration() &&
           HandledFuncs.count(ApplyCallee) == 0 &&
           HandledFuncs.size() < RecursionBudget) {
         HandledFuncs.insert(ApplyCallee);
-        if (isClosureAppliedIn(UserAI.getReferencedFunction(),
+        if (isClosureAppliedIn(UserAI.getReferencedFunctionOrNull(),
                                UserAI.getCalleeArgIndex(*ArgUse), HandledFuncs))
           return true;
       }
@@ -1044,6 +1053,7 @@ static bool canSpecializeFullApplySite(FullApplySiteKind kind) {
   case FullApplySiteKind::BeginApplyInst:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILClosureSpecializerTransform::gatherCallSites(
@@ -1166,7 +1176,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        SILFunction *ApplyCallee = AI.getReferencedFunction();
+        SILFunction *ApplyCallee = AI.getReferencedFunctionOrNull();
         if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 
@@ -1209,7 +1219,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
         // We currently only support copying intermediate reabastraction
         // closures if the closure is ultimately passed trivially.
-        bool IsClosurePassedTrivially = ClosureParamInfo.getType()
+        bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()
                                             ->isTrivialNoEscape();
         if (HaveUsedReabstraction &&  !IsClosurePassedTrivially)

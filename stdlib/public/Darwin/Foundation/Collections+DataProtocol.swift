@@ -49,7 +49,7 @@ extension Repeated: DataProtocol where Element == UInt8 {
     public typealias Regions = Repeated<Data>
 
     public var regions: Repeated<Data> {
-        guard self.count > 0 else { return repeatElement(Data(), count: 0) }
+        guard !self.isEmpty else { return repeatElement(Data(), count: 0) }
         return repeatElement(Data(CollectionOfOne(self.first!)), count: self.count)
     }
 }

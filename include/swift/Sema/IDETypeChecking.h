@@ -20,25 +20,31 @@
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
 #include "llvm/ADT/MapVector.h"
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 
 namespace swift {
   class AbstractFunctionDecl;
+  class ASTContext;
+  class ConcreteDeclRef;
   class Decl;
+  class DeclContext;
+  class DeclName;
+  enum class DeclRefKind;
   class Expr;
-  class LazyResolver;
   class ExtensionDecl;
+  class FunctionType;
+  class NominalTypeDecl;
+  class PatternBindingDecl;
   class ProtocolDecl;
+  class SourceFile;
+  class SubscriptDecl;
+  class TopLevelCodeDecl;
   class Type;
   class TypeChecker;
-  class DeclContext;
-  class ConcreteDeclRef;
   class ValueDecl;
-  class DeclName;
-
-  /// Typecheck a declaration parsed during code completion.
-  void typeCheckCompletionDecl(Decl *D);
+  struct PrintOptions;
 
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
@@ -46,13 +52,7 @@ namespace swift {
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
-  bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
-
-  bool isEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
+  bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
@@ -137,12 +137,6 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  /// Creates a type checker instance on the given AST context, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker instance.
-  TypeChecker &createTypeChecker(ASTContext &Ctx);
-
   struct ExtensionInfo {
     // The extension with the declarations to apply.
     ExtensionDecl *Ext;
@@ -202,12 +196,13 @@ namespace swift {
   /// be printed to \c OS.
   ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
     ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
+    std::vector<ExpressionTypeInfo> &scratch,
+    bool CanonicalType,
+    llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
-  bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
-                            llvm::MapVector<ProtocolDecl*, StringRef> &result);
+  ProtocolDecl *resolveProtocolName(DeclContext *dc, StringRef Name);
 
   /// FIXME: All of the below goes away once CallExpr directly stores its
   /// arguments.
@@ -232,13 +227,31 @@ namespace swift {
   /// @dynamicMemberLookup attribute on it.
   bool hasDynamicMemberLookupAttribute(Type type);
 
-  /// Returns the root type of the keypath type in a keypath dynamic member
-  /// lookup subscript, or \c None if it cannot be determined.
+  /// Returns the root type and result type of the keypath type in a keypath
+  /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///
   /// \param subscript The potential keypath dynamic member lookup subscript.
-  /// \param DC The DeclContext from which the subscript is being referenced.
-  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                                   const DeclContext *DC);
+  Type getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript);
+
+  Type getResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript);
+
+  /// Collect all the protocol requirements that a given declaration can
+  ///   provide default implementations for. VD is a declaration in extension
+  ///   declaration. Scratch is the buffer to collect those protocol
+  ///   requirements.
+  ///
+  /// \returns the slice of Scratch
+  ArrayRef<ValueDecl*>
+  canDeclProvideDefaultImplementationFor(ValueDecl* VD);
+
+  /// Get decls that the given decl overrides, protocol requirements that
+  ///   it serves as a default implementation of, and optionally protocol
+  ///   requirements it satisfies in a conforming class
+  ArrayRef<ValueDecl*>
+  collectAllOverriddenDecls(ValueDecl *VD,
+                            bool IncludeProtocolRequirements = true,
+                            bool Transitive = false);
+
 }
 
 #endif

@@ -40,7 +40,12 @@ public:
 class InstrumenterBase {
 
 protected:
-  InstrumenterBase() : CF(*this) {}
+  ASTContext &Context;
+  DeclContext *TypeCheckDC;
+  Identifier ModuleIdentifier;
+  Identifier FileIdentifier;
+
+  InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,

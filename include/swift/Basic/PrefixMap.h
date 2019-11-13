@@ -35,6 +35,7 @@
 #define SWIFT_BASIC_PREFIXMAP_H
 
 #include "swift/Basic/Algorithm.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/type_traits.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -66,8 +67,7 @@ public:
 private:
   template <typename T>
   union UninitializedStorage {
-    LLVM_ALIGNAS(alignof(T))
-    char Storage[sizeof(T)];
+    alignas(T) char Storage[sizeof(T)];
 
     template <typename... A>
     void emplace(A && ...value) {
@@ -642,7 +642,7 @@ public:
                          [&]() -> const ValueType & { return value; });
   }
 
-  void dump() const { print(llvm::errs()); }
+  SWIFT_DEBUG_DUMP { print(llvm::errs()); }
   void print(raw_ostream &out) const {
     printOpaquePrefixMap(out, Root,
                          [](raw_ostream &out, void *_node) {

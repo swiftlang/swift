@@ -76,15 +76,13 @@ struct J {
 
 // CHECK-LABEL: sil hidden [ossa] @$s27stored_property_default_arg16checkOptionalNilyyF : $@convention(thin) () -> () {
 func checkOptionalNil() {
-// CHECK: {{.*}} = metatype $@thin Optional<Int>.Type
-// CHECK-NEXT: [[L1_REF:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
+// CHECK: [[L1_REF:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
 // CHECK-NEXT: function_ref J.init(k:l:)
 // CHECK-NEXT: [[J1_REF:%.*]] = function_ref @$s27stored_property_default_arg1JV1k1lACSbSg_SiSgtcfC : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
 // CHECK-NEXT: {{.*}} = apply [[J1_REF]]({{.*}}, [[L1_REF]], {{.*}}) : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
   let m = J(k: true)
 
-// CHECK: {{.*}} = metatype $@thin Optional<Bool>.Type
-// CHECK-NEXT: [[K1_REF:%.*]] = enum $Optional<Bool>, #Optional.none!enumelt
+// CHECK: [[K1_REF:%.*]] = enum $Optional<Bool>, #Optional.none!enumelt
 // CHECK: function_ref J.init(k:l:)
 // CHECK-NEXT: [[J2_REF:%.*]] = function_ref @$s27stored_property_default_arg1JV1k1lACSbSg_SiSgtcfC : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
 // CHECK-NEXT: {{.*}} = apply [[J2_REF]]([[K1_REF]], {{.*}}, {{.*}}) : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
@@ -207,4 +205,20 @@ func checkReferenceTuple() {
 // CHECK-NEXT: [[AA1_REF:%.*]] = function_ref @$s27stored_property_default_arg2AAV2abAcA1ZCSg2ac_AG2adt_tcfC : $@convention(method) (@owned Optional<Z>, @owned Optional<Z>, @thin AA.Type) -> @owned AA
 // CHECK-NEXT: [[AA1:%.*]] = apply [[AA1_REF]]([[ELT0]], [[ELT1]], {{.*}}) : $@convention(method) (@owned Optional<Z>, @owned Optional<Z>, @thin AA.Type) -> @owned AA
   let ae = AA.init(ab:)()
+}
+
+struct OptionalGeneric<T> {
+  var t: T?
+  var x: Int
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s27stored_property_default_arg31checkDefaultInitGenericOptionalyyF : $@convention(thin) () -> () {
+func checkDefaultInitGenericOptional() {
+  let og = OptionalGeneric<Int>(x: 0)
+
+  // CHECK: [[VALUE:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
+  // CHECK: [[NIL:%.*]] = alloc_stack $Optional<Int>
+  // CHECK: store [[VALUE]] to [trivial] [[NIL]] : $*Optional<Int>
+  // CHECK: [[FN:%.*]] =  function_ref @$s27stored_property_default_arg15OptionalGenericV1t1xACyxGxSg_SitcfC : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, Int, @thin OptionalGeneric<τ_0_0>.Type) -> @out OptionalGeneric<τ_0_0>
+  // CHECK: apply [[FN]]<Int>(%0, [[NIL]], {{%.*}}, %1)
 }

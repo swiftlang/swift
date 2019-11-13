@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_AST_ASTMANGLER_H__
-#define __SWIFT_AST_ASTMANGLER_H__
+#ifndef SWIFT_AST_ASTMANGLER_H
+#define SWIFT_AST_ASTMANGLER_H
 
 #include "swift/Basic/Mangler.h"
 #include "swift/AST/Types.h"
@@ -124,6 +124,8 @@ public:
                                           SymbolKind SKind);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
+  std::string mangleBackingInitializerEntity(const VarDecl *var,
+                                             SymbolKind SKind);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -153,24 +155,26 @@ public:
                                              ModuleDecl *Module);
   
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                        GenericSignature *signature,
+                                        GenericSignature signature,
                                         ResilienceExpansion expansion);
   std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                      GenericSignature *signature,
+                                      GenericSignature signature,
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
+  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
+  
   std::string mangleDeclType(const ValueDecl *decl);
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
@@ -285,8 +289,8 @@ protected:
   ///
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
-  bool appendGenericSignature(const GenericSignature *sig,
-                              GenericSignature *contextSig = nullptr);
+  bool appendGenericSignature(GenericSignature sig,
+                              GenericSignature contextSig = nullptr);
 
   void appendRequirement(const Requirement &reqt);
 
@@ -309,10 +313,11 @@ protected:
   void appendDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
 
   void appendInitializerEntity(const VarDecl *var);
+  void appendBackingInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
-                                 GenericSignature *&genericSig,
-                                 GenericSignature *&parentGenericSig);
+                                 GenericSignature &genericSig,
+                                 GenericSignature &parentGenericSig);
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 
@@ -348,4 +353,4 @@ protected:
 } // end namespace Mangle
 } // end namespace swift
 
-#endif // __SWIFT_AST_ASTMANGLER_H__
+#endif // SWIFT_AST_ASTMANGLER_H

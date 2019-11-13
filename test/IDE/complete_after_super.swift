@@ -116,7 +116,7 @@
 // RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_2 > %t.super.txt
-// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT_CONTEXT < %t.super.txt
 // RUN: %FileCheck %s -check-prefix=CLOSURE_2 < %t.super.txt
 // RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
@@ -227,6 +227,15 @@ extension SuperBaseA {
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT: End completions
 
+// COMMON_BASE_A_DOT_CONTEXT: Begin completions
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT: End completions
+
 class SuperDerivedA : SuperBaseA {
   var derivedInstanceVar: Int
 
@@ -257,13 +266,13 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init#^CONSTRUCTOR_SUPER_INIT_1^#
 // CONSTRUCTOR_SUPER_INIT_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_1-DAG: Pattern/CurrModule: ()[#SuperBaseA#];
+// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal: ()[#SuperBaseA#]; name=()
 // CONSTRUCTOR_SUPER_INIT_1: End completions
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
-// CONSTRUCTOR_SUPER_INIT_PAREN_1: Pattern/CurrModule: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal: ['('][')'][#SuperBaseA#]; name=
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
@@ -482,7 +491,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: End completions
   }
-  func instanceFunc1() {
+  override func instanceFunc1() {
     #^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
@@ -495,7 +504,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
-  func instanceFunc1(_ a: Int) {
+  override func instanceFunc1(_ a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}
@@ -514,7 +523,7 @@ class Closures : SuperBaseA {
   }
 
   func bar() {
-    let inner = { () -> Void in
+    let inner = { () -> Int in
       // CLOSURE_2: Begin completions, 6 items
       // CLOSURE_2: End completions
       super.#^CLOSURE_2^#

@@ -39,22 +39,28 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps SwiftUnitTests)
   endif()
 
-  set(deps_binaries
+  set(deps_binaries)
+
+  if (SWIFT_INCLUDE_TOOLS)
+    list(APPEND deps_binaries
       swift swift-ide-test swift-syntax-test sil-opt swift-llvm-opt swift-demangle
       sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester swift-refactor swift-demangle-yamldump)
+
+    if(SWIFT_BUILD_SYNTAXPARSERLIB)
+      list(APPEND deps_binaries swift-syntax-parser-test)
+    endif()
+    if(SWIFT_BUILD_SOURCEKIT)
+      list(APPEND deps_binaries sourcekitd-test complete-test)
+    endif()
+  endif()
+
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
          llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings dsymutil)
-  endif()
-  if(SWIFT_BUILD_SYNTAXPARSERLIB)
-    list(APPEND deps_binaries swift-syntax-parser-test)
-  endif()
-  if(SWIFT_BUILD_SOURCEKIT)
-    list(APPEND deps_binaries sourcekitd-test complete-test)
+         llvm-strings llvm-readelf dsymutil)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -81,7 +87,7 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps ${deps_binaries})
   else()
     foreach(binary ${deps_binaries})
-      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}")
+      list(APPEND deps "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/${binary}${CMAKE_EXECUTABLE_SUFFIX}")
     endforeach()
   endif()
 
@@ -128,6 +134,7 @@ normalize_boolean_spelling(SWIFT_AST_VERIFIER)
 normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -136,6 +143,7 @@ set(profdata_merge_worker
 set(TEST_MODES
     optimize_none optimize optimize_unchecked optimize_size
     optimize_none_with_implicit_dynamic
+    optimize_with_implicit_dynamic
     only_executable only_non_executable
 )
 set(TEST_SUBSETS
@@ -198,7 +206,7 @@ foreach(SDK ${SWIFT_SDKS})
 
     # NOTE create a stub BlocksRuntime library that can be used for the
     # reflection tests
-    file(WRITE ${test_bin_dir}/BlocksRuntime.c
+    file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
       "void
 #if defined(_WIN32)
 __declspec(dllexport)
@@ -213,7 +221,7 @@ _Block_release(void) { }\n")
       ARCHITECTURE ${ARCH}
       SDK ${SDK}
       INSTALL_IN_COMPONENT dev
-      ${test_bin_dir}/BlocksRuntime.c)
+      ${test_bin_dir}/Inputs/BlocksRuntime.c)
     set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
       LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
@@ -221,10 +229,9 @@ _Block_release(void) { }\n")
       OUTPUT_NAME BlocksRuntime)
     list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
-    list(APPEND test_dependencies
-        "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-
     if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+      list(APPEND test_dependencies
+          "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
       list(APPEND test_dependencies
           "swift-reflection-test${VARIANT_SUFFIX}_signed")
     endif()
@@ -242,7 +249,9 @@ _Block_release(void) { }\n")
     if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
       # These are supported testing SDKs, but their implementation of
       # `command_upload_stdlib` is hidden.
-    elseif("${SDK}" STREQUAL "ANDROID")
+    elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
+      # This adb setup is only needed when cross-compiling for Android, so the
+      # second check above makes sure we don't bother when the host is Android.
       if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
         message(FATAL_ERROR
             "When running Android host tests, you must specify the directory on the device "
@@ -296,6 +305,10 @@ _Block_release(void) { }\n")
       endif()
 
       list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
+
+      if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+        list(APPEND LIT_ARGS "--param" "differentiable_programming")
+      endif()
 
       foreach(test_subset ${TEST_SUBSETS})
         set(directories)

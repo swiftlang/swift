@@ -125,3 +125,11 @@ func fixitThrow2() throws {
   throw MSV.Foo
   var _: (Int) throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{16-21=throws}}
 }
+
+let fn: () -> throws Void  // expected-error{{'throws' may only occur before '->'}} {{12-12=throws }} {{15-22=}}
+
+// SR-11574
+func fixitTry0<T>(a: T) try where T:ExpressibleByStringLiteral {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{25-28=throws}}
+func fixitTry1<T>(a: T) try {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{25-28=throws}}
+func fixitTry2() try {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{18-21=throws}}
+let fixitTry3 : () try -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{20-23=throws}}

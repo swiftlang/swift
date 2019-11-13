@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_SHIMS_KEYPATH_H__
-#define __SWIFT_SHIMS_KEYPATH_H__
+#ifndef SWIFT_STDLIB_SHIMS_KEYPATH_H
+#define SWIFT_STDLIB_SHIMS_KEYPATH_H
 
 #include "SwiftStdint.h"
 
@@ -120,4 +120,4 @@ static inline const void *_Nonnull __swift_keyPathGenericWitnessTable_addr(void)
 } // namespace swift
 #endif
 
-#endif // __SWIFT_SHIMS_KEYPATH_H__
+#endif // SWIFT_STDLIB_SHIMS_KEYPATH_H

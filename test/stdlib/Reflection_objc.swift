@@ -9,9 +9,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
 //

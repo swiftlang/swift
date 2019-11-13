@@ -57,15 +57,22 @@ class TestMigrateSwiftSDKsMeta(type):
 @add_metaclass(TestMigrateSwiftSDKsMeta)
 class TestMigrateSwiftSDKs(TestCase):
 
+    def test_empty_swift_sdks(self):
+        args = migration.migrate_swift_sdks(['--swift-sdks='])
+        self.assertListEqual(args, ['--stdlib-deployment-targets='])
+
     def test_multiple_swift_sdk_flags(self):
+        sdks = ['OSX', 'IOS', 'IOS_SIMULATOR']
+
         args = [
-            '--swift-sdks=OSX',
-            '--swift-sdks=OSX;IOS;IOS_SIMULATOR'
+            '--swift-sdks=',
+            '--swift-sdks={}'.format(';'.join(sdks))
         ]
 
         args = migration.migrate_swift_sdks(args)
-        target_names = _get_sdk_target_names(['OSX', 'IOS', 'IOS_SIMULATOR'])
+        target_names = _get_sdk_target_names(sdks)
 
         self.assertListEqual(args, [
+            '--stdlib-deployment-targets=',
             '--stdlib-deployment-targets={}'.format(' '.join(target_names))
         ])

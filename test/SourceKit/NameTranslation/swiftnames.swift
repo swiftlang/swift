@@ -69,7 +69,7 @@ class C3: NSObject {
 // RUN: %sourcekitd-test -req=translate -swift-name "foo2(_:_:_:)" -pos=12:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK7 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo1()" -pos=14:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK8 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo1()" -pos=14:11 %s -print-raw-response -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK_RAW8 %s
-// RUN: %sourcekitd-test -req=translate -swift-name "foo1(a:b:c:)" -pos=14:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
+// RUN: %sourcekitd-test -req=translate -swift-name "foo1(a:b:c:)" -pos=14:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-DIAG %s
 // RUN: %sourcekitd-test -req=translate -swift-name "C11" -pos=1:8 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK9 %s
 
 // RUN: %sourcekitd-test -req=translate -swift-name "init(a1:b2:)" -pos=10:16 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK10 %s
@@ -86,7 +86,7 @@ class C3: NSObject {
 // RUN: %sourcekitd-test -req=translate -swift-name "zoo(m:)" -pos=55:14 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK17 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "zoo(m:)" -pos=55:14 %s -print-raw-response -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK_RAW17 %s
 
-// CHECK-NONE: <empty name translation info>
+// CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve Swift declaration name.">
 // CHECK1: fooWithA:b:c:
 // CHECK2: fooWithA1:b1:c1:
 // CHECK3: foo:b1:c1:

@@ -72,7 +72,7 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   }
 
   std::string buffer = ED->getParentModule()->getNameStr();
-  for (auto D : reversed(outerTypes)) {
+  for (auto D : llvm::reverse(outerTypes)) {
     buffer += ".";
     buffer += D->getNameStr();
   }
@@ -114,7 +114,8 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
       return {BaseName, ObjCSelector()};
     return {VAD->getObjCPropertyName(), ObjCSelector()};
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
-    return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
+    return getObjCNameForSwiftDecl(SD->getParsedAccessor(AccessorKind::Get),
+                                   PreferredName);
   } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
     SmallString<64> Buffer;
     {

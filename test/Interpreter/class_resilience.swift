@@ -288,7 +288,7 @@ ResilientClassTestSuite.test("TypeByName") {
              == ChildOfOutsideParentWithResilientStoredProperty.self)
 }
 
-@_fixed_layout
+@frozen
 public struct Empty {}
 
 // rdar://48031465

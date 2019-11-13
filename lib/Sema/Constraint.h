@@ -23,6 +23,7 @@
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
@@ -150,6 +151,11 @@ enum class ConstraintKind : char {
   /// The first type is a type that's a candidate to be the underlying type of
   /// the second opaque archetype.
   OpaqueUnderlyingType,
+  /// The first type will be equal to the second type, but only when the
+  /// second type has been fully determined (and mapped down to a concrete
+  /// type). At that point, this constraint will be treated like an `Equal`
+  /// constraint.
+  OneWayEqual,
 };
 
 /// Classification of the different kinds of constraints.
@@ -201,7 +207,8 @@ enum class ConversionRestrictionKind {
   MetatypeToExistentialMetatype,
   /// Existential metatype to metatype conversion.
   ExistentialMetatypeToMetatype,
-  /// T -> U? value to optional conversion (or to implicitly unwrapped optional).
+  /// T -> U? value to optional conversion (or to implicitly unwrapped
+  /// optional).
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
@@ -219,7 +226,23 @@ enum class ConversionRestrictionKind {
   CFTollFreeBridgeToObjC,
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
-  ObjCTollFreeBridgeToCF
+  ObjCTollFreeBridgeToCF,
+};
+
+/// Specifies whether a given conversion requires the creation of a temporary
+/// value which is only valid for a limited scope. For example, the
+/// array-to-pointer conversion produces a pointer that is only valid for the
+/// duration of the call that it's passed to. Such ephemeral conversions cannot
+/// be passed to non-ephemeral parameters.
+enum class ConversionEphemeralness {
+  /// The conversion requires the creation of a temporary value.
+  Ephemeral,
+  /// The conversion does not require the creation of a temporary value.
+  NonEphemeral,
+  /// It is not currently known whether the conversion will produce a temporary
+  /// value or not. This can occur for example with an inout-to-pointer
+  /// conversion of a member whose base type is an unresolved type variable.
+  Unresolved,
 };
 
 /// Return a string representation of a conversion restriction.
@@ -370,7 +393,8 @@ public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
                             Type First, Type Second, Type Third,
-                            ConstraintLocator *locator);
+                            ConstraintLocator *locator,
+                            ArrayRef<TypeVariableType *> extraTypeVars = { });
 
   /// Create a new member constraint, or a disjunction of that with the outer
   /// alternatives.
@@ -489,6 +513,7 @@ public:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OpaqueUnderlyingType:
+    case ConstraintKind::OneWayEqual:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -602,6 +627,11 @@ public:
   /// e.g. coercion constraint "as X" which forms a disjunction.
   bool isExplicitConversion() const;
 
+  /// Whether this is a one-way constraint.
+  bool isOneWayConstraint() const {
+    return Kind == ConstraintKind::OneWayEqual;
+  }
+
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
@@ -629,13 +659,9 @@ public:
 
   void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint));

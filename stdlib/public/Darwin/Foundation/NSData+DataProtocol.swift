@@ -43,9 +43,11 @@ extension NSData : DataProtocol {
     @nonobjc
     public subscript(position: Int) -> UInt8 {
         var byte = UInt8(0)
+        var offset = position
         enumerateBytes { (ptr, range, stop) in
-            if range.location <= position && position < range.upperBound {
-                byte = ptr.load(fromByteOffset: range.location - position, as: UInt8.self)
+            offset -= range.lowerBound
+            if range.contains(position) {
+                byte = ptr.load(fromByteOffset: offset, as: UInt8.self)
                 stop.pointee = true
             }
         }

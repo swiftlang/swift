@@ -23,10 +23,8 @@ class DeclContext;
 namespace index {
 
 void indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer);
-void indexSourceFile(SourceFile *SF, StringRef hash,
-                     IndexDataConsumer &consumer);
-void indexModule(ModuleDecl *module, StringRef hash,
-                 IndexDataConsumer &consumer);
+void indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer);
+void indexModule(ModuleDecl *module, IndexDataConsumer &consumer);
 
 } // end namespace index
 } // end namespace swift

@@ -176,7 +176,7 @@ bb12:                                             // Preds: bb3
 // CHECK: bb3
 // CHECK: class_method
 // CHECK: br bb1
-// CHECK }
+// CHECK: }
 // devirt_jump_thread.double (devirt_jump_thread.FooClass) -> Swift.Int32
 sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi : $@convention(thin) (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
@@ -230,7 +230,7 @@ bb6:                                              // Preds: bb1
 // CHECK: bb1(%{{.*}} : $Int32):
 // CHECK: checked_cast_br
 // CHECK: bb2(%{{.*}} : $Int32):
-// CHECK }
+// CHECK: }
 sil @_TF18devirt_jump_thread6dont_jump_thread_alloc_stackFCS_8FooClassSi : $@convention(thin) (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
@@ -284,7 +284,7 @@ bb6:                                              // Preds: bb1
 // CHECK: bb1(%{{.*}} : $Int32):
 // CHECK: checked_cast_br
 // CHECK: bb2(%{{.*}} : $Int32):
-// CHECK }
+// CHECK: }
 sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi : $@convention(thin) (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %100 = alloc_ref $Bar

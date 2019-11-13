@@ -48,8 +48,8 @@ void swift::initializeProtocolLookup() {
     const swift::MetadataSections::Range &protocols =
       sections->swift5_protocols;
     if (protocols.length)
-      addImageProtocolsBlockCallback(reinterpret_cast<void *>(protocols.start),
-                                     protocols.length);
+      addImageProtocolsBlockCallbackUnsafe(
+          reinterpret_cast<void *>(protocols.start), protocols.length);
 
     if (sections->next == registered)
       break;
@@ -63,8 +63,8 @@ void swift::initializeProtocolConformanceLookup() {
     const swift::MetadataSections::Range &conformances =
         sections->swift5_protocol_conformances;
     if (conformances.length)
-      addImageProtocolConformanceBlockCallback(reinterpret_cast<void *>(conformances.start),
-                                               conformances.length);
+      addImageProtocolConformanceBlockCallbackUnsafe(
+          reinterpret_cast<void *>(conformances.start), conformances.length);
 
     if (sections->next == registered)
       break;
@@ -78,8 +78,8 @@ void swift::initializeTypeMetadataRecordLookup() {
     const swift::MetadataSections::Range &type_metadata =
         sections->swift5_type_metadata;
     if (type_metadata.length)
-      addImageTypeMetadataRecordBlockCallback(reinterpret_cast<void *>(type_metadata.start),
-                                              type_metadata.length);
+      addImageTypeMetadataRecordBlockCallbackUnsafe(
+          reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
 
     if (sections->next == registered)
       break;
@@ -118,9 +118,14 @@ void swift_addNewDSOImage(const void *addr) {
   const auto &dynamic_replacements = sections->swift5_repl;
   const auto *replacements =
       reinterpret_cast<void *>(dynamic_replacements.start);
-  if (dynamic_replacements.length)
-    addImageDynamicReplacementBlockCallback(replacements, dynamic_replacements.length);
-
+  if (dynamic_replacements.length) {
+    const auto &dynamic_replacements_some = sections->swift5_reps;
+    const auto *replacements_some =
+      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    addImageDynamicReplacementBlockCallback(
+        replacements, dynamic_replacements.length, replacements_some,
+        dynamic_replacements_some.length);
+  }
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {

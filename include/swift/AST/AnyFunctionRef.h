@@ -14,6 +14,7 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -52,10 +53,18 @@ public:
     }
   }
 
-  CaptureInfo &getCaptureInfo() const {
+  CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
+  }
+
+  void setCaptureInfo(CaptureInfo captures) const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setCaptureInfo(captures);
+      return;
+    }
+    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -66,6 +75,18 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
+  }
+
+  bool hasSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->hasSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
+  }
+
+  Expr *getSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
   Type getType() const {
@@ -116,6 +137,12 @@ public:
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
 
+  bool isDeferBody() const {
+    if (auto *fd = dyn_cast_or_null<FuncDecl>(getAbstractFunctionDecl()))
+      return fd->isDeferBody();
+    return false;
+  }
+
   /// Return true if this closure is passed as an argument to a function and is
   /// known not to escape from that function.  In this case, captures can be
   /// more efficient.
@@ -151,8 +178,7 @@ public:
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->dump();
     }
@@ -172,7 +198,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getGenericSignature();
     }

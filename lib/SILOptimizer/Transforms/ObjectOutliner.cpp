@@ -14,9 +14,9 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -488,7 +488,8 @@ bool ObjectOutliner::optimizeObjectAllocation(AllocRefInst *ARI) {
 void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   // Find the replacement function in the swift stdlib.
   SmallVector<ValueDecl *, 1> results;
-  SILModule *Module = &FindStringCall->getFunction()->getModule();
+  auto &F = *FindStringCall->getFunction();
+  SILModule *Module = &F.getModule();
   Module->getASTContext().lookupInSwiftModule("_findStringSwitchCaseWithCache",
                                               results);
   if (results.size() != 1)
@@ -506,7 +507,8 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   if (FTy->getNumParameters() != 3)
     return;
 
-  SILType cacheType = FTy->getParameters()[2].getSILStorageType().getObjectType();
+  SILType cacheType = FTy->getParameters()[2].getSILStorageType(*Module, FTy)
+                                             .getObjectType();
   NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
   if (!cacheDecl)
     return;
@@ -516,8 +518,9 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   assert(!cacheDecl->isResilient(Module->getSwiftModule(),
                                  ResilienceExpansion::Minimal));
 
-  SILType wordTy = cacheType.getFieldType(
-                            cacheDecl->getStoredProperties().front(), *Module);
+  SILType wordTy =
+      cacheType.getFieldType(cacheDecl->getStoredProperties().front(), *Module,
+                             F.getTypeExpansionContext());
 
   GlobalVariableMangler Mangler;
   std::string GlobName =

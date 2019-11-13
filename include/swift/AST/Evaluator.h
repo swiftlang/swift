@@ -20,6 +20,7 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -249,7 +250,7 @@ public:
   ///
   /// These functions will be called to evaluate any requests within that
   /// zone.
-  void registerRequestFunctions(uint8_t zoneID,
+  void registerRequestFunctions(Zone zone,
                                 ArrayRef<AbstractRequestFunction *> functions);
 
   /// Evaluate the given request and produce its result,
@@ -285,11 +286,35 @@ public:
       (*this)(requests)...);
   }
 
+  /// Cache a precomputed value for the given request, so that it will not
+  /// be computed.
+  template<typename Request,
+           typename std::enable_if<Request::hasExternalCache>::type* = nullptr>
+  void cacheOutput(const Request &request,
+                   typename Request::OutputType &&output) {
+    request.cacheResult(std::move(output));
+  }
+
+  /// Cache a precomputed value for the given request, so that it will not
+  /// be computed.
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  void cacheOutput(const Request &request,
+                   typename Request::OutputType &&output) {
+    cache.insert({getCanonicalRequest(request), std::move(output)});
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
   /// caching.
   void clearCache() { cache.clear(); }
+
+  /// Is the given request, or an equivalent, currently being evaluated?
+  template <typename Request>
+  bool hasActiveRequest(const Request &request) const {
+    return activeRequests.count(AnyRequest(request));
+  }
 
 private:
   template <typename Request>
@@ -428,17 +453,13 @@ public:
 
   /// Dump the dependencies of the given request to the debugging stream
   /// as a tree.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dumpDependencies(const AnyRequest &request) const LLVM_ATTRIBUTE_USED,
-    "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpDependencies(const AnyRequest &request));
 
   /// Print all dependencies known to the evaluator as a single Graphviz
   /// directed graph.
   void printDependenciesGraphviz(llvm::raw_ostream &out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dumpDependenciesGraphviz() const LLVM_ATTRIBUTE_USED,
-    "Only meant for use in the debugger");
+  SWIFT_DEBUG_DUMPER(dumpDependenciesGraphviz());
 };
 
 template <typename Request>

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection of indices for an arbitrary collection
-@_fixed_layout
+@frozen
 public struct DefaultIndices<Elements: Collection> {
   @usableFromInline
   internal var _elements: Elements

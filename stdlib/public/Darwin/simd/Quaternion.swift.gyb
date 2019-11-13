@@ -18,8 +18,6 @@ import Darwin
 
 %for scalar in ['Float','Double']:
 % quat = 'simd_quat' + ('f' if scalar == 'Float' else 'd')
-% vec3 = str.lower(scalar) + '3'
-% vec4 = str.lower(scalar) + '4'
 % mat3 = 'simd_' + str.lower(scalar) + '3x3'
 % mat4 = 'simd_' + str.lower(scalar) + '4x4'
 
@@ -34,13 +32,13 @@ extension ${quat} {
   ///   - r: The real (scalar) part.
   @_transparent
   public init(ix: ${scalar}, iy: ${scalar}, iz: ${scalar}, r: ${scalar}) {
-    self.init(vector: ${vec4}(ix, iy, iz, r))
+    self.init(vector: SIMD4<${scalar}>(ix, iy, iz, r))
   }
 
   /// Construct a quaternion from real and imaginary parts.
   @_transparent
-  public init(real: ${scalar}, imag: ${vec3}) {
-    self.init(vector: simd_make_${vec4}(imag, real))
+  public init(real: ${scalar}, imag: SIMD3<${scalar}>) {
+    self.init(vector: simd_make_${str.lower(scalar)}4(imag, real))
   }
 
   /// A quaternion whose action is a rotation by `angle` radians about `axis`.
@@ -49,13 +47,13 @@ extension ${quat} {
   ///   - angle: The angle to rotate by measured in radians.
   ///   - axis: The axis to rotate around.
   @_transparent
-  public init(angle: ${scalar}, axis: ${vec3}) {
+  public init(angle: ${scalar}, axis: SIMD3<${scalar}>) {
     self = simd_quaternion(angle, axis)
   }
 
   /// A quaternion whose action rotates the vector `from` onto the vector `to`.
   @_transparent
-  public init(from: ${vec3}, to: ${vec3}) {
+  public init(from: SIMD3<${scalar}>, to: SIMD3<${scalar}>) {
     self = simd_quaternion(from, to)
   }
 
@@ -80,11 +78,11 @@ extension ${quat} {
   }
 
   /// The imaginary (vector) part of `self`.
-  public var imag: ${vec3} {
+  public var imag: SIMD3<${scalar}> {
     @_transparent
-    get { return simd_make_${vec3}(vector) }
+    get { return simd_make_${str.lower(scalar)}3(vector) }
     @_transparent
-    set { vector = simd_make_${vec4}(newValue, vector.w) }
+    set { vector = simd_make_${str.lower(scalar)}4(newValue, vector.w) }
   }
 
   /// The angle (in radians) by which `self`'s action rotates.
@@ -95,7 +93,7 @@ extension ${quat} {
 
   /// The normalized axis about which `self`'s action rotates.
   @_transparent
-  public var axis: ${vec3} {
+  public var axis: SIMD3<${scalar}> {
     return simd_axis(self)
   }
 
@@ -126,7 +124,7 @@ extension ${quat} {
   /// Applies the rotation represented by a unit quaternion to the vector and
   /// returns the result.
   @_transparent
-  public func act(_ vector: ${vec3}) -> ${vec3} {
+  public func act(_ vector: SIMD3<${scalar}>) -> SIMD3<${scalar}> {
     return simd_act(self, vector)
   }
 }

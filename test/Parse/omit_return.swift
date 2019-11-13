@@ -936,7 +936,7 @@ var fvs_explicit: String {
 var fvs_explicitClosure: () -> Void {
     get { return { print("howdy") } }
     set {
-        return { print("howdy") } // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
+        return { print("howdy") } // expected-error {{unexpected non-void return value in void function}}
     }
 }
 
@@ -1005,7 +1005,7 @@ var fvs_stubMyOwnFatalError: () {
 var fvs_forceTryExplicit: String {
     get { "ok" }
     set {
-        return try! failableIdentity("shucks") // expected-error {{unexpected non-void return value in void function}}
+        return try! failableIdentity("shucks") // expected-error {{cannot convert value of type 'String' to expected argument type '()'}}
     }
 }
 

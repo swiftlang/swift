@@ -19,19 +19,19 @@ func useDict<K, V>(_ d: MyDictionary<K,V>) {}
 useDictStringInt(["Hello" : 1])
 useDictStringInt(["Hello" : 1, "World" : 2])
 useDictStringInt(["Hello" : 1, "World" : 2.5])
-// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary value type 'Int'}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary value type 'DictStringInt.Value' (aka 'Int')}}
 useDictStringInt([4.5 : 2])
-// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary key type 'String'}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt([nil : 2])
-// expected-error@-1 {{'nil' is not compatible with expected dictionary key type 'String'}}
+// expected-error@-1 {{'nil' is not compatible with expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt([7 : 1, "World" : 2])
-// expected-error@-1 {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt(["Hello" : nil])
-// expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'Int'}}
+// expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'DictStringInt.Value' (aka 'Int')}}
 
 typealias FuncBoolToInt = (Bool) -> Int
 let dict1: MyDictionary<String, FuncBoolToInt> = ["Hello": nil]
-// expected-error@-1 {{'nil' is not compatible with expected dictionary value type '(Bool) -> Int'}}
+// expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'MyDictionary<String, FuncBoolToInt>.Value' (aka '(Bool) -> Int')}}
 
 // Generic dictionary literals.
 useDict(["Hello" : 1])
@@ -63,9 +63,10 @@ var _: MyDictionary<String, Int>? = ["foo", 1]  // expected-error {{dictionary o
 var _: MyDictionary<String, Int>? = ["foo", 1, "bar", 42]  // expected-error {{dictionary of type 'MyDictionary<String, Int>' cannot be initialized with array literal}}
 // expected-note @-1 {{did you mean to use a dictionary literal instead?}} {{43-44=:}} {{53-54=:}}
 
-var _: MyDictionary<String, Int>? = ["foo", 1.0, 2]  // expected-error {{cannot convert value of type '[Any]' to specified type 'MyDictionary<String, Int>?'}}
+var _: MyDictionary<String, Int>? = ["foo", 1.0, 2]  // expected-error {{cannot convert value of type '[Double]' to specified type 'MyDictionary<String, Int>?'}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Double'}}
 
-var _: MyDictionary<String, Int>? = ["foo" : 1.0]  // expected-error {{cannot convert value of type 'Double' to expected dictionary value type 'Int'}}
+var _: MyDictionary<String, Int>? = ["foo" : 1.0]  // expected-error {{cannot convert value of type 'Double' to expected dictionary value type 'MyDictionary<String, Int>.Value' (aka 'Int')}}
 
 
 // <rdar://problem/24058895> QoI: Should handle [] in dictionary contexts better

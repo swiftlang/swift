@@ -127,7 +127,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
     if (isPartialApplyOfReabstractionThunk(PAI)) {
       // However, first check for withoutActuallyEscaping, which is always
       // a valid non-escaping use.
-      SILFunction *thunkDef = PAI->getReferencedFunction();
+      SILFunction *thunkDef = PAI->getReferencedFunctionOrNull();
+      if (!thunkDef)
+        return true;
       if (!thunkDef->isWithoutActuallyEscapingThunk())
         followUses(PAI);
       return false;
@@ -144,6 +146,28 @@ const ParamDecl *getParamDeclFromOperand(SILValue value) {
       return decl;
 
   return nullptr;
+}
+
+bool isUseOfSelfInInitializer(Operand *oper) {
+  if (auto *PBI = dyn_cast<ProjectBoxInst>(oper->get())) {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(PBI->getOperand())) {
+      switch (MUI->getKind()) {
+      case MarkUninitializedInst::Kind::Var:
+        return false;
+      case MarkUninitializedInst::Kind::RootSelf:
+      case MarkUninitializedInst::Kind::CrossModuleRootSelf:
+      case MarkUninitializedInst::Kind::DerivedSelf:
+      case MarkUninitializedInst::Kind::DerivedSelfOnly:
+      case MarkUninitializedInst::Kind::DelegatingSelf:
+      case MarkUninitializedInst::Kind::DelegatingSelfAllocated:
+        return true;
+      }
+
+      llvm_unreachable("Bad MarkUninitializedInst::Kind");
+    }
+  }
+
+  return false;
 }
 
 static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
@@ -299,16 +323,34 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   // Otherwise, we have at least one escaping use of a partial_apply
   // capturing a non-escaping value. We need to emit diagnostics.
 
+  // Should match SELECT_ESCAPING_CLOSURE_KIND in DiagnosticsSIL.def.
+  enum {
+    EscapingLocalFunction,
+    EscapingClosure
+  } functionKind = EscapingClosure;
+
+  if (auto *F = PAI->getReferencedFunctionOrNull()) {
+    if (auto loc = F->getLocation()) {
+      if (loc.isASTNode<FuncDecl>())
+        functionKind = EscapingLocalFunction;
+    }
+  }
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
-    auto *param = getParamDeclFromOperand(inoutCapture->get());
-    if (param->isSelfParameter())
-      diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture);
-    else {
-      diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
-                param->getName());
-      diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
-                param->getName());
+    if (isUseOfSelfInInitializer(inoutCapture)) {
+      diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
+               functionKind);
+    } else {
+      auto *param = getParamDeclFromOperand(inoutCapture->get());
+      if (param->isSelfParameter())
+        diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
+                 functionKind);
+      else {
+        diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
+                 functionKind, param->getName());
+        diagnose(Context, param->getLoc(), diag::inout_param_defined_here,
+                 param->getName());
+      }
     }
 
     diagnoseCaptureLoc(Context, DC, PAI, inoutCapture);
@@ -318,11 +360,12 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   for (auto noEscapeCapture : noEscapeCaptures) {
     if (auto *param = getParamDeclFromOperand(noEscapeCapture->get())) {
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_param_capture,
-               param->getName());
+               functionKind, param->getName());
       diagnose(Context, param->getLoc(), diag::noescape_param_defined_here,
                param->getName());
     } else {
-      diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture);
+      diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture,
+               functionKind);
     }
 
     diagnoseCaptureLoc(Context, DC, PAI, noEscapeCapture);

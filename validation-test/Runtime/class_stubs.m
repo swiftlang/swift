@@ -3,16 +3,15 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library -emit-module -o %t/libfirst.dylib -emit-objc-header-path %t/first.h %S/Inputs/class-stubs-from-objc/first.swift -Xlinker -install_name -Xlinker @executable_path/libfirst.dylib -enable-library-evolution
-// RUN: %target-build-swift -emit-library -o %t/libsecond.dylib -emit-objc-header-path %t/second.h -I %t %S/Inputs/class-stubs-from-objc/second.swift -Xlinker -install_name -Xlinker @executable_path/libsecond.dylib -lfirst -L %t -Xfrontend -enable-resilient-objc-class-stubs
+// RUN: %target-build-swift -emit-library -o %t/libsecond.dylib -emit-objc-header-path %t/second.h -I %t %S/Inputs/class-stubs-from-objc/second.swift -Xlinker -install_name -Xlinker @executable_path/libsecond.dylib -lfirst -L %t -target %target-next-stable-abi-triple
 // RUN: cp %S/Inputs/class-stubs-from-objc/module.map %t/
-// RUN: xcrun %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond
+// RUN: xcrun -sdk %sdk %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond -Wl,-U,_objc_loadClassref -target %target-next-stable-abi-triple
 // RUN: %target-codesign %t/main %t/libfirst.dylib %t/libsecond.dylib
-// RUN: %target-run %t/main %t/libfirst.dylib %t/libsecond.dylib | %FileCheck %s
+// RUN: %target-run %t/main %t/libfirst.dylib %t/libsecond.dylib
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-
-// XFAIL: *
+// REQUIRES: swift_stable_abi
 
 #import <dlfcn.h>
 #import <stdio.h>
@@ -39,9 +38,17 @@ int main(int argc, const char * const argv[]) {
 
   DerivedClass *obj = [[DerivedClass alloc] init];
 
-  // CHECK: Result is 43
-  printf("Result is %ld\n", [obj instanceMethod]); 
+  {
+    long result = [obj instanceMethod];
+    printf("[obj instanceMethod] == %ld\n", result);
+    if (result != 43)
+      exit(EXIT_FAILURE);
+  }
 
-  // CHECK: Result is 31338
-  printf("Result is %ld\n", [DerivedClass classMethod]); 
+  {
+    long result = [DerivedClass classMethod];
+    printf("[obj classMethod] == %ld\n", result);
+    if (result != 31338)
+      exit(EXIT_FAILURE);
+  }
 }

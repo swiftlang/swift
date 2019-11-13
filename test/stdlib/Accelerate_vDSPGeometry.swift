@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: rdar50301438
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -15,7 +16,7 @@ var Accelerate_vDSPGeometryTests = TestSuite("Accelerate_vDSPGeometry")
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     Accelerate_vDSPGeometryTests.test("vDSP/SinglePrecisionDot") {
         let a: [Float] = [ 1.2, 6.7, 0.22334, 101.9, 90.1, 100.999 ]
@@ -56,7 +57,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let xlegs = [(1, 2),        (4, 5),     (2, 1),         (1000, 1), (-1055, 55)]
     let ylegs = [(-1000, 2),    (4, -50),   (-25, -100),    (1, 1000), (5, 1)]

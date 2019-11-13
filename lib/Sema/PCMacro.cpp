@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 
 using namespace swift;
@@ -38,13 +39,11 @@ namespace {
 
 class Instrumenter : InstrumenterBase {
 private:
-  ASTContext &Context;
-  DeclContext *TypeCheckDC;
   unsigned &TmpNameIndex;
 
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, unsigned &TmpNameIndex)
-      : Context(C), TypeCheckDC(DC), TmpNameIndex(TmpNameIndex) {}
+      : InstrumenterBase(C, DC), TmpNameIndex(TmpNameIndex) {}
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
@@ -192,7 +191,7 @@ public:
 
       // point at the for stmt, to look nice
       SourceLoc StartLoc = FES->getStartLoc();
-      SourceLoc EndLoc = FES->getIterator()->getEndLoc();
+      SourceLoc EndLoc = FES->getSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
       // if (FD->getBodyResultTypeLoc().hasLocation()) {
       //   EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
@@ -322,7 +321,7 @@ public:
 
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -437,7 +436,7 @@ public:
 
               SourceRange SR = PBD->getSourceRange();
               if (!SR.isValid()) {
-                SR = PBD->getOrigInitRange(0);
+                SR = PBD->getOriginalInitRange(0);
               }
 
               Added<Stmt *> LogBefore = buildLoggerCall(SR, true);
@@ -479,11 +478,10 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setType(MaybeLoadInitExpr->getType());
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
@@ -536,15 +534,28 @@ public:
     Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
     Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
-    llvm::SmallVector<Expr *, 5> ArgsWithSourceRange{};
+    Expr *ModuleExpr =
+        !ModuleIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
 
-    ArgsWithSourceRange.append({StartLine, EndLine, StartColumn, EndColumn});
+    Expr *FileExpr =
+        !FileIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+
+    llvm::SmallVector<Expr *, 6> ArgsWithSourceRange{};
+
+    ArgsWithSourceRange.append(
+        {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *BeforeLoggerRef = new (Context)
         UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_pc_before"),
                               DeclRefKind::Ordinary, DeclNameLoc(SR.End));
     BeforeLoggerRef->setImplicit(true);
-    SmallVector<Identifier, 4> ArgLabels(ArgsWithSourceRange.size(),
+    SmallVector<Identifier, 6> ArgLabels(ArgsWithSourceRange.size(),
                                          Identifier());
     ApplyExpr *BeforeLoggerCall = CallExpr::createImplicit(
         Context, BeforeLoggerRef, ArgsWithSourceRange, ArgLabels);
@@ -603,9 +614,22 @@ public:
     Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
     Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
-    llvm::SmallVector<Expr *, 4> ArgsWithSourceRange{};
+    Expr *ModuleExpr =
+        !ModuleIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
 
-    ArgsWithSourceRange.append({StartLine, EndLine, StartColumn, EndColumn});
+    Expr *FileExpr =
+        !FileIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+
+    llvm::SmallVector<Expr *, 6> ArgsWithSourceRange{};
+
+    ArgsWithSourceRange.append(
+        {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
         UnresolvedDeclRefExpr(Context.getIdentifier(LoggerName),
@@ -613,7 +637,7 @@ public:
 
     LoggerRef->setImplicit(true);
 
-    SmallVector<Identifier, 4> ArgLabels(ArgsWithSourceRange.size(),
+    SmallVector<Identifier, 6> ArgLabels(ArgsWithSourceRange.size(),
                                          Identifier());
     ApplyExpr *LoggerCall = CallExpr::createImplicit(
         Context, LoggerRef, ArgsWithSourceRange, ArgLabels);
@@ -667,9 +691,8 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker &TC = TypeChecker::createForContext(ctx);
-              TC.checkTopLevelErrorHandling(TLCD);
-              TC.contextualizeTopLevelCode(TLC, TLCD);
+              TypeChecker::checkTopLevelErrorHandling(TLCD);
+              TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
             }
             return false;
           }

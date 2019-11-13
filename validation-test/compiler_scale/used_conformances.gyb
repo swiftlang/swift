@@ -1,0 +1,16 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select InterfaceTypeRequest %s
+// REQUIRES: asserts
+
+struct Generic${N}<T : Protocol${N}> {}
+
+struct Conforms${N} : Protocol${N} {
+% if int(N) > 1:
+  typealias A = Generic${int(N)-1}<Conforms${int(N)-1}>
+% end
+}
+
+protocol Protocol${N} {
+% if int(N) > 1:
+  associatedtype A
+% end
+}

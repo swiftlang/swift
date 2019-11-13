@@ -50,14 +50,9 @@ private:
     return Logger::isLoggingEnabledForLevel(Logger::Level::Warning);
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override {
-    return impl.recordHash(hash, isKnown);
-  }
-
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     auto kindUID = getUIDForDependencyKind(isClangModule);
-    return impl.startDependency(kindUID, name, path, isSystem, hash);
+    return impl.startDependency(kindUID, name, path, isSystem);
   }
 
   bool finishDependency(bool isClangModule) override {
@@ -168,7 +163,6 @@ private:
 
 static void indexModule(llvm::MemoryBuffer *Input,
                         StringRef ModuleName,
-                        StringRef Hash,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
@@ -190,7 +184,8 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the
     // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, None, std::move(Buf), nullptr,
+    auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath*/"",
+                                 std::move(Buf), nullptr, nullptr,
                                  /*isFramework*/false,
                                  /*treatAsPartialModule*/false);
 
@@ -208,7 +203,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
   (void)createTypeChecker(Ctx);
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
-  index::indexModule(Mod, Hash, IdxDataConsumer);
+  index::indexModule(Mod, IdxDataConsumer);
 }
 
 
@@ -239,8 +234,7 @@ void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
-                                   ArrayRef<const char *> OrigArgs,
-                                   StringRef Hash) {
+                                   ArrayRef<const char *> OrigArgs) {
   std::string Error;
   auto InputBuf = ASTMgr->getMemoryBuffer(InputFile, Error);
   if (!InputBuf) {
@@ -281,6 +275,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   if (IsModuleIndexing) {
     if (CI.setup(Invocation))
       return;
+    // Indexing needs IDE requests
+    registerIDERequestFunctions(CI.getASTContext().evaluator);
     bool IsClangModule = (FileExt == ".pcm");
     if (IsClangModule) {
       IdxConsumer.failed("Clang module files are not supported");
@@ -288,7 +284,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     }
 
     indexModule(InputBuf.get(), llvm::sys::path::stem(Filename),
-                Hash, IdxConsumer, CI, Args);
+                IdxConsumer, CI, Args);
     return;
   }
 
@@ -299,7 +295,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
 
   if (CI.setup(Invocation))
     return;
-
+  // Indexing needs IDE requests
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   trace::TracedOperation TracedOp(trace::OperationKind::IndexSource);
   if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
@@ -320,5 +317,5 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   (void)createTypeChecker(CI.getASTContext());
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
-  index::indexSourceFile(CI.getPrimarySourceFile(), Hash, IdxDataConsumer);
+  index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }

@@ -184,7 +184,8 @@ llvm::Value *irgen::emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
 }
 
 namespace {
-  /// A type-info implementation suitable for Builtin.UnknownObject.
+  /// A type-info implementation suitable for AnyObject on platforms with ObjC
+  /// interop.
   class UnknownTypeInfo : public HeapTypeInfo<UnknownTypeInfo> {
   public:
     UnknownTypeInfo(llvm::PointerType *storageType, Size size,
@@ -192,7 +193,7 @@ namespace {
       : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
-    /// Builtin.UnknownObject requires ObjC reference-counting.
+    /// AnyObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Unknown;
     }
@@ -363,6 +364,11 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
                                                "coalesced,no_dead_strip"));
 
+  // Mark used to prevent DCE of public unreferenced protocols to ensure
+  // that they are available for external use when a used module is used
+  // as a library.
+  addUsedGlobal(protocolLabel);
+
   // Introduce a variable to reference the protocol.
   auto *protocolRef =
       new llvm::GlobalVariable(Module, Int8PtrTy, /*constant*/ false,
@@ -373,6 +379,11 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
                                              "coalesced,no_dead_strip"));
+
+  // Mark used to prevent DCE of public unreferenced protocols to ensure
+  // that they are available for external use when a used module is used
+  // as a library.
+  addUsedGlobal(protocolRef);
 
   ObjCProtocolPair pair{protocolRecord, protocolRef};
   ObjCProtocols.insert({proto, pair});
@@ -458,6 +469,7 @@ namespace {
       case SILDeclRef::Kind::StoredPropertyInitializer:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
+      case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:
@@ -761,7 +773,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     assert(origMethodType->getNumIndirectFormalResults() == 1);
     formalIndirectResult = params.claimNext();
   } else {
-    SILType appliedResultTy = origMethodType->getDirectFormalResultsType();
+    SILType appliedResultTy = origMethodType->getDirectFormalResultsType(IGM.getSILModule());
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     auto &nativeSchema = indirectedResultTI->nativeReturnValueSchema(IGM);
@@ -790,8 +802,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     }
     // Otherwise, we have a loadable type that can either be passed directly or
     // indirectly.
-    assert(info.getSILStorageType().isObject());
-    auto curSILType = info.getSILStorageType();
+    assert(info.getSILStorageType(IGM.getSILModule(), origMethodType).isObject());
+    auto curSILType = info.getSILStorageType(IGM.getSILModule(), origMethodType);
     auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(curSILType));
 
     // Load the indirectly passed parameter.
@@ -845,9 +857,9 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     cleanup();
     auto &callee = emission.getCallee();
     auto resultType =
-        callee.getOrigFunctionType()->getDirectFormalResultsType();
-    subIGF.emitScalarReturn(resultType, result, true /*isSwiftCCReturn*/,
-                            false);
+    callee.getOrigFunctionType()->getDirectFormalResultsType(IGM.getSILModule());
+    subIGF.emitScalarReturn(resultType, resultType, result,
+                            true /*isSwiftCCReturn*/, false);
   }
   
   return fwd;
@@ -923,7 +935,8 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func)
+  SILDeclRef getter = SILDeclRef(property->getOpaqueAccessor(AccessorKind::Get),
+                                 SILDeclRef::Kind::Func)
     .asForeign();
 
   return findSwiftAsObjCThunk(IGM, getter, silFn);
@@ -943,7 +956,8 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   assert(property->isSettable(property->getDeclContext()) &&
          "property is not settable?!");
   
-  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func)
+  SILDeclRef setter = SILDeclRef(property->getOpaqueAccessor(AccessorKind::Set),
+                                 SILDeclRef::Kind::Func)
     .asForeign();
   return findSwiftAsObjCThunk(IGM, setter, silFn);
 }
@@ -1004,18 +1018,18 @@ static SILDeclRef getObjCMethodRef(AbstractFunctionDecl *method) {
 }
 
 static CanSILFunctionType getObjCMethodType(IRGenModule &IGM,
-                                            AbstractFunctionDecl *method) {  
-  return IGM.getSILTypes().getConstantFunctionType(getObjCMethodRef(method));
+                                            AbstractFunctionDecl *method) {
+  return IGM.getSILTypes().getConstantFunctionType(
+      TypeExpansionContext::minimal(), getObjCMethodRef(method));
 }
 
 static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
                                               VarDecl *property) {
   // Use the lowered return type of the foreign getter.
-  auto getter = property->getGetter();
-  assert(getter);
+  auto getter = property->getOpaqueAccessor(AccessorKind::Get);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
   return IGM.getClangType(
-      methodTy->getFormalCSemanticResult().getASTType());
+    methodTy->getFormalCSemanticResult(IGM.getSILModule()).getASTType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1036,11 +1050,12 @@ HelperGetObjCEncodingForType(const clang::ASTContext &Context,
 }
 
 static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
-                                               SILType resultType,
+                                               CanSILFunctionType fnType,
                                                ArrayRef<SILParameterInfo> params,
                                                StringRef fixedParamsString,
                                                Size::int_type parmOffset,
                                                bool useExtendedEncoding) {
+  auto resultType = fnType->getFormalCSemanticResult(IGM.getSILModule());
   auto &clangASTContext = IGM.getClangASTContext();
   
   std::string encodingString;
@@ -1058,7 +1073,8 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   // TODO. Encode type qualifier, 'in', 'inout', etc. for the parameter.
   std::string paramsString;
   for (auto param : params) {
-    auto clangType = IGM.getClangType(param.getType());
+    auto clangType = IGM.getClangType(
+                            param.getArgumentType(IGM.getSILModule(), fnType));
     if (clangType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     
@@ -1080,8 +1096,6 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
                                                     CanSILFunctionType fnType,
                                                     bool useExtendedEncoding) {
-  SILType resultType = fnType->getFormalCSemanticResult();
-
   // Get the inputs without 'self'.
   auto inputs = fnType->getParameters().drop_back();
 
@@ -1090,8 +1104,8 @@ static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
   specialParams += "@0:";
   auto ptrSize = IGM.getPointerSize().getValue();
   specialParams += llvm::itostr(ptrSize);
-  GenericContextScope scope(IGM, fnType->getGenericSignature());
-  return getObjCEncodingForTypes(IGM, resultType, inputs, specialParams,
+  GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
+  return getObjCEncodingForTypes(IGM, fnType, inputs, specialParams,
                                  ptrSize * 2, useExtendedEncoding);
 }
 
@@ -1170,7 +1184,8 @@ SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
                                                   llvm::Constant *&impl) {
   Selector getterSel(subscript, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
-  CanSILFunctionType methodTy = getObjCMethodType(IGM, subscript->getGetter());
+  auto methodTy = getObjCMethodType(IGM,
+                              subscript->getOpaqueAccessor(AccessorKind::Get));
   atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
   SILFunction *silFn = nullptr;
   impl = getObjCGetterPointer(IGM, subscript, silFn);
@@ -1242,11 +1257,12 @@ SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                                   llvm::Constant *&selectorRef,
                                                   llvm::Constant *&atEncoding,
                                                   llvm::Constant *&impl) {
-  assert(subscript->isSettable() && "not a settable subscript?!");
+  assert(subscript->supportsMutation() && "not a settable subscript?!");
 
   Selector setterSel(subscript, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
-  CanSILFunctionType methodTy = getObjCMethodType(IGM, subscript->getSetter());
+  auto methodTy = getObjCMethodType(IGM,
+                              subscript->getOpaqueAccessor(AccessorKind::Set));
   atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
   SILFunction *silFn = nullptr;
   impl = getObjCSetterPointer(IGM, subscript, silFn);
@@ -1341,13 +1357,11 @@ irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
 llvm::Constant *
 irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                     CanSILFunctionType invokeTy) {
-  SILType resultType = invokeTy->getFormalCSemanticResult();
-
   // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
   // recursion of the usual '@?<...>' rule for blocks.
   auto paramTypes = invokeTy->getParameters().slice(1);
   
-  return getObjCEncodingForTypes(IGM, resultType, paramTypes,
+  return getObjCEncodingForTypes(IGM, invokeTy, paramTypes,
                                  "@?0", IGM.getPointerSize().getValue(),
                                  /*extended*/ true);
 }
@@ -1397,7 +1411,7 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
   // Don't generate a descriptor for a property without any accessors.
   // This is only possible in SIL files because Sema will normally
   // implicitly synthesize accessors for @objc properties.
-  return property->isObjC() && property->getGetter();
+  return property->isObjC() && property->requiresOpaqueAccessors();
 }
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,

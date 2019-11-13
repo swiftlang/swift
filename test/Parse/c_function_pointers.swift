@@ -11,19 +11,12 @@ class C {
 }
 
 if true {
-  var x = 0
   func local() -> Int { return 0 }
-  func localWithContext() -> Int { return x }
 
   let a: @convention(c) () -> Int = global
   let _: @convention(c) () -> Int = main.global
   let _: @convention(c) () -> Int = { 0 }
   let _: @convention(c) () -> Int = local
-
-  // Can't convert a closure with context to a C function pointer
-  let _: @convention(c) () -> Int = { x } // expected-error{{cannot be formed from a closure that captures context}}
-  let _: @convention(c) () -> Int = { [x] in x } // expected-error{{cannot be formed from a closure that captures context}}
-  let _: @convention(c) () -> Int = localWithContext // expected-error{{cannot be formed from a local function that captures context}}
 
   // Can't convert a closure value to a C function pointer
   let global2 = global
@@ -49,14 +42,6 @@ if true {
 
   func handler(_ callback: (@convention(c) () -> Int)!) {}
   handler(iuo_global) // expected-error{{a C function pointer can only be formed from a reference to a 'func' or a literal closure}}
-}
-
-class Generic<X : C> {
-  func f<Y : C>(_ y: Y) {
-    let _: @convention(c) () -> Int = { return 0 }
-    let _: @convention(c) () -> Int = { return X.staticMethod() } // expected-error{{cannot be formed from a closure that captures generic parameters}}
-    let _: @convention(c) () -> Int = { return Y.staticMethod() } // expected-error{{cannot be formed from a closure that captures generic parameters}}
-  }
 }
 
 func genericFunc<T>(_ t: T) -> T { return t }

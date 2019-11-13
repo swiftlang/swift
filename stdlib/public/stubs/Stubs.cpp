@@ -393,7 +393,12 @@ _swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
   }
 
   char *end;
+  _set_errno(0);
   *result = _strtof_l(str, &end, getCLocale());
+  if (*result == HUGE_VALF || *result == -HUGE_VALF || *result == 0.0 || *result == -0.0) {
+    if (errno == ERANGE)
+        end = nullptr;
+  }
   return end;
 }
 
@@ -406,7 +411,12 @@ _swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
   }
 
   char *end;
+  _set_errno(0);
   *result = _strtod_l(str, &end, getCLocale());
+  if (*result == HUGE_VAL || *result == -HUGE_VAL || *result == 0.0 || *result == -0.0) {
+    if (errno == ERANGE)
+        end = nullptr;
+  }
   return end;
 }
 
@@ -419,7 +429,12 @@ _swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *res
   }
 
   char *end;
+  _set_errno(0);
   *result = _strtod_l(str, &end, getCLocale());
+  if (*result == HUGE_VALL || *result == -HUGE_VALL || *result == 0.0 || *result == -0.0) {
+    if (errno == ERANGE)
+        end = nullptr;
+  }
   return end;
 }
 #endif

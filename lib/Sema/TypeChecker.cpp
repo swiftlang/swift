@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -27,15 +28,16 @@
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -51,98 +53,93 @@
 using namespace swift;
 
 TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
-  (void)ctx.createLazyResolverIfMissing<TypeChecker>();
-  return *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  assert(!ctx.getLegacyGlobalTypeChecker() &&
+         "Cannot install more than one instance of the global type checker!");
+  auto *TC = new TypeChecker();
+  ctx.installGlobalTypeChecker(TC);
+  ctx.addCleanup([=](){ delete TC; });
+  return *ctx.getLegacyGlobalTypeChecker();
 }
 
-TypeChecker::TypeChecker(ASTContext &Ctx)
-  : Context(Ctx), Diags(Ctx.Diags)
-{
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->setTypeResolver(*this);
-}
-
-TypeChecker::~TypeChecker() {
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->clearTypeResolver();
-}
-
-ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
+ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
+                                       KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
   if (!protocol && loc.isValid()) {
-    diagnose(loc, diag::missing_protocol,
-             Context.getIdentifier(getProtocolName(kind)));
+    Context.Diags.diagnose(loc, diag::missing_protocol,
+                           Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasInterfaceType()) {
-    validateDecl(protocol);
-    if (protocol->isInvalid())
-      return nullptr;
+  if (protocol && protocol->isInvalid()) {
+    return nullptr;
   }
 
   return protocol;
 }
 
-ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
+ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   if (isa<ArrayExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByArrayLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
 
   if (isa<DictionaryExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
   
   if (isa<NilLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByNilLiteral);
-  
+    return TypeChecker::getProtocol(Context, expr->getLoc(),
+                                    KnownProtocolKind::ExpressibleByNilLiteral);
+
   if (isa<IntegerLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByIntegerLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
 
   if (isa<FloatLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByFloatLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByFloatLiteral);
 
   if (isa<BooleanLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByBooleanLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByBooleanLiteral);
 
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
     if (SLE->isSingleUnicodeScalar())
-      return getProtocol(
-          expr->getLoc(),
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
           KnownProtocolKind::ExpressibleByUnicodeScalarLiteral);
 
     if (SLE->isSingleExtendedGraphemeCluster())
       return getProtocol(
-          expr->getLoc(),
+          Context, expr->getLoc(),
           KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
 
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByStringLiteral);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
   }
 
   if (isa<InterpolatedStringLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::ExpressibleByStringInterpolation);
+    return TypeChecker::getProtocol(
+        Context, expr->getLoc(),
+        KnownProtocolKind::ExpressibleByStringInterpolation);
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
     case MagicIdentifierLiteralExpr::File:
     case MagicIdentifierLiteralExpr::Function:
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringLiteral);
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByStringLiteral);
 
     case MagicIdentifierLiteralExpr::Line:
     case MagicIdentifierLiteralExpr::Column:
-      return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByIntegerLiteral);
+      return TypeChecker::getProtocol(
+          Context, expr->getLoc(),
+          KnownProtocolKind::ExpressibleByIntegerLiteral);
 
     case MagicIdentifierLiteralExpr::DSOHandle:
       return nullptr;
@@ -151,9 +148,10 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
   if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
     switch (E->getLiteralKind()) {
-#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)\
-    case ObjectLiteralExpr::Name:\
-      return getProtocol(expr->getLoc(), KnownProtocolKind::Protocol);
+#define POUND_OBJECT_LITERAL(Name, Desc, Protocol)                             \
+  case ObjectLiteralExpr::Name:                                                \
+    return TypeChecker::getProtocol(Context, expr->getLoc(),                   \
+                                    KnownProtocolKind::Protocol);
 #include "swift/Syntax/TokenKinds.def"
     }
   }
@@ -161,7 +159,8 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   return nullptr;
 }
 
-DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
+DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,
+                                                      ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, DeclBaseName::createConstructor(),
@@ -200,6 +199,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
   newParams.append(params.begin(), params.end());
 
   auto replace = [&](StringRef replacement) -> Type {
+    auto &Context = ctor->getASTContext();
     newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
                                           Context.getIdentifier(replacement),
                                           newParams[0].getParameterFlags());
@@ -218,17 +218,11 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (StdlibModule)
-    return StdlibModule;
-
-  StdlibModule = Context.getStdlibModule();
-
-  if (!StdlibModule) {
-    return dc->getParentModule();
+  if (auto *stdlib = dc->getASTContext().getStdlibModule()) {
+    return stdlib;
   }
 
-  assert(StdlibModule && "no main module found");
-  return StdlibModule;
+  return dc->getParentModule();
 }
 
 /// Bind the given extension to the given nominal type.
@@ -237,15 +231,16 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 
-static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    if (auto nominal = ext->getExtendedNominal()) {
+    assert(!ext->canNeverBeBound() &&
+           "Only extensions that can ever be bound get here.");
+    if (auto nominal = ext->computeExtendedNominal()) {
       bindExtensionToNominal(ext, nominal);
       return true;
     }
@@ -259,7 +254,7 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
@@ -272,7 +267,7 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
             worklist.push_back(ED);
       }
     }
-  });
+  }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
   // extension there, removing it from the worklist if we succeed.
@@ -294,170 +289,46 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
-  unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
-  unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
-    // Type check conformance contexts.
-    for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
-      auto decl = TC.ConformanceContexts[i];
-      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-        TC.checkConformancesInContext(ext, ext);
-      else {
-        auto *ntd = cast<NominalTypeDecl>(decl);
-        TC.checkConformancesInContext(ntd, ntd);
-
-        // Finally, we can check classes for missing initializers.
-        if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
-          TC.maybeDiagnoseClassWithoutInitializers(classDecl);
-      }
-    }
-    TC.ConformanceContexts.clear();
-
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      assert(!AFD->getDeclContext()->isLocalContext());
 
-      TC.typeCheckAbstractFunctionBody(AFD);
+      TypeChecker::typeCheckAbstractFunctionBody(AFD);
     }
-
-    // Type check external definitions.
-    for (unsigned n = TC.Context.ExternalDefinitions.size();
-         currentExternalDef != n;
-         ++currentExternalDef) {
-      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        TC.typeCheckAbstractFunctionBody(AFD);
-        TC.checkFunctionErrorHandling(AFD);
-        continue;
-      }
-      if (isa<NominalTypeDecl>(decl))
-        continue;
-      if (isa<VarDecl>(decl))
-        continue;
-      llvm_unreachable("Unhandled external definition kind");
-    }
-
-    // Complete any protocol requirement signatures that were delayed
-    // because the protocol was validated via validateDeclForNameLookup().
-    while (!TC.DelayedRequirementSignatures.empty()) {
-      auto decl = TC.DelayedRequirementSignatures.pop_back_val();
-      if (decl->isInvalid() || TC.Context.hadError())
-        continue;
-
-      TC.validateDecl(decl);
-    }
-
-    // Validate any referenced declarations for SIL's purposes.
-    // Note: if we ever start putting extension members in vtables, we'll need
-    // to validate those members too.
-    // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
-      auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
-      if (decl->isInvalid())
-        continue;
-
-      // If we've already encountered an error, don't finalize declarations
-      // from other source files.
-      if (TC.Context.hadError() &&
-          decl->getDeclContext()->getParentSourceFile() != &SF)
-        continue;
-
-      TC.finalizeDecl(decl);
-    }
-
-    // Type check synthesized functions and their bodies.
-    for (unsigned n = SF.SynthesizedDecls.size();
-         currentSynthesizedDecl != n;
-         ++currentSynthesizedDecl) {
-      auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
-      TC.typeCheckDecl(decl);
-    }
-
-    // Ensure that the requirements of the given conformance are
-    // fully checked.
-    for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
-      auto conformance = TC.PartiallyCheckedConformances[i];
-      TC.checkConformanceRequirements(conformance);
-    }
-    TC.PartiallyCheckedConformances.clear();
-
-    // Complete any conformances that we used.
-    for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
-      auto conformance = TC.UsedConformances[i];
-      if (conformance->isIncomplete())
-        TC.checkConformance(conformance);
-    }
-    TC.UsedConformances.clear();
-
-  } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentExternalDef < TC.Context.ExternalDefinitions.size() ||
-           currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
-           !TC.ConformanceContexts.empty() ||
-           !TC.DelayedRequirementSignatures.empty() ||
-           !TC.UsedConformances.empty() ||
-           !TC.PartiallyCheckedConformances.empty());
-
-  // FIXME: Horrible hack. Store this somewhere more appropriate.
-  TC.Context.LastCheckedExternalDefinition = currentExternalDef;
-  SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
-
-  // Now that all types have been finalized, run any delayed
-  // circularity checks.
-  // This has been written carefully to fail safe + finitely if
-  // for some reason a type gets re-delayed in a non-assertions
-  // build in an otherwise successful build.
-  // Types can be redelayed in a failing build because we won't
-  // type-check required declarations from different files.
-  for (size_t i = 0, e = TC.DelayedCircularityChecks.size(); i != e; ++i) {
-    TC.checkDeclCircularity(TC.DelayedCircularityChecks[i]);
-    assert((e == TC.DelayedCircularityChecks.size() ||
-            TC.Context.hadError()) &&
-           "circularity checking for type was re-delayed!");
-  }
-  TC.DelayedCircularityChecks.clear();
+  } while (currentFunctionIdx < TC.definedFunctions.size());
 
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    TC.computeCaptures(closure);
+    TypeChecker::computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
-  for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
-    TC.computeCaptures(FD);
-  }
-
-  // Check error-handling correctness for all the functions defined in
-  // this file.  This can depend on all of their interior function
-  // bodies having been type-checked.
-  for (AbstractFunctionDecl *FD : TC.definedFunctions) {
-    TC.checkFunctionErrorHandling(FD);
+  for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
+    TypeChecker::computeCaptures(FD);
   }
 
   TC.definedFunctions.clear();
 }
 
-void swift::typeCheckExternalDefinitions(SourceFile &SF) {
-  assert(SF.ASTStage == SourceFile::TypeChecked);
-  auto &Ctx = SF.getASTContext();
-  typeCheckFunctionsAndExternalDecls(SF, createTypeChecker(Ctx));
-}
-
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                                OptionSet<TypeCheckingFlags> Options,
-                                unsigned StartElem,
-                                unsigned WarnLongFunctionBodies,
-                                unsigned WarnLongExpressionTypeChecking,
-                                unsigned ExpressionTimeoutThreshold,
-                                unsigned SwitchCheckingInvocationThreshold) {
+                                unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
+  // Eagerly build the top-level scopes tree before type checking
+  // because type-checking expressions mutates the AST and that throws off the
+  // scope-based lookups. Only the top-level scopes because extensions have not
+  // been bound yet.
   auto &Ctx = SF.getASTContext();
+  if (Ctx.LangOpts.EnableASTScopeLookup && SF.isSuitableForASTScopes())
+    SF.getScope()
+        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
   // Make sure we have a type checker.
@@ -466,68 +337,51 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(SF, StartElem);
+                                  
+  // Could build scope maps here because the AST is stable now.
 
   {
     SharedTimer timer("Type checking and Semantic analysis");
 
-    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
-    TC.setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
-    if (ExpressionTimeoutThreshold != 0)
-      TC.setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
-
-    if (SwitchCheckingInvocationThreshold != 0)
-      TC.setSwitchCheckingInvocationThreshold(
-          SwitchCheckingInvocationThreshold);
-
-    if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
-      TC.enableDebugTimeFunctionBodies();
-
-    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
-      TC.enableDebugTimeExpressions();
-
-    if (Options.contains(TypeCheckingFlags::ForImmediateMode))
-      TC.setInImmediateMode(true);
-
-    // Lookup the swift module.  This ensures that we record all known
-    // protocols in the AST.
-    (void) TC.getStdlibModule(&SF);
+    if (Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies)
+      // Disable this optimization if we're compiling SwiftOnoneSupport, because
+      // we _definitely_ need to look inside every declaration to figure out
+      // what gets prespecialized.
+      if (SF.getParentModule()->isOnoneSupportModule())
+        Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies = false;
 
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
-      TC.buildTypeRefinementContextHierarchy(SF, StartElem);
+      TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
     }
 
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    bindExtensions(SF, TC);
-
-    // Look for bridging functions. This only matters when
-    // -enable-source-import is provided.
-    checkBridgedFunctions(TC.Context);
+    ::bindExtensions(SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
-        TC.typeCheckTopLevelCodeDecl(TLCD);
-        TC.contextualizeTopLevelCode(TLC, TLCD);
+        TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
+        TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
       } else {
-        TC.typeCheckDecl(D);
+        TypeChecker::typeCheckDecl(D);
       }
     }
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TC.processREPLTopLevel(SF, TLC, StartElem);
+      TypeChecker::processREPLTopLevel(SF, TLC, StartElem);
 
     typeCheckFunctionsAndExternalDecls(SF, TC);
   }
 
   // Checking that benefits from having the whole module available.
-  if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
+  if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking) {
     performWholeModuleTypeChecking(SF);
   }
 
@@ -550,7 +404,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // been cached, it will never be added to the ASTContext. The solution is to
     // skip verification and avoid caching it.
 #ifndef NDEBUG
-    if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking) &&
+    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
         SF.Kind != SourceFileKind::REPL &&
         SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
@@ -584,6 +438,84 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 #endif
 }
 
+void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
+  bool hasAnyImplementationOnlyImports =
+      llvm::any_of(MainModule->getFiles(), [](const FileUnit *F) -> bool {
+    auto *SF = dyn_cast<SourceFile>(F);
+    return SF && SF->hasImplementationOnlyImports();
+  });
+  if (!hasAnyImplementationOnlyImports)
+    return;
+
+  auto diagnose = [MainModule](const ImportDecl *normalImport,
+                               const ImportDecl *implementationOnlyImport) {
+    auto &diags = MainModule->getDiags();
+    {
+      InFlightDiagnostic warning =
+          diags.diagnose(normalImport, diag::warn_implementation_only_conflict,
+                         normalImport->getModule()->getName());
+      if (normalImport->getAttrs().isEmpty()) {
+        // Only try to add a fix-it if there's no other annotations on the
+        // import to avoid creating things like
+        // `@_implementationOnly @_exported import Foo`. The developer can
+        // resolve those manually.
+        warning.fixItInsert(normalImport->getStartLoc(),
+                            "@_implementationOnly ");
+      }
+    }
+    diags.diagnose(implementationOnlyImport,
+                   diag::implementation_only_conflict_here);
+  };
+
+  llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> normalImports;
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> implementationOnlyImports;
+
+  for (const FileUnit *file : MainModule->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    for (auto *topLevelDecl : SF->Decls) {
+      auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
+      if (!nextImport)
+        continue;
+
+      ModuleDecl *module = nextImport->getModule();
+      if (!module)
+        continue;
+
+      if (nextImport->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+        // We saw an implementation-only import.
+        bool isNew =
+            implementationOnlyImports.insert({module, nextImport}).second;
+        if (!isNew)
+          continue;
+
+        auto seenNormalImportPosition = normalImports.find(module);
+        if (seenNormalImportPosition != normalImports.end()) {
+          for (auto *seenNormalImport : seenNormalImportPosition->getSecond())
+            diagnose(seenNormalImport, nextImport);
+
+          // We're done with these; keep the map small if possible.
+          normalImports.erase(seenNormalImportPosition);
+        }
+        continue;
+      }
+
+      // We saw a non-implementation-only import. Is that in conflict with what
+      // we've seen?
+      if (auto *seenImplementationOnlyImport =
+            implementationOnlyImports.lookup(module)) {
+        diagnose(nextImport, seenImplementationOnlyImport);
+        continue;
+      }
+
+      // Otherwise, record it for later.
+      normalImports[module].push_back(nextImport);
+    }
+  }
+}
+
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
@@ -615,27 +547,35 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-  return TC.validateType(T, resolution, options);
+  assert(Ctx.getLegacyGlobalTypeChecker() &&
+         "Should have a TypeChecker registered");
+  return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
-swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
+swift::handleSILGenericParams(GenericParamList *genericParams,
                               DeclContext *DC) {
-  return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
-}
+  if (genericParams == nullptr)
+    return nullptr;
 
-void swift::typeCheckCompletionDecl(Decl *D) {
-  auto &Ctx = D->getASTContext();
+  SmallVector<GenericParamList *, 2> nestedList;
+  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
+    nestedList.push_back(genericParams);
+  }
 
-  DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
+  std::reverse(nestedList.begin(), nestedList.end());
 
-  if (auto ext = dyn_cast<ExtensionDecl>(D))
-    TC.validateExtension(ext);
-  else
-    TC.validateDecl(cast<ValueDecl>(D));
+  for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
+    auto genericParams = nestedList[i];
+    genericParams->setDepth(i);
+  }
+
+  auto sig =
+      TypeChecker::checkGenericSignature(nestedList.back(), DC,
+                                         /*parentSig=*/nullptr,
+                                         /*allowConcreteGenericParams=*/true);
+  return (sig ? sig->getGenericEnvironment() : nullptr);
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -645,17 +585,16 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-  TC.typeCheckPatternBinding(PBD, bindingIndex);
+  (void)createTypeChecker(Ctx);
+  TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
-                        TypeChecker &TC,
                         DeclContext *DC,
                         CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
-  if (TC.preCheckExpression(parsedExpr, DC))
+  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
     return None;
 
   switch (kind) {
@@ -666,13 +605,14 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   case CompletionTypeCheckKind::KeyPath:
     referencedDecl = nullptr;
     if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
-      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResultType=*/true);
+      return TypeChecker::checkObjCKeyPathExpr(DC, keyPath,
+                                               /*requireResultType=*/true);
 
     return None;
   }
 
   Type originalType = parsedExpr->getType();
-  if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
+  if (auto T = TypeChecker::getTypeOfExpressionWithoutApplying(parsedExpr, DC,
                  referencedDecl, FreeTypeVariableBinding::UnresolvedType))
     return T;
 
@@ -698,10 +638,10 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
+  (void)createTypeChecker(Ctx);
 
   // Try to solve for the actual type of the expression.
-  return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
+  return ::getTypeOfCompletionContextExpr(DC, kind, parsedExpr,
                                           referencedDecl);
 }
 
@@ -713,19 +653,17 @@ swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
                                    ConcreteDeclRef &referencedDecl) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  TypeChecker &TC = createTypeChecker(ctx);
-  return TC.getTypeOfCompletionOperator(DC, LHS, opName, refKind,
-                                        referencedDecl);
+  (void)createTypeChecker(ctx);
+  return TypeChecker::getTypeOfCompletionOperator(DC, LHS, opName, refKind,
+                                                  referencedDecl);
 }
 
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  TypeChecker &TC = createTypeChecker(ctx);
-
-  auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                    ContextualTypePurpose::CTP_Unused,
-                                    TypeCheckExprFlags::SuppressDiagnostics);
+  (void)createTypeChecker(ctx);
+  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                                   CTP_Unused);
   return !resultTy;
 }
 
@@ -734,54 +672,36 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeChecker &TC = createTypeChecker(Ctx);
-  return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  (void)createTypeChecker(Ctx);
+  return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-  TC.typeCheckTopLevelCodeDecl(TLCD);
+  (void)createTypeChecker(Ctx);
+  TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
   return true;
 }
 
 TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
+  if (auto *TC = Ctx.getLegacyGlobalTypeChecker())
+    return *TC;
   return TypeChecker::createForContext(Ctx);
 }
 
-// checkForForbiddenPrefix is for testing purposes.
+void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
+  if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
+    return;
 
-void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
+  // Don't touch special names or empty names.
+  if (Name.isSpecial() || Name.empty())
     return;
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (!VD->getBaseName().isSpecial())
-      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
-  }
-}
 
-void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (!E->getName().isSpecial())
-    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
-}
-
-void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  checkForForbiddenPrefix(Ident.empty() ? StringRef() : Ident.str());
-}
-
-void TypeChecker::checkForForbiddenPrefix(StringRef Name) {
-  if (!hasEnabledForbiddenTypecheckPrefix())
-    return;
-  if (Name.empty())
-    return;
-  if (Name.startswith(Context.LangOpts.DebugForbidTypecheckPrefix)) {
+  StringRef Str = Name.getIdentifier().str();
+  if (Str.startswith(C.TypeCheckerOpts.DebugForbidTypecheckPrefix)) {
     std::string Msg = "forbidden typecheck occurred: ";
-    Msg += Name;
+    Msg += Str;
     llvm::report_fatal_error(Msg);
   }
 }
@@ -798,4 +718,8 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
+}
+
+void swift::bindExtensions(SourceFile &SF) {
+  ::bindExtensions(SF);
 }

@@ -31,9 +31,9 @@ let RequestStringLength = "l"
 let RequestDone = "d"
 let RequestPointerSize = "p"
 
-internal func debugLog(_ message: String) {
+internal func debugLog(_ message: @autoclosure () -> String) {
 #if DEBUG_LOG
-  fputs("Child: \(message)\n", stderr)
+  fputs("Child: \(message())\n", stderr)
   fflush(stderr)
 #endif
 }

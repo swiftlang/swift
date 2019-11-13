@@ -14,7 +14,7 @@
 ///
 /// Using a builder can be faster than inserting members into an empty
 /// `Dictionary`.
-@_fixed_layout
+@frozen
 public // SPI(Foundation)
 struct _DictionaryBuilder<Key: Hashable, Value> {
   @usableFromInline

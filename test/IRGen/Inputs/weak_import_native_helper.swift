@@ -92,7 +92,9 @@ public struct WeakS {
 public enum WeakE {}
 
 @_weakLinked
-open class WeakC {}
+open class WeakC {
+  public init() {}
+}
 
 @_weakLinked
 public protocol WeakP {}
@@ -105,7 +107,9 @@ public struct GenericS<T> {}
 public enum GenericE<T> {}
 
 @_weakLinked
-open class GenericC<T> {}
+open class GenericC<T> {
+  public init() {}
+}
 
 public protocol OtherProtocol {}
 public struct ConcreteType : OtherProtocol {}

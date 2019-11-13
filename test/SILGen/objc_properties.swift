@@ -106,7 +106,7 @@ class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0([[ARG0:%.*]] : @owned $NSString, [[ARG1:%.*]] : @guaranteed $TestNSCopying):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSCopying.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
@@ -252,4 +252,31 @@ class HasLazyProperty : NSObject, HasProperty {
 func testPropSetWithPreposition(object: ObjectWithSplitProperty?) {
   // CHECK: #ObjectWithSplitProperty.flagForSomething!setter.1.foreign : (ObjectWithSplitProperty) -> (Bool) -> (), $@convention(objc_method) ({{Bool|ObjCBool}}, ObjectWithSplitProperty) -> ()
   object?.flagForSomething = false
+}
+
+@propertyWrapper
+public struct SomeWrapper {
+  private var value: Int
+
+
+  public init(wrappedValue: Int) {
+    value = wrappedValue
+  }
+
+
+  public var wrappedValue: Int {
+    get { value }
+    set { value = newValue }
+  }
+}
+
+class SomeWrapperTests {
+  @objc @SomeWrapper dynamic var someWrapper: Int = 0
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsC14testAssignmentyyF
+// CHECK: [[M:%.*]] = objc_method %0 : $SomeWrapperTests, #SomeWrapperTests.someWrapper!setter.1.foreign
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}}) : $@convention(objc_method)
+// CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
+  func testAssignment() {
+    someWrapper = 1000
+  }
 }

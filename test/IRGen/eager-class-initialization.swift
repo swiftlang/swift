@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-OLD
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -target x86_64-apple-macosx10.14.4 -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK
-// REQUIRES: CPU=x86_64
-// REQUIRES: OS=macosx
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -target %target-pre-stable-abi-triple | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-OLD
+
+// REQUIRES: objc_interop
+
+// See also eager-class-initialization-stable-abi.swift, for the stable ABI
+// deployment target test.
 
 import Foundation
 

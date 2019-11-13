@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -module-name access_enforcement_noescape -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library -enable-ownership-stripping-after-serialization %s
 // REQUIRES: asserts
 
 // This is the subset of tests from access_enforcement_noescape.swift

@@ -36,9 +36,14 @@ public let INVALID_HANDLE_VALUE: HANDLE = HANDLE(bitPattern: -1)!
 public let FOF_NO_UI: FILEOP_FLAGS =
     FILEOP_FLAGS(FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR)
 
+// winioctl.h
+public let FSCTL_SET_REPARSE_POINT: DWORD = 0x900a4
+public let FSCTL_GET_REPARSE_POINT: DWORD = 0x900a8
+public let FSCTL_DELETE_REPARSE_POINT: DWORD = 0x900ac
+
 // WinSock2.h
 public let INVALID_SOCKET: SOCKET = SOCKET(bitPattern: -1)
-public let FIONBIO: Int32 = 0x4667e
+public let FIONBIO: Int32 = Int32(bitPattern: 0x8004667e)
 
 // WinUser.h
 public let CW_USEDEFAULT: Int32 = Int32(truncatingIfNeeded: 2147483648)
@@ -92,7 +97,7 @@ public extension FILETIME {
 /// The `BOOL` type declared in WinDefs.h and used throughout WinSDK
 ///
 /// The C type is a typedef for `int`.
-@_fixed_layout
+@frozen
 public struct WindowsBool : ExpressibleByBooleanLiteral {
   @usableFromInline
   var _value: Int32

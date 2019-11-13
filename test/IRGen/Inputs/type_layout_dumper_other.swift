@@ -2,19 +2,19 @@ public class SomeClass {}
 
 public protocol SomeProtocol {}
 
-@_fixed_layout
+@frozen
 public struct ConcreteFragileStruct {
   var field: Int32
 
   public struct NestedResilientStruct {}
 }
 
-@_fixed_layout
+@frozen
 public struct NonDependentFragileStruct<T : AnyObject> {
   var field: T
 }
 
-@_fixed_layout
+@frozen
 public struct DependentFragileStruct<T> {
   var field: T
 }

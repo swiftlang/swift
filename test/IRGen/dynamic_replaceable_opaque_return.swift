@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name A -swift-version 5 -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -module-name A -swift-version 5 -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 

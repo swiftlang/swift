@@ -11,6 +11,7 @@
 #
 # ----------------------------------------------------------------------------
 from __future__ import print_function
+
 import bisect
 import os
 import re
@@ -646,10 +647,9 @@ def run():
     ... // End:
     ... ''')
     >>> long_output.flush()
-    >>> long_output_result = subprocess.check_output(sys.executable + ' ' +
-    ...    __file__ + ' ' + long_output.name + ' -- ' + "echo '" +
-    ...    long_output.name + ":112:27: error:'",
-    ...    shell=True).rstrip()
+    >>> long_output_result = subprocess.check_output([sys.executable,
+    ...    __file__, long_output.name, '--',
+    ...    'echo', long_output.name + ':112:27: error:']).rstrip()
     >>> print(long_output_result)
     /public/core/Map.swift.gyb:117:27: error:
     >>> target1.close()

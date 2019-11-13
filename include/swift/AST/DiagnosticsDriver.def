@@ -64,6 +64,9 @@ ERROR(error_expected_frontend_command,none,
 ERROR(error_cannot_specify__o_for_multiple_outputs,none,
       "cannot specify -o when generating multiple output files", ())
 
+ERROR(error_static_emit_executable_disallowed,none,
+      "-static may not be used with -emit-executable", ())
+
 ERROR(error_unable_to_load_output_file_map, none,
       "unable to load output file map '%1': %0", (StringRef, StringRef))
 
@@ -110,6 +113,10 @@ ERROR(error_sdk_too_old,none,
       "Swift does not support the SDK '%0'", (StringRef))
 ERROR(error_ios_maximum_deployment_32,none,
       "iOS %0 does not support 32-bit programs", (unsigned))
+
+WARNING(warn_arclite_not_found_when_link_objc_runtime,none,
+        "unable to find Objective-C runtime support library 'arclite'; "
+        "pass '-no-link-objc-runtime' to silence this warning", ())
 
 ERROR(error_two_files_same_name,none,
       "filename \"%0\" used twice: '%1' and '%2'",
@@ -162,6 +169,9 @@ WARNING(warn_use_filelists_deprecated, none,
 
 ERROR(cannot_find_migration_script, none,
       "missing migration script from path '%0'", (StringRef))
+
+ERROR(error_darwin_static_stdlib_not_supported, none,
+      "-static-stdlib is no longer supported on Apple platforms", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

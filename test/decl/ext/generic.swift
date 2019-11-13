@@ -131,7 +131,7 @@ func intArray(_ x: [Int]) {
 
 class GenericClass<T> { }
 
-extension GenericClass where T : Equatable {
+extension GenericClass where T : Equatable { // expected-note {{where 'T' = 'T'}}
   func foo(_ x: T, y: T) -> Bool { return x == y }
 }
 
@@ -140,7 +140,7 @@ func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
 }
 
 func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y) // expected-error{{argument type 'T' does not conform to expected type 'Equatable'}}
+  gc.foo(x, y: y) // expected-error{{referencing instance method 'foo(_:y:)' on 'GenericClass' requires that 'T' conform to 'Equatable'}}
 }
 
 
@@ -149,7 +149,8 @@ extension Array where Element == String { }
 extension GenericClass : P3 where T : P3 { }
 
 extension GenericClass where Self : P3 { }
-// expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
+// expected-error@-1{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
+// expected-error@-2{{'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol P4 {
   associatedtype T

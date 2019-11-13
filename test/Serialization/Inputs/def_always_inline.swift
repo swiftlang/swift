@@ -2,7 +2,7 @@
   return x
 }
 
-@_fixed_layout
+@frozen
 public struct AlwaysInlineInitStruct {
   @usableFromInline
   var x: Bool

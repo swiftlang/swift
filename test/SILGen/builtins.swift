@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -394,10 +394,16 @@ func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Bu
   Builtin.performInstantaneousReadAccess(address, ty1);
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins15legacy_condfail{{[_0-9a-zA-Z]*}}F
+func legacy_condfail(_ i: Builtin.Int1) {
+  Builtin.condfail(i)
+  // CHECK: cond_fail {{%.*}} : $Builtin.Int1, "unknown runtime failure"
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8condfail{{[_0-9a-zA-Z]*}}F
 func condfail(_ i: Builtin.Int1) {
-  Builtin.condfail(i)
-  // CHECK: cond_fail {{%.*}} : $Builtin.Int1
+  Builtin.condfail_message(i, StaticString("message").unsafeRawPointer)
+  // CHECK: builtin "condfail_message"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.RawPointer) : $()
 }
 
 struct S {}
@@ -601,23 +607,23 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC)
+// AnyObject (ObjC)
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
+// CHECK: bb0(%0 : $*Optional<AnyObject>):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<AnyObject>
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
+func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC) nonNull
+// AnyObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : $*Builtin.UnknownObject):
+// CHECK: bb0(%0 : $*AnyObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*AnyObject
 // CHECK: return
-func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
+func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 

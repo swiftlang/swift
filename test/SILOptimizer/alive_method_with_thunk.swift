@@ -7,18 +7,22 @@ public class BaseClass<T> {
 }
 
 public class DerivedClass: BaseClass<Double> {
-
-  // Don't eliminate this public method, which is called via a thunk
+  // This method is more visible than its override, so it gets a new
+  // vtable entry, and the base class vtable entry is replaced with a
+  // thunk that re-dispatches to the derived method.
+  //
+  // The base class method is dead, but the derived method is not.
   public override func doSomething(_ value: Double) -> Int {
     return 1
   }
 }
 
-// CHECK: sil_vtable BaseClass {
-// CHECK:  #BaseClass.doSomething!1: <T> (BaseClass<T>) -> (T) -> Int : @$s23alive_method_with_thunk9BaseClassC11doSomethingySixF // BaseClass.doSomething(_:)
-// CHECK: }
+// CHECK-LABEL: sil_vtable BaseClass {
+// CHECK-NEXT:  #BaseClass.deinit!deallocator.1: @$s23alive_method_with_thunk9BaseClassCfD
+// CHECK-NEXT: }
 
-// CHECK: sil_vtable DerivedClass {
-// CHECK:  #BaseClass.doSomething!1: <T> (BaseClass<T>) -> (T) -> Int : public @$s23alive_method_with_thunk12DerivedClassC11doSomethingySiSdFAA04BaseF0CADySixFTV [override]  // vtable thunk for BaseClass.doSomething(_:) dispatching to DerivedClass.doSomething(_:)
-// CHECK: }
+// CHECK-LABEL: sil_vtable DerivedClass {
+// CHECK-NEXT:  #DerivedClass.doSomething!1: (DerivedClass) -> (Double) -> Int : @$s23alive_method_with_thunk12DerivedClassC11doSomethingySiSdF
+// CHECK-NEXT:  #DerivedClass.deinit!deallocator.1: @$s23alive_method_with_thunk12DerivedClassCfD
+// CHECK-NEXT: }
 

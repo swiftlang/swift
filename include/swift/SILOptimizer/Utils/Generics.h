@@ -20,7 +20,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -78,7 +78,7 @@ class ReabstractionInfo {
 
   /// The generic signature of the specialization.
   /// It is nullptr if the specialization is not polymorphic.
-  GenericSignature *SpecializedGenericSig;
+  GenericSignature SpecializedGenericSig;
 
   // Set of substitutions from callee's invocation before
   // any transformations performed by the generic specializer.
@@ -99,6 +99,11 @@ class ReabstractionInfo {
 
   // Reference to the original generic non-specialized callee function.
   SILFunction *Callee;
+
+  // The module the specialization is created in.
+  ModuleDecl *TargetModule = nullptr;
+
+  bool isWholeModule = false;
 
   // The apply site which invokes the generic function.
   ApplySite Apply;
@@ -140,25 +145,27 @@ public:
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
+  ReabstractionInfo(ModuleDecl *targetModule,
+                    bool isModuleWholeModule,
+                    ApplySite Apply, SILFunction *Callee,
                     SubstitutionMap ParamSubs,
                     IsSerialized_t Serialized,
                     bool ConvertIndirectToDirect = true,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
-  /// additional requirements. Requirements may contain new layout,
-  /// conformances or same concrete type requirements.
-  ReabstractionInfo(SILFunction *Callee, ArrayRef<Requirement> Requirements);
+  /// a specialization signature.
+  ReabstractionInfo(ModuleDecl *targetModule, bool isModuleWholeModule,
+                    SILFunction *Callee, GenericSignature SpecializedSig);
 
   IsSerialized_t isSerialized() const {
     return Serialized;
   }
 
-  ResilienceExpansion getResilienceExpansion() const {
-    return (Serialized
-            ? ResilienceExpansion::Minimal
-            : ResilienceExpansion::Maximal);
+  TypeExpansionContext getResilienceExpansion() const {
+    auto resilience = (Serialized ? ResilienceExpansion::Minimal
+                                  : ResilienceExpansion::Maximal);
+    return TypeExpansionContext(resilience, TargetModule, isWholeModule);
   }
 
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
@@ -218,7 +225,7 @@ public:
     return SpecializedGenericEnv;
   }
 
-  GenericSignature *getSpecializedGenericSignature() const {
+  GenericSignature getSpecializedGenericSignature() const {
     return SpecializedGenericSig;
   }
 

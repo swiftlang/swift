@@ -22,7 +22,7 @@ module ClangModuleUser {
   export *
 }
 
-module ClangModuleWithAdapter {
+module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
@@ -34,6 +34,10 @@ module CoreData {
 module CoreCooling {
   header "CoreCooling.h"
   export *
+}
+
+module CXXInterop {
+  header "cxx_interop.h"
 }
 
 module ctypes_bits_exported {

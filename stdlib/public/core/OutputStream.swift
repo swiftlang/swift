@@ -102,7 +102,7 @@ extension TextOutputStream {
 public protocol TextOutputStreamable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
-  func write<Target : TextOutputStream>(to target: inout Target)
+  func write<Target: TextOutputStream>(to target: inout Target)
 }
 
 /// A type with a customized textual representation.
@@ -182,7 +182,7 @@ public protocol CustomStringConvertible {
 /// The description property of a conforming type must be a value-preserving
 /// representation of the original value. As such, it should be possible to
 /// re-create an instance from its string representation.
-public protocol LosslessStringConvertible : CustomStringConvertible {
+public protocol LosslessStringConvertible: CustomStringConvertible {
   /// Instantiates an instance of the conforming type from a string
   /// representation.
   init?(_ description: String)
@@ -281,7 +281,7 @@ internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
+internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
     isDebugPrint: Bool
 ) {
@@ -376,7 +376,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
 
 @usableFromInline
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _print_unlocked<T, TargetStream : TextOutputStream>(
+internal func _print_unlocked<T, TargetStream: TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
   // Optional has no representation suitable for display; therefore,
@@ -414,7 +414,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 
 @_semantics("optimize.sil.specialize.generic.never")
 @inline(never)
-public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
+public func _debugPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ target: inout TargetStream
 ) {
   if let debugPrintableObject = value as? CustomDebugStringConvertible {
@@ -437,7 +437,7 @@ public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
 }
 
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
+internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
@@ -507,7 +507,7 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
 // OutputStreams
 //===----------------------------------------------------------------------===//
 
-internal struct _Stdout : TextOutputStream {
+internal struct _Stdout: TextOutputStream {
   internal init() {}
 
   internal mutating func _lock() {
@@ -528,7 +528,7 @@ internal struct _Stdout : TextOutputStream {
   }
 }
 
-extension String : TextOutputStream {
+extension String: TextOutputStream {
   /// Appends the given string to this string.
   ///
   /// - Parameter other: A string to append.
@@ -545,41 +545,41 @@ extension String : TextOutputStream {
 // Streamables
 //===----------------------------------------------------------------------===//
 
-extension String : TextOutputStreamable {
+extension String: TextOutputStreamable {
   /// Writes the string into the given output stream.
   ///
   /// - Parameter target: An output stream.
-  public func write<Target : TextOutputStream>(to target: inout Target) {
+  public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(self)
   }
 }
 
-extension Character : TextOutputStreamable {
+extension Character: TextOutputStreamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
-  public func write<Target : TextOutputStream>(to target: inout Target) {
+  public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
 }
 
-extension Unicode.Scalar : TextOutputStreamable {
+extension Unicode.Scalar: TextOutputStreamable {
   /// Writes the textual representation of the Unicode scalar into the given
   /// output stream.
   ///
   /// - Parameter target: An output stream.
-  public func write<Target : TextOutputStream>(to target: inout Target) {
+  public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
 }
 
 /// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String) -> Void)? = nil
+public var _playgroundPrintHook: ((String) -> Void)? = nil
 
 internal struct _TeeStream<
-  L : TextOutputStream,
-  R : TextOutputStream
-> : TextOutputStream {
+  L: TextOutputStream,
+  R: TextOutputStream
+>: TextOutputStream {
 
   internal init(left: L, right: R) {
     self.left = left

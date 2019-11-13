@@ -8,7 +8,7 @@
 
 // CHECK-NOT: UnknownCode
 
-// CHECK-PRINT-DAG: @_frozen enum Exhaustive {
+// CHECK-PRINT-DAG: @frozen enum Exhaustive {
 
 import def_enum
 

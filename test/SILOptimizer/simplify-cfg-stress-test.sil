@@ -1,0 +1,1084 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+
+sil @do_something : $@convention(thin) () -> ()
+sil @getit : $@convention(thin) (Int64, Int64) -> Int64
+sil @sink : $@convention(thin) (Int64, Int64, Int64, Int64) -> ()
+
+// Check if SimplifyCFG can optimize this function in reasonabl time.
+
+// CHECK-LABEL: sil @testit
+
+// Check if there are not too many basic blocks generated.
+// CHECK-NOT: bb1000:
+
+sil @testit : $@convention(thin) (Int64, Int64, Int64, Int64, Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64, %3 : $Int64, %4 : $Int64, %5 : $Int64):
+  %12 = integer_literal $Builtin.Int64, 2
+  %13 = struct_extract %0 : $Int64, #Int64._value
+  %14 = builtin "cmp_eq_Int64"(%13 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %14, bb1, bb4
+
+bb1:
+  %16 = integer_literal $Builtin.Int64, 1
+  %17 = struct_extract %1 : $Int64, #Int64._value
+  %18 = builtin "cmp_eq_Int64"(%17 : $Builtin.Int64, %16 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %18, bb2, bb3
+
+bb2:
+  %20 = integer_literal $Builtin.Int1, -1
+  br bb5(%20 : $Builtin.Int1)
+
+bb3:
+  %22 = builtin "cmp_eq_Int64"(%17 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  br bb5(%22 : $Builtin.Int1)
+
+bb4:
+  %24 = integer_literal $Builtin.Int1, 0
+  br bb5(%24 : $Builtin.Int1)
+
+
+bb5(%26 : $Builtin.Int1):
+  %27 = struct $Bool (%26 : $Builtin.Int1)
+  %29 = integer_literal $Builtin.Int64, 1
+  %30 = builtin "cmp_eq_Int64"(%13 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %30, bb6, bb9
+
+bb6:
+  %32 = struct_extract %1 : $Int64, #Int64._value
+  %33 = builtin "cmp_eq_Int64"(%32 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %33, bb7, bb8
+
+bb7:
+  %35 = integer_literal $Builtin.Int1, -1
+  br bb10(%35 : $Builtin.Int1)
+
+bb8:
+  %37 = builtin "cmp_eq_Int64"(%32 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  br bb10(%37 : $Builtin.Int1)
+
+bb9:
+  %39 = integer_literal $Builtin.Int1, 0
+  br bb10(%39 : $Builtin.Int1)
+
+bb10(%41 : $Builtin.Int1):
+  %42 = struct $Bool (%41 : $Builtin.Int1)
+  %44 = struct_extract %1 : $Int64, #Int64._value
+  %45 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  %46 = integer_literal $Builtin.Int64, 3
+  %47 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %46 : $Builtin.Int64) : $Builtin.Int1
+  %48 = struct_extract %3 : $Int64, #Int64._value
+  %49 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %49, bb12, bb11
+
+bb11:
+  br bb15
+
+bb12:
+  %52 = integer_literal $Builtin.Int64, 0
+  %53 = struct_extract %2 : $Int64, #Int64._value
+  %54 = builtin "cmp_eq_Int64"(%53 : $Builtin.Int64, %52 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %54, bb14, bb13
+
+bb13:
+  br bb15
+
+bb14:
+  %57 = builtin "cmp_slt_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %58 = integer_literal $Builtin.Int1, -1
+  %59 = builtin "xor_Int1"(%57 : $Builtin.Int1, %58 : $Builtin.Int1) : $Builtin.Int1
+  br bb16(%59 : $Builtin.Int1)
+
+bb15:
+  %61 = integer_literal $Builtin.Int1, 0
+  br bb16(%61 : $Builtin.Int1)
+
+bb16(%63 : $Builtin.Int1):
+  %64 = struct $Bool (%63 : $Builtin.Int1)
+  %66 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %66, bb18, bb17
+
+bb17:
+  br bb21
+
+bb18:
+  %69 = integer_literal $Builtin.Int64, 0
+  %70 = struct_extract %2 : $Int64, #Int64._value
+  %71 = builtin "cmp_eq_Int64"(%70 : $Builtin.Int64, %69 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %71, bb20, bb19
+
+bb19:
+  br bb21
+
+bb20:
+  %74 = builtin "cmp_slt_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %75 = integer_literal $Builtin.Int1, -1
+  %76 = builtin "xor_Int1"(%74 : $Builtin.Int1, %75 : $Builtin.Int1) : $Builtin.Int1
+  br bb22(%76 : $Builtin.Int1)
+
+bb21:
+  %78 = integer_literal $Builtin.Int1, 0
+  br bb22(%78 : $Builtin.Int1)
+
+bb22(%80 : $Builtin.Int1):
+  %81 = struct $Bool (%80 : $Builtin.Int1)
+  %83 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %46 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %83, bb24, bb23
+
+bb23:
+  br bb27
+
+bb24:
+  %86 = integer_literal $Builtin.Int64, 0
+  %87 = struct_extract %2 : $Int64, #Int64._value
+  %88 = builtin "cmp_eq_Int64"(%87 : $Builtin.Int64, %86 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %88, bb26, bb25
+
+bb25:
+  br bb27
+
+bb26:
+  %91 = builtin "cmp_slt_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %92 = integer_literal $Builtin.Int1, -1
+  %93 = builtin "xor_Int1"(%91 : $Builtin.Int1, %92 : $Builtin.Int1) : $Builtin.Int1
+  br bb28(%93 : $Builtin.Int1)
+
+bb27:
+  %95 = integer_literal $Builtin.Int1, 0
+  br bb28(%95 : $Builtin.Int1)
+
+bb28(%97 : $Builtin.Int1):
+  %98 = struct $Bool (%97 : $Builtin.Int1)
+  %100 = struct_extract %2 : $Int64, #Int64._value
+  %101 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %101, bb29, bb30
+
+bb29:
+  br bb31(%49 : $Builtin.Int1)
+
+bb30:
+  %104 = integer_literal $Builtin.Int1, 0
+  br bb31(%104 : $Builtin.Int1)
+
+bb31(%106 : $Builtin.Int1):
+  %107 = struct $Bool (%106 : $Builtin.Int1)
+  %109 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %109, bb32, bb33
+
+bb32:
+  br bb34(%66 : $Builtin.Int1)
+
+bb33:
+  %112 = integer_literal $Builtin.Int1, 0
+  br bb34(%112 : $Builtin.Int1)
+
+bb34(%114 : $Builtin.Int1):
+  %115 = struct $Bool (%114 : $Builtin.Int1)
+  %117 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %46 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %117, bb35, bb36
+
+bb35:
+  br bb37(%83 : $Builtin.Int1)
+
+bb36:
+  %120 = integer_literal $Builtin.Int1, 0
+  br bb37(%120 : $Builtin.Int1)
+
+bb37(%122 : $Builtin.Int1):
+  %123 = struct $Bool (%122 : $Builtin.Int1)
+  cond_br %101, bb39, bb38
+
+bb38:
+  br bb42
+
+bb39:
+  %127 = integer_literal $Builtin.Int64, 0
+  %128 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %127 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %128, bb41, bb40
+
+bb40:
+  br bb42
+
+bb41:
+  %131 = struct_extract %4 : $Int64, #Int64._value
+  %132 = builtin "cmp_eq_Int64"(%131 : $Builtin.Int64, %127 : $Builtin.Int64) : $Builtin.Int1
+  br bb43(%132 : $Builtin.Int1)
+
+bb42:
+  %134 = integer_literal $Builtin.Int1, 0
+  br bb43(%134 : $Builtin.Int1)
+
+
+bb43(%136 : $Builtin.Int1):
+  %137 = struct $Bool (%136 : $Builtin.Int1)
+  cond_br %109, bb45, bb44
+
+bb44:
+  br bb48
+
+bb45:
+  %141 = integer_literal $Builtin.Int64, 0
+  %142 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %141 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %142, bb47, bb46
+
+bb46:
+  br bb48
+
+bb47:
+  %145 = struct_extract %4 : $Int64, #Int64._value
+  %146 = builtin "cmp_eq_Int64"(%145 : $Builtin.Int64, %141 : $Builtin.Int64) : $Builtin.Int1
+  br bb49(%146 : $Builtin.Int1)
+
+bb48:
+  %148 = integer_literal $Builtin.Int1, 0
+  br bb49(%148 : $Builtin.Int1)
+
+
+bb49(%150 : $Builtin.Int1):
+  %151 = struct $Bool (%150 : $Builtin.Int1)
+  cond_br %117, bb51, bb50
+
+bb50:
+  br bb54
+
+bb51:
+  %155 = integer_literal $Builtin.Int64, 0
+  %156 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %155 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %156, bb53, bb52
+
+bb52:
+  br bb54
+
+bb53:
+  %159 = struct_extract %4 : $Int64, #Int64._value
+  %160 = builtin "cmp_eq_Int64"(%159 : $Builtin.Int64, %155 : $Builtin.Int64) : $Builtin.Int1
+  br bb55(%160 : $Builtin.Int1)
+
+bb54:
+  %162 = integer_literal $Builtin.Int1, 0
+  br bb55(%162 : $Builtin.Int1)
+
+
+bb55(%164 : $Builtin.Int1):
+  %165 = struct $Bool (%164 : $Builtin.Int1)
+  %167 = struct_extract %4 : $Int64, #Int64._value
+  %168 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %169 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  %170 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %46 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %14, bb57, bb56
+
+bb56:
+  br bb66
+
+bb57:
+  %173 = integer_literal $Builtin.Int64, 0
+  %174 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %173 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %174, bb59, bb58
+
+bb58:
+  br bb66
+
+bb59:
+  %177 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %173 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %177, bb61, bb60
+
+bb60:
+  br bb66
+
+bb61:
+  %180 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %173 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %180, bb63, bb62
+
+bb62:
+  br bb66
+
+bb63:
+  %183 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %173 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %183, bb65, bb64
+
+bb64:
+  br bb66
+
+bb65:
+  %186 = struct_extract %5 : $Int64, #Int64._value
+  %187 = builtin "cmp_eq_Int64"(%186 : $Builtin.Int64, %173 : $Builtin.Int64) : $Builtin.Int1
+  br bb67(%187 : $Builtin.Int1)
+
+bb66:
+  %189 = integer_literal $Builtin.Int1, 0
+  br bb67(%189 : $Builtin.Int1)
+
+bb67(%191 : $Builtin.Int1):
+  %192 = struct $Bool (%191 : $Builtin.Int1)
+  cond_br %30, bb69, bb68
+
+bb68:
+  br bb78
+
+bb69:
+  %196 = integer_literal $Builtin.Int64, 0
+  %197 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %196 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %197, bb71, bb70
+
+bb70:
+  br bb78
+
+bb71:
+  %200 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %196 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %200, bb73, bb72
+
+bb72:
+  br bb78
+
+bb73:
+  %203 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %196 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %203, bb75, bb74
+
+bb74:
+  br bb78
+
+bb75:
+  %206 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %196 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %206, bb77, bb76
+
+bb76:
+  br bb78
+
+bb77:
+  %209 = struct_extract %5 : $Int64, #Int64._value
+  %210 = builtin "cmp_eq_Int64"(%209 : $Builtin.Int64, %196 : $Builtin.Int64) : $Builtin.Int1
+  br bb79(%210 : $Builtin.Int1)
+
+bb78:
+  %212 = integer_literal $Builtin.Int1, 0
+  br bb79(%212 : $Builtin.Int1)
+
+
+bb79(%214 : $Builtin.Int1):
+  %215 = struct $Bool (%214 : $Builtin.Int1)
+  %217 = builtin "cmp_slt_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %217, bb80, bb81
+
+bb80:
+  br bb88
+
+bb81:
+  %220 = integer_literal $Builtin.Int64, 0
+  %221 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %220 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %221, bb83, bb82
+
+bb82:
+  br bb88
+
+bb83:
+  %224 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %220 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %224, bb85, bb84
+
+bb84:
+  br bb88
+
+bb85:
+  %227 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %220 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %227, bb87, bb86
+
+bb86:
+  br bb88
+
+bb87:
+  %230 = struct_extract %5 : $Int64, #Int64._value
+  %231 = builtin "cmp_eq_Int64"(%230 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %232 = integer_literal $Builtin.Int1, -1
+  %233 = builtin "xor_Int1"(%231 : $Builtin.Int1, %232 : $Builtin.Int1) : $Builtin.Int1
+  br bb89(%233 : $Builtin.Int1)
+
+bb88:
+  %235 = integer_literal $Builtin.Int1, 0
+  br bb89(%235 : $Builtin.Int1)
+
+
+bb89(%237 : $Builtin.Int1):
+  %238 = struct $Bool (%237 : $Builtin.Int1)
+  cond_br %217, bb98, bb90
+
+bb90:
+  %241 = builtin "cmp_slt_Int64"(%100 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %241, bb92, bb91
+
+bb91:
+  br bb96
+
+bb92:
+  %244 = builtin "cmp_slt_Int64"(%167 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %244, bb94, bb93
+
+bb93:
+  br bb96
+
+bb94:
+  %247 = builtin "cmp_slt_Int64"(%48 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %247, bb97, bb95
+
+bb95:
+  br bb96
+
+bb96:
+  %250 = integer_literal $Builtin.Int1, -1
+  br bb99(%250 : $Builtin.Int1)
+
+bb97:
+  %252 = struct_extract %5 : $Int64, #Int64._value
+  %253 = builtin "cmp_eq_Int64"(%252 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  br bb99(%253 : $Builtin.Int1)
+
+bb98:
+  %255 = integer_literal $Builtin.Int1, 0
+  br bb99(%255 : $Builtin.Int1)
+
+bb99(%257 : $Builtin.Int1):
+  %258 = struct $Bool (%257 : $Builtin.Int1)
+  %260 = struct_extract %5 : $Int64, #Int64._value
+  %261 = builtin "cmp_eq_Int64"(%260 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %261, bb100, bb106
+
+bb100:
+  %263 = builtin "cmp_slt_Int64"(%100 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %263, bb102, bb101
+
+bb101:
+  br bb104
+
+bb102:
+  %266 = builtin "cmp_slt_Int64"(%48 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %266, bb105, bb103
+
+bb103:
+  br bb104
+
+bb104:
+  %269 = integer_literal $Builtin.Int1, -1
+  br bb107(%269 : $Builtin.Int1)
+
+bb105:
+  %271 = builtin "cmp_slt_Int64"(%167 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  %272 = integer_literal $Builtin.Int1, -1
+  %273 = builtin "xor_Int1"(%271 : $Builtin.Int1, %272 : $Builtin.Int1) : $Builtin.Int1
+  br bb107(%273 : $Builtin.Int1)
+
+bb106:
+  %275 = integer_literal $Builtin.Int1, 0
+  br bb107(%275 : $Builtin.Int1)
+
+
+bb107(%277 : $Builtin.Int1):
+  %278 = struct $Bool (%277 : $Builtin.Int1)
+  %280 = builtin "cmp_eq_Int64"(%260 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %280, bb108, bb109
+
+bb108:
+  %282 = integer_literal $Builtin.Int1, -1
+  %283 = builtin "xor_Int1"(%217 : $Builtin.Int1, %282 : $Builtin.Int1) : $Builtin.Int1
+  br bb110(%283 : $Builtin.Int1)
+
+bb109:
+  %285 = integer_literal $Builtin.Int1, 0
+  br bb110(%285 : $Builtin.Int1)
+
+
+bb110(%287 : $Builtin.Int1):
+  %288 = struct $Bool (%287 : $Builtin.Int1)
+  %290 = builtin "cmp_eq_Int64"(%260 : $Builtin.Int64, %46 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %290, bb112, bb111
+
+bb111:
+  br bb121
+
+bb112:
+  %293 = builtin "cmp_eq_Int64"(%13 : $Builtin.Int64, %46 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %293, bb114, bb113
+
+bb113:
+  br bb121
+
+bb114:
+  %296 = integer_literal $Builtin.Int64, 0
+  %297 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %296 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %297, bb116, bb115
+
+bb115:
+  br bb121
+
+bb116:
+  %300 = builtin "cmp_eq_Int64"(%100 : $Builtin.Int64, %296 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %300, bb118, bb117
+
+bb117:
+  br bb121
+
+bb118:
+  %303 = builtin "cmp_eq_Int64"(%167 : $Builtin.Int64, %296 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %303, bb120, bb119
+
+bb119:
+  br bb121
+
+bb120:
+  %306 = builtin "cmp_eq_Int64"(%48 : $Builtin.Int64, %296 : $Builtin.Int64) : $Builtin.Int1
+  br bb122(%306 : $Builtin.Int1)
+
+bb121:
+  %308 = integer_literal $Builtin.Int1, 0
+  br bb122(%308 : $Builtin.Int1)
+
+
+bb122(%310 : $Builtin.Int1):
+  %311 = struct $Bool (%310 : $Builtin.Int1)
+  br bb148(undef : $Bool)
+
+bb123:
+  br bb148(undef : $Bool)
+
+bb124:
+  br bb148(undef : $Bool)
+
+bb125:
+  br bb148(undef : $Bool)
+
+bb126:
+  br bb148(undef : $Bool)
+
+bb127:
+  br bb129(undef : $Bool)
+
+bb128:
+  br bb129(undef : $Bool)
+
+bb129(%320 : $Bool):
+  br bb148(undef : $Bool)
+
+bb130:
+  br bb148(undef : $Bool)
+
+bb131:
+  br bb148(undef : $Bool)
+
+bb132:
+  br bb148(undef : $Bool)
+
+bb133:
+  br bb148(undef : $Bool)
+
+bb134:
+  br bb136(undef : $Bool)
+
+bb135:
+  br bb136(undef : $Bool)
+
+bb136(%328 : $Bool):
+  br bb148(undef : $Bool)
+
+bb137:
+  br bb148(undef : $Bool)
+
+bb138:
+  br bb148(undef : $Bool)
+
+bb139:
+  br bb148(undef : $Bool)
+
+bb140:
+  br bb148(undef : $Bool)
+
+bb141:
+  br bb143(undef : $Bool)
+
+bb142:
+  br bb143(undef : $Bool)
+
+bb143(%336 : $Bool):
+  br bb148(undef : $Bool)
+
+bb144:
+  br bb148(undef : $Bool)
+
+bb145:
+  br bb148(undef : $Bool)
+
+bb146:
+  br bb148(undef : $Bool)
+
+bb147:
+  br bb148(undef : $Bool)
+
+bb148(%342 : $Bool):
+  cond_br %47, bb150, bb149
+
+bb149:
+  br bb153
+
+bb150:
+  cond_br %280, bb152, bb151
+
+bb151:
+  br bb153
+
+bb152:
+  %347 = integer_literal $Builtin.Int64, 5
+  %348 = struct $Int64 (%347 : $Builtin.Int64)
+  %349 = integer_literal $Builtin.Int64, 0
+  %350 = struct $Int64 (%349 : $Builtin.Int64)
+
+  %351 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %352 = apply %351(%348, %350) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%352 : $Int64)
+
+bb153:
+  cond_br %47, bb154, bb155
+
+bb154:
+  %355 = integer_literal $Builtin.Int64, -2
+  %356 = struct $Int64 (%355 : $Builtin.Int64)
+  %357 = integer_literal $Builtin.Int64, -9
+  %358 = struct $Int64 (%357 : $Builtin.Int64)
+
+  %359 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %360 = apply %359(%356, %358) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%360 : $Int64)
+
+bb155:
+  cond_br %14, bb157, bb156
+
+bb156:
+  br bb160
+
+bb157:
+  cond_br %45, bb159, bb158
+
+bb158:
+  br bb160
+
+bb159:
+  %366 = integer_literal $Builtin.Int64, 5
+  %367 = struct $Int64 (%366 : $Builtin.Int64)
+  %368 = integer_literal $Builtin.Int64, -7
+  %369 = struct $Int64 (%368 : $Builtin.Int64)
+
+  %370 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %371 = apply %370(%367, %369) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%371 : $Int64)
+
+bb160:
+  cond_br %30, bb162, bb161
+
+bb161:
+  br bb165
+
+bb162:
+  cond_br %45, bb164, bb163
+
+bb163:
+  br bb165
+
+bb164:
+  %377 = integer_literal $Builtin.Int64, -5
+  %378 = struct $Int64 (%377 : $Builtin.Int64)
+  %379 = integer_literal $Builtin.Int64, -3
+  %380 = struct $Int64 (%379 : $Builtin.Int64)
+
+  %381 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %382 = apply %381(%378, %380) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%382 : $Int64)
+
+bb165:
+  cond_br %30, bb167, bb166
+
+bb166:
+  br bb170
+
+bb167:
+  %386 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %386, bb169, bb168
+
+bb168:
+  br bb170
+
+bb169:
+  %389 = integer_literal $Builtin.Int64, -12
+  %390 = struct $Int64 (%389 : $Builtin.Int64)
+  %391 = integer_literal $Builtin.Int64, -5
+  %392 = struct $Int64 (%391 : $Builtin.Int64)
+
+  %393 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %394 = apply %393(%390, %392) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%394 : $Int64)
+
+bb170:
+  cond_br %14, bb172, bb171
+
+bb171:
+  br bb175
+
+bb172:
+  %398 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %398, bb174, bb173
+
+bb173:
+  br bb175
+
+bb174:
+  %401 = integer_literal $Builtin.Int64, -8
+  %402 = struct $Int64 (%401 : $Builtin.Int64)
+  %403 = integer_literal $Builtin.Int64, -7
+  %404 = struct $Int64 (%403 : $Builtin.Int64)
+
+  %405 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %406 = apply %405(%402, %404) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%406 : $Int64)
+
+bb175:
+  cond_br %30, bb177, bb176
+
+bb176:
+  br bb182
+
+bb177:
+  %410 = builtin "cmp_eq_Int64"(%44 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %410, bb179, bb178
+
+bb178:
+  br bb182
+
+bb179:
+  cond_br %280, bb181, bb180
+
+bb180:
+  br bb182
+
+bb181:
+  %415 = integer_literal $Builtin.Int64, -8
+  %416 = struct $Int64 (%415 : $Builtin.Int64)
+  %417 = integer_literal $Builtin.Int64, -7
+  %418 = struct $Int64 (%417 : $Builtin.Int64)
+
+  %419 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %420 = apply %419(%416, %418) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%420 : $Int64)
+
+bb182:
+  %422 = integer_literal $Builtin.Int64, 0
+  %423 = struct $Int64 (%422 : $Builtin.Int64)
+
+  %424 = function_ref @getit : $@convention(thin) (Int64, Int64) -> Int64
+  %425 = apply %424(%423, %423) : $@convention(thin) (Int64, Int64) -> Int64
+  br bb183(%425 : $Int64)
+
+
+bb183(%427 : $Int64):
+  br bb190(undef : $Bool)
+
+bb184:
+  br bb190(undef : $Bool)
+
+bb185:
+  br bb190(undef : $Bool)
+
+bb186:
+  br bb190(undef : $Bool)
+
+bb187:
+  br bb190(undef : $Bool)
+
+bb188:
+  br bb190(undef : $Bool)
+
+bb189:
+  br bb190(undef : $Bool)
+
+bb190(%436 : $Bool):
+  %437 = integer_literal $Builtin.Int64, 150
+  %438 = struct $Int64 (%437 : $Builtin.Int64)
+
+  %439 = function_ref @sink : $@convention(thin) (Int64, Int64, Int64, Int64) -> ()
+  %440 = apply %439(%427, %427, %438, %438) : $@convention(thin) (Int64, Int64, Int64, Int64) -> ()
+  %441 = struct_extract %215 : $Bool, #Bool._value
+  cond_br %441, bb192, bb191
+
+bb191:
+  br bb193
+
+bb192:
+
+  %444 = function_ref @do_something : $@convention(thin) () -> ()
+  %445 = apply %444() : $@convention(thin) () -> ()
+  br bb193
+
+bb193:
+  %447 = struct_extract %238 : $Bool, #Bool._value
+  cond_br %447, bb195, bb194
+
+bb194:
+  br bb196
+
+bb195:
+
+  %450 = function_ref @do_something : $@convention(thin) () -> ()
+  %451 = apply %450() : $@convention(thin) () -> ()
+  br bb196
+
+bb196:
+  %453 = struct_extract %42 : $Bool, #Bool._value
+  cond_br %453, bb198, bb197
+
+bb197:
+  br bb199
+
+bb198:
+
+  %456 = function_ref @do_something : $@convention(thin) () -> ()
+  %457 = apply %456() : $@convention(thin) () -> ()
+  br bb199
+
+bb199:
+  %459 = struct_extract %258 : $Bool, #Bool._value
+  cond_br %459, bb201, bb200
+
+bb200:
+  br bb202
+
+bb201:
+
+  %462 = function_ref @do_something : $@convention(thin) () -> ()
+  %463 = apply %462() : $@convention(thin) () -> ()
+  br bb202
+
+bb202:
+  cond_br %45, bb204, bb203
+
+bb203:
+  br bb205
+
+bb204:
+  %467 = function_ref @do_something : $@convention(thin) () -> ()
+  %468 = apply %467() : $@convention(thin) () -> ()
+  br bb205
+
+bb205:
+  cond_br %47, bb207, bb206
+
+bb206:
+  br bb208
+
+bb207:
+  %472 = function_ref @do_something : $@convention(thin) () -> ()
+  %473 = apply %472() : $@convention(thin) () -> ()
+  br bb208
+
+bb208:
+  %475 = struct_extract %137 : $Bool, #Bool._value
+  cond_br %475, bb210, bb209
+
+bb209:
+  br bb211
+
+bb210:
+  %478 = function_ref @do_something : $@convention(thin) () -> ()
+  %479 = apply %478() : $@convention(thin) () -> ()
+  br bb211
+
+bb211:
+  %481 = struct_extract %151 : $Bool, #Bool._value
+  cond_br %481, bb213, bb212
+
+bb212:
+  br bb214
+
+bb213:
+  %484 = function_ref @do_something : $@convention(thin) () -> ()
+  %485 = apply %484() : $@convention(thin) () -> ()
+  br bb214
+
+bb214:
+  %487 = struct_extract %165 : $Bool, #Bool._value
+  cond_br %487, bb216, bb215
+
+bb215:
+  br bb217
+
+bb216:
+  %490 = function_ref @do_something : $@convention(thin) () -> ()
+  %491 = apply %490() : $@convention(thin) () -> ()
+  br bb217
+
+bb217:
+  cond_br %168, bb219, bb218
+
+bb218:
+  br bb220
+
+bb219:
+  %495 = function_ref @do_something : $@convention(thin) () -> ()
+  %496 = apply %495() : $@convention(thin) () -> ()
+  br bb220
+
+bb220:
+  cond_br %169, bb222, bb221
+
+bb221:
+  br bb223
+
+bb222:
+  %500 = function_ref @do_something : $@convention(thin) () -> ()
+  %501 = apply %500() : $@convention(thin) () -> ()
+  br bb223
+
+bb223:
+  cond_br %170, bb225, bb224
+
+bb224:
+  br bb226
+
+bb225:
+  %505 = function_ref @do_something : $@convention(thin) () -> ()
+  %506 = apply %505() : $@convention(thin) () -> ()
+  br bb226
+
+bb226:
+  %508 = struct_extract %64 : $Bool, #Bool._value
+  cond_br %508, bb228, bb227
+
+bb227:
+  br bb229
+
+bb228:
+  %511 = function_ref @do_something : $@convention(thin) () -> ()
+  %512 = apply %511() : $@convention(thin) () -> ()
+  br bb229
+
+bb229:
+  %514 = struct_extract %81 : $Bool, #Bool._value
+  cond_br %514, bb231, bb230
+
+bb230:
+  br bb232
+
+bb231:
+  %517 = function_ref @do_something : $@convention(thin) () -> ()
+  %518 = apply %517() : $@convention(thin) () -> ()
+  br bb232
+
+bb232:
+  %520 = struct_extract %98 : $Bool, #Bool._value
+  cond_br %520, bb234, bb233
+
+bb233:
+  br bb235
+
+bb234:
+  %523 = function_ref @do_something : $@convention(thin) () -> ()
+  %524 = apply %523() : $@convention(thin) () -> ()
+  br bb235
+
+bb235:
+  %526 = struct_extract %107 : $Bool, #Bool._value
+  cond_br %526, bb237, bb236
+
+bb236:
+  br bb238
+
+bb237:
+  %529 = function_ref @do_something : $@convention(thin) () -> ()
+  %530 = apply %529() : $@convention(thin) () -> ()
+  br bb238
+
+bb238:
+  %532 = struct_extract %115 : $Bool, #Bool._value
+  cond_br %532, bb240, bb239
+
+bb239:
+  br bb241
+
+bb240:
+  %535 = function_ref @do_something : $@convention(thin) () -> ()
+  %536 = apply %535() : $@convention(thin) () -> ()
+  br bb241
+
+bb241:
+  %538 = struct_extract %123 : $Bool, #Bool._value
+  cond_br %538, bb243, bb242
+
+bb242:
+  br bb244
+
+bb243:
+  %541 = function_ref @do_something : $@convention(thin) () -> ()
+  %542 = apply %541() : $@convention(thin) () -> ()
+  br bb244
+
+bb244:
+  %544 = struct_extract %192 : $Bool, #Bool._value
+  cond_br %544, bb246, bb245
+
+bb245:
+  br bb247
+
+bb246:
+  %547 = function_ref @do_something : $@convention(thin) () -> ()
+  %548 = apply %547() : $@convention(thin) () -> ()
+  br bb247
+
+bb247:
+  %550 = struct_extract %27 : $Bool, #Bool._value
+  cond_br %550, bb249, bb248
+
+bb248:
+  br bb250
+
+bb249:
+  %553 = function_ref @do_something : $@convention(thin) () -> ()
+  %554 = apply %553() : $@convention(thin) () -> ()
+  br bb250
+
+bb250:
+  %556 = struct_extract %278 : $Bool, #Bool._value
+  cond_br %556, bb252, bb251
+
+bb251:
+  br bb253
+
+bb252:
+  %559 = function_ref @do_something : $@convention(thin) () -> ()
+  %560 = apply %559() : $@convention(thin) () -> ()
+  br bb253
+
+bb253:
+  %562 = struct_extract %288 : $Bool, #Bool._value
+  cond_br %562, bb255, bb254
+
+bb254:
+  br bb256
+
+bb255:
+  %565 = function_ref @do_something : $@convention(thin) () -> ()
+  %566 = apply %565() : $@convention(thin) () -> ()
+  br bb256
+
+bb256:
+  %568 = struct_extract %311 : $Bool, #Bool._value
+  cond_br %568, bb258, bb257
+
+bb257:
+  br bb259
+
+bb258:
+  %571 = function_ref @do_something : $@convention(thin) () -> ()
+  %572 = apply %571() : $@convention(thin) () -> ()
+  br bb259
+
+bb259:
+  %574 = tuple ()
+  return %574 : $()
+}

@@ -20,9 +20,9 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -75,7 +75,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       if (!Apply || !Apply.hasSubstitutions())
         continue;
 
-      auto *Callee = Apply.getReferencedFunction();
+      auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
       if (!Callee->isDefinition()) {
@@ -99,7 +99,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       auto *I = Applies.pop_back_val();
       auto Apply = ApplySite::isa(I);
       assert(Apply && "Expected an apply!");
-      SILFunction *Callee = Apply.getReferencedFunction();
+      SILFunction *Callee = Apply.getReferencedFunctionOrNull();
       assert(Callee && "Expected to have a known callee");
 
       if (!Apply.canOptimize() || !Callee->shouldOptimize())

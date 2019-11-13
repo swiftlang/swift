@@ -17,6 +17,9 @@
 
 #include "InstrumenterSupport.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Demangling/Punycode.h"
+#include "llvm/Support/Path.h"
 
 using namespace swift;
 using namespace swift::instrumenter_support;
@@ -33,17 +36,13 @@ public:
     diags.addConsumer(*this);
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (Kind == swift::DiagnosticKind::Error) {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (Info.Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                           FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(llvm::errs(), Info.FormatString,
+                                           Info.FormatArgs);
     llvm::errs() << "\n";
   }
   bool hadError() { return error; }
@@ -75,6 +74,41 @@ public:
 };
 } // end anonymous namespace
 
+InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
+    : Context(C), TypeCheckDC(DC), CF(*this) {
+  // Prefixes for module and file vars
+  const std::string builtinPrefix = "__builtin";
+  const std::string modulePrefix = "_pg_module_";
+  const std::string filePrefix = "_pg_file_";
+
+  // Setup Module identifier
+  std::string moduleName = TypeCheckDC->getParentModule()->getName().str();
+  Identifier moduleIdentifier =
+      Context.getIdentifier(builtinPrefix + modulePrefix + moduleName);
+
+  SmallVector<ValueDecl *, 1> results;
+  TypeCheckDC->getParentModule()->lookupValue(
+      moduleIdentifier, NLKind::UnqualifiedLookup, results);
+
+  ModuleIdentifier = (results.size() == 1) ? moduleIdentifier : Identifier();
+
+  // Setup File identifier
+  StringRef filePath = TypeCheckDC->getParentSourceFile()->getFilename();
+  StringRef fileName = llvm::sys::path::stem(filePath);
+
+  std::string filePunycodeName;
+  Punycode::encodePunycodeUTF8(fileName, filePunycodeName, true);
+  Identifier fileIdentifier =
+      Context.getIdentifier(builtinPrefix + modulePrefix + moduleName +
+                            filePrefix + filePunycodeName);
+
+  results.clear();
+  TypeCheckDC->getParentModule()->lookupValue(
+      fileIdentifier, NLKind::UnqualifiedLookup, results);
+
+  FileIdentifier = (results.size() == 1) ? fileIdentifier : Identifier();
+}
+
 void InstrumenterBase::anchor() {}
 
 bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
@@ -82,9 +116,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   DiagnosticSuppression suppression(Ctx.Diags);
   ErrorGatherer errorGatherer(Ctx.Diags);
 
-  TypeChecker &TC = TypeChecker::createForContext(Ctx);
-
-  TC.typeCheckExpression(parsedExpr, DC);
+  TypeChecker::typeCheckExpression(parsedExpr, DC);
 
   if (parsedExpr) {
     ErrorFinder errorFinder;

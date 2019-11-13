@@ -205,7 +205,7 @@ copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF, SILLocation loc,
     assert(value.getValue() != destAddr && "copying in place?!");
     SILValue accessAddr =
       UnenforcedFormalAccess::enter(SGF, loc, destAddr, SILAccessKind::Modify);
-    value.copyInto(SGF, accessAddr, loc);
+    value.copyInto(SGF, loc, accessAddr);
     return;
   }
   
@@ -371,12 +371,13 @@ public:
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
-
-    auto boxType = SGF.SGM.Types
-      .getContextBoxTypeForCapture(decl,
-                     SGF.SGM.Types.getLoweredRValueType(decl->getType()),
-                     SGF.F.getGenericEnvironment(),
-                     /*mutable*/ true);
+    // The box type's context is lowered in the minimal resilience domain.
+    auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
+        decl,
+        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                           decl->getType()),
+        SGF.F.getGenericEnvironment(),
+        /*mutable*/ true);
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
@@ -627,7 +628,7 @@ public:
     if (isInit)
       value.forwardInto(SGF, loc, address);
     else
-      value.copyInto(SGF, address, loc);
+      value.copyInto(SGF, loc, address);
   }
 
   void finishUninitialized(SILGenFunction &SGF) override {
@@ -850,7 +851,8 @@ void EnumElementPatternInitialization::emitEnumMatch(
         }
 
         // Otherwise, the bound value for the enum case is available.
-        SILType eltTy = value.getType().getEnumElementType(eltDecl, SGF.SGM.M);
+        SILType eltTy = value.getType().getEnumElementType(
+            eltDecl, SGF.SGM.M, SGF.getTypeExpansionContext());
         auto &eltTL = SGF.getTypeLowering(eltTy);
 
         if (mv.getType().isAddress()) {
@@ -1166,14 +1168,13 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 }
 
 void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
-                                        unsigned pbdEntry) {
-  auto &entry = PBD->getPatternList()[pbdEntry];
-  auto initialization = emitPatternBindingInitialization(entry.getPattern(),
+                                        unsigned idx) {
+  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getExecutableInit()) {
+  if (auto *Init = PBD->getExecutableInit(idx)) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
@@ -1185,13 +1186,18 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  for (unsigned i : indices(PBD->getPatternList())) {
+  for (unsigned i : range(PBD->getNumPatternEntries())) {
     emitPatternBinding(PBD, i);
   }
 }
 
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
+
+  // Emit the variable's accessors.
+  D->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.emitFunction(accessor);
+  });
 }
 
 /// Emit literals for the major, minor, and subminor components of the version
@@ -1233,7 +1239,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 
   auto silDeclRef = SILDeclRef(versionQueryDecl);
   SILValue availabilityGTEFn = emitGlobalFunctionRef(
-      loc, silDeclRef, getConstantInfo(silDeclRef));
+      loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
 
   SILValue args[] = {majorValue, minorValue, subminorValue};
   return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
@@ -1389,95 +1395,6 @@ CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
   Cleanups.pushCleanupInState<DeinitExistentialCleanup>(state, addr,
                                                       concreteFormalType, repr);
   return Cleanups.getTopCleanup();
-}
-
-void SILGenModule::emitExternalWitnessTable(NormalProtocolConformance *c) {
-  // Emit the witness table right now if we used it.
-  if (usedConformances.count(c)) {
-    getWitnessTable(c);
-    return;
-  }
-  // Otherwise, remember it for later.
-  delayedConformances.insert({c, {lastEmittedConformance}});
-  lastEmittedConformance = c;
-}
-
-static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
-  auto *dc = d->getDeclContext();
-  if (auto *sf = dyn_cast<SourceFile>(dc->getModuleScopeContext()))
-    if (M.isWholeModule() || M.getAssociatedContext() == sf)
-      return true;
-
-  return false;
-}
-
-void SILGenModule::emitExternalDefinition(Decl *d) {
-  if (isDeclaredInPrimaryFile(M, d))
-    return;
-
-  switch (d->getKind()) {
-  case DeclKind::Func:
-  case DeclKind::Accessor: {
-    emitFunction(cast<FuncDecl>(d));
-    break;
-  }
-  case DeclKind::Constructor: {
-    auto C = cast<ConstructorDecl>(d);
-    // For factories, we don't need to emit a special thunk; the normal
-    // foreign-to-native thunk is sufficient.
-    if (C->isFactoryInit())
-      break;
-
-    emitConstructor(C);
-    break;
-  }
-  case DeclKind::Enum:
-  case DeclKind::Struct:
-  case DeclKind::Class: {
-    // Emit witness tables.
-    auto nom = cast<NominalTypeDecl>(d);
-    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
-                                            nullptr)) {
-      auto *proto = c->getProtocol();
-      if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
-          isa<NormalProtocolConformance>(c)) {
-        emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
-      }
-    }
-    break;
-  }
-
-  case DeclKind::Protocol:
-    // Nothing to do in SILGen for other external types.
-    break;
-
-  case DeclKind::Var:
-    // Imported static vars are handled solely in IRGen.
-    break;
-
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-  case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::EnumElement:
-  case DeclKind::TopLevelCode:
-  case DeclKind::TypeAlias:
-  case DeclKind::AssociatedType:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::Param:
-  case DeclKind::Import:
-  case DeclKind::Subscript:
-  case DeclKind::Destructor:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::Module:
-  case DeclKind::MissingMember:
-  case DeclKind::OpaqueType:
-    llvm_unreachable("Not a valid external definition for SILGen");
-  }
 }
 
 /// Create a LocalVariableInitialization for the uninitialized var.

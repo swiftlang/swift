@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -sil-verify-all -primary-file %s -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -primary-file %s -emit-sil -o - -verify -enable-ownership-stripping-after-serialization
 
 // These tests are deliberately shallow, because I do not want to depend on the
 // specifics of SIL generation, which might change for reasons unrelated to this
@@ -185,5 +186,21 @@ func dontCrash() {
     return
   default:
     fatalError("baz \(k)")
+  }
+}
+
+func switchLoopWithPartialApplyCallee(reportError: ((String) -> (Void))?) {
+  let reportError = reportError ?? { error in
+    print(error)
+  }
+
+  for _ in 0..<1 {
+    reportError("foo bar baz")
+  }
+}
+
+func switchLoopWithPartialApplyCaller() {
+  switchLoopWithPartialApplyCallee { error in
+      print(error)
   }
 }
