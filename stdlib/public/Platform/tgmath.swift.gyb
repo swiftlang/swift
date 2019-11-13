@@ -108,7 +108,7 @@ func _vjpRemainder<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T
 ) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
-  return (remainder(x, y), { v in (v, v) })
+  return (remainder(x, y), { v in (v, -v * ((x / y).rounded(.toNearestOrEven))) })
 }
 
 @usableFromInline
@@ -117,7 +117,7 @@ func _vjpFmod<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T
 ) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
-  return (fmod(x, y), { v in (v, v) })
+  return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
 }
 
 @usableFromInline
