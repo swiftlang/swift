@@ -6927,7 +6927,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
-    if (Context.LangOpts.EnableOperatorDesignatedTypes) {
+    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       if (Tok.is(tok::identifier)) {
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);

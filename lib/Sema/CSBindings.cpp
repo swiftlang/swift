@@ -85,7 +85,7 @@ ConstraintSystem::determineBestBindings() {
       }
     }
 
-    if (getASTContext().LangOpts.DebugConstraintSolver) {
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       bindings.dump(typeVar, log, solverState->depth * 2);
     }
