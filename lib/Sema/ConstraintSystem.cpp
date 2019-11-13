@@ -1643,7 +1643,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
-                              /*throws*/ true));
+                              /*throws*/ true,
+                              DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1652,7 +1653,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*noescape*/ false,
-                            /*throws*/ true));
+                            /*throws*/ true,
+                            DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
     return true;
   }
@@ -1675,7 +1677,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
-                              /*throws*/ true));
+                              /*throws*/ true,
+                              DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1683,7 +1686,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*noescape*/ false,
-                            /*throws*/ true));
+                            /*throws*/ true,
+                            DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
     return true;
   }

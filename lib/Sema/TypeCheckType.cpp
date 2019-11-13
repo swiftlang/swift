@@ -2150,9 +2150,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
+      if (attrs.has(TAK_differentiable) &&
+          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+        diagnose(attrs.getLoc(TAK_differentiable),
+                 diag::experimental_differentiable_programming_disabled);
+      }
+
+      DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
+      if (attrs.has(TAK_differentiable)) {
+        diffKind = attrs.linear ? DifferentiabilityKind::Linear
+                                : DifferentiabilityKind::Normal;
+      }
+
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                       attrs.has(TAK_noescape));
+                                       attrs.has(TAK_noescape), diffKind);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2208,9 +2220,15 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                  diag::experimental_differentiable_programming_disabled);
       }
 
+      DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
+      if (attrs.has(TAK_differentiable)) {
+        diffKind = attrs.linear ? DifferentiabilityKind::Linear
+                                : DifferentiabilityKind::Normal;
+      }
+
       // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
-                                    fnRepr->throws());
+      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false, fnRepr->throws(),
+                                    diffKind);
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())

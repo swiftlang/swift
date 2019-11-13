@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  SWIFT_ENABLE_TENSORFLOW
 //  This file defines AST support for automatic differentiation.
 //
 //===----------------------------------------------------------------------===//
@@ -18,7 +17,11 @@
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
+#include <cstdint>
+
+#include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Range.h"
 
 namespace swift {
@@ -84,6 +87,12 @@ public:
       return getName() == other.getName();
     return getKind() == Kind::Self;
   }
+};
+
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
 };
 
 } // end namespace swift
