@@ -546,8 +546,6 @@ private:
   ~TypeChecker() = default;
 
   friend class ASTContext;
-  friend class constraints::ConstraintSystem;
-  friend class TypeCheckFunctionBodyUntilRequest;
 
 public:
   /// Create a new type checker instance for the given ASTContext, if it
