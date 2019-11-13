@@ -305,13 +305,19 @@ public:
     /// True if the merge is finished (see mergeTo). In this state this node
     /// is completely unlinked from the graph,
     bool isMerged = false;
-    
+
+    /// True if this is a content node that owns a reference count. Such a
+    /// content node necessarilly keeps alive all content it points to until it
+    /// is released. This can be conservatively false.
+    bool hasRC = false;
+
     /// The type of the node (mainly distinguishes between content and value
     /// nodes).
     NodeType Type;
     
     /// The constructor.
-    CGNode(ValueBase *V, NodeType Type) : V(V), UsePoints(0), Type(Type) {
+    CGNode(ValueBase *V, NodeType Type, bool hasRC)
+        : V(V), UsePoints(0), hasRC(hasRC), Type(Type) {
       switch (Type) {
       case NodeType::Argument:
       case NodeType::Value:
@@ -424,6 +430,12 @@ public:
 
     /// Return true if this node represents content.
     bool isContent() const { return Type == NodeType::Content; }
+
+    /// Return true if this node represents an entire reference counted object.
+    bool hasRefCount() const { return hasRC; }
+
+    void setRefCount() { hasRC = true; }
+
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
 
@@ -565,10 +577,14 @@ public:
 
     /// Removes all nodes from the graph.
     void clear();
-    
+
     /// Allocates a node of a given type.
-    CGNode *allocNode(ValueBase *V, NodeType Type) {
-      CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type);
+    ///
+    /// hasRC is set for Content nodes based on the type and origin of
+    /// the pointer.
+    CGNode *allocNode(ValueBase *V, NodeType Type, bool hasRC = false) {
+      assert(Type == NodeType::Content || !hasRC);
+      CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type, hasRC);
       Nodes.push_back(Node);
       return Node;
     }
@@ -631,7 +647,7 @@ public:
     /// Helper to create a content node and update the pointsTo graph. \p
     /// addrNode will point to the new content node. The new content node is
     /// directly initialized with the remaining function arguments.
-    CGNode *createContentNode(CGNode *addrNode, SILValue addrVal);
+    CGNode *createContentNode(CGNode *addrNode, SILValue addrVal, bool hasRC);
 
     /// Create a new content node based on an existing content node to support
     /// graph merging.
@@ -691,7 +707,7 @@ public:
     void escapeContentsOf(CGNode *Node) {
       CGNode *escapedContent = Node->getContentNodeOrNull();
       if (!escapedContent) {
-        escapedContent = createContentNode(Node, Node->V);
+        escapedContent = createContentNode(Node, Node->V, /*hasRC=*/false);
       }
       escapedContent->markEscaping();
     }
