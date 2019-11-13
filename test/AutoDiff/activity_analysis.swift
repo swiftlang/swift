@@ -57,7 +57,7 @@ func testNondifferentiableTupleElementAddr<T>(_ x: T) -> T {
 // CHECK: [ACTIVE]   %56 = tuple_element_addr %55 : $*(Int, Int, (T, Int), Int), 2
 // CHECK: [ACTIVE]   %57 = tuple_element_addr %56 : $*(T, Int), 0
 
-// Check activity analysis for `array.uninitialized_intrinsic` applications.
+// Check `array.uninitialized_intrinsic` applications.
 
 @differentiable
 func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
@@ -93,10 +93,10 @@ func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
 // CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
 // CHECK: [VARIED]   %12 = index_addr %9 : $*T, %11 : $Builtin.Word
 
-// TF-781: check activity analysis for active local address + nested conditionals.
+// TF-781: check active local address + nested conditionals.
 
 @differentiable(wrt: x)
-func TF_781_function(_ x: Float, _ y: Float) -> Float {
+func TF_781(_ x: Float, _ y: Float) -> Float {
   var result = y
   if true {
     if true {
@@ -106,7 +106,7 @@ func TF_781_function(_ x: Float, _ y: Float) -> Float {
   return result
 }
 
-// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_781_function{{.*}} at (source=0 parameters=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_781{{.*}} at (source=0 parameters=(0))
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
 // CHECK: [USEFUL] %1 = argument of bb0 : $Float
 // CHECK: [ACTIVE]   %4 = alloc_stack $Float, var, name "result"
@@ -116,3 +116,41 @@ func TF_781_function(_ x: Float, _ y: Float) -> Float {
 // CHECK: [ACTIVE]   %24 = begin_access [modify] [static] %4 : $*Float
 // CHECK: [ACTIVE]   %31 = begin_access [read] [static] %4 : $*Float
 // CHECK: [ACTIVE]   %32 = load [trivial] %31 : $*Float
+
+// TF-954: check nested conditionals and addresses.
+
+@differentiable
+func TF_954(_ x: Float) -> Float {
+  var outer = x
+  outerIf: if true {
+    var inner = outer
+    inner = inner * x // check activity of this `apply`
+    if false {
+      break outerIf
+    }
+    outer = inner
+  }
+  return outer
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}TF_954{{.*}} at (source=0 parameters=(0))
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "outer"
+// CHECK: bb1:
+// CHECK: [ACTIVE]   %10 = alloc_stack $Float, var, name "inner"
+// CHECK: [ACTIVE]   %11 = begin_access [read] [static] %2 : $*Float
+// CHECK: [NONE]   %14 = metatype $@thin Float.Type
+// CHECK: [ACTIVE]   %15 = begin_access [read] [static] %10 : $*Float
+// CHECK: [VARIED]   %16 = load [trivial] %15 : $*Float
+// CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
+// CHECK:   %18 = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [VARIED]   %19 = apply %18(%16, %0, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %20 = begin_access [modify] [static] %10 : $*Float
+// CHECK: bb3:
+// CHECK: [ACTIVE]   %31 = begin_access [read] [static] %10 : $*Float
+// CHECK: [ACTIVE]   %32 = load [trivial] %31 : $*Float
+// CHECK: [ACTIVE]   %34 = begin_access [modify] [static] %2 : $*Float
+// CHECK: bb5:
+// CHECK: [ACTIVE]   %40 = begin_access [read] [static] %2 : $*Float
+// CHECK: [ACTIVE]   %41 = load [trivial] %40 : $*Float
