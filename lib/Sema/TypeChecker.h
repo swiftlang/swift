@@ -542,9 +542,9 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
-  ASTContext &Context;
+  TypeChecker() = default;
+  ~TypeChecker() = default;
 
-  TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
   friend class constraints::ConstraintSystem;
   friend class TypeCheckFunctionBodyUntilRequest;
@@ -559,7 +559,6 @@ public:
 public:
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
-  ~TypeChecker();
 
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
