@@ -925,16 +925,6 @@ public:
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-  /// \name Name lookup
-  ///
-  /// Routines that perform name lookup.
-  ///
-  /// During type checking, these routines should be used instead of
-  /// \c MemberLookup and \c UnqualifiedLookup, because these routines will
-  /// lazily introduce declarations and (FIXME: eventually) perform recursive
-  /// type-checking that the AST-level lookup routines don't.
-  ///
-  /// @{
 private:
   Optional<Type> boolType;
 
@@ -1335,6 +1325,17 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
+  /// \name Name lookup
+  ///
+  /// Routines that perform name lookup.
+  ///
+  /// During type checking, these routines should be used instead of
+  /// \c MemberLookup and \c UnqualifiedLookup, because these routines will
+  /// lazily introduce declarations and (FIXME: eventually) perform recursive
+  /// type-checking that the AST-level lookup routines don't.
+  ///
+  /// @{
+
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
   ///
@@ -1370,10 +1371,6 @@ public:
   static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
                                    NameLookupOptions options
                                      = defaultMemberLookupOptions);
-
-  /// Check whether the given declaration can be written as a
-  /// member of the given base type.
-  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
   /// Look up a member type within the given type.
   ///
@@ -1414,6 +1411,9 @@ public:
   /// Given an pre-folded expression, find LHS from the expression if a binary
   /// operator \c name appended to the expression.
   static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+  /// Check whether the given declaration can be written as a
+  /// member of the given base type.
+  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
   /// @}
 
