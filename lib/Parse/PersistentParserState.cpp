@@ -25,14 +25,12 @@ PersistentParserState::PersistentParserState() { }
 
 PersistentParserState::~PersistentParserState() { }
 
-void PersistentParserState::delayDecl(DelayedDeclKind Kind,
-                                      unsigned Flags,
-                                      DeclContext *ParentContext,
-                                      SourceRange BodyRange,
-                                      SourceLoc PreviousLoc) {
-  assert(!CodeCompletionDelayedDeclState.get() &&
+void PersistentParserState::setCodeCompletionDelayedDeclState(
+    CodeCompletionDelayedDeclKind Kind, unsigned Flags,
+    DeclContext *ParentContext, SourceRange BodyRange, SourceLoc PreviousLoc) {
+  assert(!CodeCompletionDelayedDeclStat.get() &&
          "only one decl can be delayed for code completion");
-  CodeCompletionDelayedDeclState.reset(new DelayedDeclState(
+  CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
       Kind, Flags, ParentContext, BodyRange, PreviousLoc,
       ScopeInfo.saveCurrentScope()));
 }
@@ -44,11 +42,4 @@ void PersistentParserState::delayDeclList(IterableDeclContext *D) {
 void PersistentParserState::parseAllDelayedDeclLists() {
   for (auto IDC : DelayedDeclLists)
     IDC->loadAllMembers();
-}
-
-void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
-                                          SourceRange BodyRange,
-                                          SourceLoc PreviousLoc) {
-  delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
-            PreviousLoc);
 }
