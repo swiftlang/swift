@@ -710,8 +710,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
-    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights) {
+    const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
@@ -743,9 +742,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
-      auto weight = weights.find(anchor);
-      if (weight != weights.end())
-        return weight->getSecond().first + 1;
+      auto weight = cs.getExprDepth(anchor);
+      if (weight)
+        return *weight + 1;
     }
 
     return 1;
@@ -1197,7 +1196,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
-    switch (compareSolutions(*this, viable, diff, i, bestIdx, ExprWeights)) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1221,7 +1220,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, viable, diff, bestIdx, i, ExprWeights)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1273,7 +1272,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       if (losers[j])
         continue;
 
-      switch (compareSolutions(*this, viable, diff, i, j, ExprWeights)) {
+      switch (compareSolutions(*this, viable, diff, i, j)) {
       case SolutionCompareResult::Identical:
         // FIXME: Dub one of these the loser arbitrarily?
         break;
