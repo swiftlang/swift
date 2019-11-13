@@ -692,7 +692,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelErrorHandling(TLCD);
-              TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
+              TypeChecker::contextualizeTopLevelCode(TLCD);
             }
             return false;
           }
