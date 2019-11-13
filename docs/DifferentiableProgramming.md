@@ -238,13 +238,12 @@ Differentiation is the process of computing derivatives. See the
 ["Math Introduction"](#math-introduction) section below for more details.
 
 Derivatives are a fundamental tool in calculus and have applications in many
-domains, notably deep learning. Numerical computing in Swift is an
-expressive, high-performance language that is a great fit for numerical
-applications. Recent proposals have paved the way for low-level numerical
-computing in Swift: [AdditiveArithmetic][SE-0233], SIMD [[1][SE-0229]]
-[[2][SE-0251]], [generic math functions][SE-0246]. However, high-level numerical
-computing applications, including machine learning and artificial intelligence,
-require more work.
+domains, notably deep learning. Numerical computing in Swift is an expressive,
+high-performance language that is a great fit for numerical applications. Recent
+proposals have paved the way for low-level numerical computing in Swift:
+[AdditiveArithmetic][SE-0233], SIMD [[1][SE-0229]] [[2][SE-0251]], [generic math
+functions][SE-0246]. However, high-level numerical computing applications,
+including machine learning and artificial intelligence, require more work.
 
 We believe that first-class differentiable programming is a big step towards
 high-level numerical computing support and will make Swift a real contender in
