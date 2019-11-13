@@ -554,9 +554,28 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
-swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
+swift::handleSILGenericParams(GenericParamList *genericParams,
                               DeclContext *DC) {
-  return TypeChecker::handleSILGenericParams(genericParams, DC);
+  if (genericParams == nullptr)
+    return nullptr;
+
+  SmallVector<GenericParamList *, 2> nestedList;
+  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
+    nestedList.push_back(genericParams);
+  }
+
+  std::reverse(nestedList.begin(), nestedList.end());
+
+  for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
+    auto genericParams = nestedList[i];
+    genericParams->setDepth(i);
+  }
+
+  auto sig =
+      TypeChecker::checkGenericSignature(nestedList.back(), DC,
+                                         /*parentSig=*/nullptr,
+                                         /*allowConcreteGenericParams=*/true);
+  return (sig ? sig->getGenericEnvironment() : nullptr);
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

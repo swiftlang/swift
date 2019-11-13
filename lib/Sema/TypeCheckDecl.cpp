@@ -634,32 +634,6 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
-/// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericEnvironment *
-TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
-                                    DeclContext *DC) {
-  if (genericParams == nullptr)
-    return nullptr;
-
-  SmallVector<GenericParamList *, 2> nestedList;
-  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
-    nestedList.push_back(genericParams);
-  }
-
-  std::reverse(nestedList.begin(), nestedList.end());
-
-  for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
-    auto genericParams = nestedList[i];
-    genericParams->setDepth(i);
-  }
-
-  auto sig = TypeChecker::checkGenericSignature(
-             nestedList.back(), DC,
-             /*parentSig=*/nullptr,
-             /*allowConcreteGenericParams=*/true);
-  return (sig ? sig->getGenericEnvironment() : nullptr);
-}
-
 /// Check whether \c current is a redeclaration.
 static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   // If we've already checked this declaration, don't do it again.
