@@ -925,9 +925,6 @@ public:
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-private:
-  Optional<Type> boolType;
-
 public:
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
