@@ -204,7 +204,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
-  // Parse, typecheck and temporarily insert the incomplete code into the AST.
+  // Parse and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
   PersistentParserState PersistentState;
@@ -212,8 +212,8 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
-  performTypeChecking(SF, PersistentState.getTopLevelContext(),
-                      OriginalDeclCount);
+  performNameBinding(SF, OriginalDeclCount);
+  bindExtensions(SF);
 
   performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
 
