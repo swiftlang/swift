@@ -520,6 +520,22 @@ void swift::_swift_stdlib_funlockfile_stdout() {
 #endif
 }
 
+void swift::_swift_stdlib_flockfile_stderr() {
+#if defined(_WIN32)
+  _lock_file(stderr);
+#else
+  flockfile(stderr);
+#endif
+}
+
+void swift::_swift_stdlib_funlockfile_stderr() {
+#if defined(_WIN32)
+  _unlock_file(stderr);
+#else
+  funlockfile(stderr);
+#endif
+}
+
 int swift::_swift_stdlib_putc_stderr(int C) {
   return putc(C, stderr);
 }

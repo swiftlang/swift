@@ -530,6 +530,37 @@ internal struct _Stdout: TextOutputStream {
   }
 }
 
+internal struct _Stderr: TextOutputStream {
+  internal init() {}
+
+  internal mutating func _lock() {
+    _swift_stdlib_flockfile_stderr()
+  }
+
+  internal mutating func _unlock() {
+    _swift_stdlib_funlockfile_stderr()
+  }
+
+  internal mutating func write(_ string: String) {
+    if string.isEmpty { return }
+
+    var string = string
+    _ = string.withUTF8 { utf8 in
+      _swift_stdlib_fwrite_stderr(utf8.baseAddress!, 1, utf8.count)
+    }
+  }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+public func stdout() -> some TextOutputStream {
+  return _Stdout()
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+public func stderr() -> some TextOutputStream {
+  return _Stderr()
+}
+
 extension String: TextOutputStream {
   /// Appends the given string to this string.
   ///
@@ -590,7 +621,7 @@ internal struct _TeeStream<
 
   internal var left: L
   internal var right: R
-  
+
   /// Append the given `string` to this stream.
   internal mutating func write(_ string: String) {
     left.write(string); right.write(string)
