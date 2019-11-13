@@ -17,7 +17,6 @@ This script compares performance test logs and issues a formatted report.
 
 Invoke `$ compare_perf_tests.py -h ` for complete list of options.
 
-class `Sample` is single benchmark measurement.
 class `PerformanceTestSamples` is collection of `Sample`s and their statistics.
 class `PerformanceTestResult` is a summary of performance test execution.
 class `LogParser` converts log files into `PerformanceTestResult`s.
@@ -35,20 +34,6 @@ import sys
 from bisect import bisect, bisect_left, bisect_right
 from collections import namedtuple
 from math import ceil, sqrt
-
-
-class Sample(namedtuple('Sample', 'i num_iters runtime')):
-    u"""Single benchmark measurement.
-
-    Initialized with:
-    `i`: ordinal number of the sample taken,
-    `num-num_iters`:  number or iterations used to compute it,
-    `runtime`: in microseconds (μs).
-    """
-
-    def __repr__(self):
-        """Shorter Sample formating for debugging purposes."""
-        return 's({0.i!r}, {0.num_iters!r}, {0.runtime!r})'.format(self)
 
 
 class Yield(namedtuple('Yield', 'before_sample after')):
@@ -70,6 +55,7 @@ class PerformanceTestSamples(object):
         self.name = name  # Name of the performance test
         self.num_iters = num_iters  # Number of iterations averaged in sample
         self.samples = []
+        self._all_samples = []
         self.outliers = []
         self._runtimes = []
         self.mean = 0.0
@@ -90,16 +76,17 @@ class PerformanceTestSamples(object):
 
     def add(self, sample):
         """Add sample to collection and recompute statistics."""
-        assert isinstance(sample, Sample)
+        assert isinstance(sample, int)
         self._update_stats(sample)
-        i = bisect(self._runtimes, sample.runtime)
-        self._runtimes.insert(i, sample.runtime)
+        i = bisect(self._runtimes, sample)
+        self._runtimes.insert(i, sample)
         self.samples.insert(i, sample)
+        self._all_samples.append(sample)
 
     def _update_stats(self, sample):
         old_stats = (self.count, self.mean, self.S_runtime)
         _, self.mean, self.S_runtime = (
-            self.running_mean_variance(old_stats, sample.runtime))
+            self.running_mean_variance(old_stats, sample))
 
     def exclude_outliers(self, top_only=False):
         """Exclude outliers by applying Interquartile Range Rule.
@@ -119,11 +106,13 @@ class PerformanceTestSamples(object):
 
         outliers = self.samples[:lo] + self.samples[hi:]
         samples = self.samples[lo:hi]
+        all = self._all_samples
 
         self.__init__(self.name, num_iters=self.num_iters)  # re-initialize
         for sample in samples:  # and
             self.add(sample)  # re-compute stats
         self.outliers = outliers
+        self._all_samples = all
 
     @property
     def count(self):
@@ -138,17 +127,17 @@ class PerformanceTestSamples(object):
     @property
     def all_samples(self):
         """List of all samples in ascending order."""
-        return sorted(self.samples + self.outliers, key=lambda s: s.i)
+        return self._all_samples
 
     @property
     def min(self):
         """Minimum sampled value."""
-        return self.samples[0].runtime
+        return self.samples[0]
 
     @property
     def max(self):
         """Maximum sampled value."""
-        return self.samples[-1].runtime
+        return self.samples[-1]
 
     def quantile(self, q):
         """Return runtime for given quantile.
@@ -157,7 +146,7 @@ class PerformanceTestSamples(object):
         https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
         """
         index = max(0, int(ceil(self.count * float(q))) - 1)
-        return self.samples[index].runtime
+        return self.samples[index]
 
     @property
     def median(self):
@@ -257,8 +246,7 @@ class PerformanceTestResult(object):
                             for i in range(0, self.num_samples)]
 
             self.samples = PerformanceTestSamples(
-                self.name,
-                [Sample(None, None, int(runtime)) for runtime in runtimes])
+                self.name, [int(runtime) for runtime in runtimes])
             self.samples.exclude_outliers(top_only=True)
             sams = self.samples
             self.min, self.max, self.median, self.mean, self.sd = \
@@ -416,9 +404,7 @@ class LogParser(object):
         (lambda self, num_iters: setattr(self, 'num_iters', int(num_iters))),
 
         re.compile(r'\s+Sample (\d+),(\d+)'):
-        (lambda self, i, runtime:
-         self.samples.append(
-             Sample(int(i), int(self.num_iters), int(runtime)))),
+        (lambda self, i, runtime: self.samples.append(int(runtime))),
 
         re.compile(r'\s+SetUp (\d+)'):
         (lambda self, setup: setattr(self, 'setup', int(setup))),
