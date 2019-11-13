@@ -362,7 +362,7 @@ ConstraintSystem::SolverState::SolverState(
 
   // If we're supposed to debug a specific constraint solver attempt,
   // turn on debugging now.
-  ASTContext &ctx = CS.getTypeChecker().Context;
+  ASTContext &ctx = CS.getASTContext();
   auto &tyOpts = ctx.TypeCheckerOpts;
   OldDebugConstraintSolver = tyOpts.DebugConstraintSolver;
   if (tyOpts.DebugConstraintSolverAttempt &&
@@ -409,7 +409,7 @@ ConstraintSystem::SolverState::~SolverState() {
   }
 
   // Restore debugging state.
-  TypeCheckerOptions &tyOpts = CS.getTypeChecker().Context.TypeCheckerOpts;
+  TypeCheckerOptions &tyOpts = CS.getASTContext().TypeCheckerOpts;
   tyOpts.DebugConstraintSolver = OldDebugConstraintSolver;
 
   // Write our local statistics back to the overall statistics.

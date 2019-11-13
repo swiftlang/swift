@@ -2172,6 +2172,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
                                           TypeCheckExprOptions options,
                                           ExprTypeCheckListener &listener,
                                           ConstraintSystem *baseCS) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -3717,14 +3718,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
   out << "\nActive Constraints:\n";
   for (auto &constraint : ActiveConstraints) {
     out.indent(2);
-    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
   out << "\nInactive Constraints:\n";
   for (auto &constraint : InactiveConstraints) {
     out.indent(2);
-    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
@@ -3732,7 +3733,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nRetired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
-      constraint.print(out, &getTypeChecker().Context.SourceMgr);
+      constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     });
   }
@@ -3786,7 +3787,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nDisjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
       out.indent(2);
-      choice.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      choice.first->dump(&getASTContext().SourceMgr, out);
       out << " is #" << choice.second << "\n";
     }
   }
@@ -3795,7 +3796,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nOpened types:\n";
     for (const auto &opened : OpenedTypes) {
       out.indent(2);
-      opened.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
@@ -3814,7 +3815,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nOpened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
       out.indent(2);
-      openedExistential.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      openedExistential.first->dump(&getASTContext().SourceMgr, out);
       out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
     }
@@ -3823,7 +3824,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   if (!DefaultedConstraints.empty()) {
     out << "\nDefaulted constraints: ";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
-      locator->dump(&getTypeChecker().Context.SourceMgr, out);
+      locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {
       out << ", ";
     });
@@ -3832,7 +3833,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   if (failedConstraint) {
     out << "\nFailed constraint:\n";
     out.indent(2);
-    failedConstraint->print(out, &getTypeChecker().Context.SourceMgr);
+    failedConstraint->print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
