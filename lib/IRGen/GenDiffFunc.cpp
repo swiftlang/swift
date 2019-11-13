@@ -9,7 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
 // SWIFT_ENABLE_TENSORFLOW
+//
+// This file implements IR generation for `@differentiable` function types in
+// Swift.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
@@ -31,7 +37,6 @@
 
 using namespace swift;
 using namespace irgen;
-
 
 //----------------------------------------------------------------------------//
 // `@differentiable` (non-linear) function type info

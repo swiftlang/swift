@@ -1068,7 +1068,7 @@ void IRGenerator::emitGlobalTopLevel() {
   // SWIFT_ENABLE_TENSORFLOW
   // Emit differentiability witnesses.
   for (auto &dw :
-       PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
+           PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
     if (dw.isDeclaration())
       continue;
 
