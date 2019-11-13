@@ -54,6 +54,11 @@ SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_funlockfile_stdout(void);
 
 SWIFT_RUNTIME_STDLIB_API
+void _swift_stdlib_flockfile_stderr(void);
+SWIFT_RUNTIME_STDLIB_API
+void _swift_stdlib_funlockfile_stderr(void);
+
+SWIFT_RUNTIME_STDLIB_API
 int _swift_stdlib_putc_stderr(int C);
 
 SWIFT_RUNTIME_STDLIB_API
