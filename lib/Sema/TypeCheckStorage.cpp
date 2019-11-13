@@ -1525,7 +1525,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
       return synthesizePropertyWrapperSetterBody(setter, ctx);
     }
 
-    // Synthesize a getter for the storage wrapper property of a property
+    // Synthesize a setter for the storage wrapper property of a property
     // with an attached wrapper.
     if (auto original = var->getOriginalWrappedProperty(
             PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
@@ -1571,10 +1571,16 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
                    : TargetImpl::Implementation);
 
   // If this is a variable with an attached property wrapper, then
-  // the accessors need to yield the wrapped value.
-  if (isa<VarDecl>(storage) &&
-      cast<VarDecl>(storage)->hasAttachedPropertyWrapper()) {
-    target = TargetImpl::Wrapper;
+  // the accessors need to yield the wrappedValue or projectedValue.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasAttachedPropertyWrapper()) {
+      target = TargetImpl::Wrapper;
+    }
+
+    if (var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+      target = TargetImpl::WrapperStorage;
+    }
   }
 
   SourceLoc loc = storage->getLoc();
