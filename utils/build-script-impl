@@ -2396,9 +2396,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
-                    -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
-                    -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch)
-                    -DXCTEST_PATH_TO_FOUNDATION_BUILD:PATH=${FOUNDATION_BUILD_DIR}
                     -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DCMAKE_PREFIX_PATH:PATH=$(build_directory ${host} llvm)
 
@@ -2441,18 +2438,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
-                # Staging: require opt-in for building with dispatch
-                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
-                    LIBDISPATCH_BUILD_ARGS=(
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
-                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
-                    )
-                else
-                    LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
-                fi
-
                 # FIXME: Always re-build XCTest on non-darwin platforms.
                 # The Swift project might have been changed, but CMake might
                 # not be aware and will not rebuild.
@@ -2470,18 +2455,20 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
                   -DCMAKE_C_COMPILER:PATH=${LLVM_BIN}/clang
                   -DCMAKE_CXX_COMPILER:PATH=${LLVM_BIN}/clang++
-                  -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
+                  -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
+
                   ${LIBICU_BUILD_ARGS[@]}
-                  ${LIBDISPATCH_BUILD_ARGS[@]}
 
                   # NOTE(compnerd) we disable tests because XCTest is not ready
                   # yet, but we will reconfigure when the time comes.
                   -DENABLE_TESTING:BOOL=NO
 
                   -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
+
+                  -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                 )
 
                 ;;
@@ -2911,17 +2898,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
-                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
-                    LIBDISPATCH_BUILD_ARGS=(
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
-                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
-                    )
-                else
-                    LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
-                fi
-
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
@@ -2935,13 +2911,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
-                  ${LIBDISPATCH_BUILD_ARGS[@]}
+                  -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
 
                   -DENABLE_TESTING:BOOL=YES
                   -DXCTest_DIR=$(build_directory ${host} xctest)/cmake/modules
 
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
-                  -DFOUNDATION_PATH_TO_XCTEST_BUILD:PATH=$(build_directory ${host} xctest)
                 )
 
                 [[ -z "${DISTCC}" ]] || EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
