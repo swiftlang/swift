@@ -1,12 +1,12 @@
 set(framework "FrameworkABIBaseline")
 swift_install_in_component(PROGRAMS "swift-api-checker.py"
-                           DESTINATION "bin"
+                           DESTINATION "${TOOLCHAIN_TOOLS_PREFIX}bin"
                            COMPONENT toolchain-tools)
 swift_install_in_component(DIRECTORY "sdk-module-lists"
-                           DESTINATION "bin"
+                           DESTINATION "${TOOLCHAIN_TOOLS_PREFIX}bin"
                            COMPONENT toolchain-tools)
 swift_install_in_component(DIRECTORY "${framework}"
-                           DESTINATION "lib/swift"
+                           DESTINATION "${TOOLCHAIN_TOOLS_PREFIX}lib/swift"
                            COMPONENT toolchain-tools)
 
 # Add symlink of FrameworkABIBaseline to the build dir. This ensures we can
