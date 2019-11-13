@@ -406,24 +406,38 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // dead end blocks that use the value in a non-consuming way.
   //
   // TODO: There may be some way of sinking this into the loop below.
-  if (destroys.empty() &&
-      llvm::any_of(borrowScopeIntroducers,
-                   [](BorrowScopeIntroducingValue borrowScope) {
-                     return borrowScope.isLocalScope();
-                   })) {
+  bool haveAnyLocalScopes = llvm::any_of(
+      borrowScopeIntroducers, [](BorrowScopeIntroducingValue borrowScope) {
+        return borrowScope.isLocalScope();
+      });
+
+  if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
 
   // If we reached this point, then we know that all of our users can accept a
-  // guaranteed value and our owned value is destroyed only by
-  // destroy_value. Check if all of our destroys are joint post-dominated by the
-  // our end borrow scope set. If they do not, then the copy_value is lifetime
-  // extending the guaranteed value, we can not eliminate it.
+  // guaranteed value and our owned value is destroyed only by a set of
+  // destroy_values. Check if:
+  //
+  // 1. All of our destroys are joint post-dominated by our end borrow scope
+  //    set. If they do not, then the copy_value is lifetime extending the
+  //    guaranteed value, we can not eliminate it.
+  //
+  // 2. If all of our destroy_values are dead end. In such a case, the linear
+  //    lifetime checker will not perform any checks since it assumes that dead
+  //    end destroys can be ignored. Since we are going to end the program
+  //    anyways, we want to be conservative here and optimize only if we do not
+  //    need to insert an end_borrow since all of our borrow introducers are
+  //    non-local scopes.
   {
     SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck;
+    bool foundNonDeadEnd = false;
     for (auto *dvi : destroys) {
+      foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(dvi->getParent());
       destroysForLinearLifetimeCheck.push_back(&dvi->getAllOperands()[0]);
     }
+    if (!foundNonDeadEnd && haveAnyLocalScopes)
+      return false;
     SmallVector<BranchPropagatedUser, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
