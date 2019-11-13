@@ -2278,7 +2278,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!result)
     return Type();
 
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);

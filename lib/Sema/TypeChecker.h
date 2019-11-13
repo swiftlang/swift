@@ -561,8 +561,6 @@ public:
   TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();
 
-  LangOptions &getLangOpts() const { return Context.LangOpts; }
-
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
