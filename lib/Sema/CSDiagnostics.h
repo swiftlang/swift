@@ -722,6 +722,8 @@ public:
 
   bool diagnoseAsError() override;
 
+  bool diagnoseAsNote() override;
+
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 

@@ -2152,6 +2152,16 @@ bool ContextualFailure::diagnoseAsError() {
   return true;
 }
 
+bool ContextualFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
+  emitDiagnostic(decl, diag::found_candidate_type, getFromType());
+  return true;
+}
+
 static Optional<Diag<Type>>
 getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   switch (CTP) {

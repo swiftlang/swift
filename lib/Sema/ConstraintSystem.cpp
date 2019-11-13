@@ -2696,6 +2696,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     const auto *fix = viableSolutions.front().second;
     auto *commonAnchor = commonCalleeLocator->getAnchor();
     auto &DE = getASTContext().Diags;
+    auto name = decl->getFullName();
+
     if (fix->getKind() == FixKind::UseSubscriptOperator) {
       auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
       DE.diagnose(commonAnchor->getLoc(),
@@ -2705,8 +2707,18 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       DE.diagnose(commonAnchor->getLoc(),
                   diag::no_overloads_match_exactly_in_assignment,
                   decl->getBaseName());
+    } else if (llvm::all_of(
+                   viableSolutions,
+                   [](const std::pair<const Solution *, const ConstraintFix *>
+                          &fix) {
+                     auto *locator = fix.second->getLocator();
+                     return locator
+                         ->isLastElement<LocatorPathElt::ContextualType>();
+                   })) {
+      auto baseName = name.getBaseName();
+      DE.diagnose(commonAnchor->getLoc(), diag::no_candidates_match_result_type,
+                  baseName.userFacingName(), getContextualType());
     } else {
-      auto name = decl->getFullName();
       // Three choices here:
       // 1. If this is a special name avoid printing it because
       //    printing kind is sufficient;
