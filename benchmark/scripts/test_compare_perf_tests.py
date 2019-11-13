@@ -157,6 +157,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
 
         self.assertEqual(self.samples.count, 11)
         self.assertEqual(self.samples.outliers, ss[11:])
+        self.assertEqual(self.samples.all_samples, ss)
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1075, 1100))
         self.assertEqualStats(
@@ -175,6 +176,9 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.assertEqual(self.samples.count, 3)
         self.assertEqualStats(
             (self.samples.min, self.samples.max), (18, 18))
+        self.assertEqual(self.samples.all_samples,
+                         [Sample(0, 2, 23), Sample(1, 2, 18),
+                          Sample(2, 2, 18), Sample(3, 2, 18)])
 
     def test_excludes_outliers_top_only(self):
         ss = [Sample(*map(int, s.split())) for s in
