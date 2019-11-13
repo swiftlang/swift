@@ -3265,8 +3265,25 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::FunctionResult: {
+    auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
+    // If this is a mismatch between contextual type and (trailing)
+    // closure with explicitly specified result type let's record it
+    // as contextual type mismatch.
+    if (loc->isLastElement<LocatorPathElt::ContextualType>() ||
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      auto *argExpr = simplifyLocatorToAnchor(loc);
+      if (argExpr && isa<ClosureExpr>(argExpr)) {
+        conversionsOrFixes.push_back(ContextualMismatch::create(
+            *this, lhs, rhs,
+            getConstraintLocator(argExpr, ConstraintLocator::ClosureResult)));
+        break;
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
+
   case ConstraintLocator::Member:
-  case ConstraintLocator::FunctionResult:
   case ConstraintLocator::DynamicLookupResult: {
     // Most likely this is an attempt to use get-only subscript as mutating,
     // or assign a value of a result of function/member ref e.g. `foo() = 42`

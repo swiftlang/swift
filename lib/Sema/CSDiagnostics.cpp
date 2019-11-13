@@ -1986,6 +1986,17 @@ bool ContextualFailure::diagnoseAsError() {
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
   case ConstraintLocator::ClosureResult: {
+    auto *closure = cast<ClosureExpr>(getRawAnchor());
+    if (closure->hasExplicitResultType() &&
+        closure->getExplicitResultTypeLoc().getTypeRepr()) {
+      auto resultRepr = closure->getExplicitResultTypeLoc().getTypeRepr();
+      emitDiagnostic(resultRepr->getStartLoc(),
+                     diag::incorrect_explicit_closure_result, getFromType(),
+                     getToType())
+          .fixItReplace(resultRepr->getSourceRange(), getToType().getString());
+      return true;
+    }
+
     diagnostic = diag::cannot_convert_closure_result;
     break;
   }
