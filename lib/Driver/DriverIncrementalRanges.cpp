@@ -149,6 +149,14 @@ Optional<Ranges> SourceRangeBasedInfo::loadChangedRanges(
     const StringRef compiledSourcePath, const StringRef primaryPath,
     const bool showIncrementalBuildDecisions, DiagnosticEngine &diags) {
 
+  // Shortcut the diff if the saved source is newer than the actual source.
+  auto isPreviouslyCompiledNewer = isFileNewerThan(compiledSourcePath,
+                                                   primaryPath, diags);
+  if (!isPreviouslyCompiledNewer)
+    return None;
+  if (isPreviouslyCompiledNewer.getValue())
+    return {};
+
   auto wasCompiledBefore = llvm::MemoryBuffer::getFile(compiledSourcePath);
   if (auto ec = wasCompiledBefore.getError()) {
     diags.diagnose(SourceLoc(), diag::warn_unable_to_load_compiled_swift,
@@ -280,6 +288,7 @@ bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
   return true;
 }
 
+/// Return true if lhs is newer than rhs, or None for error.
 Optional<bool> SourceRangeBasedInfo::isFileNewerThan(StringRef lhs,
                                                      StringRef rhs,
                                                      DiagnosticEngine &diags) {
