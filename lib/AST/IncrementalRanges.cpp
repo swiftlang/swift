@@ -120,7 +120,7 @@ Optional<SerializableSourceRange> SerializableSourceRange::findOutlierIfAny(
 Ranges SerializableSourceRange::findAllOutliers(
     ArrayRef<SerializableSourceRange> subset,
     ArrayRef<SerializableSourceRange> superset) {
-#warning incremental-ranges:  optimize with slice of superset
+  // TODO:  optimize with slice of superset
   Ranges outliers;
   std::copy_if(subset.begin(), subset.end(), std::back_inserter(outliers),
                [&](const SerializableSourceRange &r) {
