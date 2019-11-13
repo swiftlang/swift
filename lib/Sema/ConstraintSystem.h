@@ -1993,6 +1993,18 @@ public:
     return nullptr;
   }
 
+  /// Retrieve the depth of the given expression.
+  Optional<unsigned> getExprDepth(Expr *expr) const {
+    auto e = ExprWeights.find(expr);
+    if (e != ExprWeights.end())
+      return e->second.first;
+
+    if (baseCS && baseCS != this)
+      return baseCS->getExprDepth(expr);
+
+    return None;
+  }
+
   /// Returns a locator describing the callee for the anchor of a given locator.
   ///
   /// - For an unresolved dot/member anchor, this will be a locator describing
@@ -3661,8 +3673,7 @@ private:
   /// \param idx2 The index of the second solution.
   static SolutionCompareResult
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
-                   const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-                   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights);
+                   const SolutionDiff &diff, unsigned idx1, unsigned idx2);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution

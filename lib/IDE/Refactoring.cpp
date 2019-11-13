@@ -2939,30 +2939,36 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
   // This cursor must point to the start of an expression.
   if (Tok.Kind != CursorInfoKind::ExprStart)
     return nullptr;
-  Expr *Parent = Tok.TrailingExpr;
-  assert(Parent);
 
-  // Check if an expression is a number literal.
-  auto IsLiteralNumber = [&](Expr *E) -> NumberLiteralExpr* {
-    if (auto *NL = dyn_cast<NumberLiteralExpr>(E)) {
-
-      // The sub-expression must have the same start loc with the outermost
-      // expression, i.e. the cursor position.
-      if (Parent->getStartLoc().getOpaquePointerValue() ==
-        E->getStartLoc().getOpaquePointerValue()) {
-        return NL;
-      }
-    }
-    return nullptr;
-  };
   // For every sub-expression, try to find the literal expression that matches
   // our criteria.
-  for (auto Pair: Parent->getDepthMap()) {
-    if (auto Result = IsLiteralNumber(Pair.getFirst())) {
-      return Result;
+  class FindLiteralNumber : public ASTWalker {
+    Expr * const parent;
+
+  public:
+    NumberLiteralExpr *found = nullptr;
+
+    explicit FindLiteralNumber(Expr *parent) : parent(parent) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *literal = dyn_cast<NumberLiteralExpr>(expr)) {
+        // The sub-expression must have the same start loc with the outermost
+        // expression, i.e. the cursor position.
+        if (!found &&
+            parent->getStartLoc().getOpaquePointerValue() ==
+              expr->getStartLoc().getOpaquePointerValue()) {
+          found = literal;
+        }
+      }
+
+      return { found == nullptr, expr };
     }
-  }
-  return nullptr;
+  };
+
+  auto parent = Tok.TrailingExpr;
+  FindLiteralNumber finder(parent);
+  parent->walk(finder);
+  return finder.found;
 }
 
 static std::string insertUnderscore(StringRef Text) {
