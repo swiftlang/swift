@@ -3575,7 +3575,7 @@ struct TargetSingletonMetadataInitialization {
   }
 
   /// This method can only be called from the runtime itself. It is defined
-  /// in MetadataCache.h.
+  /// in Metadata.cpp.
   TargetMetadata<Runtime> *allocate(
       const TargetTypeContextDescriptor<Runtime> *description) const;
 };
