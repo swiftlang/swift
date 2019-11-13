@@ -20,6 +20,8 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace swift {
 struct ExpectedFixIt;
@@ -32,6 +34,7 @@ struct CapturedDiagnosticInfo {
   unsigned Line;
   unsigned Column;
   SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+  llvm::StringSet<> EducationalNotes;
 };
 /// This class implements support for -verify mode in the compiler.  It
 /// buffers up diagnostics produced during compilation, then checks them
@@ -69,6 +72,9 @@ private:
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
                            StringRef InputFile);
+
+  // Render the verifier syntax for a given set of educational notes.
+  std::string renderEducationalNotes(llvm::StringSet<> &EducationalNotes);
 };
 }
 
