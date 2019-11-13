@@ -677,7 +677,7 @@ TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
-  if (C.LangOpts.DebugForbidTypecheckPrefix.empty())
+  if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
     return;
 
   // Don't touch special names or empty names.
@@ -685,7 +685,7 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
     return;
 
   StringRef Str = Name.getIdentifier().str();
-  if (Str.startswith(C.LangOpts.DebugForbidTypecheckPrefix)) {
+  if (Str.startswith(C.TypeCheckerOpts.DebugForbidTypecheckPrefix)) {
     std::string Msg = "forbidden typecheck occurred: ";
     Msg += Str;
     llvm::report_fatal_error(Msg);

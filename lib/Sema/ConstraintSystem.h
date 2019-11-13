@@ -1252,7 +1252,7 @@ private:
       }
 
       unsigned threshold =
-          cs->getASTContext().LangOpts.SolverShrinkUnsolvedThreshold;
+          cs->getASTContext().TypeCheckerOpts.SolverShrinkUnsolvedThreshold;
       return unsolvedDisjunctions >= threshold;
     }
   };
@@ -3432,13 +3432,12 @@ private:
       if (NumDefaultableBindings > 0)
         out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
 
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
       out << "bindings={";
       interleave(Bindings,
                  [&](const PotentialBinding &binding) {
                    auto type = binding.BindingType;
-                   auto &ctx = type->getASTContext();
-                   llvm::SaveAndRestore<bool> debugConstraints(
-                       ctx.LangOpts.DebugConstraintSolver, true);
                    switch (binding.Kind) {
                    case AllowedBindingKind::Exact:
                      break;
@@ -3454,7 +3453,7 @@ private:
                    if (binding.DefaultedProtocol)
                      out << "(default from "
                          << binding.DefaultedProtocol->getName() << ") ";
-                   out << type.getString();
+                   out << type.getString(PO);
                  },
                  [&]() { out << "; "; });
       out << "}";
@@ -3730,7 +3729,7 @@ public:
       used += s.getTotalMemory();
     }
     MaxMemory = std::max(used, MaxMemory);
-    auto threshold = getASTContext().LangOpts.SolverMemoryThreshold;
+    auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       return isExpressionAlreadyTooComplex= true;
     }
@@ -3748,7 +3747,7 @@ public:
 
     // Bail out once we've looked at a really large number of
     // choices.
-    if (CountScopes > getASTContext().LangOpts.SolverBindingThreshold) {
+    if (CountScopes > getASTContext().TypeCheckerOpts.SolverBindingThreshold) {
       return isExpressionAlreadyTooComplex = true;
     }
 
@@ -4188,8 +4187,10 @@ public:
   bool attempt(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *) const {
-    Out << "type variable " << TypeVar->getString()
-        << " := " << Binding.BindingType->getString();
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    Out << "type variable " << TypeVar->getString(PO)
+        << " := " << Binding.BindingType->getString(PO);
   }
 };
 

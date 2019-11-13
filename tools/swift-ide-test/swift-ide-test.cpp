@@ -3359,12 +3359,11 @@ int main(int argc, char *argv[]) {
   for (auto &Arg : options::ClangXCC) {
     InitInvok.getClangImporterOptions().ExtraArgs.push_back(Arg);
   }
-  InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
-    options::DebugForbidTypecheckPrefix;
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-
-  InitInvok.getLangOptions().DebugConstraintSolver =
+  InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
+    options::DebugForbidTypecheckPrefix;
+  InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
       options::DebugConstraintSolver;
 
   for (auto ConfigName : options::BuildConfigs)

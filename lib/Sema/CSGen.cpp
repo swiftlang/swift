@@ -3776,7 +3776,7 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return;
   
   SmallVector<Expr *, 16> linkedExprs;

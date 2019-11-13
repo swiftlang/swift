@@ -4858,7 +4858,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check all conformances.
   groupChecker.checkAllConformances();
 
-  if (Context.LangOpts.DebugGenericSignatures) {
+  if (Context.TypeCheckerOpts.DebugGenericSignatures) {
     // Now that they're filled out, print out information about the conformances
     // here, when requested.
     for (auto conformance : conformances) {
