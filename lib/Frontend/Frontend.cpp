@@ -858,7 +858,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
       return;
     }
 
-    performTypeChecking(SF, PersistentState->getTopLevelContext());
+    performTypeChecking(SF);
 
     if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
       performPCMacro(SF);
@@ -975,8 +975,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
         performNameBinding(MainFile, CurTUElem);
         break;
       case SourceFile::TypeChecked:
-        performTypeChecking(MainFile, PersistentState->getTopLevelContext(),
-                            CurTUElem);
+        performTypeChecking(MainFile, CurTUElem);
         break;
       }
     }

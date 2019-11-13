@@ -315,8 +315,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.definedFunctions.clear();
 }
 
-void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                                unsigned StartElem) {
+void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
