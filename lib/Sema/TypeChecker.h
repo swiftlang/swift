@@ -613,10 +613,6 @@ public:
   static void checkUnsupportedProtocolType(ASTContext &ctx,
                                            GenericParamList *genericParams);
 
-  /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  static GenericEnvironment *
-  handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///

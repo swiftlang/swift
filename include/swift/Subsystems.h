@@ -228,8 +228,7 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(ASTContext &Ctx,
-                                             GenericParamList *genericParams,
+  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
 
   /// Turn the given module into SIL IR.

@@ -1281,24 +1281,20 @@ bool SILParser::parseSILType(SILType &Result,
   
   // Resolve the generic environments for parsed generic function and box types.
   class HandleSILGenericParamsWalker : public ASTWalker {
-    ASTContext &C;
     SourceFile *SF;
   public:
-    HandleSILGenericParamsWalker(ASTContext &C,
-                                 SourceFile *SF)
-      : C(C), SF(SF)
-    {}
-    
+    HandleSILGenericParamsWalker(SourceFile *SF) : SF(SF) {}
+
     bool walkToTypeReprPre(TypeRepr *T) override {
       if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
         if (auto generics = fnType->getGenericParams()) {
-          auto env = handleSILGenericParams(C, generics, SF);
+          auto env = handleSILGenericParams(generics, SF);
           fnType->setGenericEnvironment(env);
         }
       }
       if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
         if (auto generics = boxType->getGenericParams()) {
-          auto env = handleSILGenericParams(C, generics, SF);
+          auto env = handleSILGenericParams(generics, SF);
           boxType->setGenericEnvironment(env);
         }
       }
@@ -1306,9 +1302,8 @@ bool SILParser::parseSILType(SILType &Result,
     }
   };
 
-  TyR.get()
-    ->walk(HandleSILGenericParamsWalker(P.Context, &P.SF));
-  
+  TyR.get()->walk(HandleSILGenericParamsWalker(&P.SF));
+
   // Save the top-level function generic environment if there was one.
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
     if (auto env = fnType->getGenericEnvironment())
@@ -2039,7 +2034,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       if (auto generics = fnType->getGenericParams()) {
         assert(!Ty.wasValidated() && Ty.getType().isNull());
 
-        genericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
+        genericEnv = handleSILGenericParams(generics, &P.SF);
         fnType->setGenericEnvironment(genericEnv);
       }
     }
@@ -3108,8 +3103,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     {
       Scope genericsScope(&P, ScopeKind::Generics);
       generics = P.maybeParseGenericParams().getPtrOrNull();
-      patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
-      
+      patternEnv = handleSILGenericParams(generics, &P.SF);
+
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
         return true;
       
@@ -5717,8 +5712,8 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   Scope toplevelScope(&P, ScopeKind::TopLevel);
   Scope genericsScope(&P, ScopeKind::Generics);
   generics = P.maybeParseGenericParams().getPtrOrNull();
-  patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
-  
+  patternEnv = handleSILGenericParams(generics, &P.SF);
+
   if (patternEnv) {
     if (patternEnv->getGenericSignature()->getCanonicalSignature()
            != VD->getInnermostDeclContext()->getGenericSignatureOfContext()
@@ -6028,7 +6023,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
 
   auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
   if (genericParams) {
-    genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
+    genericEnv = handleSILGenericParams(genericParams, &P.SF);
   }
 
   auto retVal = parseProtocolConformanceHelper(proto, genericEnv, context,
