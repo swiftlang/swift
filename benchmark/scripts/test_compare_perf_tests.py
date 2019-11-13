@@ -105,31 +105,31 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.add(Sample(5, 1, 1100))
         self.assertEqual(self.samples.iqr, 50)
 
-    def assertEqualtats(self, stats, expected_stats):
+    def assertEqualStats(self, stats, expected_stats):
         for actual, expected in zip(stats, expected_stats):
-            self.assertAlmostEquals(actual, expected, places=2)
+            self.assertAlmostEqual(actual, expected, places=2)
 
     def test_computes_mean_sd_cv(self):
         ss = self.samples
-        self.assertEqualtats(
+        self.assertEqualStats(
             (ss.mean, ss.sd, ss.cv), (1000.0, 0.0, 0.0))
         self.samples.add(Sample(2, 1, 1100))
-        self.assertEqualtats(
+        self.assertEqualStats(
             (ss.mean, ss.sd, ss.cv), (1050.0, 70.71, 6.7 / 100))
 
     def test_computes_range_spread(self):
         ss = self.samples
-        self.assertEqualtats(
+        self.assertEqualStats(
             (ss.range, ss.spread), (0, 0))
         self.samples.add(Sample(2, 1, 1100))
-        self.assertEqualtats(
+        self.assertEqualStats(
             (ss.range, ss.spread), (100, 10.0 / 100))
 
     def test_init_with_samples(self):
         self.samples = PerformanceTestSamples(
             'B2', [Sample(0, 1, 1000), Sample(1, 1, 1100)])
         self.assertEqual(self.samples.count, 2)
-        self.assertEqualtats(
+        self.assertEqualStats(
             (self.samples.mean, self.samples.sd,
              self.samples.range, self.samples.spread),
             (1050.0, 70.71, 100, 9.52 / 100))
@@ -138,7 +138,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         # guard against dividing by 0
         self.samples = PerformanceTestSamples('Zero')
         self.samples.add(Sample(0, 1, 0))
-        self.assertEqualtats(
+        self.assertEqualStats(
             (self.samples.mean, self.samples.sd, self.samples.cv,
              self.samples.range, self.samples.spread),
             (0, 0, 0.0, 0, 0.0))
@@ -150,7 +150,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
               '10 1 1050, 11 1 949, 12 1 1151'.split(',')]
         self.samples = PerformanceTestSamples('Outliers', ss)
         self.assertEqual(self.samples.count, 13)
-        self.assertEqualtats(
+        self.assertEqualStats(
             (self.samples.mean, self.samples.sd), (1050, 52.36))
 
         self.samples.exclude_outliers()
@@ -159,7 +159,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.assertEqual(self.samples.outliers, ss[11:])
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1075, 1100))
-        self.assertEqualtats(
+        self.assertEqualStats(
             (self.samples.mean, self.samples.sd), (1050, 35.36))
 
     def test_excludes_outliers_zero_IQR(self):
@@ -173,7 +173,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.exclude_outliers()
 
         self.assertEqual(self.samples.count, 3)
-        self.assertEqualtats(
+        self.assertEqualStats(
             (self.samples.min, self.samples.max), (18, 18))
 
     def test_excludes_outliers_top_only(self):
@@ -186,7 +186,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.exclude_outliers(top_only=True)
 
         self.assertEqual(self.samples.count, 4)
-        self.assertEqualtats((self.samples.min, self.samples.max), (1, 2))
+        self.assertEqualStats((self.samples.min, self.samples.max), (1, 2))
 
 
 class TestPerformanceTestResult(unittest.TestCase):
@@ -212,8 +212,8 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEqual(r.name, 'Ackermann')
         self.assertEqual((r.num_samples, r.min, r.median, r.max),
                          (3, 54383, 54512, 54601))
-        self.assertAlmostEquals(r.mean, 54498.67, places=2)
-        self.assertAlmostEquals(r.sd, 109.61, places=2)
+        self.assertAlmostEqual(r.mean, 54498.67, places=2)
+        self.assertAlmostEqual(r.sd, 109.61, places=2)
         self.assertEqual(r.samples.count, 3)
         self.assertEqual(r.samples.num_samples, 3)
         self.assertEqual([s.runtime for s in r.samples.all_samples],
@@ -344,7 +344,7 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEqual((r.num_samples, r.min, r.max), (200, 715, 1259))
         self.assertEqual((r.samples.count, r.samples.min, r.samples.max),
                          (2, 715, 1259))
-        self.assertEquals(r.max_rss, 32768)
+        self.assertEqual(r.max_rss, 32768)
         self.assertEqual((r.mem_pages, r.involuntary_cs, r.yield_count),
                          (8, 28, 15))
         log = '1,Ackermann,2,715,,16,9,,'  # --delta erased 0s
@@ -432,21 +432,21 @@ class TestResultComparison(unittest.TestCase):
     def test_init(self):
         rc = ResultComparison(self.r1, self.r2)
         self.assertEqual(rc.name, 'AngryPhonebook')
-        self.assertAlmostEquals(rc.ratio, 12325.0 / 11616.0)
-        self.assertAlmostEquals(rc.delta, (((11616.0 / 12325.0) - 1) * 100),
-                                places=3)
+        self.assertAlmostEqual(rc.ratio, 12325.0 / 11616.0)
+        self.assertAlmostEqual(rc.delta, (((11616.0 / 12325.0) - 1) * 100),
+                               places=3)
         # handle test results that sometimes change to zero, when compiler
         # optimizes out the body of the incorrectly written test
         rc = ResultComparison(self.r0, self.r0)
         self.assertEqual(rc.name, 'GlobalClass')
-        self.assertAlmostEquals(rc.ratio, 1)
-        self.assertAlmostEquals(rc.delta, 0, places=3)
+        self.assertAlmostEqual(rc.ratio, 1)
+        self.assertAlmostEqual(rc.delta, 0, places=3)
         rc = ResultComparison(self.r0, self.r01)
-        self.assertAlmostEquals(rc.ratio, 0, places=3)
-        self.assertAlmostEquals(rc.delta, 2000000, places=3)
+        self.assertAlmostEqual(rc.ratio, 0, places=3)
+        self.assertAlmostEqual(rc.delta, 2000000, places=3)
         rc = ResultComparison(self.r01, self.r0)
-        self.assertAlmostEquals(rc.ratio, 20001)
-        self.assertAlmostEquals(rc.delta, -99.995, places=3)
+        self.assertAlmostEqual(rc.ratio, 20001)
+        self.assertAlmostEqual(rc.delta, -99.995, places=3)
         # disallow comparison of different test results
         self.assertRaises(
             AssertionError,
@@ -526,11 +526,11 @@ Total performance tests executed: 1
         parser = LogParser()
         results = parser.parse_results(log.splitlines())
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
-        self.assertEquals(results[0].name, 'Array.append.Array.Int?')
-        self.assertEquals(results[1].name,
-                          'Bridging.NSArray.as!.Array.NSString')
-        self.assertEquals(results[2].name,
-                          'Flatten.Array.Tuple4.lazy.for-in.Reserve')
+        self.assertEqual(results[0].name, 'Array.append.Array.Int?')
+        self.assertEqual(results[1].name,
+                         'Bridging.NSArray.as!.Array.NSString')
+        self.assertEqual(results[2].name,
+                         'Flatten.Array.Tuple4.lazy.for-in.Reserve')
 
     def test_parse_results_tab_delimited(self):
         log = '34\tBitCount\t20\t3\t4\t4\t0\t4'
@@ -715,8 +715,8 @@ Totals,2"""
         self.assertEqual(result.min, 350815)
         self.assertEqual(result.max, 376131)
         self.assertEqual(result.median, 358817)
-        self.assertAlmostEquals(result.sd, 8443.37, places=2)
-        self.assertAlmostEquals(result.mean, 361463.25, places=2)
+        self.assertAlmostEqual(result.sd, 8443.37, places=2)
+        self.assertAlmostEqual(result.mean, 361463.25, places=2)
         self.assertEqual(result.num_samples, 8)
         samples = result.samples
         self.assertTrue(isinstance(samples, PerformanceTestSamples))

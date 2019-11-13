@@ -188,8 +188,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                          ['Benchmark1', 'Benchmark2'])
         self.assertEqual(driver.all_tests,
                          ['Benchmark1', 'Benchmark2'])
-        self.assertEquals(driver.test_number['Benchmark1'], "1")
-        self.assertEquals(driver.test_number['Benchmark2'], "2")
+        self.assertEqual(driver.test_number['Benchmark1'], "1")
+        self.assertEqual(driver.test_number['Benchmark2'], "2")
 
     list_all_tests = (
         '/benchmarks/Benchmark_O --list --delim=\t --skip-tags='.split(' '),
@@ -316,10 +316,10 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         """
         r = self.driver.run('b')
         self.assertTrue(self.parser_stub.results_from_string_called)
-        self.assertEquals(r.name, 'b1')  # non-matching name, just 1st result
+        self.assertEqual(r.name, 'b1')  # non-matching name, just 1st result
         r = self.driver.run()
         self.assertTrue(isinstance(r, dict))
-        self.assertEquals(r['b1'].name, 'b1')
+        self.assertEqual(r['b1'].name, 'b1')
 
     def test_measure_memory(self):
         self.driver.run('b', measure_memory=True)
