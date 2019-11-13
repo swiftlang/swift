@@ -743,8 +743,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   bool isMemberLValue = isLValue;
   auto propertyWrapperMutability =
       [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
-    if (accessor->isCoroutine())
-      return None;
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
       return None;
@@ -1572,6 +1570,13 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
                    ? TargetImpl::Ordinary
                    : TargetImpl::Implementation);
 
+  // If this is a variable with an attached property wrapper, then
+  // the accessors need to yield the wrapped value.
+  if (isa<VarDecl>(storage) &&
+      cast<VarDecl>(storage)->hasAttachedPropertyWrapper()) {
+    target = TargetImpl::Wrapper;
+  }
+
   SourceLoc loc = storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
@@ -1602,8 +1607,11 @@ synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
-  auto impl = modify->getStorage()->getReadWriteImpl();
-  assert(impl != ReadWriteImplKind::Modify &&
+  auto storage = modify->getStorage();
+  auto impl = storage->getReadWriteImpl();
+  auto hasWrapper = isa<VarDecl>(storage) &&
+                    cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
+  assert((hasWrapper || impl != ReadWriteImplKind::Modify) &&
          impl != ReadWriteImplKind::Immutable);
 #endif
   return synthesizeCoroutineAccessorBody(modify, ctx);
@@ -2548,7 +2556,8 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   }
 
   if (wrapperSetterIsUsable)
-    info = StorageImplInfo::getMutableComputed();
+    info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
+                           ReadWriteImplKind::Modify);
   else
     info = StorageImplInfo::getImmutableComputed();
 }
