@@ -665,6 +665,14 @@ public:
                            IsFreeFunctionWitness_t isFree,
                            bool isSelfConformance);
 
+  /// Generates subscript arguments for keypath. This function handles lowering of all index expressions
+  /// including default arguments.
+  ///
+  /// \returns Lowered index arguments.
+  /// \param subscript - The subscript decl who's arguments are being lowered.
+  /// \param subs - Used to get subscript function type and to substitute generic args.
+  /// \param indexExpr - An expression holding the indices of the subscript (either a TupleExpr
+  /// or a ParanExpr).
   SmallVector<ManagedValue, 4>
   emitKeyPathSubscriptOperands(SubscriptDecl *subscript, SubstitutionMap subs,
                                Expr *indexExpr);

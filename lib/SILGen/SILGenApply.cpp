@@ -6082,10 +6082,10 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
   ArgEmitter emitter(
-      *this, fnType.getPointer()->getRepresentation(),
+      *this, fnType->getRepresentation(),
       /*yield*/ false,
       /*isForCoroutine*/ false,
-      ClaimedParamsRef(fnType, fnType.getPointer()->getParameters()), argValues,
+      ClaimedParamsRef(fnType, fnType->getParameters()), argValues,
       delayedArgs,
       /*foreign error*/ None, ImportAsMemberStatus());
 
