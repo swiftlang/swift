@@ -3432,13 +3432,12 @@ private:
       if (NumDefaultableBindings > 0)
         out << "#defaultable_bindings=" << NumDefaultableBindings << " ";
 
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
       out << "bindings={";
       interleave(Bindings,
                  [&](const PotentialBinding &binding) {
                    auto type = binding.BindingType;
-                   auto &ctx = type->getASTContext();
-                   llvm::SaveAndRestore<bool> debugConstraints(
-                       ctx.LangOpts.DebugConstraintSolver, true);
                    switch (binding.Kind) {
                    case AllowedBindingKind::Exact:
                      break;
@@ -3454,7 +3453,7 @@ private:
                    if (binding.DefaultedProtocol)
                      out << "(default from "
                          << binding.DefaultedProtocol->getName() << ") ";
-                   out << type.getString();
+                   out << type.getString(PO);
                  },
                  [&]() { out << "; "; });
       out << "}";
@@ -4188,8 +4187,10 @@ public:
   bool attempt(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *) const {
-    Out << "type variable " << TypeVar->getString()
-        << " := " << Binding.BindingType->getString();
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    Out << "type variable " << TypeVar->getString(PO)
+        << " := " << Binding.BindingType->getString(PO);
   }
 };
 

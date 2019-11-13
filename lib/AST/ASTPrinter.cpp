@@ -3595,7 +3595,7 @@ public:
   }
 
   void visitUnresolvedType(UnresolvedType *T) {
-    if (T->getASTContext().LangOpts.DebugConstraintSolver)
+    if (Options.PrintTypesForDebugging)
       Printer << "<<unresolvedtype>>";
     else
       Printer << "_";
@@ -4331,7 +4331,7 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitTypeVariableType(TypeVariableType *T) {
-    if (T->getASTContext().LangOpts.DebugConstraintSolver) {
+    if (Options.PrintTypesForDebugging) {
       Printer << "$T" << T->getID();
       return;
     }

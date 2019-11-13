@@ -601,7 +601,9 @@ public:
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    Out << "TypeVariableStep for " << TypeVar->getString() << " with #"
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    Out << "TypeVariableStep for " << TypeVar->getString(PO) << " with #"
         << InitialBindings.size() << " initial bindings\n";
   }
 

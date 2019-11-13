@@ -415,13 +415,15 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
   if (isDebugMode()) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
     auto &log = getDebugLogger();
 
     log << "Initial bindings: ";
     interleave(InitialBindings.begin(), InitialBindings.end(),
                [&](const Binding &binding) {
-                 log << TypeVar->getString()
-                     << " := " << binding.BindingType->getString();
+                 log << TypeVar->getString(PO)
+                     << " := " << binding.BindingType->getString(PO);
                },
                [&log] { log << ", "; });
 

@@ -2242,11 +2242,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 
   if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
-      << boundType->getString() << " := "
-      << refType->getString() << ")\n";
+      << boundType->getString(PO) << " := "
+      << refType->getString(PO) << ")\n";
   }
 
   // If this overload is disfavored, note that.

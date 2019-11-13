@@ -3686,7 +3686,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   out << "Type Variables:\n";
   for (auto tv : getTypeVariables()) {
     out.indent(2);
-    out << tv->getString(PO);
+    Type(tv).print(out, PO);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
@@ -3703,7 +3703,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
       }
     } else {
       out << " equivalent to ";
-      out << rep->getString(PO);
+      Type(rep).print(out, PO);
     }
 
     if (auto *locator = tv->getImpl().getLocator()) {
@@ -3751,10 +3751,10 @@ void ConstraintSystem::print(raw_ostream &out) const {
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
-          out << choice.getBaseType()->getString() << ".";
+          out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
-            << resolved->BoundType->getString() << " == "
-            << resolved->ImpliedType->getString() << "\n";
+            << resolved->BoundType->getString(PO) << " == "
+            << resolved->ImpliedType->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::BaseType:
