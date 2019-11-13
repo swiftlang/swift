@@ -17,6 +17,9 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/FileUnit.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVMContext.h"
@@ -973,7 +976,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
   //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
   unsigned numGenericParams = 1 + arity;
-  BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
+  BuiltinFunctionBuilder builder(Context, numGenericParams);
   // Get the `Differentiable` protocol.
   auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
   // Create type parameters and add conformance constraints.
@@ -986,10 +989,10 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     fnArgGens.push_back(T);
   }
   // Generator for the first argument, i.e. the @differentiable function.
-  BuiltinGenericSignatureBuilder::LambdaGenerator firstArgGen {
+  BuiltinFunctionBuilder::LambdaGenerator firstArgGen {
     // Generator for the function type at the argument position, i.e. the
     // function being differentiated.
-    [=, &fnArgGens](BuiltinGenericSignatureBuilder &builder) -> Type {
+    [=, &fnArgGens](BuiltinFunctionBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
           .withDifferentiabilityKind(DifferentiabilityKind::Normal)
@@ -1011,8 +1014,8 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   auto *paramIndices = IndexSubset::get(
       Context, SmallBitVector(origFnTy->getNumParams(), true));
   // Generator for the resultant function type, i.e. the AD derivative function.
-  BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
-      [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
+  BuiltinFunctionBuilder::LambdaGenerator resultGen{
+      [=, &Context](BuiltinFunctionBuilder &builder) -> Type {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
             paramIndices, /*resultIndex*/ 0, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));

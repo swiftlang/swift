@@ -1814,11 +1814,12 @@ public:
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership)
+                     // SWIFT_ENABLE_TENSORFLOW
+                     ValueOwnership ownership, bool nonDifferentiable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               // SWIFT_ENABLE_TENSORFLOW
-              uint8_t(ownership) << OwnershipShift) |
+              (uint8_t(ownership) << OwnershipShift) |
               (nonDifferentiable ? NonDifferentiable : 0)) {}
 
   /// Create one from what's present in the parameter type

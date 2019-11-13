@@ -900,12 +900,12 @@ namespace decls_block {
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // non-ephemeral?
-    ValueOwnershipField // inout, shared or owned?
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // non-ephemeral?
+    ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>           // nondifferentiable?
   >;
 

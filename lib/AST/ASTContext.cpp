@@ -3069,7 +3069,7 @@ void AnyFunctionType::decomposeInput(
                         ParameterTypeFlags::fromParameterType(
                           // SWIFT_ENABLE_TENSORFLOW
                           type, false, false, false, ValueOwnership::Default,
-                          /*nonDifferentiable*/ false))
+                          /*nonDifferentiable*/ false));
     return;
   }
 }
