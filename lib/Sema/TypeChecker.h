@@ -930,6 +930,12 @@ public:
   /// tree.
   static Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
 
+private:
+  /// Given an pre-folded expression, find LHS from the expression if a binary
+  /// operator \c name appended to the expression.
+  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+
+public:
   /// Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -1326,11 +1332,6 @@ public:
   ///
   /// Routines that perform name lookup.
   ///
-  /// During type checking, these routines should be used instead of
-  /// \c MemberLookup and \c UnqualifiedLookup, because these routines will
-  /// lazily introduce declarations and (FIXME: eventually) perform recursive
-  /// type-checking that the AST-level lookup routines don't.
-  ///
   /// @{
 
   /// Perform unqualified name lookup at the given source location
@@ -1405,9 +1406,6 @@ public:
                                                     Identifier name,
                                                     SourceLoc nameLoc);
 
-  /// Given an pre-folded expression, find LHS from the expression if a binary
-  /// operator \c name appended to the expression.
-  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
   /// Check whether the given declaration can be written as a
   /// member of the given base type.
   static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
