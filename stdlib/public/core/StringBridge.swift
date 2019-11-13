@@ -362,7 +362,6 @@ internal func _cocoaASCIIPointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
 
 // This does not create a bridged String that's safe to use past the current
 // stack frame, e.g. it does not defensively copy it and so on.
-@_effects(releasenone)
 internal func _withTemporaryBridgedCocoaString<R>(
   _ cocoaString: _CocoaString?,
   _ work: (String) throws -> R
