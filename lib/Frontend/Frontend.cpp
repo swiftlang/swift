@@ -861,7 +861,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     performTypeChecking(SF, PersistentState->getTopLevelContext());
 
     if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
-      performPCMacro(SF, PersistentState->getTopLevelContext());
+      performPCMacro(SF);
     }
 
     // Playground transform knows to look out for PCMacro's changes and not

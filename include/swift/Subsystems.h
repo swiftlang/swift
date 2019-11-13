@@ -168,7 +168,7 @@ namespace swift {
   /// Once parsing and name-binding are complete this optionally walks the ASTs
   /// to add calls to externally provided functions that simulate
   /// "program counter"-like debugging events.
-  void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
+  void performPCMacro(SourceFile &SF);
 
   /// Creates a type checker instance on the given AST context, if it
   /// doesn't already have one.
