@@ -632,7 +632,6 @@ Total performance tests executed: 1
 Running AngryPhonebook for 3 samples.
     Measuring with scale 78.
     Sample 0,11812
-    Measuring with scale 90.
     Sample 1,13898
     Sample 2,11467
 1,AngryPhonebook,3,11467,13898,12392,1315,11812
@@ -656,7 +655,7 @@ Totals,2"""
         )
         self.assertEqual(r.num_samples, r.samples.num_samples)
         self.assertEqual(results[0].samples.all_samples,
-                         [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
+                         [(0, 78, 11812), (1, 78, 13898), (2, 78, 11467)])
         self.assertEqual(r.yields, None)
 
         r = results[1]
@@ -731,25 +730,15 @@ Totals,2"""
 
     def test_excludes_outliers_from_samples(self):
         verbose_log = """Running DropFirstAnySeqCntRangeLazy for 10 samples.
-    Measuring with scale 2.
     Sample 0,455
-    Measuring with scale 2.
     Sample 1,203
-    Measuring with scale 2.
     Sample 2,205
-    Measuring with scale 2.
     Sample 3,207
-    Measuring with scale 2.
     Sample 4,208
-    Measuring with scale 2.
     Sample 5,206
-    Measuring with scale 2.
     Sample 6,205
-    Measuring with scale 2.
     Sample 7,206
-    Measuring with scale 2.
     Sample 8,208
-    Measuring with scale 2.
     Sample 9,184
 65,DropFirstAnySeqCntRangeLazy,10,184,455,228,79,206
 """
