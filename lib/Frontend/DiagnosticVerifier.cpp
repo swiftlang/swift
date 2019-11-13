@@ -84,9 +84,11 @@ namespace {
   /// against expected-error markers in the source file.
   class DiagnosticVerifier {
     SourceManager &SM;
+    StringRef VerifyTag;
     std::vector<llvm::SMDiagnostic> CapturedDiagnostics;
   public:
-    explicit DiagnosticVerifier(SourceManager &SM) : SM(SM) {}
+    explicit DiagnosticVerifier(SourceManager &SM, StringRef VerifyTag)
+        : SM(SM), VerifyTag(VerifyTag) {}
 
     void addDiagnostic(const llvm::SMDiagnostic &Diag) {
       CapturedDiagnostics.push_back(Diag);
@@ -259,6 +261,21 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       MatchStart = MatchStart.substr(strlen("expected-remark"));
     } else
       continue;
+
+    // If a verify tag was specified, skip any expected diagnostics which don't
+    // include it.
+    StringRef TagStr = (llvm::Twine("(") + VerifyTag + ")").str();
+    if (!VerifyTag.empty() && !MatchStart.startswith(TagStr))
+      continue;
+
+    // If no verify tag was specified, skip any directives which look like they
+    // have tags.
+    if (VerifyTag.empty() && MatchStart.startswith("("))
+      continue;
+
+    // The tag was matched successfully, trim it before parsing the rest.
+    if (!VerifyTag.empty())
+      MatchStart = MatchStart.substr(TagStr.size());
 
     // Skip any whitespace before the {{.
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
@@ -765,10 +782,9 @@ static void VerifyModeDiagnosticHook(const llvm::SMDiagnostic &Diag,
   ((DiagnosticVerifier*)Context)->addDiagnostic(Diag);
 }
 
-
-void swift::enableDiagnosticVerifier(SourceManager &SM) {
+void swift::enableDiagnosticVerifier(SourceManager &SM, StringRef VerifyTag) {
   SM.getLLVMSourceMgr().setDiagHandler(VerifyModeDiagnosticHook,
-                                       new DiagnosticVerifier(SM));
+                                       new DiagnosticVerifier(SM, VerifyTag));
 }
 
 bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,

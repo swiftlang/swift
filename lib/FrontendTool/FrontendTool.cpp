@@ -1953,7 +1953,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    enableDiagnosticVerifier(Instance->getSourceMgr());
+    enableDiagnosticVerifier(Instance->getSourceMgr(), diagOpts.VerifyTag);
   }
 
   if (Invocation.getFrontendOptions()

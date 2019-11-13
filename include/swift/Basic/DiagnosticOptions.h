@@ -32,6 +32,10 @@ public:
     VerifyAndApplyFixes
   } VerifyMode = NoVerify;
 
+  /// Specifies a tag which denotes which diagnostics the verifier should expect
+  /// for a given invocation.
+  std::string VerifyTag = "";
+
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;

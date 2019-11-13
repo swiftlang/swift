@@ -25,7 +25,7 @@ namespace swift {
 
   /// Set up the specified source manager so that diagnostics are captured
   /// instead of being printed.
-  void enableDiagnosticVerifier(SourceManager &SM);
+  void enableDiagnosticVerifier(SourceManager &SM, StringRef VerifyTag);
 
   /// Verify that captured diagnostics meet with the expectations of the source
   /// files corresponding to the specified \p BufferIDs and tear down our

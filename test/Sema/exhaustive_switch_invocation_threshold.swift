@@ -2,18 +2,8 @@
 // stopping the check, producing the correct diagnostic, and not producing the
 // diagnostic for a completed check.
 //
-// RUN: %empty-directory(%t)
-//
-// RUN: not %target-swift-frontend -typecheck %s -switch-checking-invocation-threshold=1 2>%t/unproven.txt
-// RUN: %FileCheck %s --check-prefix UNABLE-TO-CHECK <%t/unproven.txt
-// RUN: not %FileCheck %s --check-prefix MUST-BE-EXHAUSTIVE <%t/unproven.txt
-//
-// RUN: not %target-swift-frontend -typecheck %s  2>%t/disproved.txt
-// RUN: %FileCheck %s --check-prefix MUST-BE-EXHAUSTIVE <%t/disproved.txt
-// RUN: not %FileCheck %s --check-prefix UNABLE-TO-CHECK <%t/disproved.txt
-//
-// UNABLE-TO-CHECK: error: the compiler is unable to check that this switch is exhaustive in reasonable time
-// MUST-BE-EXHAUSTIVE: error: switch must be exhaustive
+// RUN: %target-typecheck-verify-swift -verify-tag=UNABLE-TO-CHECK -switch-checking-invocation-threshold=1
+// RUN: %target-typecheck-verify-swift -verify-tag=MUST-BE-EXHAUSTIVE
 
 
 enum A {
@@ -25,6 +15,10 @@ enum B {
 
 func f(a: A, b: B) {
   switch (a, b) {
+    // expected-error(UNABLE-TO-CHECK)@-1 {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
+    // expected-note(UNABLE-TO-CHECK)@-2 {{do you want to add a default clause?}}
+    // expected-error(MUST-BE-EXHAUSTIVE)@-3 {{switch must be exhaustive}}
+    // expected-note(MUST-BE-EXHAUSTIVE)@-4 {{add missing case}}
     case
 //    (.a1, .b1),
     (.a2, .b1),

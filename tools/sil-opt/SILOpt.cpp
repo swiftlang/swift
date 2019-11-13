@@ -408,8 +408,10 @@ int main(int argc, char **argv) {
 
   // If we're in verify mode, install a custom diagnostic handling for
   // SourceMgr.
+  // TODO: It might be useful to support specifying a verifier tag here instead
+  // of always passing an empty string.
   if (VerifyMode)
-    enableDiagnosticVerifier(CI.getSourceMgr());
+    enableDiagnosticVerifier(CI.getSourceMgr(), /*VerifyTag*/ StringRef());
 
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
