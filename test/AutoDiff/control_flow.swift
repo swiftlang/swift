@@ -68,10 +68,7 @@ ControlFlowTests.test("Conditionals") {
     }
     return outer
   }
-  // FIXME(TF-954): Investigate incorrect derivative related to addresses and
-  // nested control flow.
-  // expectEqual((9, 6), valueWithGradient(at: 3, in: cond4_var))
-  expectEqual((9, 0), valueWithGradient(at: 3, in: cond4_var))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: cond4_var))
 
   func cond_tuple(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -707,16 +704,10 @@ ControlFlowTests.test("Loops") {
     }
     return outer
   }
-  // FIXME(TF-954): Investigate incorrect derivative related to addresses and
-  // nested control flow.
-  // expectEqual((6, 5), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 1) }))
-  // expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
-  // expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
-  // expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
-  expectEqual((6, 0), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 1) }))
-  expectEqual((20, 0), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
-  expectEqual((52, 26), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
-  expectEqual((24, 12), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
+  expectEqual((6, 5), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 1) }))
+  expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
+  expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
+  expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
 }
 
 runAllTests()

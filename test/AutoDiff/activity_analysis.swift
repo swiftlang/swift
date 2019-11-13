@@ -140,12 +140,12 @@ func TF_954(_ x: Float) -> Float {
 // CHECK: bb1:
 // CHECK: [ACTIVE]   %10 = alloc_stack $Float, var, name "inner"
 // CHECK: [ACTIVE]   %11 = begin_access [read] [static] %2 : $*Float
-// CHECK: [NONE]   %14 = metatype $@thin Float.Type
+// CHECK: [USEFUL]   %14 = metatype $@thin Float.Type
 // CHECK: [ACTIVE]   %15 = begin_access [read] [static] %10 : $*Float
-// CHECK: [VARIED]   %16 = load [trivial] %15 : $*Float
+// CHECK: [ACTIVE]   %16 = load [trivial] %15 : $*Float
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
 // CHECK:   %18 = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
-// CHECK: [VARIED]   %19 = apply %18(%16, %0, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [ACTIVE]   %19 = apply %18(%16, %0, %14) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK: [ACTIVE]   %20 = begin_access [modify] [static] %10 : $*Float
 // CHECK: bb3:
 // CHECK: [ACTIVE]   %31 = begin_access [read] [static] %10 : $*Float
