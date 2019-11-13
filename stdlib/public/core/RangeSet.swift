@@ -9,7 +9,9 @@ public struct RangeSet<Bound: Comparable> {
   ///
   /// - Parameter range: The range to use for the new range set.
   public init(_ range: Range<Bound>) {
-    self._ranges = [range]
+    if !range.isEmpty {
+      self._ranges = [range]
+    }
   }
   
   /// Creates a range set containing the given ranges.
@@ -114,14 +116,16 @@ public struct RangeSet<Bound: Comparable> {
     return beginningIndex ..< endingIndex
   }
   
-  /// Inserts a range that is known to be greater than all the elements in
-  /// the set so far.
+  /// Inserts a non-empty range that is known to be greater than all the 
+  /// elements in the set so far.
   ///
   /// - Precondition: The range set must be empty, or else
   ///   `ranges.last!.upperBound <= range.lowerBound`.
+  /// - Precondition: `range` must not be empty.
   internal mutating func _append(_ range: Range<Bound>) {
     precondition(_ranges.isEmpty
       || _ranges.last!.upperBound <= range.lowerBound)
+    precondition(!range.isEmpty)
     if _ranges.isEmpty {
       _ranges.append(range)
     } else if _ranges.last!.upperBound == range.lowerBound {
