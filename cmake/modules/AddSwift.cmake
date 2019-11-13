@@ -2398,7 +2398,7 @@ endmacro()
 
 function(add_swift_host_tool executable)
   set(options)
-  set(single_parameter_options SWIFT_COMPONENT)
+  set(single_parameter_options "SWIFT_COMPONENT;DESTINATION_PREFIX")
   set(multiple_parameter_options LINK_LIBRARIES)
 
   cmake_parse_arguments(ASHT
@@ -2423,7 +2423,7 @@ function(add_swift_host_tool executable)
   add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
   swift_install_in_component(TARGETS ${executable}
                              RUNTIME
-                               DESTINATION bin
+                               DESTINATION "${ASHT_DESTINATION_PREFIX}bin"
                                COMPONENT ${ASHT_SWIFT_COMPONENT})
 
   swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
