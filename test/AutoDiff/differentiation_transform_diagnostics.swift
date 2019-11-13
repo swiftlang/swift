@@ -65,9 +65,9 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
 //===----------------------------------------------------------------------===//
 
 func uses_optionals(_ x: Float) -> Float {
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
   var maybe: Float? = 10
   maybe = x
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
   return maybe!
 }
 
