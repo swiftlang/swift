@@ -62,6 +62,11 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.assertEqual(s.num_iters, 42)
         self.assertEqual(s.runtime, 1000)
 
+    def test_num_iters(self):
+        self.assertIsNone(self.samples.num_iters)
+        averaged = PerformanceTestSamples('B1', num_iters=42)
+        self.assertEqual(averaged.num_iters, 42)
+
     def test_quantile(self):
         self.assertEqual(self.samples.quantile(1), 1000)
         self.assertEqual(self.samples.quantile(0), 1000)
@@ -658,7 +663,8 @@ Totals,2"""
             ('AngryPhonebook', 11467, 13898, 12392, 1315, 11812)
         )
         self.assertEqual(r.num_samples, r.samples.num_samples)
-        self.assertEqual(results[0].samples.all_samples,
+        self.assertEqual(r.samples.num_iters, 78)
+        self.assertEqual(r.samples.all_samples,
                          [(0, 78, 11812), (1, 78, 13898), (2, 78, 11467)])
         self.assertEqual(r.yields, None)
 
@@ -669,7 +675,7 @@ Totals,2"""
         )
         self.assertEqual(r.setup, 14444)
         self.assertEqual(r.num_samples, r.samples.num_samples)
-        self.assertEqual(results[1].samples.all_samples,
+        self.assertEqual(r.samples.all_samples,
                          [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
         yielded = r.yields[0]
         self.assertEqual(yielded.before_sample, 1)

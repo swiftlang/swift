@@ -65,9 +65,10 @@ class PerformanceTestSamples(object):
     Computes the sample population statistics.
     """
 
-    def __init__(self, name, samples=None):
+    def __init__(self, name, samples=None, num_iters=None):
         """Initialize with benchmark name and optional list of Samples."""
         self.name = name  # Name of the performance test
+        self.num_iters = num_iters  # Number of iterations averaged in sample
         self.samples = []
         self.outliers = []
         self._runtimes = []
@@ -119,7 +120,7 @@ class PerformanceTestSamples(object):
         outliers = self.samples[:lo] + self.samples[hi:]
         samples = self.samples[lo:hi]
 
-        self.__init__(self.name)  # re-initialize
+        self.__init__(self.name, num_iters=self.num_iters)  # re-initialize
         for sample in samples:  # and
             self.add(sample)  # re-compute stats
         self.outliers = outliers
@@ -388,7 +389,8 @@ class LogParser(object):
         r.voluntary_cs = self.voluntary_cs
         r.involuntary_cs = r.involuntary_cs or self.involuntary_cs
         if self.samples:
-            r.samples = PerformanceTestSamples(r.name, self.samples)
+            r.samples = PerformanceTestSamples(
+                r.name, self.samples, self.num_iters)
             r.samples.exclude_outliers()
         self.results.append(r)
         r.yields = self.yields or None
@@ -411,7 +413,7 @@ class LogParser(object):
         # Verbose mode adds new productions:
         # Adaptively determined N; test loop multiple adjusting runtime to ~1s
         re.compile(r'\s+Measuring with scale (\d+).'):
-        (lambda self, num_iters: setattr(self, 'num_iters', num_iters)),
+        (lambda self, num_iters: setattr(self, 'num_iters', int(num_iters))),
 
         re.compile(r'\s+Sample (\d+),(\d+)'):
         (lambda self, i, runtime:
