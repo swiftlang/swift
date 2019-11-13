@@ -856,8 +856,9 @@ namespace driver {
       auto compileJobsToSchedule = compileJobsToScheduleViaDependencies;
 
       if (Comp.getEnableSourceRangeDependencies()) {
-        auto compileJobsToScheduleViaSourceRanges =
-            computeRangesAndGetNeededCompileJobs(DepGraph);
+        auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
+        auto &compileJobsToScheduleViaSourceRanges = jobs.first;
+        auto &jobsLackingSupplementaryOutputs = jobs.second;
         // <= because of fewer casading jobs
         const size_t inputCount = Comp.getInputFiles().size();
         const bool useSourceRangeDependencies =
@@ -877,6 +878,8 @@ namespace driver {
                                : "dependencies")
                        << "\n";
         }
+        for (const Job *Cmd : jobsLackingSupplementaryOutputs)
+          compileJobsToSchedule.insert(Cmd);
       }
 
       for (const Job *Cmd : Comp.getJobs()) {
@@ -891,9 +894,12 @@ namespace driver {
       }
     }
 
-    /// Return hadError
+    /// Return both the jobs to compile if using ranges, and also any jobs that
+    /// must be compiled to use ranges in the future (because they were lacking
+    /// supplementary output files).
     template <typename DependencyGraphT>
-    llvm::SmallPtrSet<const Job *, 16>
+    std::pair<llvm::SmallPtrSet<const Job *, 16>,
+              llvm::SmallVector<const Job *, 16>>
     computeRangesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
       using namespace incremental_ranges;
 
@@ -914,21 +920,23 @@ namespace driver {
       // But, since we register errors by recording massive changes to
       // primaries, could just keep on.
       // load dependencies for external dependencies and interfacehashes
-      auto jobsToCompile = SourceRangeBasedInfo::
-          neededCompileJobsForRangeBasedIncrementalCompilation(
-              allSourceRangeInfo, Comp.getJobsSimply(),
-              [&](const Job *Cmd) {
-                scheduleCommandIfNecessaryAndPossible(Cmd);
-              },
-              [&](const Job *Cmd) { DeferredCommands.insert(Cmd); },
-              [&](const Job *Cmd, Twine why) {
-                noteBuilding(Cmd, true, why.str());
-              });
+      auto jobsToCompileAndJobsNeededForSupplementaryOutputs =
+          SourceRangeBasedInfo::
+              neededCompileJobsForRangeBasedIncrementalCompilation(
+                  allSourceRangeInfo, Comp.getJobsSimply(),
+                  [&](const Job *Cmd) {
+                    scheduleCommandIfNecessaryAndPossible(Cmd);
+                  },
+                  [&](const Job *Cmd) { DeferredCommands.insert(Cmd); },
+                  [&](const Job *Cmd, Twine why) {
+                    noteBuilding(Cmd, true, why.str());
+                  });
 
       for (const Job *Cmd :
            externallyDependentJobsForRangeBasedIncrementalCompilation(DepGraph))
-        jobsToCompile.insert(Cmd);
-      return jobsToCompile;
+        jobsToCompileAndJobsNeededForSupplementaryOutputs.first.insert(Cmd);
+
+      return jobsToCompileAndJobsNeededForSupplementaryOutputs;
     }
 
     template <typename DependencyGraphT>

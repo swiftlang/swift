@@ -70,6 +70,9 @@ SourceRangeBasedInfo ::loadAllInfo(ArrayRef<const Job *> jobs,
   for (const auto *Cmd : jobs) {
     StringRef primaryPath = Cmd->getFirstSwiftPrimaryInput();
 
+    if (primaryPath.empty())
+      continue;
+
     const StringRef compiledSourcePath =
         Cmd->getOutput().getAdditionalOutputForType(
             file_types::TY_CompiledSource);
@@ -101,15 +104,15 @@ Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOnePrimary(
       llvm::errs() << "WARNING could not remove: " << swiftRangesPath;
   };
 
-  if (primaryPath.empty())
-    return None; // not a compile job
+  assert(!primaryPath.empty() && "Must have a primary to load info.");
 
-  // nonexistant primary -> it was removed
+  // nonexistant primary -> it was removed since invoking swift?!
   if (!llvm::sys::fs::exists(primaryPath)) {
     if (showIncrementalBuildDecisions)
       llvm::outs() << primaryPath << " was removed.";
     // so they won't be used if primary gets re-added
     removeSupplementaryPaths();
+    // Force any other file that parsed something in this one to be rebuilt.
     return wholeFileChanged();
   }
 
@@ -121,7 +124,7 @@ Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOnePrimary(
 
   if (!swiftRangesFileContents || !changedRanges) {
     removeSupplementaryPaths();
-    return wholeFileChanged();
+    return None;
   }
 
   Ranges nonlocalChangedRanges = computeNonlocalChangedRanges(
@@ -155,8 +158,7 @@ Optional<Ranges> SourceRangeBasedInfo::loadChangedRanges(
   if (!isPreviouslyCompiledNewer)
     return None;
   if (isPreviouslyCompiledNewer.getValue())
-    return {};
-
+    return Optional<Ranges>(Ranges());
   auto wasCompiledBefore = llvm::MemoryBuffer::getFile(compiledSourcePath);
   if (auto ec = wasCompiledBefore.getError()) {
     diags.diagnose(SourceLoc(), diag::warn_unable_to_load_compiled_swift,
@@ -212,7 +214,8 @@ Ranges SourceRangeBasedInfo::computeNonlocalChangedRanges(
 // MARK: scheduling
 //==============================================================================
 
-llvm::SmallPtrSet<const Job *, 16>
+std::pair<llvm::SmallPtrSet<const Job *, 16>,
+          llvm::SmallVector<const Job *, 16>>
 SourceRangeBasedInfo::neededCompileJobsForRangeBasedIncrementalCompilation(
     const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
     std::vector<const Job *> jobs, function_ref<void(const Job *)> schedule,
@@ -220,6 +223,7 @@ SourceRangeBasedInfo::neededCompileJobsForRangeBasedIncrementalCompilation(
     function_ref<void(const Job *, Twine)> noteBuilding) {
 
   llvm::SmallPtrSet<const Job *, 16> neededJobs;
+  llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
   for (const Job *Cmd : jobs) {
     const auto primary = Cmd->getFirstSwiftPrimaryInput();
     if (primary.empty()) {
@@ -230,8 +234,14 @@ SourceRangeBasedInfo::neededCompileJobsForRangeBasedIncrementalCompilation(
         allInfos, Cmd, [&](Twine why) { noteBuilding(Cmd, why.str()); });
     if (shouldSchedule)
       neededJobs.insert(Cmd);
+    if (allInfos.count(primary) == 0) {
+      jobsLackingSupplementaryOutputs.push_back(Cmd);
+      noteBuilding(
+          Cmd,
+          "to create source-range and compiled-source files for the next time");
+    }
   }
-  return neededJobs;
+  return {neededJobs, jobsLackingSupplementaryOutputs};
 }
 
 bool SourceRangeBasedInfo::shouldScheduleCompileJob(

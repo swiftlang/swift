@@ -61,18 +61,20 @@ private:
   static Optional<SourceRangeBasedInfo> wholeFileChanged();
 
   /// Using supplied paths, interrogate the supplementary outputs and update the
-  /// two references.
+  /// two references. Return None if a file was missing or corrupted.
   static Optional<SourceRangeBasedInfo>
   loadInfoForOnePrimary(StringRef primaryPath, StringRef compiledSourcePath,
                         StringRef swiftRangesPath,
                         bool showIncrementalBuildDecisions,
                         DiagnosticEngine &diags);
 
+  /// Return None for error
   static Optional<SwiftRangesFileContents>
   loadSwiftRangesFileContents(StringRef swiftRangesPath, StringRef primaryPath,
                               const bool showIncrementalBuildDecisions,
                               DiagnosticEngine &);
 
+  /// Return None for error
   static Optional<Ranges>
   loadChangedRanges(StringRef compiledSourcePath, StringRef primaryPath,
                     const bool showIncrementalBuildDecisions,
@@ -86,8 +88,11 @@ private:
   //==============================================================================
 
 public:
-  /// return hadError
-  static llvm::SmallPtrSet<const driver::Job *, 16>
+  /// Return both the jobs to compile if using ranges, and also any jobs that
+  /// must be compiled to use ranges in the future (because they were lacking
+  /// supplementary output files).
+  static std::pair<llvm::SmallPtrSet<const driver::Job *, 16>,
+                   llvm::SmallVector<const driver::Job *, 16>>
   neededCompileJobsForRangeBasedIncrementalCompilation(
       const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
       std::vector<const driver::Job *>,

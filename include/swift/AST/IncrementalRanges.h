@@ -180,6 +180,7 @@ struct SwiftRangesFileContents {
       : unparsedRangesByNonPrimary(std::move(unparsedRangesByNonPrimary)),
         noninlinableFunctionBodies(std::move(noninlinableFunctionBodies)) {}
 
+  /// Return None for error.
   static Optional<SwiftRangesFileContents>
   load(const StringRef primaryPath, const llvm::MemoryBuffer &swiftRangesBuffer,
        const bool showIncrementalBuildDecisions, DiagnosticEngine &diags);
