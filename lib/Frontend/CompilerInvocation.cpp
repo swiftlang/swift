@@ -284,17 +284,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableSubstSILFunctionTypesForFunctionValues |=
     Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
 
-  Opts.EnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_enable_operator_designated_types);
-
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
-
-  // Always enable operator designated types for the standard library.
-  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
-
-  Opts.SolverEnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_solver_enable_operator_designated_types);
 
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {
@@ -353,9 +344,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
 
-  Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
-  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   if (Args.hasArg(OPT_verify_syntax_tree)) {
     Opts.BuildSyntaxTree = true;
@@ -390,34 +379,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTestableAttrRequiresTestableModule
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
   }
-
-  if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.DebugConstraintSolverAttempt = attempt;
-    }
-  }
-
-  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
-    unsigned line;
-    if (StringRef(A->getValue()).getAsInteger(10, line)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.DebugConstraintSolverOnLines.push_back(line);
-    }
-  }
-  llvm::sort(Opts.DebugConstraintSolverOnLines);
   
-  if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
-    Opts.DebugForbidTypecheckPrefix = A->getValue();
-  }
-
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
@@ -431,31 +393,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.RequireExplicitAvailabilityTarget = A->getValue();
     }
   }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.SolverMemoryThreshold = threshold;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.SolverShrinkUnsolvedThreshold = threshold;
-    }
-  }
-
-  if (Args.getLastArg(OPT_solver_disable_shrink))
-    Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -528,9 +465,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     (Target.isTvOS() && Target.isOSVersionLT(12, 2)) ||
     (Target.isWatchOS() && Target.isOSVersionLT(5, 2));
 
-  Opts.DisableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
-
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
@@ -557,8 +491,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                                  const FrontendOptions &FrontendOpts) {
   using namespace options;
 
-  auto setUnsignedIntegerArgument = [&Args, &Diags](
-      options::ID optionID, unsigned radix, unsigned &valueToSet) {
+  auto setUnsignedIntegerArgument = [&Args, &Diags](options::ID optionID,
+                                                    unsigned radix,
+                                                    unsigned &valueToSet) {
     if (const Arg *A = Args.getLastArg(optionID)) {
       unsigned attempt;
       if (StringRef(A->getValue()).getAsInteger(radix, attempt)) {
@@ -589,7 +524,75 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // body skipping.
   Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
 
-  return false;
+  Opts.DisableConstraintSolverPerformanceHacks |=
+      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+
+  Opts.EnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_enable_operator_designated_types);
+
+  // Always enable operator designated types for the standard library.
+  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
+
+  Opts.SolverEnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_solver_enable_operator_designated_types);
+
+  Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
+  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
+
+  bool HadError = false;
+  if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
+    unsigned attempt;
+    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverAttempt = attempt;
+    }
+  }
+
+  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
+    unsigned line;
+    if (StringRef(A->getValue()).getAsInteger(10, line)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverOnLines.push_back(line);
+    }
+  }
+  llvm::sort(Opts.DebugConstraintSolverOnLines);
+
+  if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
+    Opts.DebugForbidTypecheckPrefix = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
+    unsigned threshold;
+    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.SolverMemoryThreshold = threshold;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
+    unsigned threshold;
+    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.SolverShrinkUnsolvedThreshold = threshold;
+    }
+  }
+
+  if (Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
+
+  return HadError;
 }
 
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,

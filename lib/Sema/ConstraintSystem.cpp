@@ -2241,7 +2241,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
@@ -2392,7 +2392,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.DebugConstraintSolver) {
+  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
@@ -2437,7 +2437,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
-      if (getASTContext().LangOpts.DebugConstraintSolver) {
+      if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log << "---Ambiguity error: " << viable.size()
             << " solutions found---\n";

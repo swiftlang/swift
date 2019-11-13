@@ -516,7 +516,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (!attemptFixes && choice.isUnavailable())
     return true;
 
-  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   // Don't attempt to solve for generic operators if we already have
@@ -605,7 +605,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
 
-  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   if (auto restriction = currentChoice->getRestriction()) {
@@ -633,7 +633,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
       isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
       !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
-      !ctx.LangOpts.SolverEnableOperatorDesignatedTypes) {
+      !ctx.TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
     return true;
   }
 

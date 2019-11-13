@@ -2089,7 +2089,7 @@ llvm::Expected<PrecedenceGroupDecl *>
 OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
                                          InfixOperatorDecl *IOD) const {
   auto enableOperatorDesignatedTypes =
-      IOD->getASTContext().LangOpts.EnableOperatorDesignatedTypes;
+      IOD->getASTContext().TypeCheckerOpts.EnableOperatorDesignatedTypes;
 
   auto &Diags = IOD->getASTContext().Diags;
   PrecedenceGroupDecl *group = nullptr;
@@ -2330,7 +2330,9 @@ public:
       (void)IOD->getPrecedenceGroup();
     } else {
       auto nominalTypes = OD->getDesignatedNominalTypes();
-      if (nominalTypes.empty() && Ctx.LangOpts.EnableOperatorDesignatedTypes) {
+      const auto wantsDesignatedTypes =
+          Ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
+      if (nominalTypes.empty() && wantsDesignatedTypes) {
         auto identifiers = OD->getIdentifiers();
         auto identifierLocs = OD->getIdentifierLocs();
         if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
@@ -3100,7 +3102,7 @@ public:
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
 
-    if (PD->getASTContext().LangOpts.DebugGenericSignatures) {
+    if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
         GenericSignature::get({PD->getProtocolSelfType()},
                               PD->getRequirementSignature());

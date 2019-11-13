@@ -1252,7 +1252,7 @@ private:
       }
 
       unsigned threshold =
-          cs->getASTContext().LangOpts.SolverShrinkUnsolvedThreshold;
+          cs->getASTContext().TypeCheckerOpts.SolverShrinkUnsolvedThreshold;
       return unsolvedDisjunctions >= threshold;
     }
   };
@@ -3730,7 +3730,7 @@ public:
       used += s.getTotalMemory();
     }
     MaxMemory = std::max(used, MaxMemory);
-    auto threshold = getASTContext().LangOpts.SolverMemoryThreshold;
+    auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       return isExpressionAlreadyTooComplex= true;
     }
@@ -3748,7 +3748,7 @@ public:
 
     // Bail out once we've looked at a really large number of
     // choices.
-    if (CountScopes > getASTContext().LangOpts.SolverBindingThreshold) {
+    if (CountScopes > getASTContext().TypeCheckerOpts.SolverBindingThreshold) {
       return isExpressionAlreadyTooComplex = true;
     }
 
