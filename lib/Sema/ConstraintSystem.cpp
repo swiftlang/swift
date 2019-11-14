@@ -2425,7 +2425,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
-    if (diagnoseAmbiguityWithFixes(expr, viable))
+    if (diagnoseAmbiguityWithFixes(viable))
       return true;
 
     // FIXME: If we were able to actually fix things along the way,
@@ -2529,7 +2529,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
 }
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
-    Expr *expr, ArrayRef<Solution> solutions) {
+    ArrayRef<Solution> solutions) {
   if (solutions.empty())
     return false;
 

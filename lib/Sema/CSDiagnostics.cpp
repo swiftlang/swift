@@ -680,7 +680,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   // about missing conformance just in case.
   auto operatorID = name.getIdentifier();
 
-  auto *applyExpr = cast_or_null<ApplyExpr>(findParentExpr(anchor));
+  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
     auto lhsType = getType(binaryOp->getArg()->getElement(0));
     auto rhsType = getType(binaryOp->getArg()->getElement(1));
