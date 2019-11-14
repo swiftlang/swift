@@ -187,7 +187,7 @@ extension __StringStorage {
     }
   }
 
-  @objc
+  @objc(hash)
   final internal var hash: UInt {
     @_effects(readonly) get {
       return _getCocoaHash()
@@ -418,11 +418,9 @@ extension __SharedStringStorage {
   
   @inline(__always)
   internal var start: UnsafePointer<UInt8>? {
-     let guts = _contents._guts
-     if !guts.isSmall && guts.isFastUTF8 {
-       return guts._object.fastUTF8.baseAddress!
-     }
-     return nil
+    let guts = _contents._guts
+    guard !guts.isSmall else { return nil }
+    return guts._object.fastUTF8.baseAddress!
   }
   
   @inline(__always)
@@ -440,7 +438,7 @@ extension __SharedStringStorage {
     }
   }
 
-  @objc
+  @objc(hash)
   final internal var hash: UInt {
     @_effects(readonly) get {
       return _getCocoaHash()
