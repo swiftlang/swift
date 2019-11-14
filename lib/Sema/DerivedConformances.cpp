@@ -104,7 +104,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-        // empty enumas are allowed to conform as well.
+        // empty enums are allowed to conform as well.
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
