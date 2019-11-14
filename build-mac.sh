@@ -1,5 +1,7 @@
 #/bin/bash
 
+export sourcedir=$PWD/..
+
 ./utils/build-script --release --wasm --verbose \
   --skip-build-benchmarks \
   --extra-cmake-options=" \
@@ -22,4 +24,8 @@
   --wasm-icu-i18n-include "$sourcedir/icu_out/include" \
   --wasm-icu-uc "$sourcedir/icu_out/lib" \
   --wasm-icu-uc-include "$sourcedir/icu_out/include" \
-  --wasm-wasi-sdk "$sourcedir/wasi-sdk"
+  --wasm-wasi-sdk "$sourcedir/wasi-sdk" \
+  --install-swift \
+  --install-prefix="/opt/swiftwasm-sdk" \
+  --install-destdir="$sourcedir/install" \
+  --installable-package="$sourcedir/swiftwasm-mac.tar.gz"

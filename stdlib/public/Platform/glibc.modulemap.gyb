@@ -353,12 +353,14 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/libgen.h"
       export *
     }
+% if CMAKE_SDK != "WASM":
     module net {
       module if {
         header "${GLIBC_INCLUDE_PATH}/net/if.h"
         export *
       }
     }
+% end
     module netinet {
       module in {
         header "${GLIBC_INCLUDE_PATH}/netinet/in.h"
@@ -517,10 +519,12 @@ module SwiftGlibc [system] {
       export *
     }
 % end
+% if CMAKE_SDK != "WASM":
     module termios {
       header "${GLIBC_INCLUDE_PATH}/termios.h"
       export *
     }
+% end
     module unistd {
       header "${GLIBC_INCLUDE_PATH}/unistd.h"
       export *

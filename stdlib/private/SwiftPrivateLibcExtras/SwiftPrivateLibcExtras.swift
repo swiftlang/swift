@@ -20,7 +20,7 @@ import MSVCRT
 #endif
 
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
-#if os(Android) || os(Haiku) || os(Windows)
+#if os(Android) || os(Haiku) || os(Windows) || os(Wasm)
   preconditionFailure("mkstemps doesn't work on your platform")
 #else
   var utf8CStr = template.utf8CString

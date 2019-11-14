@@ -22,9 +22,10 @@ sudo ./install_cmake.sh --skip-license --prefix=/opt/cmake
 sudo ln -sf /opt/cmake/bin/* /usr/local/bin
 cmake --version
 
-wget -O wasi-sdk.tar.gz https://github.com/swiftwasm/wasi-sdk/releases/download/20190421.6/wasi-sdk-3.19gefb17cb478f9.m-linux.tar.gz
+wget -O wasi-sdk.tar.gz https://github.com/swiftwasm/wasi-sdk/releases/download/20191022.1/wasi-sdk-4.39g3025a5f47c04-linux.tar.gz
 tar xfz wasi-sdk.tar.gz
-mv wasi-sdk-3.19gefb17cb478f9+m/opt/wasi-sdk ./wasi-sdk
+mv wasi-sdk-4.39g3025a5f47c04 ./wasi-sdk
+mv wasi-sdk/share/wasi-sysroot wasi-sdk/share/sysroot
 
 wget -O icu.tar.xz "https://github.com/swiftwasm/icu4c-wasi/releases/download/20190421.3/icu4c-wasi.tar.xz"
 tar xf icu.tar.xz

@@ -1,5 +1,7 @@
 #/bin/bash
 
+export sourcedir=$PWD/..
+
 ./utils/build-script --release --wasm --verbose \
   --skip-build-benchmarks \
   --extra-cmake-options=" \
