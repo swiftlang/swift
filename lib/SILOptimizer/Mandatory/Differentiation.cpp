@@ -98,7 +98,7 @@ static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
   return nullptr;
 }
 
-/// Given a value, find its single `destructure_tuple` user if the value is
+/// Given a value, finds its single `destructure_tuple` user if the value is
 /// tuple-typed and such a user exists.
 static DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
   bool foundDestructureTupleUser = false;
@@ -130,7 +130,7 @@ static void forEachApplyDirectResult(
       resultCallback(result);
 }
 
-/// Given a function, gather all of its formal results (both direct and
+/// Given a function, gathers all of its formal results (both direct and
 /// indirect) in an order defined by its result type. Note that "formal results"
 /// refer to result values in the body of the function, not at call sites.
 static void
@@ -154,7 +154,7 @@ collectAllFormalResultsInTypeOrder(SILFunction &function,
                                                : indResults[indResIdx++]);
 }
 
-/// Given a function, gather all of its direct results in an order defined by
+/// Given a function, gathers all of its direct results in an order defined by
 /// its result type. Note that "formal results" refer to result values in the
 /// body of the function, not at call sites.
 static void
@@ -171,7 +171,7 @@ collectAllDirectResultsInTypeOrder(SILFunction &function,
     results.push_back(retVal);
 }
 
-/// Given a function call site, gather all of its actual results (both direct
+/// Given a function call site, gathers all of its actual results (both direct
 /// and indirect) in an order defined by its result type.
 static void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
@@ -291,7 +291,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   return GenericParamList::create(ctx, SourceLoc(), clonedParams, SourceLoc());
 }
 
-/// Given an `differentiable_function` instruction, find the corresponding
+/// Given an `differentiable_function` instruction, finds the corresponding
 /// differential operator used in the AST. If no differential operator is found,
 /// return nullptr.
 static DifferentiableFunctionExpr *
@@ -512,7 +512,7 @@ private:
     llvm_unreachable("No files?");
   }
 
-  /// Compute and set the access level for the given nominal type, given the
+  /// Computes and sets the access level for the given nominal type, given the
   /// original function linkage.
   void computeAccessLevel(
       NominalTypeDecl *nominal, SILLinkage originalLinkage) {
@@ -668,7 +668,7 @@ private:
     return linearMapStruct;
   }
 
-  /// Add a linear map to the linear map struct.
+  /// Adds a linear map field to the linear map struct.
   VarDecl *addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
     // IRGen requires decls to have AST types (not `SILFunctionType`), so we
     // convert the `SILFunctionType` of the linear map to a `FunctionType` with
@@ -701,12 +701,12 @@ private:
     return linearMapDecl;
   }
 
-  /// Given an `apply` instruction, conditionally add a linear map struct field
+  /// Given an `apply` instruction, conditionally adds a linear map struct field
   /// for its linear map function if it is active.
   void addLinearMapToStruct(ADContext &context, ApplyInst *ai,
                             const SILAutoDiffIndices &indices);
 
-  /// Generate linear map struct and branching enum declarations for the given
+  /// Generates linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
   /// branching enum field.
   void generateDifferentiationDataStructures(
