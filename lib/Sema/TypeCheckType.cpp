@@ -626,6 +626,60 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
+static Type checkConstrainedExtensionRequirements(Type type,
+                                                  SourceLoc loc,
+                                                  DeclContext *dc) {
+  // Even if the type is not generic, it might be inside of a generic
+  // context, so we need to check requirements.
+  GenericTypeDecl *decl;
+  Type parentTy;
+  if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
+    decl = aliasTy->getDecl();
+    parentTy = aliasTy->getParent();
+  } else if (auto *nominalTy = type->getAs<NominalType>()) {
+    decl = nominalTy->getDecl();
+    parentTy = nominalTy->getParent();
+  } else {
+    return type;
+  }
+
+  // FIXME: Some day the type might also have its own 'where' clause, even
+  // if its not generic.
+
+  auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+  if (!ext || !ext->isConstrainedExtension())
+    return type;
+
+  if (parentTy->hasUnboundGenericType() ||
+      parentTy->hasTypeVariable()) {
+    return type;
+  }
+
+  auto subMap = parentTy->getContextSubstitutions(ext);
+
+  SourceLoc noteLoc = ext->getLoc();
+  if (noteLoc.isInvalid())
+    noteLoc = loc;
+
+  auto genericSig = ext->getGenericSignature();
+  auto result =
+    TypeChecker::checkGenericArguments(
+        dc, loc, noteLoc, type,
+        genericSig->getGenericParams(),
+        genericSig->getRequirements(),
+        QueryTypeSubstitutionMap{subMap},
+        TypeChecker::LookUpConformance(dc),
+        None);
+
+  switch (result) {
+  case RequirementCheckResult::Failure:
+  case RequirementCheckResult::SubstitutionFailure:
+    return ErrorType::get(dc->getASTContext());
+  case RequirementCheckResult::Success:
+    return type;
+  }
+}
+
 static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
 
 /// Apply generic arguments to the given type.
@@ -650,7 +704,9 @@ static Type applyGenericArguments(Type type,
                                   TypeResolution resolution,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options) {
+  auto dc = resolution.getDeclContext();
   auto loc = comp->getIdLoc();
+
   auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
   if (!generic) {
     if (type->is<UnboundGenericType>() &&
@@ -660,7 +716,10 @@ static Type applyGenericArguments(Type type,
       return ErrorType::get(type->getASTContext());
     }
 
-    return type;
+    if (resolution.getStage() == TypeResolutionStage::Structural)
+      return type;
+
+    return checkConstrainedExtensionRequirements(type, loc, dc);
   }
 
   if (type->hasError()) {
@@ -668,7 +727,6 @@ static Type applyGenericArguments(Type type,
     return type;
   }
 
-  auto dc = resolution.getDeclContext();
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
