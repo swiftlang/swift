@@ -665,14 +665,13 @@ public:
 
 } // end anonymous namespace
 
-void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
+void swift::performPCMacro(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
   private:
     unsigned TmpNameIndex = 0;
-    TopLevelContext &TLC;
 
   public:
-    ExpressionFinder(TopLevelContext &TLC) : TLC(TLC) {}
+    ExpressionFinder() = default;
 
     bool walkToDeclPre(Decl *D) override {
       ASTContext &ctx = D->getASTContext();
@@ -692,7 +691,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelErrorHandling(TLCD);
-              TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
+              TypeChecker::contextualizeTopLevelCode(TLCD);
             }
             return false;
           }
@@ -702,7 +701,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
     }
   };
 
-  ExpressionFinder EF(TLC);
+  ExpressionFinder EF;
   for (Decl *D : SF.Decls) {
     D->walk(EF);
   }

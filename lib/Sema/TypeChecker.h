@@ -38,7 +38,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
-class TopLevelContext;
 class TypeChecker;
 class TypeResolution;
 class TypeResolutionOptions;
@@ -819,8 +818,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                                  unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
 
   static void typeCheckDecl(Decl *D);
 
@@ -1159,8 +1157,7 @@ public:
   ///
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
-  static void contextualizeTopLevelCode(TopLevelContext &TLC,
-                                        TopLevelCodeDecl *TLCD);
+  static void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
   /// Return the type-of-reference of the given value.
   ///

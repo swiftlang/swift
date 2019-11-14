@@ -277,6 +277,10 @@ public:
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
 
+  /// The next auto-closure discriminator.  This needs to be preserved
+  /// across invocations of both the parser and the type-checker.
+  unsigned NextAutoClosureDiscriminator = 0;
+
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
