@@ -1072,8 +1072,13 @@ void IRGenerator::emitGlobalTopLevel() {
     if (dw.isDeclaration())
       continue;
 
-    // Emit into same IRGenModule as the VJP.
-    CurrentIGMPtr IGM = getGenModule(dw.getVJP());
+    // Emit into same IRGenModule as the original function.
+    // NOTE(TF-894): Investigate whether `getGenModule(dw.getVJP())` is
+    // significant/desirable; `getGenModule` seems relevant for multi-threaded
+    // compilation. When the differentiation transform canonicalizes all
+    // differentiability witnesses to have JVP/VJP functions, we can assert
+    // that JVP/VJP functions exist and use `getGenModule(dw.getVJP())`.
+    CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction());
 
     IGM->emitSILDifferentiabilityWitness(&dw);
   }
