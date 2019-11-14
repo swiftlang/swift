@@ -656,8 +656,8 @@ func sr4214() {
   let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> () // Ok
   var v = MutableSubscripts()
   closure(&v)
-  // FIXME: This diagnostic isn't really all that much better
-  // expected-error@+1 {{cannot convert value of type '(inout MutableSubscripts) -> ()' to expected argument type '(_) -> _'}}
+  // expected-error@+2 {{declared closure result '()' is incompatible with contextual type 'MutableSubscripts'}}
+  // expected-error@+1 {{cannot convert value of type '(inout MutableSubscripts) -> ()' to expected argument type '(MutableSubscripts) -> MutableSubscripts'}}
   sequence(v) { (state : inout MutableSubscripts) -> () in
     _ = MutableSubscripts.initialize(from: &state)
     return ()
