@@ -126,8 +126,14 @@ static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
 
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
                                       legacy::PassManagerBase &PM) {
-  PM.add(createAddressSanitizerFunctionPass());
-  PM.add(createModuleAddressSanitizerLegacyPassPass());
+  auto &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper &>(Builder);
+  auto recover =
+      bool(BuilderWrapper.IRGOpts.SanitizersWithRecoveryInstrumentation &
+           SanitizerKind::Address);
+  PM.add(createAddressSanitizerFunctionPass(/*CompileKernel=*/false, recover));
+  PM.add(createModuleAddressSanitizerLegacyPassPass(/*CompileKernel=*/false,
+                                                    recover));
 }
 
 static void addThreadSanitizerPass(const PassManagerBuilder &Builder,

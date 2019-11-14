@@ -889,6 +889,15 @@ def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
 
+def sanitize_recover_EQ
+    : CommaJoined<["-"], "sanitize-recover=">,
+      Flags<[FrontendOption, NoInteractiveOption]>,
+      MetaVarName<"<check>">,
+      HelpText<"Specify which sanitizer runtime checks (see -sanitize=) will "
+               "generate instrumentation that allows error recovery. Listed "
+               "checks should be comma separated. Default behavior is to not "
+               "allow error recovery.">;
+
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   MetaVarName<"<type>">,
