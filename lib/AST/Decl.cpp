@@ -6046,11 +6046,12 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   return AnyFunctionType::Param(type, label, flags);
 }
 
-Initializer *ParamDecl::getDefaultArgumentInitContextCached() const {
+Optional<Initializer *> ParamDecl::getCachedDefaultArgumentInitContext() const {
   if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
-      return defaultInfo->InitContextAndIsTypeChecked.getPointer();
+    if (auto *init = defaultInfo->InitContextAndIsTypeChecked.getPointer())
+      return init;
 
-  return nullptr;
+  return None;
 }
 
 Initializer *ParamDecl::getDefaultArgumentInitContext() const {
@@ -6160,7 +6161,7 @@ CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
 }
 
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
-  auto *oldContext = getDefaultArgumentInitContextCached();
+  auto oldContext = getCachedDefaultArgumentInitContext();
   assert((!oldContext || oldContext == initContext) &&
          "Cannot change init context after setting");
 

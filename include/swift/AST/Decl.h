@@ -5198,7 +5198,7 @@ class ParamDecl : public VarDecl {
 
   /// Retrieve the cached initializer context for the parameter's default
   /// argument without triggering a request.
-  Initializer *getDefaultArgumentInitContextCached() const;
+  Optional<Initializer *> getCachedDefaultArgumentInitContext() const;
 
   enum class Flags : uint8_t {
     /// Whether or not this parameter is vargs.

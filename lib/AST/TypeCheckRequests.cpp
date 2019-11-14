@@ -1190,10 +1190,7 @@ void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
 Optional<Initializer *>
 DefaultArgumentInitContextRequest::getCachedResult() const {
   auto *param = std::get<0>(getStorage());
-  if (auto *init = param->getDefaultArgumentInitContextCached())
-    return init;
-
-  return None;
+  return param->getCachedDefaultArgumentInitContext();
 }
 
 void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {

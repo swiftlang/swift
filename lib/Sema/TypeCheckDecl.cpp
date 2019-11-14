@@ -2066,7 +2066,7 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
       continue;
 
     // If this param already has a context, continue using it.
-    if (otherParam->getDefaultArgumentInitContextCached())
+    if (otherParam->getCachedDefaultArgumentInitContext())
       continue;
 
     // Create a new initializer context. If this is for the parameter that
