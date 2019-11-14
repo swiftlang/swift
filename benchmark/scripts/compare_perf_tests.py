@@ -31,7 +31,7 @@ from __future__ import print_function
 import argparse
 import re
 import sys
-from bisect import bisect, bisect_left, bisect_right
+from bisect import bisect_left, bisect_right
 from collections import namedtuple
 from math import ceil, sqrt
 
@@ -76,19 +76,6 @@ class PerformanceTestSamples(object):
             'Mean={0.mean:.0f} SD={0.sd:.0f} CV={0.cv:.2%}'
             .format(self) if self.samples else
             '{0.name!s} n=0'.format(self))
-
-    def add(self, sample):
-        """Add sample to collection and recompute statistics."""
-        assert isinstance(sample, int)
-        self._update_stats(sample)
-        i = bisect(self.samples, sample)
-        self.samples.insert(i, sample)
-        self._all_samples.append(sample)
-
-    def _update_stats(self, sample):
-        old_stats = (self.count, self.mean, self.S_runtime)
-        _, self.mean, self.S_runtime = (
-            self.running_mean_variance(old_stats, sample))
 
     def _recompute_stats(self):
         _, self.mean, self.S_runtime = reduce(
@@ -289,7 +276,9 @@ class PerformanceTestResult(object):
         """
         # Statistics
         if self.samples and r.samples:
-            map(self.samples.add, r.samples.samples)
+            self.samples.samples = sorted(
+                self.samples.samples + r.samples.samples)
+            self.samples._recompute_stats()
             sams = self.samples
             self.num_samples += r.num_samples
             sams.outliers += r.samples.outliers

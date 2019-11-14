@@ -33,8 +33,7 @@ from test_utils import captured_output
 
 class TestPerformanceTestSamples(unittest.TestCase):
     def setUp(self):
-        self.samples = PerformanceTestSamples('B1')
-        self.samples.add(1000)
+        self.samples = PerformanceTestSamples('B1', [1000])
 
     def test_has_name(self):
         self.assertEqual(self.samples.name, 'B1')
@@ -42,22 +41,29 @@ class TestPerformanceTestSamples(unittest.TestCase):
     def test_stores_samples(self):
         self.assertEqual(self.samples.count, 1)
         self.assertEqual(self.samples.samples[0], 1000)
+        self.assertEqual(self.samples.samples, [1000])
+        self.assertEqual(self.samples.all_samples, [1000])
+
+        s = PerformanceTestSamples('B1', [1000, 1100, 1050])
+        self.assertEqual(s.samples, [1000, 1050, 1100])  # sorted
+        self.assertEqual(s.all_samples, [1000, 1100, 1050])  # maintains order
 
     def test_num_iters(self):
         self.assertIsNone(self.samples.num_iters)
-        averaged = PerformanceTestSamples('B1', num_iters=42)
+        averaged = PerformanceTestSamples('B', num_iters=42)
         self.assertEqual(averaged.num_iters, 42)
 
     def test_quantile(self):
-        self.assertEqual(self.samples.quantile(1), 1000)
-        self.assertEqual(self.samples.quantile(0), 1000)
-        self.samples.add(1100)
-        self.assertEqual(self.samples.quantile(0), 1000)
-        self.assertEqual(self.samples.quantile(1), 1100)
-        self.samples.add(1050)
-        self.assertEqual(self.samples.quantile(0), 1000)
-        self.assertEqual(self.samples.quantile(.5), 1050)
-        self.assertEqual(self.samples.quantile(1), 1100)
+        s = PerformanceTestSamples('B1', [1000])
+        self.assertEqual(s.quantile(1), 1000)
+        self.assertEqual(s.quantile(0), 1000)
+        s = PerformanceTestSamples('B1', [1000, 1100])
+        self.assertEqual(s.quantile(0), 1000)
+        self.assertEqual(s.quantile(1), 1100)
+        s = PerformanceTestSamples('B1', [1000, 1100, 1050])
+        self.assertEqual(s.quantile(0), 1000)
+        self.assertEqual(s.quantile(.5), 1050)
+        self.assertEqual(s.quantile(1), 1100)
 
     def assertEqualFiveNumberSummary(self, ss, expected_fns):
         e_min, e_q1, e_median, e_q3, e_max = expected_fns
@@ -68,28 +74,21 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.assertEqual(ss.max, e_max)
 
     def test_computes_five_number_summary(self):
-        self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1000, 1000, 1000))
-        self.samples.add(1100)
-        self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1000, 1100, 1100))
-        self.samples.add(1050)
-        self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1050, 1100, 1100))
-        self.samples.add(1025)
-        self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1025, 1050, 1100))
-        self.samples.add(1075)
-        self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1025, 1050, 1075, 1100))
+        s = PerformanceTestSamples('B', [1000])
+        self.assertEqualFiveNumberSummary(s, (1000, 1000, 1000, 1000, 1000))
+        s = PerformanceTestSamples('B', [1000, 1100])
+        self.assertEqualFiveNumberSummary(s, (1000, 1000, 1000, 1100, 1100))
+        s = PerformanceTestSamples('B', [1000, 1100, 1050])
+        self.assertEqualFiveNumberSummary(s, (1000, 1000, 1050, 1100, 1100))
+        s = PerformanceTestSamples('B', [1000, 1100, 1050, 1025])
+        self.assertEqualFiveNumberSummary(s, (1000, 1000, 1025, 1050, 1100))
+        s = PerformanceTestSamples('B', [1000, 1100, 1050, 1025, 1075])
+        self.assertEqualFiveNumberSummary(s, (1000, 1025, 1050, 1075, 1100))
 
     def test_computes_inter_quartile_range(self):
         self.assertEqual(self.samples.iqr, 0)
-        self.samples.add(1025)
-        self.samples.add(1050)
-        self.samples.add(1075)
-        self.samples.add(1100)
-        self.assertEqual(self.samples.iqr, 50)
+        s = PerformanceTestSamples('B', [1000, 1025, 1050, 1075, 1100])
+        self.assertEqual(s.iqr, 50)
 
     def assertEqualStats(self, stats, expected_stats):
         for actual, expected in zip(stats, expected_stats):
@@ -99,7 +98,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         ss = self.samples
         self.assertEqualStats(
             (ss.mean, ss.sd, ss.cv), (1000.0, 0.0, 0.0))
-        self.samples.add(1100)
+        ss = PerformanceTestSamples('B', [1000, 1100])
         self.assertEqualStats(
             (ss.mean, ss.sd, ss.cv), (1050.0, 70.71, 6.7 / 100))
 
@@ -107,7 +106,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         ss = self.samples
         self.assertEqualStats(
             (ss.range, ss.spread), (0, 0))
-        self.samples.add(1100)
+        ss = PerformanceTestSamples('B', [1000, 1100])
         self.assertEqualStats(
             (ss.range, ss.spread), (100, 10.0 / 100))
 
@@ -122,8 +121,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
 
     def test_can_handle_zero_runtime(self):
         # guard against dividing by 0
-        self.samples = PerformanceTestSamples('Zero')
-        self.samples.add(0)
+        self.samples = PerformanceTestSamples('Zero', [0])
         self.assertEqualStats(
             (self.samples.mean, self.samples.sd, self.samples.cv,
              self.samples.range, self.samples.spread),
@@ -149,11 +147,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
             (self.samples.mean, self.samples.sd), (1050, 35.36))
 
     def test_excludes_outliers_zero_IQR(self):
-        self.samples = PerformanceTestSamples('Tight')
-        self.samples.add(23)
-        self.samples.add(18)
-        self.samples.add(18)
-        self.samples.add(18)
+        self.samples = PerformanceTestSamples('Tight', [23, 18, 18, 18])
         self.assertEqual(self.samples.iqr, 0)
 
         self.samples.exclude_outliers()
