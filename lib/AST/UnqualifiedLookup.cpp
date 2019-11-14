@@ -1191,10 +1191,6 @@ llvm::Expected<LookupResult>
 UnqualifiedLookupRequest::evaluate(Evaluator &evaluator, DeclName name,
                                    DeclContext *dc, SourceLoc loc,
                                    UnqualifiedLookupFlags flags) const {
-  auto *stats = dc->getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumUnqualifiedLookup++;
-
   SmallVector<LookupResultEntry, 4> results;
   size_t indexOfFirstOuterResult = 0;
   UnqualifiedLookupFactory factory(name, dc, loc,
