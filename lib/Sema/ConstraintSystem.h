@@ -1664,8 +1664,7 @@ public:
   };
 
   ConstraintSystem(DeclContext *dc,
-                   ConstraintSystemOptions options,
-                   Expr *expr = nullptr);
+                   ConstraintSystemOptions options);
   ~ConstraintSystem();
 
   /// Retrieve the type checker associated with this constraint system.

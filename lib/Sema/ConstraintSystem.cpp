@@ -75,16 +75,11 @@ ExpressionTimer::~ExpressionTimer() {
 
 
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
-                                   ConstraintSystemOptions options,
-                                   Expr *expr)
+                                   ConstraintSystemOptions options)
   : Context(dc->getASTContext()), DC(dc), Options(options),
     Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
-  if (expr) {
-    InputExprs.insert(expr);
-  }
-
   assert(DC && "context required");
 }
 

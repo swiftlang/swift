@@ -574,7 +574,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(DC, None, E);
+  ConstraintSystem cs(DC, None);
   cs.baseCS = &BaseCS;
 
   // Set up expression type checker timer for the candidate.
