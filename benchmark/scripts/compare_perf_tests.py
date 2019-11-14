@@ -104,15 +104,11 @@ class PerformanceTestSamples(object):
               bisect_left(self._runtimes, int(self.q1 - 1.5 * self.iqr)))
         hi = bisect_right(self._runtimes, int(self.q3 + 1.5 * self.iqr))
 
-        outliers = self.samples[:lo] + self.samples[hi:]
-        samples = self.samples[lo:hi]
-        all = self._all_samples
-
-        self.__init__(self.name, num_iters=self.num_iters)  # re-initialize
-        for sample in samples:  # and
-            self.add(sample)  # re-compute stats
-        self.outliers = outliers
-        self._all_samples = all
+        self.outliers = self.samples[:lo] + self.samples[hi:]
+        self.samples = self.samples[lo:hi]
+        # re-compute stats
+        _, self.mean, self.S_runtime = reduce(
+            self.running_mean_variance, self.samples, (0, 0.0, 0.0))
 
     @property
     def count(self):
