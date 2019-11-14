@@ -5751,10 +5751,8 @@ private:
   /// Mapping from original basic blocks to local temporary values to be cleaned
   /// up. This is populated when pullback emission is run on one basic block and
   /// cleaned before processing another basic block.
-  DenseMap<SILBasicBlock *, SmallVector<SILValue, 64>>
+  DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>>
       blockTemporaries;
-
-  llvm::DenseSet<SILValue> blockTemporarySet;
 
   /// The main builder.
   SILBuilder builder;
@@ -5855,10 +5853,10 @@ private:
   SILValue recordTemporary(SILValue value) {
     assert(value->getType().isObject());
     assert(value->getFunction() == &getPullback());
-    blockTemporaries[value->getParentBlock()].push_back(value);
+    auto inserted = blockTemporaries[value->getParentBlock()].insert(value);
+    (void)inserted;
     LLVM_DEBUG(getADDebugStream() << "Recorded temporary " << value);
-    auto insertion = blockTemporarySet.insert(value); (void)insertion;
-    assert(insertion.second && "Temporary already recorded?");
+    assert(inserted && "Temporary already recorded?");
     return value;
   }
 
@@ -5867,10 +5865,9 @@ private:
     assert(bb->getParent() == &getPullback());
     LLVM_DEBUG(getADDebugStream() << "Cleaning up temporaries for pullback bb"
                << bb->getDebugID() << '\n');
-    for (auto temp : blockTemporaries[bb]) {
+    for (auto temp : blockTemporaries[bb])
       builder.emitDestroyValueOperation(loc, temp);
-      blockTemporarySet.erase(temp);
-    }
+    blockTemporaries[bb].clear();
   }
 
   //--------------------------------------------------------------------------//
@@ -6452,7 +6449,7 @@ public:
     // Ensure all temporaries have been cleaned up.
     for (auto &bb : pullback) {
       for (auto temp : blockTemporaries[&bb]) {
-        if (blockTemporarySet.count(temp)) {
+        if (blockTemporaries[&bb].count(temp)) {
           leakFound = true;
           getADDebugStream() << "Found leaked temporary:\n" << temp;
         }
@@ -6670,11 +6667,7 @@ public:
       for (auto pair : incomingValues) {
         auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
-        // FIXME: This is a hack because `blockTemporarySet` cannot be updated.
-        // Consider changing `blockTemporarySet` to be per-bb like
-        // `blockTemporaries`?
-        blockTemporaries[getPullbackBlock(predBB)].push_back(
-            concreteBBArgAdjCopy);
+        blockTemporaries[getPullbackBlock(predBB)].insert(concreteBBArgAdjCopy);
         setAdjointValue(predBB, incomingValue,
                         makeConcreteAdjointValue(concreteBBArgAdjCopy));
       }
