@@ -71,9 +71,12 @@ namespace constraints {
 /// A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
-  /// The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 4> TypeVarAndOptions;
-  
+  /// The type variable that we saved the state of.
+  TypeVariableType *TypeVar;
+
+  /// The saved type variable options.
+  unsigned Options;
+
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
@@ -82,9 +85,6 @@ public:
 
   /// Restore the state of the type variable to the saved state.
   void restore();
-
-  TypeVariableType *getTypeVariable() { return TypeVarAndOptions.getPointer(); }
-  unsigned getOptions() { return TypeVarAndOptions.getInt(); }
 };
 
 /// A set of saved type variable bindings.
@@ -171,9 +171,12 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to a non-escaping type or not.
   TVO_CanBindToNoEscape = 0x04,
 
+  /// Whether the type variable can be bound to a hole type or not.
+  TVO_CanBindToHole = 0x08,
+
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x08,
+  TVO_PrefersSubtypeBinding = 0x10,
 };
 
 /// The implementation object for a type variable used within the
@@ -239,6 +242,9 @@ public:
 
   /// Whether this type variable can bind to an inout type.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
+
+  /// Whether this type variable can bind to a hole type.
+  bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -427,6 +433,14 @@ public:
     else
       impl.getTypeVariable()->Bits.TypeVariableType.Options &=
           ~TVO_CanBindToNoEscape;
+  }
+
+  void enableCanBindToHole(constraints::SavedTypeVariableBindings *record) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
   }
 
   /// Print the type variable to the given output stream.
@@ -1109,13 +1123,6 @@ private:
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
-  /// The set of "holes" in the constraint system encountered
-  /// along the current path identified by locator. A "hole" is
-  /// a type variable which type couldn't be determined due to
-  /// an inference failure e.g. missing member, ambiguous generic
-  /// parameter which hasn't been explicitly specified.
-  llvm::SmallSetVector<ConstraintLocator *, 4> Holes;
-
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
   std::vector<std::pair<ConstraintLocator*, unsigned>>
@@ -1610,9 +1617,6 @@ public:
     /// The length of \c Fixes.
     unsigned numFixes;
 
-    /// The length of \c Holes.
-    unsigned numHoles;
-
     /// The length of \c FixedRequirements.
     unsigned numFixedRequirements;
 
@@ -2057,14 +2061,6 @@ public:
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
   void recordPotentialHole(TypeVariableType *typeVar);
-
-  bool isPotentialHole(TypeVariableType *typeVar) const {
-    return isPotentialHoleAt(typeVar->getImpl().getLocator());
-  }
-
-  bool isPotentialHoleAt(ConstraintLocator *locator) const {
-    return bool(Holes.count(locator));
-  }
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.

@@ -702,39 +702,28 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
       CollectionElementContextualMismatch(cs, srcType, dstType, locator);
 }
 
-bool ExplicitlySpecifyGenericArguments::diagnose(bool asNote) const {
+bool DefaultGenericArgument::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<GenericTypeParamType *, 4> missingParams{Param};
+
+  for (auto *otherFix : fixes) {
+    if (auto *fix = otherFix->getAs<DefaultGenericArgument>())
+      missingParams.push_back(fix->Param);
+  }
+
   auto &cs = getConstraintSystem();
-  MissingGenericArgumentsFailure failure(cs, getParameters(),
-                                         getLocator());
+  MissingGenericArgumentsFailure failure(cs, missingParams, getLocator());
   return failure.diagnose(asNote);
 }
 
-ConstraintFix *
-ExplicitlySpecifyGenericArguments::coalescedWith(ArrayRef<ConstraintFix *> fixes) {
-  if (fixes.empty())
-    return this;
-
-  auto params = getParameters();
-  llvm::SmallVector<GenericTypeParamType *, 4> missingParams{params.begin(),
-                                                             params.end()};
-  for (auto *otherFix : fixes) {
-    if (auto *fix = otherFix->getAs<ExplicitlySpecifyGenericArguments>()) {
-      auto additionalParams = fix->getParameters();
-      missingParams.append(additionalParams.begin(), additionalParams.end());
-    }
-  }
-
-  return ExplicitlySpecifyGenericArguments::create(getConstraintSystem(),
-                                                   missingParams, getLocator());
+bool DefaultGenericArgument::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
 }
 
-ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
-    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
-    ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
-  void *mem = cs.getAllocator().Allocate(
-      size, alignof(ExplicitlySpecifyGenericArguments));
-  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
+DefaultGenericArgument *
+DefaultGenericArgument::create(ConstraintSystem &cs, GenericTypeParamType *param,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) DefaultGenericArgument(cs, param, locator);
 }
 
 SkipUnhandledConstructInFunctionBuilder *

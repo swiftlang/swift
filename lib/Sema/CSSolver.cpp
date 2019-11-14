@@ -437,7 +437,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
-  numHoles = cs.Holes.size();
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
@@ -484,9 +483,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any fixes.
   truncate(cs.Fixes, numFixes);
-
-  // Remove any holes encountered along the current path.
-  truncate(cs.Holes, numHoles);
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);

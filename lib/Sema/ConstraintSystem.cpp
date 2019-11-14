@@ -1121,7 +1121,8 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
     auto *paramLocator = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
 
-    auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding);
+    auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
+                                                    TVO_CanBindToHole);
     auto result = replacements.insert(std::make_pair(
         cast<GenericTypeParamType>(gp->getCanonicalType()), typeVar));
 
