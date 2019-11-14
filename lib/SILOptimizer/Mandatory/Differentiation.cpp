@@ -5862,9 +5862,10 @@ private:
     return value;
   }
 
-  /// Clean up all temporary values for the given block.
+  /// Clean up all temporary values for the given pullback block.
   void cleanUpTemporariesForBlock(SILBasicBlock *bb, SILLocation loc) {
-    LLVM_DEBUG(getADDebugStream() << "Cleaning up temporaries for bb"
+    assert(bb->getParent() == &getPullback());
+    LLVM_DEBUG(getADDebugStream() << "Cleaning up temporaries for pullback bb"
                << bb->getDebugID() << '\n');
     for (auto temp : blockTemporaries[bb]) {
       builder.emitDestroyValueOperation(loc, temp);
@@ -6653,20 +6654,29 @@ public:
     auto predEnumVal = getPullbackStructElement(bb, predEnumField);
 
     // Propagate adjoint values from active basic block arguments to
-    // predecessor terminator operands.
+    // incoming values (predecessor terminator operands).
     for (auto *bbArg : bb->getArguments()) {
       if (!getActivityInfo().isActive(bbArg, getIndices()))
         continue;
       // Get predecessor terminator operands.
       SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
       bbArg->getSingleTerminatorOperands(incomingValues);
-      // Initialize adjoint value of predecessor terminator operands as
-      // adjoint value of current block arguments.
+      // Materialize adjoint value of active basic block argument, create a
+      // copy, and set copy as adjoint value of incoming values.
       auto bbArgAdj = getAdjointValue(bb, bbArg);
+      auto concreteBBArgAdj = materializeAdjoint(bbArgAdj, pbLoc);
+      auto concreteBBArgAdjCopy =
+          builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
       for (auto pair : incomingValues) {
         auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
-        setAdjointValue(predBB, incomingValue, bbArgAdj);
+        // FIXME: This is a hack because `blockTemporarySet` cannot be updated.
+        // Consider changing `blockTemporarySet` to be per-bb like
+        // `blockTemporaries`?
+        blockTemporaries[getPullbackBlock(predBB)].push_back(
+            concreteBBArgAdjCopy);
+        setAdjointValue(predBB, incomingValue,
+                        makeConcreteAdjointValue(concreteBBArgAdjCopy));
       }
     }
 
@@ -6705,10 +6715,7 @@ public:
     }
     // Emit cleanups for all block-local temporaries.
     cleanUpTemporariesForBlock(pbBB, pbLoc);
-    // - If the original block has exactly one predecessor, then the pullback
-    //   block has exactly one successor. Extract the pullback struct value
-    //   from the predecessor enum value using `unchecked_take_enum_data_addr`
-    //   and `load [take]`, and branch to the pullback successor block.
+    // Branch to pullback successor blocks.
     assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
     builder.createSwitchEnum(
         pbLoc, predEnumVal, /*DefaultBB*/ nullptr, pullbackSuccessorCases);
@@ -6782,7 +6789,6 @@ public:
       src = cvi->getOperand();
     addAdjointValue(si->getParent(), src,
                     makeConcreteAdjointValue(newAdjValue), si->getLoc());
-    blockTemporaries[ai->getParent()].push_back(newAdjValue);
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
@@ -7177,9 +7183,7 @@ public:
       for (auto i : range(ti->getNumOperands())) {
         if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
           continue;
-        auto adjElt = val;
-        if (val->getType().is<TupleType>())
-          adjElt = elts->getResult(adjIdx++);
+        auto adjElt = elts->getResult(adjIdx++);
         addAdjointValue(bb, ti->getOperand(i),
                         makeConcreteAdjointValue(adjElt), ti->getLoc());
       }
