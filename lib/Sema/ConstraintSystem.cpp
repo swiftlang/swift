@@ -73,35 +73,6 @@ ExpressionTimer::~ExpressionTimer() {
       .highlight(E->getSourceRange());
 }
 
-/// Extend the given depth map by adding depths for all of the subexpressions
-/// of the given expression.
-static void extendDepthMap(
-   Expr *expr,
-   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
-  class RecordingTraversal : public ASTWalker {
-  public:
-    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
-    unsigned Depth = 0;
-
-    explicit RecordingTraversal(
-        llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
-        : DepthMap(depthMap) {}
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      DepthMap[E] = {Depth, Parent.getAsExpr()};
-      Depth++;
-      return { true, E };
-    }
-
-    Expr *walkToExprPost(Expr *E) override {
-      Depth--;
-      return E;
-    }
-  };
-
-  RecordingTraversal traversal(depthMap);
-  expr->walk(traversal);
-}
 
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
                                    ConstraintSystemOptions options,
@@ -111,7 +82,7 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
     CG(*new ConstraintGraph(*this))
 {
   if (expr) {
-    extendDepthMap(expr, ExprWeights);
+    InputExprs.insert(expr);
   }
 
   assert(DC && "context required");
@@ -528,6 +499,54 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     return getConstraintLocator(anchor, ConstraintLocator::Member);
 
   return getConstraintLocator(anchor);
+}
+
+/// Extend the given depth map by adding depths for all of the subexpressions
+/// of the given expression.
+static void extendDepthMap(
+   Expr *expr,
+   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
+    unsigned Depth = 0;
+
+    explicit RecordingTraversal(
+        llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
+        : DepthMap(depthMap) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      DepthMap[E] = {Depth, Parent.getAsExpr()};
+      Depth++;
+      return { true, E };
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      Depth--;
+      return E;
+    }
+  };
+
+  RecordingTraversal traversal(depthMap);
+  expr->walk(traversal);
+}
+
+Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
+    Expr *expr) {
+  // Bring the set of expression weights up to date.
+  while (NumInputExprsInWeights < InputExprs.size()) {
+    extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
+    ++NumInputExprsInWeights;
+  }
+
+  auto e = ExprWeights.find(expr);
+  if (e != ExprWeights.end())
+    return e->second;
+
+  if (baseCS && baseCS != this)
+    return baseCS->getExprDepthAndParent(expr);
+
+  return None;
 }
 
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,

@@ -1024,6 +1024,12 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  /// The set of expressions for which we have generated constraints.
+  llvm::SetVector<Expr *> InputExprs;
+
+  /// The number of input expressions whose parents and depths have
+  /// been entered into \c ExprWeights.
+  unsigned NumInputExprsInWeights = 0;
 
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
@@ -1982,28 +1988,21 @@ public:
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
   /// Lookup and return parent associated with given expression.
-  Expr *getParentExpr(Expr *expr) const {
-    auto e = ExprWeights.find(expr);
-    if (e != ExprWeights.end())
-      return e->second.second;
-
-    if (baseCS && baseCS != this)
-      return baseCS->getParentExpr(expr);
-
+  Expr *getParentExpr(Expr *expr) {
+    if (auto result = getExprDepthAndParent(expr))
+      return result->second;
     return nullptr;
   }
 
   /// Retrieve the depth of the given expression.
-  Optional<unsigned> getExprDepth(Expr *expr) const {
-    auto e = ExprWeights.find(expr);
-    if (e != ExprWeights.end())
-      return e->second.first;
-
-    if (baseCS && baseCS != this)
-      return baseCS->getExprDepth(expr);
-
+  Optional<unsigned> getExprDepth(Expr *expr) {
+    if (auto result = getExprDepthAndParent(expr))
+      return result->first;
     return None;
   }
+
+  /// Retrieve the depth and parent expression of the given expression.
+  Optional<std::pair<unsigned, Expr *>> getExprDepthAndParent(Expr *expr);
 
   /// Returns a locator describing the callee for the anchor of a given locator.
   ///
