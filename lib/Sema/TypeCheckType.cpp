@@ -626,11 +626,43 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-Type TypeChecker::applyGenericArguments(Type type,
-                                        SourceLoc loc,
-                                        TypeResolution resolution,
-                                        GenericIdentTypeRepr *generic,
-                                        TypeResolutionOptions options) {
+static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
+
+/// Apply generic arguments to the given type.
+///
+/// If the type is itself not generic, this does nothing.
+///
+/// This function emits diagnostics about an invalid type or the wrong number
+/// of generic arguments, whereas applyUnboundGenericArguments requires this
+/// to be in a correct and valid form.
+///
+/// \param type The generic type to which to apply arguments.
+/// \param resolution The type resolution to perform.
+/// \param comp The arguments to apply with the angle bracket range for
+/// diagnostics.
+/// \param options The type resolution context.
+///
+/// \returns A BoundGenericType bound to the given arguments, or null on
+/// error.
+///
+/// \see applyUnboundGenericArguments
+static Type applyGenericArguments(Type type,
+                                  TypeResolution resolution,
+                                  ComponentIdentTypeRepr *comp,
+                                  TypeResolutionOptions options) {
+  auto loc = comp->getIdLoc();
+  auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
+  if (!generic) {
+    if (type->is<UnboundGenericType>() &&
+        !options.is(TypeResolverContext::TypeAliasDecl) &&
+        !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
+      diagnoseUnboundGenericType(type, loc);
+      return ErrorType::get(type->getASTContext());
+    }
+
+    return type;
+  }
+
   if (type->hasError()) {
     generic->setInvalid();
     return type;
@@ -716,15 +748,14 @@ Type TypeChecker::applyGenericArguments(Type type,
     args.push_back(substTy);
   }
 
-  auto result = applyUnboundGenericArguments(unboundType, genericDecl, loc,
-                                             resolution, args);
-  if (!result)
-    return result;
+  auto result = TypeChecker::applyUnboundGenericArguments(
+      unboundType, genericDecl, loc,
+      resolution, args);
 
   if (!options.contains(TypeResolutionFlags::AllowUnavailable)) {
     if (options.isAnyExpr() || dc->getParent()->isLocalContext())
       if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        diagnoseGenericTypeExportability(loc, result, dc);
+        TypeChecker::diagnoseGenericTypeExportability(loc, result, dc);
   }
 
   // Migration hack.
@@ -908,41 +939,25 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 }
 
 /// Returns a valid type or ErrorType in case of an error.
-static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
+static Type resolveTypeDecl(TypeDecl *typeDecl,
                             DeclContext *foundDC, TypeResolution resolution,
-                            GenericIdentTypeRepr *generic,
+                            ComponentIdentTypeRepr *comp,
                             TypeResolutionOptions options) {
-
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
-  Type type = TypeChecker::resolveTypeInContext(typeDecl, foundDC, resolution,
-                                                options, generic);
-
-  if (type->is<UnboundGenericType>() && !generic &&
-      !options.is(TypeResolverContext::TypeAliasDecl) &&
-      !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
-    diagnoseUnboundGenericType(type, loc);
-    return ErrorType::get(typeDecl->getASTContext());
-  }
+  Type type = TypeChecker::resolveTypeInContext(
+      typeDecl, foundDC, resolution, options,
+      isa<GenericIdentTypeRepr>(comp));
 
   if (type->hasError() && foundDC &&
       (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
     auto fromDC = resolution.getDeclContext();
     assert(fromDC && "No declaration context for type resolution?");
     maybeDiagnoseBadConformanceRef(fromDC, foundDC->getDeclaredInterfaceType(),
-                                   loc, typeDecl);
+                                   comp->getIdLoc(), typeDecl);
   }
 
-  if (generic) {
-    // Apply the generic arguments to the type.
-    type = TypeChecker::applyGenericArguments(type, loc, resolution, generic,
-                                              options);
-    if (!type)
-      return nullptr;
-  }
-
-  assert(type);
-  return type;
+  return applyGenericArguments(type, resolution, comp, options);
 }
 
 static std::string getDeclNameFromContext(DeclContext *dc,
@@ -1217,9 +1232,8 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // that now.
   if (auto *typeDecl = comp->getBoundDecl()) {
     // Resolve the type declaration within this context.
-    return resolveTypeDecl(typeDecl, comp->getIdLoc(),
-                           comp->getDeclContext(), resolution,
-                           dyn_cast<GenericIdentTypeRepr>(comp), options);
+    return resolveTypeDecl(typeDecl, comp->getDeclContext(), resolution,
+                           comp, options);
   }
 
   // Resolve the first component, which is the only one that requires
@@ -1265,13 +1279,8 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
 
-    Type type = resolveTypeDecl(typeDecl, comp->getIdLoc(),
-                                foundDC, resolution,
-                                dyn_cast<GenericIdentTypeRepr>(comp), options);
-
-    if (!type)
-      return type;
-
+    Type type = resolveTypeDecl(typeDecl, foundDC, resolution,
+                                comp, options);
     if (type->is<ErrorType>())
       return type;
 
@@ -1355,23 +1364,6 @@ static Type resolveNestedIdentTypeComponent(
   auto &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
 
-  auto maybeApplyGenericArgs = [&](Type memberType) {
-    // If there are generic arguments, apply them now.
-    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-      return TypeChecker::applyGenericArguments(memberType, comp->getIdLoc(),
-                                                resolution, genComp, options);
-    }
-
-    if (memberType->is<UnboundGenericType>() &&
-        !options.is(TypeResolverContext::TypeAliasDecl) &&
-        !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
-      diagnoseUnboundGenericType(memberType, comp->getLoc());
-      return ErrorType::get(ctx);
-    }
-
-    return memberType;
-  };
-
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
@@ -1416,7 +1408,7 @@ static Type resolveNestedIdentTypeComponent(
       return memberType;
 
     // If there are generic arguments, apply them now.
-    return maybeApplyGenericArgs(memberType);
+    return applyGenericArguments(memberType, resolution, comp, options);
   };
 
   // Short-circuiting.
@@ -1433,7 +1425,7 @@ static Type resolveNestedIdentTypeComponent(
       // type later on.
       if (!memberType->is<DependentMemberType>() ||
           memberType->castTo<DependentMemberType>()->getAssocType()) {
-        return maybeApplyGenericArgs(memberType);
+        return applyGenericArguments(memberType, resolution, comp, options);
       }
 
       return memberType;
