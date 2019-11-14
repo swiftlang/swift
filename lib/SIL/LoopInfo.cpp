@@ -48,13 +48,16 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
     return true;
   }
   if (I->isDeallocatingStack()) {
-    SILInstruction *Alloc = nullptr;
-    if (auto *Dealloc = dyn_cast<DeallocStackInst>(I))
-      Alloc = dyn_cast<AllocStackInst>(Dealloc->getOperand());
-    if (auto *Dealloc = dyn_cast<DeallocRefInst>(I))
-      Alloc = dyn_cast<AllocRefInst>(Dealloc->getOperand());
-    // The matching alloc_stack must be in the loop.
-    return Alloc && contains(Alloc);
+    SILInstruction *alloc = nullptr;
+    if (auto *dealloc = dyn_cast<DeallocStackInst>(I)) {
+      SILValue address = dealloc->getOperand();
+      if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
+        alloc = cast<SingleValueInstruction>(address);
+    }
+    if (auto *dealloc = dyn_cast<DeallocRefInst>(I))
+      alloc = dyn_cast<AllocRefInst>(dealloc->getOperand());
+
+    return alloc && contains(alloc);
   }
 
   // CodeGen can't build ssa for objc methods.
