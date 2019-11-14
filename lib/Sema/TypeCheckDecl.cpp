@@ -75,7 +75,7 @@ namespace {
 /// Float and integer literals are additionally keyed by numeric equivalence.
 struct RawValueKey {
   enum class Kind : uint8_t {
-    String, Float, Int, Tombstone, Empty
+    String, Float, Int, Bool, Tombstone, Empty
   } kind;
   
   struct IntValueTy {
@@ -101,6 +101,7 @@ struct RawValueKey {
     StringRef stringValue;
     IntValueTy intValue;
     FloatValueTy floatValue;
+    bool boolValue;
   };
   
   explicit RawValueKey(LiteralExpr *expr) {
@@ -136,6 +137,12 @@ struct RawValueKey {
       kind = Kind::String;
       stringValue = cast<StringLiteralExpr>(expr)->getValue();
       return;
+
+    case ExprKind::BooleanLiteral:
+      kind = Kind::Bool;
+      boolValue = cast<BooleanLiteralExpr>(expr)->getValue();
+      return;
+
     default:
       llvm_unreachable("not a valid literal expr for raw value");
     }
@@ -183,6 +190,8 @@ public:
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
       return DenseMapInfo<StringRef>::getHashValue(k.stringValue);
+    case RawValueKey::Kind::Bool:
+      return DenseMapInfo<uint64_t>::getHashValue(k.boolValue);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;
@@ -204,6 +213,8 @@ public:
              a.intValue.v1 == b.intValue.v1;
     case RawValueKey::Kind::String:
       return a.stringValue.equals(b.stringValue);
+    case RawValueKey::Kind::Bool:
+      return a.boolValue == b.boolValue;
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return true;
@@ -1681,6 +1692,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       elt->setInvalid();
       continue;
     }
+
 
     // If the raw values of the enum case are fixed, then we trust our callers
     // to have set things up correctly.  This comes up with imported enums
