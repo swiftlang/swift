@@ -710,16 +710,16 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // Skip invalid declarations.
-    if (other->isInvalid())
-      continue;
-
     // Skip declarations in other files.
     // In practice, this means we will warn on a private declaration that
     // shadows a non-private one, but only in the file where the shadowing
     // happens. We will warn on conflicting non-private declarations in both
     // files.
     if (!other->isAccessibleFrom(currentDC))
+      continue;
+
+    // Skip invalid declarations.
+    if (other->isInvalid())
       continue;
 
     // Thwart attempts to override the same declaration more than once.
