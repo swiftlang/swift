@@ -216,7 +216,8 @@ SwiftRangesEmitter::collectSerializedUnparsedRangesByNonPrimary() const {
 
 Ranges
 SwiftRangesEmitter::collectSortedSerializedNoninlinableFunctionBodies() const {
-  return serializeRanges(sortRanges(collectNoninlinableFunctionBodies()));
+  return serializeRanges(
+      coalesceSortedRanges(sortRanges(collectNoninlinableFunctionBodies())));
 }
 
 std::vector<CharSourceRange>
@@ -228,7 +229,12 @@ SwiftRangesEmitter::collectNoninlinableFunctionBodies() const {
     std::vector<CharSourceRange> ranges;
     bool walkToDeclPre(Decl *D) override {
       if (const auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-        if (!AFD->getAttrs().hasAttribute<InlinableAttr>()) {
+        // If you change an accessor body you might change the inferred
+        // type, and the change might propagate, so exclude them from local
+        // change ranges.
+        // Also rule out implicit constructors a fortiori.
+        if (!isa<AccessorDecl>(AFD) && !AFD->isImplicit() &&
+            !AFD->getAttrs().hasAttribute<InlinableAttr>()) {
           auto sr = AFD->getBodySourceRange();
           if (sr.isValid())
             ranges.push_back(Lexer::getCharSourceRangeFromSourceRange(SM, sr));
@@ -268,15 +274,17 @@ SwiftRangesEmitter::sortRanges(std::vector<CharSourceRange> ranges) const {
 
 std::vector<CharSourceRange> SwiftRangesEmitter::coalesceSortedRanges(
     std::vector<CharSourceRange> ranges) const {
+  if (ranges.empty())
+    return ranges;
   auto toBeWidened = ranges.begin();
   auto candidate = toBeWidened + 1;
   while (candidate < ranges.end()) {
     if (isImmediatelyBeforeOrOverlapping(*toBeWidened, *candidate))
       toBeWidened->widen(*candidate++);
-    else if (++toBeWidened == candidate)
-      ++candidate;
+    else
+      *++toBeWidened = *candidate++;
   }
-  ranges.erase(candidate, ranges.end());
+  ranges.erase(toBeWidened + 1, ranges.end());
   return ranges;
 }
 
