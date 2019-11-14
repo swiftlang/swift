@@ -2117,17 +2117,9 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
       auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
       assert(ptai && "Expected `pointer_to_address` user for uninitialized "
                      "array intrinsic");
-      for (auto use : ptai->getUses()) {
-        auto *inst = use->getUser();
-        if (auto *si = dyn_cast<StoreInst>(inst)) {
-          setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
-        } else if (auto *iai = dyn_cast<IndexAddrInst>(inst)) {
-          for (auto use : iai->getUses())
-            if (auto si = dyn_cast<StoreInst>(use->getUser()))
-              setUsefulAndPropagateToOperands(si->getSrc(),
-                                              dependentVariableIndex);
-        }
-      }
+      // Propagate usefulness through `pointer_to_address` users' operands.
+      for (auto use : ptai->getUses())
+        propagateUseful(use->getUser(), dependentVariableIndex);
     }
   }
 }
@@ -7395,9 +7387,11 @@ public:
   NO_ADJOINT(Branch)
   NO_ADJOINT(CondBranch)
 
-  // Buffer projection.
+  // Address projections.
   NO_ADJOINT(StructElementAddr)
   NO_ADJOINT(TupleElementAddr)
+  NO_ADJOINT(PointerToAddress)
+  NO_ADJOINT(IndexAddr)
 
   // Memory allocation/access.
   NO_ADJOINT(AllocStack)
