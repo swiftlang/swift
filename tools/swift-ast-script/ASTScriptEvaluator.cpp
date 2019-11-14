@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Frontend/Frontend.h"
 
 using namespace swift;
@@ -114,7 +115,9 @@ bool ASTScript::execute() const {
     return true;
   }
 
-  UnqualifiedLookup viewLookup(ctx.getIdentifier("View"), swiftUI);
+  auto req = UnqualifiedLookupRequest{ctx.getIdentifier("View"), swiftUI,
+                                      SourceLoc(), UnqualifiedLookupFlags()};
+  auto viewLookup = evaluateOrDefault(ctx.evaluator, req, {});
   auto viewProtocol =
     dyn_cast_or_null<ProtocolDecl>(viewLookup.getSingleTypeResult());
   if (!viewProtocol) {

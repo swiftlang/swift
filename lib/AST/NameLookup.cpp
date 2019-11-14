@@ -1982,8 +1982,11 @@ directReferencesForUnqualifiedTypeLookup(DeclName name,
   if (lookupOuter == LookupOuterResults::Included)
     options |= UnqualifiedLookup::Flags::IncludeOuterResults;
 
-  UnqualifiedLookup lookup(name, dc, loc, options);
-  for (const auto &result : lookup.Results) {
+  auto &ctx = dc->getASTContext();
+  auto flags = UnqualifiedLookupFlags(options.toRaw());
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
+  for (const auto &result : lookup.allResults()) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
       results.push_back(typeDecl);
   }

@@ -2073,12 +2073,13 @@ void lookupReplacedDecl(DeclName replacedDeclName,
 
   auto *moduleScopeCtxt = declCtxt->getModuleScopeContext();
   if (isa<FileUnit>(declCtxt)) {
-    UnqualifiedLookup lookup(replacedDeclName, moduleScopeCtxt,
-                             attr->getLocation());
-    if (lookup.isSuccess()) {
-      for (auto entry : lookup.Results) {
-        results.push_back(entry.getValueDecl());
-      }
+    auto &ctx = declCtxt->getASTContext();
+    auto req =
+        UnqualifiedLookupRequest{replacedDeclName, moduleScopeCtxt,
+                                 attr->getLocation(), UnqualifiedLookupFlags()};
+    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    for (auto entry : lookup) {
+      results.push_back(entry.getValueDecl());
     }
     return;
   }

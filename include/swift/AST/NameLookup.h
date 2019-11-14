@@ -156,12 +156,20 @@ public:
     return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
   }
 
+  /// \returns An array of both the inner and outer results.
+  ArrayRef<LookupResultEntry> allResults() const {
+    return llvm::makeArrayRef(Results);
+  }
+
   const LookupResultEntry& operator[](unsigned index) const {
     return Results[index];
   }
 
   LookupResultEntry front() const { return innerResults().front(); }
   LookupResultEntry back() const { return innerResults().back(); }
+
+  /// \returns The index of the first outer result within \c allResults().
+  size_t getIndexOfFirstOuterResult() const { return IndexOfFirstOuterResult; }
 
   /// Add a result to the set of results.
   void add(LookupResultEntry result, bool isOuter) {

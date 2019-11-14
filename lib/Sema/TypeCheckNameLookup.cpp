@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
@@ -225,13 +226,17 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, loc,
-                           convertToUnqualifiedLookupOptions(options));
+  auto ulOptions = convertToUnqualifiedLookupOptions(options);
+
+  auto &ctx = dc->getASTContext();
+  auto flags = UnqualifiedLookupFlags(ulOptions.toRaw());
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
 
   LookupResult result;
   LookupResultBuilder builder(result, dc, options);
-  for (auto idx : indices(lookup.Results)) {
-    const auto &found = lookup.Results[idx];
+  for (auto idx : indices(lookup.allResults())) {
+    const auto &found = lookup[idx];
     // Determine which type we looked through to find this result.
     Type foundInType;
 
@@ -246,7 +251,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     }
 
     builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
-                /*isOuter=*/idx >= lookup.IndexOfFirstOuterResult);
+                /*isOuter=*/idx >= lookup.getIndexOfFirstOuterResult());
   }
   return result;
 }
@@ -255,18 +260,18 @@ LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
+  auto &ctx = dc->getASTContext();
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
                    UnqualifiedLookup::Flags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
-    UnqualifiedLookup lookup(
-        name, dc, loc,
-        ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
-
-    if (!lookup.Results.empty() ||
-        !options.contains(NameLookupFlags::ProtocolMembers)) {
-      return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
-    }
+    ulOptions -= UnqualifiedLookupFlags::AllowProtocolMembers;
+    auto flags = UnqualifiedLookupFlags(ulOptions.toRaw());
+    auto lookup = evaluateOrDefault(
+        ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
+    if (!lookup.allResults().empty() ||
+        !options.contains(NameLookupFlags::ProtocolMembers))
+      return lookup;
   }
 
   {
@@ -275,11 +280,10 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
-    UnqualifiedLookup lookup(
-        name, dc, loc,
-        ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
-
-    return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
+    ulOptions |= UnqualifiedLookupFlags::AllowProtocolMembers;
+    auto flags = UnqualifiedLookupFlags(ulOptions.toRaw());
+    return evaluateOrDefault(
+        ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
   }
 }
 
