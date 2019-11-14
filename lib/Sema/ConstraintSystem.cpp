@@ -73,6 +73,36 @@ ExpressionTimer::~ExpressionTimer() {
       .highlight(E->getSourceRange());
 }
 
+/// Extend the given depth map by adding depths for all of the subexpressions
+/// of the given expression.
+static void extendDepthMap(
+   Expr *expr,
+   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
+    unsigned Depth = 0;
+
+    explicit RecordingTraversal(
+        llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
+        : DepthMap(depthMap) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      DepthMap[E] = {Depth, Parent.getAsExpr()};
+      Depth++;
+      return { true, E };
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      Depth--;
+      return E;
+    }
+  };
+
+  RecordingTraversal traversal(depthMap);
+  expr->walk(traversal);
+}
+
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
                                    ConstraintSystemOptions options,
                                    Expr *expr)
@@ -80,8 +110,9 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
     Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
-  if (expr)
-    ExprWeights = expr->getDepthMap();
+  if (expr) {
+    extendDepthMap(expr, ExprWeights);
+  }
 
   assert(DC && "context required");
 }
