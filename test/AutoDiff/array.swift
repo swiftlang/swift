@@ -5,7 +5,8 @@ import DifferentiationUnittest
 
 var ArrayAutoDiffTests = TestSuite("ArrayAutoDiff")
 
-typealias FloatArrayGrad = Array<Float>.TangentVector
+typealias FloatArrayTan = Array<Float>.TangentVector
+typealias TrackedFloatArrayTan = Array<Tracked<Float>>.TangentVector
 
 ArrayAutoDiffTests.test("ArrayIdentity") {
   func arrayIdentity(_ x: [Float]) -> [Float] {
@@ -14,8 +15,8 @@ ArrayAutoDiffTests.test("ArrayIdentity") {
 
   let backprop = pullback(at: [5, 6, 7, 8], in: arrayIdentity)
   expectEqual(
-    FloatArrayGrad([1, 2, 3, 4]),
-    backprop(FloatArrayGrad([1, 2, 3, 4])))
+    FloatArrayTan([1, 2, 3, 4]),
+    backprop(FloatArrayTan([1, 2, 3, 4])))
 }
 
 ArrayAutoDiffTests.test("ArraySubscript") {
@@ -24,20 +25,50 @@ ArrayAutoDiffTests.test("ArraySubscript") {
   }
 
   expectEqual(
-    FloatArrayGrad([1, 1, 1, 0, 0, 0]),
+    FloatArrayTan([1, 1, 1, 0, 0, 0]),
     gradient(at: [2, 3, 4, 5, 6, 7], in: sumFirstThree))
 }
 
 ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
-  func twoElementLiteral(_ x: Tracked<Float>, _ y: Tracked<Float>) -> [Tracked<Float>] {
-    return [x, y]
+  do {
+    func twoElementLiteral(_ x: Tracked<Float>, _ y: Tracked<Float>) -> [Tracked<Float>] {
+      return [x, y]
+    }
+    let pb = pullback(at: 1, 1, in: twoElementLiteral)
+    let (gradX, gradY) = pb(TrackedFloatArrayTan([Tracked<Float>(1), Tracked<Float>(2)]))
+    expectEqual(1, gradX)
+    expectEqual(2, gradY)
   }
 
-  let (gradX, gradY) = pullback(at: Tracked<Float>(1), Tracked<Float>(1), in: twoElementLiteral)(
-    Array<Tracked<Float>>.DifferentiableView([Tracked<Float>(1), Tracked<Float>(2)]))
+  do {
+    // TF-952: Test array literal initialized from an address (e.g. `var`).
+    func twoElementLiteralAddress(_ x: Tracked<Float>, _ y: Tracked<Float>) -> [Tracked<Float>] {
+      var result = x
+      result = result * y
+      return [result, result]
+    }
+    let pb = pullback(at: 3, 4, in: twoElementLiteralAddress)
+    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
+    // FIXME(TF-952): Fix incorrect zero derivatives.
+    // expectEqual(8, gradX)
+    // expectEqual(6, gradY)
+    expectEqual(0, gradX)
+    expectEqual(0, gradY)
+  }
 
-  expectEqual(Tracked<Float>(1), gradX)
-  expectEqual(Tracked<Float>(2), gradY)
+  do {
+    // TF-952: Test array literal initialized with function call results.
+    func twoElementLiteralFunctionResult(_ x: Tracked<Float>, _ y: Tracked<Float>) -> [Tracked<Float>] {
+      return [x * y, x * y]
+    }
+    let pb = pullback(at: 3, 4, in: twoElementLiteralFunctionResult)
+    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
+    // FIXME(TF-952): Fix incorrect zero derivatives.
+    // expectEqual(8, gradX)
+    // expectEqual(6, gradY)
+    expectEqual(0, gradX)
+    expectEqual(0, gradY)
+  }
 }
 
 ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
@@ -91,22 +122,22 @@ ArrayAutoDiffTests.test("ArrayConcat") {
 
   expectEqual(
     TwoArrays.TangentVector(
-      a: FloatArrayGrad([1, 1]),
-      b: FloatArrayGrad([1, 0])),
+      a: FloatArrayTan([1, 1]),
+      b: FloatArrayTan([1, 0])),
     gradient(
       at: TwoArrays(a: [0, 0], b: [0, 0]),
       in: sumFirstThreeConcatted))
   expectEqual(
     TwoArrays.TangentVector(
-      a: FloatArrayGrad([1, 1, 1, 0]),
-      b: FloatArrayGrad([0, 0])),
+      a: FloatArrayTan([1, 1, 1, 0]),
+      b: FloatArrayTan([0, 0])),
     gradient(
       at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]),
       in: sumFirstThreeConcatted))
   expectEqual(
     TwoArrays.TangentVector(
-      a: FloatArrayGrad([]),
-      b: FloatArrayGrad([1, 1, 1, 0])),
+      a: FloatArrayTan([]),
+      b: FloatArrayTan([1, 1, 1, 0])),
     gradient(
       at: TwoArrays(a: [], b: [0, 0, 0, 0]),
       in: sumFirstThreeConcatted))
@@ -133,8 +164,8 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
 
   let backprop = pullback(at: [5, 6, 7, 8], in: constructView)
   expectEqual(
-    FloatArrayGrad([1, 2, 3, 4]),
-    backprop(FloatArrayGrad([1, 2, 3, 4])))
+    FloatArrayTan([1, 2, 3, 4]),
+    backprop(FloatArrayTan([1, 2, 3, 4])))
 }
 
 ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
@@ -147,8 +178,8 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
     at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
     in: accessBase)
   expectEqual(
-    FloatArrayGrad([1, 2, 3, 4]),
-    backprop(FloatArrayGrad([1, 2, 3, 4])))
+    FloatArrayTan([1, 2, 3, 4]),
+    backprop(FloatArrayTan([1, 2, 3, 4])))
 }
 
 ArrayAutoDiffTests.test("Array.DifferentiableView : KeyPathIterable") {
