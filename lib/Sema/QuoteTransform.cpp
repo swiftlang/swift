@@ -133,9 +133,9 @@ protected:
     if (culprit) {
       auto str =
           allocateString([&](raw_ostream &os) { return culprit->dump(os); });
-      tc.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_detailed, str);
+      ctx.Diags.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_detailed, str);
     } else {
-      tc.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_brief);
+      ctx.Diags.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_brief);
     }
   }
 
@@ -1271,14 +1271,15 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
 Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
   assert(exprType);
   if (!Context.getQuoteModule()) {
-    diagnose(loc, diag::quote_literal_no_quote_module);
+    Context.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
   if (auto fnExprType = exprType->getAs<FunctionType>()) {
     auto n = fnExprType->getParams().size();
     auto quoteClass = Context.getFunctionQuoteDecl(n);
     if (!quoteClass) {
-      diagnose(loc, diag::quote_literal_no_function_quote_class, n);
+      Context.Diags.diagnose(loc, diag::quote_literal_no_function_quote_class,
+                             n);
       return Type();
     }
     SmallVector<Type, 4> typeArgs;
@@ -1294,7 +1295,7 @@ Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
   } else {
     auto quoteClass = Context.getQuoteDecl();
     if (!quoteClass) {
-      diagnose(loc, diag::quote_literal_no_quote_class);
+      Context.Diags.diagnose(loc, diag::quote_literal_no_quote_class);
       return Type();
     }
     if (auto lvalueExprType = exprType->getAs<LValueType>()) {
@@ -1327,11 +1328,11 @@ Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
       }
       return FunctionType::get(paramTypes, typeArgs[typeArgs.size() - 1]);
     } else {
-      diagnose(loc, diag::unquote_wrong_type);
+      Context.Diags.diagnose(loc, diag::unquote_wrong_type);
       return Type();
     }
   } else {
-    diagnose(loc, diag::unquote_wrong_type);
+    Context.Diags.diagnose(loc, diag::unquote_wrong_type);
     return Type();
   }
 }
@@ -1354,12 +1355,12 @@ Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
 
 Type TypeChecker::getTypeOfQuoteDecl(SourceLoc loc) {
   if (!Context.getQuoteModule()) {
-    diagnose(loc, diag::quote_literal_no_quote_module);
+    Context.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
   auto treeProto = Context.getTreeDecl();
   if (!treeProto) {
-    diagnose(loc, diag::quote_literal_no_tree_proto);
+    Context.Diags.diagnose(loc, diag::quote_literal_no_tree_proto);
     return Type();
   }
   return treeProto->getDeclaredType();

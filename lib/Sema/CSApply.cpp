@@ -2248,6 +2248,7 @@ namespace {
       // because their nested closures / funcs aren't yet typechecked by now,
       // DeclQuoteExprs can be expanded right away.
       auto &tc = cs.getTypeChecker();
+      auto &ctx = cs.getASTContext();
       Expr *quotedExpr = tc.quoteDecl(expr->getQuotedDecl(), cs.DC);
       if (quotedExpr) {
         cs.cacheExprTypes(quotedExpr);
@@ -2259,7 +2260,7 @@ namespace {
           expr->setSemanticExpr(quotedExpr);
           return expr;
         } else {
-          tc.diagnose(expr->getLoc(), diag::quote_literal_no_tree_proto);
+          ctx.Diags.diagnose(expr->getLoc(), diag::quote_literal_no_tree_proto);
           return nullptr;
         }
       } else {
@@ -5652,7 +5653,7 @@ static void
 maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
                                                  Expr *expr,
                                                  AnyFunctionType *toType) {
-  auto &tc = cs.getTypeChecker();
+  ASTContext &ctx = cs.getASTContext();
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
   auto isToTypeLinear =
@@ -5662,9 +5663,9 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
   // closure expression or a declaration/member reference.
   if (fromFnType->getDifferentiabilityKind() == DifferentiabilityKind::Normal &&
       toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-    tc.diagnose(expr->getLoc(),
-                diag::invalid_differentiable_function_conversion_expr,
-                isToTypeLinear);
+    ctx.Diags.diagnose(expr->getLoc(),
+                       diag::invalid_differentiable_function_conversion_expr,
+                       isToTypeLinear);
     return;
   }
   // Conversion from a non-`@differentiable` function to a `@differentiable` is
@@ -5680,9 +5681,10 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         // to change the declaration to be a '@differentiable' closure. Emit a
         // note with a fix-it.
         if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
-          tc.diagnose(expr->getLoc(),
-                      diag::invalid_differentiable_function_conversion_expr,
-                      isToTypeLinear);
+          ctx.Diags.diagnose(
+              expr->getLoc(),
+              diag::invalid_differentiable_function_conversion_expr,
+              isToTypeLinear);
           if (paramDecl->getType()->is<AnyFunctionType>()) {
             auto *typeRepr = paramDecl->getTypeRepr();
             while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
@@ -5692,11 +5694,11 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
               attributeString += "(linear)";
             auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);
             auto paramListLoc = funcTypeRepr->getArgsTypeRepr()->getStartLoc();
-            tc.diagnose(paramDecl->getLoc(),
-                diag::invalid_differentiable_function_conversion_parameter,
-                attributeString)
-               .highlight(paramDecl->getTypeRepr()->getSourceRange())
-               .fixItInsert(paramListLoc, attributeString + " ");
+            ctx.Diags.diagnose(paramDecl->getLoc(),
+                    diag::invalid_differentiable_function_conversion_parameter,
+                    attributeString)
+                .highlight(paramDecl->getTypeRepr()->getSourceRange())
+                .fixItInsert(paramListLoc, attributeString + " ");
           }
           return;
         }
@@ -5708,9 +5710,9 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
                 ->getSemanticsProvidingExpr()->getReferencedDecl().getDecl()))
           return;
       }
-      tc.diagnose(expr->getLoc(),
-                  diag::invalid_differentiable_function_conversion_expr,
-                  isToTypeLinear);
+      ctx.Diags.diagnose(expr->getLoc(),
+                         diag::invalid_differentiable_function_conversion_expr,
+                         isToTypeLinear);
     };
     maybeDiagnoseFunctionRef(getSemanticExprForDeclOrMemberRef(expr));
   }
@@ -6361,11 +6363,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           ->castTo<FunctionType>();
       switch (fromEI.getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
-        expr = cs.cacheType(new (tc.Context)
+        expr = cs.cacheType(new (ctx)
             DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
         break;
       case DifferentiabilityKind::Linear:
-        expr = cs.cacheType(new (tc.Context)
+        expr = cs.cacheType(new (ctx)
             LinearFunctionExtractOriginalExpr(expr, fromFunc));
         break;
       case DifferentiabilityKind::NonDifferentiable:
@@ -6379,8 +6381,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
              toEI.getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
       // TODO(TF-908): Create a `LinearToDifferentiableFunctionExpr` and SILGen
       // it as thunk application. Remove the diagnostic.
-      tc.diagnose(expr->getLoc(),
-                  diag::unsupported_linear_to_differentiable_conversion);
+      ctx.Diags.diagnose(expr->getLoc(),
+                         diag::unsupported_linear_to_differentiable_conversion);
     }
     // Handle implicit conversion from non-@differentiable to @differentiable.
     maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
@@ -6392,11 +6394,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           ->castTo<FunctionType>();
       switch (toEI.getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
-        expr = cs.cacheType(new (tc.Context)
+        expr = cs.cacheType(new (ctx)
                             DifferentiableFunctionExpr(expr, fromFunc));
         break;
       case DifferentiabilityKind::Linear:
-        expr = cs.cacheType(new (tc.Context)
+        expr = cs.cacheType(new (ctx)
                             LinearFunctionExpr(expr, fromFunc));
         break;
       case DifferentiabilityKind::NonDifferentiable:
@@ -7640,7 +7642,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       // will obviate the necessity of this workaround.
       quote->getSubExpr()->setType(getType(quote->getSubExpr()));
 
-      Expr *quotedExpr = tc.quoteExpr(quote->getSubExpr(), quoteDC);
+      Expr *quotedExpr =
+          getTypeChecker().quoteExpr(quote->getSubExpr(), quoteDC);
       if (quotedExpr) {
         cacheExprTypes(quotedExpr);
         quote->setSemanticExpr(quotedExpr);
