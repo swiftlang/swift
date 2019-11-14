@@ -761,22 +761,35 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
 ///   stmt-continue:
 ///     'continue' identifier?
 ///
-ParserResult<Stmt> Parser::parseStmtContinue() {
-  SyntaxContext->setCreateSyntax(SyntaxKind::ContinueStmt);
-  SourceLoc Loc = consumeToken(tok::kw_continue);
-  SourceLoc TargetLoc;
-  Identifier Target;
+ParsedSyntaxResult<ParsedStmtSyntax> Parser::parseStmtContinueSyntax() {
+  ParsedContinueStmtSyntaxBuilder builder(*SyntaxContext);
 
+  auto continueTok = consumeTokenSyntax(tok::kw_continue);
+  builder.useContinueKeyword(std::move(continueTok));
+    
   // If we have an identifier after this, which is not the start of another
   // stmt or decl, we assume it is the label to continue to, unless there is a
   // line break.  There is ambiguity with expressions (e.g. "continue x+y") but
   // since the expression after the continue is dead, we don't feel bad eagerly
   // parsing this.
   if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
-      !isStartOfStmt() && !isStartOfDecl())
-    TargetLoc = consumeIdentifier(&Target);
+      !isStartOfStmt() && !isStartOfDecl()) {
+    auto labelTok = consumeIdentifierSyntax();
+    builder.useLabel(std::move(labelTok));
+  }
+    
+  return makeParsedResult(builder.build());
+}
 
-  return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
+ParserResult<Stmt> Parser::parseStmtContinue() {
+  auto leadingLoc = leadingTriviaLoc();
+  
+  auto parsed = parseStmtContinueSyntax();
+  SyntaxContext->addSyntax(parsed.get());
+
+  auto syntax = SyntaxContext->topNode<ContinueStmtSyntax>();
+  auto result = Generator.generate(syntax, leadingLoc);
+  return makeParserResult(result);
 }
 
 

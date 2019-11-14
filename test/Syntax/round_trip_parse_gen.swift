@@ -359,6 +359,8 @@ func statementTests() {
       continue
     } else {
       continue LABEL
+    } else {
+      LABEL: continue  
     }
   }
 

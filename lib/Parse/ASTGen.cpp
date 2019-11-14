@@ -234,6 +234,8 @@ Stmt *ASTGen::generate(const StmtSyntax &S, const SourceLoc Loc) {
 
   if (auto breakStmt = S.getAs<BreakStmtSyntax>()) {
     StmtAST = generate(*breakStmt, Loc);
+  } else if (auto continueStmt = S.getAs<ContinueStmtSyntax>()) {
+    StmtAST = generate(*continueStmt, Loc);
   } else {
     #ifndef NDEBUG
       S.dump();
@@ -256,6 +258,20 @@ Stmt *ASTGen::generate(const BreakStmtSyntax &Stmt, const SourceLoc Loc) {
   }
 
   return new (Context) BreakStmt(breakLoc, Target, TargetLoc);
+}
+
+Stmt *ASTGen::generate(const ContinueStmtSyntax &Stmt, const SourceLoc Loc) {
+  auto continueTok = Stmt.getContinueKeyword();
+  SourceLoc continueLoc = advanceLocBegin(Loc, continueTok);
+  
+  SourceLoc TargetLoc;
+  Identifier Target;
+  if (auto labelTok = Stmt.getLabel()) {
+    TargetLoc = advanceLocBegin(Loc, *labelTok);
+    Target = Context.getIdentifier(labelTok->getText());
+  }
+  
+  return new (Context) ContinueStmt(continueLoc, Target, TargetLoc);
 }
 
 Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {

@@ -359,7 +359,9 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
       continue</ContinueStmt>
     } </CodeBlock>else <CodeBlock>{<ContinueStmt>
       continue LABEL</ContinueStmt>
-    }</CodeBlock></IfStmt>
+    } </CodeBlock></IfStmt>else <ClosureExpr>{
+      LABEL: <ContinueStmt>continue  </ContinueStmt>
+    }</ClosureExpr>
   }</CodeBlock></ForInStmt><IfStmt>
 
   if<ConditionElement><IdentifierExpr>
