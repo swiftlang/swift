@@ -439,6 +439,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     llvm::SmallString<128> newFilename;
     if (auto err = FileSystem->getRealPath(input.file(), newFilename))
       newFilename = input.file();
+    llvm::sys::path::native(newFilename);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {

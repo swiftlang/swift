@@ -25,6 +25,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -283,6 +284,7 @@ static inline std::string getInterfaceGenDocumentName() {
   // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
   llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
   llvm::sys::fs::make_absolute(path);
+  llvm::sys::path::native(path);
   return path.str();
 }
 
@@ -446,6 +448,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::SmallString<64> AbsSourceFile;
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
+    llvm::sys::path::native(AbsSourceFile);
     SourceFile = AbsSourceFile.str();
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
