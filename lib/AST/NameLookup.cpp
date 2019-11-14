@@ -106,6 +106,28 @@ void LookupResult::shiftDownResults() {
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           UnqualifiedLookupFlags flags) {
+  using Flag = std::pair<UnqualifiedLookupFlags, StringRef>;
+  Flag possibleFlags[] = {
+      {UnqualifiedLookupFlags::AllowProtocolMembers, "AllowProtocolMembers"},
+      {UnqualifiedLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
+      {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
+      {UnqualifiedLookupFlags::KnownPrivate, "KnownPrivate"},
+      {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
+  };
+
+  UnqualifiedLookup::Options options(flags);
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
 void DebuggerClient::anchor() {}
 
 void AccessFilteringDeclConsumer::foundDecl(

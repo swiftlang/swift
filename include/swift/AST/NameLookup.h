@@ -117,6 +117,11 @@ public:
 
   ValueDecl *getBaseDecl() const;
 
+  friend bool operator ==(const LookupResultEntry &lhs,
+                          const LookupResultEntry &rhs) {
+    return lhs.BaseDC == rhs.BaseDC && lhs.Value == rhs.Value;
+  }
+
   void print(llvm::raw_ostream &) const;
 };
 
@@ -185,6 +190,11 @@ public:
     return dyn_cast<TypeDecl>(front().getValueDecl());
   }
 
+  friend bool operator ==(const LookupResult &lhs, const LookupResult &rhs) {
+    return lhs.Results == rhs.Results &&
+           lhs.IndexOfFirstOuterResult == rhs.IndexOfFirstOuterResult;
+  }
+
   /// Filter out any results that aren't accepted by the given predicate.
   void
   filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
@@ -195,24 +205,28 @@ public:
   void shiftDownResults();
 };
 
+enum class UnqualifiedLookupFlags {
+  /// This lookup is known to not affect downstream files.
+  KnownPrivate = 0x01,
+  /// This lookup should only return types.
+  TypeLookup = 0x02,
+  /// This lookup should consider declarations within protocols to which the
+  /// context type conforms.
+  AllowProtocolMembers = 0x04,
+  /// Don't check access when doing lookup into a type.
+  IgnoreAccessControl = 0x08,
+  /// This lookup should include results from outside the innermost scope with
+  /// results.
+  IncludeOuterResults = 0x10,
+};
+
+void simple_display(llvm::raw_ostream &out, UnqualifiedLookupFlags flags);
+
 /// This class implements and represents the result of performing
 /// unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
 public:
-  enum class Flags {
-    /// This lookup is known to not affect downstream files.
-    KnownPrivate = 0x01,
-    /// This lookup should only return types.
-    TypeLookup = 0x02,
-    /// This lookup should consider declarations within protocols to which the
-    /// context type conforms.
-    AllowProtocolMembers = 0x04,
-    /// Don't check access when doing lookup into a type.
-    IgnoreAccessControl = 0x08,
-    /// This lookup should include results from outside the innermost scope with
-    /// results.
-    IncludeOuterResults = 0x10,
-  };
+  using Flags = UnqualifiedLookupFlags;
   using Options = OptionSet<Flags>;
 
   /// Lookup an unqualified identifier \p Name in the context.

@@ -1228,6 +1228,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
   factory.performUnqualifiedLookup();
 }
 
+llvm::Expected<LookupResult>
+UnqualifiedLookupRequest::evaluate(Evaluator &evaluator, DeclName name,
+                                   DeclContext *dc, SourceLoc loc,
+                                   UnqualifiedLookupFlags flags) const {
+  UnqualifiedLookup lookup(name, dc, loc, UnqualifiedLookup::Options(flags));
+  return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
+}
+
 TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
   if (Results.size() != 1)
     return nullptr;

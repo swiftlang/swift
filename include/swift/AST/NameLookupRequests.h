@@ -25,11 +25,16 @@
 namespace swift {
 
 class ClassDecl;
+class DeclContext;
+class DeclName;
 class DestructorDecl;
 class GenericContext;
 class GenericParamList;
+class LookupResult;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
+enum class UnqualifiedLookupFlags;
 namespace ast_scope {
 class ASTScopeImpl;
 class ScopeCreator;
@@ -300,6 +305,27 @@ public:
   bool isCached() const;
   Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
   void cacheResult(ast_scope::ASTScopeImpl *) const {}
+};
+
+/// Performs unqualified lookup for a DeclName from a given context.
+class UnqualifiedLookupRequest
+    : public SimpleRequest<UnqualifiedLookupRequest,
+                           LookupResult(DeclName, DeclContext *, SourceLoc,
+                                        UnqualifiedLookupFlags),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  // FIXME: We should be taking an OptionSet instead of the raw
+  // UnqualifiedLookupFlags, but we don't want to define == for OptionSet. We
+  // should find a way to define custom equality specifically for requests.
+  llvm::Expected<LookupResult> evaluate(Evaluator &evaluator, DeclName name,
+                                        DeclContext *dc, SourceLoc loc,
+                                        UnqualifiedLookupFlags flags) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup
