@@ -3075,9 +3075,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     return funcTy;
   }
   
-  void *mem = ctx.Allocate(sizeof(GenericFunctionType) +
-                             sizeof(AnyFunctionType::Param) * params.size(),
-                           alignof(GenericFunctionType));
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param>(params.size());
+  void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
   auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
