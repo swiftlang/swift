@@ -1,4 +1,4 @@
-set(SourceKitSupport_sources
+add_sourcekit_library(SourceKitSupport
   Concurrency-libdispatch.cpp
   FuzzyStringMatcher.cpp
   Logging.cpp
@@ -6,10 +6,6 @@ set(SourceKitSupport_sources
   ThreadSafeRefCntPtr.cpp
   Tracing.cpp
   UIDRegistry.cpp
-)
-
-add_sourcekit_library(SourceKitSupport
-  ${SourceKitSupport_sources}
   LINK_LIBS swiftBasic swiftSyntax clangBasic clangRewrite
 )
 if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
