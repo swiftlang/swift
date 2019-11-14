@@ -3007,7 +3007,8 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
   }
   if (C.getIncrementalBuildEnabled()) {
     file_types::forEachIncrementalOutputType([&](file_types::ID type) {
-      addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
+      if (C.getUseSourceRangeDependencies() || type == file_types::TY_SwiftDeps)
+        addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
     });
   }
   chooseLoadedModuleTracePath(C, workingDirectory, Buf, Output);
