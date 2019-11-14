@@ -3007,7 +3007,7 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
   }
   if (C.getIncrementalBuildEnabled()) {
     file_types::forEachIncrementalOutputType([&](file_types::ID type) {
-      if (C.getUseSourceRangeDependencies() || type == file_types::TY_SwiftDeps)
+      if (C.getEnableSourceRangeDependencies() || type == file_types::TY_SwiftDeps)
         addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
     });
   }
