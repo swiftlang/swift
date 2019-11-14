@@ -5,7 +5,21 @@
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t
 // RUN: touch -t 201401240005 %t/*
 
+// Ensure that the extra outputs are not generated when they should not be:
+
 // RUN: cd %t && %swiftc_driver -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
+// RUN: ls %t | %FileCheck -check-prefix=CHECK-NO-RANGE-OUTPUTS %s
+// CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
+// CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
+// CHECK-NO-RANGE-OUTPUTS: .swiftdeps
+// CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
+// CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
+
+// Now, do it again with range dependencies enabled:
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/range-lifecycle/* %t
+// RUN: touch -t 201401240005 %t/*
+// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 // CHECK-FIRST-DAG: <unknown>:0: warning: unable to load dependencies file "./main.swiftdeps", disabling incremental mode
 // CHECK-FIRST-DAG: Incremental compilation could not read build record.
@@ -47,31 +61,11 @@
 // CHECK-FILEB1-RANGES: noninlinableFunctionBodies: []
 // CHECK-FILEB1-RANGES: ...
 
+// Add an attribute to: a structure that no other file uses
 
+// RUN: cp %t/fileB2.swift %t/fileB.swift
+// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies-c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | tee /tmp/out | %FileCheck -check-prefix=CHECK-ONLY-C %s
 
-// RUN: cd %t && %swiftc_driver -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | tee /tmp/out | %FileCheck -check-prefix=CHECK-SECOND %s
+// CHECK-ONLY-C: foobar
 
-// CHECK-SECOND
-
-
-
-
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift ./yet-another.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s
-
-// CHECK-SECOND-NOT: Handled
-
-// RUN: touch -t 201401240006 %t/other.swift
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift ./yet-another.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
-
-// CHECK-THIRD-DAG: Handled other.swift
-// CHECK-THIRD-DAG: Handled main.swift
-// CHECK-THIRD-DAG: Handled yet-another.swift
-
-// RUN: touch -t 201401240007 %t/other.swift
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./other.swift ./main.swift ./yet-another.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
-
-// RUN: touch -t 201401240008 %t/other.swift
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./yet-another.swift ./other.swift ./main.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
-
-// RUN: touch -t 201401240009 %t/other.swift
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./other.swift ./yet-another.swift ./main.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
+// RUN: gazorp
