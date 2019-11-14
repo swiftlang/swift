@@ -5751,8 +5751,7 @@ private:
   /// Mapping from original basic blocks to local temporary values to be cleaned
   /// up. This is populated when pullback emission is run on one basic block and
   /// cleaned before processing another basic block.
-  DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>>
-      blockTemporaries;
+  DenseMap<SILBasicBlock *, SmallSetVector<SILValue, 64>> blockTemporaries;
 
   /// The main builder.
   SILBuilder builder;
