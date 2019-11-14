@@ -253,8 +253,6 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
 
   for (auto Info : ReflectionInfos) {
     for (auto BuiltinTypeDescriptor : Info.Builtin) {
-      if (BuiltinTypeDescriptor->Size <= 0)
-        continue;
       if (BuiltinTypeDescriptor->getAlignment() <= 0)
         continue;
       if (BuiltinTypeDescriptor->Stride <= 0)
