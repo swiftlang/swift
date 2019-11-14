@@ -352,11 +352,18 @@ IndexSubset *getLoweredParameterIndices(IndexSubset *indices,
                                         AnyFunctionType *type);
 
 /// Retrieve config from the function name of a variant of
-/// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+/// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2`.
 /// Returns true if the function name is parsed successfully.
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffDerivativeFunctionKind &kind,
                                    unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
 
 /// Computes the correct linkage for a derivative function given the linkage of
 /// the original function. If the original linkage is not external and

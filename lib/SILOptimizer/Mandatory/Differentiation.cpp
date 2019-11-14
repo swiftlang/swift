@@ -8961,11 +8961,15 @@ void Differentiation::run() {
       for (SILInstruction &i : bb) {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
           context.getDifferentiableFunctionInsts().push_back(dfi);
+        // Reject uncanonical `linear_function` instructions.
+        // FIXME(SR-11850): Add support for linear map transposition.
         else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
-          astCtx.Diags.diagnose(
-              lfi->getLoc().getSourceLoc(),
-              diag::autodiff_conversion_to_linear_function_not_supported);
-          errorOccurred = true;
+          if (!lfi->hasTransposeFunction()) {
+            astCtx.Diags.diagnose(
+                lfi->getLoc().getSourceLoc(),
+                diag::autodiff_conversion_to_linear_function_not_supported);
+            errorOccurred = true;
+          }
         }
       }
     }
