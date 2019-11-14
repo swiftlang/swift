@@ -1406,18 +1406,13 @@ static Type resolveNestedIdentTypeComponent(
 
     // Diagnose a bad conformance reference if we need to.
     if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
-        inferredAssocType && memberType && memberType->hasError()) {
+        inferredAssocType && memberType->hasError()) {
       maybeDiagnoseBadConformanceRef(DC, parentTy, comp->getLoc(),
                                      inferredAssocType);
     }
 
-    // If we found a reference to an associated type or other member type that
-    // was marked invalid, just return ErrorType to silence downstream errors.
-    if (member->isInvalid())
-      return ErrorType::get(ctx);
-
     // At this point, we need to have resolved the type of the member.
-    if (!memberType || memberType->hasError())
+    if (memberType->hasError())
       return memberType;
 
     // If there are generic arguments, apply them now.
@@ -2592,26 +2587,11 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       auto argTy = resolveType(repr->getGenericArguments()[i], options);
       genericArgMap.insert({params[i], argTy->getCanonicalType()});
     }
-    
-    bool ok = true;
+
     subMap = SubstitutionMap::get(
       genericSig,
       QueryTypeSubstitutionMap{genericArgMap},
-      [&](CanType depTy, Type replacement, ProtocolDecl *proto)
-      -> ProtocolConformanceRef {
-        auto result = TypeChecker::conformsToProtocol(
-                                            replacement, proto, DC,
-                                            ConformanceCheckOptions());
-        if (result.isInvalid()) {
-          ok = false;
-          return ProtocolConformanceRef(proto);
-        }
-
-        return result;
-      });
-
-    if (!ok)
-      return ErrorType::get(Context);
+      TypeChecker::LookUpConformance(DC));
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);
