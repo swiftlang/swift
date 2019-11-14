@@ -32,6 +32,10 @@ SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultArgumentExprRequest,
+              Expr *(ParamDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultArgumentInitContextRequest,
+              Initializer *(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
