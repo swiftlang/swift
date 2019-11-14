@@ -51,6 +51,7 @@ static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
   case PlatformConditionKind::LABEL: return IDENTIFIER;
 #include "swift/AST/PlatformConditionKinds.def"
   }
+  llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
 /// Extract source text of the expression.
@@ -661,13 +662,20 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
 
     // Parse elements
     SmallVector<ASTNode, 16> Elements;
+    llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
+                                 InInactiveClauseEnvironment || !isActive);
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
-    } else {
+    } else if (SyntaxContext->isEnabled()) {
+      // We shouldn't skip code if we are building syntax tree.
       // The parser will keep running and we just discard the AST part.
       DiagnosticSuppression suppression(Context.Diags);
       SmallVector<ASTNode, 16> dropedElements;
       parseElements(dropedElements, false);
+    } else {
+      DiagnosticTransaction DT(Diags);
+      skipUntilConditionalBlockClose();
+      DT.abort();
     }
 
     Clauses.emplace_back(ClauseLoc, Condition,

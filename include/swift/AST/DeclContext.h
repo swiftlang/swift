@@ -23,6 +23,7 @@
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -49,7 +50,6 @@ namespace swift {
   class ExtensionDecl;
   class Expr;
   class GenericParamList;
-  class LazyResolver;
   class LazyMemberLoader;
   class GenericSignature;
   class GenericTypeParamDecl;
@@ -261,7 +261,13 @@ public:
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
-  
+
+  /// Returns whether this context has value semantics.
+  bool hasValueSemantics() const;
+
+  /// Returns whether this context is an extension constrained to a class type.
+  bool isClassConstrainedProtocolExtension() const;
+
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
@@ -354,7 +360,7 @@ public:
 
   /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
-  GenericSignature *getGenericSignatureOfContext() const;
+  GenericSignature getGenericSignatureOfContext() const;
 
   /// Retrieve the innermost archetypes of this context or any
   /// of its parents.
@@ -404,6 +410,15 @@ public:
   const Decl *getInnermostDeclarationDeclContext() const {
     return
         const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
+  }
+
+  /// Returns the innermost context that is an AbstractFunctionDecl whose
+  /// body has been skipped.
+  LLVM_READONLY
+  DeclContext *getInnermostSkippedFunctionContext();
+  const DeclContext *getInnermostSkippedFunctionContext() const {
+    return
+        const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
   }
 
   /// Returns the semantic parent of this context.  A context has a
@@ -457,6 +472,10 @@ public:
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;
+
+  /// Extensions are only allowed at the level in a file
+  /// FIXME: do this for Protocols, too someday
+  bool canBeParentOfExtension() const;
 
   /// Returns true if lookups within this context could affect downstream files.
   ///
@@ -578,7 +597,7 @@ public:
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 
-  void dumpContext() const;
+  SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
 
@@ -651,7 +670,7 @@ public:
 
 /// The range of declarations stored within an iterable declaration
 /// context.
-typedef IteratorRange<DeclIterator> DeclRange;
+using DeclRange = iterator_range<DeclIterator>;
 
 /// The kind of an \c IterableDeclContext.
 enum class IterableDeclContextKind : uint8_t {  
@@ -760,7 +779,7 @@ public:
   void addMember(Decl *member, Decl *hint = nullptr);
 
   /// See \c MemberCount
-  unsigned getMemberCount() const { return MemberCount; }
+  unsigned getMemberCount() const;
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {

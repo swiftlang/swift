@@ -89,8 +89,7 @@ static bool isBarrier(SILInstruction *inst) {
 #define BUILTIN_CAST_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs)                     \
   BUILTIN_NO_BARRIER(Id)
-#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload)                    \
-  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, UncheckedID, Attrs,   \
                                                Overload)                       \
   BUILTIN_NO_BARRIER(Id)
@@ -104,6 +103,11 @@ static bool isBarrier(SILInstruction *inst) {
 #define BUILTIN_RUNTIME_CALL(Id, Name, Attrs)                                  \
   case BuiltinValueKind::Id:                                                   \
     return true; // A runtime call could be anything.
+
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
+#include "swift/AST/Builtins.def"
 
     // Handle BUILTIN_MISC_OPERATIONs individually.
     case BuiltinValueKind::Sizeof:
@@ -158,12 +162,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
       return true;
-
-#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
-#define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
-#define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
-
-#include "swift/AST/Builtins.def"
     }
   }
   return false;

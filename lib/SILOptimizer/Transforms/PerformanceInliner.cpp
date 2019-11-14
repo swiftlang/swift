@@ -17,7 +17,7 @@
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
@@ -278,7 +278,8 @@ bool SILPerformanceInliner::isProfitableToInline(
 
     // Don't inline class methods.
     if (Callee->hasSelfParam()) {
-      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
+      auto SelfTy = Callee->getLoweredFunctionType()
+                          ->getSelfInstanceType(FuncBuilder.getModule());
       if (SelfTy->mayHaveSuperclass() &&
           Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
         isClassMethodAtOsize = true;

@@ -6,7 +6,6 @@
 | | **Architecture** | **Master** | **Package** |
 |---|:---:|:---:|:---:|
 | **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
-| **Ubuntu 14.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
 | **Ubuntu 18.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04)|
 
@@ -14,19 +13,19 @@
 
 | **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
-|**[Debian 9.1 (Raspberry Pi)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/armv7_debian_stretch.json)** | ARMv7 | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1)|
-|**[Fedora 27](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_fedora_27.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27)|
-|**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04)|
 |**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le)|
 |**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_16.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
-|**[Ubuntu 16.04 (TensorFlow)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow)|
-|**[macOS 10.13 (TensorFlow)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_macos_high_sierra_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow)|
-|**[Ubuntu 16.04 (TensorFlow with GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu)|
-|**[Debian 9.5](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_debian_9.5.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_5/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_5)|
 |**[Windows 2019](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_windows_2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64)|
 
+**Swift TensorFlow Community-Hosted CI Platforms**
+
+| **OS** | **Architecture** | **Build** |
+|---|:---:|:---:|
+|**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow)|
+|**[macOS 10.13](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_macos_high_sierra_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow)|
+|**[Ubuntu 16.04 (GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu)|
 
 ## Welcome to Swift
 
@@ -87,7 +86,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11 beta 6](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.2](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -149,6 +148,10 @@ Manager, building for various platforms, running tests after builds, and more.
 There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
+
+First, make sure that you're in the swift directory:
+
+    cd swift
 
 To build using Ninja, run:
 
@@ -327,8 +330,8 @@ expressed today.
 ## Build Dependencies
 
 ### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of 
-Swift and its companion projects; at least version 3.4.3 is required. 
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of
+Swift and its companion projects; at least version 3.4.3 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded

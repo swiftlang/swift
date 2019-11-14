@@ -17,14 +17,16 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
@@ -262,7 +264,8 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
     Serialized = IsSerialized;
   }
 
-  auto refType = M.Types.getLoweredRValueType(varDecl->getInterfaceType());
+  auto refType = M.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                              varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType,
@@ -274,6 +277,7 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
                          SILCoroutineKind::None,
                          ParameterConvention::Direct_Unowned,
                          /*params*/ {}, /*yields*/ {}, Results, None,
+                         SubstitutionMap(), false,
                          M.getASTContext());
   auto getterName = M.allocateCopy(getterNameTmp);
   return FunctionBuilder.getOrCreateFunction(
@@ -738,6 +742,16 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   SingleValueInstruction *InitVal;
   SILGlobalVariable *SILG = getVariableOfStaticInitializer(InitF, InitVal);
   if (!SILG)
+    return;
+
+  auto expansion = ResilienceExpansion::Maximal;
+  if (hasPublicVisibility(SILG->getLinkage()))
+    expansion = ResilienceExpansion::Minimal;
+
+  auto &tl = Module->Types.getTypeLowering(
+      SILG->getLoweredType(),
+      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
+  if (!tl.isLoadable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "

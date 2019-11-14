@@ -231,7 +231,8 @@ emitInvocation(SILBuilder &Builder,
     if (ReInfo.getSpecializedType()->isPolymorphic()) {
       Subs = ReInfo.getCallerParamSubstitutionMap();
       CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-          Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
+          Builder.getModule(), ReInfo.getCallerParamSubstitutionMap(),
+          Builder.getTypeExpansionContext());
       assert(!CalleeSubstFnTy->isPolymorphic() &&
              "Substituted callee type should not be polymorphic");
       assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -345,7 +346,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // the specialized attribute's substitution list. Visit only
   // SubstitutableTypes, skipping DependentTypes.
   auto GenericSig =
-    GenericFunc->getLoweredFunctionType()->getGenericSignature();
+    GenericFunc->getLoweredFunctionType()->getInvocationGenericSignature();
   auto SubMap = ReInfo.getClonerParamSubstitutionMap();
 
   GenericSig->forEachParam([&](GenericTypeParamType *ParamTy, bool Canonical) {
@@ -628,7 +629,8 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
   auto CalleeSubstFnTy = CanSILFuncTy;
   if (CanSILFuncTy->isPolymorphic()) {
     CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
+        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap(),
+        Builder.getTypeExpansionContext());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -713,7 +715,7 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
 
   LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
              dbgs() << "  Generic Sig:";
-             dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
+             dbgs().indent(2); FT->getInvocationGenericSignature()->print(dbgs());
              dbgs() << "  Generic Env:";
              dbgs().indent(2);
              GenericFunc->getGenericEnvironment()->dump(dbgs());
@@ -752,7 +754,7 @@ void EagerSpecializerTransform::run() {
     if (F.isDynamicallyReplaceable())
       continue;
 
-    if (!F.getLoweredFunctionType()->getGenericSignature())
+    if (!F.getLoweredFunctionType()->getInvocationGenericSignature())
       continue;
 
     // Create a specialized function with ReabstractionInfo for each attribute.
@@ -763,7 +765,9 @@ void EagerSpecializerTransform::run() {
     // TODO: Use a decision-tree to reduce the amount of dynamic checks being
     // performed.
     for (auto *SA : F.getSpecializeAttrs()) {
-      ReInfoVec.emplace_back(&F, SA->getSpecializedSignature());
+      ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
+                             FuncBuilder.getModule().isWholeModule(), &F,
+                             SA->getSpecializedSignature());
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);

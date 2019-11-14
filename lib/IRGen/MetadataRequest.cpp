@@ -470,15 +470,15 @@ namespace {
 
       auto subs =
         type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
-      requirements.enumerateFulfillments(IGF.IGM, subs,
-                                [&](unsigned reqtIndex, CanType type,
-                                    Optional<ProtocolConformanceRef> conf) {
-        if (conf) {
-          Values.push_back(emitWitnessTableRef(IGF, type, *conf));
-        } else {
-          Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
-        }
-      });
+      requirements.enumerateFulfillments(
+          IGF.IGM, subs,
+          [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
+            if (conf) {
+              Values.push_back(emitWitnessTableRef(IGF, type, conf));
+            } else {
+              Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
+            }
+          });
 
       collectTypes(IGF.IGM, decl);
       assert(Types.size() == Values.size());
@@ -516,11 +516,13 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
-                                                  ResilienceExpansion::Maximal);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        getSwiftModule(), ResilienceExpansion::Maximal,
+        getSILModule().isWholeModule());
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    return underlyingTy;
   }
 
   return type;
@@ -531,10 +533,13 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type.getASTType()->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
-                                                  ResilienceExpansion::Maximal);
-    type = type.subst(getSILModule(), replacer, replacer, genericSig,
-                      /*substitute opaque*/ true);
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        getSwiftModule(), ResilienceExpansion::Maximal,
+        getSILModule().isWholeModule());
+    auto underlyingTy =
+        type.subst(getSILModule(), replacer, replacer, genericSig,
+                   /*substitute opaque*/ true);
+    return underlyingTy;
   }
 
   return type;
@@ -546,13 +551,15 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
-                                                  ResilienceExpansion::Maximal);
-    conformance = conformance.subst(type, replacer, replacer,
-                                    SubstFlags::SubstituteOpaqueArchetypes);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        getSwiftModule(), ResilienceExpansion::Maximal,
+        getSILModule().isWholeModule());
+    auto substConformance = conformance.subst(
+        type, replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    return std::make_pair(underlyingTy, substConformance);
   }
 
   return std::make_pair(type, conformance);
@@ -990,12 +997,6 @@ namespace {
     MetadataResponse
     visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type,
                                  DynamicMetadataRequest request) {
-      return emitDirectMetadataRef(type);
-    }
-
-    MetadataResponse
-    visitBuiltinUnknownObjectType(CanBuiltinUnknownObjectType type,
-                                  DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -1729,7 +1730,7 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
                 IGM.Int8PtrTy, // arg 1
                 IGM.Int8PtrTy, // arg 2
                 IGM.TypeContextDescriptorPtrTy) // type context descriptor
-        ->stripPointerCasts());
+        .getCallee());
 
     if (thunkFn->empty()) {
       ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -2201,7 +2202,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
        IGM.getModule()
          ->getOrInsertFunction("__swift_instantiateConcreteTypeFromMangledName",
                                IGF.IGM.TypeMetadataPtrTy, cache->getType())
-         ->stripPointerCasts());
+        .getCallee());
   if (instantiationFn->empty()) {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(instantiationFn);
@@ -2497,7 +2498,7 @@ namespace {
                                       DynamicMetadataRequest request) {
       // All function types have the same layout regardless of arguments or
       // abstraction level. Use the metadata for () -> () for thick functions,
-      // or Builtin.UnknownObject for block functions.
+      // or AnyObject for block functions.
       auto &C = type->getASTContext();
       switch (type->getRepresentation()) {
       case SILFunctionType::Representation::Thin:
@@ -2516,8 +2517,8 @@ namespace {
                  CanFunctionType::get({}, C.TheEmptyTupleType),
                                        request).getMetadata();
       case SILFunctionType::Representation::Block:
-        // All block types look like Builtin.UnknownObject.
-        return emitDirectMetadataRef(C.TheUnknownObjectType, request);
+        // All block types look like AnyObject.
+        return emitDirectMetadataRef(C.getAnyObjectType(), request);
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -2646,9 +2647,9 @@ namespace {
       auto &C = IGF.IGM.Context;
       if (t == C.TheEmptyTupleType
           || t == C.TheNativeObjectType
-          || t == C.TheUnknownObjectType
           || t == C.TheBridgeObjectType
-          || t == C.TheRawPointerType)
+          || t == C.TheRawPointerType
+          || t == C.getAnyObjectType())
         return true;
       if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
         auto width = intTy->getWidth();
@@ -2725,8 +2726,8 @@ namespace {
         return emitFromValueWitnessTable(
                  CanFunctionType::get({}, C.TheEmptyTupleType));
       case SILFunctionType::Representation::Block:
-        // All block types look like Builtin.UnknownObject.
-        return emitFromValueWitnessTable(C.TheUnknownObjectType);
+        // All block types look like AnyObject.
+        return emitFromValueWitnessTable(C.getAnyObjectType());
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -2769,7 +2770,7 @@ namespace {
       case ReferenceCounting::ObjC:
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
-        return emitFromValueWitnessTable(IGF.IGM.Context.TheUnknownObjectType);
+        return emitFromValueWitnessTable(IGF.IGM.Context.getAnyObjectType());
 
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:

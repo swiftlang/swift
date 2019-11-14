@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -41,6 +42,7 @@ class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
 class ConstraintLocatorBuilder;
+enum class ConversionRestrictionKind;
 class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -150,6 +152,10 @@ enum class FixKind : uint8_t {
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
 
+  /// If there are more arguments than parameters, let's fix that up
+  /// by removing extraneous arguments.
+  RemoveExtraneousArguments,
+
   /// Allow single tuple closure parameter destructuring into N arguments.
   AllowClosureParameterDestructuring,
 
@@ -192,6 +198,31 @@ enum class FixKind : uint8_t {
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
+
+  /// Allow a single argument type mismatch. This is the most generic
+  /// failure related to argument-to-parameter conversions.
+  AllowArgumentTypeMismatch,
+
+  /// Explicitly construct type conforming to `RawRepresentable` protocol
+  /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
+  ExplicitlyConstructRawRepresentable,
+
+  /// Use raw value type associated with raw representative accessible
+  /// using `.rawValue` member.
+  UseValueTypeOfRawRepresentative,
+  /// If an array was passed to a variadic argument, give a specific diagnostic
+  /// and offer to drop the brackets if it's a literal.
+  ExpandArrayIntoVarargs,
+
+  /// Remove extraneous call to something which can't be invoked e.g.
+  /// a variable, a property etc.
+  RemoveCall,
+
+  AllowInvalidUseOfTrailingClosure,
+
+  /// Allow an ephemeral argument conversion for a parameter marked as being
+  /// non-ephemeral.
+  TreatEphemeralAsNonEphemeral,
 };
 
 class ConstraintFix {
@@ -210,6 +241,11 @@ public:
 
   virtual ~ConstraintFix();
 
+  template <typename Fix>
+  const Fix *getAs() const {
+    return Fix::classof(this) ? static_cast<const Fix *>(this) : nullptr;
+  }
+
   FixKind getKind() const { return Kind; }
 
   bool isWarning() const { return IsWarning; }
@@ -218,13 +254,15 @@ public:
 
   /// Diagnose a failure associated with this fix given
   /// root expression and information from constraint system.
-  virtual bool diagnose(Expr *root, bool asNote = false) const = 0;
+  virtual bool diagnose(bool asNote = false) const = 0;
+
+  virtual ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) {
+    return this;
+  }
 
   void print(llvm::raw_ostream &Out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const
-                              LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Retrieve anchor expression associated with this fix.
   /// NOTE: such anchor comes directly from locator without
@@ -252,7 +290,7 @@ class ForceOptional final : public ConstraintFix {
 public:
   std::string getName() const override { return "force optional"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static ForceOptional *create(ConstraintSystem &cs, Type baseType,
                                Type unwrappedType, ConstraintLocator *locator);
@@ -274,7 +312,7 @@ public:
     return "unwrap optional base of member lookup";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
                                     ConstraintLocator *locator);
@@ -292,24 +330,9 @@ class TreatRValueAsLValue final : public ConstraintFix {
 public:
   std::string getName() const override { return "treat rvalue as lvalue"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
-                                     ConstraintLocator *locator);
-};
-
-
-/// Replace a coercion ('as') with a forced checked cast ('as!').
-class CoerceToCheckedCast final : public ConstraintFix {
-  CoerceToCheckedCast(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::CoerceToCheckedCast, locator) {}
-
-public:
-  std::string getName() const override { return "as to as!"; }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static CoerceToCheckedCast *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
 };
 
@@ -327,7 +350,7 @@ class MarkExplicitlyEscaping final : public ConstraintFix {
 public:
   std::string getName() const override { return "add @escaping"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
                                         ConstraintLocator *locator,
@@ -359,7 +382,7 @@ public:
     return {getTrailingObjects<Identifier>(), NumLabels};
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
@@ -392,7 +415,7 @@ public:
     return "add missing protocol conformance";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,
@@ -422,7 +445,7 @@ public:
     return "skip same-type generic requirement";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   Type lhsType() { return LHS; }
   Type rhsType() { return RHS; }
@@ -446,7 +469,7 @@ public:
     return "skip superclass generic requirement";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   Type subclassType() { return LHS; }
   Type superclassType() { return RHS; }
@@ -472,8 +495,8 @@ protected:
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+                     ConstraintLocator *locator, bool warning = false)
+      : ConstraintFix(cs, kind, locator, warning), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -481,7 +504,7 @@ public:
   Type getFromType() const { return LHS; }
   Type getToType() const { return RHS; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
@@ -499,7 +522,7 @@ class DropThrowsAttribute final : public ContextualMismatch {
 public:
   std::string getName() const override { return "drop 'throws' attribute"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static DropThrowsAttribute *create(ConstraintSystem &cs,
                                      FunctionType *fromType,
@@ -517,7 +540,7 @@ class ForceDowncast final : public ContextualMismatch {
 public:
   std::string getName() const override;
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static ForceDowncast *create(ConstraintSystem &cs, Type fromType, Type toType,
                                ConstraintLocator *locator);
@@ -532,7 +555,7 @@ class AddAddressOf final : public ContextualMismatch {
 public:
   std::string getName() const override { return "add address-of"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AddAddressOf *create(ConstraintSystem &cs, Type argTy, Type paramTy,
                               ConstraintLocator *locator);
@@ -548,7 +571,7 @@ public:
     return "remove extraneous use of `&`";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static RemoveAddressOf *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                  ConstraintLocator *locator);
@@ -590,7 +613,7 @@ public:
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static GenericArgumentsMismatch *create(ConstraintSystem &cs, Type actual,
                                           Type required,
@@ -645,7 +668,7 @@ class AutoClosureForwarding final : public ConstraintFix {
 public:
   std::string getName() const override { return "fix @autoclosure forwarding"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AutoClosureForwarding *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
@@ -663,7 +686,7 @@ public:
     return "allow pointer conversion for autoclosure result type";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowAutoClosurePointerConversion *create(ConstraintSystem &cs,
                                                    Type pointeeType,
@@ -682,7 +705,7 @@ public:
     return "remove unwrap operator `!` or `?`";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static RemoveUnwrap *create(ConstraintSystem &cs, Type baseType,
                               ConstraintLocator *locator);
@@ -697,7 +720,7 @@ public:
     return "insert explicit `()` to make a call";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static InsertExplicitCall *create(ConstraintSystem &cs,
                                     ConstraintLocator *locator);
@@ -721,7 +744,7 @@ public:
     return "insert '$' or '_' to use property wrapper type instead of wrapped type";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
                                     bool usingStorageWrapper, Type base,
@@ -748,7 +771,7 @@ public:
     return "remove '$' or _ to use wrapped type instead of wrapper type";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
@@ -764,7 +787,7 @@ public:
     return "replace '.subscript(...)' with subscript operator";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static UseSubscriptOperator *create(ConstraintSystem &cs,
                                       ConstraintLocator *locator);
@@ -787,7 +810,7 @@ public:
            "' based on its use";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclName member,
@@ -829,7 +852,7 @@ public:
            "' on value of protocol type";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
                                              Type baseType, ValueDecl *member,
@@ -851,7 +874,7 @@ public:
     return "allow access to instance member on type or a type member on instance";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
                                            ValueDecl *member, DeclName usedName,
@@ -869,7 +892,7 @@ public:
     return "allow partially applied 'mutating' method";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowInvalidPartialApplication *create(bool isWarning,
                                                 ConstraintSystem &cs,
@@ -900,7 +923,7 @@ public:
     return "allow invalid initializer reference";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowInvalidInitRef *
   dynamicOnMetatype(ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
@@ -938,7 +961,7 @@ public:
     return "fix tuple mismatches in type and arity";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 };
 
 class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
@@ -953,7 +976,7 @@ public:
     return "allow `mutating` method on r-value base";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowMutatingMemberOnRValueBase *
   create(ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclName name,
@@ -974,7 +997,7 @@ public:
     return "allow closure parameter destructuring";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowClosureParamDestructuring *create(ConstraintSystem &cs,
                                                 FunctionType *contextualType,
@@ -989,13 +1012,12 @@ class AddMissingArguments final
 
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
   unsigned NumSynthesized;
 
-  AddMissingArguments(ConstraintSystem &cs, FunctionType *funcType,
-                      llvm::ArrayRef<AnyFunctionType::Param> synthesizedArgs,
+  AddMissingArguments(ConstraintSystem &cs,
+                      llvm::ArrayRef<Param> synthesizedArgs,
                       ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddMissingArguments, locator), Fn(funcType),
+      : ConstraintFix(cs, FixKind::AddMissingArguments, locator),
         NumSynthesized(synthesizedArgs.size()) {
     std::uninitialized_copy(synthesizedArgs.begin(), synthesizedArgs.end(),
                             getSynthesizedArgumentsBuf().begin());
@@ -1008,15 +1030,64 @@ public:
     return {getTrailingObjects<Param>(), NumSynthesized};
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
-  static AddMissingArguments *create(ConstraintSystem &cs, FunctionType *fnType,
+  static AddMissingArguments *create(ConstraintSystem &cs,
                                      llvm::ArrayRef<Param> synthesizedArgs,
                                      ConstraintLocator *locator);
 
 private:
   MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
     return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+};
+
+class RemoveExtraneousArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<
+          RemoveExtraneousArguments,
+          std::pair<unsigned, AnyFunctionType::Param>> {
+  friend TrailingObjects;
+
+  using IndexedParam = std::pair<unsigned, AnyFunctionType::Param>;
+
+  FunctionType *ContextualType;
+  unsigned NumExtraneous;
+
+  RemoveExtraneousArguments(ConstraintSystem &cs, FunctionType *contextualType,
+                            llvm::ArrayRef<IndexedParam> extraArgs,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveExtraneousArguments, locator),
+        ContextualType(contextualType), NumExtraneous(extraArgs.size()) {
+    std::uninitialized_copy(extraArgs.begin(), extraArgs.end(),
+                            getExtraArgumentsBuf().begin());
+  }
+
+public:
+  std::string getName() const override { return "remove extraneous argument(s)"; }
+
+  ArrayRef<IndexedParam> getExtraArguments() const {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
+  }
+
+  bool diagnose(bool asNote = false) const override;
+
+  /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
+  /// logic would be obsolete.
+  ///
+  /// Determine whether presence of extraneous arguments indicates
+  /// potential name shadowing problem with local `min`/`max` shadowing
+  /// global definitions with different number of arguments.
+  static bool isMinMaxNameShadowing(ConstraintSystem &cs,
+                                    ConstraintLocatorBuilder locator);
+
+  static RemoveExtraneousArguments *
+  create(ConstraintSystem &cs, FunctionType *contextualType,
+         llvm::ArrayRef<IndexedParam> extraArgs, ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<IndexedParam> getExtraArgumentsBuf() {
+    return {getTrailingObjects<IndexedParam>(), NumExtraneous};
   }
 };
 
@@ -1040,7 +1111,7 @@ public:
     return "move out-of-order argument to correct position";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
                                         unsigned argIdx,
@@ -1061,7 +1132,7 @@ public:
     return "allow inaccessible member reference";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclName name,
@@ -1078,7 +1149,7 @@ public:
     return "allow anyobject as root type for a keypath";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator);
@@ -1098,7 +1169,7 @@ public:
     return "treat keypath subscript index as conforming to Hashable";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static TreatKeyPathSubscriptIndexAsHashable *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
@@ -1137,7 +1208,7 @@ public:
     llvm_unreachable("covered switch");
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   /// Determine whether give reference requires a fix and produce one.
   static AllowInvalidRefInKeyPath *
@@ -1156,7 +1227,7 @@ class RemoveReturn final : public ConstraintFix {
 public:
   std::string getName() const override { return "remove or omit return type"; }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
@@ -1171,7 +1242,7 @@ public:
     return "fix collection element contextual mismatch";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
@@ -1197,6 +1268,10 @@ class ExplicitlySpecifyGenericArguments final
   }
 
 public:
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ExplicitlySpecifyGenericArguments;
+  }
+
   std::string getName() const override {
     return "default missing generic arguments to `Any`";
   }
@@ -1205,7 +1280,9 @@ public:
     return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
+
+  ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) override;
 
   static ExplicitlySpecifyGenericArguments *
   create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
@@ -1238,7 +1315,7 @@ public:
     return "skip unhandled constructs when applying a function builder";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static SkipUnhandledConstructInFunctionBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
@@ -1260,7 +1337,7 @@ public:
     return "allow single parameter tuple splat";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   /// Apply this fix to given arguments/parameters and return `true`
   /// this fix is not applicable and solver can't continue, `false`
@@ -1281,11 +1358,28 @@ public:
     return "ignore specified contextual type";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
+};
+
+class IgnoreAssignmentDestinationType final : public ContextualMismatch {
+  IgnoreAssignmentDestinationType(ConstraintSystem &cs, Type sourceTy,
+                                  Type destTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, sourceTy, destTy, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore type of the assignment destination";
+  }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
+                                                 Type sourceTy, Type destTy,
+                                                 ConstraintLocator *locator);
 };
 
 /// If this is an argument-to-parameter conversion which is associated with
@@ -1301,11 +1395,159 @@ public:
     return "allow conversions between argument/parameter marked as `inout`";
   }
 
-  bool diagnose(Expr *root, bool asNote = false) const override;
+  bool diagnose(bool asNote = false) const override;
 
   static AllowInOutConversion *create(ConstraintSystem &cs, Type argType,
                                       Type paramType,
                                       ConstraintLocator *locator);
+};
+
+class AllowArgumentMismatch : public ContextualMismatch {
+protected:
+  AllowArgumentMismatch(ConstraintSystem &cs, Type argType, Type paramType,
+                        ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::AllowArgumentTypeMismatch, argType,
+                              paramType, locator) {}
+
+  AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
+                        Type paramType, ConstraintLocator *locator,
+                        bool warning = false)
+      : ContextualMismatch(cs, kind, argType, paramType, locator, warning) {}
+
+public:
+  std::string getName() const override {
+    return "allow argument to parameter type conversion mismatch";
+  }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
+                                       Type paramType,
+                                       ConstraintLocator *locator);
+};
+
+class ExpandArrayIntoVarargs final : public AllowArgumentMismatch {
+
+  ExpandArrayIntoVarargs(ConstraintSystem &cs, Type argType, Type paramType,
+                         ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::ExpandArrayIntoVarargs, argType,
+                              paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "cannot pass Array elements as variadic arguments";
+  }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static ExpandArrayIntoVarargs *attempt(ConstraintSystem &cs, Type argType,
+                                         Type paramType,
+                                         ConstraintLocatorBuilder locator);
+};
+
+class ExplicitlyConstructRawRepresentable final : public AllowArgumentMismatch {
+  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::ExplicitlyConstructRawRepresentable,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "explicitly construct a raw representable type";
+  }
+
+  static ExplicitlyConstructRawRepresentable *
+  attempt(ConstraintSystem &cs, Type argType, Type paramType,
+          ConstraintLocatorBuilder locator);
+};
+
+class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
+  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type argType,
+                                  Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::UseValueTypeOfRawRepresentative,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "use `.rawValue` of a raw representable type";
+  }
+
+  static UseValueTypeOfRawRepresentative *
+  attempt(ConstraintSystem &cs, Type argType, Type paramType,
+          ConstraintLocatorBuilder locator);
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class CoerceToCheckedCast final : public ContextualMismatch {
+  CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
+                      ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
+                           locator) {}
+
+public:
+  std::string getName() const { return "as to as!"; }
+
+  bool diagnose(bool asNote = false) const;
+
+  static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator);
+};
+
+class RemoveInvalidCall final : public ConstraintFix {
+  RemoveInvalidCall(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveCall, locator) {}
+
+public:
+  std::string getName() const {
+    return "remove extraneous call from value of non-function type";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static RemoveInvalidCall *create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator);
+};
+
+class AllowInvalidUseOfTrailingClosure final : public AllowArgumentMismatch {
+  AllowInvalidUseOfTrailingClosure(ConstraintSystem &cs, Type argType,
+                                   Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::AllowInvalidUseOfTrailingClosure,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const {
+    return "allow invalid use of trailing closure";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static AllowInvalidUseOfTrailingClosure *create(ConstraintSystem &cs,
+                                                  Type argType, Type paramType,
+                                                  ConstraintLocator *locator);
+};
+
+class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
+  ConversionRestrictionKind ConversionKind;
+
+  TreatEphemeralAsNonEphemeral(ConstraintSystem &cs, ConstraintLocator *locator,
+                               Type srcType, Type dstType,
+                               ConversionRestrictionKind conversionKind,
+                               bool downgradeToWarning)
+      : AllowArgumentMismatch(cs, FixKind::TreatEphemeralAsNonEphemeral,
+                              srcType, dstType, locator, downgradeToWarning),
+        ConversionKind(conversionKind) {}
+
+public:
+  ConversionRestrictionKind getConversionKind() const { return ConversionKind; }
+  std::string getName() const override;
+
+  bool diagnose(bool asNote = false) const override;
+
+  static TreatEphemeralAsNonEphemeral *
+  create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
+         Type dstType, ConversionRestrictionKind conversionKind,
+         bool downgradeToWarning);
 };
 
 } // end namespace constraints

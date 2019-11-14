@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 
 using namespace swift;
@@ -320,7 +321,7 @@ public:
 
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -481,7 +482,6 @@ public:
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setType(MaybeLoadInitExpr->getType());
     VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
@@ -665,14 +665,13 @@ public:
 
 } // end anonymous namespace
 
-void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
+void swift::performPCMacro(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
   private:
     unsigned TmpNameIndex = 0;
-    TopLevelContext &TLC;
 
   public:
-    ExpressionFinder(TopLevelContext &TLC) : TLC(TLC) {}
+    ExpressionFinder() = default;
 
     bool walkToDeclPre(Decl *D) override {
       ASTContext &ctx = D->getASTContext();
@@ -691,9 +690,8 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker &TC = TypeChecker::createForContext(ctx);
-              TC.checkTopLevelErrorHandling(TLCD);
-              TC.contextualizeTopLevelCode(TLC, TLCD);
+              TypeChecker::checkTopLevelErrorHandling(TLCD);
+              TypeChecker::contextualizeTopLevelCode(TLCD);
             }
             return false;
           }
@@ -703,7 +701,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
     }
   };
 
-  ExpressionFinder EF(TLC);
+  ExpressionFinder EF;
   for (Decl *D : SF.Decls) {
     D->walk(EF);
   }

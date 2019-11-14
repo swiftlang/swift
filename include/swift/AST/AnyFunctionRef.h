@@ -14,6 +14,7 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -52,13 +53,13 @@ public:
     }
   }
 
-  const CaptureInfo &getCaptureInfo() const {
+  CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
-  void setCaptureInfo(const CaptureInfo &captures) const {
+  void setCaptureInfo(CaptureInfo captures) const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setCaptureInfo(captures);
       return;
@@ -177,8 +178,7 @@ public:
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->dump();
     }
@@ -198,7 +198,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getGenericSignature();
     }

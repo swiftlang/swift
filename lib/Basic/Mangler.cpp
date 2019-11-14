@@ -200,8 +200,10 @@ void Mangler::appendIdentifier(StringRef ident) {
   recordOpStat("<identifier>", OldPos);
 }
 
-void Mangler::dump() {
-  llvm::errs() << Buffer.str() << '\n';
+void Mangler::dump() const {
+  // FIXME: const_casting because llvm::raw_svector_ostream::str() is
+  // incorrectly not marked const.
+  llvm::errs() << const_cast<Mangler*>(this)->Buffer.str() << '\n';
 }
 
 bool Mangler::tryMangleSubstitution(const void *ptr) {

@@ -51,8 +51,8 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
 #include "swift/Option/Options.h"
@@ -237,12 +237,156 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 }
 }
 
+/// Compute the per-module information to be recorded in the trace file.
+//
+// The most interesting/tricky thing here is _which_ paths get recorded in
+// the trace file as dependencies. It depends on how the module was synthesized.
+// The key points are:
+//
+// 1. Paths to swiftmodules in the module cache or in the prebuilt cache are not
+//    recorded - Precondition: the corresponding path to the swiftinterface must
+//    already be present as a key in pathToModuleDecl.
+// 2. swiftmodules next to a swiftinterface are saved if they are up-to-date.
+//
+// FIXME: Use the VFS instead of handling paths directly. We are particularly
+// sloppy about handling relative paths in the dependency tracker.
+static void computeSwiftModuleTraceInfo(
+    const SmallPtrSetImpl<ModuleDecl *> &importedModules,
+    const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
+    const DependencyTracker &depTracker,
+    StringRef prebuiltCachePath,
+    std::vector<SwiftModuleTraceInfo> &traceInfo) {
+
+  SmallString<256> buffer;
+
+  std::string errMsg;
+  llvm::raw_string_ostream err(errMsg);
+
+  // FIXME: Use PrettyStackTrace instead.
+  auto errorUnexpectedPath =
+      [&pathToModuleDecl](llvm::raw_string_ostream &errStream) {
+    errStream << "The module <-> path mapping we have is:\n";
+    for (auto &m: pathToModuleDecl)
+      errStream << m.second->getName() << " <-> " << m.first << '\n';
+    llvm::report_fatal_error(errStream.str());
+  };
+
+  using namespace llvm::sys;
+
+  auto computeAdjacentInterfacePath = [](SmallVectorImpl<char> &modPath) {
+    auto swiftInterfaceExt =
+      file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile);
+    path::replace_extension(modPath, swiftInterfaceExt);
+  };
+
+  for (auto &depPath : depTracker.getDependencies()) {
+
+    // Decide if this is a swiftmodule based on the extension of the raw
+    // dependency path, as the true file may have a different one.
+    // For example, this might happen when the canonicalized path points to
+    // a Content Addressed Storage (CAS) location.
+    auto moduleFileType =
+      file_types::lookupTypeForExtension(path::extension(depPath));
+    auto isSwiftmodule =
+      moduleFileType == file_types::TY_SwiftModuleFile;
+    auto isSwiftinterface =
+      moduleFileType == file_types::TY_SwiftModuleInterfaceFile;
+
+    if (!(isSwiftmodule || isSwiftinterface))
+      continue;
+
+    auto dep = pathToModuleDecl.find(depPath);
+    if (dep != pathToModuleDecl.end()) {
+      // Great, we recognize the path! Check if the file is still around.
+
+      ModuleDecl *depMod = dep->second;
+      if(depMod->isResilient() && !isSwiftinterface) {
+        // FIXME: Ideally, we would check that the swiftmodule has a
+        // swiftinterface next to it. Tracked by rdar://problem/56351399.
+      }
+
+      // FIXME: Better error handling
+      StringRef realDepPath
+        = fs::real_path(depPath, buffer, /*expand_tile*/true)
+        ? StringRef(depPath) // Couldn't find the canonical path, assume
+                             // this is good enough.
+        : buffer.str();
+
+      traceInfo.push_back({
+        /*Name=*/
+        depMod->getName(),
+        /*Path=*/
+        realDepPath,
+        // TODO: There is an edge case which is not handled here.
+        // When we build a framework using -import-underlying-module, or an
+        // app/test using -import-objc-header, we should look at the direct
+        // imports of the bridging modules, and mark those as our direct
+        // imports.
+        /*IsImportedDirectly=*/
+        importedModules.find(depMod) != importedModules.end(),
+        /*SupportsLibraryEvolution=*/
+        depMod->isResilient()
+      });
+      buffer.clear();
+
+      continue;
+    }
+
+    // If the depTracker had an interface, that means that we must've
+    // built a swiftmodule from that interface, so we should have that
+    // filename available.
+    if (isSwiftinterface) {
+      err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
+      errorUnexpectedPath(err);
+    }
+
+    // Skip cached modules in the prebuilt cache. We will add the corresponding
+    // swiftinterface from the SDK directly, but this isn't checked. :-/
+    //
+    // FIXME: This is incorrect if both paths are not relative w.r.t. to the
+    // same root.
+    if (StringRef(depPath).startswith(prebuiltCachePath))
+      continue;
+
+    // If we have a swiftmodule next to an interface, that interface path will
+    // be saved (not checked), so don't save the path to this swiftmodule.
+    SmallString<256> moduleAdjacentInterfacePath(depPath);
+    computeAdjacentInterfacePath(moduleAdjacentInterfacePath);
+    if (pathToModuleDecl.find(moduleAdjacentInterfacePath)
+        != pathToModuleDecl.end())
+      continue;
+
+    // FIXME: The behavior of fs::exists for relative paths is undocumented.
+    // Use something else instead?
+    if (fs::exists(moduleAdjacentInterfacePath)) {
+      // This should be an error but it is not because of funkiness around
+      // compatible modules such as us having both armv7s.swiftinterface
+      // and armv7.swiftinterface in the dependency tracker.
+      continue;
+    }
+    buffer.clear();
+
+    // We might land here when we have a arm.swiftmodule in the cache path
+    // which added a dependency on a arm.swiftinterface (which was not loaded).
+  }
+
+  // Almost a re-implementation of reversePathSortedFilenames :(.
+  std::sort(
+    traceInfo.begin(), traceInfo.end(),
+    [](const SwiftModuleTraceInfo &m1, const SwiftModuleTraceInfo &m2) -> bool {
+      return std::lexicographical_compare(
+        m1.Path.rbegin(), m1.Path.rend(),
+        m2.Path.rbegin(), m2.Path.rend());
+  });
+}
+
 static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
+                                          StringRef prebuiltCachePath,
                                           StringRef loadedModuleTracePath) {
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError()
-         && "We may not be able to emit a proper trace if there was an error.");
+         && "We should've already exited earlier if there was an error.");
 
   if (loadedModuleTracePath.empty())
     return false;
@@ -269,67 +413,22 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (auto &module : ctxt.LoadedModules) {
     ModuleDecl *loadedDecl = module.second;
-    assert(loadedDecl && "Expected loaded module to be non-null.");
+    if (!loadedDecl)
+      llvm::report_fatal_error("Expected loaded modules to be non-null.");
     if (loadedDecl == mainModule)
       continue;
-    assert(!loadedDecl->getModuleFilename().empty()
-           && ("Don't know how to handle modules with empty names."
-               " One potential reason for getting an empty module name might"
-               " be that the module could not be deserialized correctly."));
+    if (loadedDecl->getModuleFilename().empty())
+      llvm::report_fatal_error(
+        "Don't know how to handle modules with empty names."
+        " One potential reason for getting an empty module name might"
+        " be that the module could not be deserialized correctly.");
     pathToModuleDecl.insert(
       std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
   }
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
-  SmallString<256> buffer;
-  for (auto &depPath : depTracker->getDependencies()) {
-    StringRef realDepPath;
-    // FIXME: appropriate error handling
-    if (llvm::sys::fs::real_path(depPath, buffer,/*expand_tilde=*/true))
-      // Couldn't find the canonical path, so let's just assume the old one was
-      // canonical (enough).
-      realDepPath = depPath;
-    else
-      realDepPath = buffer.str();
-
-    // Decide if this is a swiftmodule based on the extension of the raw
-    // dependency path, as the true file may have a different one.
-    // For example, this might happen when the canonicalized path points to
-    // a Content Addressed Storage (CAS) location.
-    auto moduleFileType =
-      file_types::lookupTypeForExtension(llvm::sys::path::extension(depPath));
-    if (moduleFileType == file_types::TY_SwiftModuleFile
-        || moduleFileType == file_types::TY_SwiftParseableInterfaceFile) {
-      auto dep = pathToModuleDecl.find(depPath);
-      assert(dep != pathToModuleDecl.end()
-             && "Dependency must've been loaded.");
-      ModuleDecl *depMod = dep->second;
-      swiftModules.push_back({
-        /*Name=*/
-        depMod->getName(),
-        /*Path=*/
-        realDepPath,
-        // TODO: There is an edge case which is not handled here.
-        // When we build a framework using -import-underlying-module, or an
-        // app/test using -import-objc-header, we should look at the direct
-        // imports of the bridging modules, and mark those as our direct
-        // imports.
-        /*IsImportedDirectly=*/
-        importedModules.find(depMod) != importedModules.end(),
-        /*SupportsLibraryEvolution=*/
-        depMod->isResilient()
-      });
-    }
-  }
-
-  // Almost a re-implementation of reversePathSortedFilenames :(.
-  std::sort(
-    swiftModules.begin(), swiftModules.end(),
-    [](const SwiftModuleTraceInfo &m1, const SwiftModuleTraceInfo &m2) -> bool {
-      return std::lexicographical_compare(
-        m1.Path.rbegin(), m1.Path.rend(),
-        m2.Path.rbegin(), m2.Path.rend());
-  });
+  computeSwiftModuleTraceInfo(importedModules, pathToModuleDecl, *depTracker,
+                              prebuiltCachePath, swiftModules);
 
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,
@@ -339,8 +438,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   };
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
-  // so first write the whole thing into memory and dump out that buffer to the
-  // file.
+  // so first write to memory and then dump the buffer to the trace file.
   std::string stringBuffer;
   {
     llvm::raw_string_ostream memoryBuffer(stringBuffer);
@@ -349,7 +447,6 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     json::jsonize(jsonOutput, trace, /*Required=*/true);
   }
   stringBuffer += "\n";
-
   out << stringBuffer;
 
   return true;
@@ -362,7 +459,8 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
   return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         return emitLoadedModuleTraceIfNeeded(
-            mainModule, depTracker, input.loadedModuleTracePath());
+          mainModule, depTracker, opts.PrebuiltModuleCachePath,
+          input.loadedModuleTracePath());
       });
 }
 
@@ -406,7 +504,8 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
   if (!OS) return true;
   SM.print(*OS, EmitVerboseSIL, M, SortSIL);
-  return false;
+
+  return M->getASTContext().hadError();
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
@@ -437,18 +536,18 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
   });
 }
 
-/// Prints the stable parseable interface for \p M to \p outputPath.
+/// Prints the stable module interface for \p M to \p outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::emitParseableInterface
+/// \see swift::emitSwiftInterface
 static bool
-printParseableInterfaceIfNeeded(StringRef outputPath,
-                                ParseableInterfaceOptions const &Opts,
-                                LangOptions const &LangOpts,
-                                ModuleDecl *M) {
+printModuleInterfaceIfNeeded(StringRef outputPath,
+                             ModuleInterfaceOptions const &Opts,
+                             LangOptions const &LangOpts,
+                             ModuleDecl *M) {
   if (outputPath.empty())
     return false;
 
@@ -465,7 +564,7 @@ printParseableInterfaceIfNeeded(StringRef outputPath,
   }
   return withOutputFile(diags, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
-    return swift::emitParseableInterface(out, Opts, M);
+    return swift::emitSwiftInterface(out, Opts, M);
   });
 }
 
@@ -506,13 +605,9 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (!(FixitAll || shouldTakeFixit(Kind, Info)))
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (!(FixitAll || shouldTakeFixit(Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
       AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
@@ -669,13 +764,13 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
-static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
-                                              CompilerInstance &Instance) {
+static bool buildModuleFromInterface(CompilerInvocation &Invocation,
+                                     CompilerInstance &Instance) {
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
-  return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangModuleCachePath(),
@@ -749,13 +844,16 @@ static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";
+    scope.buildFullyExpandedTree();
     scope.print(llvm::errs());
     return;
   }
   // Probe each of the locations, and dump what we find.
   for (auto lineColumn :
-       Invocation.getFrontendOptions().DumpScopeMapLocations)
+       Invocation.getFrontendOptions().DumpScopeMapLocations) {
+    scope.buildFullyExpandedTree();
     scope.dumpOneScopeMapLocation(lineColumn);
+  }
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
@@ -1002,10 +1100,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
-  if (opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
-    hadAnyError |= printParseableInterfaceIfNeeded(
-        Invocation.getParseableInterfaceOutputPathForWholeModule(),
-        Invocation.getParseableInterfaceOptions(),
+  if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Invocation.getModuleInterfaceOutputPathForWholeModule(),
+        Invocation.getModuleInterfaceOptions(),
         Invocation.getLangOptions(),
         Instance.getMainModule());
   }
@@ -1041,7 +1139,7 @@ static bool performCompile(CompilerInstance &Instance,
     return precompileBridgingHeader(Invocation, Instance);
 
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
-    return buildModuleFromParseableInterface(Invocation, Instance);
+    return buildModuleFromInterface(Invocation, Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Invocation, Instance, Stats);
@@ -1122,10 +1220,20 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Typecheck) {
     if (emitIndexData(Invocation, Instance))
       return true;
-    if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
-                                                            Invocation,
-                                                            moduleIsPublic)) {
-      return true;
+    // FIXME: Whole-module outputs with a non-whole-module -typecheck ought to
+    // be disallowed, but the driver implements -index-file mode by generating a
+    // regular whole-module frontend command line and modifying it to index just
+    // one file (by making it a primary) instead of all of them. If that
+    // invocation also has flags to emit whole-module supplementary outputs, the
+    // compiler can crash trying to access information for non-type-checked
+    // declarations in the non-primary files. For now, prevent those crashes by
+    // guarding the emission of whole-module supplementary outputs.
+    if (opts.InputsAndOutputs.isWholeModule()) {
+      if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
+                                                              Invocation,
+                                                              moduleIsPublic)) {
+        return true;
+      }
     }
     return false;
   }
@@ -1710,13 +1818,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     SourceManager dummyMgr;
 
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
-                         "fatal error encountered during compilation; please "
-                         "file a bug report with your project and the crash "
-                         "log",
-                         {}, DiagnosticInfo(), SourceLoc());
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo(), SourceLoc());
+    DiagnosticInfo errorInfo(
+        DiagID(0), SourceLoc(), DiagnosticKind::Error,
+        "fatal error encountered during compilation; please file a bug report "
+        "with your project and the crash log",
+        {}, SourceLoc(), {}, {}, {}, false);
+    DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note,
+                            reason, {}, SourceLoc(), {}, {}, {}, false);
+    PDC.handleDiagnostic(dummyMgr, errorInfo);
+    PDC.handleDiagnostic(dummyMgr, noteInfo);
     if (shouldCrash)
       abort();
   };

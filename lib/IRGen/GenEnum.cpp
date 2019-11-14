@@ -315,9 +315,10 @@ namespace {
 
     SILType getSingletonType(IRGenModule &IGM, SILType T) const {
       assert(!ElementsWithPayload.empty());
-      
+
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  IGM.getSILModule());
+                                  IGM.getSILModule(),
+                                  IGM.getMaximalTypeExpansionContext());
     }
 
   public:
@@ -614,8 +615,9 @@ namespace {
       assert(ElementsWithPayload.size() == 1 &&
              "empty singleton enum should not be dynamic!");
 
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            IGM.getSILModule());
+      auto payloadTy = T.getEnumElementType(
+          ElementsWithPayload[0].decl, IGM.getSILModule(),
+          IGM.getMaximalTypeExpansionContext());
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
       IGF.Builder.CreateCall(
@@ -1127,10 +1129,12 @@ namespace {
   protected:
     int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
-      // raw values from C.
-      assert(target->hasRawValueExpr()
-             && "c-compatible enum elt has no raw value?!");
-      auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
+      // raw values from C. An invalid raw value is assigned the error index -1.
+      auto intExpr =
+          dyn_cast_or_null<IntegerLiteralExpr>(target->getRawValueExpr());
+      if (!intExpr) {
+        return -1;
+      }
       auto intType = getDiscriminatorType();
 
       APInt intValue =
@@ -1565,7 +1569,8 @@ namespace {
 
     SILType getPayloadType(IRGenModule &IGM, SILType T) const {
       return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  IGM.getSILModule());
+                                  IGM.getSILModule(),
+                                  IGM.getMaximalTypeExpansionContext());
     }
 
     const TypeInfo &getPayloadTypeInfo() const {
@@ -2955,8 +2960,9 @@ namespace {
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            IGM.getSILModule());
+      auto payloadTy =
+          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
+                               IGM.getMaximalTypeExpansionContext());
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto emptyCasesVal = llvm::ConstantInt::get(IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -4573,8 +4579,9 @@ namespace {
 
         unsigned tagIndex = 0;
         for (auto &payloadCasePair : ElementsWithPayload) {
-          SILType PayloadT = T.getEnumElementType(payloadCasePair.decl,
-                                                  IGF.getSILModule());
+          SILType PayloadT =
+              T.getEnumElementType(payloadCasePair.decl, IGF.getSILModule(),
+                                   IGF.IGM.getMaximalTypeExpansionContext());
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
@@ -4690,9 +4697,9 @@ namespace {
       }
 
       for (auto &payloadCasePair : ElementsWithPayload) {
-        SILType payloadT =
-          T.getEnumElementType(payloadCasePair.decl,
-                               collector.IGF.getSILModule());
+        SILType payloadT = T.getEnumElementType(
+            payloadCasePair.decl, collector.IGF.getSILModule(),
+            collector.IGF.IGM.getMaximalTypeExpansionContext());
         auto &payloadTI = *payloadCasePair.ti;
         payloadTI.collectMetadataForOutlining(collector, payloadT);
       }
@@ -4735,8 +4742,9 @@ namespace {
                 // Destroy the data.
                 Address dataAddr = IGF.Builder.CreateBitCast(
                     addr, elt.ti->getStorageType()->getPointerTo());
-                SILType payloadT =
-                    T.getEnumElementType(elt.decl, IGF.getSILModule());
+                SILType payloadT = T.getEnumElementType(
+                    elt.decl, IGF.getSILModule(),
+                    IGF.IGM.getMaximalTypeExpansionContext());
                 elt.ti->destroy(IGF, dataAddr, payloadT, true /*isOutlined*/);
               });
           return;
@@ -4975,9 +4983,11 @@ namespace {
         Address eltAddr = IGF.Builder.CreateStructGEP(metadataBuffer, i,
                                                   IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
-        
-        auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
-        
+
+        auto payloadTy =
+            T.getEnumElementType(elt.decl, IGF.getSILModule(),
+                                 IGF.IGM.getMaximalTypeExpansionContext());
+
         auto metadata = emitTypeLayoutRef(IGF, payloadTy, collector);
         
         IGF.Builder.CreateStore(metadata, eltAddr);
@@ -5777,10 +5787,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
-
-    if (!elt->hasInterfaceType())
-      TC.IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
-
+    
     // Compute whether this gives us an apparent payload or dynamic layout.
     // Note that we do *not* apply substitutions from a bound generic instance
     // yet. We want all instances of a generic enum to share an implementation
@@ -5810,7 +5817,8 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       // *Now* apply the substitutions and get the type info for the instance's
       // payload type, since we know this case carries an apparent payload in
       // the generic case.
-      SILType fieldTy = type.getEnumElementType(elt, TC.IGM.getSILModule());
+      SILType fieldTy = type.getEnumElementType(
+          elt, TC.IGM.getSILModule(), TC.IGM.getMaximalTypeExpansionContext());
       auto *substArgTI = &TC.IGM.getTypeInfo(fieldTy);
 
       elementsWithPayload.push_back({elt, substArgTI, origArgTI});

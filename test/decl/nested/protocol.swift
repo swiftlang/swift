@@ -19,10 +19,9 @@ class OuterGenericClass<T> {
   }
 }
 
-protocol OuterProtocol {
+protocol OuterProtocol { // expected-note{{'OuterProtocol' declared here}}
   associatedtype Hen
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
-  // expected-note@-1 {{did you mean 'InnerProtocol'?}}
     associatedtype Rooster
     func flip(_ r: Rooster)
     func flop(_ h: Hen) // expected-error{{use of undeclared type 'Hen'}}
@@ -51,16 +50,17 @@ protocol Racoon {
   }
 }
 
-enum SillyRawEnum : SillyProtocol.InnerClass {}
+enum SillyRawEnum : SillyProtocol.InnerClass {} // expected-error {{an enum with no cases cannot declare a raw type}}
+// expected-error@-1 {{raw type}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum OuterEnum {
   protocol C {} // expected-error{{protocol 'C' cannot be nested inside another declaration}}
-  // expected-note@-1{{'C' previously declared here}}
-  case C(C) // expected-error{{invalid redeclaration of 'C'}}
+  case C(C)
 }
 
 class OuterClass {
@@ -105,7 +105,9 @@ func testLookup(_ x: OuterForUFI.Inner) {
   x.req()
   x.extMethod()
 }
+
+// N.B. Lookup fails here because OuterForUFI.Inner is marked invalid.
 func testLookup<T: OuterForUFI.Inner>(_ x: T) {
-  x.req()
-  x.extMethod()
+  x.req() // expected-error {{value of type 'T' has no member 'req'}}
+  x.extMethod() // expected-error {{value of type 'T' has no member 'extMethod'}}
 }

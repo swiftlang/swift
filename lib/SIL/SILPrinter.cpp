@@ -333,6 +333,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     OS << "!propertyinit";
     break;
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    OS << "!backinginit";
+    break;
   }
 
   auto uncurryLevel = getParameterListCount() - 1;
@@ -466,7 +469,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::Any) {
+    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -1058,7 +1061,7 @@ public:
   }
 
   void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
+                          GenericSignature Sig = GenericSignature()) {
     if (!Subs.hasAnySubstitutableParams()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses
@@ -1080,7 +1083,7 @@ public:
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutionMap(),
-                       AI->getOrigCalleeType()->getGenericSignature());
+                       AI->getOrigCalleeType()->getInvocationGenericSignature());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
@@ -1539,13 +1542,13 @@ public:
   }
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \
   }
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    *this << getIDAndType(I->getOperand()); \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
+    *this << getIDAndType(I->getOperand());                                    \
   }
 #include "swift/AST/ReferenceStorage.def"
 
@@ -2414,7 +2417,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
   
-  auto sig = getLoweredFunctionType()->getGenericSignature();
+  auto sig = getLoweredFunctionType()->getSubstGenericSignature();
   auto *env = getGenericEnvironment();
   if (sig && env) {
     llvm::SmallString<16> disambiguatedNameBuf;
@@ -2993,6 +2996,12 @@ void SILCoverageMap::dump() const {
 }
 
 #ifndef NDEBUG
+// Disable the "for use only in debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
@@ -3025,6 +3034,10 @@ void SILDebugScope::dump(SILModule &Mod) const {
   // We just use the default indent and llvm::errs().
   dump(Mod.getASTContext().SourceMgr);
 }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
 
 #endif
 

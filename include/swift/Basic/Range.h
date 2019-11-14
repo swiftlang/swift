@@ -15,8 +15,6 @@
 ///  This file provides classes and functions for conveniently working
 ///  with ranges,
 ///
-///  reversed returns an iterator_range out of the reverse iterators of a type.
-///
 ///  map creates an iterator_range which applies a function to all the elements
 ///  in another iterator_range.
 ///
@@ -25,10 +23,6 @@
 ///
 ///  indices returns the range of indices from [0..size()) on a
 ///  subscriptable type.
-///
-///  Note that this is kept in Swift because it's really only useful in
-///  C++11, and there aren't any major open-source subprojects of LLVM
-///  that can use C++11 yet.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -44,14 +38,7 @@
 
 namespace swift {
   using llvm::make_range;
-  using llvm::iterator_range;
 
-  template<typename T>
-  inline auto reversed(T &&container)
-  -> decltype(llvm::make_range(container.rbegin(), container.rend())) {
-    return llvm::make_range(container.rbegin(), container.rend());
-  }
-  
   // Wrapper for std::transform that creates a new back-insertable container
   // and transforms a range into it.
   template<typename T, typename InputRange, typename MapFn>
@@ -234,9 +221,9 @@ static inline IntRange<unsigned> range(unsigned end) {
 
 /// Returns a reverse Int range (start, end].
 static inline auto reverse_range(unsigned start, unsigned end) ->
-  decltype(reversed(range(start+1, end+1))) {
+  decltype(llvm::reverse(range(start+1, end+1))) {
   assert(start <= end && "Invalid integral range");
-  return reversed(range(start+1, end+1));
+  return llvm::reverse(range(start+1, end+1));
 }
 
 } // end namespace swift

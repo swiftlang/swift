@@ -81,7 +81,7 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
     return true;
   }
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
 
   return true;
 }

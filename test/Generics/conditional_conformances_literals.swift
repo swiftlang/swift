@@ -9,13 +9,14 @@ struct Works: Hashable, Conforms {}
 struct Fails: Hashable {}
 
 extension Array: SameType where Element == Works {}
-// expected-note@-1 2 {{requirement from conditional conformance of '[Fails]' to 'SameType'}}
+// expected-note@-1 3 {{requirement from conditional conformance of '[Fails]' to 'SameType'}}
 extension Dictionary: SameType where Value == Works {}
-// expected-note@-1 2 {{requirement from conditional conformance of '[Int : Fails]' to 'SameType'}}
+// expected-note@-1 3 {{requirement from conditional conformance of '[Int : Fails]' to 'SameType'}}
 extension Array: Conforms where Element: Conforms {}
-// expected-note@-1 5 {{requirement from conditional conformance of '[Fails]' to 'Conforms'}}
+// expected-note@-1 7 {{requirement from conditional conformance of '[Fails]' to 'Conforms'}}
 extension Dictionary: Conforms where Value: Conforms {}
-// expected-note@-1 3 {{requirement from conditional conformance of '[Int : Fails]' to 'Conforms'}}
+// expected-note@-1 5 {{requirement from conditional conformance of '[Int : Fails]' to 'Conforms'}}
+// expected-note@-2 2 {{requirement from conditional conformance of '[Int : Conforms]' to 'Conforms'}}
 
 let works = Works()
 let fails = Fails()
@@ -38,11 +39,11 @@ func arraySameType() {
 
     let _: SameType = [works] as SameType
     let _: SameType = [fails] as SameType
-    // expected-error@-1 {{'[Fails]' is not convertible to 'SameType'}}
+    // expected-error@-1 {{cannot convert value of type 'Fails' to expected element type 'Works'}}
 
     let _: SameType = arrayWorks as SameType
     let _: SameType = arrayFails as SameType
-    // expected-error@-1 {{'[Fails]' is not convertible to 'SameType'}}
+    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
 }
 
 func dictionarySameType() {
@@ -63,11 +64,11 @@ func dictionarySameType() {
 
     let _: SameType = [0 : works] as SameType
     let _: SameType = [0 : fails] as SameType
-    // expected-error@-1 {{'[Int : Fails]' is not convertible to 'SameType'}}
+    // expected-error@-1 {{cannot convert value of type 'Fails' to expected dictionary value type 'Works'}}
 
     let _: SameType = dictWorks as SameType
     let _: SameType = dictFails as SameType
-    // expected-error@-1 {{'[Int : Fails]' is not convertible to 'SameType'}}
+    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
 }
 
 func arrayConforms() {
@@ -88,11 +89,11 @@ func arrayConforms() {
 
     let _: Conforms = [works] as Conforms
     let _: Conforms = [fails] as Conforms
-    // expected-error@-1 {{'[Fails]' is not convertible to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = arrayWorks as Conforms
     let _: Conforms = arrayFails as Conforms
-    // expected-error@-1 {{'[Fails]' is not convertible to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 }
 
 func dictionaryConforms() {
@@ -113,11 +114,11 @@ func dictionaryConforms() {
 
     let _: Conforms = [0 : works] as Conforms
     let _: Conforms = [0 : fails] as Conforms
-    // expected-error@-1 {{'[Int : Fails]' is not convertible to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = dictWorks as Conforms
     let _: Conforms = dictFails as Conforms
-    // expected-error@-1 {{'[Int : Fails]' is not convertible to 'Conforms'}}
+    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
 }
 
 func combined() {
@@ -127,9 +128,9 @@ func combined() {
 
     // Needs self conforming protocols:
     let _: Conforms = [[0: [1 : [works]] as Conforms]]
-    // expected-error@-1 {{protocol type 'Conforms' cannot conform to 'Conforms' because only concrete types can conform to protocols}}
+    // expected-error@-1 {{value of protocol type 'Conforms' cannot conform to 'Conforms'; only struct/enum/class types can conform to protocols}}
 
     let _: Conforms = [[0: [1 : [fails]] as Conforms]]
     // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
-    // expected-error@-2 {{protocol type 'Conforms' cannot conform to 'Conforms' because only concrete types can conform to protocols}}
+    // expected-error@-2 {{value of protocol type 'Conforms' cannot conform to 'Conforms'; only struct/enum/class types can conform to protocols}}
 }

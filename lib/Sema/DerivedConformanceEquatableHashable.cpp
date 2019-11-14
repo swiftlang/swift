@@ -45,20 +45,17 @@ enum NonconformingMemberKind {
 static SmallVector<ParamDecl *, 3>
 associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(elt);
-
     auto PL = elt->getParameterList();
     if (!PL)
       continue;
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC, None)) {
+      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                          protocol, DC, None)
+              .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -85,19 +82,15 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
 static SmallVector<VarDecl *, 3>
 storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   auto storedProperties = theStruct->getStoredProperties();
   SmallVector<VarDecl *, 3> nonconformingProperties;
   for (auto propertyDecl : storedProperties) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    if (!propertyDecl->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(propertyDecl);
-    if (!propertyDecl->hasInterfaceType())
-      nonconformingProperties.push_back(propertyDecl);
-
     auto type = propertyDecl->getValueInterfaceType();
+    if (!type)
+      nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
                                          DC, None)) {
@@ -148,8 +141,11 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
     auto nonconformingAssociatedTypes =
         associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
     for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
+      SourceLoc reprLoc;
+      if (auto *repr = typeToDiagnose->getTypeRepr())
+        reprLoc = repr->getStartLoc();
       ctx.Diags.diagnose(
-          typeToDiagnose->getTypeLoc().getLoc(),
+          reprLoc,
           diag::missing_member_type_conformance_prevents_synthesis,
           NonconformingMemberKind::AssociatedValue,
           typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
@@ -191,7 +187,7 @@ static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  /*IsCaptureList*/true, SourceLoc(),
                                  C.getIdentifier(indexStrRef),
                                  varContext);
-  varDecl->setType(type);
+  varDecl->setInterfaceType(type);
   varDecl->setHasNonPatternBindingInit(true);
   return varDecl;
 }
@@ -705,15 +701,16 @@ deriveEquatable_eq(
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
     return param;
   };
@@ -764,21 +761,13 @@ deriveEquatable_eq(
   }
 
   if (!C.getEqualIntDecl()) {
-    derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
-                        diag::no_equal_overload_for_int);
+    derived.ConformanceDecl->diagnose(diag::no_equal_overload_for_int);
     return nullptr;
   }
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the interface type.
-  eqDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  eqDecl->computeType();
-
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  eqDecl->setValidationToChecked();
-
-  C.addSynthesizedDecl(eqDecl);
 
   // Add the operator to the parent scope.
   derived.addMembersToConformanceContext({eqDecl});
@@ -813,7 +802,7 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
     else
       llvm_unreachable("todo");
   }
-  TC.diagnose(requirement->getLoc(), diag::broken_equatable_requirement);
+  requirement->diagnose(diag::broken_equatable_requirement);
   return nullptr;
 }
 
@@ -855,7 +844,7 @@ deriveHashable_hashInto(
                                                     void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (into: inout Hasher) -> ()
@@ -868,17 +857,16 @@ deriveHashable_hashInto(
   auto hasherDecl = C.getHasherDecl();
   if (!hasherDecl) {
     auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-    derived.TC.diagnose(hashableProto->getLoc(),
-                        diag::broken_hashable_no_hasher);
+    hashableProto->diagnose(diag::broken_hashable_no_hasher);
     return nullptr;
   }
   Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
-  auto *hasherParamDecl = new (C) ParamDecl(ParamDecl::Specifier::InOut,
-                                            SourceLoc(),
+  auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
                                             C.Id_hasher, parentDC);
+  hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
   hasherParamDecl->setInterfaceType(hasherType);
 
   ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
@@ -898,14 +886,10 @@ deriveHashable_hashInto(
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  hashDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
-  hashDecl->setValidationToChecked();
-
-  C.addSynthesizedDecl(hashDecl);
 
   derived.addMembersToConformanceContext({hashDecl});
+
   return hashDecl;
 }
 
@@ -1169,9 +1153,6 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // _hashValue(for:)
   auto *hashFunc = C.getHashValueForDecl();
-  if (!hashFunc->hasInterfaceType())
-    static_cast<TypeChecker *>(C.getLazyResolver())->validateDecl(hashFunc);
-
   auto substitutions = SubstitutionMap::get(
       hashFunc->getGenericSignature(),
       [&](SubstitutableType *dependentType) {
@@ -1208,25 +1189,24 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // @derived var hashValue: Int {
   //   return _hashValue(for: self)
   // }
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type intType = C.getIntDecl()->getDeclaredType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (!TypeChecker::conformsToProtocol(intType,
-                                       C.getProtocol(KnownProtocolKind::Hashable),
-                                       parentDC, None)) {
+  if (TypeChecker::conformsToProtocol(
+          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC, None)
+          .isInvalid()) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!TypeChecker::conformsToProtocol(intType, intLiteralProto,
-                                       parentDC, None)) {
+  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC, None)
+          .isInvalid()) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -1236,7 +1216,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                     /*IsCaptureList*/false, SourceLoc(),
                     C.Id_hashValue, parentDC);
-  hashValueDecl->setType(intType);
+  hashValueDecl->setInterfaceType(intType);
 
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -1251,18 +1231,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);
 
-  // Compute the interface type of hashValue().
-  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  getterDecl->computeType();
-
-  getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setValidationToChecked();
   hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
@@ -1276,10 +1250,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
       parentDC);
-  C.addSynthesizedDecl(hashValueDecl);
-  C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
+  // If any of the members we synthesized didn't typecheck, bail out.
+  if (derived.addMembersToConformanceContext({hashValueDecl, patDecl})) {
+    return nullptr;
+  }
+
   return hashValueDecl;
 }
 

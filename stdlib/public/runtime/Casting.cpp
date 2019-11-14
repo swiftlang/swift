@@ -99,10 +99,6 @@ static void _buildNameForMetadata(const Metadata *type,
   // Use the remangler to generate a mangled name from the type metadata.
   
   Demangle::Demangler Dem;
-  // We want to resolve symbolic references to a user-comprehensible
-  // representation of the referenced context.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-  
   auto demangling = _swift_buildDemanglingForMetadata(type, Dem);
   if (demangling == nullptr) {
     result = "<<< invalid type >>>";
@@ -407,7 +403,7 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   for (auto protocol : existentialType->getProtocols()) {
     if (!_conformsToProtocol(value, type, protocol, conformances))
       return false;
-    if (protocol.needsWitnessTable()) {
+    if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
       ++conformances;
     }
@@ -1118,6 +1114,13 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       return nullptr;
     }
     break;
+
+  case MetadataKind::Existential: {
+    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
+    if (!_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return nullptr;
+    return origSourceType;
+  }
 
   default:
     // The cast succeeds only if the metadata pointers are statically

@@ -28,8 +28,14 @@ class Benchmarks(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
+    def should_build(self, host_target):
+        return True
+
     def build(self, host_target):
         run_build_script_helper(host_target, self, self.args)
+
+    def should_test(self, host_target):
+        return self.args.test_toolchainbenchmarks
 
     def test(self, host_target):
         """Just run a single instance of the command for both .debug and
@@ -44,6 +50,9 @@ class Benchmarks(product.Product):
 
         bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
         shell.call([bench_Osize] + cmdline)
+
+    def should_install(self, host_target):
+        return False
 
     def install(self, host_target):
         pass

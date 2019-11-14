@@ -92,7 +92,7 @@ bb0:
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #135.
 // CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #136.
 // CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
@@ -120,7 +120,7 @@ bb0:
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #142.
 // CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #143.
 // CHECK-NEXT:   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
@@ -142,8 +142,7 @@ bb0:
 // Now check that a native object address may:
 //
 // 1. May alias raw pointer addresses.
-// 2. Not alias an unknown object. Objective-C objects are allocated differently
-// than Swift objects and may not alias.
+// 2. May alias an unknown object.
 // 3. Does not alias scalar addresses. This can only occur via inttoptr and the
 // like. Since we are using type oracles we are allowed to make the assumption
 // that this type of type punning can be ignored.
@@ -151,8 +150,8 @@ bb0:
 
 // CHECK: PAIR #149.
 // CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #150.
 // CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
 // CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -179,8 +178,8 @@ bb0:
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #156.
 // CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #157.
 // CHECK-NEXT:   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
 // CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -198,52 +197,53 @@ bb0:
 // CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
 // CHECK-NEXT: NoAlias
 
-// Check that unknown object addresses may only alias raw pointer addresses and
-// other unknown object addresses. Anything else should be no alias.
+// Check that AnyObject addresses can alias pretty much any object or untyped
+// pointer.
+// FIXME: We could do better here; AnyObject is a particularly easy existential.
 // CHECK: PAIR #163.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #164.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #165.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #166.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #167.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #168.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #169.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #170.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #171.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #172.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #173.
-// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT:   %20 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 
 // Next check that Int8 addresses can only alias Int8 addresses and raw
 // pointers. This includes ensuring that Int8 cannot alias Int32 addresses.
@@ -269,8 +269,8 @@ bb0:
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #181.
 // CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #182.
 // CHECK-NEXT:   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
 // CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -305,8 +305,8 @@ bb0:
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #202.
 // CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
-// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #203.
 // CHECK-NEXT:   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
 // CHECK-NEXT:   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -328,7 +328,7 @@ sil @builtin_test : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int8>
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
@@ -336,7 +336,7 @@ bb0:
 
   %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
   %8 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  %9 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
   %10 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
   %11 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %12 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
@@ -348,7 +348,7 @@ bb0:
   // makes it simpler to write these tests.
   %14 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
   %15 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  %16 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
   %17 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
   %18 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %19 = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
@@ -404,8 +404,8 @@ bb0:
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #353.
 // CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
-// CHECK-NEXT:   %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #354.
 // CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <STest_S3>, 0
 // CHECK-NEXT:   %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
@@ -473,13 +473,13 @@ sil @struct_tests : $@convention(thin) () -> () {
 
   %21 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %22 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
   %24 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %25 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
 
   %26 = project_box %21 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
   %27 = project_box %22 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
   %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %30 = project_box %25 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
 
@@ -526,8 +526,8 @@ sil @struct_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #353.
 // CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
-// CHECK-NEXT:   %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #354.
 // CHECK-NEXT:   %13 = project_box %6 : $<τ_0_0> { var τ_0_0 } <ETest_E3>, 0
 // CHECK-NEXT:   %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
@@ -595,13 +595,13 @@ sil @enum_tests : $@convention(thin) () -> () {
 
   %21 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %22 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
   %24 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %25 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
 
   %26 = project_box %21 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
   %27 = project_box %22 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  %28 = project_box %23 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
   %29 = project_box %24 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %30 = project_box %25 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
 
@@ -637,7 +637,7 @@ sil @enum_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #85.
 // CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
-// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #86.
 // CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <CTest_C1>, 0
@@ -682,7 +682,7 @@ sil @enum_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #105.
 // CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
-// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #106.
 // CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <CTest_C2>, 0
@@ -723,7 +723,7 @@ sil @enum_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #124.
 // CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
-// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+// CHECK-NEXT:   %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
 // CHECK-NEXT: MayAlias
 // CHECK: PAIR #125.
 // CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <CTest_C3>, 0
@@ -774,7 +774,7 @@ sil @class_tests : $@convention(thin) () -> () {
   %9 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
   %10 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %11 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %12 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %12 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
   %13 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int8>
   %14 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %15 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
@@ -782,7 +782,7 @@ sil @class_tests : $@convention(thin) () -> () {
   %16 = project_box %9 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
   %17 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
   %18 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  %19 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
   %20 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
   %21 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %22 = project_box %15 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0
@@ -814,8 +814,8 @@ sil @class_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #77.
 // CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
-// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #78.
 // CHECK-NEXT:   %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <(Builtin.RawPointer, Builtin.Int64)>, 0
 // CHECK-NEXT:   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -846,8 +846,8 @@ sil @class_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #95.
 // CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #96.
 // CHECK-NEXT:   %4 = project_box %1 : $<τ_0_0> { var τ_0_0 } <(TTest_S1, Builtin.Int64)>, 0
 // CHECK-NEXT:   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -878,8 +878,8 @@ sil @class_tests : $@convention(thin) () -> () {
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #112.
 // CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
-// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT:   %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #113.
 // CHECK-NEXT:   %5 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TTest_E1, Builtin.Int64)>, 0
 // CHECK-NEXT:   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
@@ -917,14 +917,14 @@ sil @tuple_tests : $@convention(thin) () -> () {
 
   %9 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %10 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
-  %11 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %11 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
   %12 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int8>
   %13 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %14 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>
 
   %15 = project_box %9 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
   %16 = project_box %10 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
-  %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  %17 = project_box %11 : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
   %18 = project_box %12 : $<τ_0_0> { var τ_0_0 } <Builtin.Int8>, 0
   %19 = project_box %13 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %20 = project_box %14 : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE32>, 0

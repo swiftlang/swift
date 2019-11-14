@@ -72,7 +72,7 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to look in when loading a parseable interface file, to see if a
+  /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
 
@@ -81,28 +81,6 @@ public:
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
-
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, overrides the default threshold for how long we let
-  /// the expression type checker run before we consider an expression
-  /// too complex.
-  unsigned SolverExpressionTimeThreshold = 0;
-  
-  /// If non-zero, overrides the default threshold for how many times
-  /// the Space::minus function is called before we consider switch statement
-  /// exhaustiveness checking to be too complex.
-  unsigned SwitchCheckingInvocationThreshold = 0;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -155,6 +133,9 @@ public:
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
+
+  /// Ignore .swiftsourceinfo file when trying to get source locations from module imported decls.
+  bool IgnoreSwiftSourceInfo = false;
 
   /// When true, emitted module files will always contain options for the
   /// debugger to use. When unset, the options will only be present if the
@@ -339,6 +320,7 @@ private:
 
 public:
   static bool doesActionGenerateSIL(ActionType);
+  static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);

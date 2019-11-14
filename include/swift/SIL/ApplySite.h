@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -130,8 +131,13 @@ public:
     llvm_unreachable("covered switch");                                        \
   } while (0)
 
+  /// Return the callee operand as a value.
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
+
   /// Return the callee operand.
-  SILValue getCallee() const { FOREACH_IMPL_RETURN(getCallee()); }
+  const Operand *getCalleeOperand() const {
+    FOREACH_IMPL_RETURN(getCalleeOperand());
+  }
 
   /// Return the callee value by looking through function conversions until we
   /// find a function_ref, partial_apply, or unrecognized callee value.
@@ -389,6 +395,24 @@ public:
       return false;
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
+    }
+  }
+
+  /// If this is a terminator apply site, then pass the first instruction of
+  /// each successor to fun. Otherwise, pass std::next(Inst).
+  ///
+  /// The intention is that this abstraction will enable the compiler writer to
+  /// ignore whether or not an apply site is a terminator when inserting
+  /// instructions after an apply site. This results in eliminating unnecessary
+  /// if-else code otherwise required to handle such situations.
+  void insertAfter(llvm::function_ref<void(SILBasicBlock::iterator)> func) {
+    auto *ti = dyn_cast<TermInst>(Inst);
+    if (!ti) {
+      return func(std::next(Inst->getIterator()));
+    }
+
+    for (auto *succBlock : ti->getSuccessorBlocks()) {
+      func(succBlock->begin());
     }
   }
 

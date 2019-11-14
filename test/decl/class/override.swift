@@ -265,8 +265,8 @@ class Base24646184 {
   func foo(ok: SubTy) { }
 }
 class Derived24646184 : Base24646184 {
-  override init(_: Ty) { } // expected-error {{'init(_:)' has already been overridden}}
-  override init(_: SubTy) { } // expected-note {{'init(_:)' previously overridden here}}
+  override init(_: Ty) { } // expected-note {{'init(_:)' previously overridden here}}
+  override init(_: SubTy) { } // expected-error {{'init(_:)' has already been overridden}}
   override func foo(_: Ty) { } // expected-note {{'foo' previously overridden here}}
   override func foo(_: SubTy) { } // expected-error {{'foo' has already been overridden}}
 

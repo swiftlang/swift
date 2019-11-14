@@ -564,7 +564,8 @@
           "implicit": true,
           "declAttributes": [
             "Inlinable"
-          ]
+          ],
+          "init_kind": "Designated"
         },
         {
           "kind": "Var",
@@ -1823,5 +1824,5 @@
       ]
     }
   ],
-  "json_format_version": 5
+  "json_format_version": 6
 }

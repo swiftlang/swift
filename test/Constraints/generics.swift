@@ -2,7 +2,7 @@
 
 infix operator +++
 
-protocol ConcatToAnything {
+protocol ConcatToAnything { // expected-note {{where 'Self' = 'U'}}
   static func +++ <T>(lhs: Self, other: T)
 }
 
@@ -14,7 +14,7 @@ func min<T : Comparable>(_ x: T, y: T) -> T {
 func weirdConcat<T : ConcatToAnything, U>(_ t: T, u: U) {
   t +++ u
   t +++ 1
-  u +++ t // expected-error{{argument type 'U' does not conform to expected type 'ConcatToAnything'}}
+  u +++ t // expected-error{{referencing operator function '+++' on 'ConcatToAnything' requires that 'U' conform to 'ConcatToAnything'}}
 }
 
 // Make sure that the protocol operators don't get in the way.
@@ -161,10 +161,7 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      // FIXME(diagnostics): Diagnostic regressed here from `cannot convert value of type 'UInt' to expected argument type 'Int'`.
-      // Once argument-to-parameter mismatch diagnostics are moved to the new diagnostic framework, we'll be able to restore
-      // original contextual conversion failure diagnostic here. Note that this only happens in Swift 4 mode.
-      elems.deinitialize(count: self.value)  // expected-error {{ambiguous reference to member 'deinitialize(count:)'}}
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }
@@ -191,7 +188,8 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{protocol type 'Any' cannot conform to 'Hashable' because only concrete types can conform to protocols}}
+_ = [] as Set  // expected-error {{value of protocol type 'Any' cannot conform to 'Hashable'; only struct/enum/class types can conform to protocols}}
+// expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
 
 
 //<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
@@ -236,8 +234,7 @@ class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as p
 Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, Int>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
-// TODO(diagnostics): We should try to produce a single note in this case.
-Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 2 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 1 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
 // expected-error@-1 {{generic parameter 'B' could not be inferred}}
 
 // <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
@@ -649,7 +646,7 @@ struct BottleLayout {
 }
 let arr = [BottleLayout]()
 let layout = BottleLayout(count:1)
-let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
+let ix = arr.firstIndex(of:layout) // expected-error {{referencing instance method 'firstIndex(of:)' on 'Collection' requires that 'BottleLayout' conform to 'Equatable'}}
 
 let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
 
@@ -831,4 +828,10 @@ extension SR11435 where T : P { // expected-note {{where 'T' = 'Int'}}
 func test_identification_of_key_path_component_callees() {
   _ = \SR11435<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
   _ = \SR11435<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
+}
+
+func sr_11491(_ value: [String]) {
+  var arr: Set<String> = []
+  arr.insert(value)
+  // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
 }

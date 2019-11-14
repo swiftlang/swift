@@ -4,7 +4,6 @@
 // to diagnose other errors in adjacent exprs.
 
 struct P<T: K> { }
-// expected-note@-1 {{arguments to generic parameter 'T' ('String' and 'T') are expected to be equal}}
 
 struct S {
     init<B>(_ a: P<B>) {
@@ -14,7 +13,7 @@ struct S {
 
 protocol K { }
 
-func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> {
+func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> { // expected-note {{where 'Object' = 'String'}}
     fatalError()
 }
 
@@ -28,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{cannot convert value of type 'P<String>' to expected argument type 'P<T>'}}
+    static let j = S(\A.id + "id") // expected-error {{operator function '+' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034

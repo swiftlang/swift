@@ -177,17 +177,18 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
 ///
 /// WARNING: This is not a constant time operation because it is implemented
 /// in terms of getVarDecl, which requests all BaseType's stored properties.
-SILType Projection::getType(SILType BaseType, SILModule &M) const {
+SILType Projection::getType(SILType BaseType, SILModule &M,
+                            TypeExpansionContext context) const {
   assert(isValid());
   switch (getKind()) {
   case ProjectionKind::Struct:
   case ProjectionKind::Class:
-    return BaseType.getFieldType(getVarDecl(BaseType), M);
+    return BaseType.getFieldType(getVarDecl(BaseType), M, context);
   case ProjectionKind::Enum:
-    return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
+    return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M, context);
   case ProjectionKind::Box:
-    return getSILBoxFieldType(BaseType.castTo<SILBoxType>(),
-                              M.Types, getIndex());
+    return getSILBoxFieldType(context, BaseType.castTo<SILBoxType>(), M.Types,
+                              getIndex());
   case ProjectionKind::Tuple:
     return BaseType.getTupleElementType(getIndex());
   case ProjectionKind::Upcast:
@@ -285,18 +286,20 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   llvm_unreachable("Unhandled ProjectionKind in switch.");
 }
 
-void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
-                                  llvm::SmallVectorImpl<Projection> &Out) {
+void Projection::getFirstLevelProjections(
+    SILType Ty, SILModule &Mod, TypeExpansionContext context,
+    llvm::SmallVectorImpl<Projection> &Out) {
   if (auto *S = Ty.getStructOrBoundGenericStruct()) {
     unsigned Count = 0;
     for (auto *VDecl : S->getStoredProperties()) {
       (void) VDecl;
       Projection P(ProjectionKind::Struct, Count++);
       LLVM_DEBUG(ProjectionPath X(Ty);
-                 assert(X.getMostDerivedType(Mod) == Ty);
+                 assert(X.getMostDerivedType(Mod, context) == Ty);
                  X.append(P);
-                 assert(X.getMostDerivedType(Mod)==Ty.getFieldType(VDecl, Mod));
-                 X.verify(Mod););
+                 assert(X.getMostDerivedType(Mod, context) ==
+                                     Ty.getFieldType(VDecl, Mod, context));
+                 X.verify(Mod, context););
       Out.push_back(P);
     }
     return;
@@ -306,10 +309,11 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
     for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
       Projection P(ProjectionKind::Tuple, i);
       LLVM_DEBUG(ProjectionPath X(Ty);
-                 assert(X.getMostDerivedType(Mod) == Ty);
+                 assert(X.getMostDerivedType(Mod, context) == Ty);
                  X.append(P);
-                 assert(X.getMostDerivedType(Mod) == Ty.getTupleElementType(i));
-                 X.verify(Mod););
+                 assert(X.getMostDerivedType(Mod, context) ==
+                        Ty.getTupleElementType(i));
+                 X.verify(Mod, context););
       Out.push_back(P);
     }
     return;
@@ -321,10 +325,11 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
       (void) VDecl;
       Projection P(ProjectionKind::Class, Count++);
       LLVM_DEBUG(ProjectionPath X(Ty);
-                 assert(X.getMostDerivedType(Mod) == Ty);
+                 assert(X.getMostDerivedType(Mod, context) == Ty);
                  X.append(P);
-                 assert(X.getMostDerivedType(Mod)==Ty.getFieldType(VDecl, Mod));
-                 X.verify(Mod););
+                 assert(X.getMostDerivedType(Mod, context) ==
+                        Ty.getFieldType(VDecl, Mod, context));
+                 X.verify(Mod, context););
       Out.push_back(P);
     }
     return;
@@ -334,11 +339,10 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
     for (unsigned field : indices(Box->getLayout()->getFields())) {
       Projection P(ProjectionKind::Box, field);
       LLVM_DEBUG(ProjectionPath X(Ty);
-                 assert(X.getMostDerivedType(Mod) == Ty);
-                 X.append(P);
-                 assert(X.getMostDerivedType(Mod)
-                        == getSILBoxFieldType(Box, Mod.Types, field));
-                 X.verify(Mod););
+                 assert(X.getMostDerivedType(Mod, context) == Ty); X.append(P);
+                 assert(X.getMostDerivedType(Mod, context) ==
+                        getSILBoxFieldType(context, Box, Mod.Types, field));
+                 X.verify(Mod, context););
       (void)Box;
       Out.push_back(P);
     }
@@ -580,12 +584,13 @@ void Projection::print(raw_ostream &os, SILType baseType) const {
   os << "<unexpected projection>";
 }
 
-raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) const {
+raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M,
+                                   TypeExpansionContext context) const {
   os << "Projection Path [";
   SILType IterType = getBaseType();
   for (const Projection &IterProj : Path) {
     SILType BaseType = IterType;
-    IterType = IterProj.getType(IterType, M);
+    IterType = IterProj.getType(IterType, M, context);
 
     os << BaseType.getAddressType() << "\n  ";
 
@@ -596,16 +601,16 @@ raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) const {
   return os;
 }
 
-void ProjectionPath::dump(SILModule &M) const {
-  print(llvm::dbgs(), M);
+void ProjectionPath::dump(SILModule &M, TypeExpansionContext context) const {
+  print(llvm::dbgs(), M, context);
 }
 
-void ProjectionPath::verify(SILModule &M) {
+void ProjectionPath::verify(SILModule &M, TypeExpansionContext context) {
 #ifndef NDEBUG
   SILType IterTy = getBaseType();
   assert(IterTy);
   for (auto &Proj : Path) {
-    IterTy = Proj.getType(IterTy, M);
+    IterTy = Proj.getType(IterTy, M, context);
     assert(IterTy);
   }
 #endif
@@ -613,6 +618,7 @@ void ProjectionPath::verify(SILModule &M) {
 
 void
 ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
+                                                  TypeExpansionContext context,
                                                   ProjectionPathList &Paths) {
   // Perform a BFS to expand the given type into projectionpath each of
   // which contains 1 field from the type.
@@ -626,7 +632,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     // Get the next level projections based on current projection's type.
     ProjectionPath PP = Worklist.pop_back_val();
     // Get the current type to process.
-    SILType Ty = PP.getMostDerivedType(*Mod);
+    SILType Ty = PP.getMostDerivedType(*Mod, context);
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
 
@@ -655,7 +661,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
 
     // Get the first level projection of the current type.
     Projections.clear();
-    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+    Projection::getFirstLevelProjections(Ty, *Mod, context, Projections);
 
     // Reached the end of the projection tree, this field can not be expanded
     // anymore.
@@ -695,11 +701,12 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
       continue;
       
     // Get the current type to process.
-    SILType Ty = PP.getMostDerivedType(Mod);
+    SILType Ty = PP.getMostDerivedType(Mod, F.getTypeExpansionContext());
 
     // Get the first level projection of the current type.
     llvm::SmallVector<Projection, 4> Projections;
-    Projection::getFirstLevelProjections(Ty, Mod, Projections);
+    Projection::getFirstLevelProjections(Ty, Mod, F.getTypeExpansionContext(),
+                                         Projections);
 
     // Reached the end of the projection tree, this field can not be expanded
     // anymore.
@@ -719,7 +726,8 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
     for (auto &P : Projections) {
       ProjectionPath X(B);
       X.append(PP);
-      assert(PP.getMostDerivedType(Mod) == X.getMostDerivedType(Mod));
+      assert(PP.getMostDerivedType(Mod, F.getTypeExpansionContext()) ==
+             X.getMostDerivedType(Mod, F.getTypeExpansionContext()));
       X.append(P);
       Worklist.push_back(X);
     }
@@ -728,8 +736,8 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
 
   // Check whether any path leads to a non-trivial type.
   for (auto &X : Paths) {
-    if (!X.getMostDerivedType(Mod).isTrivial(F))
-       return true;
+    if (!X.getMostDerivedType(Mod, F.getTypeExpansionContext()).isTrivial(F))
+      return true;
   }   
   return false;
 }
@@ -937,7 +945,8 @@ processUsersOfValue(ProjectionTree &Tree,
     // we have a projection to the next level children, create the next
     // level children nodes lazily.
     if (!Initialized)
-      createNextLevelChildren(Tree);
+      createNextLevelChildren(
+          Tree, TypeExpansionContext(*projectionInst->getFunction()));
 
     // Look up the Node for this projection add {User, ChildNode} to the
     // worklist.
@@ -962,15 +971,14 @@ processUsersOfValue(ProjectionTree &Tree,
   }
 }
 
-void
-ProjectionTreeNode::
-createNextLevelChildrenForStruct(ProjectionTree &Tree, StructDecl *SD) {
+void ProjectionTreeNode::createNextLevelChildrenForStruct(
+    ProjectionTree &Tree, TypeExpansionContext context, StructDecl *SD) {
   SILModule &Mod = Tree.getModule();
   unsigned ChildIndex = 0;
   SILType Ty = getType();
   for (VarDecl *VD : SD->getStoredProperties()) {
     assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
-    SILType NodeTy = Ty.getFieldType(VD, Mod);
+    SILType NodeTy = Ty.getFieldType(VD, Mod, context);
     auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
     LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " <<NodeTy << "\n");
     LLVM_DEBUG(llvm::dbgs() << "            Projection: " 
@@ -1000,9 +1008,8 @@ createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT) {
   }
 }
 
-void
-ProjectionTreeNode::
-createNextLevelChildren(ProjectionTree &Tree) {
+void ProjectionTreeNode::createNextLevelChildren(ProjectionTree &Tree,
+                                                 TypeExpansionContext context) {
   LLVM_DEBUG(llvm::dbgs() << "    Creating children for: " << getType() <<"\n");
   if (Initialized) {
     LLVM_DEBUG(llvm::dbgs() << "        Already initialized! bailing!\n");
@@ -1020,7 +1027,7 @@ createNextLevelChildren(ProjectionTree &Tree) {
 
   if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
     LLVM_DEBUG(llvm::dbgs() << "        Found a struct!\n");
-    createNextLevelChildrenForStruct(Tree, SD);
+    createNextLevelChildrenForStruct(Tree, context, SD);
     return;
   }
 
@@ -1284,7 +1291,7 @@ computeUsesAndLiveness(SILValue Base) {
 
     // If node is not a leaf, add its children to the worklist and continue.
     if (!Node->ChildProjections.empty()) {
-      for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
+      for (unsigned ChildIdx : llvm::reverse(Node->ChildProjections)) {
         Worklist.push_back(getNode(ChildIdx));
       }
       continue;
@@ -1337,7 +1344,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
 
       // Create projections for each one of them and the child node and
       // projection to the worklist for processing.
-      for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
+      for (unsigned ChildIdx : llvm::reverse(Node->ChildProjections)) {
         const ProjectionTreeNode *ChildNode = getNode(ChildIdx);
         auto I = ChildNode->createProjection(B, Loc, V).get();
         LLVM_DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": "
@@ -1512,5 +1519,13 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
     // this iteration.
     std::copy(NewNodes.begin(), NewNodes.end(), std::back_inserter(Worklist));
     NewNodes.clear();
+  }
+}
+
+void ProjectionTree::getUsers(SmallPtrSetImpl<SILInstruction *> &users) const {
+  for (auto *node : ProjectionTreeNodes) {
+    for (auto *op : node->getNonProjUsers()) {
+      users.insert(op->getUser());
+    }
   }
 }

@@ -21,15 +21,28 @@
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
+class AbstractFunctionDecl;
+class BraceStmt;
+class ClosureExpr;
+class ConstructorDecl;
 class CustomAttr;
 class Decl;
+class EnumDecl;
+enum class FunctionBuilderClosurePreCheck : uint8_t;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;
+class InfixOperatorDecl;
 class IterableDeclContext;
 class ModuleDecl;
+class NamedPattern;
 class NominalTypeDecl;
 class OperatorDecl;
+class OpaqueTypeDecl;
+class PatternBindingEntry;
+class ParamDecl;
+enum class ParamSpecifier : uint8_t;
+class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
@@ -40,10 +53,13 @@ enum class ResilienceExpansion : unsigned;
 class Type;
 class ValueDecl;
 class VarDecl;
+class Witness;
 class TypeAliasDecl;
 class Type;
 struct TypePair;
+struct TypeWitnessAndDecl;
 enum class AncestryFlags : uint8_t;
+enum class ImplicitMemberAction : uint8_t;
 
 // Define the AST type zone (zone 1)
 #define SWIFT_TYPEID_ZONE AST

@@ -180,3 +180,21 @@ func parentheticalInout2(_ fn: (((inout Int)), Int) -> ()) {
   var value = 0
   fn(&value, 0)
 }
+
+// SR-11724
+// FIXME: None of these diagnostics is particularly good.
+func bogusDestructuring() {
+  struct Bar {}
+
+  struct Foo {
+    func registerCallback(_ callback: @escaping ([Bar]) -> Void) {} // expected-note {{found this candidate}}
+    func registerCallback(_ callback: @escaping ([String: Bar]) -> Void) {} // expected-note {{found this candidate}}
+    func registerCallback(_ callback: @escaping (Bar?) -> Void) {} // expected-note {{found this candidate}}
+  }
+
+  Foo().registerCallback { ([Bar]) in } // expected-warning {{unnamed parameters must be written with the empty name '_'}} {{29-29=_: }}
+  Foo().registerCallback { ([String: Bar]) in }// expected-warning {{unnamed parameters must be written with the empty name '_'}} {{29-29=_: }}
+  Foo().registerCallback { (Bar?) in } // expected-error {{ambiguous use of 'registerCallback'}}
+  // expected-error@-1 {{expected parameter name followed by ':'}}
+  // expected-error@-2 {{expected ',' separator}}
+}

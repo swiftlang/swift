@@ -200,7 +200,6 @@ static bool swiftCodeCompleteImpl(
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
     CI.getSourceMgr().setFileSystem(FileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CI.setup(Invocation)) {
@@ -213,7 +212,7 @@ static bool swiftCodeCompleteImpl(
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   SwiftConsumer.clearContext();
 
   return true;

@@ -23,7 +23,7 @@
 // NO-PRIMARY-FILE: warning: ignoring -emit-reference-dependencies (requires -primary-file)
 
 
-// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module "%S/../Inputs/empty file.swift" -o "%t/empty file.swiftmodule" -emit-module-doc-path "%t/empty file.swiftdoc" -emit-objc-header-path "%t/empty file.h" -emit-parseable-module-interface-path "%t/empty file.swiftinterface" | %FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module "%S/../Inputs/empty file.swift" -o "%t/empty file.swiftmodule" -emit-module-doc-path "%t/empty file.swiftdoc" -emit-objc-header-path "%t/empty file.h" -emit-module-interface-path "%t/empty file.swiftinterface" | %FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
 
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftmodule :
 // CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift

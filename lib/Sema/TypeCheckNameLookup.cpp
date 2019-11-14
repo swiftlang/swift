@@ -200,7 +200,7 @@ namespace {
       auto conformance = TypeChecker::conformsToProtocol(conformingType,
                                                          foundProto, DC,
                                                          conformanceOptions);
-      if (!conformance) {
+      if (conformance.isInvalid()) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
         // not a class constraint if any.
@@ -210,7 +210,7 @@ namespace {
         return;
       }
 
-      if (conformance->isAbstract()) {
+      if (conformance.isAbstract()) {
         assert(foundInType->is<ArchetypeType>() ||
                foundInType->isExistentialType());
         addResult(found);
@@ -219,10 +219,9 @@ namespace {
 
       // Dig out the witness.
       ValueDecl *witness = nullptr;
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType)
-          .second;
+        witness = concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
       } else if (found->isProtocolRequirement()) {
         witness = concrete->getWitnessDecl(found);
 
@@ -358,8 +357,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 }
 
 bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
-  auto memberType = typeDecl->getDeclaredInterfaceType();
-
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -370,28 +367,38 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   //
   // FIXME: Could lift this restriction once we have sugared
   // "member types".
-  if (type->is<UnboundGenericType>() &&
-      isa<TypeAliasDecl>(typeDecl) &&
-      cast<TypeAliasDecl>(typeDecl)->getGenericParams() == nullptr &&
-      memberType->hasTypeParameter()) {
-    return true;
-  }
+  if (type->is<UnboundGenericType>()) {
+    // Generic typealiases can be accessed with an unbound generic
+    // base, since we represent the member type as an unbound generic
+    // type.
+    //
+    // Non-generic type aliases can only be accessed if the
+    // underlying type is not dependent.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (!aliasDecl->isGeneric() &&
+          aliasDecl->getUnderlyingType()->getCanonicalType()
+            ->hasTypeParameter()) {
+        return true;
+      }
+    }
 
-  if (type->is<UnboundGenericType>() &&
-      isa<AssociatedTypeDecl>(typeDecl)) {
-    return true;
+    if (isa<AssociatedTypeDecl>(typeDecl))
+      return true;
   }
 
   if (type->isExistentialType() &&
       typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-    // TODO: Temporarily allow typealias and associated type lookup on
-    //       existential type iff it doesn't have any type parameters.
-    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
-      return memberType->hasTypeParameter();
-
-    // Don't allow lookups of nested types of an existential type,
-    // because there is no way to represent such types.
-    return true;
+    // Allow typealias member access on existential types if the underlying
+    // type does not have any type parameters.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (aliasDecl->getUnderlyingType()->getCanonicalType()
+          ->hasTypeParameter())
+        return true;
+    } else {
+      // Don't allow lookups of other nested types of an existential type,
+      // because there is no way to represent such types.
+      return true;
+    }
   }
 
   return false;
@@ -422,16 +429,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
-    // FIXME: This should happen before we attempt shadowing checks.
-    if (!typeDecl->hasInterfaceType()) {
-      dc->getASTContext().getLazyResolver()->resolveDeclSignature(typeDecl);
-      if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
-        continue;
+    // HACK: Lookups rooted at a typealias are trying to look for its underlying
+    // type so they shouldn't also find that same typealias.
+    if (decl == dyn_cast<TypeAliasDecl>(dc)) {
+      continue;
     }
 
-    auto memberType = typeDecl->getDeclaredInterfaceType();
-
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
@@ -455,11 +461,12 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       // FIXME: This is a hack, we should be able to remove this entire 'if'
       // statement once we learn how to deal with the circularity here.
-      if (isa<TypeAliasDecl>(typeDecl) &&
-          isa<ProtocolDecl>(typeDecl->getDeclContext())) {
-        if (!type->is<ArchetypeType>() &&
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+        if (isa<ProtocolDecl>(aliasDecl->getDeclContext()) &&
+            !type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
-            memberType->hasTypeParameter() &&
+            aliasDecl->getUnderlyingType()->getCanonicalType()
+              ->hasTypeParameter() &&
             !options.contains(NameLookupFlags::PerformConformanceCheck)) {
           continue;
         }
@@ -475,8 +482,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                         typeDecl, type);
+    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                              typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -496,10 +503,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      // If we're validating the protocol recursively, bail out.
-      if (!protocol->hasValidSignature())
-        continue;
-
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);
       if (!conformance) {
@@ -508,7 +511,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
@@ -516,8 +519,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto typeDecl =
-        concrete->getTypeWitnessAndDecl(assocType).second;
+      auto *typeDecl =
+        concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
 
       // Circularity.
       if (!typeDecl)
@@ -600,12 +603,11 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
-  if (NumTypoCorrections >= getLangOpts().TypoCorrectionLimit ||
-      (Diags.hasFatalErrorOccurred() &&
-       !Diags.getShowDiagnosticsAfterFatalError()))
+  auto &Ctx = DC->getASTContext();
+  if (!Ctx.shouldPerformTypoCorrection() ||
+      (Ctx.Diags.hasFatalErrorOccurred() &&
+       !Ctx.Diags.getShowDiagnosticsAfterFatalError()))
     return;
-
-  ++NumTypoCorrections;
 
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl *> entries(maxResults);
@@ -667,7 +669,7 @@ static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {
 }
 
 static InFlightDiagnostic
-noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
+noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
                    bool wasClaimed) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Suggest 'self' at the use point instead of pointing at the start
@@ -679,8 +681,9 @@ noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
         return InFlightDiagnostic();
       }
 
-      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         var->getName().str());
+      auto &Diags = decl->getASTContext().Diags;
+      return Diags.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
+                            var->getName().str());
     }
   }
 
@@ -690,24 +693,24 @@ noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
                       isa<FuncDecl>(decl) ? "method" :
                       "member");
 
-    return tc.diagnose(parentDecl,
+    return parentDecl->diagnose(
                        wasClaimed ? diag::implicit_member_declared_here
                                   : diag::note_typo_candidate_implicit_member,
                        decl->getBaseName().userFacingName(), kind);
   }
 
   if (wasClaimed) {
-    return tc.diagnose(decl, diag::decl_declared_here, decl->getBaseName());
+    return decl->diagnose(diag::decl_declared_here, decl->getBaseName());
   } else {
-    return tc.diagnose(decl, diag::note_typo_candidate,
-                       decl->getBaseName().userFacingName());
+    return decl->diagnose(diag::note_typo_candidate,
+                          decl->getBaseName().userFacingName());
   }
 }
 
 void TypoCorrectionResults::noteAllCandidates() const {
   for (auto candidate : Candidates) {
     auto &&diagnostic =
-      noteTypoCorrection(TC, Loc, candidate, ClaimedCorrection);
+      noteTypoCorrection(Loc, candidate, ClaimedCorrection);
 
     // Don't add fix-its if we claimed the correction for the primary
     // diagnostic.

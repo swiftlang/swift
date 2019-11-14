@@ -243,6 +243,8 @@ ERROR(cannot_subscript_ambiguous_base,none,
 
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
+ERROR(conditional_cast_from_nil,none,
+      "nil literal cannot be the source of a conditional cast", ())
 
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
@@ -379,9 +381,62 @@ ERROR(cannot_convert_default_arg_value_nil,none,
 ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
+
+NOTE(candidate_has_invalid_argument_at_position,none,
+     "candidate expects %select{|in-out }2value of type %0 for parameter #%1",
+     (Type, unsigned, bool))
+
+ERROR(cannot_convert_array_to_variadic,none,
+      "cannot pass array of type %0 as variadic arguments of type %1",
+      (Type,Type))
+NOTE(candidate_would_match_array_to_variadic,none,
+     "candidate would match if array elements were passed as"
+     " variadic arguments of type %0", (Type))
+NOTE(suggest_pass_elements_directly,none,
+     "remove brackets to pass array elements directly", ())
+
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
+
+// @_nonEphemeral conversion diagnostics
+ERROR(cannot_pass_type_to_non_ephemeral,none,
+      "cannot pass %0 to parameter; argument %1 must be a pointer that "
+      "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
+WARNING(cannot_pass_type_to_non_ephemeral_warning,none,
+        "passing %0 to parameter, but argument %1 should be a pointer that "
+        "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
+ERROR(cannot_use_inout_non_ephemeral,none,
+      "cannot use inout expression here; argument %0 must be a pointer that "
+      "outlives the call%select{| to %2}1", (StringRef, bool, DeclName))
+WARNING(cannot_use_inout_non_ephemeral_warning,none,
+        "inout expression creates a temporary pointer, but argument %0 should "
+        "be a pointer that outlives the call%select{| to %2}1",
+        (StringRef, bool, DeclName))
+ERROR(cannot_construct_dangling_pointer,none,
+      "initialization of %0 results in a dangling %select{|buffer }1pointer",
+      (Type, unsigned))
+WARNING(cannot_construct_dangling_pointer_warning,none,
+        "initialization of %0 results in a dangling %select{|buffer }1pointer",
+        (Type, unsigned))
+NOTE(ephemeral_pointer_argument_conversion_note,none,
+     "implicit argument conversion from %0 to %1 produces a pointer valid only "
+     "for the duration of the call%select{| to %3}2",
+     (Type, Type, bool, DeclName))
+NOTE(ephemeral_use_with_unsafe_pointer,none,
+     "use 'withUnsafe%select{Bytes|MutableBytes|Pointer|MutablePointer}0' in "
+     "order to explicitly convert argument to %select{buffer |buffer ||}0"
+     "pointer valid for a defined scope", (unsigned))
+NOTE(ephemeral_use_string_with_c_string,none,
+     "use the 'withCString' method on String in order to explicitly "
+     "convert argument to pointer valid for a defined scope", ())
+NOTE(ephemeral_use_array_with_unsafe_buffer,none,
+     "use the 'withUnsafe%select{Bytes|MutableBytes|BufferPointer|"
+     "MutableBufferPointer}0' method on Array in order to explicitly convert "
+     "argument to buffer pointer valid for a defined scope", (unsigned))
+NOTE(candidate_performs_illegal_ephemeral_conv,none,
+     "candidate expects pointer that outlives the call for parameter #%0",
+     (unsigned))
 
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
@@ -390,6 +445,12 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+
+ERROR(cannot_convert_condition_value,none,
+      "cannot convert value of type %0 to expected condition type %1",
+      (Type, Type))
+ERROR(cannot_convert_condition_value_nil,none,
+      "'nil' is not compatible with expected condition type %0", (Type))
 
 ERROR(cannot_yield_rvalue_by_reference_same_type,none,
       "cannot yield immutable value of type %0 as an inout yield", (Type))
@@ -489,6 +550,10 @@ ERROR(cannot_convert_subscript_assign_protocol,none,
       (Type, Type))
 ERROR(cannot_convert_subscript_assign_nil,none,
       "'nil' cannot be assigned to subscript of type %0", (Type))
+
+NOTE(cannot_convert_candidate_result_to_contextual_type,none,
+     "%0 produces %1, not the expected contextual result type %2",
+     (DeclName, Type, Type))
 
 // for ... in expression
 ERROR(cannot_convert_sequence_element_value,none,
@@ -863,6 +928,8 @@ NOTE(found_this_precedence_group,none,
 ERROR(unknown_precedence_group,none,
       "unknown precedence group %0", (Identifier))
 ERROR(precedence_group_cycle,none,
+      "cycle in '%select{lowerThan|higherThan}0' relation", (bool))
+ERROR(higher_than_precedence_group_cycle,none,
       "cycle in higherThan relation: %0", (StringRef))
 ERROR(precedence_group_lower_within_module,none,
       "precedence group cannot be given lower precedence than group in same"
@@ -872,6 +939,8 @@ ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
 NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
+NOTE(circular_reference_through_precedence_group, none,
+     "through reference to precedence group %0 here", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -1096,10 +1165,14 @@ ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,
       "missing argument for parameter #%0 in call", (unsigned))
+ERROR(missing_arguments_in_call,none,
+      "missing arguments for parameters %0 in call", (StringRef))
 ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,none,
       "extra argument in call", ())
+ERROR(extra_arguments_in_call,none,
+      "extra arguments at positions %0 in call", (StringRef))
 ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,
@@ -1107,6 +1180,11 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
+NOTE(candidate_with_extraneous_args,none,
+      "candidate %0 requires %1 argument%s1, "
+      "but %2 %select{were|was}3 %select{provided|used in closure body}4",
+      (Type, unsigned, unsigned, bool, bool))
+
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
@@ -1388,6 +1466,12 @@ ERROR(corresponding_param_not_defaulted,none,
 NOTE(inherited_default_param_here,none,
      "corresponding parameter declared here", ())
 
+WARNING(option_set_zero_constant,none,
+        "static property %0 produces an empty option set",
+        (Identifier))
+NOTE(option_set_empty_set_init,none,
+     "use [] to silence this warning", ())
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
@@ -1487,6 +1571,9 @@ ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
+ERROR(variable_bound_by_no_pattern,none,
+      "variable %0 is not bound by any pattern",
+      (DeclName))
 
 WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",
@@ -1660,10 +1747,19 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(type_cannot_conform, none,
+      "%select{|value of protocol }0type %1 cannot conform to %2; "
+      "only struct/enum/class types can conform to protocols",
+      (bool, Type, Type))
+NOTE(required_by_opaque_return,none,
+    "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
+NOTE(required_by_decl,none,
+     "required by %0 %1 where %2 = %3",
+     (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(required_by_decl_ref,none,
+     "required by referencing %0 %1 on %2 where %3 = %4",
+     (DescriptiveDeclKind, DeclName, Type, Type, Type))
 
-ERROR(protocol_does_not_conform_objc,none,
-      "protocol type %0 cannot conform to %1 because only concrete "
-      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",
@@ -1682,12 +1778,18 @@ ERROR(type_does_not_conform_owner,none,
 ERROR(type_does_not_conform_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 conform to %4",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires that %3 be a class type",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
-ERROR(type_does_not_conform_in_opaque_return,none,
-      "return type of %0 %1 requires that %2 conform to %3",
+ERROR(type_does_not_conform_anyobject_decl_owner,none,
+      "%0 %1 requires that %2 be a class type",
       (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(type_does_not_conform_in_opaque_return,none,
+      "return type of %0 %1 requires that %2 %select{conform to %3|be a class type}4",
+      (DescriptiveDeclKind, DeclName, Type, Type, bool))
 ERROR(types_not_equal_decl,none,
       "%0 %1 requires the types %2 and %3 be equivalent",
       (DescriptiveDeclKind, DeclName, Type, Type))
@@ -1706,6 +1808,8 @@ NOTE(where_requirement_failure_both_subst,none,
      "where %0 = %1, %2 = %3", (Type, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
+NOTE(wrapped_type_satisfies_requirement,none,
+     "wrapped type %0 satisfies this requirement; did you mean to unwrap?", (Type))
 NOTE(candidate_types_conformance_requirement,none,
      "candidate requires that %0 conform to %1 "
      "(requirement specified as %2 == %3%4)",
@@ -2641,6 +2745,8 @@ ERROR(dynamic_self_invalid_method,none,
       "covariant 'Self' can only appear at the top level of method result type", ())
 ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
+ERROR(dynamic_self_default_arg,none,
+      "covariant 'Self' type cannot be referenced from a default argument expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -2693,6 +2799,10 @@ ERROR(escaping_non_function_parameter,none,
 
 NOTE(escaping_optional_type_argument, none,
      "closure is already escaping in optional type argument", ())
+
+// @_nonEphemeral attribute
+ERROR(non_ephemeral_non_pointer_type,none,
+      "@_nonEphemeral attribute only applies to pointer types", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
@@ -2823,6 +2933,9 @@ ERROR(delegating_designated_init,none,
       "designated initializer for %0 cannot delegate (with 'self.init'); "
       "did you mean this to be a convenience initializer?",
       (Type))
+ERROR(delegating_designated_init_in_extension,none,
+      "designated initializer for %0 cannot delegate (with 'self.init')",
+      (Type))
 NOTE(delegation_here,none, "delegation occurs here", ())
 ERROR(chain_convenience_init,none,
       "must call a designated initializer of the superclass %0",
@@ -2850,6 +2963,9 @@ ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (DeclName))
+ERROR(cfclass_designated_init_in_extension,none,
+      "designated initializer cannot be declared in an extension of %0",
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
@@ -2859,7 +2975,6 @@ ERROR(nonclass_convenience_init,none,
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
-
 ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "
       "a 'required' initializer", (Type))
@@ -3342,6 +3457,11 @@ ERROR(unresolved_label_corrected,none,
       "use of unresolved label %0; did you mean %1?",
       (Identifier, Identifier))
 
+ERROR(foreach_sequence_does_not_conform_to_expected_protocol,none,
+      "for-in loop requires %0 to conform to %1"
+      "%select{|; did you mean to unwrap optional?}2",
+      (Type, Type, bool))
+
 // Switch Stmt
 ERROR(no_match_operator,none,
       "no binary '~=' operator available for 'switch' statement", ())
@@ -3460,8 +3580,14 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
+NOTE(note_maybe_forgot_to_form_tuple,none,
+     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
+ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
+      "%0 %select{%1 |}2expects %3 separate arguments"
+      "%select{|; remove extra parentheses to change tuple into separate arguments}4",
+      (DescriptiveDeclKind, DeclName, bool, unsigned, bool))
 
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
@@ -3610,9 +3736,6 @@ ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
       "Error}0 type", (unsigned))
-ERROR(pointer_type_not_found,none,
-      "broken standard library: cannot find "
-      "%select{UnsafePointer|UnsafeMutablePointer}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
@@ -4417,6 +4540,9 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))
+WARNING(observe_keypath_property_not_objc_dynamic, none,
+        "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
+        "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
@@ -4497,10 +4623,6 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_wrapper_ambiguous_initial_value_init, none,
-  "property wrapper type %0 has multiple initial-value initializers", (Type))
-ERROR(property_wrapper_ambiguous_default_value_init, none,
-  "property wrapper type %0 has multiple default-value initializers", (Type))
 ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing property wrapper type %3 "
@@ -4617,6 +4739,13 @@ NOTE(previous_function_builder_here, none,
      "previous function builder specified here", ())
 ERROR(function_builder_arguments, none,
       "function builder attributes cannot have arguments", ())
+
+//------------------------------------------------------------------------------
+// MARK: differentiable programming diagnostics
+//------------------------------------------------------------------------------
+ERROR(experimental_differentiable_programming_disabled, none,
+      "differentiable programming is an experimental feature that is "
+      "currently disabled", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -203,8 +203,13 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
+        args.test_swiftpm = False
+        args.test_swiftsyntax = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
+        args.test_skstresstester = False
+        args.test_swiftevolve = False
+        args.test_toolchainbenchmarks = False
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
@@ -303,6 +308,10 @@ def create_argument_parser():
                 'device')
     option(['-I', '--ios-all'], store_true('ios_all'),
            help='also build for iOS, and allow all iOS tests')
+
+    option(['--skip-local-build'], toggle_true('skip_local_build'),
+           help='set to skip building for the local platform')
+
     option('--skip-ios', store_false('ios'),
            help='set to skip everything iOS-related')
 
@@ -546,8 +555,11 @@ def create_argument_parser():
     option(['--libcxx'], store_true('build_libcxx'),
            help='build libcxx')
 
-    option(['-p', '--swiftpm'], store_true('build_swiftpm'),
+    option(['-p', '--swiftpm'], toggle_true('build_swiftpm'),
            help='build swiftpm')
+
+    option(['--install-swiftpm'], toggle_true('install_swiftpm'),
+           help='install swiftpm')
 
     option(['--swiftsyntax'], store_true('build_swiftsyntax'),
            help='build swiftSyntax')
@@ -562,8 +574,21 @@ def create_argument_parser():
            help='build IndexStoreDB')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
+           help='install SwiftSyntax')
+    option('--skip-install-swiftsyntax-module',
+           toggle_true('skip_install_swiftsyntax_module'),
+           help='skip installing the SwiftSyntax modules')
+    option('--swiftsyntax-verify-generated-files',
+           toggle_true('swiftsyntax_verify_generated_files'),
+           help='set to verify that the generated files in the source tree '
+                'match the ones that would be generated from current master')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
+    option(['--install-skstresstester'], toggle_true('install_skstresstester'),
+           help='install the SourceKit stress tester')
+    option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
+           help='install SwiftEvolve')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -947,10 +972,21 @@ def create_argument_parser():
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
 
+    option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
+           help='skip testing swiftpm')
+    option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
+           help='skip testing SwiftSyntax')
     option('--skip-test-indexstore-db', toggle_false('test_indexstoredb'),
            help='skip testing indexstore-db')
     option('--skip-test-sourcekit-lsp', toggle_false('test_sourcekitlsp'),
            help='skip testing sourcekit-lsp')
+    option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
+           help='skip testing the SourceKit Stress tester')
+    option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
+           help='skip testing SwiftEvolve')
+    option('--skip-test-toolchain-benchmarks',
+           toggle_false('test_toolchainbenchmarks'),
+           help='skip testing toolchain benchmarks')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1005,6 +1041,14 @@ def create_argument_parser():
                 '%(default)s is the default.')
 
     # -------------------------------------------------------------------------
+    in_group('Experimental language features')
+
+    option('--enable-experimental-differentiable-programming', toggle_true,
+           default=True,
+           help='Enable experimental Swift differentiable programming language'
+                ' features.')
+
+    # -------------------------------------------------------------------------
     in_group('Unsupported options')
 
     option('--build-jobs', unsupported)
@@ -1013,6 +1057,16 @@ def create_argument_parser():
     option('--skip-test-optimize-for-size', unsupported)
     option('--skip-test-optimize-none-with-implicit-dynamic', unsupported)
     option('--skip-test-optimized', unsupported)
+
+    # -------------------------------------------------------------------------
+    in_group('Build-script-impl arguments (for disambiguation)')
+    # We need to list --skip-test-swift explicitly because otherwise argparse
+    # will auto-expand arguments like --skip-test-swift to the only known
+    # argument --skip-test-swiftevolve.
+    # These arguments are forwarded to impl_args in migration.py
+
+    option('--install-swift', toggle_true('impl_install_swift'))
+    option('--skip-test-swift', toggle_true('impl_skip_test_swift'))
 
     # -------------------------------------------------------------------------
     return builder.build()
@@ -1056,7 +1110,8 @@ Using option presets:
 
 
 Any arguments not listed are forwarded directly to Swift's
-'build-script-impl'.  See that script's help for details.
+'build-script-impl'. See that script's help for details. The listed
+build-script-impl arguments are only for disambiguation in the argument parser.
 
 Environment variables
 ---------------------

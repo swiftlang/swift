@@ -174,6 +174,9 @@ public:
     setInsertionPoint(I);
   }
 
+  SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilder &B)
+      : SILBuilder(BB, DS, B.getBuilderContext()) {}
+
   /// Build instructions before the given insertion point, inheriting the debug
   /// location.
   ///
@@ -194,16 +197,23 @@ public:
     assert(F && "cannot create this instruction without a function context");
     return *F;
   }
+
+  TypeExpansionContext getTypeExpansionContext() const {
+    return TypeExpansionContext(getFunction());
+  }
+
   SILBuilderContext &getBuilderContext() const { return C; }
   SILModule &getModule() const { return C.Module; }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
-    auto expansion = ResilienceExpansion::Maximal;
+
+    auto expansion = TypeExpansionContext::maximal(getModule().getSwiftModule(),
+                                                   getModule().isWholeModule());
     // If there's no current SILFunction, we're inserting into a global
     // variable initializer.
-    if (F)
-      expansion = F->getResilienceExpansion();
-
+    if (F) {
+      expansion = TypeExpansionContext(getFunction());
+    }
     return getModule().Types.getTypeLowering(T, expansion);
   }
 
@@ -333,12 +343,11 @@ public:
   // Type remapping
   //===--------------------------------------------------------------------===//
 
-  static SILType
-  getPartialApplyResultType(SILType Ty, unsigned ArgCount, SILModule &M,
-                            SubstitutionMap subs,
-                            ParameterConvention calleeConvention,
-                            PartialApplyInst::OnStackKind onStack =
-                                PartialApplyInst::OnStackKind::NotOnStack);
+  static SILType getPartialApplyResultType(
+      TypeExpansionContext context, SILType Ty, unsigned ArgCount, SILModule &M,
+      SubstitutionMap subs, ParameterConvention calleeConvention,
+      PartialApplyInst::OnStackKind onStack =
+          PartialApplyInst::OnStackKind::NotOnStack);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -403,6 +412,8 @@ public:
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false) {
     Loc.markAsPrologue();
+    assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
+           "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocStackInst::create(getSILDebugLocation(Loc), elementType,
                                          getFunction(), C.OpenedArchetypes,
                                          Var, hasDynamicLifetime));
@@ -443,6 +454,8 @@ public:
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false) {
     Loc.markAsPrologue();
+    assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
+           "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        C.OpenedArchetypes, Var,
                                        hasDynamicLifetime));
@@ -567,7 +580,8 @@ public:
   FunctionRefBaseInst *createFunctionRefFor(SILLocation Loc, SILFunction *f) {
     if (f->isDynamicallyReplaceable())
       return createDynamicFunctionRef(Loc, f);
-    else return createFunctionRef(Loc, f);
+    else
+      return createFunctionRef(Loc, f);
   }
 
   FunctionRefBaseInst *createFunctionRef(SILLocation Loc, SILFunction *f,
@@ -583,20 +597,20 @@ public:
   }
 
   FunctionRefInst *createFunctionRef(SILLocation Loc, SILFunction *f) {
-    return insert(new (getModule())
-                      FunctionRefInst(getSILDebugLocation(Loc), f));
+    return insert(new (getModule()) FunctionRefInst(getSILDebugLocation(Loc), f,
+                                                    getTypeExpansionContext()));
   }
 
   DynamicFunctionRefInst *
   createDynamicFunctionRef(SILLocation Loc, SILFunction *f) {
     return insert(new (getModule()) DynamicFunctionRefInst(
-        getSILDebugLocation(Loc), f));
+        getSILDebugLocation(Loc), f, getTypeExpansionContext()));
   }
 
   PreviousDynamicFunctionRefInst *
   createPreviousDynamicFunctionRef(SILLocation Loc, SILFunction *f) {
     return insert(new (getModule()) PreviousDynamicFunctionRefInst(
-        getSILDebugLocation(Loc), f));
+        getSILDebugLocation(Loc), f, getTypeExpansionContext()));
   }
 
   AllocGlobalInst *createAllocGlobal(SILLocation Loc, SILGlobalVariable *g) {
@@ -604,16 +618,16 @@ public:
                       AllocGlobalInst(getSILDebugLocation(Loc), g));
   }
   GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g) {
-    return insert(new (getModule())
-                      GlobalAddrInst(getSILDebugLocation(Loc), g));
+    return insert(new (getModule()) GlobalAddrInst(getSILDebugLocation(Loc), g,
+                                                   getTypeExpansionContext()));
   }
   GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILType Ty) {
     return insert(new (F->getModule())
                   GlobalAddrInst(getSILDebugLocation(Loc), Ty));
   }
   GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g) {
-    return insert(new (getModule())
-                      GlobalValueInst(getSILDebugLocation(Loc), g));
+    return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,
+                                                    getTypeExpansionContext()));
   }
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
 
@@ -907,11 +921,11 @@ public:
     return insert(new (getModule())                                            \
                       RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty));    \
   }                                                                            \
-  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc,              \
-                                                 SILValue operand) {           \
+  StrongCopy##Name##ValueInst *createStrongCopy##Name##Value(                  \
+      SILLocation Loc, SILValue operand) {                                     \
     auto type = getFunction().getLoweredType(                                  \
         operand->getType().getASTType().getReferenceStorageReferent());        \
-    return insert(new (getModule()) Copy##Name##ValueInst(                     \
+    return insert(new (getModule()) StrongCopy##Name##ValueInst(               \
         getSILDebugLocation(Loc), operand, type));                             \
   }
 
@@ -1278,8 +1292,8 @@ public:
   UncheckedEnumDataInst *createUncheckedEnumData(SILLocation Loc,
                                                  SILValue Operand,
                                                  EnumElementDecl *Element) {
-    SILType EltType =
-        Operand->getType().getEnumElementType(Element, getModule());
+    SILType EltType = Operand->getType().getEnumElementType(
+        Element, getModule(), getTypeExpansionContext());
     return createUncheckedEnumData(Loc, Operand, Element, EltType);
   }
 
@@ -1300,8 +1314,8 @@ public:
   UncheckedTakeEnumDataAddrInst *
   createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
                                   EnumElementDecl *Element) {
-    SILType EltType =
-        Operand->getType().getEnumElementType(Element, getModule());
+    SILType EltType = Operand->getType().getEnumElementType(
+        Element, getModule(), getTypeExpansionContext());
     return createUncheckedTakeEnumDataAddr(Loc, Operand, Element, EltType);
   }
 
@@ -1376,7 +1390,8 @@ public:
 
   StructExtractInst *createStructExtract(SILLocation Loc, SILValue Operand,
                                          VarDecl *Field) {
-    auto type = Operand->getType().getFieldType(Field, getModule());
+    auto type = Operand->getType().getFieldType(Field, getModule(),
+                                                getTypeExpansionContext());
     return createStructExtract(Loc, Operand, Field, type);
   }
 
@@ -1390,7 +1405,8 @@ public:
 
   StructElementAddrInst *
   createStructElementAddr(SILLocation Loc, SILValue Operand, VarDecl *Field) {
-    auto ResultTy = Operand->getType().getFieldType(Field, getModule());
+    auto ResultTy = Operand->getType().getFieldType(Field, getModule(),
+                                                    getTypeExpansionContext());
     return createStructElementAddr(Loc, Operand, Field, ResultTy);
   }
 
@@ -1401,7 +1417,8 @@ public:
   }
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
                                            VarDecl *Field) {
-    auto ResultTy = Operand->getType().getFieldType(Field, getModule());
+    auto ResultTy = Operand->getType().getFieldType(Field, getModule(),
+                                                    getTypeExpansionContext());
     return createRefElementAddr(Loc, Operand, Field, ResultTy);
   }
 
@@ -2083,8 +2100,7 @@ public:
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
-    if (F->hasOwnership() &&
-        v.getOwnershipKind() == ValueOwnershipKind::Any)
+    if (F->hasOwnership() && v.getOwnershipKind() == ValueOwnershipKind::None)
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);
@@ -2125,7 +2141,8 @@ public:
 
   SILValue emitStructExtract(SILLocation Loc, SILValue Operand,
                              VarDecl *Field) {
-    auto type = Operand->getType().getFieldType(Field, getModule());
+    auto type = Operand->getType().getFieldType(Field, getModule(),
+                                                getTypeExpansionContext());
     return emitStructExtract(Loc, Operand, Field, type);
   }
 
@@ -2260,6 +2277,11 @@ public:
       : SILBuilder(BB) {
     inheritScopeFrom(InheritScopeFrom);
   }
+
+  explicit SILBuilderWithScope(SILBasicBlock *BB, SILBuilder &B,
+                               SILInstruction *InheritScopeFrom)
+      : SILBuilder(BB, InheritScopeFrom->getDebugScope(),
+                   B.getBuilderContext()) {}
 
   /// Creates a new SILBuilder with an insertion point at the
   /// beginning of BB and the debug scope from the first

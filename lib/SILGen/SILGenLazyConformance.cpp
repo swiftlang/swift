@@ -78,7 +78,7 @@ void SILGenModule::useConformancesFromType(CanType type) {
     if (isa<ProtocolDecl>(decl))
       return;
 
-    auto *genericSig = decl->getGenericSignature();
+    auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return;
 
@@ -109,17 +109,15 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
       return;
 
     if (objectiveCBridgeable) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, objectiveCBridgeable);
-      if (subConformance)
-        useConformance(*subConformance);
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, objectiveCBridgeable))
+        useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, bridgedStoredNSError);
-      if (subConformance)
-        useConformance(*subConformance);
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, bridgedStoredNSError))
+        useConformance(subConformance);
     }
   });
 }
@@ -324,7 +322,7 @@ void SILGenModule::emitLazyConformancesForFunction(SILFunction *F) {
 }
 
 void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
-  auto *genericSig = NTD->getGenericSignature();
+  auto genericSig = NTD->getGenericSignature();
 
   if (genericSig) {
     for (auto reqt : genericSig->getRequirements()) {

@@ -74,7 +74,8 @@ namespace {
     }
     
     SILType getType(IRGenModule &IGM, SILType T) const {
-      return T.getFieldType(Field, IGM.getSILModule());
+      return T.getFieldType(Field, IGM.getSILModule(),
+                            IGM.getMaximalTypeExpansionContext());
     }
   };
 
@@ -95,7 +96,8 @@ namespace {
 
     SILType getType(IRGenModule &IGM, SILType T) const {
       if (Field)
-        return T.getFieldType(Field, IGM.getSILModule());
+        return T.getFieldType(Field, IGM.getSILModule(),
+                              IGM.getMaximalTypeExpansionContext());
 
       // The Swift-field-less cases use opaque storage, which is
       // guaranteed to ignore the type passed to it.
@@ -185,6 +187,7 @@ namespace {
       switch (fieldInfo.getKind()) {
       case ElementLayout::Kind::Fixed:
       case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::EmptyTailAllocatedCType:
         return MemberAccessStrategy::getDirectFixed(
                                                fieldInfo.getFixedByteOffset());
       case ElementLayout::Kind::InitialNonFixedSize:
@@ -278,6 +281,7 @@ namespace {
           break;
         }
         case ElementLayout::Kind::Empty:
+        case ElementLayout::Kind::EmptyTailAllocatedCType:
         case ElementLayout::Kind::InitialNonFixedSize:
         case ElementLayout::Kind::NonFixed:
           continue;
@@ -590,7 +594,9 @@ namespace {
     SILType getType(VarDecl *field) {
       assert(field->getDeclContext() == TheStruct->getAnyNominal());
       auto silType = SILType::getPrimitiveAddressType(TheStruct);
-      return silType.getFieldType(field, IGM.getSILModule());
+      return silType.getFieldType(
+          field, IGM.getSILModule(),
+          IGM.getMaximalTypeExpansionContext());
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
@@ -731,8 +737,9 @@ private:
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
-      auto &fieldTI = cast<LoadableTypeInfo>(
-        IGM.getTypeInfo(SwiftType.getFieldType(swiftField, IGM.getSILModule())));
+      auto &fieldTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(
+          SwiftType.getFieldType(swiftField, IGM.getSILModule(),
+                                 IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI);
       return;
     }
@@ -789,7 +796,8 @@ private:
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
-      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal));
+      layout.completeEmptyTailAllocatedCType(
+          fieldType.isPOD(ResilienceExpansion::Maximal), NextOffset);
     else
       layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());

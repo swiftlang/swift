@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
@@ -114,6 +115,30 @@ static constexpr const char *const fixItStrings[] = {
 #include "swift/AST/DiagnosticsAll.def"
     "<not a fix-it>",
 };
+
+#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
+  static constexpr const char *const DIAG##_educationalNotes[] = {__VA_ARGS__, \
+                                                                  nullptr};
+#include "swift/AST/EducationalNotes.def"
+
+// NOTE: sadly, while GCC and Clang support array designators in C++, they are
+// not part of the standard at the moment, so Visual C++ doesn't support them.
+// This construct allows us to provide a constexpr array initialized to empty
+// values except in the cases that EducationalNotes.def are provided, similar to
+// what the C array would have looked like.
+template<int N>
+struct EducationalNotes {
+  constexpr EducationalNotes() : value() {
+    for (auto i = 0; i < N; ++i) value[i] = {};
+#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
+  value[LocalDiagID::DIAG] = DIAG##_educationalNotes;
+#include "swift/AST/EducationalNotes.def"
+  }
+  const char *const *value[N];
+};
+
+static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = EducationalNotes<LocalDiagID::NumDiags>();
+static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
@@ -278,6 +303,14 @@ void InFlightDiagnostic::flush() {
     Engine->flushActiveDiagnostic();
 }
 
+void Diagnostic::addChildNote(Diagnostic &&D) {
+  assert(storedDiagnosticInfos[(unsigned)D.ID].kind == DiagnosticKind::Note &&
+         "Only notes can have a parent.");
+  assert(storedDiagnosticInfos[(unsigned)ID].kind != DiagnosticKind::Note &&
+         "Notes can't have children.");
+  ChildNotes.push_back(std::move(D));
+}
+
 bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
@@ -379,7 +412,7 @@ static bool isInterestingTypealias(Type type) {
   // Compatibility aliases are only interesting insofar as their underlying
   // types are interesting.
   if (aliasDecl->isCompatibilityAlias()) {
-    auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
+    auto underlyingTy = aliasDecl->getUnderlyingType();
     return isInterestingTypealias(underlyingTy);
   }
 
@@ -397,7 +430,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
     return false;
 
   // Don't show generic type parameters.
-  if (type->hasTypeParameter())
+  if (type->getCanonicalType()->hasTypeParameter())
     return false;
 
   // Only show 'aka' if there's a typealias involved; other kinds of sugar
@@ -660,9 +693,8 @@ void DiagnosticEngine::formatDiagnosticText(
     }
     
     if (Modifier == "error") {
-      assert(false && "encountered %error in diagnostic text");
-      Out << StringRef("<<ERROR>>");
-      break;
+      Out << StringRef("<<INTERNAL ERROR: encountered %error in diagnostic text>>");
+      continue;
     }
 
     // Parse the optional argument list for a modifier, which is brace-enclosed.
@@ -675,11 +707,19 @@ void DiagnosticEngine::formatDiagnosticText(
     // Find the digit sequence, and parse it into an argument index.
     size_t Length = InText.find_if_not(isdigit);
     unsigned ArgIndex;      
-    bool Result = InText.substr(0, Length).getAsInteger(10, ArgIndex);
-    assert(!Result && "Unparseable argument index value?");
-    (void)Result;
-    assert(ArgIndex < Args.size() && "Out-of-range argument index");
+    bool IndexParseFailed = InText.substr(0, Length).getAsInteger(10, ArgIndex);
+
+    if (IndexParseFailed) {
+      Out << StringRef("<<INTERNAL ERROR: unparseable argument index in diagnostic text>>");
+      continue;
+    }
+
     InText = InText.substr(Length);
+
+    if (ArgIndex >= Args.size()) {
+      Out << StringRef("<<INTERNAL ERROR: out-of-range argument index in diagnostic text>>");
+      continue;
+    }
 
     // Convert the argument to a string.
     formatDiagnosticArgument(Modifier, ModifierArguments, Args, ArgIndex,
@@ -802,10 +842,11 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
   TentativeDiagnostics.clear();
 }
 
-void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+Optional<DiagnosticInfo>
+DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic.getID());
   if (behavior == DiagnosticState::Behavior::Ignore)
-    return;
+    return None;
 
   // Figure out the source location.
   SourceLoc loc = diagnostic.getLoc();
@@ -845,7 +886,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           // FIXME: Horrible, horrible hackaround. We're not getting a
           // DeclContext everywhere we should.
           if (!dc) {
-            return;
+            return None;
           }
 
           while (!dc->isModuleContext()) {
@@ -922,17 +963,48 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
   }
 
-  // Pass the diagnostic off to the consumer.
-  DiagnosticInfo Info;
-  Info.ID = diagnostic.getID();
-  Info.Ranges = diagnostic.getRanges();
-  Info.FixIts = diagnostic.getFixIts();
-  for (auto &Consumer : Consumers) {
-    Consumer->handleDiagnostic(
-        SourceMgr, loc, toDiagnosticKind(behavior),
-        diagnosticStringFor(Info.ID, getPrintDiagnosticNames()),
-        diagnostic.getArgs(), Info, getDefaultDiagnosticLoc());
+  return DiagnosticInfo(
+      diagnostic.getID(), loc, toDiagnosticKind(behavior),
+      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNames()),
+      diagnostic.getArgs(), getDefaultDiagnosticLoc(), /*child note info*/ {},
+      diagnostic.getRanges(), diagnostic.getFixIts(), diagnostic.isChildNote());
+}
+
+void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
+  if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
+    SmallVector<DiagnosticInfo, 1> childInfo;
+    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
+    auto childNotes = diagnostic.getChildNotes();
+    for (unsigned idx = 0; idx < childNotes.size(); ++idx) {
+      if (auto child = diagnosticInfoForDiagnostic(childNotes[idx])) {
+        childInfo.push_back(*child);
+        childInfoPtrs.push_back(&childInfo[idx]);
+      }
+    }
+    info->ChildDiagnosticInfo = childInfoPtrs;
+    
+    SmallVector<std::string, 1> educationalNotePaths;
+    if (useDescriptiveDiagnostics) {
+      auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
+      while (associatedNotes && *associatedNotes) {
+        SmallString<128> notePath(getDiagnosticDocumentationPath());
+        llvm::sys::path::append(notePath, *associatedNotes);
+        educationalNotePaths.push_back(notePath.str());
+        associatedNotes++;
+      }
+      info->EducationalNotePaths = educationalNotePaths;
+    }
+
+    for (auto &consumer : Consumers) {
+      consumer->handleDiagnostic(SourceMgr, *info);
+    }
   }
+
+  // For compatibility with DiagnosticConsumers which don't know about child
+  // notes. These can be ignored by consumers which do take advantage of the
+  // grouping.
+  for (auto &childNote : diagnostic.getChildNotes())
+    emitDiagnostic(childNote);
 }
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
@@ -998,7 +1070,7 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     if (content.empty())
       continue;
 
-    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
 }

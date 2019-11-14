@@ -12,7 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -633,7 +633,8 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
   assert(Callee && "Trying to optimize a dynamic function!?");
 
-  auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto CalleeSig = Callee->getLoweredFunctionType()
+                         ->getInvocationGenericSignature();
   auto AISubs = AI.getSubstitutionMap();
 
   SmallVector<GenericTypeParamType *, 4> SubstParams;

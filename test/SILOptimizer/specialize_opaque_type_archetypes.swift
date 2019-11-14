@@ -4,8 +4,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
 // RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import External
 import External2
@@ -50,12 +49,12 @@ func identity<T>(_ t: T) -> T {
 
 // CHECK-LABEL: sil @$s1A10testFooBaryyxAA1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed T) -> () {
 // CHECK: bb3([[FOOS_INT:%.*]] : $Builtin.Int64):
-// CHECK:  [[ID:%.*]] = function_ref @$s1A8identityyxxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> Int64
 // CHECK:  [[FOO_RES:%.*]] = struct $Int64 ([[FOOS_INT]] : $Builtin.Int64)
+// CHECK:  [[ID:%.*]] = function_ref @$s1A8identityyxxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> Int64
 // CHECK:  [[ID_RES:%.*]] = apply [[ID]]([[FOO_RES]]) : $@convention(thin) (Int64) -> Int64
 // CHECK:  [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
-// CHECK:  %27 = apply [[USEP]]([[ID_RES]]) : $@convention(thin) (Int64) -> ()
-// CHECK:  %29 = apply [[USEP]]([[FOO_RES]]) : $@convention(thin) (Int64) -> ()
+// CHECK:  apply [[USEP]]([[ID_RES]]) : $@convention(thin) (Int64) -> ()
+// CHECK:  apply [[USEP]]([[FOO_RES]]) : $@convention(thin) (Int64) -> ()
 
 public func testFooBar<T:P>(_ t : T) {
   let x = foo(getInt())
@@ -100,9 +99,8 @@ public func returnC() -> some CP {
 }
 
 // CHECK-LABEL: sil @$s1A4useCyyF
-// CHECK: [[INT:%.*]] = struct $Int64 (
-// CHECK:  // function_ref specialized useP<A>(_:)
 // CHECK: [[FUN:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK: [[INT:%.*]] = struct $Int64 (
 // CHECK:  = apply [[FUN]]([[INT]])
 public func useC() {
    let c = returnC()
@@ -167,6 +165,7 @@ struct Container2 {
 }
 
 class Container3 {
+  @inline(__always)
   init(member : S.T) {
     self.member = member
   }
@@ -230,8 +229,8 @@ func nonResilient() -> some ExternalP2 {
 // CHECK-LABEL: sil @$s1A019usePairResilientNonC0yyF : $@convention(thin) () -> ()
 // CHECK: alloc_stack $Pair<MyInt64, @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK: cond_fail
-// CHECK: [[FIRST_MYVALUE3:%.*]] = struct $Int64
 // CHECK: [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK: [[FIRST_MYVALUE3:%.*]] = struct $Int64
 // CHECK: apply [[USEP]]([[FIRST_MYVALUE3]])
 // CHECK:  [[MYVALUE_WITNESS:%.*]] = witness_method $@_opaqueReturnTypeOf("$s9External217externalResilientQryF"
 // CHECK:  [[SECOND_MYVALUE3:%.*]] = apply [[MYVALUE_WITNESS]]
@@ -259,7 +258,7 @@ public struct Adapter<T: P3>: P3 {
 // Don't assert.
 // CHECK-LABEL: sil {{.*}} @$s1A7AdapterVyxGAA2P3A2aEP3foo2ATQzyFTW
 // CHECK:  [[F:%.*]] = function_ref @$s1A7AdapterV3fooQryF
-// CHECK:  apply [[F]]<τ_0_0>(%0, %1) : $@convention(method) <τ_0_0 where τ_0_0 : P3> (@in_guaranteed Adapter<τ_0_0>) -> @out @_opaqueReturnTypeOf("$s1A7AdapterV3fooQryF", 0)
+// CHECK:  apply [[F]]<τ_0_0>(%0, %1) : $@convention(method) <τ_0_0 where τ_0_0 : P3> (@in_guaranteed Adapter<τ_0_0>) ->
 extension P3 {
   public func foo() -> some P3 {
     return Adapter(inner: self)
@@ -271,9 +270,8 @@ extension P3 {
 
 // CHECK-LABEL: sil @$s1A21useExternalResilient2yyF : $@convention(thin) () -> ()
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
-// CHECK:   [[FUN:%.*]] = function_ref @$s9External226inlinableExternalResilientQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External226inlinableExternalResilientQryF", 0)
-// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External226inlinableExternalResilientQryF", 0)
-// CHECK:   apply [[FUN]]([[RES2]])
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External226inlinableExternalResilientQryF : $@convention(thin) () -> @out Int64
+// CHECK:   apply [[FUN]]([[RES]])
 // CHECK:   return
 public func useExternalResilient2() {
   let e = inlinableExternalResilient()
@@ -283,9 +281,8 @@ public func useExternalResilient2() {
 // In this case we should only 'peel' one layer of opaque archetypes.
 // CHECK-LABEL: sil @$s1A21useExternalResilient3yyF
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
-// CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External3031inlinableExternalResilientCallsD0QryF", 0)
-// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0){{.*}}to $*@_opaqueReturnTypeOf("$s9External3031inlinableExternalResilientCallsD0QryF", 0)
-// CHECK:  apply [[FUN]]([[RES2]])
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  apply [[FUN]]([[RES]])
 public func useExternalResilient3() {
   let e = inlinableExternalResilientCallsResilient()
   useP(e.myValue3())
@@ -294,9 +291,8 @@ public func useExternalResilient3() {
 // Check that we can look throught two layers of inlinable resilient functions.
 // CHECK-LABEL: sil @$s1A21useExternalResilient4yyF
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
-// CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External3040inlinableExternalResilientCallsInlinablecD0QryF", 0)
-// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External3040inlinableExternalResilientCallsInlinablecD0QryF", 0)
-// CHECK:   apply [[FUN]]([[RES2]])
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) () -> @out Int64
+// CHECK:   apply [[FUN]]([[RES]])
 public func useExternalResilient4() {
   let e = inlinableExternalResilientCallsInlinableExternalResilient()
   useP(e.myValue3())
@@ -307,8 +303,7 @@ public func useExternalResilient4() {
 // CHECK:   [[CONTAINER:%.*]] = apply [[CONTAINER_INIT_FUN]]
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[COMPUTED_PROP:%.*]] = function_ref @$s8External0A9ContainerV16computedPropertyQrvg
-// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s8External0A9ContainerV16computedPropertyQrvp", 0)
-// CHECK:   apply [[COMPUTED_PROP]]([[RES2]], [[CONTAINER]])
+// CHECK:   apply [[COMPUTED_PROP]]([[RES]], [[CONTAINER]])
 // CHECK:   [[MYVALUE:%.*]] = function_ref @$ss5Int64V8ExternalE8myValue2AByF : $@convention(method) (Int64) -> Int64
 // CHECK:   apply [[MYVALUE]]
 public func testStoredProperty() {
@@ -330,8 +325,7 @@ public func testResilientProperty() {
 // CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
 // CHECK:  [[RES:%.*]] = alloc_stack $Int64
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV18inlineablePropertyQrvg
-// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV18inlineablePropertyQrvp", 0)
-// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
 public func testResilientInlinableProperty() {
   let r = ResilientContainer()
   useP(r.inlineableProperty.myValue3())
@@ -341,8 +335,7 @@ public func testResilientInlinableProperty() {
 // CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
 // CHECK:  [[RES:%.*]] = alloc_stack $Int64
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV19inlineableProperty2Qrvg
-// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV19inlineableProperty2Qrvp", 0)
-// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
 public func testResilientInlinableProperty3() {
   let r = ResilientContainer()
   useP(r.inlineableProperty2.myValue3())
@@ -363,8 +356,7 @@ public func testResilientProperty2() {
 // CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V18inlineablePropertyQrvg
-// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0){{.*}}to $*@_opaqueReturnTypeOf("$s9External319ResilientContainer2V18inlineablePropertyQrvp", 0)
-// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
 public func testResilientInlinableProperty2() {
   let r = ResilientContainer2()
   useP(r.inlineableProperty.myValue3())
@@ -374,8 +366,7 @@ public func testResilientInlinableProperty2() {
 // CHECK:   [[CONTAINTER:%.*]] = alloc_stack $ResilientContainer2
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvg
-// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvp", 0)
-// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINTER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINTER]])
 public func testResilientInlinablePropertyCallsResilientInlinable() {
   let r = ResilientContainer2()
   useP(r.inlineablePropertyCallsResilientInlineable.myValue3())
@@ -421,9 +412,9 @@ func testIt<T>(cl: (Int64) throws -> T) {
 // CHECK-LABEL: sil shared [noinline] @$s1A16testPartialApplyyyxAA2P4RzlFAA2PAV_Tg5
 // CHECK:  [[PA:%.*]] = alloc_stack $PA
 // CHECK:  store %0 to [[PA]] : $*PA
-// CHECK:  [[F:%.*]] = function_ref @$s1A2PAVAA2P4A2aDP3fooy2ATQzs5Int64VFTW : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out @_opaqueReturnTypeOf("$s1A2PAV3fooyQrs5Int64VF", 0)
-// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[PA]]) : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out @_opaqueReturnTypeOf("$s1A2PAV3fooyQrs5Int64VF", 0)
-// CHECK:  convert_function [[C]] : $@callee_guaranteed (Int64) -> @out @_opaqueReturnTypeOf("$s1A2PAV3fooyQrs5Int64VF", {{.*}} to $@callee_guaranteed (Int64) -> (@out Int64, @error Error)
+// CHECK:  [[F:%.*]] = function_ref @$s1A2PAVAA2P4A2aDP3fooy2ATQzs5Int64VFTW : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out Int64
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[PA]]) : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out Int64
+// CHECK:  convert_function [[C]] : $@callee_guaranteed (Int64) -> @out Int64 to $@callee_guaranteed (Int64) -> (@out Int64, @error Error)
 @inline(never)
 func testPartialApply<T: P4>(_ t: T) {
   let fun = t.foo
@@ -546,3 +537,43 @@ func useAbstractFunction<T: P>(_ fn: (Int64) -> T) {}
 public func testThinToThick() {
   useAbstractFunction(bar)
 }
+
+// CHECK-LABEL: sil @$s1A19rdar56410009_normalyyF
+public func rdar56410009_normal() {
+  // CHECK: [[EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF
+  // CHECK: = apply [[EXTERNAL_RESILIENT_WRAPPER]]<@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸>({{%.+}}, {{%.+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ExternalP2> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF", 0) 🦸<τ_0_0>
+  _ = externalResilientWrapper(externalResilient())
+} // CHECK: end sil function '$s1A19rdar56410009_normalyyF'
+
+// CHECK-LABEL: sil @$s1A25rdar56410009_inlinedInneryyF
+public func rdar56410009_inlinedInner() {
+  // CHECK: [[EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF
+  // CHECK: = apply [[EXTERNAL_RESILIENT_WRAPPER]]<Int64>({{%.+}}, {{%.+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ExternalP2> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s9External224externalResilientWrapperyQrxAA10ExternalP2RzlF", 0) 🦸<τ_0_0>
+  _ = externalResilientWrapper(inlinableExternalResilient())
+} // CHECK: end sil function '$s1A25rdar56410009_inlinedInneryyF'
+
+// CHECK-LABEL: sil @$s1A25rdar56410009_inlinedOuteryyF
+public func rdar56410009_inlinedOuter() {
+  // CHECK: [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFAA08externalD0QryFQOyQo__Tg5
+  // CHECK: = apply [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER]]({{%.+}}, {{%.+}}) : $@convention(thin) (@in_guaranteed @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸) -> @out WrapperP2<@_opaqueReturnTypeOf("$s9External217externalResilientQryF"
+  _ = inlinableExternalResilientWrapper(externalResilient())
+} // CHECK: end sil function '$s1A25rdar56410009_inlinedOuteryyF'
+
+// Specialized from above
+// CHECK-LABEL: sil shared [noinline] @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFAA08externalD0QryFQOyQo__Tg5
+// CHECK: [[WRAPPER_INIT:%.+]] = function_ref @$s9External29WrapperP2VyACyxGxcfC
+// CHECK: = apply [[WRAPPER_INIT]]<@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) 🦸>({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : ExternalP2> (@in τ_0_0, @thin WrapperP2<τ_0_0>.Type) -> @out WrapperP2<τ_0_0>
+// CHECK: end sil function '$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFAA08externalD0QryFQOyQo__Tg5'
+
+// Specialized from below
+// CHECK-LABEL: sil shared [noinline] @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFs5Int64V_Tg5
+// CHECK: [[WRAPPER_INIT:%.+]] = function_ref @$s9External29WrapperP2VyACyxGxcfC
+// CHECK: = apply [[WRAPPER_INIT]]<Int64>({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : ExternalP2> (@in τ_0_0, @thin WrapperP2<τ_0_0>.Type) -> @out WrapperP2<τ_0_0>
+// CHECK: end sil function '$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFs5Int64V_Tg5'
+
+// CHECK-LABEL: sil @$s1A24rdar56410009_inlinedBothyyF
+public func rdar56410009_inlinedBoth() {
+  // CHECK: [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER:%.+]] = function_ref @$s9External233inlinableExternalResilientWrapperyQrxAA0C2P2RzlFs5Int64V_Tg5
+  // CHECK: = apply [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER]]({{%.+}}, {{%.+}}) : $@convention(thin) (Int64) -> @out WrapperP2<Int64>
+  _ = inlinableExternalResilientWrapper(inlinableExternalResilient())
+} // CHECK:  end sil function '$s1A24rdar56410009_inlinedBothyyF'

@@ -254,3 +254,12 @@ class SelfStoredPropertyInit {
 
   var value = Self.myValue() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
 }
+
+// rdar://problem/55273931 - erroneously rejecting 'Self' in lazy initializer
+class Foo {
+  static var value: Int = 17
+
+  lazy var doubledValue: Int = {
+    Self.value * 2
+  }()
+}

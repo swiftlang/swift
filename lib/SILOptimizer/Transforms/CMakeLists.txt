@@ -21,7 +21,6 @@ silopt_register_sources(
   MergeCondFail.cpp
   Outliner.cpp
   ObjectOutliner.cpp
-  OwnershipModelEliminator.cpp
   PerformanceInliner.cpp
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
@@ -32,7 +31,6 @@ silopt_register_sources(
   SILSROA.cpp
   SimplifyCFG.cpp
   Sink.cpp
-  SpecializeOpaqueArchetypes.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
   UnsafeGuaranteedPeephole.cpp

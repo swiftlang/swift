@@ -870,8 +870,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(missing_parameter_type,PointsToFirstBadToken,
-      "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
@@ -895,6 +893,8 @@ ERROR(parameter_operator_keyword_argument,none,
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
+WARNING(parameter_unnamed_warn,none,
+        "unnamed parameters must be written with the empty name '_'", ())
 
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
@@ -1510,6 +1510,30 @@ ERROR(attr_specialize_expected_partial_or_full,none,
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
+// differentiable
+ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
+      "expected a %0 function name", (StringRef))
+ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
+      "expected a list of parameters to differentiate with respect to", ())
+ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
+      "use 'wrt:' to specify parameters to differentiate with respect to", ())
+ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@differentiable' attribute", (StringRef))
+ERROR(attr_differentiable_expected_label,none,
+      "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
+      "or 'vjp:'", ())
+ERROR(differentiable_attribute_expected_rparen,none,
+      "expected ')' in '@differentiable' attribute", ())
+ERROR(unexpected_argument_differentiable,none,
+      "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
+
+// differentiation `wrt` parameters clause
+ERROR(expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after '%0'", (StringRef))
+ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter name, "
+      "parameter index, or 'self'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1526,6 +1550,8 @@ ERROR(expected_generics_type_restriction,none,
       (Identifier))
 ERROR(requires_single_equal,none,
       "use '==' for same-type requirements rather than '='", ())
+ERROR(requires_comma,none,
+      "expected ',' to separate the requirements of this 'where' clause", ())
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())

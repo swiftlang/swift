@@ -16,7 +16,7 @@
 #ifndef SWIFT_CLANGIMPORTER_CLANGMODULE_H
 #define SWIFT_CLANGIMPORTER_CLANGMODULE_H
 
-#include "swift/AST/Module.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
 

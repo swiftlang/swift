@@ -191,7 +191,7 @@ public struct UnsafeRawPointer: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init<T>(_ other: UnsafePointer<T>) {
+  public init<T>(@_nonEphemeral _ other: UnsafePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -204,7 +204,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: UnsafePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ other: UnsafePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -217,7 +217,7 @@ public struct UnsafeRawPointer: _Pointer {
   ///
   /// - Parameter other: The mutable raw pointer to convert.
   @_transparent
-  public init(_ other: UnsafeMutableRawPointer) {
+  public init(@_nonEphemeral _ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
 
@@ -230,7 +230,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The mutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
   @_transparent
-  public init?(_ other: UnsafeMutableRawPointer?) {
+  public init?(@_nonEphemeral _ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -243,7 +243,7 @@ public struct UnsafeRawPointer: _Pointer {
   ///		
   /// - Parameter other: The typed pointer to convert.		
   @_transparent		
-  public init<T>(_ other: UnsafeMutablePointer<T>) {		
+  public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
    _rawValue = other._rawValue		
   }		
 
@@ -256,7 +256,7 @@ public struct UnsafeRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the		
   ///   result is `nil`.		
   @_transparent		
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {		
+  public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
    guard let unwrapped = other else { return nil }		
    _rawValue = unwrapped._rawValue		
   }		
@@ -543,7 +543,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert.
   @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
+  public init<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -556,7 +556,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
+  public init?<T>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -569,7 +569,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   /// - Parameter other: The immutable raw pointer to convert.
   @_transparent
-  public init(mutating other: UnsafeRawPointer) {
+  public init(@_nonEphemeral mutating other: UnsafeRawPointer) {
     _rawValue = other._rawValue
   }
 
@@ -582,7 +582,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// - Parameter other: The immutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
   @_transparent
-  public init?(mutating other: UnsafeRawPointer?) {
+  public init?(@_nonEphemeral mutating other: UnsafeRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -997,23 +997,23 @@ extension UnsafeMutableRawPointer: Strideable {
 
 extension OpaquePointer {
   @_transparent
-  public init(_ from: UnsafeMutableRawPointer) {
+  public init(@_nonEphemeral _ from: UnsafeMutableRawPointer) {
     self._rawValue = from._rawValue
   }
 
   @_transparent
-  public init?(_ from: UnsafeMutableRawPointer?) {
+  public init?(@_nonEphemeral _ from: UnsafeMutableRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }
 
   @_transparent
-  public init(_ from: UnsafeRawPointer) {
+  public init(@_nonEphemeral _ from: UnsafeRawPointer) {
     self._rawValue = from._rawValue
   }
 
   @_transparent
-  public init?(_ from: UnsafeRawPointer?) {
+  public init?(@_nonEphemeral _ from: UnsafeRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }

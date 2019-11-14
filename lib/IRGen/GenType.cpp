@@ -1105,8 +1105,9 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
-bool TypeConverter::readLegacyTypeInfo(StringRef path) {
-  auto fileOrErr = llvm::MemoryBuffer::getFile(path);
+bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
+                                       StringRef path) {
+  auto fileOrErr = fs.getBufferForFile(path);
   if (!fileOrErr)
     return true;
 
@@ -1209,6 +1210,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   llvm::SmallString<128> defaultPath;
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  auto fs =
+      IGM.getSwiftModule()->getASTContext().SourceMgr.getFileSystem();
   if (path.empty()) {
     const auto &Triple = IGM.Context.LangOpts.Target;
 
@@ -1225,7 +1228,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     bool found = false;
     for (auto &RuntimeLibraryPath
          : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
-      if (llvm::sys::fs::exists(RuntimeLibraryPath)) {
+      if (fs->exists(RuntimeLibraryPath)) {
         defaultPath.append(RuntimeLibraryPath);
         found = true;
         break;
@@ -1245,7 +1248,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     path = defaultPath;
   }
 
-  bool error = readLegacyTypeInfo(path);
+  bool error = readLegacyTypeInfo(*fs, path);
   if (error)
     llvm::report_fatal_error("Cannot read '" + path + "'");
 }
@@ -1463,25 +1466,25 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
-  return getSILTypes().getLoweredType(orig, subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      orig, subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(Type subst) const {
-  return getSILTypes().getLoweredType(subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
-  return getSILTypes().getTypeLowering(type,
-                                       ResilienceExpansion::Maximal);
+  return getSILTypes().getTypeLowering(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
-  return getSILModule().isTypeABIAccessible(type,
-                                            ResilienceExpansion::Maximal);
+  return getSILModule().isTypeABIAccessible(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1788,8 +1791,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -1920,9 +1921,6 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
-        if (!field->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(field);
-
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
@@ -1946,9 +1944,6 @@ namespace {
       for (auto elt : decl->getAllElements()) {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
-
-        if (!elt->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
 
         if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -2312,7 +2307,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto allFields = structDecl->getStoredProperties();
     
     if (allFields.size() == 1) {
-      auto fieldTy = t.getFieldType(allFields[0], IGM.getSILModule());
+      auto fieldTy = t.getFieldType(
+          allFields[0], IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(fieldTy))
         return SILType();
       return fieldTy;
@@ -2332,7 +2330,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasAssociatedValues()) {
-      auto enumEltTy = t.getEnumElementType(*theCase, IGM.getSILModule());
+      auto enumEltTy = t.getEnumElementType(
+          *theCase, IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(enumEltTy))
         return SILType();
       return enumEltTy;

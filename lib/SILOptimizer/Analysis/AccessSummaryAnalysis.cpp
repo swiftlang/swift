@@ -380,13 +380,13 @@ void AccessSummaryAnalysis::recompute(FunctionInfo *initial) {
   } while (needAnotherIteration);
 }
 
-std::string
-AccessSummaryAnalysis::SubAccessSummary::getDescription(SILType BaseType,
-                                                        SILModule &M) const {
+std::string AccessSummaryAnalysis::SubAccessSummary::getDescription(
+    SILType BaseType, SILModule &M, TypeExpansionContext context) const {
   std::string sbuf;
   llvm::raw_string_ostream os(sbuf);
 
-  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M);
+  os << AccessSummaryAnalysis::getSubPathDescription(BaseType, SubPath, M,
+                                                     context);
 
   if (!SubPath->isRoot())
     os << " ";
@@ -409,9 +409,8 @@ void AccessSummaryAnalysis::ArgumentSummary::getSortedSubAccesses(
   assert(storage.size() == SubAccesses.size());
 }
 
-std::string
-AccessSummaryAnalysis::ArgumentSummary::getDescription(SILType BaseType,
-                                                       SILModule &M) const {
+std::string AccessSummaryAnalysis::ArgumentSummary::getDescription(
+    SILType BaseType, SILModule &M, TypeExpansionContext context) const {
   std::string sbuf;
   llvm::raw_string_ostream os(sbuf);
   os << "[";
@@ -425,7 +424,7 @@ AccessSummaryAnalysis::ArgumentSummary::getDescription(SILType BaseType,
     if (index > 0) {
       os << ", ";
     }
-    os << subAccess.getDescription(BaseType, M);
+    os << subAccess.getDescription(BaseType, M, context);
     ++index;
   }
   os << "]";
@@ -551,7 +550,8 @@ AccessSummaryAnalysis::findSubPathAccessed(BeginAccessInst *BAI) {
 /// that stored-property relaxation supports: struct stored properties
 /// and tuple elements.
 std::string AccessSummaryAnalysis::getSubPathDescription(
-    SILType baseType, const IndexTrieNode *subPath, SILModule &M) {
+    SILType baseType, const IndexTrieNode *subPath, SILModule &M,
+    TypeExpansionContext context) {
   // Walk the trie to the root to collect the sequence (in reverse order).
   llvm::SmallVector<unsigned, 4> reversedIndices;
   const IndexTrieNode *I = subPath;
@@ -564,13 +564,13 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
   llvm::raw_string_ostream os(sbuf);
 
   SILType containingType = baseType;
-  for (unsigned index : reversed(reversedIndices)) {
+  for (unsigned index : llvm::reverse(reversedIndices)) {
     os << ".";
 
     if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {
       VarDecl *var = D->getStoredProperties()[index];
       os << var->getBaseName();
-      containingType = containingType.getFieldType(var, M);
+      containingType = containingType.getFieldType(var, M, context);
       continue;
     }
 
@@ -635,7 +635,8 @@ void AccessSummaryAnalysis::FunctionSummary::print(raw_ostream &os,
     }
     SILArgument *arg = fn->getArgument(i);
     SILModule &m = fn->getModule();
-    os << getAccessForArgument(i).getDescription(arg->getType(), m);
+    os << getAccessForArgument(i).getDescription(arg->getType(), m,
+                                                 TypeExpansionContext(*fn));
   }
 
   os << ")";

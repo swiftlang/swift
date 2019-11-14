@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
+// RUN: %target-swift-frontend -emit-sil %s -verify -enable-ownership-stripping-after-serialization
 
 func test0(a: (() -> ()) -> (), b: () -> ()) {
   a(b) // expected-error {{passing a non-escaping function parameter 'b' to a call to a non-escaping function parameter can allow re-entrant modification of a variable}}

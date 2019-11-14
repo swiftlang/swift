@@ -13,9 +13,9 @@
 
 #define DEBUG_TYPE "sil-destroy-hoisting"
 #include "swift/SIL/MemoryLifetime.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -94,6 +94,8 @@ class DestroyHoisting {
   }
 
   void getUsedLocationsOfAddr(Bits &bits, SILValue addr);
+
+  void getUsedLocationsOfOperands(Bits &bits, SILInstruction *I);
 
   void getUsedLocationsOfInst(Bits &bits, SILInstruction *Inst);
 
@@ -308,6 +310,12 @@ void DestroyHoisting::getUsedLocationsOfAddr(Bits &bits, SILValue addr) {
   }
 }
 
+void DestroyHoisting::getUsedLocationsOfOperands(Bits &bits, SILInstruction *I) {
+  for (Operand &op : I->getAllOperands()) {
+    getUsedLocationsOfAddr(bits, op.get());
+  }
+}
+
 // Set all bits of locations which instruction \p I is using. It's including
 // parent and sub-locations (see comment in getUsedLocationsOfAddr).
 void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
@@ -318,15 +326,21 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
         getUsedLocationsOfAddr(bits, LBI->getOperand());
       }
       break;
+    case SILInstructionKind::EndApplyInst:
+      // Operands passed to begin_apply are alive throughout an end_apply ...
+      getUsedLocationsOfOperands(bits, cast<EndApplyInst>(I)->getBeginApply());
+      break;
+    case SILInstructionKind::AbortApplyInst:
+      // ... or abort_apply.
+      getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
+      break;
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::CopyAddrInst:
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:
-      for (Operand &op : I->getAllOperands()) {
-        getUsedLocationsOfAddr(bits, op.get());
-      }
+      getUsedLocationsOfOperands(bits, I);
       break;
     case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::DestroyAddrInst:
@@ -700,6 +714,10 @@ public:
       return;
 
     if (!F->hasOwnership())
+      return;
+
+    // If we are not supposed to perform ossa optimizations, bail.
+    if (!F->getModule().getOptions().EnableOSSAOptimizations)
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "

@@ -32,7 +32,8 @@ extension OSLogInterpolation {
   ///  - argumentString: the interpolated expression of type String, which is autoclosured.
   ///  - privacy: a privacy qualifier which is either private or public. Default is private.
   ///  TODO: create a specifier to denote auto-inferred privacy level and make it default.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public mutating func appendInterpolation(
     _ argumentString: @autoclosure @escaping () -> String,
@@ -50,9 +51,9 @@ extension OSLogInterpolation {
 
   /// Update preamble and append argument headers based on the parameters of
   /// the interpolation.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
-  @usableFromInline
   internal mutating func addStringHeaders(_ isPrivate: Bool) {
     // Append argument header.
     let header = getArgumentHeader(isPrivate: isPrivate, type: .string)
@@ -74,7 +75,7 @@ extension OSLogInterpolation {
   /// This function must be constant evaluable and all its arguments
   /// must be known at compile time.
   @inlinable
-  @_semantics("oslog.interpolation.getFormatSpecifier")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getStringFormatSpecifier(_ isPrivate: Bool) -> String {
@@ -87,9 +88,11 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of String type, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @usableFromInline
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal mutating func append(_ value: @escaping () -> String) {
-    argumentClosures!.append({ $0.serialize(value()) })
+    argumentClosures.append({ serialize(value(), at: &$0, using: &$1) })
   }
 }
 
@@ -102,29 +105,33 @@ extension OSLogArguments {
 @inlinable
 @_optimize(none)
 @_effects(readonly)
-@_semantics("oslog.string.sizeForEncoding")
+@_semantics("constant_evaluable")
 internal func sizeForEncoding() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }
 
-extension OSLogByteBufferBuilder {
-  /// Serialize a string at the buffer location pointed to by `position`. 
-  /// Record any auxiliary storage created for getting a stable pointer to the
-  /// parameter string in the `self.auxiliaryStorage` property, so that the
-  /// storage is alive for the lifetime of `self`.
-  @usableFromInline
-  internal mutating func serialize(_ stringValue: String) {
-    let (optionalStorage, bytePointer): (AnyObject?, UnsafeRawPointer) =
-      _convertConstStringToUTF8PointerArgument(
-        stringValue)
+/// Serialize a stable pointer to the string `stringValue` at the buffer location
+/// pointed by `bufferPosition`. When necessary, this function would copy the
+/// string contents to a storage with a stable pointer. If that happens, a reference
+/// to the storage will be added to `storageObjects`.
+@usableFromInline
+@_alwaysEmitIntoClient
+internal func serialize(
+  _ stringValue: String,
+  at bufferPosition: inout ByteBufferPointer,
+  using storageObjects: inout StorageObjects
+) {
+  let (optionalStorage, bytePointer): (AnyObject?, UnsafeRawPointer) =
+    _convertConstStringToUTF8PointerArgument(
+      stringValue)
 
-    if let storage = optionalStorage {
-      auxiliaryStorage.append(storage)
-    }
-
-    let byteCount = sizeForEncoding()
-    let dest = UnsafeMutableRawBufferPointer(start: position, count: byteCount)
-    withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }
-    position += byteCount
+  if let storage = optionalStorage {
+    storageObjects.append(storage)
   }
+
+  let byteCount = sizeForEncoding()
+  let dest =
+    UnsafeMutableRawBufferPointer(start: bufferPosition, count: byteCount)
+  withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }
+  bufferPosition += byteCount
 }

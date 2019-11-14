@@ -98,6 +98,8 @@ ERROR(new_decl_without_intro,none,"%0 is a new API without @available attribute"
 
 ERROR(objc_name_change,none,"%0 has ObjC name change from %1 to %2", (StringRef, StringRef, StringRef))
 
+ERROR(desig_init_added,none,"%0 has been added as a designated initializer to an open class", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

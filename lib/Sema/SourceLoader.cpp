@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
@@ -105,8 +106,8 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
                                      /*isSystem=*/false);
 
   // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
-                                          false);
+  llvm::SaveAndRestore<bool>
+      turnOffDebug(Ctx.TypeCheckerOpts.DebugConstraintSolver, false);
 
   unsigned bufferID;
   if (auto BufID =

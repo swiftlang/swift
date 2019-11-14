@@ -82,7 +82,8 @@ public:
   }
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
-    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts, "unknown");
+    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID,
+                         LangOpts, TypeCheckerOptions(), "unknown");
 
     bool Done = false;
     while (!Done) {

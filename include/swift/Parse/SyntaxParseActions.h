@@ -33,12 +33,6 @@ namespace syntax {
 
 typedef void *OpaqueSyntaxNode;
 
-// todo [gsoc]: remove when possible
-enum class OpaqueSyntaxNodeKind {
-  SwiftSyntax,
-  LibSyntax,
-};
-
 class SyntaxParseActions {
   virtual void _anchor();
 
@@ -61,14 +55,18 @@ public:
                                            ArrayRef<OpaqueSyntaxNode> elements,
                                            CharSourceRange range) = 0;
 
+  /// Discard raw syntax node.
+  /// 
+  /// FIXME: This breaks invariant that any recorded node will be a part of the
+  /// result SourceFile syntax. This method is a temporary workaround, and
+  /// should be removed when we fully migrate to libSyntax parsing.
+  virtual void discardRecordedNode(OpaqueSyntaxNode node) = 0;
+
   /// Used for incremental re-parsing.
   virtual std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
     return std::make_pair(0, nullptr);
   }
-
-  /// Returns what kind of OpaqueSyntaxNode is created by `recordXXX` methods.
-  virtual OpaqueSyntaxNodeKind getOpaqueKind() = 0;
 };
 
 } // end namespace swift

@@ -14,6 +14,13 @@
 // RUN: %FileCheck %s -check-prefix=TESTING < %t.testing.txt
 // RUN: %FileCheck %s -check-prefix=TESTING-NEGATIVE < %t.testing.txt
 
+// Test the case when we have .swiftsourceinfo
+//
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-testing -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t > %t.testing.txt
+// RUN: %FileCheck %s -check-prefix=SOURCE-LOC < %t.testing.txt
+
 /// PublicClass Documentation
 public class PublicClass {
   /// Public Function Documentation
@@ -73,4 +80,9 @@ private class PrivateClass {
 // TESTING: InternalClass Documentation
 // TESTING: Internal Function Documentation
 
-
+// SOURCE-LOC: comments-hidden.swift:37:15: Func/PublicClass.__UnderscoredPublic RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:39:10: Constructor/PublicClass.init RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:41:10: Subscript/PublicClass.subscript RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:43:10: Constructor/PublicClass.init RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:45:10: Subscript/PublicClass.subscript RawComment=none BriefComment=none DocCommentAsXML=none
+// SOURCE-LOC: comments-hidden.swift:50:15: Func/-= RawComment=none BriefComment=none DocCommentAsXML=none

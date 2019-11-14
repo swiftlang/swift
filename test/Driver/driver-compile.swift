@@ -128,7 +128,7 @@
 // FILELIST: -supplementary-output-file-map {{(["][^"]+supplementaryOutputs[^"]+["]|[^ ]+supplementaryOutputs[^ ]+)}}
 // FILELIST: -output-filelist {{[^-]}}
 
-// UPDATE-CODE: DISTINCTIVE-PATH{{/|\\\\}}usr{{/|\\\\}}bin{{/|\\\\}}swift
+// UPDATE-CODE: {{DISTINCTIVE-PATH|distinctive-path}}{{/|\\\\}}usr{{/|\\\\}}bin{{/|\\\\}}swift{{c?(\.exe)?}}
 // UPDATE-CODE: -frontend -c
 // UPDATE-CODE: -emit-remap-file-path {{.+}}.remap
 

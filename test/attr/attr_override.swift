@@ -626,3 +626,25 @@ class SR_10198_Derived_1: SR_10198_Base_1 {
   init(_ arg1: Int) { super.init(SR_10198_Base_S()) } // okay, doesn't crash
 }
 
+// SR-11740
+
+public class SR_11740_Base<F, A> {}
+
+public class SR_11740_Derived<F, A>
+  : SR_11740_Base<SR_11740_Base<F, A>, A>,
+    SR_11740_Q {}
+
+public protocol SR_11740_P {}
+
+public protocol SR_11740_Q: SR_11740_P {
+    associatedtype A
+}
+
+public extension SR_11740_Base where F: SR_11740_Q {
+    static func foo(_: F.A) {}
+}
+
+extension SR_11740_Derived where F: SR_11740_P {
+    public static func foo(_: A) {}
+}
+

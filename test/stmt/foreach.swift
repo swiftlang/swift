@@ -5,7 +5,7 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
+  for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
 }
 
 struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
@@ -14,6 +14,7 @@ struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does n
 
 func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
+  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
@@ -22,17 +23,19 @@ struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does n
 
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
+  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note 2 {{do you want to add protocol stubs?}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
 
 func bad_containers_4(bc: BadContainer4) {
   for e in bc { }
+  // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
 }
 
 // Pattern type-checking
@@ -60,15 +63,15 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sumf : Float
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
-  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'Int' to expected type 'Float'}}
-  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'Int' does not conform to expected protocol 'ElementProtocol'}}
+  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'GoodRange<Int>.Element' (aka 'Int') to expected type 'Float'}}
+  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'GoodRange<Int>.Element' (aka 'Int') does not conform to expected protocol 'ElementProtocol'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 
   for (i, f) in gtr {
     sum = sum + i
     sumf = sumf + f
-    sum = sum + f  // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Float'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+    sum = sum + f  // expected-error {{cannot convert value of type 'Float' to expected argument type 'Int'}}
   }
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
@@ -171,15 +174,13 @@ func testMatchingPatterns() {
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
   let array : [Int]?
-  for x in array {  // expected-error {{value of optional type '[Int]?' must be unwrapped}}
-    // expected-note@-1{{coalesce}}
-    // expected-note@-2{{force-unwrap}}
+  for x in array {  // expected-error {{for-in loop requires '[Int]?' to conform to 'Sequence'; did you mean to unwrap optional?}}
   }
 }
 
 // Crash with (invalid) for each over an existential
 func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
-  for x in s { // expected-error {{protocol type 'Sequence' cannot conform to 'Sequence' because only concrete types can conform to protocols}}
+  for x in s { // expected-error {{value of protocol type 'Sequence' cannot conform to 'Sequence'; only struct/enum/class types can conform to protocols}}
     _ = x
   }
 }

@@ -17,6 +17,7 @@
 
 #include "InstrumenterSupport.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Demangling/Punycode.h"
 #include "llvm/Support/Path.h"
 
@@ -35,17 +36,13 @@ public:
     diags.addConsumer(*this);
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (Kind == swift::DiagnosticKind::Error) {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (Info.Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                           FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(llvm::errs(), Info.FormatString,
+                                           Info.FormatArgs);
     llvm::errs() << "\n";
   }
   bool hadError() { return error; }
@@ -119,9 +116,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   DiagnosticSuppression suppression(Ctx.Diags);
   ErrorGatherer errorGatherer(Ctx.Diags);
 
-  TypeChecker &TC = TypeChecker::createForContext(Ctx);
-
-  TC.typeCheckExpression(parsedExpr, DC);
+  TypeChecker::typeCheckExpression(parsedExpr, DC);
 
   if (parsedExpr) {
     ErrorFinder errorFinder;

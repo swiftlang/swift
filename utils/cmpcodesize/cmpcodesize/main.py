@@ -107,6 +107,18 @@ How to specify files:
                              'other programs.',
                         action='store_true',
                         default=False)
+    parser.add_argument('-o', '--old-build-directory',
+                        help='The directory containing the baseline objects ' +
+                             'against which to compare sizes.',
+                        action='store',
+                        dest='old_build_dir',
+                        default=None)
+    parser.add_argument('-n', '--new-build-directory',
+                        help='The directory containing the new objects whose' +
+                             'sizes are to be compared against the baseline.',
+                        action='store',
+                        dest='new_build_dir',
+                        default=None)
 
     # Positional arguments.
     # These can be specified in means beyond what argparse supports,
@@ -145,8 +157,12 @@ How to specify files:
     else:
         old_file_args = parsed_arguments.files
 
-        old_build_dir = os.environ.get("SWIFT_OLD_BUILDDIR")
-        new_build_dir = os.environ.get("SWIFT_NEW_BUILDDIR")
+        old_build_dir = parsed_arguments.old_build_dir
+        if not old_build_dir:
+            old_build_dir = os.environ.get("SWIFT_OLD_BUILDDIR")
+        new_build_dir = parsed_arguments.new_build_dir
+        if not new_build_dir:
+            new_build_dir = os.environ.get("SWIFT_NEW_BUILDDIR")
 
         if not parsed_arguments.files:
             assert old_build_dir and new_build_dir, \

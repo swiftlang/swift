@@ -1,5 +1,9 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
+// Just make sure that we do not infinite loop when compiling without block merging.
+//
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg -simplify-cfg-simplify-unconditional-branches=0
+
 // REQUIRES: objc_interop
 
 import Swift
@@ -420,4 +424,34 @@ bb4:
 bb5:
   release_value %16 : $Optional<NSObject>
   switch_enum %16 : $Optional<NSObject>, case #Optional.none!enumelt: bb4, default bb3
+}
+
+// Just make sure that we do not infinite loop here.
+//
+// CHECK-LABEL: sil @infinite_loop_2 : $@convention(thin) () -> @owned Optional<NSObject> {
+// CHECK: } // end sil function 'infinite_loop_2'
+sil @infinite_loop_2 : $@convention(thin) () -> @owned Optional<NSObject> {
+bb0:
+  %0 = function_ref @infinite_loop_get_optional_nsobject : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  %1 = apply %0() : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  br bb1(%1 : $Optional<NSObject>)
+
+bb1(%3 : $Optional<NSObject>):
+  switch_enum %3 : $Optional<NSObject>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
+
+bb2:
+  br bb5(%3 : $Optional<NSObject>)
+
+bb3(%7 : $NSObject):
+  br bb4(%3 : $Optional<NSObject>)
+
+bb4(%9 : $Optional<NSObject>):
+  %11 = enum $Optional<NSObject>, #Optional.none!enumelt
+  return %11 : $Optional<NSObject>
+
+bb5(%14 : $Optional<NSObject>):
+  br bb6
+
+bb6:
+  br bb5(%14 : $Optional<NSObject>)
 }

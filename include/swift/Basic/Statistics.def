@@ -230,9 +230,6 @@ FRONTEND_STATISTIC(Sema, NumCyclicOneWayComponentsCollapsed)
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
 
-/// Number of declarations validated.
-FRONTEND_STATISTIC(Sema, NumDeclsValidated)
-
 /// Number of declarations type checked.
 FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
 

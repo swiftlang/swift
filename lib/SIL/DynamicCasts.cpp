@@ -135,7 +135,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   // the implementation, including checkGenericArguments, needs to be taught to
   // recognize that types with archetypes may potentially succeed.
   if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
-    assert(!conformance->getConditionalRequirements().empty());
+    assert(!conformance.getConditionalRequirements().empty());
     return DynamicCastFeasibility::MaySucceed;
   }
 
@@ -217,8 +217,7 @@ bool swift::isObjectiveCBridgeable(ModuleDecl *M, CanType Ty) {
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
     // Check whether the type conforms to _BridgedToObjectiveC.
-    auto conformance = M->lookupConformance(Ty, bridgedProto);
-    return conformance.hasValue();
+    return (bool)M->lookupConformance(Ty, bridgedProto);
   }
   return false;
 }
@@ -232,8 +231,7 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
   if (errorTypeProto) {
     // Find the conformance of the value type to Error.
     // Check whether the type conforms to Error.
-    auto conformance = M->lookupConformance(Ty, errorTypeProto);
-    return conformance.hasValue();
+    return (bool)M->lookupConformance(Ty, errorTypeProto);
   }
   return false;
 }
@@ -920,7 +918,8 @@ namespace {
         auto sourceSomeDecl = Ctx.getOptionalSomeDecl();
 
         SILType loweredSourceObjectType =
-          source.Value->getType().getEnumElementType(sourceSomeDecl, M);
+            source.Value->getType().getEnumElementType(
+                sourceSomeDecl, M, B.getTypeExpansionContext());
 
         // Form the target for the optional object.
         EmitSomeState state;
@@ -993,8 +992,8 @@ namespace {
       auto someDecl = Ctx.getOptionalSomeDecl();
       state.SomeDecl = someDecl;
 
-      SILType loweredObjectType =
-        target.LoweredType.getEnumElementType(someDecl, M);
+      SILType loweredObjectType = target.LoweredType.getEnumElementType(
+          someDecl, M, B.getTypeExpansionContext());
 
       if (target.isAddress()) {
         SILValue objectAddr =

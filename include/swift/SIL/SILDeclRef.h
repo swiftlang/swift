@@ -133,6 +133,10 @@ struct SILDeclRef {
     /// routines have an ivar destroyer, which is emitted as
     /// .cxx_destruct.
     IVarDestroyer,
+
+    /// References the wrapped value injection function used to initialize
+    /// the backing storage property from a wrapped value.
+    PropertyWrapperBackingInitializer,
   };
   
   /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
@@ -244,6 +248,11 @@ struct SILDeclRef {
   /// of a nominal type.
   bool isStoredPropertyInitializer() const {
     return kind == Kind::StoredPropertyInitializer;
+  }
+  /// True if the SILDeclRef references the initializer for the backing storage
+  /// of a property wrapper.
+  bool isPropertyWrapperBackingInitializer() const {
+    return kind == Kind::PropertyWrapperBackingInitializer;
   }
 
   /// True if the SILDeclRef references the ivar initializer or deinitializer of

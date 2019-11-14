@@ -4,9 +4,6 @@ class C {
   // Erroneous typealias decl.
   typealias Inner: Foo = Int
 
-  typealias Alias1 = [Generic<Int
-
-
   // Implict accessor with attribute at the top of its body.
   var x: Int {
     @objc
@@ -17,7 +14,7 @@ do {
   typealias Alias2 = () -> (a b: [Generic<Int
 }
 do {
-  typealias Alias3 = (a b C, 
+  typealias Alias3 = (a b C,
 }
 do {
   typealias Alias3 = () -> @objc func
@@ -27,6 +24,9 @@ do {
 }
 do {
   typealias Alias = A & B & C.D<>
+}
+do {
+  typealias boo bar = Int
 }
 
 // Orphan '}' at top level

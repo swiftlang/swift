@@ -31,8 +31,8 @@ class Demo {
 }
 
 let some = Some(keyPath: \Demo.here)
-// expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((Any) -> Void)?>'}}
-// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((Any) -> Void)?') are expected to be equal}}
+// expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((V) -> Void)?>'}}
+// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((V) -> Void)?') are expected to be equal}}
 // expected-error@-3 {{generic parameter 'V' could not be inferred}}
 // expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}
 
@@ -81,4 +81,24 @@ class Foo {
 
 func testFoo<T: Foo>(_: T) {
   let _: X<T> = .init(foo: \.optBar!.optWibble?.boolProperty)
+}
+
+// rdar://problem/56131416
+
+enum Rdar56131416 {
+  struct Pass<T> {}
+  static func f<T, U>(_ value: T, _ prop: KeyPath<T, U>) -> Pass<U> { fatalError() }
+
+  struct Fail<T> {}
+  static func f<T, U>(_ value: T, _ transform: (T) -> U) -> Fail<U> { fatalError() }
+  
+  static func takesCorrectType(_: Pass<UInt>) {}
+}
+
+func rdar56131416() {
+  // This call should not be ambiguous.
+  let result = Rdar56131416.f(1, \.magnitude) // no-error
+  
+  // This type should be selected correctly.
+  Rdar56131416.takesCorrectType(result)
 }

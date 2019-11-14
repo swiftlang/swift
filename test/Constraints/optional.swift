@@ -217,7 +217,7 @@ struct SR_3248 {
 
 SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-SR_3248().callback("test")  // expected-error {{cannot invoke 'callback' with an argument list of type '(String)'}}
+SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 
 _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}
@@ -372,4 +372,25 @@ func rdar_53238058() {
     // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
     // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
+}
+
+// SR-8411 - Inconsistent ambiguity with optional and non-optional inout-to-pointer
+func sr8411() {
+  struct S {
+    init(_ x: UnsafeMutablePointer<Int>) {}
+    init(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func foo(_ x: UnsafeMutablePointer<Int>) {}
+    static func foo(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func bar(_ x: UnsafeMutablePointer<Int>, _ y: Int) {}
+    static func bar(_ x: UnsafeMutablePointer<Int>?, _ y: Int) {}
+  }
+
+  var foo = 0
+
+  _ = S(&foo)      // Ok
+  _ = S.init(&foo) // Ok
+  _ = S.foo(&foo)  // Ok
+  _ = S.bar(&foo, 42) // Ok
 }

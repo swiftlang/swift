@@ -105,7 +105,8 @@
             "Override",
             "ObjC",
             "Dynamic"
-          ]
+          ],
+          "init_kind": "Designated"
         }
       ],
       "declKind": "Class",
@@ -183,5 +184,5 @@
       ]
     }
   ],
-  "json_format_version": 5
+  "json_format_version": 6
 }

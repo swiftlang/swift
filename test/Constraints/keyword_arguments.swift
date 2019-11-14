@@ -255,22 +255,20 @@ missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in
 // -------------------------------------------
 // Extra arguments
 // -------------------------------------------
-// FIXME: Diagnostics could be improved with all extra arguments and
-// note pointing to the declaration being called.
-func extraargs1(x: Int) {}
+func extraargs1(x: Int) {} // expected-note {{'extraargs1(x:)' declared here}}
 
 extraargs1(x: 1, y: 2) // expected-error{{extra argument 'y' in call}}
-extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
+extraargs1(x: 1, 2, 3) // expected-error{{extra arguments at positions #2, #3 in call}}
 
 // -------------------------------------------
 // Argument name mismatch
 // -------------------------------------------
 
-func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
+func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { } // expected-note {{'mismatch1(thisFoo:bar:wibble:)' declared here}}
 
 mismatch1(foo: 5) // expected-error {{extra argument 'foo' in call}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
-mismatch1(food: 1, zap: 2) // expected-error{{extra argument 'food' in call}}
+mismatch1(food: 1, zap: 2) // expected-error{{extra arguments at positions #1, #2 in call}}
 
 // -------------------------------------------
 // Subscript keyword arguments
@@ -344,12 +342,24 @@ func trailingclosure4(f: () -> Int) {}
 trailingclosure4 { 5 }
 
 func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression: () -> T?) { }
+// expected-note@-1 {{in call to function 'trailingClosure5(_:line:expression:)'}}
 func trailingClosure6<T>(value: Int, expression: () -> T?) { }
+// expected-note@-1 {{in call to function 'trailingClosure6(value:expression:)'}}
 
-trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
-// expected-error@-1 {{enum type 'Optional<Any>' has no case 'Some'; did you mean 'some'}} {{61-65=some}}
-trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
-// expected-error@-1 {{enum type 'Optional<Any>' has no case 'Some'; did you mean 'some'}} {{39-43=some}}
+trailingClosure5(file: "hello", line: 17) { // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  return Optional.Some(5)
+  // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'}} {{19-23=some}}
+  // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
+  // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
+}
+trailingClosure6(5) { // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  return Optional.Some(5)
+  // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'}} {{19-23=some}}
+  // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
+  // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
+}
 
 class MismatchOverloaded1 {
   func method1(_ x: Int!, arg: ((Int) -> Int)!) { }

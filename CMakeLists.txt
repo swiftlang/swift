@@ -11,6 +11,8 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+set(CMAKE_DISABLE_IN_SOURCE_BUILD YES)
+
 if(DEFINED CMAKE_JOB_POOLS)
   # CMake < 3.11 doesn't support CMAKE_JOB_POOLS. Manually set the property.
   set_property(GLOBAL PROPERTY JOB_POOLS "${CMAKE_JOB_POOLS}")
@@ -18,7 +20,7 @@ else()
   # Make a job pool for things that can't yet be distributed
   cmake_host_system_information(
     RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
-  set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
+  set_property(GLOBAL APPEND PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
   # Put linking in that category
   set(CMAKE_JOB_POOL_LINK local_jobs)
 endif()
@@ -125,7 +127,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.1")
+set(SWIFT_VERSION "5.1.1")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -219,7 +221,7 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
    "Path to the directory that contains Swift tools that are executable on the build machine")
 
-option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
@@ -375,6 +377,10 @@ option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
   "Build stdlibCore with exclusivity checking enabled"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
+  "Enable experimental Swift differentiable programming features"
+  FALSE)
+
 #
 # End of user-configurable options.
 #
@@ -447,6 +453,10 @@ endif()
 
 if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
   include(ClangClCompileRules)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES Clang)
+  add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin OR
@@ -962,17 +972,14 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
     set(SWIFT_LIBDISPATCH_C_COMPILER ${CMAKE_C_COMPILER})
     set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
-    get_target_property(CLANG_LOCATION clang LOCATION)
-    get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
-
     if(CMAKE_SYSTEM_NAME STREQUAL Windows)
       set(SWIFT_LIBDISPATCH_C_COMPILER
-          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+          $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
       set(SWIFT_LIBDISPATCH_CXX_COMPILER
-          ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+          $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
     else()
-      set(SWIFT_LIBDISPATCH_C_COMPILER ${CLANG_LOCATION}/clang)
-      set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CLANG_LOCATION}/clang++)
+      set(SWIFT_LIBDISPATCH_C_COMPILER $<TARGET_FILE_DIR:clang>/clang)
+      set(SWIFT_LIBDISPATCH_CXX_COMPILER $<TARGET_FILE_DIR:clang>/clang++)
     endif()
   else()
     message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
@@ -996,6 +1003,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                         -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                         -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+                        -DCMAKE_INSTALL_LIBDIR=lib
                         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                         -DCMAKE_LINKER=${CMAKE_LINKER}
                         -DCMAKE_RANLIB=${CMAKE_RANLIB}
@@ -1088,12 +1096,6 @@ endif()
 # declares the swift-stdlib-* set of targets. These targets will then
 # implicitly depend on any targets declared with IS_STDLIB.
 #
-# One such library that declares IS_STDLIB is SwiftSyntax, living in
-# tools/SwiftSyntax. If we include stdlib/ after tools/,
-# the swift-stdlib-* set of targets will not have been generated yet,
-# causing the implicit dependency for SwiftSyntax to silently not be
-# created. This then will cause SwiftSyntax to fail to build.
-#
 # https://bugs.swift.org/browse/SR-5975
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
@@ -1118,7 +1120,7 @@ add_subdirectory(include)
 
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(lib)
-  
+
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975
@@ -1126,6 +1128,8 @@ if(SWIFT_INCLUDE_TOOLS)
 endif()
 
 add_subdirectory(utils)
+
+add_subdirectory(userdocs)
 
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(SWIFT_BUILD_PERF_TESTSUITE)

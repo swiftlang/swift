@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -52,6 +53,8 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::SubscriptDecl:
     // Nothing to do for these.
     break;
 
@@ -59,10 +62,9 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
       if (auto *PBD = patternInit->getBinding()) {
         auto i = patternInit->getBindingIndex();
+        PBD->getPattern(i)->forEachVariable(
+            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (PBD->getInit(i)) {
-          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-            typeCheckCompletionDecl(VD);
-          });
           if (!PBD->isInitializerChecked(i))
             typeCheckPatternBinding(PBD, i);
         }
@@ -72,43 +74,46 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-
-    // FIXME: This shouldn't be necessary, but we crash otherwise.
-    if (auto *AD = dyn_cast<AccessorDecl>(AFD))
-      typeCheckCompletionDecl(AD->getStorage());
-
-    typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
     break;
   }
 
   case DeclContextKind::ExtensionDecl:
-    typeCheckCompletionDecl(cast<ExtensionDecl>(DC));
-    break;
-
-  case DeclContextKind::GenericTypeDecl:
-    typeCheckCompletionDecl(cast<GenericTypeDecl>(DC));
+    // Make sure the extension has been bound, in case it is in an
+    // inactive #if or something weird like that.
+    cast<ExtensionDecl>(DC)->computeExtendedNominal();
     break;
 
   case DeclContextKind::FileUnit:
     llvm_unreachable("module scope context handled above");
-
-  case DeclContextKind::SubscriptDecl:
-    typeCheckCompletionDecl(cast<SubscriptDecl>(DC));
-    break;
   }
 }
 } // anonymous namespace
 
 void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
-  // The only time we have to explicitly check a TopLevelCodeDecl
-  // is when we're directly inside of one. In this case,
-  // performTypeChecking() did not type check it for us.
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC))
-    typeCheckTopLevelCodeDecl(TLCD);
-  else
+
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+    // Typecheck all 'TopLevelCodeDecl's up to the target one.
+    // In theory, this is not needed, but it fails to resolve the type of
+    // 'guard'ed variable. e.g.
+    //
+    //   guard value = something() else { fatalError() }
+    //   <complete>
+    // Here, 'value' is '<error type>' unless we explicitly typecheck the
+    // 'guard' statement.
+    SourceFile *SF = DC->getParentSourceFile();
+    for (auto *D : SF->Decls) {
+      if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
+        typeCheckTopLevelCodeDecl(Code);
+        if (Code == TLCD)
+          break;
+      }
+    }
+  } else {
     typeCheckContextImpl(DC, Loc);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -169,13 +174,11 @@ Expr *swift::ide::findParsedExpr(const DeclContext *DC,
 
 Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (FD->hasInterfaceType()) {
-      auto Ty = FD->getInterfaceType();
-      if (FD->getDeclContext()->isTypeContext())
-        Ty = FD->getMethodInterfaceType();
-      if (auto FT = Ty->getAs<AnyFunctionType>())
-        return DC->mapTypeIntoContext(FT->getResult());
-    }
+    auto Ty = FD->getInterfaceType();
+    if (FD->getDeclContext()->isTypeContext())
+      Ty = FD->getMethodInterfaceType();
+    if (auto FT = Ty->getAs<AnyFunctionType>())
+      return DC->mapTypeIntoContext(FT->getResult());
   } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
     if (ACE->getType() && !ACE->getType()->hasError())
       return ACE->getResultType();
@@ -284,11 +287,6 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
-    if (!VD->hasInterfaceType()) {
-      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
-      if (!VD->hasInterfaceType())
-        continue;
-    }
     Type declaredMemberType = VD->getInterfaceType();
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
@@ -697,7 +695,7 @@ class ExprContextAnalyzer {
     switch (D->getKind()) {
     case DeclKind::PatternBinding: {
       auto PBD = cast<PatternBindingDecl>(D);
-      for (unsigned I = 0; I < PBD->getNumPatternEntries(); ++I) {
+      for (unsigned I : range(PBD->getNumPatternEntries())) {
         if (auto Init = PBD->getInit(I)) {
           if (containsTarget(Init)) {
             if (PBD->getPattern(I)->hasType()) {
@@ -754,8 +752,7 @@ class ExprContextAnalyzer {
       if (!AFD)
         return;
       auto param = AFD->getParameters()->get(initDC->getIndex());
-      if (param->hasInterfaceType())
-        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
       break;
     }
     }
@@ -770,7 +767,7 @@ class ExprContextAnalyzer {
   /// in order to avoid a base expression affecting the type. However, now that
   /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
-    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
+    return body->getNumElements() == 1 && body->getFirstElement().is<Expr *>();
   }
 
 public:
@@ -897,9 +894,6 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
         ModuleDecl *CurrModule, DeclContext *DC, Type T, ValueDecl *VD) {
 
   if (VD->isOperator())
-    return false;
-
-  if (!VD->hasInterfaceType())
     return false;
 
   if (T->getOptionalObjectType() &&

@@ -19,7 +19,6 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -215,7 +214,8 @@ public:
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr);
+                                              const ValueDecl *D = nullptr,
+                                              bool disableEntryBlockVerification = false);
 
   SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,

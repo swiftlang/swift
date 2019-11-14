@@ -1180,7 +1180,7 @@ Haskell
 Haskell provides three different common error-propagation mechanisms.
 
 The first is that, like many other functional languages, it supports
-manual propagation with a ``Maybe`` type.  A function can return ``None``
+manual propagation with a ``Maybe`` type.  A function can return ``Nothing``
 to indicate that it couldn't produce a more useful result.  This is
 the most common failure method for functions in the functional subset
 of the library.

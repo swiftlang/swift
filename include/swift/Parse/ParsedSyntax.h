@@ -26,6 +26,7 @@ public:
     : RawNode(std::move(rawNode)) {}
 
   const ParsedRawSyntaxNode &getRaw() const { return RawNode; }
+  ParsedRawSyntaxNode takeRaw() { return std::move(RawNode); }
   syntax::SyntaxKind getKind() const { return RawNode.getKind(); }
 
   /// Returns true if the syntax node is of the given type.
@@ -39,7 +40,7 @@ public:
   template <typename T>
   T castTo() const {
     assert(is<T>() && "castTo<T>() node of incompatible type!");
-    return T { RawNode };
+    return T { RawNode.copyDeferred() };
   }
 
   /// If this Syntax node is of the right kind, cast and return it,
@@ -50,6 +51,10 @@ public:
       return castTo<T>();
     }
     return llvm::None;
+  }
+
+  ParsedSyntax copyDeferred() const {
+    return ParsedSyntax { RawNode.copyDeferred() };
   }
 
   static bool kindof(syntax::SyntaxKind Kind) {
@@ -65,7 +70,7 @@ public:
 class ParsedTokenSyntax final : public ParsedSyntax {
 public:
   explicit ParsedTokenSyntax(ParsedRawSyntaxNode rawNode)
-    : ParsedSyntax(rawNode) {}
+    : ParsedSyntax(std::move(rawNode)) {}
 
   tok getTokenKind() const {
     return getRaw().getTokenKind();

@@ -71,7 +71,7 @@ public:
   void dump(SILGenFunction &SGF) const override {
     llvm::errs() << "IndirectOpenedSelfCleanup\n";
     if (box)
-      box->dump();
+      box->print(llvm::errs());
   }
 };
 
@@ -468,11 +468,12 @@ public:
       : loc(loc), subPlan(std::move(subPlan)) {
     unsigned errorParamIndex =
         calleeTypeInfo.foreignError->getErrorParameterIndex();
+    auto substFnType = calleeTypeInfo.substFnType;
     SILParameterInfo errorParameter =
-        calleeTypeInfo.substFnType->getParameters()[errorParamIndex];
+        substFnType->getParameters()[errorParamIndex];
     // We assume that there's no interesting reabstraction here beyond a layer
     // of optional.
-    errorPtrType = errorParameter.getType();
+    errorPtrType = errorParameter.getArgumentType(SGF.SGM.M, substFnType);
     unwrappedPtrType = errorPtrType;
     Type unwrapped = errorPtrType->getOptionalObjectType();
     isOptional = (bool) unwrapped;
@@ -570,8 +571,10 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   // need to make our own make SILResultInfo array.
   case ForeignErrorConvention::NilResult: {
     assert(allResults.size() == 1);
-    CanType objectType = allResults[0].getType().getOptionalObjectType();
-    SILResultInfo optResult = allResults[0].getWithType(objectType);
+    auto substFnTy = calleeTypeInfo.substFnType;
+    CanType objectType = allResults[0].getReturnValueType(SGF.SGM.M, substFnTy)
+                                      .getOptionalObjectType();
+    SILResultInfo optResult = allResults[0].getWithInterfaceType(objectType);
     allResults.clear();
     allResults.push_back(optResult);
     break;
@@ -598,12 +601,15 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // Otherwise, grab the next result.
   auto result = allResults.pop_back_val();
 
+  auto calleeTy = calleeTypeInfo.substFnType;
+  
   // If the result is indirect, and we have an address to emit into, and
   // there are no abstraction differences, then just do it.
   if (init && init->canPerformInPlaceInitialization() &&
       SGF.silConv.isSILIndirect(result) &&
       !SGF.getLoweredType(substType).getAddressType().hasAbstractionDifference(
-            calleeTypeInfo.getOverrideRep(), result.getSILStorageType())) {
+            calleeTypeInfo.getOverrideRep(),
+            result.getSILStorageType(SGF.SGM.M, calleeTy))) {
     return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
   }
 
@@ -618,7 +624,7 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // then we need to evaluate the arguments first in order to have access to
   // the opened Self type. A special result plan defers allocating the stack
   // slot to the point the call is emitted.
-  if (result.getType()->hasOpenedExistential()
+  if (result.getReturnValueType(SGF.SGM.M, calleeTy)->hasOpenedExistential()
       && SGF.silConv.isSILIndirect(result)) {
     return ResultPlanPtr(
       new IndirectOpenedSelfResultPlan(SGF, origType, substType));
@@ -627,7 +633,8 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // Create a temporary if the result is indirect.
   std::unique_ptr<TemporaryInitialization> temporary;
   if (SGF.silConv.isSILIndirect(result)) {
-    auto &resultTL = SGF.getTypeLowering(result.getType());
+    auto &resultTL = SGF.getTypeLowering(
+                               result.getReturnValueType(SGF.SGM.M, calleeTy));
     temporary = SGF.emitTemporary(loc, resultTL);
   }
 
