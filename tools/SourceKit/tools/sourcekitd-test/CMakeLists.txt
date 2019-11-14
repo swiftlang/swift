@@ -2,19 +2,21 @@ set(LLVM_TARGET_DEFINITIONS Options.td)
 swift_tablegen(Options.inc -gen-opt-parser-defs)
 swift_add_public_tablegen_target(sourcekitdTestOptionsTableGen)
 
-if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-  set(SOURCEKITD_TEST_LINK_LIBS sourcekitdInProc)
-else()
-  set(SOURCEKITD_TEST_LINK_LIBS sourcekitd)
-endif()
-
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
-  LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} SourceKitSupport
-    clangRewrite clangLex clangBasic
-  LLVM_LINK_COMPONENTS core support option coverage lto
+  LLVM_LINK_COMPONENTS core option coverage lto
 )
+target_link_libraries(sourcekitd-test PRIVATE
+  SourceKitSupport
+  clangRewrite
+  clangLex
+  clangBasic)
+if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
+  target_link_libraries(sourcekitd-test PRIVATE sourcekitdInProc)
+else()
+  target_link_libraries(sourcekitd-test PRIVATE sourcekitd)
+endif()
 if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   target_link_libraries(sourcekitd-test PRIVATE dispatch BlocksRuntime)
 endif()
