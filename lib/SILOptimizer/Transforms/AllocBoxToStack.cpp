@@ -328,7 +328,7 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
         (!inAppliedFunction && isa<DeallocBoxInst>(User)))
       continue;
 
-    // If our user instruction is a copy_value or a marked_uninitialized, visit
+    // If our user instruction is a copy_value or a mark_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
       llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
