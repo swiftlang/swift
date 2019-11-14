@@ -93,6 +93,55 @@ func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
 // CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
 // CHECK: [VARIED]   %12 = index_addr %9 : $*T, %11 : $Builtin.Word
 
+// TF-952: Test array literal initialized from an address (e.g. `var`).
+@differentiable
+func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
+  var result = x
+  result = result * y
+  return [result, result]
+}
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicAddress{{.*}} at (source=0 parameters=(0 1))
+// CHECK: [VARIED] %0 = argument of bb0 : $Float
+// CHECK: [VARIED] %1 = argument of bb0 : $Float
+// CHECK: [VARIED]   %4 = alloc_stack $Float, var, name "result"
+// CHECK: [VARIED]   %7 = begin_access [read] [static] %4 : $*Float
+// CHECK: [VARIED]   %8 = load [trivial] %7 : $*Float
+// CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
+// CHECK: [VARIED]   %11 = apply %10(%8, %1, %6) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// CHECK: [VARIED]   %12 = begin_access [modify] [static] %4 : $*Float
+// CHECK: [USEFUL]   %15 = integer_literal $Builtin.Word, 2
+// CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
+// CHECK: [ACTIVE]   %17 = apply %16<Float>(%15) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE] (**%18**, %19) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED] (%18, **%19**) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED]   %20 = pointer_to_address %19 : $Builtin.RawPointer to [strict] $*Float
+// CHECK: [VARIED]   %21 = begin_access [read] [static] %4 : $*Float
+// CHECK: [VARIED]   %24 = integer_literal $Builtin.Word, 1
+// CHECK: [VARIED]   %25 = index_addr %20 : $*Float, %24 : $Builtin.Word
+// CHECK: [VARIED]   %26 = begin_access [read] [static] %4 : $*Float
+
+// TF-952: Test array literal initialized with function call results.
+@differentiable
+func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [Float] {
+  return [x * y, x * y]
+}
+// CHECK-LABEL: [AD] Activity info for ${{.*}}testArrayUninitializedIntrinsicFunctionResult{{.*}} at (source=0 parameters=(0 1))
+// [ACTIVE] %0 = argument of bb0 : $Float
+// [ACTIVE] %1 = argument of bb0 : $Float
+// [USEFUL]   %4 = integer_literal $Builtin.Word, 2
+// [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
+// [ACTIVE]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// [ACTIVE] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
+// [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
+// [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float
+// [NONE]   // function_ref static Float.* infix(_:_:)
+// [ACTIVE]   %12 = apply %11(%0, %1, %10) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+// [VARIED]   %14 = integer_literal $Builtin.Word, 1
+// [VARIED]   %15 = index_addr %9 : $*Float, %14 : $Builtin.Word
+// [USEFUL]   %16 = metatype $@thin Float.Type
+// [NONE]   // function_ref static Float.* infix(_:_:)
+// [ACTIVE]   %18 = apply %17(%0, %1, %16) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+
 // TF-781: check active local address + nested conditionals.
 
 @differentiable(wrt: x)
