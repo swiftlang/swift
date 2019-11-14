@@ -392,17 +392,16 @@ MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
   } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
+  // SWIFT_ENABLE_TENSORFLOW
+  } else if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
+    if (auto whereClause = attr->getWhereClause())
+      return whereClause->getRequirements();
+    return {};
+  // SWIFT_ENABLE_TENSORFLOW END
   } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
     return whereClause->getRequirements();
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
-    if (auto whereClause = attr->getWhereClause())
-      return whereClause->getRequirements();
-    return {};
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
 
   return { };
 }
