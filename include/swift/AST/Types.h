@@ -2975,6 +2975,11 @@ public:
       return Representation(rawRep);
     }
 
+    /// Return the underlying Uncommon value if it is not the default value.
+    Optional<Uncommon> getUncommonInfo() const {
+      return Other.empty() ? Optional<Uncommon>() : Other;
+    }
+
     bool hasSelfParam() const {
       switch (getSILRepresentation()) {
       case SILFunctionTypeRepresentation::Thick:
@@ -3060,12 +3065,16 @@ public:
   };
 
 protected:
+  /// Create an AnyFunctionType.
+  ///
+  /// Subclasses are responsible for storing and retrieving the
+  /// ExtInfo::Uncommon value if one is present.
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, ExtInfo Info)
   : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     Bits.AnyFunctionType.ExtInfoBits = Info.Bits;
-    Bits.AnyFunctionType.HasUncommonInfo = false;
+    Bits.AnyFunctionType.HasUncommonInfo = Info.getUncommonInfo().hasValue();
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
@@ -3119,9 +3128,14 @@ public:
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangFunctionType());
   }
 
-  ExtInfo getCanonicalExtInfo() const {
+  /// Get the canonical ExtInfo for the function type.
+  ///
+  /// The parameter useClangFunctionType is present only for staging purposes.
+  /// In the future, we will always use the canonical clang function type.
+  ExtInfo getCanonicalExtInfo(bool useClangFunctionType) const {
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits,
-                   getCanonicalClangFunctionType());
+                   useClangFunctionType ? getCanonicalClangFunctionType()
+                                        : nullptr);
   }
 
   /// Get the representation of the function type.
@@ -3187,16 +3201,25 @@ END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
   return CanYield(getType()->getCanonicalType(), getFlags());
 }
-
 /// FunctionType - A monomorphic function type, specified with an arrow.
 ///
 /// For example:
 ///   let x : (Float, Int) -> Int
 class FunctionType final : public AnyFunctionType,
     public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param> {
+    private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
+                                  AnyFunctionType::ExtInfo::Uncommon> {
   friend TrailingObjects;
       
+
+  size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
+    return getNumParams();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ExtInfo::Uncommon>) const {
+    return hasClangFunctionType() ? 1 : 0;
+  }
+
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(ArrayRef<Param> params, Type result,
@@ -3205,6 +3228,14 @@ public:
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
     return {getTrailingObjects<Param>(), getNumParams()};
+  }
+
+  const clang::Type *getClangFunctionType() const {
+    if (!hasClangFunctionType())
+      return nullptr;
+    auto *type = getTrailingObjects<ExtInfo::Uncommon>()->ClangFunctionType;
+    assert(type && "If the pointer was null, we shouldn't have stored it.");
+    return type;
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {

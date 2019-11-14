@@ -1204,12 +1204,14 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
 
+    bool useClangFunctionType =
+      resultTy->getASTContext().LangOpts.UseClangFunctionTypes;
+    auto extInfo = funcTy->getCanonicalExtInfo(useClangFunctionType);
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        funcTy->getCanonicalExtInfo());
+                                        extInfo);
     } else {
-      Result = FunctionType::get(canParams, resultTy,
-                                 funcTy->getCanonicalExtInfo());
+      Result = FunctionType::get(canParams, resultTy, extInfo);
     }
     assert(Result->isCanonical());
     break;
@@ -3124,9 +3126,16 @@ AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
   return;
 }
 
-// TODO: (Varun) Save the pointer in the TrailingObject and retrieve it
 const clang::Type *AnyFunctionType::getClangFunctionType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getClangFunctionType();
+  case TypeKind::GenericFunction:
+    // Generic functions do not have C types.
   return nullptr;
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
 }
 
 const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {

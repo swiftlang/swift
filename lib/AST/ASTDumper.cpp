@@ -3608,6 +3608,12 @@ namespace {
 
       OS << "\n";
       Indent += 2;
+      if (auto *cty = T->getClangFunctionType()) {
+        std::string s;
+        llvm::raw_string_ostream os(s);
+        cty->dump(os);
+        printField("clang_type", os.str());
+      }
       printAnyFunctionParams(T->getParams(), "input");
       Indent -=2;
       printRec("output", T->getResult());

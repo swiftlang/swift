@@ -5977,6 +5977,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         }
       }
 
+      fromType->dump(llvm::errs());
+      toType->dump(llvm::errs());
       llvm_unreachable("Should be handled above");
     }
 

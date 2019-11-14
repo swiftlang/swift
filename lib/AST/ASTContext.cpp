@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -463,6 +464,8 @@ struct ASTContext::Implementation {
   RC<syntax::SyntaxArena> TheSyntaxArena;
 
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
+
+  Optional<ClangTypeConverter> Converter;
 };
 
 ASTContext::Implementation::Implementation()
@@ -2997,11 +3000,17 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  void *mem = ctx.Allocate(sizeof(FunctionType) +
-                             sizeof(AnyFunctionType::Param) * params.size(),
-                           alignof(FunctionType), arena);
+  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+
+  size_t allocSize =
+    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::Uncommon>(
+      params.size(), uncommon.hasValue() ? 1 : 0);
+  void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
+  if (uncommon.hasValue())
+    isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+
   auto funcTy = new (mem) FunctionType(params, result, info,
                                        isCanonical ? &ctx : nullptr,
                                        properties);
@@ -3018,6 +3027,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                       output, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+  if (uncommon.hasValue())
+    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -4321,6 +4333,19 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // No special bridging to Objective-C, but this can become an 'Any'.
   return Type();
+}
+
+const clang::Type *
+ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                 Type resultTy,
+                                 FunctionType::ExtInfo incompleteExtInfo,
+                                 FunctionTypeRepresentation trueRep) {
+  auto &impl = getImpl();
+  if (!impl.Converter) {
+    auto *cml = getClangModuleLoader();
+    impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
+  }
+  return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
 }
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {

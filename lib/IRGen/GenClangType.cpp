@@ -12,6 +12,8 @@
 //
 //  This file implements generation of Clang AST types from Swift AST types
 //  for types that are representable in Objective-C interfaces.
+//  AST/ClangTypeConverter.cpp duplicates a bunch of code from here, so make
+//  sure to keep the two in sync.
 //
 //===----------------------------------------------------------------------===//
 

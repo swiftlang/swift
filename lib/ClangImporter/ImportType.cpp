@@ -421,8 +421,7 @@ namespace {
             funcTy->getExtInfo()
               .withRepresentation(
                 AnyFunctionType::Representation::CFunctionPointer)
-              .withClangFunctionType(nullptr)),
-              // TODO: (Varun) Replace arg with pointeeQualType.getTypePtr()
+              .withClangFunctionType(pointeeQualType.getTypePtr())),
           ImportHint::CFunctionPointer
         };
       }
@@ -576,7 +575,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy);
+      return FunctionType::get(params, resultTy, FunctionType::ExtInfo());
     }
 
     ImportResult
