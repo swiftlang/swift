@@ -93,7 +93,7 @@ private:
     for (auto i : indices.set_bits()) {
       unsigned bitWordIndex, offset;
       std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
-      getBitWord(bitWordIndex) |= (1 << offset);
+      getBitWord(bitWordIndex) |= (1ull << offset);
     }
   }
 
@@ -181,7 +181,7 @@ public:
   bool contains(unsigned index) const {
     unsigned bitWordIndex, offset;
     std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(index);
-    return getBitWord(bitWordIndex) & (1 << offset);
+    return getBitWord(bitWordIndex) & (1ull << offset);
   }
 
   bool isEmpty() const {
