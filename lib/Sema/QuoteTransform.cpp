@@ -66,8 +66,8 @@ protected:
   ASTContext &ctx;
   Breadcrumbs &bcs;
 
-  AbstractQuoter(TypeChecker &tc, Breadcrumbs &bcs)
-      : tc(tc), ctx(tc.Context), bcs(bcs) {}
+  AbstractQuoter(TypeChecker &tc, ASTContext& ctx, Breadcrumbs &bcs)
+      : tc(tc), ctx(ctx), bcs(bcs) {}
 
   Expr *quoteArray(ArrayRef<Expr *> quotedTrees) {
     auto arrayExpr =
@@ -158,7 +158,8 @@ private:
 class TypeQuoter : public TypeVisitor<TypeQuoter, Expr *>,
                    private AbstractQuoter {
 public:
-  TypeQuoter(TypeChecker &tc, Breadcrumbs &bcs) : AbstractQuoter(tc, bcs) {}
+  TypeQuoter(TypeChecker &tc, ASTContext &ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(tc, ctx, bcs) {}
 
 #define UNSUPPORTED_TYPE(TYPE)                                                 \
   Expr *visit##TYPE(TYPE *type) { return unknownTree(type); }
@@ -296,8 +297,8 @@ class ASTQuoter
   TypeQuoter typeQuoter;
 
 public:
-  ASTQuoter(TypeChecker &tc, Breadcrumbs &bcs)
-      : AbstractQuoter(tc, bcs), typeQuoter(TypeQuoter(tc, bcs)) {}
+  ASTQuoter(TypeChecker &tc, ASTContext& ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(tc, ctx, bcs), typeQuoter(TypeQuoter(tc, ctx, bcs)) {}
 
 #define UNSUPPORTED_EXPR(EXPR)                                                 \
   Expr *visit##EXPR(EXPR *expr) {                                              \
@@ -1222,7 +1223,7 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
   assert(expr->getType());
 
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, bcs);
+  ASTQuoter astQuoter(*this, Context, bcs);
   Expr *quotedExpr = astQuoter.visit(expr);
   if (!quotedExpr) {
     return nullptr;
@@ -1339,7 +1340,7 @@ Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
 
 Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, bcs);
+  ASTQuoter astQuoter(*this, Context, bcs);
   Expr *quotedDecl = astQuoter.visit(decl);
   if (!quotedDecl) {
     return nullptr;

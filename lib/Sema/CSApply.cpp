@@ -2252,7 +2252,7 @@ namespace {
       Expr *quotedExpr = tc.quoteDecl(expr->getQuotedDecl(), cs.DC);
       if (quotedExpr) {
         cs.cacheExprTypes(quotedExpr);
-        auto treeProto = tc.Context.getTreeDecl();
+        auto treeProto = ctx.getTreeDecl();
         if (treeProto) {
           quotedExpr =
               coerceExistential(quotedExpr, treeProto->getDeclaredType(),
