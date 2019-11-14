@@ -783,7 +783,7 @@ static NullablePtr<EnumElementDecl> getEnumCase(SILValue Val,
 }
 
 static int getThreadingCost(SILInstruction *I) {
-  if (!isa<DeallocStackInst>(I) && !I->isTriviallyDuplicatable())
+  if (!I->isTriviallyDuplicatable())
     return 1000;
 
   // Don't jumpthread function calls.

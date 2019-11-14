@@ -70,6 +70,10 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
       invariants.insert(inst);
     } else if (!inst->isTriviallyDuplicatable())
       return false;
+    // It wouldn't make sense to rotate dealloc_stack without also rotating the
+    // alloc_stack, which is covered by isTriviallyDuplicatable.
+    else if (isa<DeallocStackInst>(inst))
+      return false;
     else if (isa<FunctionRefInst>(inst)) {
       moves.push_back(inst);
       invariants.insert(inst);
