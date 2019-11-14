@@ -549,6 +549,10 @@ extension __SharedStringStorage {
     in range: _SwiftNSRange,
     with aString: _CocoaString?
   ) {
+    guard let aString = aString else {
+      _replace(in: range, with: "")
+      return
+    }
     _withTemporaryBridgedCocoaString(aString) {
       _replace(in: range, with: $0)
     }
@@ -556,6 +560,9 @@ extension __SharedStringStorage {
   
   @objc(appendString:)
   final func appendString(_ aString: _CocoaString?) {
+    guard let aString = aString else {
+        return
+    }
     _withTemporaryBridgedCocoaString(aString) {
       _contents.append($0)
       return

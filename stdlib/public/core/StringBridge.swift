@@ -363,7 +363,7 @@ internal func _cocoaASCIIPointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
 // This does not create a bridged String that's safe to use past the current
 // stack frame, e.g. it does not defensively copy it and so on.
 internal func _withTemporaryBridgedCocoaString<R>(
-  _ cocoaString: _CocoaString?,
+  _ cocoaString: _CocoaString,
   _ work: (String) throws -> R
 ) rethrows -> R {
   guard let cocoaString = cocoaString else {
@@ -383,17 +383,21 @@ internal func _withTemporaryBridgedCocoaString<R>(
     return try work(storage.asString)
   case .cocoa(let str):
     let length = _stdlib_binary_CFStringGetLength(str)
-    guard let ascii = _cocoaASCIIPointer(str) else {
-      let tmp = _StringGuts(
+    let guts:_StringGuts
+    if let ascii = _cocoaASCIIPointer(str) {
+      // form an immortal contiguous-ASCII string if we can
+      let asciiBuffer = UnsafeBufferPointer(start: ascii, count: length)
+      guts = _StringGuts(asciiBuffer, isASCII: true)
+    } else {
+      // or fall back to lazily bridging if we can't
+      guts = _StringGuts(
         cocoa: str,
         providesFastUTF8: false,
         isASCII: false,
         length: length
       )
-      return try work(String(tmp))
     }
-    let asciiBuffer = UnsafeBufferPointer(start: ascii, count: length)
-    return try work(String(_StringGuts(asciiBuffer, isASCII: true)))
+    return try work(String(guts))
   }
 }
 
@@ -430,13 +434,14 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     }
 #endif
 
-    let ascii = _cocoaASCIIPointer(immutableCopy)
+    let isContiguousASCII = _cocoaASCIIPointer(immutableCopy) != nil
     let length = _stdlib_binary_CFStringGetLength(immutableCopy)
     return _StringGuts(
       cocoa: immutableCopy,
-      providesFastUTF8: ascii != nil,
-      isASCII: ascii != nil,
-      length: length)
+      providesFastUTF8: isContiguousASCII,
+      isASCII: isContiguousASCII,
+      length: length
+    )
   }
 }
 

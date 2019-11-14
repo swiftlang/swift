@@ -521,14 +521,12 @@ final internal class __SharedStringStorage
 
   @inline(__always)
   final internal var isASCII: Bool { return _countAndFlags.isASCII }
-
   
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
       return String(_StringGuts(self))
     }
   }
-
 }
 
 extension __SharedStringStorage {
