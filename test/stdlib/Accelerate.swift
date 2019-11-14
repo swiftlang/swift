@@ -115,6 +115,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
             expectTrue(elementsAlmostEqual(destination, returnedResult))
         }
     }
+}
 
 //===----------------------------------------------------------------------===//
 //
@@ -298,12 +299,13 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         expectTrue(elementsAlmostEqual(result, legacyResult))
         expectTrue(elementsAlmostEqual(result, returnedResult))
     }
+}
 
-    //===----------------------------------------------------------------------===//
-    //
-    //  vDSP difference equation
-    //
-    //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//
+//  vDSP difference equation
+//
+//===----------------------------------------------------------------------===//
 
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
@@ -382,12 +384,13 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         expectTrue(elementsAlmostEqual(result, legacyResult))
         expectTrue(elementsAlmostEqual(result, returnedResult))
     }
+}
 
-    //===----------------------------------------------------------------------===//
-    //
-    //  vDSP downsampling
-    //
-    //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//
+//  vDSP downsampling
+//
+//===----------------------------------------------------------------------===//
 
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     AccelerateTests.test("vDSP/DownsampleSinglePrecision") {
@@ -469,12 +472,13 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         expectTrue(elementsAlmostEqual(result, legacyResult))
         expectTrue(elementsAlmostEqual(result, returnedResult))
     }
+}
 
-    //===----------------------------------------------------------------------===//
-    //
-    //  vDSP polynomial evaluation.
-    //
-    //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//
+//  vDSP polynomial evaluation.
+//
+//===----------------------------------------------------------------------===//
 
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
