@@ -31,6 +31,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -1205,10 +1206,10 @@ CanType TypeBase::computeCanonicalType() {
 
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        funcTy->getExtInfo());
+                                        funcTy->getCanonicalExtInfo());
     } else {
       Result = FunctionType::get(canParams, resultTy,
-                                 funcTy->getExtInfo());
+                                 funcTy->getCanonicalExtInfo());
     }
     assert(Result->isCanonical());
     break;
@@ -3109,6 +3110,33 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
   // by one of our member protocols.
   return build(C, CanTypes, HasExplicitAnyObject);
+}
+
+void
+AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
+#ifndef NDEBUG
+  if (!type->isFunctionType()) {
+    llvm::errs() << "Expected a Clang function type but found\n";
+    type->dump(llvm::errs());
+    llvm_unreachable("");
+  }
+#endif
+  return;
+}
+
+// TODO: (Varun) Save the pointer in the TrailingObject and retrieve it
+const clang::Type *AnyFunctionType::getClangFunctionType() const {
+  return nullptr;
+}
+
+const clang::Type *AnyFunctionType::getCanonicalClangFunctionType() const {
+  auto *ty = getClangFunctionType();
+  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
+}
+
+// TODO: [store-sil-clang-function-type]
+const clang::FunctionType *SILFunctionType::getClangFunctionType() const {
+  return nullptr;
 }
 
 FunctionType *

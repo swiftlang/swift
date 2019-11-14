@@ -2975,7 +2975,9 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
                            ExtInfo info) {
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  ID.AddInteger(info.getFuncAttrKey());
+  auto infoKey = info.getFuncAttrKey();
+  ID.AddInteger(infoKey.first);
+  ID.AddPointer(infoKey.second);
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
@@ -3026,7 +3028,9 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  ID.AddInteger(info.getFuncAttrKey());
+  auto infoKey = info.getFuncAttrKey();
+  ID.AddInteger(infoKey.first);
+  ID.AddPointer(infoKey.second);
 }
 
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
@@ -3121,7 +3125,9 @@ void SILFunctionType::Profile(
     bool isGenericSignatureImplied,
     SubstitutionMap substitutions) {
   id.AddPointer(genericParams.getPointer());
-  id.AddInteger(info.getFuncAttrKey());
+  auto infoKey = info.getFuncAttrKey();
+  id.AddInteger(infoKey.first);
+  id.AddPointer(infoKey.second);
   id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
@@ -3165,9 +3171,10 @@ SILFunctionType::SILFunctionType(
       Substitutions(substitutions) {
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
-  Bits.SILFunctionType.ExtInfo = ext.Bits;
+  Bits.SILFunctionType.ExtInfoBits = ext.Bits;
+  Bits.SILFunctionType.HasUncommonInfo = false;
   // The use of both assert() and static_assert() below is intentional.
-  assert(Bits.SILFunctionType.ExtInfo == ext.Bits && "Bits were dropped!");
+  assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
   static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);

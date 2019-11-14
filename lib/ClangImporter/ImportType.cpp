@@ -418,8 +418,11 @@ namespace {
         auto funcTy = pointeeType->castTo<FunctionType>();
         return {
           FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-            funcTy->getExtInfo().withRepresentation(
-                          AnyFunctionType::Representation::CFunctionPointer)),
+            funcTy->getExtInfo()
+              .withRepresentation(
+                AnyFunctionType::Representation::CFunctionPointer)
+              .withClangFunctionType(nullptr)),
+              // TODO: (Varun) Replace arg with pointeeQualType.getTypePtr()
           ImportHint::CFunctionPointer
         };
       }

@@ -479,9 +479,11 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
+  // TODO: [store-sil-clang-function-type]
   auto einfo = SILFunctionType::ExtInfo(
       representation, flags.isPseudogeneric(), !flags.isEscaping(),
-      DifferentiabilityKind::NonDifferentiable);
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

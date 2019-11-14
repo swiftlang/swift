@@ -2208,8 +2208,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
+      // TODO: [store-sil-clang-function-type]
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                       attrs.has(TAK_noescape), diffKind);
+                                       attrs.has(TAK_noescape), diffKind,
+                                       nullptr);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2272,8 +2274,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
+      // TODO: (Varun) clangFunctionType should not be nullptr.
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false, fnRepr->throws(),
-                                    diffKind);
+                                    diffKind, nullptr);
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())

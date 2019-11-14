@@ -3943,6 +3943,8 @@ public:
 
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
+
+    // FIXME: [clang-function-type-serialization] Serialize the clang type here
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
