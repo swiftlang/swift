@@ -492,8 +492,13 @@ private:
   /// ownership is enabled.
   void addMissingDestroysForCopiedValues(LoadBorrowInst *li, SILValue newVal,
 					 const SmallBitVector &instsToSkip);
-  void addHandOffCopyDestroysForPhis(LoadBorrowInst *li, SILValue newVal,
-				     SmallBitVector &instsToSkipOut);
+
+  /// As a result of us using the SSA updater, insert hand off copy/destroys at
+  /// each phi and make sure that intermediate phis do not leak by inserting
+  /// destroys along paths that go through the intermediate phi that do not also
+  /// go through the
+  void addHandOffCopyDestroysForPhis(SILInstruction *load, SILValue newVal,
+                                     SmallBitVector &instsToSkipOut);
 };
 
 } // end anonymous namespace
@@ -958,8 +963,10 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(LoadInst *li,
   return nullptr;
 }
 
-void AvailableValueAggregator::addHandOffCopyDestroysForPhis(LoadBorrowInst *lbi, SILValue newVal,
-							     SmallBitVector &instsToSkip) {
+void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
+    SILInstruction *load, SILValue newVal, SmallBitVector &instsToSkip) {
+  assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
+
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
@@ -1124,14 +1131,14 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(LoadBorrowInst *lbi
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     auto error = checker.checkValue(
-        phiArg, {BranchPropagatedUser(&lbi->getAllOperands()[0])}, {},
+        phiArg, {BranchPropagatedUser(&load->getAllOperands()[0])}, {},
         errorKind, &leakingBlocks);
 
     if (!error.getFoundError()) {
       // If we did not find an error, then our copy_value must be strongly
       // control equivalent as our load_borrow. So just insert a destroy_value
       // for the copy_value.
-      auto next = std::next(lbi->getIterator());
+      auto next = std::next(load->getIterator());
       SILBuilderWithScope builder(next);
       builder.emitDestroyValueOperation(next->getLoc(), phiArg);
       continue;
@@ -1142,7 +1149,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(LoadBorrowInst *lbi
     // this if we found a loop since our leaking blocks will lifetime extend the
     // value over the loop.
     if (!error.getFoundOverConsume()) {
-      auto next = std::next(lbi->getIterator());
+      auto next = std::next(load->getIterator());
       SILBuilderWithScope builder(next);
       builder.emitDestroyValueOperation(next->getLoc(), phiArg);
     }
