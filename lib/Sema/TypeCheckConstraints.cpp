@@ -2197,7 +2197,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
-  ConstraintSystem cs(dc, csOptions, expr);
+  ConstraintSystem cs(dc, csOptions);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
