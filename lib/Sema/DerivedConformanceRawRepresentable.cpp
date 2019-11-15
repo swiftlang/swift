@@ -43,6 +43,9 @@ static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
                                      /*implicit*/ true);
     if (floatLit->isNegative())
       cast<FloatLiteralExpr>(clone)->setNegative(expr->getLoc());
+  } else if (auto boolLit = dyn_cast<BooleanLiteralExpr>(expr)) {
+    clone = new (C) BooleanLiteralExpr(boolLit->getValue(), expr->getLoc(),
+                                       /*implicit*/true);
   } else {
     llvm_unreachable("invalid raw literal expr");
   }
