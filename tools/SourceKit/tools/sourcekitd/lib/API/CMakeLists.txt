@@ -12,9 +12,10 @@ add_sourcekit_library(sourcekitdAPI
   sourcekitdAPI-Common.cpp
   TokenAnnotationsArray.cpp
   ExpressionTypeArray.cpp
-  LINK_LIBS
-      SourceKitSupport SourceKitSwiftLang
 )
+target_link_libraries(sourcekitdAPI PRIVATE
+  SourceKitSupport
+  SourceKitSwiftLang)
 
 if(APPLE AND HAVE_XPC_H)
   target_sources(sourcekitdAPI PRIVATE
