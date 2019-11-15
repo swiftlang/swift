@@ -7281,13 +7281,24 @@ public:
     auto tupleTanTy = getRemappedTangentType(dti->getOperand()->getType());
     SmallVector<AdjointValue, 8> adjValues;
     for (auto origElt : dti->getResults()) {
-      if (!getTangentSpace(origElt->getType().getASTType()))
+      if (!getTangentSpace(remapType(origElt->getType()).getASTType()))
         continue;
       adjValues.push_back(getAdjointValue(bb, origElt));
     }
-    addAdjointValue(bb, dti->getOperand(),
-                    makeAggregateAdjointValue(tupleTanTy, adjValues),
-                    dti->getLoc());
+    // Handle tuple tangent type.
+    // Add adjoints for every tuple element that has a tangent space.
+    if (tupleTanTy.is<TupleType>()) {
+      assert(adjValues.size() > 1);
+      addAdjointValue(bb, dti->getOperand(),
+                      makeAggregateAdjointValue(tupleTanTy, adjValues),
+                      dti->getLoc());
+    }
+    // Handle non-tuple tangent type.
+    // Add adjoint for the single tuple element that has a tangent space.
+    else {
+      assert(adjValues.size() == 1);
+      addAdjointValue(bb, dti->getOperand(), adjValues.front(), dti->getLoc());
+    }
   }
 
   /// Handle `load` or `load_borrow` instruction
