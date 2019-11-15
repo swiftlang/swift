@@ -19,6 +19,7 @@
 
 #include "swift/AST/IncrementalRanges.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Driver/SourceComparator.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace swift {
@@ -35,11 +36,13 @@ namespace incremental_ranges {
 
 class SourceRangeBasedInfo {
   SwiftRangesFileContents swiftRangesFileContents;
-  /// All changed ranges in the primary as computed by the diff in the driver;
-  /// really only need to know if there are any
-  Ranges changedRanges;
-  /// All of the non-local changes: at present only those residing outside
-  /// function bodies.
+  /// All changed ranges in the primary as computed by the diff in the driver
+  /// Both relative to the previously-compiled and the current source.
+  SourceComparator::LRRanges changedRanges;
+  /// All of the non-local changes in the previously-compiled code:  those
+  /// residing outside function bodies.
+  /// (We only have and only need function-body ranges for the
+  /// previously-compiled source.)
   Ranges nonlocalChangedRanges;
 
   //==============================================================================
@@ -55,7 +58,8 @@ public:
   SourceRangeBasedInfo(SourceRangeBasedInfo &&);
 
 private:
-  SourceRangeBasedInfo(SwiftRangesFileContents &&, Ranges &&changedRanges,
+  SourceRangeBasedInfo(SwiftRangesFileContents &&,
+                       SourceComparator::LRRanges &&changedRanges,
                        Ranges &&nonlocalChangedRanges);
 
   static Optional<SourceRangeBasedInfo> wholeFileChanged();
@@ -75,13 +79,16 @@ private:
                               DiagnosticEngine &);
 
   /// Return None for error
-  static Optional<Ranges>
+  /// If no error returns ranges of changes from both lhs and rhs.
+  /// Lhs used for scheduling jobs, rhs just for dumping and testing.
+  static Optional<SourceComparator::LRRanges>
   loadChangedRanges(StringRef compiledSourcePath, StringRef primaryPath,
                     const bool showIncrementalBuildDecisions,
                     DiagnosticEngine &);
 
-  static Ranges computeNonlocalChangedRanges(const SwiftRangesFileContents &,
-                                             const Ranges &);
+  static Ranges
+  computeNonlocalChangedRanges(const SwiftRangesFileContents &,
+                               const SourceComparator::LRRanges &);
 
   //==============================================================================
   // MARK: scheduling jobs

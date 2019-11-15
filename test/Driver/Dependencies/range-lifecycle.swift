@@ -87,14 +87,17 @@
 
 // CHECK-FILEA-AND-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
 
-// RUN: %FileCheck -check-prefix=CHECK-DIFFS-1 %s <%t/output2
+// RUN: %FileCheck -check-prefix=CHECK-DIFFS-NONE-1 %s <%t/output2
+// CHECK-DIFFS-NONE-1-DAG: *** no changed ranges in 'main.swift' (w.r.t previously- or about-to-be-compiled) ***
+// CHECK-DIFFS-NONE-1-DAG: *** no changed ranges in 'fileA.swift' (w.r.t previously- or about-to-be-compiled) ***
 
-// CHECK-DIFFS-1: *** no changed ranges in previously-compiled 'fileA.swift' ***
-// CHECK-DIFFS-1: *** all changed ranges in previously-compiled 'fileB.swift' ***
-// CHECK-DIFFS-1-NEXT: [4:18--4:19)
-// CHECK-DIFFS-1: *** nonlocal changed ranges in previously-compiled 'fileB.swift' ***
-// CHECK-DIFFS-1-NEXT: [4:18--4:19)
-// CHECK-DIFFS-1: *** no changed ranges in previously-compiled 'main.swift' ***
+// RUN: %FileCheck -check-prefix=CHECK-DIFFS-FILEB-1 %s <%t/output2
+// CHECK-DIFFS-FILEB-1: *** all changed ranges in 'fileB.swift' (w.r.t previously-compiled) ***
+// CHECK-DIFFS-FILEB-1-NEXT: - [4:18--4:19)
+// CHECK-DIFFS-FILEB-1-NEXT: *** all changed ranges in 'fileB.swift' (w.r.t to-be-compiled) ***
+// CHECK-DIFFS-FILEB-1-NEXT: - [4:18--4:28)
+// CHECK-DIFFS-FILEB-1-NEXT: *** nonlocal changed ranges in 'fileB.swift' (w.r.t previously-compiled) ***
+// CHECK-DIFFS-FILEB-1-NEXT: - [4:18--4:19)
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEA-FILEB-SELECTING-RANGES %s <%t/output2
 

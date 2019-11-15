@@ -38,8 +38,8 @@ using namespace driver;
 //==============================================================================
 
 SourceRangeBasedInfo::SourceRangeBasedInfo(
-    SwiftRangesFileContents &&swiftRangesFileContents, Ranges &&changedRanges,
-    Ranges &&nonlocalChangedRanges)
+    SwiftRangesFileContents &&swiftRangesFileContents,
+    SourceComparator::LRRanges &&changedRanges, Ranges &&nonlocalChangedRanges)
     : swiftRangesFileContents(std::move(swiftRangesFileContents)),
       changedRanges(std::move(changedRanges)),
       nonlocalChangedRanges(std::move(nonlocalChangedRanges)) {}
@@ -52,7 +52,7 @@ SourceRangeBasedInfo::SourceRangeBasedInfo(SourceRangeBasedInfo &&x)
 /// TODO: optimize by using no entry intead of the wholeFileChanged entry
 Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::wholeFileChanged() {
   return SourceRangeBasedInfo(SwiftRangesFileContents(),
-                              SerializableSourceRange::RangesForWholeFile(),
+                              SourceComparator::LRRanges::wholeFile(),
                               SerializableSourceRange::RangesForWholeFile());
 }
 
@@ -148,7 +148,7 @@ SourceRangeBasedInfo::loadSwiftRangesFileContents(
                                        showIncrementalBuildDecisions, diags);
 }
 
-Optional<Ranges> SourceRangeBasedInfo::loadChangedRanges(
+Optional<SourceComparator::LRRanges> SourceRangeBasedInfo::loadChangedRanges(
     const StringRef compiledSourcePath, const StringRef primaryPath,
     const bool showIncrementalBuildDecisions, DiagnosticEngine &diags) {
 
@@ -158,26 +158,28 @@ Optional<Ranges> SourceRangeBasedInfo::loadChangedRanges(
   if (!isPreviouslyCompiledNewer)
     return None;
   if (isPreviouslyCompiledNewer.getValue())
-    return Optional<Ranges>(Ranges());
-  auto wasCompiledBefore = llvm::MemoryBuffer::getFile(compiledSourcePath);
-  if (auto ec = wasCompiledBefore.getError()) {
+    return SourceComparator::LRRanges(); // no changes
+
+  auto whatWasPreviouslyCompiled =
+      llvm::MemoryBuffer::getFile(compiledSourcePath);
+  if (auto ec = whatWasPreviouslyCompiled.getError()) {
     diags.diagnose(SourceLoc(), diag::warn_unable_to_load_compiled_swift,
                    compiledSourcePath, ec.message());
     return None;
   }
 
-  auto aboutToCompile = llvm::MemoryBuffer::getFile(primaryPath);
-  if (auto ec = aboutToCompile.getError()) {
+  auto whatIsAboutToBeCompiled = llvm::MemoryBuffer::getFile(primaryPath);
+  if (auto ec = whatIsAboutToBeCompiled.getError()) {
     diags.diagnose(SourceLoc(), diag::warn_unable_to_load_primary, primaryPath,
                    ec.message());
     return None;
   }
   //  SourceComparator::test();
-  auto comp = SourceComparator(wasCompiledBefore->get()->getBuffer(),
-                               aboutToCompile->get()->getBuffer());
+  auto comp = SourceComparator(whatWasPreviouslyCompiled->get()->getBuffer(),
+                               whatIsAboutToBeCompiled->get()->getBuffer());
   comp.compare();
   // lhs in terms of old version
-  return comp.convertAllMismatches().lhs();
+  return comp.convertAllMismatches();
 }
 
 Optional<SwiftRangesFileContents> SwiftRangesFileContents::load(
@@ -206,9 +208,9 @@ Optional<SwiftRangesFileContents> SwiftRangesFileContents::load(
 
 Ranges SourceRangeBasedInfo::computeNonlocalChangedRanges(
     const SwiftRangesFileContents &swiftRangesFileContents,
-    const Ranges &changedRanges) {
+    const SourceComparator::LRRanges &changedRanges) {
   return SerializableSourceRange::findAllOutliers(
-      changedRanges, swiftRangesFileContents.noninlinableFunctionBodies);
+      changedRanges.lhs(), swiftRangesFileContents.noninlinableFunctionBodies);
 }
 //==============================================================================
 // MARK: scheduling
@@ -340,19 +342,20 @@ void SourceRangeBasedInfo ::dumpAllInfo(
 
 void SourceRangeBasedInfo::dumpChangedRanges(
     const StringRef primaryFilename) const {
-  auto dumpRangeSet = [&](StringRef which, const Ranges &ranges) {
-    llvm::errs() << "*** " << which
-                 << " changed ranges in previously-compiled '"
-                 << primaryFilename << "' ***\n";
+  auto dumpRangeSet = [&](StringRef which, StringRef wrt,
+                          const Ranges &ranges) {
+    llvm::errs() << "*** " << which << " changed ranges in '" << primaryFilename
+                 << "' (w.r.t " << wrt << ") ***\n";
     for (const auto &r : ranges)
-      llvm::errs() << r.printString() << "\n";
-    llvm::errs() << "\n";
+      llvm::errs() << "- " << r.printString() << "\n";
   };
   if (changedRanges.empty()) {
     assert(nonlocalChangedRanges.empty() && "A fortiori.");
-    dumpRangeSet("no", {});
+    dumpRangeSet("no", "previously- or about-to-be-compiled", {});
     return;
   }
-  dumpRangeSet("all", changedRanges);
-  dumpRangeSet("nonlocal", nonlocalChangedRanges);
+  dumpRangeSet("all", "previously-compiled", changedRanges.lhs());
+  dumpRangeSet("all", "to-be-compiled", changedRanges.rhs());
+  dumpRangeSet("nonlocal", "previously-compiled", nonlocalChangedRanges);
+  llvm::errs() << "\n";
 }

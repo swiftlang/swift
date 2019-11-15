@@ -179,10 +179,21 @@ public:
   };
   /// A pair of vectors of SerializableSourceRanges, one per side.
   struct LRRanges : LR<Ranges> {
-    LRRanges() : LR({}, {}) {}
+    LRRanges() : LRRanges({}, {}) {}
+    LRRanges(Ranges &&lhs, Ranges &&rhs) : LR(std::move(lhs), std::move(rhs)) {}
+    static LRRanges wholeFile() {
+      return {SerializableSourceRange::RangesForWholeFile(),
+              SerializableSourceRange::RangesForWholeFile()};
+    }
     void push_back(const LRSerializableRange &range) {
       lhs().push_back(range.lhs());
       rhs().push_back(range.rhs());
+    }
+    bool empty() const {
+      assert(lhs().empty() == rhs().empty() && "diff should produce at least "
+                                               "empty ranges for an addition "
+                                               "to the other side");
+      return lhs().empty();
     }
   };
 
