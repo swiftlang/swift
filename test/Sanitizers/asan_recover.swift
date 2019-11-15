@@ -42,6 +42,11 @@ fflush(stdout)
 
 let size:Int = 128;
 
+func foo(_ rawptr:UnsafeMutablePointer<UInt8>) {
+  print("Read second element:\(rawptr.advanced(by: 1).pointee)")
+  fflush(stdout)
+}
+
 // In this test we need multiple issues to occur that ASan can detect.
 // Allocating a buffer and artificially poisoning it seems like the best way to
 // test this because there's no undefined behavior happening. Hopefully this
@@ -77,18 +82,18 @@ __asan_poison_memory_region(UnsafeMutableRawPointer(x), size)
 // NOTE: Testing for stackframe `#0` should ensure that the poison read
 // happened in instrumentation and not in an interceptor.
 // CHECK-COMMON-STDERR: AddressSanitizer: use-after-poison
-// CHECK-COMMON-STDERR: #0 0x{{.+}} in main {{.*}}asan_recover.swift:[[@LINE+1]]
+// CHECK-COMMON-STDERR: #0 0x{{.+}} in main{{.*}}
 print("Read first element:\(x.advanced(by: 0).pointee)")
 fflush(stdout)
 // CHECK-RECOVER-STDOUT: Read first element:0
 
 // Second error
+// NOTE: Very loose regex is to accomodate if name demangling
+// fails. rdar://problem/57235673
 // CHECK-RECOVER-STDERR: AddressSanitizer: use-after-poison
-// CHECK-RECOVER-STDERR: #0 0x{{.+}} in main {{.*}}asan_recover.swift:[[@LINE+1]]
-print("Read second element:\(x.advanced(by: 1).pointee)")
-fflush(stdout)
+// CHECK-RECOVER-STDERR: #0 0x{{.+}} in {{.*}}foo{{.*}}
 // CHECK-RECOVER-STDOUT: Read second element:0
-
+foo(x)
 __asan_unpoison_memory_region(UnsafeMutableRawPointer(x), size)
 
 x.deallocate();
