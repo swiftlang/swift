@@ -361,23 +361,29 @@ internal func _cocoaASCIIPointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
 }
 
 // This does not create a bridged String that's safe to use past the current
-// stack frame, e.g. it does not defensively copy it and so on.
-internal func _withTemporaryBridgedCocoaString<R>(
+// stack frame, e.g. it does not defensively copy it and so on. Returns true
+// if we were able to quickly bridge a String, or false if not
+internal func _withTemporaryBridgedCocoaString(
   _ cocoaString: _CocoaString,
-  _ work: (String) throws -> R
-) rethrows -> R {
+  _ work: (String) -> Void
+) -> Bool {
   switch _KnownCocoaString(cocoaString) {
   case .storage(let storage):
-    return try work(storage.asString)
+    work(storage.asString)
+    return true
   case .shared(let storage):
-    return try work(storage.asString)
+    work(storage.asString)
+    return true
     #if !(arch(i386) || arch(arm))
   case .tagged(let str):
     let tmpStr = String(_StringGuts(_SmallString(taggedCocoa: str)))
-    return try work(tmpStr)
+    work(tmpStr)
+    return true
     #endif
   case .mutable(let storage):
-    return try work(storage.asString)
+    //TODO: only fast path this if it's String-backed
+    work(storage.asString)
+    return true
   case .cocoa(let str):
     let length = _stdlib_binary_CFStringGetLength(str)
     let guts:_StringGuts
@@ -385,17 +391,26 @@ internal func _withTemporaryBridgedCocoaString<R>(
       // form an immortal contiguous-ASCII string if we can
       let asciiBuffer = UnsafeBufferPointer(start: ascii, count: length)
       guts = _StringGuts(asciiBuffer, isASCII: true)
-    } else {
-      // or fall back to lazily bridging if we can't
-      guts = _StringGuts(
-        cocoa: str,
-        providesFastUTF8: false,
-        isASCII: false,
-        length: length
-      )
+      work(String(guts))
+      return true
     }
-    return try work(String(guts))
+    return false
   }
+}
+
+internal func _withCocoaStringUTF16Contents(
+  _ cocoaString: _CocoaString,
+  _ work: (UnsafeBufferPointer<UTF16.CodeUnit>) -> Void
+) {
+  let length = _stdlib_binary_CFStringGetLength(str)
+  var buffer = UnsafeMutableBufferPointer<UTF16.CodeUnit>.allocate(length)
+  _cocoaStringCopyCharacters(
+    from: cocoaString,
+    range: 0 ..< length,
+    into: buffer
+  )
+  work(UnsafeBufferPointer(buffer))
+  buffer.deallocate()
 }
 
 @usableFromInline
