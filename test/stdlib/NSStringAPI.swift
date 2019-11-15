@@ -1467,14 +1467,14 @@ NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
     s.replaceCharacters(in: NSRange(location: i, length: 1), with: "")
     expectEqual(7, s.length)
     let result = [
-      s.character(at: 0),
-      s.character(at: 1),
-      s.character(at: 2),
-      s.character(at: 3),
-      s.character(at: 4),
-      s.character(at: 5),
-      s.character(at: 6),
-      s.character(at: 7)
+      Int(s.character(at: 0)),
+      Int(s.character(at: 1)),
+      Int(s.character(at: 2)),
+      Int(s.character(at: 3)),
+      Int(s.character(at: 4)),
+      Int(s.character(at: 5)),
+      Int(s.character(at: 6)),
+      Int(s.character(at: 7))
     ]
     expectEqual(expectedResults[i], result)
   }
