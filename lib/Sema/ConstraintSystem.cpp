@@ -528,6 +528,12 @@ static void extendDepthMap(
 
 Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
     Expr *expr) {
+  // Check whether the parent has this information.
+  if (baseCS && baseCS != this) {
+    if (auto known = baseCS->getExprDepthAndParent(expr))
+      return *known;
+  }
+
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
     extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
@@ -537,9 +543,6 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
   auto e = ExprWeights.find(expr);
   if (e != ExprWeights.end())
     return e->second;
-
-  if (baseCS && baseCS != this)
-    return baseCS->getExprDepthAndParent(expr);
 
   return None;
 }
