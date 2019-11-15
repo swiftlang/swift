@@ -12,7 +12,9 @@
 // CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
 // CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
 
+
 // Now, do it again with range dependencies enabled:
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t
 // RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
@@ -31,8 +33,8 @@
 // CHECK-MAIN1-RANGES: ---
 // CHECK-MAIN1-RANGES: unparsedRangesByNonPrimary:
 // CHECK-MAIN1-RANGES:   ./fileB.swift:
-// CHECK-MAIN1-RANGES:     - { start: { line: 1, column: 17 }, end: { line: 6, column: 2 } }
-// CHECK-MAIN1-RANGES:     - { start: { line: 7, column: 16 }, end: { line: 10, column: 2 } }
+// CHECK-MAIN1-RANGES:     - { start: { line: 1, column: 18 }, end: { line: 6, column: 2 } }
+// CHECK-MAIN1-RANGES:     - { start: { line: 7, column: 19 }, end: { line: 10, column: 2 } }
 // CHECK-MAIN1-RANGES: noninlinableFunctionBodies: []
 // CHECK-MAIN1-RANGES: ...
 
@@ -42,12 +44,13 @@
 // CHECK-FILEA1-RANGES: ---
 // CHECK-FILEA1-RANGES: unparsedRangesByNonPrimary:
 // CHECK-FILEA1-RANGES:   ./fileB.swift:
-// CHECK-FILEA1-RANGES:     - { start: { line: 7, column: 16 }, end: { line: 10, column: 2 } }
+// CHECK-FILEA1-RANGES:     - { start: { line: 7, column: 19 }, end: { line: 10, column: 2 } }
 // CHECK-FILEA1-RANGES: noninlinableFunctionBodies:
-// CHECK-FILEA1-RANGES:   - { start: { line: 1, column: 14 }, end: { line: 4, column: 2 } }
-// CHECK-FILEA1-RANGES:   - { start: { line: 5, column: 13 }, end: { line: 7, column: 2 } }
-// CHECK-FILEA1-RANGES:   - { start: { line: 8, column: 12 }, end: { line: 8, column: 14 } }
+// CHECK-FILEA1-RANGES:   - { start: { line: 1, column: 17 }, end: { line: 4, column: 2 } }
+// CHECK-FILEA1-RANGES:   - { start: { line: 5, column: 17 }, end: { line: 7, column: 2 } }
+// CHECK-FILEA1-RANGES:   - { start: { line: 8, column: 17 }, end: { line: 8, column: 19 } }
 // CHECK-FILEA1-RANGES: ...
+
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEB1-RANGES %s <%t/fileB.swiftranges
 
@@ -62,7 +65,7 @@
 // Add an attribute to: a structure that no other file uses
 
 // RUN: cp %t/fileB2.swift %t/fileB.swift
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | tee /tmp/out >%t/output
+// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental >%t/output 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-ONLY-B %s <%t/output
 
 // CHECK-ONLY-B-NOT: Queuing{{.*}}<= main.swift
@@ -78,7 +81,8 @@
 // Add an attribute to: a structure that one other file uses
 
 // RUN: cp %t/fileB3.swift %t/fileB.swift
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | tee /tmp/out >%t/output
+// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental -driver-dump-compiled-source-diffs >%t/output  2>&1
+
 // RUN: %FileCheck -check-prefix=CHECK-ONLY-AB %s <%t/output
 
 // CHECK-ONLY-AB-NOT: Queuing{{.*}}<= main.swift
@@ -88,11 +92,32 @@
 // CHECK-AB-DAG: Queuing{{.*}}<= fileB.swift{{.*}}Ranges
 // CHECK-AB-DAG: Queuing{{.*}}<= fileA.swift{{.*}}Ranges
 
+// RUN: %FileCheck -check-prefix=CHECK-DIFFS1 %s <%t/output
+
+// CHECK-DIFFS1: *** all changed ranges in './fileA.swift' ***
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: *** nonlocal changed ranges in './fileA.swift' ***
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: *** all changed ranges in './fileB.swift' ***
+// CHECK-DIFFS1-NEXT: [6:1--6:1)
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: *** nonlocal changed ranges in './fileB.swift' ***
+// CHECK-DIFFS1-NEXT: [6:1--6:1)
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: *** all changed ranges in './main.swift' ***
+// CHECK-DIFFS1-NEXT: {{^$}}
+// CHECK-DIFFS1-NEXT: *** nonlocal changed ranges in './main.swift' ***
+// CHECK-DIFFS1-NEXT: {{^$}}
+
+
+// RUN: gazorp
 
 // What if the user adds a close brace and new type in the middle?
 
 // RUN: cp %t/fileB4.swift %t/fileB.swift
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 | tee /tmp/out >%t/output
+// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental >%t/output 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-ALL-REBUILT %s <%t/output
 
 // CHECK-NEW-TOP-NOT: Queuing{{.*}}<= main.swift

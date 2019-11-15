@@ -1,8 +1,8 @@
-func snort() { 
-  _ = A_Uses_C()
+func func1InA() {
+  _ = Struct1nB()
   print(3)
 }
-func nine() {
+func func2InA() {
   _ = 3423
 }
-func ten() {}
+func func3InA() {}

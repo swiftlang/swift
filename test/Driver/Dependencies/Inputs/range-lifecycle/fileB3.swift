@@ -1,14 +1,14 @@
-struct A_Uses_C {
-// asdf
- var i = 3425;
- var k = 3
- func somethingNew() {
-  _ = "adf"
- }
- var sdf = 4
+struct Struct1nB { // used by A
+  // asdf
+  var instVar1 = 3425;
+  var instVar2 = 3
+  var instVar3 = 4
+  func newMemberFunc1() {
+    _ = "adf"
+  }
 }
-struct No_Uses {
- var sadf = 333
- var wer = 3999983
- var additional = "foo"
+struct Struct2InB { // not used
+  var instVar1 = 333
+  var instVar2 = 3999983
+  var newInstVar3 = "foo"
 }
