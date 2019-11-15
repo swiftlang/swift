@@ -100,6 +100,28 @@ public func single_concrete() {
 // CHECK-NEXT:    ret i8** [[T0]]
 // CHECK-NEXT:  }
 
+// TYPEBYNAME-LABEL: define linkonce_odr hidden i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
+// TYPEBYNAME-NEXT:  entry:
+// TYPEBYNAME-NEXT:    %conditional.requirement.buffer = alloca [1 x i8**], align 8
+// TYPEBYNAME-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL", align 8
+// TYPEBYNAME-NEXT:    [[IS_NULL:%.*]] = icmp eq i8** [[CACHE]], null
+// TYPEBYNAME-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
+
+// TYPEBYNAME:       cacheIsNull:
+// TYPEBYNAME-NEXT:    [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
+// TYPEBYNAME-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
+// TYPEBYNAME-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
+// TYPEBYNAME-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+
+// TYPEBYNAME-NEXT:    [[Single_P1:%.*]] = call i8** @swift_getWitnessTable
+// TYPEBYNAME-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
+// TYPEBYNAME-NEXT:    br label %cont
+
+// TYPEBYNAME:       cont:
+// TYPEBYNAME-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Single_P1]], %cacheIsNull ]
+// TYPEBYNAME-NEXT:    ret i8** [[T0]]
+// TYPEBYNAME-NEXT:  }
+
 
 public struct Double<B, C> {}
 extension Double: P1 where B: P2, C: P3 {
