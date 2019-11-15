@@ -1261,6 +1261,8 @@ function(_add_swift_library_single target name)
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 
+  # There are scenarios in which this function is called with SDKROOT set
+  # In those we need to ensure we link against the dylibs present in the SDK
   if(DEFINED ENV{SDKROOT})
       list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
   endif()
