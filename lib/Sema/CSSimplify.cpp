@@ -1767,8 +1767,31 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     auto func2Param = func2Params[i];
 
     // Variadic bit must match.
-    if (func1Param.isVariadic() != func2Param.isVariadic())
-      return getTypeMatchFailure(argumentLocator);
+    if (func1Param.isVariadic() != func2Param.isVariadic()) {
+      if (!(shouldAttemptFixes() && func2Param.isVariadic()))
+        return getTypeMatchFailure(argumentLocator);
+
+      auto argType =
+          getFixedTypeRecursive(func1Param.getPlainType(), /*wantRValue=*/true);
+      auto varargsType = func2Param.getPlainType();
+
+      // Delay solving this constriant until argument is resolved.
+      if (argType->is<TypeVariableType>()) {
+        addUnsolvedConstraint(Constraint::create(
+            *this, kind, func1, func2, getConstraintLocator(locator)));
+        return getTypeMatchSuccess();
+      }
+
+      auto *fix = ExpandArrayIntoVarargs::attempt(
+          *this, argType, varargsType,
+          argumentLocator.withPathElement(LocatorPathElt::ApplyArgToParam(
+              i, i, func2Param.getParameterFlags())));
+
+      if (!fix || recordFix(fix))
+        return getTypeMatchFailure(argumentLocator);
+
+      continue;
+    }
 
     // Labels must match.
     //
