@@ -6,7 +6,7 @@
 // RUN: %swift-dump-pcm %t/script.pcm | %FileCheck %s --check-prefix=CHECK-DUMP
 // CHECK-DUMP: Information for module file '{{.*}}/script.pcm':
 // CHECK-DUMP:   Module name: script
-// CHECK-DUMP:   Module map file: {{.*}}/Inputs/custom-modules/module.map
+// CHECK-DUMP:   Module map file: {{.*[/\\]}}Inputs{{/|\\}}custom-modules{{/|\\}}module.map
 
 // Compile a source file that imports the explicit module.
 // RUN: %target-swift-frontend -typecheck -verify -Xcc -fmodule-file=%t/script.pcm %s
