@@ -147,3 +147,9 @@ public init() {
 deinit {
     fatalError()
 }
+
+#if false
+ extension Result {
+   func foo() {}
+ }
+ #endif

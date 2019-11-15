@@ -1554,7 +1554,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "GlobalToMember_Class_Container",
     key.offset: 410,
     key.length: 87,
@@ -1659,7 +1658,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToGlobal_Class_Container",
     key.offset: 649,
     key.length: 105,
@@ -1750,7 +1748,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_Class_Swift3",
     key.offset: 934,
     key.length: 117,
@@ -1779,7 +1776,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_Class_Swift4",
     key.offset: 1052,
     key.length: 88,
@@ -1853,7 +1849,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameContainer_Class_Container",
     key.offset: 1269,
     key.length: 198,
@@ -1974,7 +1969,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameName_Class_Swift3",
     key.offset: 1657,
     key.length: 127,
@@ -2003,7 +1997,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameName_Class_Swift4",
     key.offset: 1785,
     key.length: 93,
@@ -2093,7 +2086,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "GlobalToMember_Typedef_Container",
     key.offset: 2250,
     key.length: 82,
@@ -2169,7 +2161,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToGlobal_Typedef_Container",
     key.offset: 2485,
     key.length: 109,
@@ -2260,7 +2251,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_Typedef_Swift3",
     key.offset: 2778,
     key.length: 121,
@@ -2289,7 +2279,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_Typedef_Swift4",
     key.offset: 2900,
     key.length: 83,
@@ -2349,7 +2338,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameContainer_Typedef_Container",
     key.offset: 3114,
     key.length: 195,
@@ -2456,7 +2444,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameName_Typedef_Swift3",
     key.offset: 3503,
     key.length: 131,
@@ -2485,7 +2472,6 @@ extension MemberToMember_SameName_Typedef_Swift4 {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "MemberToMember_SameName_Typedef_Swift4",
     key.offset: 3635,
     key.length: 88,
