@@ -336,11 +336,11 @@ void SourceRangeBasedInfo ::dumpAllInfo(
 }
 
 void SourceRangeBasedInfo::dumpChangedRanges(const StringRef primary) const {
-  llvm::errs() << " *** all changed ranges in '" << primary << "' ***\n";
+  llvm::errs() << "*** all changed ranges in '" << primary << "' ***\n";
   for (const auto &r : changedRanges)
     llvm::errs() << r.printString() << "\n";
   llvm::errs() << "\n";
-  llvm::errs() << " *** nonlocal changed ranges in '" << primary << "' ***\n";
+  llvm::errs() << "*** nonlocal changed ranges in '" << primary << "' ***\n";
   for (const auto &r : nonlocalChangedRanges)
     llvm::errs() << r.printString() << "\n";
   llvm::errs() << "\n";
