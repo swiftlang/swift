@@ -84,6 +84,58 @@ ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
   expectEqual(Float(2), gradY)
 }
 
+ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
+  do {
+    // TF-922: Test array literal and control flow.
+    func controlFlow(
+        _ x: Tracked<Float>, _ y: Tracked<Float>, _ bool: Bool = true
+    ) -> [Tracked<Float>] {
+      var result = [x * y, x * y]
+      let result2 = bool ? result : result
+      var result3 = bool ? (bool ? result2 : result) : result2
+      return result3
+    }
+    let pb = pullback(at: 3, 4, in: { controlFlow($0, $1) })
+    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
+    // FIXME(TF-952): Fix incorrect zero derivatives.
+    // expectEqual(8, gradX)
+    // expectEqual(6, gradY)
+    expectEqual(0, gradX)
+    expectEqual(0, gradY)
+  }
+
+  do {
+    // TF-922: Test array literal and control flow.
+    func controlFlowAddress(
+        _ x: Tracked<Float>, _ y: Tracked<Float>, _ bool: Bool = true
+    ) -> [Tracked<Float>] {
+      var product = x * y // initial value is an address
+      var result = [product, product]
+      let result2 = bool ? result : result
+      var result3 = bool ? (bool ? result2 : result) : result2
+      return result3
+    }
+    let pb = pullback(at: 3, 4, in: { controlFlowAddress($0, $1) })
+    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
+    expectEqual(8, gradX)
+    expectEqual(6, gradY)
+  }
+
+  do {
+    // TF-922: Test array literal and control flow.
+    func controlFlowGeneric<T>(_ x: T, _ y: T, _ bool: Bool = true) -> [T] {
+      var result = [x, y] // initial values are addresses
+      let result2 = bool ? result : result
+      var result3 = bool ? (bool ? result2 : result) : result2
+      return result3
+    }
+    let pb = pullback(at: Tracked<Float>(3), 4, in: { controlFlowGeneric($0, $1) })
+    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
+    expectEqual(1, gradX)
+    expectEqual(1, gradY)
+  }
+}
+
 ArrayAutoDiffTests.test("ExpressibleByArrayLiteralIndirect") {
   struct Indirect<T: Differentiable>: Differentiable & ExpressibleByArrayLiteral {
     var x: T

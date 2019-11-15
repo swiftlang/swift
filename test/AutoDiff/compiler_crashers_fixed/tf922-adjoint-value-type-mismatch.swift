@@ -1,12 +1,18 @@
-// RUN: not --crash %target-swift-emit-sil %s
+// RUN: %target-swift-emit-sil %s
 // REQUIRES: asserts
 
 // TF-922: Adjoint value type mismatch assertion failure during direct adjoint
 // accumulation in differentiation transform pullback generation.
 
+// The cause is an adjoint value accumulation bug in
+// `PullbackEmitter::visitDestructureTupleInst` for tuple values with
+// non-tuple-typed adjoint values. This is relevant for array literal
+// initialization because `array.uninitialized_intrinsic` returns a tuple
+// with a `destructure_tuple` user.
+
 @differentiable
 func TF_922(_ x: Float) -> [Float] {
-  var result: [Float] = [x]
+  var result = [x]
   let result2 = true ? result : result
   let result3 = true ? result : result2
   return result3
