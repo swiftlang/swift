@@ -67,6 +67,10 @@ static bool swiftConformingMethodListImpl(
     return false;
   }
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
 
   // Create a factory for code completion callbacks that will feed the
