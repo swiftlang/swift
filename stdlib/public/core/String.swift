@@ -444,7 +444,7 @@ extension String {
   /// different `UInt8` arrays---the first with well-formed UTF-8 code unit
   /// sequences and the second with an ill-formed sequence at the end.
   ///
-  ///     let validUTF8: [UInt8] = [67, 97, 102, -61, -87, 0]
+  ///     let validUTF8: [Int8] = [67, 97, 102, -61, -87, 0]
   ///     let s = String(uninitializedCapacity: validUTF8.count,
   ///                    initializingUTF8With: { ptr in
   ///         ptr.initializeFrom(validUTF8)
@@ -452,7 +452,7 @@ extension String {
   ///     })
   ///     // Prints "Café"
   ///
-  ///     let invalidUTF8: [UInt8] = [67, 97, 102, -61, 0]
+  ///     let invalidUTF8: [Int8] = [67, 97, 102, -61, 0]
   ///     let s = String(uninitializedCapacity: invalidUTF8.count,
   ///                    initializingUTF8With: { ptr in
   ///         ptr.initializeFrom(invalidUTF8)
@@ -479,7 +479,7 @@ extension String {
   internal init(
     uninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<UInt8>
+      _ buffer: UnsafeMutableBufferPointer<Int8>
     ) throws -> Int
   ) rethrows {
     if _fastPath(capacity <= _SmallString.capacity) {
