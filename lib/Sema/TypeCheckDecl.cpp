@@ -2049,7 +2049,7 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     if (param == otherParam)
       result = initDC;
     else
-      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, initDC);
+      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, std::move(initDC));
   }
   assert(result && "Didn't create init context?");
   return result;
