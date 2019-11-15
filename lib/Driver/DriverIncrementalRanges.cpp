@@ -253,11 +253,11 @@ bool SourceRangeBasedInfo::shouldScheduleCompileJob(
 
   auto iter = allInfos.find(primary);
   if (iter == allInfos.end()) {
-    noteBuilding("because could not obtain range info from frontend");
+    noteBuilding("(could not obtain range info from frontend)");
     return true;
   }
   if (!iter->second.changedRanges.empty()) {
-    noteBuilding("source changed");
+    noteBuilding("(this file changed)");
     return true;
   }
   return iter->second.didPrimaryParseAnyNonlocalNonprimaryChanges(
@@ -292,8 +292,8 @@ bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
     const auto whatChanged = SerializableSourceRange::findOutlierIfAny(
         nonPriInfo.nonlocalChangedRanges, unparsedRanges->second);
     if (whatChanged) {
-      noteBuilding(Twine(nonPriFilename) + " changed at " +
-                   whatChanged->printString());
+      noteBuilding(Twine("(changed: ") + nonPriFilename + ":" +
+                   whatChanged->printString() + ")");
       return false;
     }
   }
@@ -342,7 +342,7 @@ void SourceRangeBasedInfo::dumpChangedRanges(
     const StringRef primaryFilename) const {
   auto dumpRangeSet = [&](StringRef which, const Ranges &ranges) {
     llvm::errs() << "*** " << which
-                 << " changed ranges in previously-compiled' "
+                 << " changed ranges in previously-compiled '"
                  << primaryFilename << "' ***\n";
     for (const auto &r : ranges)
       llvm::errs() << r.printString() << "\n";

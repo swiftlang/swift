@@ -1,15 +1,10 @@
 struct Struct1nB { // used by A
   // asdf
-  var instVar1 = 3425;
-  var instVar2 = 3
-  var instVar3 = 4
-  func newMemberFunc1() {
-    _ = "adf"
-  }
-  var newInstVar4 = 9
+  var instVar1 = 0
+  var instVar2 = "change 2"
+  }; func watchMe(_: Int) {}; struct Surprise {
 }
 struct Struct2InB { // not used
-  var instVar1 = 333
-  var instVar2 = 3999983
-  var newInstVar3 = "foo"
+  var instVar1 = 0
+  var instVar2 = "change 1"
 }

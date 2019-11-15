@@ -260,8 +260,12 @@ namespace driver {
         return;
       if (ScheduledCommands.count(cmd))
         return;
-      llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd)
-                   << (forRanges ? " <Ranges>" : "") << "\n";
+      llvm::outs() << "Queuing "
+                   << (forRanges ? "<Ranges> "
+                                 : Comp.getEnableSourceRangeDependencies()
+                                       ? "<Dependencies> "
+                                       : "")
+                   << reason << ": " << LogJob(cmd) << "\n";
 
       if (Comp.getEnableExperimentalDependencies())
         ExpDepGraph.getValue().printPath(llvm::outs(), cmd);
@@ -628,15 +632,17 @@ namespace driver {
         // Will reload again, sigh
         if (Comp.getShowIncrementalBuildDecisions() &&
             (!DependentsForDeps.empty() || !Dependents.empty())) {
-          llvm::outs() << "After completion of " << LogJob(FinishedCmd) << ": ";
+          llvm::outs() << "After completion of " << LogJob(FinishedCmd)
+                       << ": \n";
           for (auto const *Cmd : DependentsForDeps)
-            llvm::outs() << "Dependencies would now schedule: " << LogJob(Cmd)
+            llvm::outs() << "- Dependencies would now schedule: " << LogJob(Cmd)
                          << "\n";
           for (auto const *Cmd : Dependents)
-            llvm::outs() << "Source ranges will now schedule: " << LogJob(Cmd)
+            llvm::outs() << "- Source ranges will now schedule: " << LogJob(Cmd)
                          << "\n";
-          llvm::outs() << "For an additional " << DependentsForDeps.size()
-                       << " (deps) vs " << Dependents.size() << " (ranges)\n";
+          if (DependentsForDeps.size() > 1 || Dependents.size() > 1)
+            llvm::outs() << "For an additional " << DependentsForDeps.size()
+                         << " (deps) vs " << Dependents.size() << " (ranges)\n";
         }
       }
 
@@ -868,15 +874,17 @@ namespace driver {
           compileJobsToSchedule = compileJobsToScheduleViaSourceRanges;
 
         if (Comp.getShowIncrementalBuildDecisions()) {
-          llvm::outs() << "Dependencies would run "
-                       << compileJobsToScheduleViaDependencies.size()
-                       << " compilations initially, source-ranges would run "
-                       << compileJobsToScheduleViaSourceRanges.size()
-                       << " compilations almost always; selecting "
+          llvm::outs() << "\n"
+                       << "Selecting "
                        << (Comp.getUseSourceRangeDependencies()
                                ? "source ranges"
                                : "dependencies")
-                       << "\n";
+                       << " because "
+                       << "dependency jobs: "
+                       << compileJobsToScheduleViaDependencies.size()
+                       << " + ?, "
+                       << "source-range jobs: "
+                       << compileJobsToScheduleViaSourceRanges.size() << "\n\n";
         }
         for (const Job *Cmd : jobsLackingSupplementaryOutputs)
           compileJobsToSchedule.insert(Cmd);
