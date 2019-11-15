@@ -2118,8 +2118,32 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
       assert(ptai && "Expected `pointer_to_address` user for uninitialized "
                      "array intrinsic");
       // Propagate usefulness through `pointer_to_address` users' operands.
-      for (auto use : ptai->getUses())
-        propagateUseful(use->getUser(), dependentVariableIndex);
+      // Note: `propagateUseful(use->getUser(), ...)` is intentionally not used
+      // because it marks more values than necessary as useful, including:
+      // - The `Builtin.RawPointer` result of the intrinsic.
+      // - The `pointer_to_address` user of the `Builtin.RawPointer`.
+      // - `index_addr` and `integer_literal` instructions for indexing the
+      //   `Builtin.RawPointer`.
+      for (auto use : ptai->getUses()) {
+        auto *user = use->getUser();
+        if (auto *si = dyn_cast<StoreInst>(user)) {
+          setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
+        } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+          setUsefulAndPropagateToOperands(cai->getSrc(),
+                                          dependentVariableIndex);
+        } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+          for (auto use : iai->getUses()) {
+            auto *user = use->getUser();
+            if (auto si = dyn_cast<StoreInst>(user)) {
+              setUsefulAndPropagateToOperands(si->getSrc(),
+                                              dependentVariableIndex);
+            } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+              setUsefulAndPropagateToOperands(cai->getSrc(),
+                                              dependentVariableIndex);
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -7390,8 +7414,6 @@ public:
   // Address projections.
   NO_ADJOINT(StructElementAddr)
   NO_ADJOINT(TupleElementAddr)
-  NO_ADJOINT(PointerToAddress)
-  NO_ADJOINT(IndexAddr)
 
   // Memory allocation/access.
   NO_ADJOINT(AllocStack)
