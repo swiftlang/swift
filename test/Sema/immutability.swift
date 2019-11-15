@@ -701,3 +701,43 @@ extension JustAProtocol {
     name = "World" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }
+
+struct S {
+  var x = 0
+  static var y = 0
+
+  struct Nested {
+    func foo() {
+      // SR-11786: Make sure we don't offer the 'self.' fix-it here.
+      let x = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+      x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    }
+  }
+
+  func bar() {
+    // SR-11787: Make sure we insert "self." in the right location.
+    let x = 0 // expected-note 3{{change 'let' to 'var' to make it mutable}}
+    x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+
+    (try x) += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{10-10=self.}}
+
+    x = 1 // expected-error {{cannot assign to value: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+
+    // SR-11788: Insert "Type." for a static property.
+    let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+    y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'S.' to refer to mutable static property of 'S'}} {{5-5=S.}}
+  }
+}
+
+struct S2<T> {
+  static var y: Int { get { 0 } set {} }
+  func foo() {
+    let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+    y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'S2<T>.' to refer to mutable static property of 'S2<T>'}} {{5-5=S2<T>.}}
+  }
+}
