@@ -1034,10 +1034,10 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CFObject:
     M = getLoadedModule(Id_CoreFoundation);
     break;
-  case KnownProtocolKind::Differentiable:
-    M = getLoadedModule(Id_Differentiation);
-    break;
+
   // SWIFT_ENABLE_TENSORFLOW
+  // NOTE: The `Differentiable` protocol is in the stdlib module on tensorflow
+  // branch, but in `_Differentiation` module on the master branch.
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
     M = getLoadedModule(Id_TensorFlow);
@@ -1045,6 +1045,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Expression:
     M = getLoadedModule(Id_Quote);
     break;
+  // SWIFT_ENABLE_TENSORFLOW END
   default:
     M = getStdlibModule();
     break;
