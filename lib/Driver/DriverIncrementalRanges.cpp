@@ -292,7 +292,8 @@ bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
     const auto whatChanged = SerializableSourceRange::findOutlierIfAny(
         nonPriInfo.nonlocalChangedRanges, unparsedRanges->second);
     if (whatChanged) {
-      noteBuilding(Twine(nonPriFilename) + " changed at " + whatChanged->printString());
+      noteBuilding(Twine(nonPriFilename) + " changed at " +
+                   whatChanged->printString());
       return false;
     }
   }
@@ -337,9 +338,12 @@ void SourceRangeBasedInfo ::dumpAllInfo(
   }
 }
 
-void SourceRangeBasedInfo::dumpChangedRanges(const StringRef primaryFilename) const {
+void SourceRangeBasedInfo::dumpChangedRanges(
+    const StringRef primaryFilename) const {
   auto dumpRangeSet = [&](StringRef which, const Ranges &ranges) {
-    llvm::errs() << "*** " << which << " changed ranges in previously-compiled' " << primaryFilename << "' ***\n";
+    llvm::errs() << "*** " << which
+                 << " changed ranges in previously-compiled' "
+                 << primaryFilename << "' ***\n";
     for (const auto &r : ranges)
       llvm::errs() << r.printString() << "\n";
     llvm::errs() << "\n";
