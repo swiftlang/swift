@@ -185,7 +185,7 @@ struct SwiftRangesFileContents {
   load(const StringRef primaryPath, const llvm::MemoryBuffer &swiftRangesBuffer,
        const bool showIncrementalBuildDecisions, DiagnosticEngine &diags);
 
-  void dump(StringRef primary) const;
+  void dump(StringRef primaryFilename) const;
 
   static constexpr const char *header = "### Swift source ranges file v0 ###\n";
 };

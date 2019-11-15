@@ -261,7 +261,7 @@ bool SourceRangeBasedInfo::shouldScheduleCompileJob(
     return true;
   }
   return iter->second.didPrimaryParseAnyNonlocalNonprimaryChanges(
-      primary, allInfos, noteBuilding);
+      llvm::sys::path::filename(primary), allInfos, noteBuilding);
 }
 
 bool SourceRangeBasedInfo::didPrimaryParseAnyNonlocalNonprimaryChanges(
@@ -283,15 +283,16 @@ bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
     if (nonPri == primary || nonPriInfo.nonlocalChangedRanges.empty())
       continue;
     auto unparsedRanges = myUnparsedRangesByNonPri.find(nonPri);
+    const auto nonPriFilename = llvm::sys::path::filename(nonPri);
     if (unparsedRanges == myUnparsedRangesByNonPri.end()) {
-      noteBuilding(Twine(nonPri) +
+      noteBuilding(Twine(nonPriFilename) +
                    " changed non-locally but I have no unparsed ranges there");
       return false;
     }
     const auto whatChanged = SerializableSourceRange::findOutlierIfAny(
         nonPriInfo.nonlocalChangedRanges, unparsedRanges->second);
     if (whatChanged) {
-      noteBuilding(Twine(nonPri) + " changed at " + whatChanged->printString());
+      noteBuilding(Twine(nonPriFilename) + " changed at " + whatChanged->printString());
       return false;
     }
   }
@@ -328,21 +329,26 @@ void SourceRangeBasedInfo ::dumpAllInfo(
   if (!dumpSwiftRanges && !dumpCompiledSourceDiffs)
     return;
   for (const auto &info : allInfos) {
+    const auto filename = llvm::sys::path::filename(info.getKey());
     if (dumpSwiftRanges)
-      info.getValue().swiftRangesFileContents.dump(info.getKey());
+      info.getValue().swiftRangesFileContents.dump(filename);
     if (dumpCompiledSourceDiffs)
-      info.getValue().dumpChangedRanges(info.getKey());
+      info.getValue().dumpChangedRanges(filename);
   }
 }
 
-void SourceRangeBasedInfo::dumpChangedRanges(const StringRef primary) const {
-  llvm::errs() << "*** all changed ranges in '" << primary << "' ***\n";
-  for (const auto &r : changedRanges)
-    llvm::errs() << r.printString() << "\n";
-  llvm::errs() << "\n";
-  llvm::errs() << "*** nonlocal changed ranges in '" << primary << "' ***\n";
-  for (const auto &r : nonlocalChangedRanges)
-    llvm::errs() << r.printString() << "\n";
-  llvm::errs() << "\n";
-  llvm::errs() << "\n";
+void SourceRangeBasedInfo::dumpChangedRanges(const StringRef primaryFilename) const {
+  auto dumpRangeSet = [&](StringRef which, const Ranges &ranges) {
+    llvm::errs() << "*** " << which << " changed ranges in previously-compiled' " << primaryFilename << "' ***\n";
+    for (const auto &r : ranges)
+      llvm::errs() << r.printString() << "\n";
+    llvm::errs() << "\n";
+  };
+  if (changedRanges.empty()) {
+    assert(nonlocalChangedRanges.empty() && "A fortiori.");
+    dumpRangeSet("no", {});
+    return;
+  }
+  dumpRangeSet("all", changedRanges);
+  dumpRangeSet("nonlocal", nonlocalChangedRanges);
 }

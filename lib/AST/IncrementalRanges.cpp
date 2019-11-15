@@ -331,8 +331,8 @@ bool CompiledSourceEmitter::emit() {
 // MARK: SwiftRangesFileContents
 //==============================================================================
 
-void SwiftRangesFileContents::dump(const StringRef primary) const {
-  llvm::errs() << "\n*** Swift range file contents for '" << primary
+void SwiftRangesFileContents::dump(const StringRef primaryFilename) const {
+  llvm::errs() << "\n*** Swift range file contents for '" << primaryFilename
                << "': ***\n";
   llvm::yaml::Output dumper(llvm::errs());
   dumper << *const_cast<SwiftRangesFileContents *>(this);
