@@ -7305,95 +7305,85 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
       [&](Expr *expr, Type type) { setType(expr, type); });
 }
 
+namespace {
+  /// Function object to compare source locations, putting invalid
+  /// locations at the end.
+  class CompareExprSourceLocs {
+    SourceManager &sourceMgr;
+
+  public:
+    explicit CompareExprSourceLocs(SourceManager &sourceMgr)
+      : sourceMgr(sourceMgr) { }
+
+    bool operator()(Expr *lhs, Expr *rhs) const {
+      if (static_cast<bool>(lhs) != static_cast<bool>(rhs)) {
+        return static_cast<bool>(lhs);
+      }
+
+      auto lhsLoc = lhs->getLoc();
+      auto rhsLoc = rhs->getLoc();
+      if (lhsLoc.isValid() != rhsLoc.isValid())
+        return lhsLoc.isValid();
+
+      return sourceMgr.isBeforeInBuffer(lhsLoc, rhsLoc);
+    }
+  };
+
+}
+
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
-bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
+bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
   // First transfer all of the deduced information back
   // to the constraint system.
   applySolution(solution);
 
-  class DiagnosticWalker : public ASTWalker {
-    Expr *root;
-    const Solution &solution;
-    llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
+  /// Collect the fixes on a per-expression basis.
+  llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
+  for (auto *fix : solution.Fixes) {
+    fixesPerExpr[fix->getAnchor()].push_back(fix);
+  }
 
-    /// Determines whether any error have been diagnosed while
-    /// trying to apply fixes associated with a given solution.
-    bool DiagnosedAnyErrors = false;
+  // Collect all of the expressions that have fixes, and sort them by
+  // source ordering.
+  SmallVector<Expr *, 4> exprsWithFixes;
+  for (const auto &fix : fixesPerExpr) {
+    exprsWithFixes.push_back(fix.getFirst());
+  }
+  std::sort(exprsWithFixes.begin(), exprsWithFixes.end(),
+            CompareExprSourceLocs(Context.SourceMgr));
 
-  public:
-    DiagnosticWalker(Expr *expr, const Solution &solution)
-        : root(expr), solution(solution) {
-      for (auto *fix : solution.Fixes)
-        fixesPerExpr[fix->getAnchor()].push_back(fix);
-    }
+  // Walk over each of the expressions, diagnosing fixes.
+  bool diagnosedAnyErrors = false;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Diagnose root expression last.
-      if (E == root)
-        return {true, E};
+  for (auto expr : exprsWithFixes) {
+    // Coalesce fixes with the same locator to avoid duplicating notes.
+    auto fixes = fixesPerExpr[expr];
 
-      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
-        auto result = solution.builderTransformedClosures.find(closure);
-        if (result != solution.builderTransformedClosures.end()) {
-          auto *transformedExpr = result->second.singleExpr;
-          // Since this closure has been transformed into something
-          // else let's look inside transformed expression instead.
-          transformedExpr->walk(*this);
-          return {false, E};
-        }
-      }
+    using ConstraintFixVector = llvm::SmallVector<ConstraintFix *, 4>;
+    llvm::SmallMapVector<ConstraintLocator *,
+        llvm::SmallMapVector<FixKind, ConstraintFixVector, 4>, 4> aggregatedFixes;
+    for (auto *fix : fixes)
+      aggregatedFixes[fix->getLocator()][fix->getKind()].push_back(fix);
 
-      diagnose(E);
-      return {true, E};
-    }
+    for (auto fixesPerLocator : aggregatedFixes) {
+      for (auto fixesPerKind : fixesPerLocator.second) {
+        auto fixes = fixesPerKind.second;
+        auto *primaryFix = fixes[0];
+        ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
 
-    Expr *walkToExprPost(Expr *E) override {
-      if (E == root)
-        diagnose(E);
-      return E;
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return {true, S};
-    }
-
-    bool hadErrors() const { return DiagnosedAnyErrors; }
-
-  private:
-    void diagnose(Expr *E) {
-      auto fixes = fixesPerExpr.find(E);
-      if (fixes == fixesPerExpr.end())
-        return;
-
-      // Coalesce fixes with the same locator to avoid duplicating notes.
-      using ConstraintFixVector = llvm::SmallVector<ConstraintFix *, 4>;
-      llvm::SmallMapVector<ConstraintLocator *,
-          llvm::SmallMapVector<FixKind, ConstraintFixVector, 4>, 4> aggregatedFixes;
-      for (auto *fix : fixes->second)
-        aggregatedFixes[fix->getLocator()][fix->getKind()].push_back(fix);
-
-      for (auto fixesPerLocator : aggregatedFixes) {
-        for (auto fixesPerKind : fixesPerLocator.second) {
-          auto fixes = fixesPerKind.second;
-          auto *primaryFix = fixes[0];
-          ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
-
-          auto diagnosed = primaryFix->coalesceAndDiagnose(secondaryFixes);
-          if (primaryFix->isWarning()) {
-            assert(diagnosed && "warnings should always be diagnosed");
-            (void)diagnosed;
-          } else {
-            DiagnosedAnyErrors |= diagnosed;
-          }
+        auto diagnosed = primaryFix->coalesceAndDiagnose(secondaryFixes);
+        if (primaryFix->isWarning()) {
+          assert(diagnosed && "warnings should always be diagnosed");
+          (void)diagnosed;
+        } else {
+          diagnosedAnyErrors |= diagnosed;
         }
       }
     }
-  };
+  }
 
-  DiagnosticWalker diagnostics(E, solution);
-  E->walk(diagnostics);
-  return diagnostics.hadErrors();
+  return diagnosedAnyErrors;
 }
 
 /// Apply a given solution to the expression, producing a fully
@@ -7413,7 +7403,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     if (shouldSuppressDiagnostics())
       return nullptr;
 
-    bool diagnosedErrorsViaFixes = applySolutionFixes(expr, solution);
+    bool diagnosedErrorsViaFixes = applySolutionFixes(solution);
     // If all of the available fixes would result in a warning,
     // we can go ahead and apply this solution to AST.
     if (!llvm::all_of(solution.Fixes, [](const ConstraintFix *fix) {

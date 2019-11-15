@@ -1709,7 +1709,7 @@ private:
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
-  bool applySolutionFixes(Expr *E, const Solution &solution);
+  bool applySolutionFixes(const Solution &solution);
 
   /// If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
