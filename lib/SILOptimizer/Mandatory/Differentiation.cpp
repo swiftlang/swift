@@ -7153,8 +7153,9 @@ public:
 
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
-  ///    Adjoint: adj[x0] += tuple_extract adj[y], 0
-  ///             ...
+  ///    Adjoint: (adj[x0], adj[x1], adj[x2], ...) += destructure_tuple adj[y]
+  ///                                         ^~~
+  ///                         excluding non-differentiable elements
   void visitTupleInst(TupleInst *ti) {
     auto *bb = ti->getParent();
     auto av = getAdjointValue(bb, ti);
@@ -7171,7 +7172,10 @@ public:
     case AdjointValueKind::Concrete: {
       auto val = av.getConcreteValue();
       unsigned adjIdx = 0;
-      auto elts = builder.createDestructureTuple(ti->getLoc(), val);
+      auto valCopy = builder.emitCopyValueOperation(ti->getLoc(), val);
+      auto elts = builder.createDestructureTuple(ti->getLoc(), valCopy);
+      for (auto elt : elts->getResults())
+        recordTemporary(elt);
       for (auto i : range(ti->getNumOperands())) {
         if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
           continue;
