@@ -704,6 +704,7 @@ extension JustAProtocol {
 
 struct S {
   var x = 0
+  static var y = 0
 
   struct Nested {
     func foo() {
@@ -724,5 +725,19 @@ struct S {
 
     x = 1 // expected-error {{cannot assign to value: 'x' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+
+    // SR-11788: Insert "Type." for a static property.
+    let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+    y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'S.' to refer to mutable static property of 'S'}} {{5-5=S.}}
+  }
+}
+
+struct S2<T> {
+  static var y: Int { get { 0 } set {} }
+  func foo() {
+    let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+    y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'S2<T>.' to refer to mutable static property of 'S2<T>'}} {{5-5=S2<T>.}}
   }
 }

@@ -1616,8 +1616,8 @@ bool AssignmentFailure::diagnoseAsError() {
       emitDiagnostic(Loc, DeclDiagnostic, message)
           .highlight(immutableExpr->getSourceRange());
 
-      // If there is a masked instance variable of the same type, emit a
-      // note to fixit prepend a 'self.'.
+      // If there is a masked property of the same type, emit a
+      // note to fixit prepend a 'self.' or 'Type.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
         SmallVector<ValueDecl *, 2> results;
         DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
@@ -1648,9 +1648,20 @@ bool AssignmentFailure::diagnoseAsError() {
 
         if (foundProperty != results.end()) {
           auto startLoc = immutableExpr->getStartLoc();
-          emitDiagnostic(startLoc, diag::masked_instance_variable,
-                         typeContext->getSelfTypeInContext())
-              .fixItInsert(startLoc, "self.");
+          auto *property = *foundProperty;
+          auto selfTy = typeContext->getSelfTypeInContext();
+
+          // If we found an instance property, suggest inserting "self.",
+          // otherwise suggest "Type." for a static property.
+          std::string fixItText;
+          if (property->isInstanceMember()) {
+            fixItText = "self.";
+          } else {
+            fixItText = selfTy->getString() + ".";
+          }
+          emitDiagnostic(startLoc, diag::masked_mutable_property,
+                         fixItText, property->getDescriptiveKind(), selfTy)
+              .fixItInsert(startLoc, fixItText);
         }
       }
 
