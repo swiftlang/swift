@@ -677,8 +677,6 @@ Type ConstraintSystem::openUnboundGenericType(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
 
-  checkNestedTypeConstraints(*this, type, locator);
-
   if (!type->hasUnboundGenericType())
     return type;
 
@@ -1036,6 +1034,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                       TypeResolverContext::InExpression,
                                       /*isSpecialized=*/false);
 
+    checkNestedTypeConstraints(*this, type, locator);
+
     // Open the type.
     type = openUnboundGenericType(type, locator);
 
@@ -1289,6 +1289,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
     auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                          typeDecl, baseObjTy);
+
+    checkNestedTypeConstraints(*this, memberTy, locator);
+
     // Open the type if it was a reference to a generic type.
     memberTy = openUnboundGenericType(memberTy, locator);
 
