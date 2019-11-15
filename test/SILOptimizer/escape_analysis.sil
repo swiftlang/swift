@@ -1535,3 +1535,123 @@ bb0:
   return %7 : $()
 }
 
+// Test the absence of redundant pointsTo edges
+// CHECK-LABEL: CG of testInitializePointsToLeaf
+// CHECK:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK:   Con %0.1 Esc: A, Succ: (%0.2) [rc]
+// CHECK:   Con %0.2 Esc: A, Succ: (%12.1)
+// CHECK:   Val %2 Esc: %4, Succ: %0.2
+// CHECK:   Val %4 Esc: %4, Succ: %2
+// CHECK:   Val %7 Esc: %12, Succ: (%12.1), %0.2
+// CHECK:   Val %12 Esc: %12, Succ: (%12.1), %7
+// CHECK:   Con %12.1 Esc: A, Succ: (%13) [rc]
+// CHECK:   Con %13 Esc: A, Succ:
+// CHECK-LABEL: End
+class C {
+  var c: C
+}
+
+sil @testInitializePointsToWrapOptional : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode> {
+bb0(%0: $LinkedNode):
+  %adr = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %val = load %adr : $*LinkedNode
+  %optional = enum $Optional<LinkedNode>, #Optional.some!enumelt.1, %val : $LinkedNode
+  return %optional : $Optional<LinkedNode>
+}
+
+sil @testInitializePointsToLeaf : $@convention(method) (@guaranteed LinkedNode) -> () {
+bb0(%0 : $LinkedNode):
+  %f1 = function_ref @testInitializePointsToWrapOptional : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode>
+  %call1 = apply %f1(%0) : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode>
+  switch_enum %call1 : $Optional<LinkedNode>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb3
+
+bb2(%arg1 : $LinkedNode):
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %call2 = apply %f1(%0) : $@convention(method) (@guaranteed LinkedNode) -> Optional<LinkedNode>
+  switch_enum %call2 : $Optional<LinkedNode>, case #Optional.some!enumelt.1: bb10, case #Optional.none!enumelt: bb9
+
+bb9:
+  %37 = integer_literal $Builtin.Int1, -1
+  cond_fail %37 : $Builtin.Int1, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+// %40
+bb10(%arg2 : $LinkedNode):
+  %adr = ref_element_addr %arg2 : $LinkedNode, #LinkedNode.next
+  %val = load %adr : $*LinkedNode
+  %66 = tuple ()
+  return %66 : $()
+}
+
+// Another test for redundant pointsTo edges. In the original
+// implementation, redundant points edges were created whenever adding
+// a defer edge from a node with uninitialized pointsTo to a node with
+// already-initialized pointsTo.
+// CHECK-LABEL: CG of testInitializePointsToRedundant
+// CHECK:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK:   Con %0.1 Esc: A, Succ: (%2) [rc]
+// CHECK:   Arg %1 Esc: A, Succ: (%0.1)
+// CHECK:   Con %2 Esc: A, Succ:
+// CHECK:   Val %7 Esc: %7,%18, Succ: %0
+// CHECK:   Val %12 Esc: %12,%14,%18, Succ: %1
+// CHECK:   Val %14 Esc: %18, Succ: (%0.1), %1, %12
+// CHECK:   Val %18 Esc: %18, Succ: %7, %14
+// CHECK-LABEL: End
+sil @testInitializePointsToMerge : $@convention(method) (@guaranteed C, @guaranteed C) -> C {
+bb0(%0: $C, %1 : $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $C)
+
+bb2:
+  br bb3(%1 : $C)
+
+bb3(%arg : $C):
+  return %arg : $C
+}
+
+sil @testInitializePointsToRedundant : $@convention(method) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : $C, %1 : $C):
+  %adr0 = ref_element_addr %0 : $C, #C.c
+  %val0 = load %adr0 : $*C
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $C)
+
+bb2:
+  br bb3(%0 : $C)
+
+bb3(%arg1 : $C):
+  br bb4
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb7(%1 : $C)
+
+bb6:
+  br bb7(%1 : $C)
+
+bb7(%arg2 : $C):
+  %f1 = function_ref @testInitializePointsToMerge : $@convention(method) (@guaranteed C, @guaranteed C) -> C
+  %call1 = apply %f1(%arg2, %1) : $@convention(method) (@guaranteed C, @guaranteed C) -> C
+  cond_br undef, bb8, bb9
+
+bb8:
+  br bb10(%call1 : $C)
+
+bb9:
+  br bb10(%arg1 : $C)
+
+bb10(%arg3 : $C):
+  %66 = tuple ()
+  return %66 : $()
+}
