@@ -366,9 +366,6 @@ internal func _withTemporaryBridgedCocoaString<R>(
   _ cocoaString: _CocoaString,
   _ work: (String) throws -> R
 ) rethrows -> R {
-  guard let cocoaString = cocoaString else {
-    return try work("")
-  }
   switch _KnownCocoaString(cocoaString) {
   case .storage(let storage):
     return try work(storage.asString)
