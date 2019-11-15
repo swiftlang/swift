@@ -1736,7 +1736,7 @@ namespace {
     bool
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
-                                 bool requiresMappingOut,
+                                 bool requiresMappingOut, bool isDifferentiable,
                                  SmallVectorImpl<AnyFunctionType::Param> &ps);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
@@ -1970,6 +1970,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Remember whether this is a function parameter.
   bool isParam = options.is(TypeResolverContext::FunctionInput);
 
+  // Remember whether this is a variadic function parameter.
+  bool isVariadicFunctionParam =
+      options.is(TypeResolverContext::VariadicFunctionInput) &&
+      !options.hasBase(TypeResolverContext::EnumElementDecl);
+
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
@@ -2198,10 +2203,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       // @autoclosure is only valid on parameters.
       if (!isParam && attrs.has(TAK_autoclosure)) {
-        bool isVariadicFunctionParam =
-            options.is(TypeResolverContext::VariadicFunctionInput) &&
-            !options.hasBase(TypeResolverContext::EnumElementDecl);
-
         diagnose(attrs.getLoc(TAK_autoclosure),
                  isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
                                          : diag::attr_only_on_parameters,
@@ -2308,6 +2309,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.convention = None;
   }
 
+  if (attrs.has(TAK_nondiff)) {
+    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+      diagnose(attrs.getLoc(TAK_nondiff),
+               diag::experimental_differentiable_programming_disabled);
+    } else if (!isParam) {
+      // @nondiff is only valid on parameters.
+      diagnose(attrs.getLoc(TAK_nondiff),
+               (isVariadicFunctionParam
+                    ? diag::attr_not_on_variadic_parameters
+                    : diag::attr_only_on_parameters_of_differentiable),
+               "@nondiff");
+    }
+    attrs.clearAttribute(TAK_nondiff);
+  }
+
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
@@ -2360,7 +2376,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
 bool TypeResolver::resolveASTFunctionTypeParams(
     TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    bool requiresMappingOut,
+    bool requiresMappingOut, bool isDifferentiable,
     SmallVectorImpl<AnyFunctionType::Param> &elements) {
   elements.reserve(inputRepr->getNumElements());
 
@@ -2424,8 +2440,23 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ownership = ValueOwnership::Default;
       break;
     }
+
+    bool nondiff = false;
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+      if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
+        if (!isDifferentiable &&
+            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_only_on_parameters_of_differentiable, "@nondiff")
+              .highlight(eltTypeRepr->getSourceRange());
+        else
+          nondiff = true;
+      }
+    }
+
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
+        nondiff);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2477,7 +2508,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   SmallVector<AnyFunctionType::Param, 8> params;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                         repr->getGenericEnvironment() != nullptr, params)) {
+                                   repr->getGenericEnvironment() != nullptr,
+                                   extInfo.isDifferentiable(), params)) {
     return Type();
   }
 

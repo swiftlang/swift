@@ -3931,8 +3931,8 @@ public:
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(),
-          rawOwnership);
+          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
+          paramFlags.isNonDifferentiable());
     }
   }
 
