@@ -2261,6 +2261,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!result)
     return Type();
 
+  // Apply this solution to the constraint system.
+  cs.applySolution(solution);
+
   // Apply the solution to the expression.
   result = cs.applySolution(
       solution, result, convertType.getType(),

@@ -7334,10 +7334,6 @@ namespace {
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
-  // First transfer all of the deduced information back
-  // to the constraint system.
-  applySolution(solution);
-
   /// Collect the fixes on a per-expression basis.
   llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
   for (auto *fix : solution.Fixes) {
@@ -7392,11 +7388,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
                                       bool skipClosures) {
-  // Add the node types back.
-  for (auto &nodeType : solution.addedNodeTypes) {
-    setType(nodeType.first, nodeType.second);
-  }
-
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
