@@ -68,11 +68,19 @@ bool swift::removeUnreachableBlocks(SILFunction &f) {
   return changed;
 }
 
-/// Helper function to perform SSA updates in case of jump threading.
-void swift::updateSSAAfterCloning(BasicBlockCloner &cloner,
-                                  SILBasicBlock *srcBB, SILBasicBlock *destBB) {
+void BasicBlockCloner::updateSSAAfterCloning() {
+  // All instructions should have been checked by canCloneInstruction. But we
+  // still need to check the arguments.
+  for (auto arg : origBB->getArguments()) {
+    if ((needsSSAUpdate |= isUsedOutsideOfBlock(arg))) {
+      break;
+    }
+  }
+  if (!needsSSAUpdate)
+    return;
+
   SILSSAUpdater ssaUpdater;
-  for (auto availValPair : cloner.AvailVals) {
+  for (auto availValPair : availVals) {
     ValueBase *inst = availValPair.first;
     if (inst->use_empty())
       continue;
@@ -85,20 +93,20 @@ void swift::updateSSAAfterCloning(BasicBlockCloner &cloner,
       useList.push_back(UseWrapper(use));
 
     ssaUpdater.Initialize(inst->getType());
-    ssaUpdater.AddAvailableValue(destBB, inst);
-    ssaUpdater.AddAvailableValue(srcBB, newResult);
+    ssaUpdater.AddAvailableValue(origBB, inst);
+    ssaUpdater.AddAvailableValue(getNewBB(), newResult);
 
     if (useList.empty())
       continue;
 
     // Update all the uses.
     for (auto useWrapper : useList) {
-      Operand *use = useWrapper;
+      Operand *use = useWrapper; // unwrap
       SILInstruction *user = use->getUser();
       assert(user && "Missing user");
 
       // Ignore uses in the same basic block.
-      if (user->getParent() == destBB)
+      if (user->getParent() == origBB)
         continue;
 
       ssaUpdater.RewriteUse(*use);
@@ -128,6 +136,29 @@ bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *domInfo,
   return changed;
 }
 
+void BasicBlockCloner::sinkAddressProjections() {
+  // Because the address projections chains will be disjoint (an instruction
+  // in one chain cannot use the result of an instruction in another chain),
+  // the order they are sunk does not matter.
+  for (auto ii = origBB->begin(), ie = origBB->end(); ii != ie;) {
+    bool canSink = sinkProj.analyzeAddressProjections(&*ii);
+    (void)canSink;
+    assert(canSink && "canCloneInstruction should catch this.");
+
+    sinkProj.cloneProjections();
+    assert((sinkProj.getInBlockDefs().empty() || needsSSAUpdate)
+           && "canCloneInstruction should catch this.");
+
+    auto nextII = std::next(ii);
+    recursivelyDeleteTriviallyDeadInstructions(
+        &*ii, false, [&nextII](SILInstruction *deadInst) {
+          if (deadInst->getIterator() == nextII)
+            ++nextII;
+        });
+    ii = nextII;
+  }
+}
+
 // Populate 'projections' with the chain of address projections leading
 // to and including 'inst'.
 //
@@ -149,7 +180,7 @@ bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
       return true;
     }
     if (auto *addressProj = dyn_cast<SingleValueInstruction>(def)) {
-      if (addressProj->isTriviallyDuplicatable()) {
+      if (addressProj->isPure()) {
         projections.push_back(addressProj);
         return true;
       }
@@ -183,19 +214,40 @@ bool SinkAddressProjections::cloneProjections() {
     return false;
 
   SILBasicBlock *bb = projections.front()->getParent();
-  SmallVector<Operand *, 4> usesToReplace;
   // Clone projections in last-to-first order.
   for (unsigned idx = 0; idx < projections.size(); ++idx) {
     auto *oldProj = projections[idx];
     assert(oldProj->getParent() == bb);
+    // Reset transient per-projection sets.
     usesToReplace.clear();
+    firstBlockUse.clear();
+    // Gather uses.
     for (Operand *use : oldProj->getUses()) {
-      if (use->getUser()->getParent() != bb)
+      auto *useBB = use->getUser()->getParent();
+      if (useBB != bb) {
+        firstBlockUse.try_emplace(useBB, use);
         usesToReplace.push_back(use);
+      }
     }
+    // Replace uses. Uses must be handled in the same order they were discovered
+    // above.
+    //
+    // Avoid cloning a projection multiple times per block. This avoids extra
+    // projections, but also prevents the removal of DebugValue. If a
+    // projection's only remaining is DebugValue, then it is deleted along with
+    // the DebugValue.
     for (Operand *use : usesToReplace) {
-      auto *newProj = oldProj->clone(use->getUser());
-      use->set(cast<SingleValueInstruction>(newProj));
+      auto *useBB = use->getUser()->getParent();
+      auto *firstUse = firstBlockUse.lookup(useBB);
+      SingleValueInstruction *newProj;
+      if (use == firstUse)
+        newProj = cast<SingleValueInstruction>(oldProj->clone(use->getUser()));
+      else {
+        newProj = cast<SingleValueInstruction>(firstUse->get());
+        assert(newProj->getParent() == useBB);
+        newProj->moveFront(useBB);
+      }
+      use->set(newProj);
     }
   }
   return true;
