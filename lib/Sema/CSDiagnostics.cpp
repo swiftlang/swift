@@ -1647,9 +1647,10 @@ bool AssignmentFailure::diagnoseAsError() {
         });
 
         if (foundProperty != results.end()) {
-          emitDiagnostic(Loc, diag::masked_instance_variable,
+          auto startLoc = immutableExpr->getStartLoc();
+          emitDiagnostic(startLoc, diag::masked_instance_variable,
                          typeContext->getSelfTypeInContext())
-              .fixItInsert(Loc, "self.");
+              .fixItInsert(startLoc, "self.");
         }
       }
 

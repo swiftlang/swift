@@ -712,4 +712,17 @@ struct S {
       x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
     }
   }
+
+  func bar() {
+    // SR-11787: Make sure we insert "self." in the right location.
+    let x = 0 // expected-note 3{{change 'let' to 'var' to make it mutable}}
+    x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+
+    (try x) += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{10-10=self.}}
+
+    x = 1 // expected-error {{cannot assign to value: 'x' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
+  }
 }
