@@ -105,13 +105,11 @@ extension GenericExtended : Equatable, AdditiveArithmetic, VectorProtocol where 
 // Test errors.
 
 // expected-error @+2 {{type 'Empty' does not conform to protocol 'VectorProtocol'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 struct Empty : VectorProtocol {}
 
 // Test type whose members conform to `VectorProtocol`
 // but have different `VectorSpaceScalar` associated type.
 // expected-error @+2 {{type 'InvalidMixedScalar' does not conform to protocol 'VectorProtocol'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 struct InvalidMixedScalar: VectorProtocol {
   var float: Float
   var double: Double
@@ -137,10 +135,8 @@ extension NoMemberwiseInitializerExtended : VectorProtocol
 
 // expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'VectorProtocol'}}
 // expected-error @+2 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension OtherFileNonconforming : VectorProtocol {}
 
 // expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'VectorProtocol'}}
 // expected-error @+2 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension GenericOtherFileNonconforming : VectorProtocol {}

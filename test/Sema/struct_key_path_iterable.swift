@@ -138,10 +138,8 @@ struct NameLookupConflict: NameLookupConflictProtocol & KeyPathIterable {
 
 // expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'KeyPathIterable'}}
 // expected-error @+2 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension OtherFileNonconforming : KeyPathIterable {}
 
 // expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'KeyPathIterable'}}
 // expected-error @+2 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension GenericOtherFileNonconforming : KeyPathIterable {}

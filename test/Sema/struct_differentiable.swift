@@ -326,14 +326,12 @@ public struct TF_269 : TF_269_Layer {
 // Thees should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
 // expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = Simple
 }
 // expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -381,7 +379,6 @@ extension NoMemberwiseInitializerExtended: Differentiable
   where T : Differentiable & AdditiveArithmetic {}
 // Test that `MemberwiseInitializerExtended` cannot conform to `EuclideanDifferentiable` because `T.TangentVector != T`.
 // expected-error @+2 {{type 'NoMemberwiseInitializerExtended<T>' does not conform to protocol 'EuclideanDifferentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension NoMemberwiseInitializerExtended: EuclideanDifferentiable
   where T : Differentiable & AdditiveArithmetic {}
 
@@ -389,10 +386,8 @@ extension NoMemberwiseInitializerExtended: EuclideanDifferentiable
 
 // expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
 // expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension OtherFileNonconforming : Differentiable {}
 
 // expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
 // expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 extension GenericOtherFileNonconforming : Differentiable {}
