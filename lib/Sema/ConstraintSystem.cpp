@@ -2727,6 +2727,29 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   return name;
 }
 
+/// Extend the given index map with all of the subexpressions in the given
+/// expression.
+static void extendPreorderIndexMap(
+    Expr *expr, llvm::DenseMap<Expr *, unsigned> &indexMap) {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, unsigned> &IndexMap;
+    unsigned Index = 0;
+
+    explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
+      : IndexMap(indexMap) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      IndexMap[E] = Index;
+      Index++;
+      return { true, E };
+    }
+  };
+
+  RecordingTraversal traversal(indexMap);
+  expr->walk(traversal);
+}
+
 bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
                                          ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
@@ -2747,7 +2770,10 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   // Heuristically, all other things being equal, we should complain about the
   // ambiguous expression that (1) has the most overloads, (2) is deepest, or
   // (3) comes earliest in the expression.
-  auto indexMap = expr->getPreorderIndexMap();
+  llvm::DenseMap<Expr *, unsigned> indexMap;
+  for (auto expr : InputExprs) {
+    extendPreorderIndexMap(expr, indexMap);
+  }
 
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
     auto &overload = diff.overloads[i];
