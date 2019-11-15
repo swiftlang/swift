@@ -1425,19 +1425,19 @@ private:
   /// The original function.
   SILFunction &getFunction();
 
-  /// The conformance lookup function.
-  // FIXME(TF-945): `LookupConformanceFn` is a type alias for
-  // `llvm::function_ref`, which does not own the underlying callable and should
-  // not be stored. Instead, delete `getLookupConformanceFunction()` and define
-  // a `hasTangentSpace(SILValue)` helper.
-  LookupConformanceFn getLookupConformanceFunction() {
-    // Look up in derivative generic signature, if defined.
-    if (derivativeGenericSignature)
-      return LookUpConformanceInSignature(
-          derivativeGenericSignature.getPointer());
-    // Otherwise, look up in the module.
-    return LookUpConformanceInModule(
-        getFunction().getModule().getSwiftModule());
+  /// Returns true if the given SILValue has a tangent space.
+  bool hasTangentSpace(SILValue value) {
+    auto type = value->getType().getASTType();
+    // Remap archetypes in the derivative generic signature, if it exists.
+    if (derivativeGenericSignature && type->hasArchetype()) {
+      type = derivativeGenericSignature->getCanonicalTypeInContext(
+          type->mapTypeOutOfContext());
+    }
+    // Look up conformance in the current module.
+    auto lookupConformance =
+        LookUpConformanceInModule(getFunction().getModule().getSwiftModule());
+    return type->getAutoDiffAssociatedTangentSpace(
+        lookupConformance).hasValue();
   }
 
   /// Perform analysis and populate variedness and usefulness sets.
@@ -2003,12 +2003,7 @@ void DifferentiableActivityInfo::propagateVaried(
     if (isVaried(teai->getOperand(), i)) {
       // Propagate variedness only if the `tuple_element_addr` result has a
       // tangent space. Otherwise, the result does not need a derivative.
-      auto projType = teai->getType().getASTType();
-      if (derivativeGenericSignature && projType->hasArchetype())
-        projType = derivativeGenericSignature->getCanonicalTypeInContext(
-            projType->mapTypeOutOfContext());
-      if (projType->getAutoDiffAssociatedTangentSpace(
-              getLookupConformanceFunction()))
+      if (hasTangentSpace(teai))
         setVariedAndPropagateToUsers(teai, i);
     }
   }
