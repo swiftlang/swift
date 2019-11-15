@@ -1555,9 +1555,9 @@ bool AssignmentFailure::diagnoseAsError() {
 
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
-  auto immInfo = resolveImmutableBase(DestExpr);
-
-  Optional<OverloadChoice> choice = immInfo.second;
+  Expr *immutableExpr;
+  Optional<OverloadChoice> choice;
+  std::tie(immutableExpr, choice) = resolveImmutableBase(DestExpr);
 
   // Attempt diagnostics based on the overload choice.
   if (choice.hasValue()) {
@@ -1571,9 +1571,9 @@ bool AssignmentFailure::diagnoseAsError() {
 
     if (!choice->isDecl()) {
       if (choice->getKind() == OverloadChoiceKind::KeyPathApplication &&
-          !isa<ApplyExpr>(immInfo.first)) {
+          !isa<ApplyExpr>(immutableExpr)) {
         std::string message = "key path is read-only";
-        if (auto *SE = dyn_cast<SubscriptExpr>(immInfo.first)) {
+        if (auto *SE = dyn_cast<SubscriptExpr>(immutableExpr)) {
           if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
             auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
             message =
@@ -1581,7 +1581,7 @@ bool AssignmentFailure::diagnoseAsError() {
           }
         }
         emitDiagnostic(Loc, DeclDiagnostic, message)
-            .highlight(immInfo.first->getSourceRange());
+            .highlight(immutableExpr->getSourceRange());
         return true;
       }
       return false;
@@ -1595,7 +1595,7 @@ bool AssignmentFailure::diagnoseAsError() {
       message += VD->getName().str().str();
       message += "'";
 
-      auto type = getType(immInfo.first);
+      auto type = getType(immutableExpr);
 
       if (isKnownKeyPathType(type))
         message += " is read-only";
@@ -1614,7 +1614,7 @@ bool AssignmentFailure::diagnoseAsError() {
       }
 
       emitDiagnostic(Loc, DeclDiagnostic, message)
-          .highlight(immInfo.first->getSourceRange());
+          .highlight(immutableExpr->getSourceRange());
 
       // If there is a masked instance variable of the same type, emit a
       // note to fixit prepend a 'self.'.
@@ -1654,7 +1654,7 @@ bool AssignmentFailure::diagnoseAsError() {
         message = "subscript is immutable";
 
       emitDiagnostic(Loc, DeclDiagnostic, message)
-          .highlight(immInfo.first->getSourceRange());
+          .highlight(immutableExpr->getSourceRange());
       return true;
     }
 
@@ -1676,7 +1676,7 @@ bool AssignmentFailure::diagnoseAsError() {
         message += " is not settable";
 
       emitDiagnostic(Loc, diagID, message)
-          .highlight(immInfo.first->getSourceRange());
+          .highlight(immutableExpr->getSourceRange());
       return true;
     }
   }
@@ -1686,13 +1686,13 @@ bool AssignmentFailure::diagnoseAsError() {
 
   // If a keypath was the problem but wasn't resolved into a vardecl
   // it is ambiguous or unable to be used for setting.
-  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immInfo.first)) {
+  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immutableExpr)) {
     emitDiagnostic(Loc, DeclDiagnostic, "immutable key path")
         .highlight(KPE->getSourceRange());
     return true;
   }
 
-  if (auto LE = dyn_cast<LiteralExpr>(immInfo.first)) {
+  if (auto LE = dyn_cast<LiteralExpr>(immutableExpr)) {
     emitDiagnostic(Loc, DeclDiagnostic, "literals are not mutable")
         .highlight(LE->getSourceRange());
     return true;
@@ -1700,7 +1700,7 @@ bool AssignmentFailure::diagnoseAsError() {
 
   // If the expression is the result of a call, it is an rvalue, not a mutable
   // lvalue.
-  if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
+  if (auto *AE = dyn_cast<ApplyExpr>(immutableExpr)) {
     // Handle literals, which are a call to the conversion function.
     auto argsTuple =
         dyn_cast<TupleExpr>(AE->getArg()->getSemanticsProvidingExpr());
@@ -1733,22 +1733,22 @@ bool AssignmentFailure::diagnoseAsError() {
     return true;
   }
 
-  if (auto contextualType = cs.getContextualType(immInfo.first)) {
+  if (auto contextualType = cs.getContextualType(immutableExpr)) {
     Type neededType = contextualType->getInOutObjectType();
-    Type actualType = getType(immInfo.first)->getInOutObjectType();
+    Type actualType = getType(immutableExpr)->getInOutObjectType();
     if (!neededType->isEqual(actualType)) {
       if (DeclDiagnostic.ID != diag::cannot_pass_rvalue_inout_subelement.ID) {
         emitDiagnostic(Loc, DeclDiagnostic,
                        "implicit conversion from '" + actualType->getString() +
                            "' to '" + neededType->getString() +
                            "' requires a temporary")
-            .highlight(immInfo.first->getSourceRange());
+            .highlight(immutableExpr->getSourceRange());
       }
       return true;
     }
   }
 
-  if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
+  if (auto IE = dyn_cast<IfExpr>(immutableExpr)) {
     emitDiagnostic(Loc, DeclDiagnostic,
                    "result of conditional operator '? :' is never mutable")
         .highlight(IE->getQuestionLoc())
@@ -1757,7 +1757,7 @@ bool AssignmentFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(Loc, TypeDiagnostic, getType(DestExpr))
-      .highlight(immInfo.first->getSourceRange());
+      .highlight(immutableExpr->getSourceRange());
   return true;
 }
 
