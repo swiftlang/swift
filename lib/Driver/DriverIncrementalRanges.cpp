@@ -257,7 +257,7 @@ bool SourceRangeBasedInfo::shouldScheduleCompileJob(
     return true;
   }
   if (!iter->second.changedRanges.empty()) {
-    noteBuilding(" source changed");
+    noteBuilding("source changed");
     return true;
   }
   return iter->second.didPrimaryParseAnyNonlocalNonprimaryChanges(
