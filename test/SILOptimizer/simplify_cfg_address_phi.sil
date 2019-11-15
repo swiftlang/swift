@@ -134,3 +134,118 @@ bb4:
 bb5:
   return %val : $Builtin.Int32
 }
+
+// Test that debug_value_addr is not unnecessarilly lost during address projection sinking.
+public class CC<R> {
+  let r : R
+  init(_ _r: R) { r = _r }
+}
+
+sil @useAny : $@convention(thin) <V> (@in_guaranteed V) -> ()
+
+// CHECK-LABEL: sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
+// CHECK: debug_value_addr %0 : $*S, let, name "u"
+// CHECK: apply %{{.*}}<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[FIELD:%.*]] = ref_element_addr %1 : $CC<R>, #CC.r
+// CHECK: debug_value_addr [[FIELD]] : $*R, let, name "u"
+// CHECK: apply %10<R>([[FIELD]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: } // end sil function 'testDebugValue'
+sil @testDebugValue : $@convention(method) <R><S> (@in_guaranteed S, @guaranteed CC<R>, Bool) -> () {
+bb0(%0 : $*S, %1 : $CC<R>, %2 : $Bool):
+  %bool = struct_extract %2 : $Bool, #Bool._value
+  cond_br %bool, bb1, bb2
+
+bb1:
+  debug_value_addr %0 : $*S, let, name "u"
+  %f1 = function_ref @useAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %call1 = apply %f1<S>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb2
+
+bb2:
+  %field = ref_element_addr %1 : $CC<R>, #CC.r
+  debug_value_addr %field : $*R, let, name "t"
+  cond_br %bool, bb3, bb4
+
+bb3:
+  debug_value_addr %field : $*R, let, name "u"
+  %f2 = function_ref @useAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %call2 = apply %f2<R>(%field) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb4
+
+bb4:
+  %z = tuple ()
+  return %z : $()
+}
+
+// Test multiple uses and cloned allocation.
+//
+// project_box and struct_extract_addr will be sunk into three
+// different blocks, but only once per block.
+struct S {
+  @_hasStorage @_hasInitialValue var x: Int { get set }
+  init(x: Int = 0)
+  init()
+}
+sil @doNothing : $@convention(thin) (@inout Int) -> ()
+
+// CHECK-LABEL: sil @testMultiUse : $@convention(method) (Bool, @inout Int) -> () {
+// CHECK: bb0(%0 : $Bool, %1 : $*Int):
+// CHECK:   cond_br %{{.*}}, bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[ALLOC1:%.*]] = alloc_box ${ var S }, var, name "s"
+// CHECK:   [[PROJ1:%.*]] = project_box [[ALLOC1]] : ${ var S }, 0
+// CHECK:   [[ADR1:%.*]] = struct_element_addr [[PROJ1]] : $*S, #S.x
+// CHECK:   store %{{.*}} to [[ADR1]] : $*Int
+// CHECK:   br bb3([[ALLOC1]] : ${ var S })
+// CHECK: bb2:
+// CHECK:   apply %{{.*}}(%1) : $@convention(thin) (@inout Int) -> ()
+// CHECK:   [[ALLOC2:%.*]] = alloc_box ${ var S }, var, name "s"
+// CHECK:   [[PROJ2:%.*]] = project_box [[ALLOC2]] : ${ var S }, 0
+// CHECK:   [[ADR2:%.*]] = struct_element_addr [[PROJ2]] : $*S, #S.x
+// CHECK:   store %{{.*}} to [[ADR2]] : $*Int
+// CHECK:   apply %{{.*}}([[ADR2]]) : $@convention(thin) (@inout Int) -> ()
+// CHECK:   br bb3([[ALLOC2]] : ${ var S })
+// CHECK: bb3([[BOXARG:%.*]] : ${ var S }):
+// CHECK:   [[PROJ3:%.*]] = project_box [[BOXARG]] : ${ var S }, 0
+// CHECK:   [[ADR3:%.*]] = struct_element_addr [[PROJ3]] : $*S, #S.x
+// CHECK:   apply %{{.*}}([[ADR3]]) : $@convention(thin) (@inout Int) -> ()
+// CHECK:   release_value [[BOXARG]] : ${ var S }
+// CHECK-LABEL: } // end sil function 'testMultiUse'
+sil @testMultiUse : $@convention(method) (Bool, @inout Int) -> () {
+bb0(%0 : $Bool, %1 : $*Int):
+  %bool = struct_extract %0 : $Bool, #Bool._value
+  cond_br %bool, bb1, bb2
+
+bb1:
+  %f1 = function_ref @doNothing : $@convention(thin) (@inout Int) -> ()
+  %call1 = apply %f1(%1) : $@convention(thin) (@inout Int) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %box3 = alloc_box ${ var S }, var, name "s"
+  %proj3 = project_box %box3 : ${ var S }, 0
+  %adr3 = struct_element_addr %proj3 : $*S, #S.x
+  cond_br %bool, bb4, bb5
+
+bb4:
+  %i4 = load %1 : $*Int
+  store %i4 to %adr3 : $*Int
+  %f2 = function_ref @doNothing : $@convention(thin) (@inout Int) -> ()
+  %call2 = apply %f2(%adr3) : $@convention(thin) (@inout Int) -> ()
+  br bb6
+
+bb5:
+  %i5 = load %1 : $*Int
+  store %i5 to %adr3 : $*Int
+  br bb6
+
+bb6:
+  %f6 = function_ref @doNothing : $@convention(thin) (@inout Int) -> ()
+  %call6 = apply %f6(%adr3) : $@convention(thin) (@inout Int) -> ()
+  release_value %box3 : ${ var S }
+  %z = tuple ()
+  return %z : $()
+}

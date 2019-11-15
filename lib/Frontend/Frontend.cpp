@@ -858,10 +858,10 @@ void CompilerInstance::parseAndCheckTypesUpTo(
       return;
     }
 
-    performTypeChecking(SF, PersistentState->getTopLevelContext());
+    performTypeChecking(SF);
 
     if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
-      performPCMacro(SF, PersistentState->getTopLevelContext());
+      performPCMacro(SF);
     }
 
     // Playground transform knows to look out for PCMacro's changes and not
@@ -975,8 +975,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
         performNameBinding(MainFile, CurTUElem);
         break;
       case SourceFile::TypeChecked:
-        performTypeChecking(MainFile, PersistentState->getTopLevelContext(),
-                            CurTUElem);
+        performTypeChecking(MainFile, CurTUElem);
         break;
       }
     }

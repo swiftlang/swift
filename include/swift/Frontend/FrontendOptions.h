@@ -126,6 +126,9 @@ public:
     EmitObject,   ///< Emit object file
 
     DumpTypeInfo, ///< Dump IRGen type info
+
+    EmitPCM, ///< Emit precompiled Clang module from a module map
+    DumpPCM, ///< Dump information about a precompiled Clang module
   };
 
   /// Indicates the action the user requested that the frontend perform.

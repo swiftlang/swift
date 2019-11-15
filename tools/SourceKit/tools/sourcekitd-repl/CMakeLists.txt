@@ -2,17 +2,16 @@ set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} edit)
 check_symbol_exists(el_wgets "histedit.h" HAVE_UNICODE_LIBEDIT)
 
 if(HAVE_UNICODE_LIBEDIT)
-  if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-    set(SOURCEKITD_REPL_LINK_LIBS sourcekitdInProc)
-  else()
-    set(SOURCEKITD_REPL_LINK_LIBS sourcekitd)
-  endif()
-
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
-    LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} edit
-    LLVM_LINK_COMPONENTS support coverage lto
+    LLVM_LINK_COMPONENTS coverage lto
   )
+  target_link_libraries(sourcekitd-repl PRIVATE edit)
+  if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
+    target_link_libraries(sourcekitd-repl PRIVATE sourcekitdInProc)
+  else()
+    target_link_libraries(sourcekitd-repl PRIVATE sourcekitd)
+  endif()
   if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
     target_link_libraries(sourcekitd-repl PRIVATE dispatch BlocksRuntime)
   endif()

@@ -38,7 +38,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
-class TopLevelContext;
 class TypeChecker;
 class TypeResolution;
 class TypeResolutionOptions;
@@ -633,28 +632,6 @@ public:
 
   /// Apply generic arguments to the given type.
   ///
-  /// This function emits diagnostics about an invalid type or the wrong number
-  /// of generic arguments, whereas applyUnboundGenericArguments requires this
-  /// to be in a correct and valid form.
-  ///
-  /// \param type The generic type to which to apply arguments.
-  /// \param loc The source location for diagnostic reporting.
-  /// \param resolution The type resolution to perform.
-  /// \param generic The arguments to apply with the angle bracket range for
-  /// diagnostics.
-  /// \param options The type resolution context.
-  ///
-  /// \returns A BoundGenericType bound to the given arguments, or null on
-  /// error.
-  ///
-  /// \see applyUnboundGenericArguments
-  static Type applyGenericArguments(Type type, SourceLoc loc,
-                                    TypeResolution resolution,
-                                    GenericIdentTypeRepr *generic,
-                                    TypeResolutionOptions options);
-
-  /// Apply generic arguments to the given type.
-  ///
   /// This function requires a valid unbound generic type with the correct
   /// number of generic arguments given, whereas applyGenericArguments emits
   /// diagnostics in those cases.
@@ -819,8 +796,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                                  unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
 
   static void typeCheckDecl(Decl *D);
 
@@ -1159,8 +1135,7 @@ public:
   ///
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
-  static void contextualizeTopLevelCode(TopLevelContext &TLC,
-                                        TopLevelCodeDecl *TLCD);
+  static void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
   /// Return the type-of-reference of the given value.
   ///

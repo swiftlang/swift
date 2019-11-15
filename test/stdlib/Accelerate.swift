@@ -77,8 +77,9 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
 
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
   
+    let n = 1024
+    
     AccelerateTests.test("vDSP/DiscreteCosineTransform") {
-        let n = 1024
         
         let source = (0 ..< n).map{ i in
             return sin(Float(i) * 0.05) + sin(Float(i) * 0.025)
@@ -110,18 +111,17 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
                              source,
                              &legacyDestination)
             
-            expectTrue(destination.elementsEqual(legacyDestination))
-            expectTrue(destination.elementsEqual(returnedResult))
+            expectTrue(elementsAlmostEqual(destination, legacyDestination))
+            expectTrue(elementsAlmostEqual(destination, returnedResult))
         }
     }
 }
-  
+
 //===----------------------------------------------------------------------===//
 //
 //  Sliding window summation
 //
 //===----------------------------------------------------------------------===//
-
 if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
   
     AccelerateTests.test("vDSP/SinglePrecisionSlidingWindowSum") {
@@ -135,7 +135,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.slidingWindowSum(source,
                                                    usingWindowLength: 3)
         
-        expectTrue(destination.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(destination, returnedResult))
         expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
     }
     
@@ -150,8 +150,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.slidingWindowSum(source,
                                                    usingWindowLength: 3)
         
-        expectTrue(destination.elementsEqual(returnedResult))
-        
+        expectTrue(elementsAlmostEqual(destination, returnedResult))
         expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
     }
   
@@ -194,8 +193,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.linearInterpolate(a, b,
                                                     using: interpolationConstant)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
     
     AccelerateTests.test("vDSP/SinglePrecisionInterpolateBetweenNeighbours") {
@@ -230,8 +229,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.linearInterpolate(elementsOf: shortSignal,
                                                     using: controlVector)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionInterpolateBetweenVectors") {
@@ -261,8 +260,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.linearInterpolate(a, b,
                                                     using: interpolationConstant)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
     
     AccelerateTests.test("vDSP/DoublePrecisionInterpolateBetweenNeighbours") {
@@ -297,8 +296,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.linearInterpolate(elementsOf: shortSignal,
                                                     using: controlVector)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
 }
 
@@ -344,8 +343,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
                                                                       coefficients[3],
                                                                       coefficients[4]))
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
     
     AccelerateTests.test("vDSP/DifferenceEquationDoublePrecision") {
@@ -382,8 +381,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
                                                                       coefficients[3],
                                                                       coefficients[4]))
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
 }
 
@@ -430,8 +429,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
                                              decimationFactor: decimationFactor,
                                              filter: filter)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
     
     AccelerateTests.test("vDSP/DownsampleDoublePrecision") {
@@ -470,8 +469,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
                                              decimationFactor: decimationFactor,
                                              filter: filter)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
 }
 
@@ -503,8 +502,8 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.evaluatePolynomial(usingCoefficients: coefficients,
                                                      withVariables: variables)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
     }
     
     AccelerateTests.test("vDSP/PolynomialEvaluationDoublePrecision") {
@@ -527,8 +526,53 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
         let returnedResult = vDSP.evaluatePolynomial(usingCoefficients: coefficients,
                                                      withVariables: variables)
         
-        expectTrue(result.elementsEqual(legacyResult))
-        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(elementsAlmostEqual(result, legacyResult))
+        expectTrue(elementsAlmostEqual(result, returnedResult))
+    }
+    
+    //===----------------------------------------------------------------------===//
+    //
+    //  Array almost equal.
+    //
+    //===----------------------------------------------------------------------===//
+    
+    func elementsAlmostEqual<T: FloatingPoint>(_ lhs: [T], _ rhs: [T]) -> Bool {
+        var returnValue = true
+        zip(lhs, rhs).forEach {
+            if !isAlmostEqual($0.0, $0.1) {
+                returnValue = false
+                return
+            }
+        }
+        return returnValue
+    }
+    
+    func isAlmostEqual<T: FloatingPoint>(_ lhs: T,
+                                         _ rhs: T,
+                                         tolerance: T = T.ulpOfOne.squareRoot()) -> Bool {
+        assert(tolerance >= .ulpOfOne && tolerance < 1, "tolerance should be in [.ulpOfOne, 1).")
+        guard lhs.isFinite && rhs.isFinite else {
+            return rescaledAlmostEqual(lhs, rhs, tolerance: tolerance)
+        }
+        let scale = max(abs(lhs), abs(rhs), .leastNormalMagnitude)
+        return abs(lhs - rhs) < scale*tolerance
+    }
+    
+    func rescaledAlmostEqual<T: FloatingPoint>(_ lhs: T,
+                                               _ rhs: T,
+                                               tolerance: T) -> Bool {
+        if lhs.isNaN || rhs.isNaN { return false }
+        if lhs.isInfinite {
+            if rhs.isInfinite { return lhs == rhs }
+            let scaledLhs = T(sign: lhs.sign,
+                              exponent: T.greatestFiniteMagnitude.exponent,
+                              significand: 1)
+            let scaledRhs = T(sign: .plus,
+                              exponent: -1,
+                              significand: rhs)
+            return isAlmostEqual(scaledLhs, scaledRhs, tolerance: tolerance)
+        }
+        return rescaledAlmostEqual(rhs, lhs, tolerance: tolerance)
     }
 }
 

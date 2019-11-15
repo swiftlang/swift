@@ -168,7 +168,7 @@ namespace swift {
   /// Once parsing and name-binding are complete this optionally walks the ASTs
   /// to add calls to externally provided functions that simulate
   /// "program counter"-like debugging events.
-  void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
+  void performPCMacro(SourceFile &SF);
 
   /// Creates a type checker instance on the given AST context, if it
   /// doesn't already have one.
@@ -184,8 +184,7 @@ namespace swift {
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
   /// source file.
-  void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                           unsigned StartElem = 0);
+  void performTypeChecking(SourceFile &SF, unsigned StartElem = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method

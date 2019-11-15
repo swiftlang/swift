@@ -71,9 +71,12 @@ namespace constraints {
 /// A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
-  /// The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 4> TypeVarAndOptions;
-  
+  /// The type variable that we saved the state of.
+  TypeVariableType *TypeVar;
+
+  /// The saved type variable options.
+  unsigned Options;
+
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
@@ -82,9 +85,6 @@ public:
 
   /// Restore the state of the type variable to the saved state.
   void restore();
-
-  TypeVariableType *getTypeVariable() { return TypeVarAndOptions.getPointer(); }
-  unsigned getOptions() { return TypeVarAndOptions.getInt(); }
 };
 
 /// A set of saved type variable bindings.
@@ -171,9 +171,12 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to a non-escaping type or not.
   TVO_CanBindToNoEscape = 0x04,
 
+  /// Whether the type variable can be bound to a hole type or not.
+  TVO_CanBindToHole = 0x08,
+
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x08,
+  TVO_PrefersSubtypeBinding = 0x10,
 };
 
 /// The implementation object for a type variable used within the
@@ -239,6 +242,9 @@ public:
 
   /// Whether this type variable can bind to an inout type.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
+
+  /// Whether this type variable can bind to a hole type.
+  bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -427,6 +433,14 @@ public:
     else
       impl.getTypeVariable()->Bits.TypeVariableType.Options &=
           ~TVO_CanBindToNoEscape;
+  }
+
+  void enableCanBindToHole(constraints::SavedTypeVariableBindings *record) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
   }
 
   /// Print the type variable to the given output stream.
@@ -1024,6 +1038,12 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  /// The set of expressions for which we have generated constraints.
+  llvm::SetVector<Expr *> InputExprs;
+
+  /// The number of input expressions whose parents and depths have
+  /// been entered into \c ExprWeights.
+  unsigned NumInputExprsInWeights = 0;
 
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
@@ -1108,13 +1128,6 @@ private:
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
-
-  /// The set of "holes" in the constraint system encountered
-  /// along the current path identified by locator. A "hole" is
-  /// a type variable which type couldn't be determined due to
-  /// an inference failure e.g. missing member, ambiguous generic
-  /// parameter which hasn't been explicitly specified.
-  llvm::SmallSetVector<ConstraintLocator *, 4> Holes;
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1610,9 +1623,6 @@ public:
     /// The length of \c Fixes.
     unsigned numFixes;
 
-    /// The length of \c Holes.
-    unsigned numHoles;
-
     /// The length of \c FixedRequirements.
     unsigned numFixedRequirements;
 
@@ -1658,8 +1668,7 @@ public:
   };
 
   ConstraintSystem(DeclContext *dc,
-                   ConstraintSystemOptions options,
-                   Expr *expr = nullptr);
+                   ConstraintSystemOptions options);
   ~ConstraintSystem();
 
   /// Retrieve the type checker associated with this constraint system.
@@ -1982,28 +1991,21 @@ public:
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
   /// Lookup and return parent associated with given expression.
-  Expr *getParentExpr(Expr *expr) const {
-    auto e = ExprWeights.find(expr);
-    if (e != ExprWeights.end())
-      return e->second.second;
-
-    if (baseCS && baseCS != this)
-      return baseCS->getParentExpr(expr);
-
+  Expr *getParentExpr(Expr *expr) {
+    if (auto result = getExprDepthAndParent(expr))
+      return result->second;
     return nullptr;
   }
 
   /// Retrieve the depth of the given expression.
-  Optional<unsigned> getExprDepth(Expr *expr) const {
-    auto e = ExprWeights.find(expr);
-    if (e != ExprWeights.end())
-      return e->second.first;
-
-    if (baseCS && baseCS != this)
-      return baseCS->getExprDepth(expr);
-
+  Optional<unsigned> getExprDepth(Expr *expr) {
+    if (auto result = getExprDepthAndParent(expr))
+      return result->first;
     return None;
   }
+
+  /// Retrieve the depth and parent expression of the given expression.
+  Optional<std::pair<unsigned, Expr *>> getExprDepthAndParent(Expr *expr);
 
   /// Returns a locator describing the callee for the anchor of a given locator.
   ///
@@ -2058,14 +2060,6 @@ public:
 
   void recordPotentialHole(TypeVariableType *typeVar);
 
-  bool isPotentialHole(TypeVariableType *typeVar) const {
-    return isPotentialHoleAt(typeVar->getImpl().getLocator());
-  }
-
-  bool isPotentialHoleAt(ConstraintLocator *locator) const {
-    return bool(Holes.count(locator));
-  }
-
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
   bool hasFixFor(ConstraintLocator *locator,
@@ -2108,7 +2102,7 @@ public:
   void diagnoseFailureForExpr(Expr *expr);
 
   bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
-  bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(ArrayRef<Solution> solutions);
 
   /// Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer

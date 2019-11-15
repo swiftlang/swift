@@ -71,6 +71,10 @@ ERROR(error_option_requires_sanitizer, none,
       "option '%0' requires a sanitizer to be enabled. Use -sanitize= to "
       "enable a sanitizer", (StringRef))
 
+WARNING(warning_option_requires_specific_sanitizer, none,
+      "option '%0' has no effect when '%1' sanitizer is disabled. Use -sanitize=%1 to "
+      "enable the sanitizer", (StringRef, StringRef))
+
 ERROR(error_option_missing_required_argument, none,
       "option '%0' is missing a required argument (%1)", (StringRef, StringRef))
 

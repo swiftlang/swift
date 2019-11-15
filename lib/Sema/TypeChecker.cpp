@@ -315,8 +315,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.definedFunctions.clear();
 }
 
-void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                                unsigned StartElem) {
+void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -366,7 +365,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
-        TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
+        TypeChecker::contextualizeTopLevelCode(TLCD);
       } else {
         TypeChecker::typeCheckDecl(D);
       }
@@ -375,7 +374,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(SF, TLC, StartElem);
+      TypeChecker::processREPLTopLevel(SF, StartElem);
 
     typeCheckFunctionsAndExternalDecls(SF, TC);
   }

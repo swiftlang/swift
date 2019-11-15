@@ -117,10 +117,9 @@ static bool mayContainReference(SILType Ty, const SILFunction &F) {
 
 // Returns true if the type \p Ty must be a reference or must transitively
 // contain a reference. If \p Ty is itself an address, return false.
-// Will be used in a subsequent commit.
-// static bool mustContainReference(SILType Ty, const SILFunction &F) {
-//  return findRecursiveRefType(Ty, F, true);
-//}
+static bool mustContainReference(SILType Ty, const SILFunction &F) {
+  return findRecursiveRefType(Ty, F, true);
+}
 
 bool EscapeAnalysis::isPointer(ValueBase *V) const {
   auto *F = V->getFunction();
@@ -334,6 +333,15 @@ public:
 void EscapeAnalysis::CGNode::mergeProperties(CGNode *fromNode) {
   if (!V)
     V = fromNode->V;
+
+  // TODO: Optimistically merge hasRC. 'this' node can only be merged with
+  // `fromNode` if their pointer values are compatible. If `fromNode->hasRC` is
+  // true, then it is guaranteed to represent the head of a heap object. Thus,
+  // it can only be merged with 'this' when the pointer values that access
+  // 'this' are also references.
+  //
+  // For now, this is pessimistic until we understand performance implications.
+  hasRC &= fromNode->hasRC;
 }
 
 template <typename Visitor>
@@ -448,24 +456,18 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
                                                          CGNode *newPointsTo,
                                                          bool createEdge) {
   // Track nodes that require pointsTo edges.
-  llvm::SmallVector<CGNode *, 4> pointsToEdges;
+  llvm::SmallVector<CGNode *, 4> pointsToEdgeNodes;
+  if (createEdge)
+    pointsToEdgeNodes.push_back(initialNode);
 
   // Step 1: Visit each node that reaches or is reachable via defer edges until
   // reaching a node with the newPointsTo or with a proper pointsTo edge.
 
   // A worklist to gather updated nodes in the defer web.
   CGNodeWorklist updatedNodes(this);
-  updatedNodes.push(initialNode);
-  if (createEdge)
-    pointsToEdges.push_back(initialNode);
-  unsigned updateCount = 1;
-  assert(updateCount == updatedNodes.size());
-  // Augment the worlist with the nodes that were reached via backward
-  // traversal. It's not as precise as DFS, but helps avoid redundant pointsTo
-  // edges in most cases.
-  llvm::SmallPtrSet<CGNode *, 8> backwardReachable;
+  unsigned updateCount = 0;
 
-  auto visitDeferTarget = [&](CGNode *node, bool isSuccessor) {
+  auto visitDeferTarget = [&](CGNode *node, bool /*isSuccessor*/) {
     if (updatedNodes.contains(node))
       return true;
 
@@ -476,7 +478,7 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
       // nodes are initialized one at a time, each time a new defer edge is
       // created. If this were not complete, then the backward traversal below
       // in Step 2 could reach uninitialized nodes not seen here in Step 1.
-      pointsToEdges.push_back(node);
+      pointsToEdgeNodes.push_back(node);
       return true;
     }
     ++updateCount;
@@ -485,31 +487,29 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
       // edge. Create a "fake" pointsTo edge to maintain the graph invariant
       // (this changes the structure of the graph but adding this edge has no
       // effect on the process of merging nodes or creating new defer edges).
-      pointsToEdges.push_back(node);
+      pointsToEdgeNodes.push_back(node);
     }
     updatedNodes.push(node);
-    if (!isSuccessor)
-      backwardReachable.insert(node);
-
     return true;
   };
+  // Seed updatedNodes with initialNode.
+  visitDeferTarget(initialNode, true);
   // updatedNodes may grow during this loop.
-  unsigned nextUpdatedNodeIdx = 0;
-  for (; nextUpdatedNodeIdx < updatedNodes.size(); ++nextUpdatedNodeIdx)
-    updatedNodes[nextUpdatedNodeIdx]->visitDefers(visitDeferTarget);
+  for (unsigned idx = 0; idx < updatedNodes.size(); ++idx)
+    updatedNodes[idx]->visitDefers(visitDeferTarget);
   // Reset this worklist so others can be used, but updateNode.nodeVector still
   // holds all the nodes found by step 1.
   updatedNodes.reset();
 
   // Step 2: Update pointsTo fields by propagating backward from nodes that
   // already have a pointsTo edge.
-  assert(nextUpdatedNodeIdx == updatedNodes.size());
-  --nextUpdatedNodeIdx;
-  bool processBackwardReachable = false;
   do {
-    while (!pointsToEdges.empty()) {
-      CGNode *edgeNode = pointsToEdges.pop_back_val();
+    while (!pointsToEdgeNodes.empty()) {
+      CGNode *edgeNode = pointsToEdgeNodes.pop_back_val();
       if (!edgeNode->pointsTo) {
+        // This node is either (1) a leaf node in the defer web (identified in
+        // step 1) or (2) an arbitrary node in a defer-cycle (identified in a
+        // previous iteration of the outer loop).
         edgeNode->setPointsToEdge(newPointsTo);
         newPointsTo->mergeUsePoints(edgeNode);
         assert(updateCount--);
@@ -534,35 +534,19 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
         return Traversal::Follow;
       });
     }
-    // For all nodes visited in step 1, if any node was not backward-reachable
-    // from a pointsTo edge, create an edge for it and restart traversal.
-    //
-    // First process all forward-reachable nodes in backward order, then process
-    // all backwardReachable nodes in forward order.
-    while (nextUpdatedNodeIdx != updatedNodes.size()) {
-      CGNode *node = updatedNodes[nextUpdatedNodeIdx];
-      // When processBackwardReachable == true, the backwardReachable set is
-      // empty and all forward reachable nodes already have a pointsTo edge.
-      if (!backwardReachable.count(node)) {
-        if (!node->pointsTo) {
-          pointsToEdges.push_back(node);
-          break;
-        }
+    // For all nodes visited in step 1, pick a single node that was not
+    // backward-reachable from a pointsTo edge, create an edge for it and
+    // restart traversal. This only happens when step 1 fails to find leaves in
+    // the defer web because of defer edge cycles.
+    while (!updatedNodes.empty()) {
+      CGNode *node = updatedNodes.nodeVector.pop_back_val();
+      if (!node->pointsTo) {
+        pointsToEdgeNodes.push_back(node);
+        break;
       }
-      if (processBackwardReachable) {
-        ++nextUpdatedNodeIdx;
-        continue;
-      }
-      if (nextUpdatedNodeIdx > 0) {
-        --nextUpdatedNodeIdx;
-        continue;
-      }
-      // reverse direction
-      backwardReachable.clear();
-      processBackwardReachable = true;
     }
     // This outer loop is exceedingly unlikely to execute more than twice.
-  } while (!pointsToEdges.empty());
+  } while (!pointsToEdgeNodes.empty());
   assert(updateCount == 0);
 }
 
@@ -842,8 +826,9 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 }
 
 CGNode *EscapeAnalysis::ConnectionGraph::createContentNode(CGNode *addrNode,
-                                                           SILValue addrVal) {
-  CGNode *newContent = allocNode(addrVal, NodeType::Content);
+                                                           SILValue addrVal,
+                                                           bool hasRC) {
+  CGNode *newContent = allocNode(addrVal, NodeType::Content, hasRC);
   initializePointsToEdge(addrNode, newContent);
   assert(ToMerge.empty()
          && "Initially setting pointsTo should not require any node merges");
@@ -860,7 +845,7 @@ EscapeAnalysis::ConnectionGraph::createMergedContent(CGNode *destAddrNode,
   // on the source content.
   //
   // TODO: node properties will come from `srcContent` here...
-  return createContentNode(destAddrNode, destAddrNode->V);
+  return createContentNode(destAddrNode, destAddrNode->V, srcContent->hasRC);
 }
 
 // Get a node representing the field data within the given reference-counted
@@ -872,7 +857,7 @@ CGNode *EscapeAnalysis::ConnectionGraph::getFieldContent(CGNode *rcNode) {
   if (rcNode->pointsTo)
     return rcNode->pointsTo;
 
-  return createContentNode(rcNode, rcNode->V);
+  return createContentNode(rcNode, rcNode->V, /*hasRC=*/false);
 }
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
@@ -1140,6 +1125,8 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
   
   switch (Node->OrigNode->Type) {
     case swift::EscapeAnalysis::NodeType::Content:
+      if (Node->OrigNode->hasRefCount())
+        O << "rc-";
       O << "content";
       break;
     case swift::EscapeAnalysis::NodeType::Return:
@@ -1177,7 +1164,11 @@ std::string CGForDotView::getNodeAttributes(const Node *Node) const {
   std::string attr;
   switch (Orig->Type) {
     case swift::EscapeAnalysis::NodeType::Content:
-      attr = "style=\"rounded\"";
+      attr = "style=\"rounded";
+      if (Orig->hasRefCount()) {
+        attr += ",filled";
+      }
+      attr += "\"";
       break;
     case swift::EscapeAnalysis::NodeType::Argument:
     case swift::EscapeAnalysis::NodeType::Return:
@@ -1296,6 +1287,9 @@ void EscapeAnalysis::ConnectionGraph::dumpCG() const {
 
 void EscapeAnalysis::CGNode::dump() const {
   llvm::errs() << getTypeStr();
+  if (hasRefCount())
+    llvm::errs() << " [rc]";
+
   if (V)
     llvm::errs() << ": " << *V;
   else
@@ -1406,6 +1400,9 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
       OS << Separator << NodeStr(Def);
       Separator = ", ";
     }
+    if (Nd->hasRefCount())
+      OS << " [rc]";
+
     OS << '\n';
   }
   OS << "End\n";
@@ -1439,6 +1436,10 @@ void EscapeAnalysis::ConnectionGraph::verify(bool allowMerge) const {
     // which consist of only defer-edges and a single trailing points-to edge
     // must lead to the same
     assert(Nd->matchPointToOfDefers(allowMerge));
+    if (Nd->isContent() && Nd->V) {
+      if (Nd->hasRefCount())
+        assert(mayContainReference(Nd->V->getType(), *F));
+    }
   }
 #endif
 }
@@ -1522,15 +1523,26 @@ EscapeAnalysis::getValueContent(ConnectionGraph *conGraph, SILValue addrVal) {
     assert(isPointer(addrNodeValue));
     assert(addrNodeValue == getPointerRoot(addrVal));
   }
+  auto *F = addrVal->getFunction();
+  bool hasRC = mustContainReference(baseAddr->getType(), *F)
+               || mustContainReference(addrVal->getType(), *F);
+
   // Have we already merged a content node?
   if (CGNode *content = addrNode->getContentNodeOrNull()) {
-    // TODO: Merge node properties here.
+    // hasRC might not match if one of the values pointing to this content was
+    // cast to an unknown type. If any of the types must contain a reference,
+    // then the content should contain a reference.
+    if (content->hasRefCount())
+      assert(mayContainReference(baseAddr->getType(), *F));
+    else if (hasRC)
+      content->setRefCount();
+
     return content;
   }
   if (!isPointer(baseAddr))
     return nullptr;
 
-  return conGraph->createContentNode(addrNode, baseAddr);
+  return conGraph->createContentNode(addrNode, baseAddr, hasRC);
 }
 
 void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
@@ -1737,8 +1749,11 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           CGNode *ArrayRefNode = ArrayStructValue->getContentNodeOrNull();
           if (!ArrayRefNode) {
             ArrayRefNode = ConGraph->createContentNode(
-                ArrayStructValue, ArrayStructValue->getValueOrNull());
-          }
+                ArrayStructValue, ArrayStructValue->getValueOrNull(),
+                /*hasRC=*/true);
+          } else
+            ArrayRefNode->setRefCount();
+
           // Another content node for the element storage.
           CGNode *ArrayElementStorage = ConGraph->getFieldContent(ArrayRefNode);
           ArrayElementStorage->markEscaping();
@@ -1868,6 +1883,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       if (!rcContent)
         return;
 
+      // rcContent->hasRefCount() may or may not be true depending on whether
+      // the type could be analyzed. Either way, treat it structurally like a
+      // refcounted object.
       CGNode *fieldContent = ConGraph->getFieldContent(rcContent);
       if (!deinitIsKnownToNotCapture(OpV)) {
         fieldContent->markEscaping();

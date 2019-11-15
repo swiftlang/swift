@@ -918,14 +918,6 @@ AssociatedTypeInference::computeAbstractTypeWitness(
       return derivedType;
   }
 
-  // If there is a generic parameter of the named type, use that.
-  if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig->getInnermostGenericParams()) {
-      if (gp->getName() == assocType->getName())
-        return dc->mapTypeIntoContext(gp);
-    }
-  }
-
   return Type();
 }
 

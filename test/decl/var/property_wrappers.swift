@@ -1584,12 +1584,12 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
+extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = SR_11288_S4]}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
+  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'SR_11288_S4.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
