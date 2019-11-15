@@ -1182,9 +1182,9 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
 
-  UnqualifiedLookup::Options options;
+  UnqualifiedLookupOptions options;
   if (typeLookup)
-    options |= UnqualifiedLookup::Flags::TypeLookup;
+    options |= UnqualifiedLookupFlags::TypeLookup;
 
   auto &ctx = P.SF.getASTContext();
   auto flags = UnqualifiedLookupFlags(options.toRaw());

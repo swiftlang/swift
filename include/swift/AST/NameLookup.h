@@ -230,45 +230,11 @@ enum class UnqualifiedLookupFlags {
 
 void simple_display(llvm::raw_ostream &out, UnqualifiedLookupFlags flags);
 
-/// This class implements and represents the result of performing
-/// unqualified lookup (i.e. lookup for a plain identifier).
-class UnqualifiedLookup {
-public:
-  using Flags = UnqualifiedLookupFlags;
-  using Options = OptionSet<Flags>;
+using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
 
-  /// Lookup an unqualified identifier \p Name in the context.
-  ///
-  /// If the current DeclContext is nested in a function body, the SourceLoc
-  /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(DeclName Name, DeclContext *DC,
-                    SourceLoc Loc = SourceLoc(), Options options = Options());
-  
-  using ResultsVector = SmallVector<LookupResultEntry, 4>;
-  ResultsVector Results;
-  
-  /// The index of the first result that isn't from the innermost scope
-  /// with results.
-  ///
-  /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
-  /// will be \c Results from the innermost scope that had results, and the
-  /// remaining elements of Results will be from parent scopes of this one.
-  ///
-  /// Allows unqualified name lookup to return results from outer scopes.
-  /// This is necessary for disambiguating calls to functions like `min` and
-  /// `max`.
-  size_t IndexOfFirstOuterResult;
-
-  /// Return true if anything was found by the name lookup.
-  bool isSuccess() const { return !Results.empty(); }
-
-  /// Get the result as a single type, or a null type if that fails.
-  TypeDecl *getSingleTypeResult() const;
-};
-
-inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
-                                            UnqualifiedLookup::Flags flag2) {
-  return UnqualifiedLookup::Options(flag1) | flag2;
+inline UnqualifiedLookupOptions operator|(UnqualifiedLookupFlags flag1,
+                                          UnqualifiedLookupFlags flag2) {
+  return UnqualifiedLookupOptions(flag1) | flag2;
 }
 
 /// Describes the reason why a certain declaration is visible.

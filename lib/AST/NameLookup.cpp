@@ -117,7 +117,7 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
   };
 
-  UnqualifiedLookup::Options options(flags);
+  UnqualifiedLookupOptions options(flags);
   auto flagsToPrint = llvm::make_filter_range(
       possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
 
@@ -1976,11 +1976,11 @@ directReferencesForUnqualifiedTypeLookup(DeclName name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter) {
   DirectlyReferencedTypeDecls results;
-  UnqualifiedLookup::Options options =
-      UnqualifiedLookup::Flags::TypeLookup |
-      UnqualifiedLookup::Flags::AllowProtocolMembers;
+  UnqualifiedLookupOptions options =
+      UnqualifiedLookupFlags::TypeLookup |
+      UnqualifiedLookupFlags::AllowProtocolMembers;
   if (lookupOuter == LookupOuterResults::Included)
-    options |= UnqualifiedLookup::Flags::IncludeOuterResults;
+    options |= UnqualifiedLookupFlags::IncludeOuterResults;
 
   auto &ctx = dc->getASTContext();
   auto flags = UnqualifiedLookupFlags(options.toRaw());

@@ -208,17 +208,17 @@ namespace {
   };
 } // end anonymous namespace
 
-static UnqualifiedLookup::Options
+static UnqualifiedLookupOptions
 convertToUnqualifiedLookupOptions(NameLookupOptions options) {
-  UnqualifiedLookup::Options newOptions;
+  UnqualifiedLookupOptions newOptions;
   if (options.contains(NameLookupFlags::KnownPrivate))
-    newOptions |= UnqualifiedLookup::Flags::KnownPrivate;
+    newOptions |= UnqualifiedLookupFlags::KnownPrivate;
   if (options.contains(NameLookupFlags::ProtocolMembers))
-    newOptions |= UnqualifiedLookup::Flags::AllowProtocolMembers;
+    newOptions |= UnqualifiedLookupFlags::AllowProtocolMembers;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
+    newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
-    newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+    newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
 
   return newOptions;
 }
@@ -262,7 +262,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
-                   UnqualifiedLookup::Flags::TypeLookup;
+                   UnqualifiedLookupFlags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
     ulOptions -= UnqualifiedLookupFlags::AllowProtocolMembers;
