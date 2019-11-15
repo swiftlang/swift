@@ -6,4 +6,3 @@ func nine() {
   _ = 3423
 }
 func ten() {}
-

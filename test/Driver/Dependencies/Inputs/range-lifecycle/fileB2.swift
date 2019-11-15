@@ -9,4 +9,3 @@ struct No_Uses {
  var wer = 3999983
  var additional = "foo"
 }
-
