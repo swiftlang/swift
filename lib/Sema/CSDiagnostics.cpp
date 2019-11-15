@@ -1619,21 +1619,37 @@ bool AssignmentFailure::diagnoseAsError() {
       // If there is a masked instance variable of the same type, emit a
       // note to fixit prepend a 'self.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        UnqualifiedLookup lookup(VD->getFullName(), typeContext);
-        for (auto &result : lookup.Results) {
-          const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
-          if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
-              typeVar->isSetterAccessibleFrom(DC) &&
-              typeVar->getType()->isEqual(VD->getType())) {
-            // But not in its own accessor.
-            auto AD =
-                dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
-            if (!AD || AD->getStorage() != typeVar) {
-              emitDiagnostic(Loc, diag::masked_instance_variable,
-                             typeContext->getSelfTypeInContext())
-                  .fixItInsert(Loc, "self.");
-            }
-          }
+        SmallVector<ValueDecl *, 2> results;
+        DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
+                            VD->getFullName(),
+                            NL_QualifiedDefault | NL_RemoveNonVisible, results);
+
+        auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
+          // We're looking for a settable property that is the same type as the
+          // var we found.
+          auto *var = dyn_cast<VarDecl>(decl);
+          if (!var || var == VD)
+            return false;
+
+          if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
+            return false;
+
+          if (!var->getType()->isEqual(VD->getType()))
+            return false;
+
+          // Don't suggest a property if we're in one of its accessors.
+          auto *methodDC = DC->getInnermostMethodContext();
+          if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
+            if (AD->getStorage() == var)
+              return false;
+
+          return true;
+        });
+
+        if (foundProperty != results.end()) {
+          emitDiagnostic(Loc, diag::masked_instance_variable,
+                         typeContext->getSelfTypeInContext())
+              .fixItInsert(Loc, "self.");
         }
       }
 

@@ -701,3 +701,15 @@ extension JustAProtocol {
     name = "World" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }
+
+struct S {
+  var x = 0
+
+  struct Nested {
+    func foo() {
+      // SR-11786: Make sure we don't offer the 'self.' fix-it here.
+      let x = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
+      x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
+    }
+  }
+}
