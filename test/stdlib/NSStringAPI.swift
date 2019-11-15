@@ -1448,6 +1448,38 @@ NSStringAPIs.test("padding(toLength:withPad:startingAtIndex:)") {
       toLength: 15, withPad: "XYZ", startingAt: 1))
 }
 
+NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
+  var content = (("👩‍❤️‍👩" as String) as NSString).mutableCopy() as! NSMutableString
+
+  let expectedResults = [
+    [56425, 8205, 10084, 65039, 8205, 55357, 56425],
+    [55357, 8205, 10084, 65039, 8205, 55357, 56425],
+    [55357, 56425, 10084, 65039, 8205, 55357, 56425],
+    [55357, 56425, 8205, 65039, 8205, 55357, 56425],
+    [55357, 56425, 8205, 10084, 8205, 55357, 56425],
+    [55357, 56425, 8205, 10084, 65039, 55357, 56425],
+    [55357, 56425, 8205, 10084, 65039, 8205, 56425],
+    [55357, 56425, 8205, 10084, 65039, 8205, 55357]
+  ]
+  
+  for i in 0 ..< content.length {
+    let s = content.mutableCopy() as! NSMutableString
+    s.replaceCharacters(in: NSRange(location: i, length: 1), with: "")
+    expectEqual(7, s.length)
+    let result = [
+      s.character(at: 0),
+      s.character(at: 1),
+      s.character(at: 2),
+      s.character(at: 3),
+      s.character(at: 4),
+      s.character(at: 5),
+      s.character(at: 6),
+      s.character(at: 7)
+    ]
+    expectEqual(expectedResults[i], result)
+  }
+}
+
 NSStringAPIs.test("replacingCharacters(in:with:)") {
   do {
     let empty = ""
