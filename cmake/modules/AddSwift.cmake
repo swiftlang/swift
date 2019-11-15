@@ -2397,8 +2397,8 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(options)
-  set(single_parameter_options "SWIFT_COMPONENT;DESTINATION_PREFIX")
+  set(options "IS_LOCAL")
+  set(single_parameter_options "SWIFT_COMPONENT")
   set(multiple_parameter_options LINK_LIBRARIES)
 
   cmake_parse_arguments(ASHT
@@ -2414,6 +2414,11 @@ function(add_swift_host_tool executable)
   precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
+  set(host_tool_destination "bin")
+  if(ASHT_IS_LOCAL)
+    set(host_tool_destination "local/bin")
+  endif()
+
   # Create the executable rule.
   _add_swift_executable_single(${executable}
     SDK ${SWIFT_HOST_VARIANT_SDK}
@@ -2423,7 +2428,7 @@ function(add_swift_host_tool executable)
   add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
   swift_install_in_component(TARGETS ${executable}
                              RUNTIME
-                               DESTINATION "${ASHT_DESTINATION_PREFIX}bin"
+                               DESTINATION "${host_tool_destination}"
                                COMPONENT ${ASHT_SWIFT_COMPONENT})
 
   swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
