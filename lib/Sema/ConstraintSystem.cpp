@@ -35,10 +35,10 @@ using namespace constraints;
 #define DEBUG_TYPE "ConstraintSystem"
 
 ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
-    : E(E), WarnLimit(CS.getTypeChecker().getWarnLongExpressionTypeChecking()),
+  : E(E),
       Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
-      PrintDebugTiming(CS.getTypeChecker().getDebugTimeExpressions()),
+      PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {
   if (auto *baseCS = CS.baseCS) {
     // If we already have a timer in the base constraint
@@ -66,22 +66,20 @@ ExpressionTimer::~ExpressionTimer() {
   if (!PrintWarning)
     return;
 
+  const auto WarnLimit = getWarnLimit();
   if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
     Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
                            elapsedMS, WarnLimit)
       .highlight(E->getSourceRange());
 }
 
+
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
-                                   ConstraintSystemOptions options,
-                                   Expr *expr)
+                                   ConstraintSystemOptions options)
   : Context(dc->getASTContext()), DC(dc), Options(options),
     Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
-  if (expr)
-    ExprWeights = expr->getDepthMap();
-
   assert(DC && "context required");
 }
 
@@ -498,6 +496,57 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
   return getConstraintLocator(anchor);
 }
 
+/// Extend the given depth map by adding depths for all of the subexpressions
+/// of the given expression.
+static void extendDepthMap(
+   Expr *expr,
+   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
+    unsigned Depth = 0;
+
+    explicit RecordingTraversal(
+        llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
+        : DepthMap(depthMap) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      DepthMap[E] = {Depth, Parent.getAsExpr()};
+      Depth++;
+      return { true, E };
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      Depth--;
+      return E;
+    }
+  };
+
+  RecordingTraversal traversal(depthMap);
+  expr->walk(traversal);
+}
+
+Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
+    Expr *expr) {
+  // Check whether the parent has this information.
+  if (baseCS && baseCS != this) {
+    if (auto known = baseCS->getExprDepthAndParent(expr))
+      return *known;
+  }
+
+  // Bring the set of expression weights up to date.
+  while (NumInputExprsInWeights < InputExprs.size()) {
+    extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
+    ++NumInputExprsInWeights;
+  }
+
+  auto e = ExprWeights.find(expr);
+  if (e != ExprWeights.end())
+    return e->second;
+
+  return None;
+}
+
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {
@@ -627,8 +676,6 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 Type ConstraintSystem::openUnboundGenericType(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
-
-  checkNestedTypeConstraints(*this, type, locator);
 
   if (!type->hasUnboundGenericType())
     return type;
@@ -987,6 +1034,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                       TypeResolverContext::InExpression,
                                       /*isSpecialized=*/false);
 
+    checkNestedTypeConstraints(*this, type, locator);
+
     // Open the type.
     type = openUnboundGenericType(type, locator);
 
@@ -1120,7 +1169,8 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
     auto *paramLocator = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
 
-    auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding);
+    auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
+                                                    TVO_CanBindToHole);
     auto result = replacements.insert(std::make_pair(
         cast<GenericTypeParamType>(gp->getCanonicalType()), typeVar));
 
@@ -1239,6 +1289,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
     auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                          typeDecl, baseObjTy);
+
+    checkNestedTypeConstraints(*this, memberTy, locator);
+
     // Open the type if it was a reference to a generic type.
     memberTy = openUnboundGenericType(memberTy, locator);
 
@@ -1470,7 +1523,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
-  if (!type || type->hasError()) {
+  if (type->hasError()) {
     return Type();
   }
 
@@ -1642,7 +1695,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
-                              /*throws*/ true));
+                              /*throws*/ true,
+                              DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1651,7 +1705,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*noescape*/ false,
-                            /*throws*/ true));
+                            /*throws*/ true,
+                            DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
     return true;
   }
@@ -1674,7 +1729,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
-                              /*throws*/ true));
+                              /*throws*/ true,
+                              DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1682,7 +1738,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*noescape*/ false,
-                            /*throws*/ true));
+                            /*throws*/ true,
+                            DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
     return true;
   }
@@ -2236,12 +2293,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
   }
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
-      << boundType->getString() << " := "
-      << refType->getString() << ")\n";
+      << boundType->getString(PO) << " := "
+      << refType->getString(PO) << ")\n";
   }
 
   // If this overload is disfavored, note that.
@@ -2387,7 +2446,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.DebugConstraintSolver) {
+  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
@@ -2418,7 +2477,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
-    if (diagnoseAmbiguityWithFixes(expr, viable))
+    if (diagnoseAmbiguityWithFixes(viable))
       return true;
 
     // FIXME: If we were able to actually fix things along the way,
@@ -2432,7 +2491,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
-      if (getASTContext().LangOpts.DebugConstraintSolver) {
+      if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log << "---Ambiguity error: " << viable.size()
             << " solutions found---\n";
@@ -2522,7 +2581,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
 }
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
-    Expr *expr, ArrayRef<Solution> solutions) {
+    ArrayRef<Solution> solutions) {
   if (solutions.empty())
     return false;
 
@@ -2675,6 +2734,29 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   return name;
 }
 
+/// Extend the given index map with all of the subexpressions in the given
+/// expression.
+static void extendPreorderIndexMap(
+    Expr *expr, llvm::DenseMap<Expr *, unsigned> &indexMap) {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, unsigned> &IndexMap;
+    unsigned Index = 0;
+
+    explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
+      : IndexMap(indexMap) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      IndexMap[E] = Index;
+      Index++;
+      return { true, E };
+    }
+  };
+
+  RecordingTraversal traversal(indexMap);
+  expr->walk(traversal);
+}
+
 bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
                                          ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
@@ -2695,8 +2777,10 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   // Heuristically, all other things being equal, we should complain about the
   // ambiguous expression that (1) has the most overloads, (2) is deepest, or
   // (3) comes earliest in the expression.
-  auto depthMap = expr->getDepthMap();
-  auto indexMap = expr->getPreorderIndexMap();
+  llvm::DenseMap<Expr *, unsigned> indexMap;
+  for (auto expr : InputExprs) {
+    extendPreorderIndexMap(expr, indexMap);
+  }
 
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
     auto &overload = diff.overloads[i];
@@ -2711,10 +2795,10 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
       continue;
     unsigned index = it->second;
 
-    auto e = depthMap.find(anchor);
-    if (e == depthMap.end())
+    auto optDepth = getExprDepth(anchor);
+    if (!optDepth)
       continue;
-    unsigned depth = e->second.first;
+    unsigned depth = *optDepth;
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.

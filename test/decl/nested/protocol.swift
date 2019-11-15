@@ -106,8 +106,7 @@ func testLookup(_ x: OuterForUFI.Inner) {
   x.extMethod()
 }
 
-// N.B. Lookup fails here because OuterForUFI.Inner is marked invalid.
 func testLookup<T: OuterForUFI.Inner>(_ x: T) {
-  x.req() // expected-error {{value of type 'T' has no member 'req'}}
-  x.extMethod() // expected-error {{value of type 'T' has no member 'extMethod'}}
+  x.req()
+  x.extMethod()
 }

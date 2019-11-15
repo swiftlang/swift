@@ -196,7 +196,13 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr) {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  result.ExcludeAttrList = {DAK_AccessControl, DAK_SetterAccess, DAK_Lazy};
+  result.ExcludeAttrList = {
+    DAK_AccessControl,
+    DAK_SetterAccess,
+    DAK_Lazy,
+    DAK_StaticInitializeObjCMetadata,
+    DAK_RestatedObjCConformance
+  };
 
   return result;
 }
@@ -2520,26 +2526,26 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     [&]{
       Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
     });
-  if (auto type = decl->getInterfaceType()) {
-    Printer << ": ";
-    TypeLoc tyLoc;
-    if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr())
-      tyLoc = TypeLoc(repr, type);
-    else
-      tyLoc = TypeLoc::withoutLoc(type);
 
-    Printer.printDeclResultTypePre(decl, tyLoc);
+  auto type = decl->getInterfaceType();
+  Printer << ": ";
+  TypeLoc tyLoc;
+  if (auto *repr = decl->getTypeReprOrParentPatternTypeRepr())
+    tyLoc = TypeLoc(repr, type);
+  else
+    tyLoc = TypeLoc::withoutLoc(type);
 
-    // HACK: When printing result types for vars with opaque result types,
-    //       always print them using the `some` keyword instead of printing
-    //       the full stable reference.
-    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
-    x(Options.OpaqueReturnTypePrinting,
-      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+  Printer.printDeclResultTypePre(decl, tyLoc);
 
-    printTypeLocForImplicitlyUnwrappedOptional(
-      tyLoc, decl->isImplicitlyUnwrappedOptional());
-  }
+  // HACK: When printing result types for vars with opaque result types,
+  //       always print them using the `some` keyword instead of printing
+  //       the full stable reference.
+  llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+  x(Options.OpaqueReturnTypePrinting,
+    PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
+  printTypeLocForImplicitlyUnwrappedOptional(
+    tyLoc, decl->isImplicitlyUnwrappedOptional());
 
   printAccessors(decl);
 }
@@ -2562,7 +2568,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::EnumElement:
-      if (ArgName.empty() && BodyName.empty() && !param->getDefaultValue()) {
+      if (ArgName.empty() && BodyName.empty() && !param->hasDefaultExpr()) {
         // Don't print anything, in the style of a tuple element.
         return;
       }
@@ -2668,18 +2674,13 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto curTy = AFD->getInterfaceType();
 
   // Skip over the implicit 'self'.
-  if (AFD->hasImplicitSelfDecl()) {
-    if (curTy)
-      if (auto funTy = curTy->getAs<AnyFunctionType>())
-        curTy = funTy->getResult();
-  }
+  if (AFD->hasImplicitSelfDecl())
+    if (auto funTy = curTy->getAs<AnyFunctionType>())
+      curTy = funTy->getResult();
 
   ArrayRef<AnyFunctionType::Param> parameterListTypes;
-  if (curTy) {
-    if (auto funTy = curTy->getAs<AnyFunctionType>()) {
-      parameterListTypes = funTy->getParams();
-    }
-  }
+  if (auto funTy = curTy->getAs<AnyFunctionType>())
+    parameterListTypes = funTy->getParams();
 
   printParameterList(BodyParams, parameterListTypes,
                      AFD->argumentNameIsAPIByDefault());
@@ -2872,15 +2873,14 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
 
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (auto type = elt->getInterfaceType()) {
-      if (!elt->isInvalid()) {
-        // Walk to the params of the associated values.
-        // (EnumMetaType) -> (AssocValues) -> Enum
-        params = type->castTo<AnyFunctionType>()
-                     ->getResult()
-                     ->castTo<AnyFunctionType>()
-                     ->getParams();
-      }
+    if (!elt->isInvalid()) {
+      // Walk to the params of the associated values.
+      // (EnumMetaType) -> (AssocValues) -> Enum
+      auto type = elt->getInterfaceType();
+      params = type->castTo<AnyFunctionType>()
+                   ->getResult()
+                   ->castTo<AnyFunctionType>()
+                   ->getParams();
     }
 
     // @escaping is not valid in enum element position, even though the
@@ -2971,11 +2971,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   }, [&] { // Parameters
     printGenericDeclGenericParams(decl);
     auto params = ArrayRef<AnyFunctionType::Param>();
-    if (auto type = decl->getInterfaceType()) {
-      if (!decl->isInvalid()) {
-        // Walk to the params of the subscript's indices.
-        params = type->castTo<AnyFunctionType>()->getParams();
-      }
+    if (!decl->isInvalid()) {
+      // Walk to the params of the subscript's indices.
+      auto type = decl->getInterfaceType();
+      params = type->castTo<AnyFunctionType>()->getParams();
     }
     printParameterList(decl->getIndices(), params,
                        /*isAPINameByDefault*/false);
@@ -3596,7 +3595,7 @@ public:
   }
 
   void visitUnresolvedType(UnresolvedType *T) {
-    if (T->getASTContext().LangOpts.DebugConstraintSolver)
+    if (Options.PrintTypesForDebugging)
       Printer << "<<unresolvedtype>>";
     else
       Printer << "_";
@@ -3783,6 +3782,14 @@ public:
     if (Options.SkipAttributes)
       return;
 
+    if (!Options.excludeAttrKind(TAK_differentiable) &&
+        info.isDifferentiable()) {
+      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+        Printer << "@differentiable(linear) ";
+      } else {
+        Printer << "@differentiable ";
+      }
+    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&
@@ -3826,6 +3833,15 @@ public:
                             ProtocolConformanceRef witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
+
+    if (!Options.excludeAttrKind(TAK_differentiable) &&
+        info.isDifferentiable()) {
+      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+        Printer << "@differentiable(linear) ";
+      } else {
+        Printer << "@differentiable ";
+      }
+    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&
@@ -4315,7 +4331,7 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitTypeVariableType(TypeVariableType *T) {
-    if (T->getASTContext().LangOpts.DebugConstraintSolver) {
+    if (Options.PrintTypesForDebugging) {
       Printer << "$T" << T->getID();
       return;
     }

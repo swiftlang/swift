@@ -68,13 +68,12 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVarAndOptions(typeVar, typeVar->getImpl().getRawOptions()),
+  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
-  auto *typeVar = getTypeVariable();
-  typeVar->getImpl().setRawOptions(getOptions());
-  typeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  TypeVar->getImpl().setRawOptions(Options);
+  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
 GenericTypeParamType *
@@ -2161,6 +2160,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   auto &Context = dc->getASTContext();
   FallbackDiagnosticListener diagListener(Context, options, listener);
   auto *TC = Context.getLegacyGlobalTypeChecker();
+  assert(TC && "Must have a global type checker set");
   return TC->typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
                                      options, diagListener, baseCS);
 }
@@ -2171,6 +2171,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
                                           TypeCheckExprOptions options,
                                           ExprTypeCheckListener &listener,
                                           ConstraintSystem *baseCS) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -2196,7 +2197,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
-  ConstraintSystem cs(dc, csOptions, expr);
+  ConstraintSystem cs(dc, csOptions);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
@@ -2277,7 +2278,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!result)
     return Type();
 
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
@@ -2466,7 +2467,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   if (!expr)
     return nullptr;
 
-  if (Context.LangOpts.DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -2480,7 +2481,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
     return nullptr;
 
   auto &solution = viable[0];
-  if (Context.LangOpts.DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
@@ -3451,7 +3452,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
                    cs.getConstraintLocator(expr));
 
   auto &Context = dc->getASTContext();
-  if (Context.LangOpts.DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -3467,7 +3468,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   }
 
   auto &solution = viable[0];
-  if (Context.LangOpts.DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
@@ -3485,7 +3486,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   solution.setExprTypes(expr);
 
-  if (Context.LangOpts.DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
@@ -3506,24 +3507,23 @@ void Solution::dump() const {
 }
 
 void Solution::dump(raw_ostream &out) const {
-  ASTContext &ctx = getConstraintSystem().getASTContext();
-  llvm::SaveAndRestore<bool> debugSolver(ctx.LangOpts.DebugConstraintSolver,
-                                         true);
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
 
-  SourceManager *sm = &ctx.SourceMgr;
+  SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
   out << "Fixed score: " << FixedScore << "\n";
 
   out << "Type variables:\n";
   for (auto binding : typeBindings) {
-    auto &typeVar = binding.first->getImpl();
+    auto &typeVar = binding.first;
     out.indent(2);
-    typeVar.print(out);
+    Type(typeVar).print(out, PO);
     out << " as ";
     binding.second.print(out);
-    if (auto *locator = typeVar.getLocator()) {
+    if (auto *locator = typeVar->getImpl().getLocator()) {
       out << " @ ";
-      locator->dump(&ctx.SourceMgr, out);
+      locator->dump(sm, out);
     }
     out << "\n";
   }
@@ -3545,30 +3545,30 @@ void Solution::dump(raw_ostream &out) const {
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
-        out << choice.getBaseType()->getString() << ".";
+        out << choice.getBaseType()->getString(PO) << ".";
 
       out << choice.getDecl()->getBaseName() << ": "
-          << ovl.second.openedType->getString() << "\n";
+          << ovl.second.openedType->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::BaseType:
-      out << "base type " << choice.getBaseType()->getString() << "\n";
+      out << "base type " << choice.getBaseType()->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::KeyPathApplication:
       out << "key path application root "
-          << choice.getBaseType()->getString() << "\n";
+          << choice.getBaseType()->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
-          << choice.getBaseType()->getString()
+          << choice.getBaseType()->getString(PO)
           << " name='" << choice.getName() << "'\n";
       break;
   
     case OverloadChoiceKind::TupleIndex:
-      out << "tuple " << choice.getBaseType()->getString() << " index "
+      out << "tuple " << choice.getBaseType()->getString(PO) << " index "
         << choice.getTupleIndex() << "\n";
       break;
     }
@@ -3598,9 +3598,9 @@ void Solution::dump(raw_ostream &out) const {
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
-                   opened.first->print(out);
+                   Type(opened.first).print(out, PO);
                    out << " -> ";
-                   opened.second->print(out);
+                   Type(opened.second).print(out, PO);
                  },
                  [&]() {
                    out << ", ";
@@ -3614,7 +3614,7 @@ void Solution::dump(raw_ostream &out) const {
     for (const auto &openedExistential : OpenedExistentialTypes) {
       out.indent(2);
       openedExistential.first->dump(sm, out);
-      out << " opens to " << openedExistential.second->getString();
+      out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
     }
   }
@@ -3669,13 +3669,13 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
 
 void ConstraintSystem::print(raw_ostream &out) const {
   // Print all type variables as $T0 instead of _ here.
-  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
-                               true);
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
   
   out << "Score: " << CurrentScore << "\n";
 
-  if (contextualType.getType()) {
-    out << "Contextual Type: " << contextualType.getType();
+  if (auto ty = contextualType.getType()) {
+    out << "Contextual Type: " << ty.getString(PO);
     if (TypeRepr *TR = contextualType.getTypeRepr()) {
       out << " at ";
       TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
@@ -3686,7 +3686,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   out << "Type Variables:\n";
   for (auto tv : getTypeVariables()) {
     out.indent(2);
-    tv->getImpl().print(out);
+    Type(tv).print(out, PO);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
@@ -3703,7 +3703,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
       }
     } else {
       out << " equivalent to ";
-      rep->print(out);
+      Type(rep).print(out, PO);
     }
 
     if (auto *locator = tv->getImpl().getLocator()) {
@@ -3717,14 +3717,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
   out << "\nActive Constraints:\n";
   for (auto &constraint : ActiveConstraints) {
     out.indent(2);
-    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
   out << "\nInactive Constraints:\n";
   for (auto &constraint : InactiveConstraints) {
     out.indent(2);
-    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
@@ -3732,7 +3732,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nRetired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
-      constraint.print(out, &getTypeChecker().Context.SourceMgr);
+      constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     });
   }
@@ -3751,30 +3751,30 @@ void ConstraintSystem::print(raw_ostream &out) const {
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
-          out << choice.getBaseType()->getString() << ".";
+          out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
-            << resolved->BoundType->getString() << " == "
-            << resolved->ImpliedType->getString() << "\n";
+            << resolved->BoundType->getString(PO) << " == "
+            << resolved->ImpliedType->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString() << "\n";
+        out << "base type " << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
         out << "key path application root "
-            << choice.getBaseType()->getString() << "\n";
+            << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
       case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
-            << choice.getBaseType()->getString() << "  name="
+            << choice.getBaseType()->getString(PO) << "  name="
             << choice.getName() << "\n";
         break;
 
       case OverloadChoiceKind::TupleIndex:
-        out << "tuple " << choice.getBaseType()->getString() << " index "
+        out << "tuple " << choice.getBaseType()->getString(PO) << " index "
             << choice.getTupleIndex() << "\n";
         break;
       }
@@ -3786,7 +3786,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nDisjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
       out.indent(2);
-      choice.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      choice.first->dump(&getASTContext().SourceMgr, out);
       out << " is #" << choice.second << "\n";
     }
   }
@@ -3795,13 +3795,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nOpened types:\n";
     for (const auto &opened : OpenedTypes) {
       out.indent(2);
-      opened.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
-                   opened.first->print(out);
+                   Type(opened.first).print(out, PO);
                    out << " -> ";
-                   opened.second->print(out);
+                   Type(opened.second).print(out, PO);
                  },
                  [&]() {
                    out << ", ";
@@ -3814,8 +3814,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nOpened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
       out.indent(2);
-      openedExistential.first->dump(&getTypeChecker().Context.SourceMgr, out);
-      out << " opens to " << openedExistential.second->getString();
+      openedExistential.first->dump(&getASTContext().SourceMgr, out);
+      out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
     }
   }
@@ -3823,7 +3823,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   if (!DefaultedConstraints.empty()) {
     out << "\nDefaulted constraints: ";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
-      locator->dump(&getTypeChecker().Context.SourceMgr, out);
+      locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {
       out << ", ";
     });
@@ -3832,7 +3832,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   if (failedConstraint) {
     out << "\nFailed constraint:\n";
     out.indent(2);
-    failedConstraint->print(out, &getTypeChecker().Context.SourceMgr);
+    failedConstraint->print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 

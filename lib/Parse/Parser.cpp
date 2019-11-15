@@ -113,37 +113,112 @@ void SILParserTUStateBase::anchor() { }
 void swift::performCodeCompletionSecondPass(
     PersistentParserState &ParserState,
     CodeCompletionCallbacksFactory &Factory) {
+  Parser::performCodeCompletionSecondPass(ParserState, Factory);
+}
+
+void Parser::performCodeCompletionSecondPass(
+    PersistentParserState &ParserState,
+    CodeCompletionCallbacksFactory &Factory) {
   SharedTimer timer("CodeCompletionSecondPass");
-  if (!ParserState.hasDelayedDecl())
+  if (!ParserState.hasCodeCompletionDelayedDeclState())
     return;
 
-  auto &SF = *ParserState.getDelayedDeclContext()->getParentSourceFile();
-  auto &SM = SF.getASTContext().SourceMgr;
-  auto BufferID = SM.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
+  auto state = ParserState.takeCodeCompletionDelayedDeclState();
 
-  // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->disable();
+  auto &SF = *state->ParentContext->getParentSourceFile();
+  auto &SM = SF.getASTContext().SourceMgr;
+  auto BufferID = SM.findBufferContainingLoc(state->BodyPos.Loc);
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       Factory.createCodeCompletionCallbacks(TheParser));
   TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
 
-  switch (ParserState.getDelayedDeclKind()) {
-  case PersistentParserState::DelayedDeclKind::TopLevelCodeDecl:
-    TheParser.parseTopLevelCodeDeclDelayed();
-    break;
+  TheParser.performCodeCompletionSecondPassImpl(*state);
+}
 
-  case PersistentParserState::DelayedDeclKind::Decl:
-    TheParser.parseDeclDelayed();
-    break;
+void Parser::performCodeCompletionSecondPassImpl(
+    PersistentParserState::CodeCompletionDelayedDeclState &info) {
+  // Disable libSyntax creation in the delayed parsing.
+  SyntaxContext->disable();
 
-  case PersistentParserState::DelayedDeclKind::FunctionBody: {
-    TheParser.parseAbstractFunctionBodyDelayed();
+  auto BeginParserPosition = getParserPosition(info.BodyPos);
+  auto EndLexerState = L->getStateForEndOfTokenLoc(info.BodyEnd);
+
+  // ParserPositionRAII needs a primed parser to restore to.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  // Ensure that we restore the parser state at exit.
+  ParserPositionRAII PPR(*this);
+
+  // Create a lexer that cannot go past the end state.
+  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
+
+  // Temporarily swap out the parser's current lexer with our new one.
+  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+  // Rewind to the beginning of the top-level code.
+  restoreParserPosition(BeginParserPosition);
+
+  // Do not delay parsing in the second pass.
+  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
+
+  // Re-enter the lexical scope.
+  Scope S(this, info.takeScope());
+
+  DeclContext *DC = info.ParentContext;
+
+  switch (info.Kind) {
+  case PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
+    // Re-enter the top-level code decl context.
+    // FIXME: this can issue discriminators out-of-order?
+    auto *TLCD = cast<TopLevelCodeDecl>(DC);
+    ContextChange CC(*this, TLCD, &State->getTopLevelContext());
+
+    SourceLoc StartLoc = Tok.getLoc();
+    ASTNode Result;
+    parseExprOrStmt(Result);
+    if (!Result.isNull()) {
+      auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
+      TLCD->setBody(Brace);
+    }
+    break;
+  }
+
+  case PersistentParserState::CodeCompletionDelayedDeclKind::Decl: {
+    assert((DC->isTypeContext() || DC->isModuleScopeContext()) &&
+           "Delayed decl must be a type member or a top-level decl");
+    ContextChange CC(*this, DC);
+
+    parseDecl(ParseDeclOptions(info.Flags),
+              /*IsAtStartOfLineOrPreviousHadSemi=*/true, [&](Decl *D) {
+                if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
+                  NTD->addMember(D);
+                } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
+                  ED->addMember(D);
+                } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
+                  SF->Decls.push_back(D);
+                } else {
+                  llvm_unreachable("invalid decl context kind");
+                }
+              });
+    break;
+  }
+
+  case PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody: {
+    auto *AFD = cast<AbstractFunctionDecl>(DC);
+    ParseFunctionBody CC(*this, AFD);
+    setLocalDiscriminatorToParamList(AFD->getParameters());
+
+    auto result = parseBraceItemList(diag::func_decl_without_brace);
+    AFD->setBody(result.getPtrOrNull());
     break;
   }
   }
-  assert(!ParserState.hasDelayedDecl());
+
+  assert(!State->hasCodeCompletionDelayedDeclState() &&
+         "Second pass should not set any code completion info");
 
   CodeCompletion->doneParsing();
 }
@@ -1087,6 +1162,7 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
 struct ParserUnit::Implementation {
   std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
@@ -1094,19 +1170,16 @@ struct ParserUnit::Implementation {
   std::unique_ptr<Parser> TheParser;
 
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                 const LangOptions &Opts, StringRef ModuleName,
+                 const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
+                 StringRef ModuleName,
                  std::shared_ptr<SyntaxParseActions> spActions)
-    : SPActions(std::move(spActions)),
-      LangOpts(Opts),
-      Diags(SM),
-      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
-      SF(new (Ctx) SourceFile(
-            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
-            SFKind, BufferID,
-            SourceFile::ImplicitModuleImportKind::None,
-            Opts.CollectParsedToken,
-            Opts.BuildSyntaxTree)) {
-  }
+      : SPActions(std::move(spActions)),
+        LangOpts(Opts), TypeCheckerOpts(TyOpts), Diags(SM),
+        Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts, SM, Diags)),
+        SF(new (Ctx) SourceFile(
+            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx), SFKind,
+            BufferID, SourceFile::ImplicitModuleImportKind::None,
+            Opts.CollectParsedToken, Opts.BuildSyntaxTree)) {}
 
   ~Implementation() {
     // We need to delete the parser before the context so that it can finalize
@@ -1117,15 +1190,18 @@ struct ParserUnit::Implementation {
 };
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
-  : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {
+  : ParserUnit(SM, SFKind, BufferID,
+               LangOptions(), TypeCheckerOptions(), "input") {
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                       const LangOptions &LangOpts, StringRef ModuleName,
+                       const LangOptions &LangOpts,
+                       const TypeCheckerOptions &TypeCheckOpts,
+                       StringRef ModuleName,
                        std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName,
-                               std::move(spActions))) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
+                               ModuleName, std::move(spActions))) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
@@ -1135,8 +1211,8 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input",
-                             nullptr)) {
+  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
+                             TypeCheckerOptions(), "input", nullptr)) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,

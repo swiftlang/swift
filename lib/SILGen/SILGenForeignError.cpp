@@ -113,7 +113,8 @@ static SILValue emitIntValue(SILGenFunction &SGF, SILLocation loc,
   if (auto structDecl = type.getStructOrBoundGenericStruct()) {
     auto properties = structDecl->getStoredProperties();
     assert(properties.size() == 1);
-    SILType fieldType = type.getFieldType(properties[0], SGF.SGM.M);
+    SILType fieldType = type.getFieldType(properties[0], SGF.SGM.M,
+                                          SGF.getTypeExpansionContext());
     SILValue fieldValue = emitIntValue(SGF, loc, fieldType, value);
     return SGF.B.createStruct(loc, type, fieldValue);
   }

@@ -22,7 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/Bitcode/RecordLayout.h"
-#include "llvm/Bitcode/BitCodes.h"
+#include "llvm/Bitstream/BitCodes.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 523; // @_nonEphemeral
+const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // function type differentiability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -222,6 +222,15 @@ enum class FunctionTypeRepresentation : uint8_t {
   CFunctionPointer,
 };
 using FunctionTypeRepresentationField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal,
+  Linear,
+};
+using DifferentiabilityKindField = BCFixed<2>;
 
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
@@ -876,7 +885,8 @@ namespace decls_block {
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // noescape?
-    BCFixed<1>   // throws?
+    BCFixed<1>,   // throws?
+    DifferentiabilityKindField // differentiability kind
 
     // trailed by parameters
   >;
@@ -950,6 +960,7 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
+    DifferentiabilityKindField, // differentiability kind
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -962,6 +973,7 @@ namespace decls_block {
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
+    DifferentiabilityKindField, // differentiability kind
     BCFixed<1>,            // error result?
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields

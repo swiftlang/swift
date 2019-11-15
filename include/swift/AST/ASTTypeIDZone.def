@@ -45,6 +45,7 @@ SWIFT_TYPEID_NAMED(OpaqueTypeDecl *, OpaqueTypeDecl)
 SWIFT_TYPEID_NAMED(OperatorDecl *, OperatorDecl)
 SWIFT_TYPEID_NAMED(Optional<PropertyWrapperMutability>,
                    PropertyWrapperMutability)
+SWIFT_TYPEID_NAMED(ParamDecl *, ParamDecl)
 SWIFT_TYPEID_NAMED(PatternBindingEntry *, PatternBindingEntry)
 SWIFT_TYPEID_NAMED(PrecedenceGroupDecl *, PrecedenceGroupDecl)
 SWIFT_TYPEID_NAMED(ProtocolDecl *, ProtocolDecl)

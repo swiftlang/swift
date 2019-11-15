@@ -53,6 +53,10 @@ public:
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
+  /// Controls whether specific OSSA optimizations are run. For benchmarking
+  /// purposes.
+  bool EnableOSSAOptimizations = true;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.

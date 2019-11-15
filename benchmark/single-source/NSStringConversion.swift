@@ -17,6 +17,7 @@ import TestsUtils
 import Foundation
 
 fileprivate var test:NSString = ""
+fileprivate var mutableTest = ""
 
 public let NSStringConversion = [
   BenchmarkInfo(name: "NSStringConversion",
@@ -65,7 +66,44 @@ public let NSStringConversion = [
   BenchmarkInfo(name: "NSStringConversion.Rebridge.LongUTF8",
                 runFunction: run_NSStringConversion_longNonASCII_rebridge,
                 tags: [.validation, .api, .String, .bridging],
-                setUpFunction: { test = NSString(cString: "Thë qüick bröwn föx jumps over the lazy dög", encoding: String.Encoding.utf8.rawValue)! })]
+                setUpFunction: { test = NSString(cString: "Thë qüick bröwn föx jumps over the lazy dög", encoding: String.Encoding.utf8.rawValue)! } ),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.UTF8",
+                runFunction: run_NSStringConversion_nonASCIIMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "tëst" }),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Medium",
+                runFunction: run_NSStringConversion_mediumMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "aaaaaaaaaaaaaaa" } ),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Long",
+                runFunction: run_NSStringConversion_longMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "The quick brown fox jumps over the lazy dog" } ),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.LongUTF8",
+                runFunction: run_NSStringConversion_longNonASCIIMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "Thë qüick bröwn föx jumps over the lazy dög" } ),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Rebridge",
+                runFunction: run_NSStringConversion_rebridgeMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "test" }),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Rebridge.UTF8",
+                runFunction: run_NSStringConversion_nonASCII_rebridgeMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "tëst" }),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Rebridge.Medium",
+                runFunction: run_NSStringConversion_medium_rebridgeMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "aaaaaaaaaaaaaaa" } ),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Rebridge.Long",
+                runFunction: run_NSStringConversion_long_rebridgeMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "The quick brown fox jumps over the lazy dog" } ),
+  BenchmarkInfo(name: "NSStringConversion.MutableCopy.Rebridge.LongUTF8",
+                runFunction: run_NSStringConversion_longNonASCII_rebridgeMutable,
+                tags: [.validation, .api, .String, .bridging],
+                setUpFunction: { mutableTest = "Thë qüick bröwn föx jumps over the lazy dög" } )
+]
 
 public func run_NSStringConversion(_ N: Int) {
 let test:NSString = NSString(cString: "test", encoding: String.Encoding.ascii.rawValue)!
@@ -103,6 +141,31 @@ public func run_NSStringConversion_longNonASCII(_ N: Int) {
   innerLoop(test, N, 300)
 }
 
+fileprivate func innerMutableLoop(_ str: String, _ N: Int, _ scale: Int = 5000) {
+  for _ in 1...N * scale {
+    let copy = (str as NSString).mutableCopy() as! NSMutableString
+    for char in (identity(copy) as String).utf8 {
+      blackHole(char)
+    }
+  }
+}
+
+public func run_NSStringConversion_nonASCIIMutable(_ N: Int) {
+  innerMutableLoop(mutableTest, N, 500)
+}
+
+public func run_NSStringConversion_mediumMutable(_ N: Int) {
+  innerMutableLoop(mutableTest, N, 500)
+}
+
+public func run_NSStringConversion_longMutable(_ N: Int) {
+  innerMutableLoop(mutableTest, N, 250)
+}
+
+public func run_NSStringConversion_longNonASCIIMutable(_ N: Int) {
+  innerMutableLoop(mutableTest, N, 150)
+}
+
 fileprivate func innerRebridge(_ str: NSString, _ N: Int, _ scale: Int = 5000) {
   for _ in 1...N * scale {
     let bridged = identity(str) as String
@@ -133,6 +196,35 @@ public func run_NSStringConversion_long_rebridge(_ N: Int) {
 
 public func run_NSStringConversion_longNonASCII_rebridge(_ N: Int) {
   innerRebridge(test, N, 300)
+}
+
+fileprivate func innerMutableRebridge(_ str: String, _ N: Int, _ scale: Int = 5000) {
+  for _ in 1...N * scale {
+    let copy = (str as NSString).mutableCopy() as! NSMutableString
+    let bridged = identity(copy) as String
+    blackHole(bridged)
+    blackHole(bridged as NSString)
+  }
+}
+
+public func run_NSStringConversion_rebridgeMutable(_ N: Int) {
+  innerMutableRebridge(mutableTest, N, 1000)
+}
+
+public func run_NSStringConversion_nonASCII_rebridgeMutable(_ N: Int) {
+  innerMutableRebridge(mutableTest, N, 500)
+}
+
+public func run_NSStringConversion_medium_rebridgeMutable(_ N: Int) {
+  innerMutableRebridge(mutableTest, N, 500)
+}
+
+public func run_NSStringConversion_long_rebridgeMutable(_ N: Int) {
+  innerMutableRebridge(mutableTest, N, 500)
+}
+
+public func run_NSStringConversion_longNonASCII_rebridgeMutable(_ N: Int) {
+  innerMutableRebridge(mutableTest, N, 300)
 }
 
 #endif

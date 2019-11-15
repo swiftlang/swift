@@ -38,7 +38,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
-class TopLevelContext;
 class TypeChecker;
 class TypeResolution;
 class TypeResolutionOptions;
@@ -542,53 +541,10 @@ public:
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
 private:
-  ASTContext &Context;
+  TypeChecker() = default;
+  ~TypeChecker() = default;
 
-  /// If non-zero, warn when a function body takes longer than this many
-  /// milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongFunctionBodies = 0;
-
-  /// If non-zero, warn when type-checking an expression takes longer
-  /// than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  unsigned WarnLongExpressionTypeChecking = 0;
-
-  /// If non-zero, abort the expression type checker if it takes more
-  /// than this many seconds.
-  unsigned ExpressionTimeoutThreshold = 600;
-
-  /// If non-zero, abort the switch statement exhaustiveness checker if
-  /// the Space::minus function is called more than this many times.
-  ///
-  /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
-  // 4.2 GHz Intel Core i7.
-  // (It's arbitrary, but will keep the compiler from taking too much time.)
-  unsigned SwitchCheckingInvocationThreshold = 200000;
-
-  /// If true, the time it takes to type-check each function will be dumped
-  /// to llvm::errs().
-  bool DebugTimeFunctionBodies = false;
-
-  /// If true, the time it takes to type-check each expression will be
-  /// dumped to llvm::errs().
-  bool DebugTimeExpressions = false;
-
-  /// Indicate that the type checker is checking code that will be
-  /// immediately executed. This will suppress certain warnings
-  /// when executing scripts.
-  bool InImmediateMode = false;
-
-  /// Indicate that the type checker should skip type-checking non-inlinable
-  /// function bodies.
-  bool SkipNonInlinableFunctionBodies = false;
-
-  TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
-  friend class constraints::ConstraintSystem;
-  friend class TypeCheckFunctionBodyUntilRequest;
 
 public:
   /// Create a new type checker instance for the given ASTContext, if it
@@ -600,93 +556,6 @@ public:
 public:
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
-  ~TypeChecker();
-
-  LangOptions &getLangOpts() const { return Context.LangOpts; }
-
-  /// Dump the time it takes to type-check each function to llvm::errs().
-  void enableDebugTimeFunctionBodies() {
-    DebugTimeFunctionBodies = true;
-  }
-
-  /// Dump the time it takes to type-check each function to llvm::errs().
-  void enableDebugTimeExpressions() {
-    DebugTimeExpressions = true;
-  }
-
-  bool getDebugTimeExpressions() {
-    return DebugTimeExpressions;
-  }
-
-  /// If \p timeInMS is non-zero, warn when a function body takes longer than
-  /// this many milliseconds to type-check.
-  ///
-  /// Intended for debugging purposes only.
-  void setWarnLongFunctionBodies(unsigned timeInMS) {
-    WarnLongFunctionBodies = timeInMS;
-  }
-
-  /// If \p timeInMS is non-zero, warn when type-checking an expression
-  /// takes longer than this many milliseconds.
-  ///
-  /// Intended for debugging purposes only.
-  void setWarnLongExpressionTypeChecking(unsigned timeInMS) {
-    WarnLongExpressionTypeChecking = timeInMS;
-  }
-
-  /// Return the current setting for the number of milliseconds
-  /// threshold we use to determine whether to warn about an
-  /// expression taking a long time.
-  unsigned getWarnLongExpressionTypeChecking() {
-    return WarnLongExpressionTypeChecking;
-  }
-
-  /// Set the threshold that determines the upper bound for the number
-  /// of seconds we'll let the expression type checker run before
-  /// considering an expression "too complex".
-  void setExpressionTimeoutThreshold(unsigned timeInSeconds) {
-    ExpressionTimeoutThreshold = timeInSeconds;
-  }
-
-  /// Return the current setting for the threshold that determines
-  /// the upper bound for the number of seconds we'll let the
-  /// expression type checker run before considering an expression
-  /// "too complex".
-  /// If zero, do not limit the checking.
-  unsigned getExpressionTimeoutThresholdInSeconds() {
-    return ExpressionTimeoutThreshold;
-  }
-
-  /// Get the threshold that determines the upper bound for the number
-  /// of times we'll let the Space::minus routine run before
-  /// considering a switch statement "too complex".
-  /// If zero, do not limit the checking.
-  unsigned getSwitchCheckingInvocationThreshold() const {
-    return SwitchCheckingInvocationThreshold;
-  }
-
-  /// Set the threshold that determines the upper bound for the number
-  /// of times we'll let the Space::minus routine run before
-  /// considering a switch statement "too complex".
-  void setSwitchCheckingInvocationThreshold(unsigned invocationCount) {
-    SwitchCheckingInvocationThreshold = invocationCount;
-  }
-
-  void setSkipNonInlinableBodies(bool skip) {
-    SkipNonInlinableFunctionBodies = skip;
-  }
-
-  bool canSkipNonInlinableBodies() const {
-    return SkipNonInlinableFunctionBodies;
-  }
-
-  bool getInImmediateMode() {
-    return InImmediateMode;
-  }
-
-  void setInImmediateMode(bool InImmediateMode) {
-    this->InImmediateMode = InImmediateMode;
-  }
 
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
@@ -743,10 +612,6 @@ public:
   static void checkUnsupportedProtocolType(ASTContext &ctx,
                                            GenericParamList *genericParams);
 
-  /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  static GenericEnvironment *
-  handleSILGenericParams(GenericParamList *genericParams, DeclContext *DC);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///
@@ -764,28 +629,6 @@ public:
                                    TypeResolution resolution,
                                    TypeResolutionOptions options,
                                    bool isSpecialized);
-
-  /// Apply generic arguments to the given type.
-  ///
-  /// This function emits diagnostics about an invalid type or the wrong number
-  /// of generic arguments, whereas applyUnboundGenericArguments requires this
-  /// to be in a correct and valid form.
-  ///
-  /// \param type The generic type to which to apply arguments.
-  /// \param loc The source location for diagnostic reporting.
-  /// \param resolution The type resolution to perform.
-  /// \param generic The arguments to apply with the angle bracket range for
-  /// diagnostics.
-  /// \param options The type resolution context.
-  ///
-  /// \returns A BoundGenericType bound to the given arguments, or null on
-  /// error.
-  ///
-  /// \see applyUnboundGenericArguments
-  static Type applyGenericArguments(Type type, SourceLoc loc,
-                                    TypeResolution resolution,
-                                    GenericIdentTypeRepr *generic,
-                                    TypeResolutionOptions options);
 
   /// Apply generic arguments to the given type.
   ///
@@ -953,8 +796,7 @@ public:
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  static void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                                  unsigned StartElem);
+  static void processREPLTopLevel(SourceFile &SF, unsigned StartElem);
 
   static void typeCheckDecl(Decl *D);
 
@@ -1055,24 +897,17 @@ public:
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-  /// \name Name lookup
-  ///
-  /// Routines that perform name lookup.
-  ///
-  /// During type checking, these routines should be used instead of
-  /// \c MemberLookup and \c UnqualifiedLookup, because these routines will
-  /// lazily introduce declarations and (FIXME: eventually) perform recursive
-  /// type-checking that the AST-level lookup routines don't.
-  ///
-  /// @{
-private:
-  Optional<Type> boolType;
-
 public:
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
   static Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);
 
+private:
+  /// Given an pre-folded expression, find LHS from the expression if a binary
+  /// operator \c name appended to the expression.
+  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+
+public:
   /// Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -1184,8 +1019,9 @@ public:
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
-                                 bool limitChecking);
+  static void checkSwitchExhaustiveness(const SwitchStmt *stmt,
+                                        const DeclContext *DC,
+                                        bool limitChecking);
 
   /// Type check the given expression as a condition, which converts
   /// it to a logic value.
@@ -1299,8 +1135,7 @@ public:
   ///
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
-  static void contextualizeTopLevelCode(TopLevelContext &TLC,
-                                        TopLevelCodeDecl *TLCD);
+  static void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -1464,6 +1299,12 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
+  /// \name Name lookup
+  ///
+  /// Routines that perform name lookup.
+  ///
+  /// @{
+
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
   ///
@@ -1499,10 +1340,6 @@ public:
   static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
                                    NameLookupOptions options
                                      = defaultMemberLookupOptions);
-
-  /// Check whether the given declaration can be written as a
-  /// member of the given base type.
-  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
   /// Look up a member type within the given type.
   ///
@@ -1540,9 +1377,9 @@ public:
                                                     Identifier name,
                                                     SourceLoc nameLoc);
 
-  /// Given an pre-folded expression, find LHS from the expression if a binary
-  /// operator \c name appended to the expression.
-  static Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+  /// Check whether the given declaration can be written as a
+  /// member of the given base type.
+  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
   /// @}
 

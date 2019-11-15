@@ -3008,9 +3008,10 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
 
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
+  State->setCodeCompletionDelayedDeclState(
+      PersistentParserState::CodeCompletionDelayedDeclKind::Decl,
+      Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
+      BeginParserPosition.PreviousLoc);
 
   while (SourceMgr.isBeforeInBuffer(Tok.getLoc(), CurrentLoc))
     consumeToken();
@@ -3043,21 +3044,6 @@ void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
       continue;
     setLocalDiscriminator(P);
   }
-}
-
-void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
-                                           ParseDeclOptions Flags) {
-  auto CurLoc = Tok.getLoc();
-  backtrackToPosition(BeginParserPosition);
-  SourceLoc BeginLoc = Tok.getLoc();
-  SourceLoc EndLoc = CurLoc;
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl,
-                   Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
-
-  while (Tok.isNot(tok::eof))
-    consumeToken();
 }
 
 /// Parse a single syntactic declaration and return a list of decl
@@ -3429,26 +3415,23 @@ Parser::parseDecl(ParseDeclOptions Flags,
     consumeToken(tok::code_complete);
   }
 
-  if (AttrStatus.hasCodeCompletion()) {
-    if (CodeCompletion) {
+  if (AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion()) {
+    if (isCodeCompletionFirstPass() &&
+        !CurDeclContext->isModuleScopeContext() &&
+        !isa<TopLevelCodeDecl>(CurDeclContext) &&
+        !isa<AbstractClosureExpr>(CurDeclContext)) {
+      // Only consume non-toplevel decls.
+      consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
+
+      return makeParserError();
+    }
+    if (AttrStatus.hasCodeCompletion() && CodeCompletion) {
       Optional<DeclKind> DK;
       if (DeclResult.isNonNull())
         DK = DeclResult.get()->getKind();
       CodeCompletion->setAttrTargetDeclKind(DK);
-    } else {
-      delayParseFromBeginningToHere(BeginParserPosition, Flags);
-      return makeParserError();
     }
-  }
-
-  if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleScopeContext() &&
-      !isa<TopLevelCodeDecl>(CurDeclContext) &&
-      !isa<AbstractClosureExpr>(CurDeclContext)) {
-    // Only consume non-toplevel decls.
-    consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
-
-    return makeParserError();
+    DeclResult.setHasCodeCompletion();
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
@@ -3591,48 +3574,6 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   bool hadError = false;
   ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
   return parseDeclList(LBLoc, RBLoc, Id, Options, IDC, hadError);
-}
-
-void Parser::parseDeclDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the decl.
-  restoreParserPosition(BeginParserPosition);
-
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-  ContextChange CC(*this, DelayedState->ParentContext);
-
-  parseDecl(ParseDeclOptions(DelayedState->Flags),
-            /*IsAtStartOfLineOrPreviousHadSemi=*/true,
-            [&](Decl *D) {
-    if (auto *parent = DelayedState->ParentContext) {
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(parent)) {
-        NTD->addMember(D);
-      } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
-        ED->addMember(D);
-      } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
-        SF->Decls.push_back(D);
-      }
-    }
-  });
 }
 
 /// Parse an 'import' declaration, doing no token skipping on error.
@@ -5658,9 +5599,9 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   if (isCodeCompletionFirstPass()) {
     if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
-      State->delayDecl(PersistentParserState::DelayedDeclKind::FunctionBody,
-                       PD_Default, AFD, BodyRange,
-                       BeginParserPosition.PreviousLoc);
+      State->setCodeCompletionDelayedDeclState(
+          PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody,
+          PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
     } else {
       AFD->setBodySkipped(BodyRange);
     }
@@ -5973,20 +5914,6 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
   return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
-}
-
-/// Parse a delayed function body from the 'PersistentParserState'.
-void Parser::parseAbstractFunctionBodyDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-  auto CD = DelayedState->ParentContext->getAsDecl();
-  auto AFD = cast<AbstractFunctionDecl>(CD);
-
-  // Eagarly parse local decls or nested function bodies inside the body.
-  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
-
-  auto body = parseAbstractFunctionBodyDelayed(AFD);
-  AFD->setBodyParsed(body);
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token
@@ -7000,7 +6927,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
-    if (Context.LangOpts.EnableOperatorDesignatedTypes) {
+    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       if (Tok.is(tok::identifier)) {
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);

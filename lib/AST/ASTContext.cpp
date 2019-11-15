@@ -504,6 +504,7 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
+                            TypeCheckerOptions &typeckOpts,
                             SearchPathOptions &SearchPathOpts,
                             SourceManager &SourceMgr,
                             DiagnosticEngine &Diags) {
@@ -516,15 +517,16 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
   impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, SearchPathOpts, SourceMgr, Diags);
+  return new (mem)
+      ASTContext(langOpts, typeckOpts, SearchPathOpts, SourceMgr, Diags);
 }
 
-ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+                       SearchPathOptions &SearchPathOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
   : LangOpts(langOpts),
-    SearchPathOpts(SearchPathOpts),
-    SourceMgr(SourceMgr),
-    Diags(Diags),
+    TypeCheckerOpts(typeckOpts),
+    SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
     evaluator(Diags, langOpts.DebugDumpCycles),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
@@ -4354,42 +4356,28 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
-  if (!baseGenericCtx) {
+  if (!baseGenericCtx || !derivedGenericCtx)
     return nullptr;
-  }
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
-
-  if (!baseClass) {
+  if (!baseClass)
     return nullptr;
-  }
 
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  if (!derivedClass)
+    return nullptr;
+
+  if (derivedClass->getSuperclass().isNull())
+    return nullptr;
+
+  if (baseGenericCtx->getGenericSignature().isNull() ||
+      derivedGenericCtx->getGenericSignature().isNull())
+    return nullptr;
+
   auto baseClassSig = baseClass->getGenericSignature();
-
-  if (!derivedClass) {
-    return nullptr;
-  }
-
-  if (derivedClass->getSuperclass().isNull()) {
-    return nullptr;
-  }
-
-  if (!derivedGenericCtx || !derivedGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
-  if (derivedClass->getGenericSignature().isNull() &&
-      !baseGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
-  if (baseGenericCtx->getGenericSignature().isNull()) {
-    return nullptr;
-  }
   unsigned derivedDepth = 0;
 
   auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
@@ -4405,9 +4393,11 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
-  for (auto gp : *derivedGenericCtx->getGenericParams()) {
-    addedGenericParams.push_back(
-        gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+  if (auto *gpList = derivedGenericCtx->getGenericParams()) {
+    for (auto gp : *gpList) {
+      addedGenericParams.push_back(
+          gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+    }
   }
 
   unsigned baseDepth = 0;

@@ -867,9 +867,7 @@ public:
 
     auto *argType =
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
-                                          TVO_CanBindToNoEscape);
-
-    CS.recordPotentialHole(argType);
+                                      TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
     Arguments.push_back(param.withType(argType));
     ++NumSynthesizedArgs;
@@ -3079,7 +3077,7 @@ bool ConstraintSystem::repairFailures(
     }
 
     // If either type has a hole, consider this fixed.
-    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     conversionsOrFixes.push_back(
@@ -3145,7 +3143,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
     // If either type has a hole, consider this fixed.
-    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     // If dependent members are present here it's because
@@ -3265,8 +3263,25 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::FunctionResult: {
+    auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
+    // If this is a mismatch between contextual type and (trailing)
+    // closure with explicitly specified result type let's record it
+    // as contextual type mismatch.
+    if (loc->isLastElement<LocatorPathElt::ContextualType>() ||
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      auto *argExpr = simplifyLocatorToAnchor(loc);
+      if (argExpr && isa<ClosureExpr>(argExpr)) {
+        conversionsOrFixes.push_back(ContextualMismatch::create(
+            *this, lhs, rhs,
+            getConstraintLocator(argExpr, ConstraintLocator::ClosureResult)));
+        break;
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
+
   case ConstraintLocator::Member:
-  case ConstraintLocator::FunctionResult:
   case ConstraintLocator::DynamicLookupResult: {
     // Most likely this is an attempt to use get-only subscript as mutating,
     // or assign a value of a result of function/member ref e.g. `foo() = 42`
@@ -3405,7 +3420,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::InstanceType: {
-    if (lhs->hasUnresolvedType() || rhs->hasUnresolvedType())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     break;
@@ -4944,6 +4959,12 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
       // Track how many times we do this so that we can record a fix for each.
       ++unwrapCount;
     }
+
+    if (simplified->isHole()) {
+      if (auto *typeVar = second->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+      return SolutionKind::Solved;
+    }
   }
 
   if (simplified->isTypeVariableOrMember()) {
@@ -5273,10 +5294,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       result.markErrorAlreadyDiagnosed();
       return;
     }
-
-    // FIXME: Deal with broken recursion
-    if (!decl->hasInterfaceType())
-      return;
 
     // Dig out the instance type and figure out what members of the instance type
     // we are going to see.
@@ -5648,10 +5665,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         result.markErrorAlreadyDiagnosed();
         return result;
       }
-
-      // FIXME: Deal with broken recursion
-      if (!cand->hasInterfaceType())
-        continue;
 
       result.addUnviable(getOverloadChoice(cand, /*isBridged=*/false,
                                            /*isUnwrappedOptional=*/false),
@@ -6733,9 +6746,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
         }
 
         if (shouldAttemptFixes()) {
-          auto *componentLoc = getConstraintLocator(
-              keyPath, {LocatorPathElt::KeyPathComponent(i),
-                        LocatorPathElt::KeyPathComponentResult()});
+          auto typeVar =
+              llvm::find_if(componentTypeVars, [&](TypeVariableType *typeVar) {
+                auto *locator = typeVar->getImpl().getLocator();
+                auto elt = locator->findLast<LocatorPathElt::KeyPathComponent>();
+                return elt && elt->getIndex() == i;
+              });
 
           // If one of the components haven't been resolved, let's check
           // whether it has been determined to be a "hole" and if so,
@@ -6743,7 +6759,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
           //
           // This helps to, for example, diagnose problems with missing
           // members used as part of a key path.
-          if (isPotentialHoleAt(componentLoc)) {
+          if (typeVar != componentTypeVars.end() &&
+              (*typeVar)->getImpl().canBindToHole()) {
             anyComponentsUnresolved = true;
             capability = ReadOnly;
             continue;
@@ -6770,8 +6787,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
       if (auto *fix = AllowInvalidRefInKeyPath::forRef(
               *this, choices[i].getDecl(), componentLoc)) {
-        if (!shouldAttemptFixes() || recordFix(fix))
-          return SolutionKind::Error;
+        if (!hasFixFor(componentLoc, FixKind::AllowTypeOrInstanceMember))
+          if (!shouldAttemptFixes() || recordFix(fix))
+            return SolutionKind::Error;
 
         // If this was a method reference let's mark it as read-only.
         if (!storage) {
@@ -7109,7 +7127,7 @@ retry_after_fail:
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
     ASTContext &ctx = getASTContext();
-    if (ctx.LangOpts.DebugConstraintSolver) {
+    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
       log.indent(solverState ? solverState->depth * 2 + 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
@@ -7140,25 +7158,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // By construction, the left hand side is a type that looks like the
   // following: $T1 -> $T2.
   auto func1 = type1->castTo<FunctionType>();
-
-  // Let's check if this member couldn't be found and is fixed
-  // to exist based on its usage.
-  if (auto *memberTy = type2->getAs<TypeVariableType>()) {
-    if (isPotentialHole(memberTy)) {
-      auto *funcTy = type1->castTo<FunctionType>();
-      auto *locator = memberTy->getImpl().getLocator();
-      // Bind type variable associated with member to a type of argument
-      // application, which makes it seem like member exists with the
-      // types of the parameters matching argument types exactly.
-      addConstraint(ConstraintKind::Bind, memberTy, funcTy, locator);
-      // There might be no contextual type for result of the application,
-      // in cases like `let _ = x.foo()`, so let's record a potential hole.
-      auto resultTy = funcTy->getResult();
-      if (auto *typeVar = resultTy->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-      return SolutionKind::Solved;
-    }
-  }
 
   // Before stripping lvalue-ness and optional types, save the original second
   // type for handling `func callAsFunction` and `@dynamicCallable`
@@ -8133,7 +8132,7 @@ static bool isAugmentingFix(ConstraintFix *fix) {
 
 bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.DebugConstraintSolver) {
+  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
@@ -8173,7 +8172,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
 void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
   assert(typeVar);
-  Holes.insert(typeVar->getImpl().getLocator());
+  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
@@ -8379,7 +8378,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
-  case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::DefaultGenericArgument:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:

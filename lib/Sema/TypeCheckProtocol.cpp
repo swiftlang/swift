@@ -253,14 +253,6 @@ static bool checkObjCWitnessSelector(ValueDecl *req, ValueDecl *witness) {
   return false;
 }
 
-static ParameterList *getParameterList(ValueDecl *value) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return func->getParameters();
-
-  auto subscript = cast<SubscriptDecl>(value);
-  return subscript->getIndices();
-}
-
 // Find a standin declaration to place the diagnostic at for the
 // given accessor kind.
 static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
@@ -2215,16 +2207,39 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
     return known->second;
 
   // Collect the set of associated types rooted on Self in the
-  // signature.
+  // signature. Note that for references to nested types, we only
+  // want to consider the outermost dependent member type.
+  //
+  // For example, a requirement typed '(Iterator.Element) -> ()'
+  // is not considered to reference the associated type 'Iterator'.
   auto &assocTypes = ReferencedAssociatedTypes[req];
-  llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
-  req->getInterfaceType()->getCanonicalType().visit([&](CanType type) {
-      if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
-        if (knownAssocTypes.insert(assocType).second) {
-          assocTypes.push_back(assocType);
+
+  class Walker : public TypeWalker {
+    ProtocolDecl *Proto;
+    llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes;
+    llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
+
+  public:
+    Walker(ProtocolDecl *Proto,
+           llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes)
+      : Proto(Proto), assocTypes(assocTypes) {}
+
+    Action walkToTypePre(Type type) override {
+      if (type->is<DependentMemberType>()) {
+        if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
+          if (knownAssocTypes.insert(assocType).second)
+            assocTypes.push_back(assocType);
         }
+
+        return Action::SkipChildren;
       }
-    });
+
+      return Action::Continue;
+    }
+  };
+
+  Walker walker(Proto, assocTypes);
+  req->getInterfaceType()->getCanonicalType().walk(walker);
 
   return assocTypes;
 }
@@ -2388,11 +2403,8 @@ static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
       if (extAccess < requiredAccess) {
         shouldMoveToAnotherExtension = true;
       } else if (extAccess == requiredAccess) {
-        auto declAttr = decl->getAttrs().getAttribute<AccessControlAttr>();
-        assert(declAttr && declAttr->getAccess() < requiredAccess &&
-            "expect an explicitly specified access control level which is "
-            "less accessible than required.");
-        (void)declAttr;
+        assert(decl->getFormalAccess() < requiredAccess &&
+              "witness is accessible?");
         shouldUseDefaultAccess = true;
       }
     }
@@ -3490,12 +3502,29 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
-  if (isa<ClangModuleUnit>(Conformance->getDeclContext()->getModuleScopeContext())) {
+  if (isa<ClangModuleUnit>(DC->getModuleScopeContext())) {
     llvm::errs() << "Cannot look up associated type for imported conformance:\n";
     Conformance->getType().dump(llvm::errs());
     assocType->dump(llvm::errs());
     abort();
   }
+
+  // If we fail to find a witness via lookup, check for a generic parameter.
+  auto checkForGenericParameter = [&]() {
+    // If there is a generic parameter of the named type, use that.
+    if (auto genericSig = DC->getGenericSignatureOfContext()) {
+      for (auto gp : genericSig->getInnermostGenericParams()) {
+        if (gp->getName() == assocType->getName()) {
+          if (!checkTypeWitness(DC, Proto, assocType, gp)) {
+            recordTypeWitness(assocType, gp, nullptr);
+            return ResolveWitnessResult::Success;
+          }
+        }
+      }
+    }
+
+    return ResolveWitnessResult::Missing;
+  };
 
   // Look for a member type with the same name as the associated type.
   auto candidates = TypeChecker::lookupMemberType(
@@ -3503,7 +3532,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
-    return ResolveWitnessResult::Missing;
+    return checkForGenericParameter();
   }
 
   // Determine which of the candidates is viable.
@@ -3537,7 +3566,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                      return x.first->getDeclContext()
                         ->getSelfProtocolDecl() == nullptr;
                    }) == nonViable.end())
-    return ResolveWitnessResult::Missing;
+    return checkForGenericParameter();
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
@@ -4858,7 +4887,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check all conformances.
   groupChecker.checkAllConformances();
 
-  if (Context.LangOpts.DebugGenericSignatures) {
+  if (Context.TypeCheckerOpts.DebugGenericSignatures) {
     // Now that they're filled out, print out information about the conformances
     // here, when requested.
     for (auto conformance : conformances) {

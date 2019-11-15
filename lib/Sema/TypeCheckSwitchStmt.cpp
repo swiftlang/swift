@@ -885,16 +885,14 @@ namespace {
     };
 
     ASTContext &Context;
-    unsigned CheckingThreshold;
     const SwitchStmt *Switch;
     const DeclContext *DC;
     APIntMap<Expr *> IntLiteralCache;
     llvm::DenseMap<APFloat, Expr *, ::DenseMapAPFloatKeyInfo> FloatLiteralCache;
     llvm::DenseMap<StringRef, Expr *> StringLiteralCache;
     
-    SpaceEngine(ASTContext &C, unsigned Threashold,
-                const SwitchStmt *SS, const DeclContext *DC)
-        : Context(C), CheckingThreshold(Threashold), Switch(SS), DC(DC) {}
+    SpaceEngine(ASTContext &C, const SwitchStmt *SS, const DeclContext *DC)
+        : Context(C), Switch(SS), DC(DC) {}
     
     bool checkRedundantLiteral(const Pattern *Pat, Expr *&PrevPattern) {
       if (Pat->getKind() != PatternKind::Expr) {
@@ -1010,7 +1008,8 @@ namespace {
       Space totalSpace = Space::forType(subjectType, Identifier());
       Space coveredSpace = Space::forDisjunct(spaces);
 
-      unsigned minusCount = CheckingThreshold;
+      unsigned minusCount
+        = Context.TypeCheckerOpts.SwitchCheckingInvocationThreshold;
       auto diff = totalSpace.minus(coveredSpace, DC, &minusCount);
       if (!diff) {
         diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
@@ -1519,8 +1518,7 @@ namespace {
 void TypeChecker::checkSwitchExhaustiveness(const SwitchStmt *stmt,
                                             const DeclContext *DC,
                                             bool limited) {
-  SpaceEngine(Context, getSwitchCheckingInvocationThreshold(), stmt, DC)
-    .checkExhaustiveness(limited);
+  SpaceEngine(DC->getASTContext(), stmt, DC).checkExhaustiveness(limited);
 }
 
 void SpaceEngine::Space::dump() const {

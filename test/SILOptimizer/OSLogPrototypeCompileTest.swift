@@ -44,6 +44,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
+
+    // Check whether argument array is folded. We need not check the contents of
+    // the array which is checked by a different test suite.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 3
   }
 
   // CHECK-LABEL: @$s25OSLogPrototypeCompileTest34testInterpolationWithFormatOptionsL_1hy0aB06LoggerV_tF
@@ -77,6 +88,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
+
+    // Check whether argument array is folded. We need not check the contents of
+    // the array which is checked by a different test suite.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 3
   }
 
   // CHECK-LABEL: @$s25OSLogPrototypeCompileTest44testInterpolationWithFormatOptionsAndPrivacyL_1hy0aB06LoggerV_tF
@@ -113,6 +135,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
+
+    // Check whether argument array is folded. We need not check the contents of
+    // the array which is checked by a different test suite.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 3
   }
 
   // CHECK-LABEL: @$s25OSLogPrototypeCompileTest38testInterpolationWithMultipleArgumentsL_1hy0aB06LoggerV_tF
@@ -155,6 +188,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 3
+
+    // Check whether argument array is folded. We need not check the contents of
+    // the array which is checked by a different test suite.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 9
   }
 
   // CHECK-LABEL: @$s25OSLogPrototypeCompileTest25testLogMessageWithoutDataL_1hy0aB06LoggerV_tF
@@ -192,6 +236,16 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 0
+
+    // Check whether argument array is folded.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 0
   }
 
   // CHECK-LABEL: @$s25OSLogPrototypeCompileTest22testEscapingOfPercentsL_1hy0aB06LoggerV_tF
@@ -262,6 +316,16 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 48
+
+    // Check whether argument array is folded.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 144
   }
 
   // CHECK-LABEL: @$s25OSLogPrototypeCompileTest22testInt32InterpolationL_1hy0aB06LoggerV_tF
@@ -334,6 +398,17 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 2
+
+    // Check whether argument array is folded. We need not check the contents of
+    // the array which is checked by a different test suite.
+
+    // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+    // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+    // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+    // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+    // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+    // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+    // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 6
   }
 }
 

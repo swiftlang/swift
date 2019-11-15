@@ -824,8 +824,8 @@ bb0:
   unreachable
 }
 
-// Make sure we do perform the optimization if our borrowed value is an
-// argument.
+// Make sure that since we have a guaranteed argument and do not need to reason
+// about end_borrows, we handle this.
 //
 // CHECK-LABEL: sil [ossa] @guaranteed_arg_used_by_postdominating_no_return_function : $@convention(thin) (@guaranteed NativeObjectPair) -> MyNever {
 // CHECK-NOT: copy_value
@@ -836,6 +836,23 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   %4 = copy_value %3 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
+}
+
+
+// Make sure that since our borrow introducer is a begin_borrow, we do not
+// eliminate the copy.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
+// CHECK: copy_value
+// CHECK: } // end sil function 'borrowed_val_used_by_postdominating_no_return_function'
+sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = copy_value %2 : $Builtin.NativeObject
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   unreachable
 }
 
@@ -855,4 +872,31 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   destroy_value %2 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
+}
+
+// Just make sure we do not crash here.
+//
+// CHECK-LABEL: sil [ossa] @do_not_insert_end_borrow_given_deadend : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'do_not_insert_end_borrow_given_deadend'
+sil [ossa] @do_not_insert_end_borrow_given_deadend : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%x : @guaranteed $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLet
+  %v = load_borrow %p : $*Klass
+  %c = copy_value %v : $Klass
+  end_borrow %v : $Klass
+  apply %f(%c) : $@convention(thin) (@guaranteed Klass) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %c : $Klass
+  br bb3
+
+bb2:
+  destroy_value %c : $Klass
+  br bb3
+
+bb3:
+  unreachable
 }

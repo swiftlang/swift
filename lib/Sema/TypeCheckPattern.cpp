@@ -1488,10 +1488,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (param->isInvalid())
       return true;
 
-    if (auto type = param->getType())
-      return !isValidType(type);
-
-    return true;
+    return !isValidType(param->getType());
   };
 
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {

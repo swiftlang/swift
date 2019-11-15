@@ -748,6 +748,9 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_pcm : Flag<["-"], "emit-pcm">,
+  HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
@@ -790,6 +793,10 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_pcm : Flag<["-"], "dump-pcm">,
+  HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
@@ -888,6 +895,15 @@ def enable_private_imports : Flag<["-"], "enable-private-imports">,
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
+
+def sanitize_recover_EQ
+    : CommaJoined<["-"], "sanitize-recover=">,
+      Flags<[FrontendOption, NoInteractiveOption]>,
+      MetaVarName<"<check>">,
+      HelpText<"Specify which sanitizer runtime checks (see -sanitize=) will "
+               "generate instrumentation that allows error recovery. Listed "
+               "checks should be comma separated. Default behavior is to not "
+               "allow error recovery.">;
 
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,

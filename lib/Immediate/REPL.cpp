@@ -193,8 +193,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
         parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
                             &PersistentState);
   } while (!Done);
-  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext(),
-                      /*Options*/None);
+  performTypeChecking(REPLInputFile);
   return REPLModule;
 }
 
@@ -1163,9 +1162,9 @@ public:
           if (Tok.getText() == "debug") {
             L.lex(Tok);
             if (Tok.getText() == "on") {
-              CI.getASTContext().LangOpts.DebugConstraintSolver = true;
+              CI.getASTContext().TypeCheckerOpts.DebugConstraintSolver = true;
             } else if (Tok.getText() == "off") {
-              CI.getASTContext().LangOpts.DebugConstraintSolver = false;
+              CI.getASTContext().TypeCheckerOpts.DebugConstraintSolver = false;
             } else {
               llvm::outs() << "Unknown :constraints debug command; try :help\n";
             }

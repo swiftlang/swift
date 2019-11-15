@@ -238,13 +238,12 @@ Differentiation is the process of computing derivatives. See the
 ["Math Introduction"](#math-introduction) section below for more details.
 
 Derivatives are a fundamental tool in calculus and have applications in many
-domains, notably deep learning. Numerical computing in Swift Swift is an
-expressive, high-performance language that is a great fit for numerical
-applications. Recent proposals have paved the way for low-level numerical
-computing in Swift: [AdditiveArithmetic][SE-0233], SIMD [[1][SE-0229]]
-[[2][SE-0251]], [generic math functions][SE-0246]. However, high-level numerical
-computing applications, including machine learning and artificial intelligence,
-require more work.
+domains, notably deep learning. Numerical computing in Swift is an expressive,
+high-performance language that is a great fit for numerical applications. Recent
+proposals have paved the way for low-level numerical computing in Swift:
+[AdditiveArithmetic][SE-0233], SIMD [[1][SE-0229]] [[2][SE-0251]], [generic math
+functions][SE-0246]. However, high-level numerical computing applications,
+including machine learning and artificial intelligence, require more work.
 
 We believe that first-class differentiable programming is a big step towards
 high-level numerical computing support and will make Swift a real contender in
@@ -971,21 +970,20 @@ public protocol Differentiable {
     
     /// A closure that produces a zero tangent vector and does not capture `self`.
     ///
-    /// A zero tangent vector of `self` is equal to `TangentVector.zero`
-    /// sometimes. In some cases, the zero tangent vector dependes on
-    /// information on `self`, such as shape. For differentiable programming, it
-    /// is more memory-efficient to define a custom
-    /// `zeroTangentVectorInitializer` to return a closure that captures and
-    /// uses such information to create a zero tangent vector. For example:
+    /// In some cases, the zero tangent vector of `self` is equal to
+    /// `TangentVector.zero`. In other cases, the zero tangent vector depends on
+    /// information in `self`, such as shape for an n-dimensional array type.
+    /// For differentiable programming, it is more memory-efficient to define a
+    /// custom `zeroTangentVectorInitializer` property which returns a closure
+    /// that captures and uses only the necessary information to create a zero
+    /// tangent vector. For example:
     ///
     /// ```swift
     /// struct Vector {
-    ///    var scalars: [Float]
-    ///    var count: Int { scalars.count }
-    ///    init(repeating repeatedElement: Float, count: Int) { ... }
+    ///     var scalars: [Float]
+    ///     var count: Int { scalars.count }
+    ///     init(repeating repeatedElement: Float, count: Int) { ... }
     /// }
-    ///
-    /// ...
     /// 
     /// extension Vector: Differentiable {
     ///     typealias TangentVector = Vector

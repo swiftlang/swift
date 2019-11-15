@@ -56,7 +56,7 @@ namespace swift {
 
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
-  class LangOptions {
+  class LangOptions final {
   public:
 
     /// The target we are building for.
@@ -160,63 +160,18 @@ namespace swift {
     /// Flags for developers
     ///
 
-    /// Whether we are debugging the constraint solver.
-    ///
-    /// This option enables verbose debugging output from the constraint
-    /// solver.
-    bool DebugConstraintSolver = false;
-
-    /// Specific solution attempt for which the constraint
-    /// solver should be debugged.
-    unsigned DebugConstraintSolverAttempt = 0;
-
-    /// Line numbers to activate the constraint solver debugger.
-    /// Should be stored sorted.
-    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
-
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
-
-    /// Debug the generic signatures computed by the generic signature builder.
-    bool DebugGenericSignatures = false;
-
-    /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
-    /// identifier reference with the provided prefix name.
-    /// This is for testing purposes.
-    std::string DebugForbidTypecheckPrefix;
-
-    /// Whether to dump debug info for request evaluator cycles.
-    bool DebugDumpCycles = false;
-
+    
     /// The path to which we should emit GraphViz output for the complete
     /// request-evaluator graph.
     std::string RequestEvaluatorGraphVizPath;
-
-    /// The upper bound, in bytes, of temporary data that can be
-    /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
-
-    unsigned SolverBindingThreshold = 1024 * 1024;
-
-    /// The upper bound to number of sub-expressions unsolved
-    /// before termination of the shrink phrase of the constraint solver.
-    unsigned SolverShrinkUnsolvedThreshold = 10;
-
-    /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
-
-    /// Disable constraint system performance hacks.
-    bool DisableConstraintSolverPerformanceHacks = false;
-
-    /// Enable experimental operator designated types feature.
-    bool EnableOperatorDesignatedTypes = false;
-
+    
+    /// Whether to dump debug info for request evaluator cycles.
+    bool DebugDumpCycles = false;
+    
     /// Enable SIL type lowering
     bool EnableSubstSILFunctionTypesForFunctionValues = false;
-
-    /// Enable constraint solver support for experimental
-    ///        operator protocol designator feature.
-    bool SolverEnableOperatorDesignatedTypes = false;
 
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.
@@ -455,6 +410,103 @@ namespace swift {
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
+  };
+
+  class TypeCheckerOptions final {
+  public:
+    /// If non-zero, warn when a function body takes longer than this many
+    /// milliseconds to type-check.
+    ///
+    /// Intended for debugging purposes only.
+    unsigned WarnLongFunctionBodies = 0;
+
+    /// If non-zero, warn when type-checking an expression takes longer
+    /// than this many milliseconds.
+    ///
+    /// Intended for debugging purposes only.
+    unsigned WarnLongExpressionTypeChecking = 0;
+
+    /// If non-zero, abort the expression type checker if it takes more
+    /// than this many seconds.
+    unsigned ExpressionTimeoutThreshold = 600;
+
+    /// If non-zero, abort the switch statement exhaustiveness checker if
+    /// the Space::minus function is called more than this many times.
+    ///
+    /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
+    /// 4.2 GHz Intel Core i7.
+    /// (It's arbitrary, but will keep the compiler from taking too much time.)
+    unsigned SwitchCheckingInvocationThreshold = 200000;
+
+    /// Whether to delay checking that benefits from having the entire
+    /// module parsed, e.g., Objective-C method override checking.
+    bool DelayWholeModuleChecking = false;
+
+    /// If true, the time it takes to type-check each function will be dumped
+    /// to llvm::errs().
+    bool DebugTimeFunctionBodies = false;
+
+    /// If true, the time it takes to type-check each expression will be
+    /// dumped to llvm::errs().
+    bool DebugTimeExpressions = false;
+
+    /// Indicate that the type checker is checking code that will be
+    /// immediately executed. This will suppress certain warnings
+    /// when executing scripts.
+    bool InImmediateMode = false;
+
+    /// Indicate that the type checker should skip type-checking non-inlinable
+    /// function bodies.
+    bool SkipNonInlinableFunctionBodies = false;
+    
+    ///
+    /// Flags for developers
+    ///
+
+    /// Whether we are debugging the constraint solver.
+    ///
+    /// This option enables verbose debugging output from the constraint
+    /// solver.
+    bool DebugConstraintSolver = false;
+
+    /// Specific solution attempt for which the constraint
+    /// solver should be debugged.
+    unsigned DebugConstraintSolverAttempt = 0;
+
+    /// Line numbers to activate the constraint solver debugger.
+    /// Should be stored sorted.
+    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
+
+    /// Debug the generic signatures computed by the generic signature builder.
+    bool DebugGenericSignatures = false;
+
+    /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
+    /// identifier reference with the provided prefix name.
+    /// This is for testing purposes.
+    std::string DebugForbidTypecheckPrefix;
+
+    /// The upper bound, in bytes, of temporary data that can be
+    /// allocated by the constraint solver.
+    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+
+    unsigned SolverBindingThreshold = 1024 * 1024;
+
+    /// The upper bound to number of sub-expressions unsolved
+    /// before termination of the shrink phrase of the constraint solver.
+    unsigned SolverShrinkUnsolvedThreshold = 10;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
+
+    /// Enable experimental operator designated types feature.
+    bool EnableOperatorDesignatedTypes = false;
+    
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
+    /// Enable constraint solver support for experimental
+    ///        operator protocol designator feature.
+    bool SolverEnableOperatorDesignatedTypes = false;
   };
 } // end namespace swift
 
