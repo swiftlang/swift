@@ -49,11 +49,8 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
     }
     let pb = pullback(at: 3, 4, in: twoElementLiteralAddress)
     let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    // FIXME(TF-952): Fix incorrect zero derivatives.
-    // expectEqual(8, gradX)
-    // expectEqual(6, gradY)
-    expectEqual(0, gradX)
-    expectEqual(0, gradY)
+    expectEqual(8, gradX)
+    expectEqual(6, gradY)
   }
 
   do {

@@ -1426,6 +1426,10 @@ private:
   SILFunction &getFunction();
 
   /// The conformance lookup function.
+  // FIXME(TF-945): `LookupConformanceFn` is a type alias for
+  // `llvm::function_ref`, which does not own the underlying callable and should
+  // not be stored. Instead, delete `getLookupConformanceFunction()` and define
+  // a `hasTangentSpace(SILValue)` helper.
   LookupConformanceFn getLookupConformanceFunction() {
     // Look up in derivative generic signature, if defined.
     if (derivativeGenericSignature)
@@ -1436,7 +1440,7 @@ private:
         getFunction().getModule().getSwiftModule());
   }
 
-  /// Perform analysis and populate sets.
+  /// Perform analysis and populate variedness and usefulness sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
   /// Marks the given value as varied and propagates variedness to users.
@@ -1450,9 +1454,8 @@ private:
   void propagateVariedInwardsThroughProjections(
       SILValue value, unsigned independentVariableIndex);
 
+  /// Marks the given value as useful for the given dependent variable index.
   void setUseful(SILValue value, unsigned dependentVariableIndex);
-  void setUsefulAcrossArrayInitialization(SILValue value,
-                                          unsigned dependentVariableIndex);
   /// Marks the given value as useful and recursively propagates usefulness to:
   /// - Defining instruction operands, if the value has a defining instruction.
   /// - Incoming values, if the value is a basic block argument.
@@ -1465,20 +1468,35 @@ private:
   /// field projections.
   void propagateUsefulThroughAddress(SILValue value,
                                      unsigned dependentVariableIndex);
+  /// If the given value is an `array.uninitialized_intrinsic` application,
+  /// selectively propagate usefulness through its `RawPointer` result.
+  void setUsefulAcrossArrayInitialization(SILValue value,
+                                          unsigned dependentVariableIndex);
 
 public:
   explicit DifferentiableActivityInfo(
       DifferentiableActivityCollection &parent,
       GenericSignature derivativeGenericSignature);
 
+  /// Returns true if the given value is varied for the given independent
+  /// variable index.
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
-  bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
+
+  /// Returns true if the given value is varied for any of the given parameter
+  /// (independent variable) indices.
   bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
+
+  /// Returns true if the given value is useful for the given dependent variable
+  /// index.
+  bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
+
+  /// Returns true if the given value is active for the given
+  /// `SILAutoDiffIndices` (parameter indices and result index).
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
 
+  /// Returns the activity of the given value for the given `SILAutoDiffIndices`
+  /// (parameter indices and result index).
   Activity getActivity(SILValue value,
-                       const SILAutoDiffIndices &indices) const;
-  Activity getActivity(SILInstruction *inst,
                        const SILAutoDiffIndices &indices) const;
 };
 
@@ -1892,6 +1910,49 @@ SILFunction &DifferentiableActivityInfo::getFunction() {
   return parent.function;
 }
 
+void DifferentiableActivityInfo::analyze(DominanceInfo *di,
+                                         PostDominanceInfo *pdi) {
+  auto &function = getFunction();
+  LLVM_DEBUG(getADDebugStream()
+             << "Running activity analysis on @" << function.getName() << '\n');
+  // Inputs are just function's arguments, count `n`.
+  auto paramArgs = function.getArgumentsWithoutIndirectResults();
+  for (auto value : paramArgs)
+    inputValues.push_back(value);
+  LLVM_DEBUG({
+    auto &s = getADDebugStream();
+    s << "Inputs in @" << function.getName() << ":\n";
+    for (auto val : inputValues)
+      s << val << '\n';
+  });
+  // Outputs are indirect result buffers and return values, count `m`.
+  collectAllFormalResultsInTypeOrder(function, outputValues);
+  LLVM_DEBUG({
+    auto &s = getADDebugStream();
+    s << "Outputs in @" << function.getName() << ":\n";
+    for (auto val : outputValues)
+      s << val << '\n';
+  });
+
+  // Propagate variedness starting from the inputs.
+  assert(variedValueSets.empty());
+  for (auto inputAndIdx : enumerate(inputValues)) {
+    auto input = inputAndIdx.value();
+    unsigned i = inputAndIdx.index();
+    variedValueSets.push_back({});
+    setVariedAndPropagateToUsers(input, i);
+  }
+
+  // Mark differentiable outputs as useful.
+  assert(usefulValueSets.empty());
+  for (auto outputAndIdx : enumerate(outputValues)) {
+    auto output = outputAndIdx.value();
+    unsigned i = outputAndIdx.index();
+    usefulValueSets.push_back({});
+    setUsefulAndPropagateToOperands(output, i);
+  }
+}
+
 void DifferentiableActivityInfo::setVariedAndPropagateToUsers(
     SILValue value, unsigned independentVariableIndex) {
   // Skip already-varied values to prevent infinite recursion.
@@ -1992,6 +2053,33 @@ void DifferentiableActivityInfo::propagateVaried(
   }
 }
 
+void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
+    SILValue value, unsigned independentVariableIndex) {
+  // Skip `@noDerivative` struct projections.
+#define SKIP_NODERIVATIVE(INST) \
+  if (auto *sei = dyn_cast<INST##Inst>(value)) \
+    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
+      return;
+  SKIP_NODERIVATIVE(StructExtract)
+  SKIP_NODERIVATIVE(StructElementAddr)
+#undef SKIP_NODERIVATIVE
+  // Set value as varied and propagate to users.
+  setVariedAndPropagateToUsers(value, independentVariableIndex);
+  auto *inst = value->getDefiningInstruction();
+  if (!inst || isa<ApplyInst>(inst))
+    return;
+  // Standard propagation.
+  for (auto &op : inst->getAllOperands())
+    propagateVariedInwardsThroughProjections(
+        op.get(), independentVariableIndex);
+}
+
+void DifferentiableActivityInfo::setUseful(SILValue value,
+                                           unsigned dependentVariableIndex) {
+  usefulValueSets[dependentVariableIndex].insert(value);
+  setUsefulAcrossArrayInitialization(value, dependentVariableIndex);
+}
+
 void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
     SILValue value, unsigned dependentVariableIndex) {
   // Skip already-useful values to prevent infinite recursion.
@@ -2057,46 +2145,31 @@ void DifferentiableActivityInfo::propagateUseful(
   }
 }
 
-void DifferentiableActivityInfo::analyze(DominanceInfo *di,
-                                         PostDominanceInfo *pdi) {
-  auto &function = getFunction();
-  LLVM_DEBUG(getADDebugStream()
-             << "Running activity analysis on @" << function.getName() << '\n');
-  // Inputs are just function's arguments, count `n`.
-  auto paramArgs = function.getArgumentsWithoutIndirectResults();
-  for (auto value : paramArgs)
-    inputValues.push_back(value);
-  LLVM_DEBUG({
-    auto &s = getADDebugStream();
-    s << "Inputs in @" << function.getName() << ":\n";
-    for (auto val : inputValues)
-      s << val << '\n';
-  });
-  // Outputs are indirect result buffers and return values, count `m`.
-  collectAllFormalResultsInTypeOrder(function, outputValues);
-  LLVM_DEBUG({
-    auto &s = getADDebugStream();
-    s << "Outputs in @" << function.getName() << ":\n";
-    for (auto val : outputValues)
-      s << val << '\n';
-  });
-
-  // Propagate variedness starting from the inputs.
-  assert(variedValueSets.empty());
-  for (auto inputAndIdx : enumerate(inputValues)) {
-    auto input = inputAndIdx.value();
-    unsigned i = inputAndIdx.index();
-    variedValueSets.push_back({});
-    setVariedAndPropagateToUsers(input, i);
-  }
-
-  // Mark differentiable outputs as useful.
-  assert(usefulValueSets.empty());
-  for (auto outputAndIdx : enumerate(outputValues)) {
-    auto output = outputAndIdx.value();
-    unsigned i = outputAndIdx.index();
-    usefulValueSets.push_back({});
-    setUsefulAndPropagateToOperands(output, i);
+void DifferentiableActivityInfo::propagateUsefulThroughAddress(
+    SILValue value, unsigned dependentVariableIndex) {
+  assert(value->getType().isAddress());
+  // Skip already-useful values to prevent infinite recursion.
+  if (isUseful(value, dependentVariableIndex))
+    return;
+  setUseful(value, dependentVariableIndex);
+  if (auto *inst = value->getDefiningInstruction())
+    propagateUseful(inst, dependentVariableIndex);
+  // Recursively propagate usefulness through users that are projections or
+  // `begin_access` instructions.
+  for (auto use : value->getUses()) {
+    // Propagate usefulness through user's operands.
+    propagateUseful(use->getUser(), dependentVariableIndex);
+    for (auto res : use->getUser()->getResults()) {
+#define SKIP_NODERIVATIVE(INST) \
+if (auto *sei = dyn_cast<INST##Inst>(res)) \
+if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
+continue;
+      SKIP_NODERIVATIVE(StructExtract)
+      SKIP_NODERIVATIVE(StructElementAddr)
+#undef SKIP_NODERIVATIVE
+      if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res))
+        propagateUsefulThroughAddress(res, dependentVariableIndex);
+    }
   }
 }
 
@@ -2117,72 +2190,33 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
       auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
       assert(ptai && "Expected `pointer_to_address` user for uninitialized "
                      "array intrinsic");
+      // Propagate usefulness through `pointer_to_address` users' operands.
+      // Note: `propagateUseful(use->getUser(), ...)` is intentionally not used
+      // because it marks more values than necessary as useful, including:
+      // - The `RawPointer` result of the intrinsic.
+      // - The `pointer_to_address` user of the `RawPointer`.
+      // - `index_addr` and `integer_literal` instructions for indexing the
+      //   `RawPointer`.
       for (auto use : ptai->getUses()) {
-        auto *inst = use->getUser();
-        if (auto *si = dyn_cast<StoreInst>(inst)) {
+        auto *user = use->getUser();
+        if (auto *si = dyn_cast<StoreInst>(user)) {
           setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
-        } else if (auto *iai = dyn_cast<IndexAddrInst>(inst)) {
-          for (auto use : iai->getUses())
-            if (auto si = dyn_cast<StoreInst>(use->getUser()))
+        } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+          setUsefulAndPropagateToOperands(cai->getSrc(),
+                                          dependentVariableIndex);
+        } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+          for (auto use : iai->getUses()) {
+            auto *user = use->getUser();
+            if (auto si = dyn_cast<StoreInst>(user)) {
               setUsefulAndPropagateToOperands(si->getSrc(),
                                               dependentVariableIndex);
+            } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+              setUsefulAndPropagateToOperands(cai->getSrc(),
+                                              dependentVariableIndex);
+            }
+          }
         }
       }
-    }
-  }
-}
-
-void DifferentiableActivityInfo::setUseful(SILValue value,
-                                           unsigned dependentVariableIndex) {
-  usefulValueSets[dependentVariableIndex].insert(value);
-  setUsefulAcrossArrayInitialization(value, dependentVariableIndex);
-}
-
-void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
-    SILValue value, unsigned independentVariableIndex) {
-  // Skip `@noDerivative` struct projections.
-#define SKIP_NODERIVATIVE(INST) \
-  if (auto *sei = dyn_cast<INST##Inst>(value)) \
-    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-      return;
-  SKIP_NODERIVATIVE(StructExtract)
-  SKIP_NODERIVATIVE(StructElementAddr)
-#undef SKIP_NODERIVATIVE
-  // Set value as varied and propagate to users.
-  setVariedAndPropagateToUsers(value, independentVariableIndex);
-  auto *inst = value->getDefiningInstruction();
-  if (!inst || isa<ApplyInst>(inst))
-    return;
-  // Standard propagation.
-  for (auto &op : inst->getAllOperands())
-    propagateVariedInwardsThroughProjections(
-        op.get(), independentVariableIndex);
-}
-
-void DifferentiableActivityInfo::propagateUsefulThroughAddress(
-    SILValue value, unsigned dependentVariableIndex) {
-  assert(value->getType().isAddress());
-  // Check whether value is already useful to prevent infinite recursion.
-  if (isUseful(value, dependentVariableIndex))
-    return;
-  setUseful(value, dependentVariableIndex);
-  if (auto *inst = value->getDefiningInstruction())
-    propagateUseful(inst, dependentVariableIndex);
-  // Recursively propagate usefulness through users that are projections or
-  // `begin_access` instructions.
-  for (auto use : value->getUses()) {
-    // Propagate usefulness through user's operands.
-    propagateUseful(use->getUser(), dependentVariableIndex);
-    for (auto res : use->getUser()->getResults()) {
-#define SKIP_NODERIVATIVE(INST) \
-      if (auto *sei = dyn_cast<INST##Inst>(res)) \
-        if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-          continue;
-      SKIP_NODERIVATIVE(StructExtract)
-      SKIP_NODERIVATIVE(StructElementAddr)
-#undef SKIP_NODERIVATIVE
-      if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res))
-        propagateUsefulThroughAddress(res, dependentVariableIndex);
     }
   }
 }
@@ -2196,9 +2230,9 @@ bool DifferentiableActivityInfo::isVaried(
 }
 
 bool DifferentiableActivityInfo::isVaried(
-    SILValue value, IndexSubset *parameterIndices) const {
-  for (auto paramIdx : parameterIndices->getIndices())
-    if (isVaried(value, paramIdx))
+    SILValue value, IndexSubset *independentVariableIndices) const {
+  for (auto i : independentVariableIndices->getIndices())
+    if (isVaried(value, i))
       return true;
   return false;
 }
@@ -2223,14 +2257,6 @@ Activity DifferentiableActivityInfo::getActivity(
     activity |= ActivityFlags::Varied;
   if (isUseful(value, indices.source))
     activity |= ActivityFlags::Useful;
-  return activity;
-}
-
-Activity DifferentiableActivityInfo::getActivity(
-    SILInstruction *inst, const SILAutoDiffIndices &indices) const {
-  Activity activity;
-  for (auto result : inst->getResults())
-    activity |= getActivity(result, indices);
   return activity;
 }
 
@@ -7395,7 +7421,7 @@ public:
   NO_ADJOINT(Branch)
   NO_ADJOINT(CondBranch)
 
-  // Buffer projection.
+  // Address projections.
   NO_ADJOINT(StructElementAddr)
   NO_ADJOINT(TupleElementAddr)
 
