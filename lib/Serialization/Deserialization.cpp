@@ -4673,13 +4673,13 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isNonEphemeral, isNonDifferentiable;
+      bool isVariadic, isAutoClosure, isNonEphemeral, isNoDerivative;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
                                                    isNonEphemeral,
                                                    rawOwnership,
-                                                   isNonDifferentiable);
+                                                   isNoDerivative);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4694,7 +4694,7 @@ public:
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isNonDifferentiable));
+                                             isNoDerivative));
     }
 
     if (!isGeneric) {

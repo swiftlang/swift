@@ -11,5 +11,5 @@ func a(_ f: @differentiable (Float) -> Float) {}
 func b(_ f: @differentiable(linear) (Float) -> Float) {}
 // CHECK: func b(_ f: @differentiable(linear) (Float) -> Float)
 
-func c(_ f: @differentiable (Float, @nondiff Float) -> Float) {}
-// CHECK: func c(_ f: @differentiable (Float, @nondiff Float) -> Float)
+func c(_ f: @differentiable (Float, @noDerivative Float) -> Float) {}
+// CHECK: func c(_ f: @differentiable (Float, @noDerivative Float) -> Float)

@@ -2476,8 +2476,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-  if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
-    printer << "@nondiff ";
+  if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
+    printer << "@noDerivative ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:

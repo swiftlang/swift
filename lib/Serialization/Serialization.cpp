@@ -3932,7 +3932,7 @@ public:
           S.addDeclBaseNameRef(param.getLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
-          paramFlags.isNonDifferentiable());
+          paramFlags.isNoDerivative());
     }
   }
 

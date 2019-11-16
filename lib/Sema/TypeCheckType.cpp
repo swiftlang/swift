@@ -2309,19 +2309,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.convention = None;
   }
 
-  if (attrs.has(TAK_nondiff)) {
+  if (attrs.has(TAK_noDerivative)) {
     if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-      diagnose(attrs.getLoc(TAK_nondiff),
+      diagnose(attrs.getLoc(TAK_noDerivative),
                diag::experimental_differentiable_programming_disabled);
     } else if (!isParam) {
-      // @nondiff is only valid on parameters.
-      diagnose(attrs.getLoc(TAK_nondiff),
+      // @noDerivative is only valid on parameters.
+      diagnose(attrs.getLoc(TAK_noDerivative),
                (isVariadicFunctionParam
                     ? diag::attr_not_on_variadic_parameters
                     : diag::attr_only_on_parameters_of_differentiable),
-               "@nondiff");
+               "@noDerivative");
     }
-    attrs.clearAttribute(TAK_nondiff);
+    attrs.clearAttribute(TAK_noDerivative);
   }
 
   // In SIL, handle @opened (n), which creates an existential archetype.
@@ -2441,22 +2441,22 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       break;
     }
 
-    bool nondiff = false;
+    bool noDerivative = false;
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
-      if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
+      if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
         if (!isDifferentiable &&
             Context.LangOpts.EnableExperimentalDifferentiableProgramming)
           diagnose(eltTypeRepr->getLoc(),
-                   diag::attr_only_on_parameters_of_differentiable, "@nondiff")
+                   diag::attr_only_on_parameters_of_differentiable, "@noDerivative")
               .highlight(eltTypeRepr->getSourceRange());
         else
-          nondiff = true;
+          noDerivative = true;
       }
     }
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        nondiff);
+        noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
