@@ -402,12 +402,14 @@ internal func _withCocoaStringUTF16Contents(
   _ cocoaString: _CocoaString,
   _ work: (UnsafeBufferPointer<UTF16.CodeUnit>) -> Void
 ) {
-  let length = _stdlib_binary_CFStringGetLength(str)
-  var buffer = UnsafeMutableBufferPointer<UTF16.CodeUnit>.allocate(length)
+  let length = _stdlib_binary_CFStringGetLength(cocoaString)
+  let buffer = UnsafeMutableBufferPointer<UTF16.CodeUnit>.allocate(
+    capacity: length
+  )
   _cocoaStringCopyCharacters(
     from: cocoaString,
     range: 0 ..< length,
-    into: buffer
+    into: buffer.baseAddress!
   )
   work(UnsafeBufferPointer(buffer))
   buffer.deallocate()

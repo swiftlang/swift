@@ -1473,8 +1473,7 @@ NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
       Int(s.character(at: 3)),
       Int(s.character(at: 4)),
       Int(s.character(at: 5)),
-      Int(s.character(at: 6)),
-      Int(s.character(at: 7))
+      Int(s.character(at: 6))
     ]
     expectEqual(expectedResults[i], result)
   }
