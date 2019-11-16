@@ -94,6 +94,10 @@ namespace swift {
     /// when using RequireExplicitAvailability.
     std::string RequireExplicitAvailabilityTarget;
 
+    /// If true, '#file' evaluates to the full path rather than a
+    /// human-readable string.
+    bool MagicFileIdentifierEvaluatesToPath = false;
+
     ///
     /// Support for alternate usage modes
     ///

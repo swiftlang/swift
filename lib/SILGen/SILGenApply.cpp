@@ -4881,7 +4881,7 @@ static std::string getMagicFileString(SILGenFunction &SGF, SourceLoc loc) {
     return "";
 
   auto path = SGF.getASTContext().SourceMgr.getDisplayNameForLoc(loc);
-  if (false /* FIXME: Add a command line flag for this */)
+  if (SGF.getASTContext().LangOpts.MagicFileIdentifierEvaluatesToPath)
     return path;
 
   auto value = llvm::sys::path::filename(path).str();

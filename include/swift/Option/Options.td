@@ -267,6 +267,14 @@ def output_file_map_EQ : Joined<["-"], "output-file-map=">,
   Flags<[NoInteractiveOption, ArgumentIsPath]>,
   Alias<output_file_map>;
 
+def pound_file : Separate<["-"], "pound-file">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specifies whether '#file' evaluates to a full path or a compact human-readable string">,
+  MetaVarName<"compact|path">;
+def pound_file_EQ : Joined<["-"], "pound-file=">,
+  Flags<[FrontendOption]>,
+  Alias<pound_file>;
+
 def save_temps : Flag<["-"], "save-temps">,
   Flags<[NoInteractiveOption,DoesNotAffectIncrementalBuild]>,
   HelpText<"Save intermediate compilation results">;

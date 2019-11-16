@@ -453,6 +453,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
 
+  if (Arg *A = Args.getLastArg(OPT_pound_file)) {
+    StringRef value = A->getValue();
+    if (value == "path")
+      Opts.MagicFileIdentifierEvaluatesToPath = true;
+    else if (value == "compact")
+      Opts.MagicFileIdentifierEvaluatesToPath = false;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getSpelling(), value);
+  }
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {
