@@ -174,7 +174,7 @@ Optional<SourceComparator::LRRanges> SourceRangeBasedInfo::loadChangedRanges(
                    ec.message());
     return None;
   }
-  //  SourceComparator::test();
+  // SourceComparator::test();
   auto comp = SourceComparator(whatWasPreviouslyCompiled->get()->getBuffer(),
                                whatIsAboutToBeCompiled->get()->getBuffer());
   comp.compare();

@@ -1,3 +1,5 @@
+// Tests how range-based incremental compilation copes wtih various changes.
+
 // Copy in the inputs.
 // The lack of a build record or swiftdeps files should disable incremental compilation
 
