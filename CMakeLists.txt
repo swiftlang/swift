@@ -469,13 +469,15 @@ option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB "Only build the Swift Syntax Parser libr
 option(SWIFT_BUILD_SOURCEKIT "Build SourceKit" TRUE)
 option(SWIFT_ENABLE_SOURCEKIT_TESTS "Enable running SourceKit tests" TRUE)
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-    message(SEND_ERROR "SyntaxParserLib and SourceKit require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
+  if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    set(SWIFT_NEED_EXPLICIT_LIBDISPATCH FALSE)
+  else()
+    set(SWIFT_NEED_EXPLICIT_LIBDISPATCH TRUE)
+    if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
+      message(SEND_ERROR "SyntaxParserLib and SourceKit require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+    endif()
   endif()
-  set(SWIFT_NEED_EXPLICIT_LIBDISPATCH TRUE)
-else()
-  set(SWIFT_NEED_EXPLICIT_LIBDISPATCH FALSE)
 endif()
 
 #
