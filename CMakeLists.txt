@@ -462,7 +462,7 @@ endif()
 option(SWIFT_BUILD_SYNTAXPARSERLIB "Build the Swift Syntax Parser library" TRUE)
 option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB "Only build the Swift Syntax Parser library" FALSE)
 option(SWIFT_BUILD_SOURCEKIT "Build SourceKit" TRUE)
-option(SWIFT_ENABLE_SOURCEKIT_TESTS "Enable running SourceKit tests" TRUE)
+option(SWIFT_ENABLE_SOURCEKIT_TESTS "Enable running SourceKit tests" ${SWIFT_BUILD_SOURCEKIT})
 
 if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
   if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
