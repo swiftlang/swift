@@ -25,6 +25,7 @@
 namespace swift {
 namespace driver {
 class Job;
+class Compilation;
 }
 namespace incremental_ranges {
 
@@ -52,8 +53,7 @@ class SourceRangeBasedInfo {
 public:
   ///  return hadError and info
   static llvm::StringMap<SourceRangeBasedInfo>
-  loadAllInfo(ArrayRef<const driver::Job *>, DiagnosticEngine &,
-              bool showIncrementalBuildDecisions);
+  loadAllInfo(const driver::Compilation &);
 
   SourceRangeBasedInfo(SourceRangeBasedInfo &&);
 

@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/SourceComparator.h"
 #include "llvm/Support/FileSystem.h"
@@ -61,9 +62,11 @@ Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::wholeFileChanged() {
 //==============================================================================
 
 llvm::StringMap<SourceRangeBasedInfo>
-SourceRangeBasedInfo ::loadAllInfo(ArrayRef<const Job *> jobs,
-                                   DiagnosticEngine &diags,
-                                   const bool showIncrementalBuildDecisions) {
+SourceRangeBasedInfo ::loadAllInfo(const Compilation &Comp) {
+  const auto &jobs = Comp.getJobs();
+  auto &diags = Comp.getDiags();
+  const auto showIncrementalBuildDecisions =
+      Comp.getShowIncrementalBuildDecisions();
 
   llvm::StringMap<SourceRangeBasedInfo> allInfos;
 

@@ -942,8 +942,7 @@ namespace driver {
 
       const auto jobs = Comp.getJobsSimply();
       const auto allSourceRangeInfo =
-          incremental_ranges::SourceRangeBasedInfo::loadAllInfo(
-              jobs, Comp.getDiags(), Comp.getShowIncrementalBuildDecisions());
+          incremental_ranges::SourceRangeBasedInfo::loadAllInfo(Comp);
 
       incremental_ranges::SourceRangeBasedInfo::dumpAllInfo(
           allSourceRangeInfo, dumpCompiledSourceDiffs, dumpSwiftRanges);
