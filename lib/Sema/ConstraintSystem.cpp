@@ -2503,7 +2503,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         }
       }
 
-      if (diagnoseAmbiguity(expr, viable)) {
+      if (diagnoseAmbiguity(viable)) {
         return true;
       }
     }
@@ -2757,8 +2757,7 @@ static void extendPreorderIndexMap(
   expr->walk(traversal);
 }
 
-bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
-                                         ArrayRef<Solution> solutions) {
+bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 

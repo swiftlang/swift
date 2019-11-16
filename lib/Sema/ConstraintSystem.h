@@ -2104,7 +2104,7 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(ArrayRef<Solution> solutions);
 
   /// Give the deprecation warning for referring to a global function
