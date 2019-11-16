@@ -1166,9 +1166,9 @@ function should_build_stdlib_target() {
 #
 NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
 SWIFT_SOURCE_DIR="${WORKSPACE}/swift"
-LLVM_SOURCE_DIR="${WORKSPACE}/llvm"
+LLVM_SOURCE_DIR="${WORKSPACE}/llvm-project/llvm"
 CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
-LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
+LLDB_SOURCE_DIR="${WORKSPACE}/llvm-project/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
@@ -1177,7 +1177,7 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
-LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
@@ -1187,29 +1187,18 @@ fi
 
 # Symlink clang into the llvm tree.
 CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
-if [ ! -e "${WORKSPACE}/clang" ] ; then
-    # If llvm/tools/clang is already a directory, use that and skip the symlink.
-    if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-        echo "Can't find source directory for clang (tried ${WORKSPACE}/clang and ${CLANG_SOURCE_DIR})"
-        exit 1
-    fi
-fi
 if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-    make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+    make_relative_symlink "${WORKSPACE}/llvm-project/clang" "${CLANG_SOURCE_DIR}"
 fi
 
 # Don't symlink clang-tools-extra into the tree as the 'clang' symlink prevents
 # make_relative_symlink from working correctly.
-if [ -e "${WORKSPACE}/clang-tools-extra" ] ; then
-    CLANG_TOOLS_EXTRA_SOURCE_DIR="${WORKSPACE}/clang-tools-extra"
-fi
+CLANG_TOOLS_EXTRA_SOURCE_DIR="${WORKSPACE}/llvm-project/clang-tools-extra"
 
 # Symlink compiler-rt into the llvm tree, if it exists.
 COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
-if [ -e "${WORKSPACE}/compiler-rt" ] ; then
-    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
-        make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
-    fi
+if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
+    make_relative_symlink "${WORKSPACE}/llvm-project/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
 fi
 
 PRODUCTS=(cmark llvm)
@@ -1930,11 +1919,9 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
                 )
 
-                if [[ ! -z "${CLANG_TOOLS_EXTRA_SOURCE_DIR}" ]] ; then
-                  cmake_options+=(
-                    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
-                  )
-                fi
+                cmake_options+=(
+                  -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
+                )
 
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
