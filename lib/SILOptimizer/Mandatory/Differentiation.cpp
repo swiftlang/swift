@@ -6231,6 +6231,8 @@ public:
     // Adjoint values of dominated active values are passed as pullback block
     // arguments.
     DominanceOrder domOrder(original.getEntryBlock(), domInfo);
+    // Keep track of visited values.
+    SmallPtrSet<SILValue, 8> visited;
     while (auto *bb = domOrder.getNext()) {
       auto &bbActiveValues = activeValues[bb];
       // If the current block has an immediate dominator, append the immediate
@@ -6240,13 +6242,12 @@ public:
         bbActiveValues.append(domBBActiveValues.begin(),
                               domBBActiveValues.end());
       }
-      SmallPtrSet<SILValue, 8> visited(bbActiveValues.begin(),
-                                       bbActiveValues.end());
-      // Register a value as active if it has not yet been visited.
       bool diagnosedActiveEnumValue = false;
-      auto addActiveValue = [&](SILValue v) {
+      // Mark the activity of a value if it has not yet been visited.
+      auto markValueActivity = [&](SILValue v) {
         if (visited.count(v))
           return;
+        visited.insert(v);
         // Diagnose active enum values. Differentiation of enum values requires
         // special adjoint value handling and is not yet supported. Diagnose
         // only the first active enum value to prevent too many diagnostics.
@@ -6262,17 +6263,19 @@ public:
         // become projections into their adjoint base buffer.
         if (Projection::isAddressProjection(v))
           return;
-        visited.insert(v);
         bbActiveValues.push_back(v);
       };
-      // Register bb arguments and all instruction operands/results.
+      // Visit bb arguments and all instruction operands/results.
+      for (auto *arg : bb->getArguments())
+        if (getActivityInfo().isActive(arg, getIndices()))
+          markValueActivity(arg);
       for (auto &inst : *bb) {
         for (auto op : inst.getOperandValues())
           if (getActivityInfo().isActive(op, getIndices()))
-            addActiveValue(op);
+            markValueActivity(op);
         for (auto result : inst.getResults())
           if (getActivityInfo().isActive(result, getIndices()))
-            addActiveValue(result);
+            markValueActivity(result);
       }
       domOrder.pushChildren(bb);
       if (errorOccurred)
