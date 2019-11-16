@@ -2,3 +2,4 @@
 extension Struct1InB {
   func addedInC() {}
 }
+func watchMe(_ : String) {}

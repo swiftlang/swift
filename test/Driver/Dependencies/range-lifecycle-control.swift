@@ -4,7 +4,7 @@
 // Ensure that the extra outputs are not generated when they should not be:
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t
-// RUN: cd %t && %swiftc_driver -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1 
+// RUN: cd %t && %swiftc_driver -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental 2>&1
 
 // Now, do it again with range dependencies enabled:
 
@@ -31,3 +31,4 @@
 // RUN: cp %t/fileB4.swift %t/fileB.swift
 // RUN: cd %t && %swiftc_driver  -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental >%t/output3 2>&1
 
+// RUN: cd %t && %swiftc_driver -c -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift ./fileC.swift -module-name main -j1 -driver-show-incremental >& %t/output6

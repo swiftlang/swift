@@ -857,38 +857,8 @@ namespace driver {
     template <typename DependencyGraphT>
     void scheduleFirstRoundJobsForIncrementalCompilation(
         DependencyGraphT &DepGraph) {
-      auto compileJobsToScheduleViaDependencies =
-          computeDependenciesAndGetNeededCompileJobs(DepGraph);
-      auto compileJobsToSchedule = compileJobsToScheduleViaDependencies;
-
-      if (Comp.getEnableSourceRangeDependencies()) {
-        auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
-        auto &compileJobsToScheduleViaSourceRanges = jobs.first;
-        auto &jobsLackingSupplementaryOutputs = jobs.second;
-        // <= because of fewer casading jobs
-        const size_t inputCount = Comp.getInputFiles().size();
-        const bool useSourceRangeDependencies =
-            compileJobsToScheduleViaSourceRanges.size() < inputCount;
-        Comp.setUseSourceRangeDependencies(useSourceRangeDependencies);
-        if (useSourceRangeDependencies)
-          compileJobsToSchedule = compileJobsToScheduleViaSourceRanges;
-
-        if (Comp.getShowIncrementalBuildDecisions()) {
-          llvm::outs() << "\n"
-                       << "Selecting "
-                       << (Comp.getUseSourceRangeDependencies()
-                               ? "source ranges"
-                               : "dependencies")
-                       << " because "
-                       << "dependency jobs: "
-                       << compileJobsToScheduleViaDependencies.size()
-                       << " + ?, "
-                       << "source-range jobs: "
-                       << compileJobsToScheduleViaSourceRanges.size() << "\n\n";
-        }
-        for (const Job *Cmd : jobsLackingSupplementaryOutputs)
-          compileJobsToSchedule.insert(Cmd);
-      }
+      const auto compileJobsToSchedule =
+          computeFirstRoundJobsForIncrementalCompilation(DepGraph);
 
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty() ||
@@ -900,6 +870,60 @@ namespace driver {
           DeferredCommands.insert(Cmd);
         }
       }
+    }
+
+    /// Figure out the best strategy and return those jobs.
+    template <typename DependencyGraphT>
+    llvm::SmallPtrSet<const Job *, 16>
+    computeFirstRoundJobsForIncrementalCompilation(DependencyGraphT &DepGraph) {
+      auto compileJobsToScheduleViaDependencies =
+          computeDependenciesAndGetNeededCompileJobs(DepGraph);
+
+      if (!Comp.getEnableSourceRangeDependencies())
+        return compileJobsToScheduleViaDependencies;
+
+      auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
+      auto &compileJobsToScheduleViaSourceRanges = jobs.first;
+      auto &jobsLackingSupplementaryOutputs = jobs.second;
+
+      const StringRef whyFallingBack =
+          reasonToFallBack(compileJobsToScheduleViaDependencies.size(),
+                           compileJobsToScheduleViaSourceRanges.size(),
+                           jobsLackingSupplementaryOutputs.size());
+
+      if (whyFallingBack.empty()) {
+        Comp.setUseSourceRangeDependencies(true);
+        if (Comp.getShowIncrementalBuildDecisions())
+          llvm::outs() << "Using ranges\n";
+        return compileJobsToScheduleViaSourceRanges;
+      }
+      Comp.setUseSourceRangeDependencies(false);
+      // Even if dependencies would not schedule these, we want them to run
+      // to create the supplementary outputs for next time.
+      for (const Job *Cmd : jobsLackingSupplementaryOutputs)
+        compileJobsToScheduleViaDependencies.insert(Cmd);
+      if (Comp.getShowIncrementalBuildDecisions())
+        llvm::outs() << "Using dependenciess: " << whyFallingBack << "\n";
+      return compileJobsToScheduleViaDependencies;
+    }
+
+    StringRef reasonToFallBack(const size_t depCount, const size_t rangeCount,
+                               const size_t lackingSupplementaryOutputsCount) {
+      if (lackingSupplementaryOutputsCount)
+        return "Some input lacks supplementary output needed for the source "
+               "range strategy.\n Maybe dependencies can do better than "
+               "recompiling every file.";
+
+      // Unless the source-range scheme would compile every file,
+      // it's likely a better bet.
+      const size_t inputCount = Comp.getInputFiles().size();
+
+      if (rangeCount < inputCount)
+        return StringRef();
+
+      (void)depCount; // Will likely compile more than this anyway
+      return "Range strategy would compile every input; dependencies cannot be "
+             "any worse.";
     }
 
     /// Return both the jobs to compile if using ranges, and also any jobs that

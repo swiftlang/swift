@@ -84,7 +84,7 @@
 
 // CHECK-FILEB-AND-SELECTING-RANGES: Queuing <Dependencies> (initial): {compile: fileB.o <= fileB.swift}
 // CHECK-FILEB-AND-SELECTING-RANGES: Queuing <Ranges> (this file changed): {compile: fileB.o <= fileB.swift}
-// CHECK-FILEB-AND-SELECTING-RANGES: Selecting source ranges
+// CHECK-FILEB-AND-SELECTING-RANGES: Using ranges
 
 // Add an attribute to: a structure that one other file uses
 
@@ -112,7 +112,7 @@
 // CHECK-FILEA-FILEB-SELECTING-RANGES: Queuing <Dependencies> (initial): {compile: fileB.o <= fileB.swift}
 // CHECK-FILEA-FILEB-SELECTING-RANGES: Queuing <Ranges> (changed: fileB.swift:[4:18--4:19)): {compile: fileA.o <= fileA.swift}
 // CHECK-FILEA-FILEB-SELECTING-RANGES: Queuing <Ranges> (this file changed): {compile: fileB.o <= fileB.swift}
-// CHECK-FILEA-FILEB-SELECTING-RANGES: Selecting source ranges
+// CHECK-FILEA-FILEB-SELECTING-RANGES: Using ranges
 
 
 // What if the user adds a close brace and new type in the middle?
@@ -130,7 +130,7 @@
 // CHECK-A-B-RANGES-THEN-MAIN: Queuing <Ranges> (changed: fileB.swift:[5:3--5:26)): {compile: fileA.o <= fileA.swift}
 // CHECK-A-B-RANGES-THEN-MAIN: Queuing <Ranges> (this file changed): {compile: fileB.o <= fileB.swift}
 
-// CHECK-A-B-RANGES-THEN-MAIN: Selecting source ranges
+// CHECK-A-B-RANGES-THEN-MAIN: Using ranges
 
 // CHECK-A-B-RANGES-THEN-MAIN: After completion of {compile: fileB.o <= fileB.swift}:
 // CHECK-A-B-RANGES-THEN-MAIN-NEXT: - Dependencies would now schedule: {compile: main.o <= main.swift}
@@ -150,21 +150,18 @@
 // RUN: %FileCheck -check-prefix=CHECK-FILEC-RANGES-1 %s <%t/fileC.swiftranges
 // CHECK-FILEC-RANGES-1: ### Swift source ranges file v0 ###
 // CHECK-FILEC-RANGES-1-NEXT: ---
-// CHECK-FILEC-RANGES-1-NEXT: unparsedRangesByNonPrimary:
-// CHECK-FILEC-RANGES-1-NEXT:   ./fileB.swift:
-// CHECK-FILEC-RANGES-1-NEXT:     - { start: { line: 5, column: 47 }, end: { line: 6, column: 2 } }
-// CHECK-FILEC-RANGES-1-NEXT:     - { start: { line: 7, column: 19 }, end: { line: 10, column: 2 } }
+// CHECK-FILEC-RANGES-1-NEXT: unparsedRangesByNonPrimary: {}
 // CHECK-FILEC-RANGES-1-NEXT: noninlinableFunctionBodies:
 // CHECK-FILEC-RANGES-1-NEXT:   - { start: { line: 3, column: 19 }, end: { line: 3, column: 21 } }
+// CHECK-FILEC-RANGES-1-NEXT:   - { start: { line: 5, column: 26 }, end: { line: 5, column: 28 } }
 // CHECK-FILEC-RANGES-1-NEXT: ...
 
 // RUN: %FileCheck -check-prefix=CHECK-ADD-NEW-FILE %s < %t/output6
 
-// CHECK-ADD-NEW-FILE: unable to load swift ranges file "./fileC.swiftranges", No such file or directory
-// CHECK-ADD-NEW-FILE: unable to determine when 'fileC.compiledsource' was last modified: No such file or directory
-// CHECK-ADD-NEW-FILE: Queuing <Ranges> (could not obtain range info from frontend): {compile: fileC.o <= fileC.swift}
-// CHECK-ADD-NEW-FILE: Queuing <Ranges> to create source-range and compiled-source files for the next time: {compile: fileC.o <= fileC.swift}
-// CHECK-ADD-NEW-FILE: Selecting source ranges because dependency jobs: 1 + ?, source-range jobs: 1
-// CHECK-ADD-NEW-FILE: <= ./fileA.swift
-
-//
+// CHECK-ADD-NEW-FILE-DAG: unable to load swift ranges file "./fileC.swiftranges", No such file or directory
+// CHECK-ADD-NEW-FILE-DAG: unable to determine when 'fileC.compiledsource' was last modified: No such file or directory
+// CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> (initial): {compile: fileC.o <= fileC.swift}
+// CHECK-ADD-NEW-FILE-DAG: Using dependenciess: Some input lacks supplementary output needed for the source range strategy.
+// CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: fileB.o <= fileB.swift}
+// CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: fileA.o <= fileA.swift}
+// CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: main.o <= main.swift}
