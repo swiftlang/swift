@@ -1,4 +1,4 @@
-struct Struct1nB { // used by A
+struct Struct1InB { // used by A
   // asdf
   var instVar1 = 0
   var instVar2 = 0

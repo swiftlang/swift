@@ -11,6 +11,10 @@
     "object": "./fileB.o",
     "swift-dependencies": "./fileB.swiftdeps"
   },
+  "./fileC.swift": {
+    "object": "./fileC.o",
+    "swift-dependencies": "./fileC.swiftdeps"
+  },
   "": {
     "swift-dependencies": "./main~buildrecord.swiftdeps"
   }
