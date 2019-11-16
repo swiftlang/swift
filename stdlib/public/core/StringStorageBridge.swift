@@ -589,7 +589,7 @@ extension __SharedStringStorage {
       // reference will make the instance non-unique.
       switch self {
       case .native(let str):
-        return str
+        return str._bridgeToObjectiveCImpl()
       case .utf16(let arr):
         return _SwiftNSMutableString(brokenContents: arr)
       }
