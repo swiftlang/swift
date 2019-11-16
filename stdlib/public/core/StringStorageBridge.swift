@@ -572,6 +572,28 @@ extension __SharedStringStorage {
         self = .utf16(arr)
       }
     }
+    
+    func mutableCopy() -> AnyObject {
+      switch _contents {
+      case .native(let str):
+        return _SwiftNSMutableString(str)
+      case .utf16(let arr):
+        return _SwiftNSMutableString(brokenContents: arr)
+      }
+    }
+    
+    func copy() -> AnyObject {
+      // While __StringStorage instances aren't immutable in general,
+      // mutations may only occur when instances are uniquely referenced.
+      // Therefore, it is safe to return self here; any outstanding Objective-C
+      // reference will make the instance non-unique.
+      switch _contents {
+      case .native(let str):
+        return str
+      case .utf16(let arr):
+        return _SwiftNSMutableString(brokenContents: arr)
+      }
+    }
   }
   
   private var _contents: Contents
@@ -585,6 +607,15 @@ extension __SharedStringStorage {
   internal init(brokenContents arr: [UTF16.CodeUnit]) {
     _contents = .utf16(arr)
     super.init()
+  }
+  
+  final internal var isStringBacked: Bool {
+    @_effects(readonly) @inline(__always) get {
+      if case .native(_) = _contents {
+        return true
+      }
+      return false
+    }
   }
   
   final internal var asString: String {
@@ -693,36 +724,22 @@ extension __SharedStringStorage {
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // While __StringStorage instances aren't immutable in general,
-    // mutations may only occur when instances are uniquely referenced.
-    // Therefore, it is safe to return self here; any outstanding Objective-C
-    // reference will make the instance non-unique.
-    return asString._bridgeToObjectiveCImpl()
+    return _contents.copy()
   }
   
   @objc(copy)
   final internal func copy() -> AnyObject {
-    return asString._bridgeToObjectiveCImpl()
+    return _contents.copy()
   }
   
   @objc(mutableCopyWithZone:)
   final internal func mutableCopy(with zone: _SwiftNSZone?) -> AnyObject {
-    switch _contents {
-    case .native(let str):
-      return _SwiftNSMutableString(str)
-    case .utf16(let arr):
-      return _SwiftNSMutableString(brokenContents: arr)
-    }
+    return _contents.mutableCopy()
   }
   
   @objc(mutableCopy)
   final internal func mutableCopy() -> AnyObject {
-    switch _contents {
-    case .native(let str):
-      return _SwiftNSMutableString(str)
-    case .utf16(let arr):
-      return _SwiftNSMutableString(brokenContents: arr)
-    }
+    return _contents.mutableCopy()
   }
   
   /*

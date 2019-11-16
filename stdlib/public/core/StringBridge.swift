@@ -325,8 +325,12 @@ internal enum _KnownCocoaString {
       self = .shared(_unsafeUncheckedDowncast(str,
                                               to: __SharedStringStorage.self))
     case ObjectIdentifier(_SwiftNSMutableString.self):
-      self = .mutable(_unsafeUncheckedDowncast(str,
-                                              to: _SwiftNSMutableString.self))
+      let mutStr = _unsafeUncheckedDowncast(str, to: _SwiftNSMutableString.self)
+      if mutStr.isStringBacked {
+        self = .mutable(mutStr)
+      } else {
+        self = .cocoa(str) // treat as opaque
+      }
     default:
       self = .cocoa(str)
     }
@@ -381,7 +385,6 @@ internal func _withTemporaryBridgedCocoaString(
     return true
     #endif
   case .mutable(let storage):
-    //TODO: only fast path this if it's String-backed
     work(storage.asString)
     return true
   case .cocoa(let str):
