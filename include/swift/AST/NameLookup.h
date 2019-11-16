@@ -228,9 +228,9 @@ enum class UnqualifiedLookupFlags {
   IncludeOuterResults = 0x10,
 };
 
-void simple_display(llvm::raw_ostream &out, UnqualifiedLookupFlags flags);
-
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
+
+void simple_display(llvm::raw_ostream &out, UnqualifiedLookupOptions options);
 
 inline UnqualifiedLookupOptions operator|(UnqualifiedLookupFlags flag1,
                                           UnqualifiedLookupFlags flag2) {

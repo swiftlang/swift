@@ -532,10 +532,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      auto req = UnqualifiedLookupRequest{VD->getBaseName(), topLevelContext,
-                                          SourceLoc(),
-                                          UnqualifiedLookupFlags::KnownPrivate};
-      auto lookup = evaluateOrDefault(Ctx.evaluator, req, {});
+      auto descriptor = UnqualifiedLookupDescriptor(
+          VD->getBaseName(), topLevelContext, SourceLoc(),
+          UnqualifiedLookupFlags::KnownPrivate);
+      auto lookup = evaluateOrDefault(Ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;

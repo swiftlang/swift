@@ -115,9 +115,10 @@ bool ASTScript::execute() const {
     return true;
   }
 
-  auto req = UnqualifiedLookupRequest{ctx.getIdentifier("View"), swiftUI,
-                                      SourceLoc(), UnqualifiedLookupFlags()};
-  auto viewLookup = evaluateOrDefault(ctx.evaluator, req, {});
+  auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier("View"),
+                                                swiftUI);
+  auto viewLookup = evaluateOrDefault(ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
   auto viewProtocol =
     dyn_cast_or_null<ProtocolDecl>(viewLookup.getSingleTypeResult());
   if (!viewProtocol) {

@@ -229,9 +229,9 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   auto ulOptions = convertToUnqualifiedLookupOptions(options);
 
   auto &ctx = dc->getASTContext();
-  auto flags = UnqualifiedLookupFlags(ulOptions.toRaw());
-  auto lookup = evaluateOrDefault(
-      ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
+  auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, ulOptions);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
 
   LookupResult result;
   LookupResultBuilder builder(result, dc, options);
@@ -265,10 +265,12 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                    UnqualifiedLookupFlags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
-    ulOptions -= UnqualifiedLookupFlags::AllowProtocolMembers;
-    auto flags = UnqualifiedLookupFlags(ulOptions.toRaw());
-    auto lookup = evaluateOrDefault(
-        ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
+    auto desc = UnqualifiedLookupDescriptor(
+        name, dc, loc,
+        ulOptions - UnqualifiedLookupFlags::AllowProtocolMembers);
+
+    auto lookup =
+        evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
     if (!lookup.allResults().empty() ||
         !options.contains(NameLookupFlags::ProtocolMembers))
       return lookup;
@@ -280,10 +282,10 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
-    ulOptions |= UnqualifiedLookupFlags::AllowProtocolMembers;
-    auto flags = UnqualifiedLookupFlags(ulOptions.toRaw());
-    return evaluateOrDefault(
-        ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
+    auto desc = UnqualifiedLookupDescriptor(
+        name, dc, loc,
+        ulOptions | UnqualifiedLookupFlags::AllowProtocolMembers);
+    return evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
   }
 }
 

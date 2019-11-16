@@ -2234,10 +2234,10 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
-    auto req = UnqualifiedLookupRequest{ctx.getIdentifier(name),
-                                        CI.getPrimarySourceFile(), SourceLoc(),
-                                        UnqualifiedLookupFlags()};
-    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier(name),
+                                                  CI.getPrimarySourceFile());
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
     for (auto result : lookup) {
       result.getValueDecl()->print(*Printer, Options);
 

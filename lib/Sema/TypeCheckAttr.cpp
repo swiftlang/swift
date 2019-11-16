@@ -2074,10 +2074,10 @@ void lookupReplacedDecl(DeclName replacedDeclName,
   auto *moduleScopeCtxt = declCtxt->getModuleScopeContext();
   if (isa<FileUnit>(declCtxt)) {
     auto &ctx = declCtxt->getASTContext();
-    auto req =
-        UnqualifiedLookupRequest{replacedDeclName, moduleScopeCtxt,
-                                 attr->getLocation(), UnqualifiedLookupFlags()};
-    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    auto descriptor = UnqualifiedLookupDescriptor(
+        replacedDeclName, moduleScopeCtxt, attr->getLocation());
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
     for (auto entry : lookup) {
       results.push_back(entry.getValueDecl());
     }

@@ -107,7 +107,7 @@ void LookupResult::shiftDownResults() {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           UnqualifiedLookupFlags flags) {
+                           UnqualifiedLookupOptions options) {
   using Flag = std::pair<UnqualifiedLookupFlags, StringRef>;
   Flag possibleFlags[] = {
       {UnqualifiedLookupFlags::AllowProtocolMembers, "AllowProtocolMembers"},
@@ -117,7 +117,6 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
   };
 
-  UnqualifiedLookupOptions options(flags);
   auto flagsToPrint = llvm::make_filter_range(
       possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
 
@@ -1983,9 +1982,9 @@ directReferencesForUnqualifiedTypeLookup(DeclName name,
     options |= UnqualifiedLookupFlags::IncludeOuterResults;
 
   auto &ctx = dc->getASTContext();
-  auto flags = UnqualifiedLookupFlags(options.toRaw());
-  auto lookup = evaluateOrDefault(
-      ctx.evaluator, UnqualifiedLookupRequest{name, dc, loc, flags}, {});
+  auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
   for (const auto &result : lookup.allResults()) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
       results.push_back(typeDecl);

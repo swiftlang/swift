@@ -1093,10 +1093,9 @@ public:
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
           auto name = ctx.getIdentifier(Tok.getText());
-          auto flags = UnqualifiedLookupFlags();
+          auto descriptor = UnqualifiedLookupDescriptor(name, &SF);
           auto lookup = evaluateOrDefault(
-              ctx.evaluator,
-              UnqualifiedLookupRequest{name, &SF, SourceLoc(), flags}, {});
+              ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
           for (auto result : lookup) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               

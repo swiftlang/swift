@@ -1188,14 +1188,12 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
 }
 
 llvm::Expected<LookupResult>
-UnqualifiedLookupRequest::evaluate(Evaluator &evaluator, DeclName name,
-                                   DeclContext *dc, SourceLoc loc,
-                                   UnqualifiedLookupFlags flags) const {
+UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
+                                   UnqualifiedLookupDescriptor desc) const {
   SmallVector<LookupResultEntry, 4> results;
   size_t indexOfFirstOuterResult = 0;
-  UnqualifiedLookupFactory factory(name, dc, loc,
-                                   UnqualifiedLookupOptions(flags), results,
-                                   indexOfFirstOuterResult);
+  UnqualifiedLookupFactory factory(desc.Name, desc.DC, desc.Loc, desc.Options,
+                                   results, indexOfFirstOuterResult);
   factory.performUnqualifiedLookup();
   return LookupResult(results, indexOfFirstOuterResult);
 }

@@ -499,9 +499,10 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use unqualified lookup to fetch other declarations with the same
   // base name.
   auto &ctx = VD->getASTContext();
-  auto req = UnqualifiedLookupRequest{VD->getBaseName(), VD->getDeclContext(),
-                                      SourceLoc(), UnqualifiedLookupFlags()};
-  auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+  auto descriptor = UnqualifiedLookupDescriptor(VD->getBaseName(),
+                                                VD->getDeclContext());
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
   for (auto result : lookup) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))

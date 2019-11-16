@@ -46,6 +46,5 @@ SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(TypeAliasDecl *), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, UnqualifiedLookupRequest,
-              LookupResult(DeclName, DeclContext *, SourceLoc,
-                           UnqualifiedLookupFlags),
-              Uncached, NoLocationInfo)
+              LookupResult(UnqualifiedLookupDescriptor), Uncached,
+              NoLocationInfo)
