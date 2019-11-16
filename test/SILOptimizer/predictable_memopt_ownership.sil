@@ -211,8 +211,12 @@ bb0(%0 : @owned $ContainsNativeObject):
 // CHECK:   [[f3:%.*]] = struct_extract [[BORROWED_ARG]] : $ComplexStruct, #ComplexStruct.f1
 // CHECK:   [[f3_copy:%.*]] = copy_value [[f3]]
 // CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   [[f3_copy_1:%.*]] = copy_value [[f3_copy]]
+// CHECK:   [[f3_copy_2:%.*]] = copy_value [[f3_copy_1]]
+// CHECK:   [[f2_x_copy_1:%.*]] = copy_value [[f2_x_copy]]
+// CHECK:   [[f2_x_copy_2:%.*]] = copy_value [[f2_x_copy_1]]
 // CHECK:   destroy_value [[ARG]]
-// CHECK:   [[RESULT:%.*]] = tuple ([[f3_copy]] : $Builtin.NativeObject, [[f2_x_copy]] : $Builtin.NativeObject, [[f1]] : $Builtin.Int32)
+// CHECK:   [[RESULT:%.*]] = tuple ([[f3_copy_2]] : $Builtin.NativeObject, [[f2_x_copy_2]] : $Builtin.NativeObject, [[f1]] : $Builtin.Int32)
 // CHECK:   return [[RESULT]]
 // CHECK: } // end sil function 'multiple_level_extract_2'
 sil [ossa] @multiple_level_extract_2 : $@convention(thin) (@owned ComplexStruct) -> (@owned Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32) {
@@ -559,11 +563,15 @@ bb3:
 //
 // CHECK: bb1:
 // CHECK:   destroy_value [[LHS1_COPY]]
-// CHECK:   br bb3([[LHS2_COPY]] :
+// CHECK:   [[LHS2_COPY_1:%.*]] = copy_value [[LHS2_COPY]]
+// CHECK:   [[LHS2_COPY_2:%.*]] = copy_value [[LHS2_COPY_1]]
+// CHECK:   br bb3([[LHS2_COPY_2]] :
 //
 // CHECK: bb2:
 // CHECK:   destroy_value [[LHS2_COPY]] : $Builtin.NativeObject
-// CHECK:   br bb3([[LHS1_COPY]] :
+// CHECK:   [[LHS1_COPY_1:%.*]] = copy_value [[LHS1_COPY]]
+// CHECK:   [[LHS1_COPY_2:%.*]] = copy_value [[LHS1_COPY_1]]
+// CHECK:   br bb3([[LHS1_COPY_2]] :
 //
 // CHECK: bb3([[PHI:%.*]] :
 // CHECK:   destroy_value [[ARG]]
@@ -649,9 +657,11 @@ struct NativeObjectTriple {
 // CHECK-NEXT: br bb3([[PAIR_LHS_COPY]] :
 //
 // CHECK: bb3([[PHI:%.*]] : @owned $Builtin.NativeObject):
-// CHECK-NEXT: [[REFORMED:%.*]] = struct $NativeObjectTriple ([[ARG0]] : {{.*}}, [[ARG1]] : {{.*}})
-// CHECK-NEXT: destroy_value [[REFORMED]]
-// CHECK-NEXT: return [[PHI]]
+// CHECK: [[PHI_COPY_1:%.*]] = copy_value [[PHI]]
+// CHECK: [[PHI_COPY_2:%.*]] = copy_value [[PHI_COPY_1]]
+// CHECK: [[REFORMED:%.*]] = struct $NativeObjectTriple ([[ARG0]] : {{.*}}, [[ARG1]] : {{.*}})
+// CHECK: destroy_value [[REFORMED]]
+// CHECK: return [[PHI_COPY_2]]
 // CHECK: } // end sil function 'diamond_test_4'
 sil [ossa] @diamond_test_4 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair):
@@ -710,9 +720,14 @@ bb3:
 // CHECK: bb4:
 // CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]] : $*NativeObjectPair, #NativeObjectPair.x
 // CHECK:   [[TRIPLE_RHS_LHS_VAL:%.*]] = load [copy] [[TRIPLE_RHS_LHS]] : $*Builtin.NativeObject
-// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL]] : {{.*}}, [[TRIPLE_RHS_RHS_VAL]] : {{.*}})
+// CHECK:   [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK:   [[TRIPLE_RHS_LHS_VAL_BORROW:%.*]] = begin_borrow [[TRIPLE_RHS_LHS_VAL]]
+// CHECK:   [[TRIPLE_RHS_RHS_VAL_COPY_BORROW:%.*]] = begin_borrow [[TRIPLE_RHS_RHS_VAL_COPY]]
+// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL_BORROW]] : {{.*}}, [[TRIPLE_RHS_RHS_VAL_COPY_BORROW]] : {{.*}})
+// CHECK:   [[STRUCT_COPY:%.*]] = copy_value [[STRUCT]]
+// CHECK:   [[STRUCT_COPY_2:%.*]] = copy_value [[STRUCT_COPY]]
 // CHECK:   destroy_addr [[BOX]]
-// CHECK:   return [[STRUCT]]
+// CHECK:   return [[STRUCT_COPY_2]]
 // CHECK: } // end sil function 'diamond_test_5'
 sil [ossa] @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair, %arg2 : @owned $Builtin.NativeObject):
@@ -758,10 +773,14 @@ bb4:
 // CHECK:   cond_br undef, [[CRITEDGE_BREAK_BB_1:bb[0-9]+]], [[CRITEDGE_BREAK_BB_2:bb[0-9]+]]
 //
 // CHECK: [[CRITEDGE_BREAK_BB_1]]:
-// CHECK-NEXT: br [[SUCC_2:bb[0-9]+]]([[TRIPLE_RHS_RHS_VAL]] :
+// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: br [[SUCC_2:bb[0-9]+]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
 //
 // CHECK: [[CRITEDGE_BREAK_BB_2]]:
-// CHECK-NEXT: br [[SUCC_1:bb[0-9]+]]([[TRIPLE_RHS_RHS_VAL]] :
+// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: br [[SUCC_1:bb[0-9]+]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
 //
 // CHECK: [[FALSE_BB]]:
 // CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
@@ -774,10 +793,14 @@ bb4:
 // CHECK:   cond_br undef, [[CRITEDGE_BREAK_BB_1:bb[0-9]+]], [[CRITEDGE_BREAK_BB_2:bb[0-9]+]]
 //
 // CHECK: [[CRITEDGE_BREAK_BB_1]]:
-// CHECK-NEXT: br [[SUCC_2]]([[TRIPLE_RHS_RHS_VAL]] :
+// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: br [[SUCC_2]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
 //
 // CHECK: [[CRITEDGE_BREAK_BB_2]]:
-// CHECK-NEXT: br [[SUCC_1]]([[TRIPLE_RHS_RHS_VAL]] :
+// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
+// CHECK-NEXT: br [[SUCC_1]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
 //
 // CHECK: [[SUCC_2]]([[PHI1:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
@@ -786,15 +809,21 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]([[PHI1:%.*]] : $Builtin.NativeObject)
 //
 // CHECK: [[SUCC_1]]([[PHI:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   br [[EXIT_BB]]([[PHI]] : {{.*}})
+// CHECK:   [[PHI_COPY:%.*]] = copy_value [[PHI]]
+// CHECK:   br [[EXIT_BB]]([[PHI_COPY]] : {{.*}})
 //
 // CHECK: [[EXIT_BB]]([[PHI:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
 // CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]] : $*NativeObjectPair, #NativeObjectPair.x
 // CHECK:   [[TRIPLE_RHS_LHS_VAL:%.*]] = load [copy] [[TRIPLE_RHS_LHS]] : $*Builtin.NativeObject
-// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL]] : {{.*}}, [[PHI]] : {{.*}})
+// CHECK:   [[PHI_COPY:%.*]] = copy_value [[PHI]]
+// CHECK:   [[TRIPLE_RHS_LHS_VAL_BORROW:%.*]] = begin_borrow [[TRIPLE_RHS_LHS_VAL]]
+// CHECK:   [[PHI_COPY_BORROW:%.*]] = begin_borrow [[PHI_COPY]]
+// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL_BORROW]] : {{.*}}, [[PHI_COPY_BORROW]] : {{.*}})
+// CHECK:   [[STRUCT_COPY_1:%.*]] = copy_value [[STRUCT]]
+// CHECK:   [[STRUCT_COPY_2:%.*]] = copy_value [[STRUCT_COPY_1]]
 // CHECK:   destroy_addr [[BOX]]
-// CHECK:   return [[STRUCT]]
+// CHECK:   return [[STRUCT_COPY_2]]
 // CHECK: } // end sil function 'diamond_test_6'
 sil [ossa] @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair, %arg2 : @owned $Builtin.NativeObject):
