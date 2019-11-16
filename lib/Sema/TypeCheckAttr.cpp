@@ -112,7 +112,8 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
 
-  // TODO: Changes are yet to be upstreamed from apple/tensorflow branch.
+  // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
+  // tensorflow branch.
   IGNORED_ATTR(Differentiable)
 #undef IGNORED_ATTR
 

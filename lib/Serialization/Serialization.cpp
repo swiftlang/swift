@@ -2291,6 +2291,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
+      // TODO(TF-837): Implement `@differentiable` attribute serialization.
+      // Blocked by TF-828: `@differentiable` attribute type-checking, which
+      // resolves parameter indices (`IndexSubset *`).
+      if (!paramIndices)
+        return;
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
       for (unsigned i : range(paramIndices->getCapacity()))
