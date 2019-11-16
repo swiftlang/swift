@@ -633,7 +633,7 @@ static void showRemovedInputs(ArrayRef<StringRef> removedInputs,
 
   if (EnableSourceRangeDependencies) {
     // If a file was removed, the compiled source comparison should handle it.
-    llvm::outs() << "Incremental compilation would been disabled had not "
+    llvm::outs() << "Incremental compilation would have been disabled had not "
                  << "range-based recompilation been enabled, because "
                  << "the following inputs were used in the previous "
                  << "compilation, but not in the current compilation:\n";
