@@ -393,8 +393,7 @@ static SmallVector<StringRef, 8> findRemovedInputs(
     const InputFileList &inputs,
     const llvm::StringMap<CompileJobAction::InputInfo> &previousInputs);
 
-static bool dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
-                                  bool EnableSourceRangeDependencies,
+static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
                                   bool ShowIncrementalBuildDecisions);
 
 /// Returns true on error.
@@ -592,8 +591,8 @@ static bool populateOutOfDateMap(InputInfoMap &map,
   const auto removedInputs = findRemovedInputs(inputs, previousInputs);
   assert(!removedInputs.empty());
 
-  return dealWithRemovedInputs(removedInputs, EnableSourceRangeDependencies,
-                               ShowIncrementalBuildDecisions);
+  dealWithRemovedInputs(removedInputs, ShowIncrementalBuildDecisions);
+  return true; // recompile everything; could do better someday
 }
 
 static SmallVector<StringRef, 8> findRemovedInputs(
@@ -613,35 +612,24 @@ static SmallVector<StringRef, 8> findRemovedInputs(
   return missingInputs;
 }
 
-static void showRemovedInputs(ArrayRef<StringRef> removedInputs,
-                              const bool EnableSourceRangeDependencies);
+static void showRemovedInputs(ArrayRef<StringRef> removedInputs);
 
 /// Return true if hadError
-static bool dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
-                                  const bool EnableSourceRangeDependencies,
+static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
                                   const bool ShowIncrementalBuildDecisions) {
   // If a file was removed, we've lost its dependency info. Rebuild everything.
   // FIXME: Can we do better?
   // Yes, for range-based recompilation.
   if (ShowIncrementalBuildDecisions)
-    showRemovedInputs(removedInputs, EnableSourceRangeDependencies);
-  return !EnableSourceRangeDependencies;
+    showRemovedInputs(removedInputs);
 }
 
-static void showRemovedInputs(ArrayRef<StringRef> removedInputs,
-                              const bool EnableSourceRangeDependencies) {
+static void showRemovedInputs(ArrayRef<StringRef> removedInputs) {
 
-  if (EnableSourceRangeDependencies) {
-    // If a file was removed, the compiled source comparison should handle it.
-    llvm::outs() << "Incremental compilation would have been disabled had not "
-                 << "range-based recompilation been enabled, because "
-                 << "the following inputs were used in the previous "
-                 << "compilation, but not in the current compilation:\n";
-  } else {
-    llvm::outs() << "Incremental compilation has been disabled, because "
-                 << "the following inputs were used in the previous "
-                 << "compilation, but not in the current compilation:\n";
-  }
+  llvm::outs() << "Incremental compilation has been disabled, because "
+               << "the following inputs were used in the previous "
+               << "compilation, but not in the current compilation:\n";
+
   for (auto &missing : removedInputs)
     llvm::outs() << "\t" << missing << "\n";
 }

@@ -209,5 +209,10 @@
 
 // RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental ./main.swift ./fileA.swift ./fileB.swift -module-name main -j1 -driver-show-incremental >& %t/output7
 
+// RUN: %FileCheck -check-prefix=CHECK-FILEC-REMOVED %s < %t/output7
+
+// CHECK-FILEC-REMOVED: Incremental compilation has been disabled, because the following inputs were used in the previous compilation, but not in the current compilation:
+// CHECK-FILEC-REMOVED-NEXT: ./fileC.swift
 
 // RUN: %t/main | tee run7 | grep SignedInteger > /dev/null && rm %t/main
+
