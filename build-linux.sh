@@ -16,7 +16,7 @@ export sourcedir=$PWD/..
   --install-destdir="$sourcedir/install" \
   --install-prefix="/opt/swiftwasm-sdk" \
   --install-swift \
-  --installable-package="$sourcedir/swiftwasm.tar.gz" \
+  --installable-package="$sourcedir/swiftwasm-linux.tar.gz" \
   --llvm-targets-to-build "X86;WebAssembly" \
   --stdlib-deployment-targets "wasm-wasm32" \
   --wasm-icu-data "todo-icu-data" \
