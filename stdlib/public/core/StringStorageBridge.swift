@@ -574,7 +574,7 @@ extension __SharedStringStorage {
     }
     
     func mutableCopy() -> AnyObject {
-      switch _contents {
+      switch self {
       case .native(let str):
         return _SwiftNSMutableString(str)
       case .utf16(let arr):
@@ -587,7 +587,7 @@ extension __SharedStringStorage {
       // mutations may only occur when instances are uniquely referenced.
       // Therefore, it is safe to return self here; any outstanding Objective-C
       // reference will make the instance non-unique.
-      switch _contents {
+      switch self {
       case .native(let str):
         return str
       case .utf16(let arr):
