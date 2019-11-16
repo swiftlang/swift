@@ -2464,7 +2464,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
     if (!ED->getModuleContext()->isResilient()) {
-      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+      attr->setInvalid();
       return;
     }
 
