@@ -197,7 +197,7 @@ static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
 static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
 TEST_F(EditTest, DiagsAfterEdit) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "func foo {}\n"
     "let v = 0\n";
@@ -234,7 +234,7 @@ TEST_F(EditTest, DiagsAfterEdit) {
 
 void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
                                    bool closeDoc) {
-  const char *DocName = "/test.swift";
+  const char *DocName = "test.swift";
   const char *Contents =
     "func foo() { _ = unknown_name }\n";
   const char *Args[] = { "-parse-as-library" };
