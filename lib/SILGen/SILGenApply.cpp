@@ -4876,6 +4876,21 @@ getMagicFunctionString(SILGenFunction &SGF) {
   return SGF.MagicFunctionString;
 }
 
+static std::string getMagicFileString(SILGenFunction &SGF, SourceLoc loc) {
+  if (!loc.isValid())
+    return "";
+
+  auto path = SGF.getASTContext().SourceMgr.getDisplayNameForLoc(loc);
+  if (false /* FIXME: Add a command line flag for this */)
+    return path;
+
+  auto value = llvm::sys::path::filename(path).str();
+  value += " (";
+  value += SGF.getModule().getSwiftModule()->getNameStr();
+  value += ")";
+  return value;
+}
+
 /// Emit an application of the given allocating initializer.
 RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
                                                       ConcreteDeclRef init,
@@ -5131,12 +5146,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
-      std::string value;
-      if (loc.isValid())
-        value = ctx.SourceMgr.getDisplayNameForLoc(loc);
-      builtinLiteralArgs = emitStringLiteral(*this, literal,
-                                             llvm::sys::path::filename(value),
-                                             C,
+      std::string value = getMagicFileString(*this, loc);
+      builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
       init = magicLiteral->getInitializer();
