@@ -1497,7 +1497,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   FrontendOpts.DisableFree = false;
   FrontendOpts.Inputs.clear();
 
-  auto clonedInstance = llvm::make_unique<clang::CompilerInstance>(
+  auto clonedInstance = std::make_unique<clang::CompilerInstance>(
     Impl.Instance->getPCHContainerOperations(),
     &Impl.Instance->getModuleCache());
   clonedInstance->setInvocation(std::move(invocation));
@@ -1531,7 +1531,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   FrontendOpts.ProgramAction = clang::frontend::GeneratePCH;
 
   auto action = wrapActionForIndexingIfEnabled(
-      FrontendOpts, llvm::make_unique<clang::GeneratePCHAction>());
+      FrontendOpts, std::make_unique<clang::GeneratePCHAction>());
   emitInstance->ExecuteAction(*action);
 
   if (emitInstance->getDiagnostics().hasErrorOccurred()) {
@@ -1567,7 +1567,7 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
 
   auto action = wrapActionForIndexingIfEnabled(
       FrontendOpts,
-      llvm::make_unique<clang::GenerateModuleFromModuleMapAction>());
+      std::make_unique<clang::GenerateModuleFromModuleMapAction>());
   emitInstance->ExecuteAction(*action);
 
   if (emitInstance->getDiagnostics().hasErrorOccurred()) {
@@ -1592,7 +1592,7 @@ bool ClangImporter::dumpPrecompiledModule(StringRef modulePath,
   FrontendOpts.Inputs = {inputFile};
   FrontendOpts.OutputFile = outputPath;
 
-  auto action = llvm::make_unique<clang::DumpModuleInfoAction>();
+  auto action = std::make_unique<clang::DumpModuleInfoAction>();
   dumpInstance->ExecuteAction(*action);
 
   if (dumpInstance->getDiagnostics().hasErrorOccurred()) {

@@ -570,10 +570,10 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     break;
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
-    llvm::TargetMachine::CodeGenFileType FileType;
+    CodeGenFileType FileType;
     FileType = (Opts.OutputKind == IRGenOutputKind::NativeAssembly
-                  ? llvm::TargetMachine::CGFT_AssemblyFile
-                  : llvm::TargetMachine::CGFT_ObjectFile);
+                  ? CGFT_AssemblyFile
+                  : CGFT_ObjectFile);
 
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         TargetMachine->getTargetIRAnalysis()));
