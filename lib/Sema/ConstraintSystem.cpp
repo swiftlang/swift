@@ -2583,6 +2583,18 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
   if (!applyExpr)
     return;
 
+  auto isNameOfStandardComparisonOperator = [](StringRef opName) -> bool {
+    return opName == "==" || opName == "!=" || opName == "===" ||
+           opName == "!==" || opName == "<" || opName == ">" ||
+           opName == "<=" || opName == ">=";
+  };
+
+  auto isEnumWithAssociatedValues = [](Type type) -> bool {
+    if (auto *enumType = type->getAs<EnumType>())
+      return !enumType->getDecl()->hasOnlyCasesWithoutAssociatedValues();
+    return false;
+  };
+
   const auto &solution = solutions.front();
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
     auto *lhs = binaryOp->getArg()->getElement(0);
@@ -2596,6 +2608,14 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                   operatorName.str(), lhsType)
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
+
+      if (isNameOfStandardComparisonOperator(operatorName.str()) &&
+          isEnumWithAssociatedValues(lhsType)) {
+        DE.diagnose(applyExpr->getLoc(),
+                    diag::no_binary_op_overload_for_enum_with_payload,
+                    operatorName.str());
+        return;
+      }
     } else {
       DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
                   operatorName.str(), lhsType, rhsType)
@@ -2624,15 +2644,34 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           FunctionType::getParamListAsString(fnType->getParams()));
   }
 
+  // All of the overload choices had generic parameters like `Self`.
+  if (parameters.empty())
+    return;
+
   DE.diagnose(anchor->getLoc(), diag::suggest_partial_overloads,
               /*isResult=*/false, operatorName.str(),
               llvm::join(parameters, ", "));
 }
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
-    ArrayRef<Solution> solutions) {
+    SmallVectorImpl<Solution> &solutions) {
   if (solutions.empty())
     return false;
+
+  if (auto bestScore = solverState->BestScore) {
+    solutions.erase(llvm::remove_if(solutions,
+                                    [&](const Solution &solution) {
+                                      return solution.getFixedScore() >
+                                             *bestScore;
+                                    }),
+                    solutions.end());
+
+    if (llvm::all_of(solutions, [&](const Solution &solution) {
+          auto score = solution.getFixedScore();
+          return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
+        }))
+      return false;
+  }
 
   // Problems related to fixes forming ambiguous solution set
   // could only be diagnosed (at the moment), if all of the fixes

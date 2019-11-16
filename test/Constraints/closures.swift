@@ -717,7 +717,7 @@ func rdar37790062() {
 }
 
 // <rdar://problem/39489003>
-typealias KeyedItem<K, T> = (key: K, value: T) // expected-note {{'T' declared as parameter to type 'KeyedItem'}}
+typealias KeyedItem<K, T> = (key: K, value: T)
 
 protocol Node {
   associatedtype T
@@ -731,7 +731,7 @@ extension Node {
   func getChild(for key:K)->(key: K, value: T) {
     return children.first(where: { (item:KeyedItem) -> Bool in
         return item.key == key
-        // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+        // expected-error@-1 {{binary operator '==' cannot be applied to two 'Self.K' operands}}
       })!
   }
 }
