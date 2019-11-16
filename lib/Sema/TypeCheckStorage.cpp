@@ -765,6 +765,14 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   if (isMemberLValue)
     isSelfLValue |= storage->isSetterMutating();
 
+  // If we're accessing a property wrapper, determine if
+  // the self requires an lvalue.
+  if (auto mut = propertyWrapperMutability(storage)) {
+    isSelfLValue = mut->first;
+    if (isMemberLValue)
+      isSelfLValue |= mut->second;
+  }
+
   Expr *selfDRE =
     buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
                        ctx);
