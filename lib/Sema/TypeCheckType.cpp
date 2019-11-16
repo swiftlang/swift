@@ -2447,7 +2447,8 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         if (!isDifferentiable &&
             Context.LangOpts.EnableExperimentalDifferentiableProgramming)
           diagnose(eltTypeRepr->getLoc(),
-                   diag::attr_only_on_parameters_of_differentiable, "@noDerivative")
+                   diag::attr_only_on_parameters_of_differentiable,
+                   "@noDerivative")
               .highlight(eltTypeRepr->getSourceRange());
         else
           noDerivative = true;

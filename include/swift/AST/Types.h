@@ -1856,9 +1856,9 @@ public:
   }
 
   ParameterTypeFlags withNoDerivative(bool noDerivative) const {
-    return ParameterTypeFlags(
-        noDerivative ? value | ParameterTypeFlags::NoDerivative
-                          : value - ParameterTypeFlags::NoDerivative);
+    return ParameterTypeFlags(noDerivative
+                                  ? value | ParameterTypeFlags::NoDerivative
+                                  : value - ParameterTypeFlags::NoDerivative);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -1927,8 +1927,7 @@ public:
   ParameterTypeFlags asParamFlags() const {
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
-                              /*nonEphemeral*/ false,
-                              getValueOwnership(),
+                              /*nonEphemeral*/ false, getValueOwnership(),
                               /*noDerivative*/ false);
   }
 
@@ -5709,8 +5708,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, isAutoClosure, isNonEphemeral, ownership,
-          isNoDerivative};
+  return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isNoDerivative};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
