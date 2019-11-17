@@ -225,7 +225,7 @@ bool SourceRangeBasedInfo::shouldScheduleCompileJob(
     function_ref<void(Twine)> noteBuilding) {
   const auto primary = Cmd->getFirstSwiftPrimaryInput();
   if (primary.empty())
-    return true; // not a compile
+    return false; // not a compile
 
   auto iter = allInfos.find(primary);
   if (iter == allInfos.end()) {

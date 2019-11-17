@@ -72,6 +72,8 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output2
 
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output2
+// CHECK-COMPARE-DISABLED: *** Comparing moot; incremental compilation disabled
 
 // RUN: %FileCheck -check-prefix=CHECK-TURN-ON-RANGES %s < %t/output2
 
@@ -80,8 +82,6 @@
 // CHECK-TURN-ON-RANGES-DAG: Added to TaskQueue: {compile: fileA.o <= fileA.swift}
 // CHECK-TURN-ON-RANGES-DAG: Added to TaskQueue: {compile: fileB.o <= fileB.swift}
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/output2
-// CHECK-COMPARE-0-0-3: *** Comparing deps: 0, ranges: 0, total: 3 ***
 
 // RUN: cmp main.swift main.compiledsource
 // RUN: cmp fileA.swift fileA.compiledsource
@@ -134,7 +134,9 @@
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output3
+
 // RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/output3
+// CHECK-COMPARE-0-0-3: *** Comparing deps: 0, ranges: 0, total: 3 ***
 
 // RUN: %FileCheck -check-prefix=CHECK-INCREMENTAL-ENABLED %s < %t/output3
 // CHECK-INCREMENTAL-ENABLED-NOT: Incremental compilation has been disabled
@@ -225,8 +227,7 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-INITIALLY-ABSENT-MAIN %s < %t/output6
 
-// RUN: %FileCheck -check-prefix=COMPARE-3-4-3 %s < %t/output6
-//COMPARE-3-4-3-NOT: *** Comparing deps: 3, ranges: 4, total: 3 ***
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output6
 
 
 // CHECK-INITIALLY-ABSENT-MAIN-NOT: Queueing{{.*}}<= main.swift
@@ -258,6 +259,9 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output7
 
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-4-4 %s < %t/output7
+// CHECK-COMPARE-MOOT-4-4: *** Comparing moot: would fall back and run 4, total: 4 ***
+
 // RUN: cmp fileB.swift fileB.compiledsource
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEC-RANGES-1 %s <%t/fileC.swiftranges
@@ -274,7 +278,7 @@
 // CHECK-ADD-NEW-FILE-DAG: unable to load swift ranges file "./fileC.swiftranges", No such file or directory
 // CHECK-ADD-NEW-FILE-DAG: unable to determine when 'fileC.compiledsource' was last modified: No such file or directory
 // CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> (initial): {compile: fileC.o <= fileC.swift}
-// CHECK-ADD-NEW-FILE-DAG: Using dependenciess: Some input lacks supplementary output needed for the source range strategy.
+// CHECK-ADD-NEW-FILE-DAG: Using dependencies: At least one input ('fileC.swift') lacks a supplementary output needed for the source range strategy.
 // CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: fileB.o <= fileB.swift}
 // CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: fileA.o <= fileA.swift}
 // CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: main.o <= main.swift}
@@ -290,6 +294,8 @@
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output8
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEC-REMOVED %s < %t/output8
+
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output8
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output8
 

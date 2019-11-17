@@ -927,7 +927,9 @@ namespace driver {
     const llvm::SmallVector<const Job *, 16> &jobsLackingSourceRangeSupplementaryOutputs) {
       if (!jobsLackingSourceRangeSupplementaryOutputs.empty()) {
         if (Comp.getShowIncrementalBuildDecisions()) {
-          llvm::outs() << "Using dependencies: Some input lacks supplementary output needed for the source "
+          llvm::outs() << "Using dependencies: At least one input ('"
+          <<   llvm::sys::path::filename(jobsLackingSourceRangeSupplementaryOutputs.front()->getFirstSwiftPrimaryInput())
+          << "') lacks a supplementary output needed for the source "
           "range strategy.\n Maybe dependencies can do better than "
           "recompiling every file.\n";
         }
@@ -984,13 +986,14 @@ namespace driver {
 
       llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
       for (const Job* Cmd: Comp.getJobs()) {
-       if (allSourceRangeInfo.count(Cmd->getFirstSwiftPrimaryInput()) == 0) {
-         noteBuilding(
-                      Cmd,
-                      true,
-                      "to create source-range and compiled-source files for the next time when falling back from source-ranges");
-         jobsLackingSupplementaryOutputs.push_back(Cmd);
-       }
+        auto pri = Cmd->getFirstSwiftPrimaryInput();
+        if (pri.empty() || allSourceRangeInfo.count(pri))
+          continue;
+        noteBuilding(
+                     Cmd,
+                     true,
+                     "to create source-range and compiled-source files for the next time when falling back from source-ranges");
+        jobsLackingSupplementaryOutputs.push_back(Cmd);
       }
 
       for (const Job *Cmd :
@@ -1937,12 +1940,14 @@ void Compilation::setFallingBackForComparison() {
 void Compilation::printComparision() const {
   if (!CompareIncrementalSchemes)
     return;
-  if (SourceRangeCompileJobs)
+  if (!getIncrementalBuildEnabled())
+    llvm::outs() << "*** Comparing incremental strategies is moot: incremental compilation disabled ***\n";
+  else if (SourceRangeCompileJobs)
     llvm::outs() << "*** Comparing deps: " << DependencyCompileJobs.size()
                  << ", ranges: " << SourceRangeCompileJobs->size()
                  << ", total: " << countSwiftInputs() << " ***\n";
   else
-    llvm::outs() << "*** Comparing moot: would fall back and run "
+    llvm::outs() << "*** Comparing incremental strategies is moot: would fall back and run "
                  << DependencyCompileJobs.size()
                  << ", total: " << countSwiftInputs() << " ***\n";
 }
