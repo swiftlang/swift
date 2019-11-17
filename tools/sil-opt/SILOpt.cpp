@@ -349,6 +349,9 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
       EnableExperimentalDifferentiableProgramming;
 
+  Invocation.getDiagnosticOptions().VerifyMode =
+      VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
@@ -404,15 +407,40 @@ int main(int argc, char **argv) {
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
+  if (VerifyMode)
+    PrintDiags.setSuppressOutput(true);
+
+  struct FinishDiagProcessingCheckRAII {
+    bool CalledFinishDiagProcessing = false;
+    ~FinishDiagProcessingCheckRAII() {
+      assert(CalledFinishDiagProcessing &&
+             "returned from the function "
+             "without calling finishDiagProcessing");
+    }
+  } FinishDiagProcessingCheckRAII;
+
+  auto finishDiagProcessing = [&](int retValue) -> int {
+    FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
+    PrintDiags.setSuppressOutput(false);
+    bool diagnosticsError = CI.getDiags().finishProcessing();
+    // If the verifier is enabled and did not encounter any verification errors,
+    // return 0 even if the compile failed. This behavior isn't ideal, but large
+    // parts of the test suite are reliant on it.
+    if (VerifyMode && !diagnosticsError) {
+      return 0;
+    }
+    return retValue ? retValue : diagnosticsError;
+  };
+
   if (CI.setup(Invocation))
-    return 1;
+    return finishDiagProcessing(1);
 
   CI.performSema();
 
   // If parsing produced an error, don't run any passes.
   bool HadError = CI.getASTContext().hadError();
   if (HadError)
-    return 1;
+    return finishDiagProcessing(1);
 
   // Load the SIL if we have a module. We have to do this after SILParse
   // creating the unfortunate double if statement.
@@ -428,11 +456,6 @@ int main(int argc, char **argv) {
     else
       SL->getAll();
   }
-
-  // If we're in verify mode, install a custom diagnostic handling for
-  // SourceMgr.
-  if (VerifyMode)
-    enableDiagnosticVerifier(CI.getSourceMgr());
 
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
@@ -511,7 +534,7 @@ int main(int argc, char **argv) {
       if (EC) {
         llvm::errs() << "while opening '" << OutputFile << "': "
                      << EC.message() << '\n';
-        return 1;
+        return finishDiagProcessing(1);
       }
       CI.getSILModule()->print(OS, CI.getMainModule(), SILOpts,
                                !DisableASTDump);
@@ -520,12 +543,7 @@ int main(int argc, char **argv) {
 
   HadError |= CI.getASTContext().hadError();
 
-  // If we're in -verify mode, we've buffered up all of the generated
-  // diagnostics.  Check now to ensure that they meet our expectations.
   if (VerifyMode) {
-    HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
-                                 /*autoApplyFixes*/false,
-                                 /*ignoreUnknown*/false);
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
@@ -535,5 +553,5 @@ int main(int argc, char **argv) {
     }
   }
 
-  return HadError;
+  return finishDiagProcessing(HadError);
 }

@@ -293,6 +293,17 @@ void CompilerInstance::setupStatsReporter() {
   Stats = std::move(Reporter);
 }
 
+void CompilerInstance::setupDiagnosticVerifierIfNeeded() {
+  auto &diagOpts = Invocation.getDiagnosticOptions();
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
+    DiagVerifier = std::make_unique<DiagnosticVerifier>(
+        SourceMgr, InputSourceCodeBufferIDs,
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
+        diagOpts.VerifyIgnoreUnknown);
+    addDiagnosticConsumer(DiagVerifier.get());
+  }
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -337,6 +348,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     return true;
 
   setupStatsReporter();
+  setupDiagnosticVerifierIfNeeded();
 
   return false;
 }

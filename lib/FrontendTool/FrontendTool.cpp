@@ -2046,15 +2046,22 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     }
   } FinishDiagProcessingCheckRAII;
 
-  auto finishDiagProcessing = [&](int retValue) -> int {
+  auto finishDiagProcessing = [&](int retValue, bool verifierEnabled) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    bool err = Instance->getDiags().finishProcessing();
-    return retValue ? retValue : err;
+    PDC.setSuppressOutput(false);
+    bool diagnosticsError = Instance->getDiags().finishProcessing();
+    // If the verifier is enabled and did not encounter any verification errors,
+    // return 0 even if the compile failed. This behavior isn't ideal, but large
+    // parts of the test suite are reliant on it.
+    if (verifierEnabled && !diagnosticsError) {
+      return 0;
+    }
+    return retValue ? retValue : diagnosticsError;
   };
 
   if (Args.empty()) {
     Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
-    return finishDiagProcessing(1);
+    return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
   CompilerInvocation Invocation;
@@ -2069,7 +2076,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
   if (Invocation.parseArgs(Args, Instance->getDiags(),
                            &configurationFileBuffers, workingDirectory)) {
-    return finishDiagProcessing(1);
+    return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -2111,19 +2118,19 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask, /*ShowAllAliases*/false);
-    return finishDiagProcessing(0);
+    return finishDiagProcessing(0, /*verifierEnabled*/ false);
   }
 
   if (Invocation.getFrontendOptions().PrintTargetInfo) {
     printTargetInfo(Invocation, llvm::outs());
-    return finishDiagProcessing(0);
+    return finishDiagProcessing(0, /*verifierEnabled*/ false);
   }
 
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::NoneAction) {
     Instance->getDiags().diagnose(SourceLoc(),
                                   diag::error_missing_frontend_action);
-    return finishDiagProcessing(1);
+    return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
   // Because the serialized diagnostics consumer is initialized here,
@@ -2159,9 +2166,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
-  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    enableDiagnosticVerifier(Instance->getSourceMgr());
-  }
+  bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasDependencyTrackerPath() ||
@@ -2176,12 +2181,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   if (Instance->setup(Invocation)) {
-    return finishDiagProcessing(1);
+    return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
   // The compiler instance has been configured; notify our observer.
   if (observer) {
     observer->configuredCompiler(*Instance);
+  }
+
+  if (verifierEnabled) {
+    // Suppress printed diagnostic output during the compile if the verifier is
+    // enabled.
+    PDC.setSuppressOutput(true);
   }
 
   int ReturnValue = 0;
@@ -2211,23 +2222,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     }
   }
 
-  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    HadError = verifyDiagnostics(
-        Instance->getSourceMgr(),
-        Instance->getInputBufferIDs(),
-        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown);
-
+  if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
       diags.resetHadAnyError();
+      PDC.setSuppressOutput(false);
       diags.diagnose(SourceLoc(), diag::verify_encountered_fatal);
       HadError = true;
     }
   }
 
-  auto r = finishDiagProcessing(HadError ? 1 : ReturnValue);
+  auto r = finishDiagProcessing(HadError ? 1 : ReturnValue, verifierEnabled);
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
   return r;

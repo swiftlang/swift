@@ -40,6 +40,7 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   // Educational notes which are buffered until the consumer is finished
   // constructing a snippet.
   SmallVector<std::string, 1> BufferedEducationalNotes;
+  bool SuppressOutput = false;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
@@ -63,6 +64,10 @@ public:
 
   bool didErrorOccur() {
     return DidErrorOccur;
+  }
+
+  void setSuppressOutput(bool suppressOutput) {
+    SuppressOutput = suppressOutput;
   }
 
 private:

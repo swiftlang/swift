@@ -883,6 +883,9 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     DidErrorOccur = true;
   }
 
+  if (SuppressOutput)
+    return;
+
   if (Info.IsChildNote)
     return;
 
