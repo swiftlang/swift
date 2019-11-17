@@ -874,98 +874,87 @@ namespace driver {
     template <typename DependencyGraphT>
     void scheduleFirstRoundJobsForIncrementalCompilation(
         DependencyGraphT &DepGraph) {
-      const auto compileJobsToSchedule =
-          computeFirstRoundJobsForIncrementalCompilation(DepGraph);
 
+      llvm::SmallPtrSet<const Job*, 16> compileJobsToSchedule;
+      for (const Job *Cmd: computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph))
+        compileJobsToSchedule.insert(Cmd);
       for (const Job *Cmd : Comp.getJobs()) {
-        if (Cmd->getFirstSwiftPrimaryInput().empty() ||
-            compileJobsToSchedule.count(Cmd))
+        if (Cmd->getFirstSwiftPrimaryInput().empty() || compileJobsToSchedule.count(Cmd))
           scheduleCommandIfNecessaryAndPossible(Cmd);
-        else {
-          assert(ScheduledCommands.count(Cmd) == 0 &&
-                 "Cannot defer already-scheduled command");
+        else
           DeferredCommands.insert(Cmd);
-        }
       }
     }
 
-    /// Figure out the best strategy and return those jobs.
+    /// Figure out the best strategy and return those jobs. May return duplicates.
     template <typename DependencyGraphT>
-    llvm::SmallPtrSet<const Job *, 16>
-    computeFirstRoundJobsForIncrementalCompilation(DependencyGraphT &DepGraph) {
+    llvm::SmallVector<const Job*, 16>
+    computeFirstRoundCompileJobsForIncrementalCompilation(DependencyGraphT &DepGraph) {
       auto compileJobsToScheduleViaDependencies =
           computeDependenciesAndGetNeededCompileJobs(DepGraph);
 
-      if (!Comp.getEnableSourceRangeDependencies()) {
-        if (Comp.CompareIncrementalSchemes) {
-#error factor
-          auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
-          auto &compileJobsToScheduleViaSourceRanges = jobs.first;
-          auto &jobsLackingSupplementaryOutputs = jobs.second;
+      const bool mustConsultRanges = Comp.getEnableSourceRangeDependencies() || Comp.CompareIncrementalSchemes;
 
-          const StringRef whyFallingBack =
-              reasonToFallBack(compileJobsToScheduleViaDependencies.size(),
-                               compileJobsToScheduleViaSourceRanges.size(),
-                               jobsLackingSupplementaryOutputs.size());
-
-          Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
-                                       compileJobsToScheduleViaSourceRanges);
-          if (!whyFallingBack.empty())
-            Comp.setFallingBackForComparison();
-        }
-        return compileJobsToScheduleViaDependencies;
-      }
+      if (!mustConsultRanges)
+      return compileJobsToScheduleViaDependencies;
 
       auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
-      auto &compileJobsToScheduleViaSourceRanges = jobs.first;
-      auto &jobsLackingSupplementaryOutputs = jobs.second;
+      llvm::SmallVector<const Job *, 16> &compileJobsToScheduleViaSourceRanges = jobs.first;
+      llvm::SmallVector<const Job *, 16> &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
 
-      const StringRef whyFallingBack =
-          reasonToFallBack(compileJobsToScheduleViaDependencies.size(),
-                           compileJobsToScheduleViaSourceRanges.size(),
-                           jobsLackingSupplementaryOutputs.size());
+      const bool shouldFallBack = decideAndExplainWhetherToFallBackToDependencies(compileJobsToScheduleViaSourceRanges, jobsLackingSourceRangeSupplementaryOutputs);
 
-      if (whyFallingBack.empty()) {
-        Comp.setUseSourceRangeDependencies(true);
-        if (Comp.getShowIncrementalBuildDecisions())
-          llvm::outs() << "Using ranges\n";
-        Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
-                                     compileJobsToScheduleViaSourceRanges);
-        return compileJobsToScheduleViaSourceRanges;
+      Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
+                                   compileJobsToScheduleViaSourceRanges);
+      if (shouldFallBack)
+        Comp.setFallingBackForComparison();
+
+      if (!Comp.getEnableSourceRangeDependencies())
+         return compileJobsToScheduleViaDependencies;
+
+      Comp.setUseSourceRangeDependencies(!shouldFallBack);
+
+      if (shouldFallBack) {
+        // Even if dependencies would not schedule these, we want them to run
+        // to create the supplementary outputs for next time.
+        for (const Job *Cmd : jobsLackingSourceRangeSupplementaryOutputs)
+          compileJobsToScheduleViaDependencies.push_back(Cmd);
       }
-      Comp.setFallingBackForComparison();
-      Comp.setUseSourceRangeDependencies(false);
-      // Even if dependencies would not schedule these, we want them to run
-      // to create the supplementary outputs for next time.
-      for (const Job *Cmd : jobsLackingSupplementaryOutputs)
-        compileJobsToScheduleViaDependencies.insert(Cmd);
-      if (Comp.getShowIncrementalBuildDecisions())
-        llvm::outs() << "Using dependenciess: " << whyFallingBack << "\n";
-      return compileJobsToScheduleViaDependencies;
+      return shouldFallBack ? compileJobsToScheduleViaDependencies : compileJobsToScheduleViaSourceRanges;
     }
 
-    StringRef reasonToFallBack(const size_t depCount, const size_t rangeCount,
-                               const size_t lackingSupplementaryOutputsCount) {
-      if (lackingSupplementaryOutputsCount)
-        return "Some input lacks supplementary output needed for the source "
-               "range strategy.\n Maybe dependencies can do better than "
-               "recompiling every file.";
-
+    bool decideAndExplainWhetherToFallBackToDependencies(llvm::SmallVector<const Job *, 16> &compileJobsToScheduleViaSourceRanges,
+    const llvm::SmallVector<const Job *, 16> &jobsLackingSourceRangeSupplementaryOutputs) {
+      if (!jobsLackingSourceRangeSupplementaryOutputs.empty()) {
+        if (Comp.getShowIncrementalBuildDecisions()) {
+          llvm::outs() << "Using dependencies: Some input lacks supplementary output needed for the source "
+          "range strategy.\n Maybe dependencies can do better than "
+          "recompiling every file.\n";
+        }
+        return true;
+       }
       // Unless the source-range scheme would compile every file,
       // it's likely a better bet.
-      if (rangeCount < Comp.countSwiftInputs())
-        return StringRef();
-
-      (void)depCount; // Will likely compile more than this anyway
-      return "Range strategy would compile every input; dependencies cannot be "
-             "any worse.";
+      llvm::SmallPtrSet<const Job*, 16> uniqueJobs;
+      for (const auto* J: compileJobsToScheduleViaSourceRanges)
+        uniqueJobs.insert(J);
+      if (uniqueJobs.size() < Comp.countSwiftInputs()) {
+        if (Comp.getShowIncrementalBuildDecisions())
+          llvm::outs() << "Using ranges\n";
+        return false;
+      }
+      if (Comp.getShowIncrementalBuildDecisions())
+        llvm::outs() << "Using dependencies: Range strategy would compile every input; dependencies cannot be "
+        "any worse.";
+      return true;
     }
+
 
     /// Return both the jobs to compile if using ranges, and also any jobs that
     /// must be compiled to use ranges in the future (because they were lacking
-    /// supplementary output files).
+    /// supplementary output files). May include duplicates.
     template <typename DependencyGraphT>
-    std::pair<llvm::SmallPtrSet<const Job *, 16>,
+    std::pair<llvm::SmallVector<const Job *, 16>,
               llvm::SmallVector<const Job *, 16>>
     computeRangesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
       using namespace incremental_ranges;
@@ -975,8 +964,7 @@ namespace driver {
       const bool dumpCompiledSourceDiffs =
           Comp.getArgs().hasArg(options::OPT_driver_dump_compiled_source_diffs);
 
-      const auto jobs = Comp.getJobsSimply();
-      const auto allSourceRangeInfo =
+       const auto allSourceRangeInfo =
           incremental_ranges::SourceRangeBasedInfo::loadAllInfo(Comp);
 
       incremental_ranges::SourceRangeBasedInfo::dumpAllInfo(
@@ -986,29 +974,37 @@ namespace driver {
       // But, since we register errors by recording massive changes to
       // primaries, could just keep on.
       // load dependencies for external dependencies and interfacehashes
-      auto jobsToCompileAndJobsNeededForSupplementaryOutputs =
-          SourceRangeBasedInfo::
-              neededCompileJobsForRangeBasedIncrementalCompilation(
-                  allSourceRangeInfo, Comp.getJobsSimply(),
-                  [&](const Job *Cmd) {
-                    scheduleCommandIfNecessaryAndPossible(Cmd);
-                  },
-                  [&](const Job *Cmd) { DeferredCommands.insert(Cmd); },
-                  [&](const Job *Cmd, Twine why) {
-                    noteBuilding(Cmd, true, why.str());
-                  });
+
+      llvm::SmallVector<const Job *, 16> neededJobs;
+      for (const Job *Cmd: Comp.getJobs()) {
+      if ( SourceRangeBasedInfo::shouldScheduleCompileJob(
+                allSourceRangeInfo, Cmd, [&](Twine why) { noteBuilding(Cmd, true, why.str()); }))
+        neededJobs.push_back(Cmd);
+      }
+
+      llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
+      for (const Job* Cmd: Comp.getJobs()) {
+       if (allSourceRangeInfo.count(Cmd->getFirstSwiftPrimaryInput()) == 0) {
+         noteBuilding(
+                      Cmd,
+                      true,
+                      "to create source-range and compiled-source files for the next time when falling back from source-ranges");
+         jobsLackingSupplementaryOutputs.push_back(Cmd);
+       }
+      }
 
       for (const Job *Cmd :
            externallyDependentJobsForRangeBasedIncrementalCompilation(DepGraph))
-        jobsToCompileAndJobsNeededForSupplementaryOutputs.first.insert(Cmd);
+        neededJobs.push_back(Cmd);
 
-      return jobsToCompileAndJobsNeededForSupplementaryOutputs;
+      return {neededJobs, jobsLackingSupplementaryOutputs};
     }
 
+    /// Return jobs to run if using dependencies, may include duplicates.
     template <typename DependencyGraphT>
-    llvm::SmallPtrSet<const Job *, 16>
+    llvm::SmallVector<const Job *, 16>
     computeDependenciesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
-      llvm::SmallPtrSet<const Job *, 16> jobsToSchedule;
+      llvm::SmallVector<const Job *, 16> jobsToSchedule;
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty())
           continue; // not Compile
@@ -1019,19 +1015,19 @@ namespace driver {
           // Dependency load error, just run them all
           for (const Job *Cmd : Comp.getJobs()) {
             if (!Cmd->getFirstSwiftPrimaryInput().empty())
-              jobsToSchedule.insert(Cmd);
+              jobsToSchedule.push_back(Cmd);
           }
           return jobsToSchedule;
         }
         if (shouldSched.getValue())
-          jobsToSchedule.insert(Cmd);
+          jobsToSchedule.push_back(Cmd);
       }
       {
         const auto additionalJobs =
             additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
                 DepGraph);
         for (const auto *Cmd : additionalJobs)
-          jobsToSchedule.insert(Cmd);
+          jobsToSchedule.push_back(Cmd);
       }
       return jobsToSchedule;
     }

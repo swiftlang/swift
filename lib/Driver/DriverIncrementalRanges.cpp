@@ -219,35 +219,6 @@ Ranges SourceRangeBasedInfo::computeNonlocalChangedRanges(
 // MARK: scheduling
 //==============================================================================
 
-std::pair<llvm::SmallPtrSet<const Job *, 16>,
-          llvm::SmallVector<const Job *, 16>>
-SourceRangeBasedInfo::neededCompileJobsForRangeBasedIncrementalCompilation(
-    const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-    std::vector<const Job *> jobs, function_ref<void(const Job *)> schedule,
-    function_ref<void(const Job *)> defer,
-    function_ref<void(const Job *, Twine)> noteBuilding) {
-
-  llvm::SmallPtrSet<const Job *, 16> neededJobs;
-  llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
-  for (const Job *Cmd : jobs) {
-    const auto primary = Cmd->getFirstSwiftPrimaryInput();
-    if (primary.empty()) {
-      schedule(Cmd); // not compile
-      continue;
-    }
-    const bool shouldSchedule = shouldScheduleCompileJob(
-        allInfos, Cmd, [&](Twine why) { noteBuilding(Cmd, why.str()); });
-    if (shouldSchedule)
-      neededJobs.insert(Cmd);
-    if (allInfos.count(primary) == 0) {
-      jobsLackingSupplementaryOutputs.push_back(Cmd);
-      noteBuilding(
-          Cmd,
-          "to create source-range and compiled-source files for the next time");
-    }
-  }
-  return {neededJobs, jobsLackingSupplementaryOutputs};
-}
 
 bool SourceRangeBasedInfo::shouldScheduleCompileJob(
     const llvm::StringMap<SourceRangeBasedInfo> &allInfos, const Job *Cmd,

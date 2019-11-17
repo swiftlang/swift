@@ -103,15 +103,13 @@ public:
   neededCompileJobsForRangeBasedIncrementalCompilation(
       const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
       std::vector<const driver::Job *>,
-      function_ref<void(const driver::Job *)> schedule,
-      function_ref<void(const driver::Job *)> defer,
       function_ref<void(const driver::Job *, Twine)> noteBuilding);
 
-private:
+public:
   static bool shouldScheduleCompileJob(
       const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
       const driver::Job *, function_ref<void(Twine)>);
-
+private:
   static Optional<bool> isFileNewerThan(StringRef lhs, StringRef rhs,
                                         DiagnosticEngine&);
 
