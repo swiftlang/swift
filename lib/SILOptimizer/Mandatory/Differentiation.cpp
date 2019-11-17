@@ -3366,7 +3366,6 @@ public:
                               context, original, attr->getIndices(), vjp)),
         pullbackInfo(context, AutoDiffLinearMapKind::Pullback, original, vjp,
                      attr->getIndices(), activityInfo) {
-    PrettyStackTraceSILFunction trace("generating VJP for", original);
     // Create empty pullback function.
     pullback = createEmptyPullback();
     context.getGeneratedFunctions().push_back(pullback);
@@ -5259,8 +5258,6 @@ public:
         differentialBuilder(SILBuilder(*createEmptyDifferential(
             context, original, attr, &differentialInfo))),
         diffLocalAllocBuilder(getDifferential()) {
-    PrettyStackTraceSILFunction trace("generating JVP and differential for",
-                                      original);
     // Create empty differential function.
     context.getGeneratedFunctions().push_back(&getDifferential());
   }
@@ -5345,6 +5342,8 @@ public:
 
   /// Run JVP generation. Returns true on error.
   bool run() {
+    PrettyStackTraceSILFunction trace("generating JVP and differential for",
+                                      original);
     LLVM_DEBUG(getADDebugStream()
                << "Cloning original @" << original->getName()
                << " to jvp @" << jvp->getName() << '\n');
@@ -5812,8 +5811,6 @@ public:
   explicit PullbackEmitter(VJPEmitter &vjpEmitter)
       : vjpEmitter(vjpEmitter), builder(getPullback()),
         localAllocBuilder(getPullback()) {
-    PrettyStackTraceSILFunction trace("generating pullback for",
-                                      &getOriginal());
     // Get dominance and post-order info for the original function.
     auto &passManager = getContext().getPassManager();
     auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
@@ -6193,6 +6190,8 @@ public:
   /// Performs pullback generation on the empty pullback function. Returns true
   /// if any error occurs.
   bool run() {
+    PrettyStackTraceSILFunction trace("generating pullback for",
+                                      &getOriginal());
     auto &original = getOriginal();
     auto &pullback = getPullback();
     auto pbLoc = getPullback().getLocation();
@@ -7851,6 +7850,7 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
 }
 
 bool VJPEmitter::run() {
+  PrettyStackTraceSILFunction trace("generating VJP for", original);
   LLVM_DEBUG(getADDebugStream()
              << "Cloning original @" << original->getName()
              << " to vjp @" << vjp->getName() << '\n');
