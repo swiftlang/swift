@@ -163,6 +163,10 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
   if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
     return true;
 
+  if (parser.isOptionalToken(nextTok)
+      || parser.isImplicitlyUnwrappedOptionalToken(nextTok))
+    return false;
+
   // The identifier could be a name or it could be a type. In a closure, we
   // assume it's a name, because the type can be inferred. Elsewhere, we
   // assume it's a type.
@@ -373,8 +377,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             // SE-110 depending on the kind of declaration.  We now need to
             // warn about the misuse of this syntax and offer to
             // fix it.
-            diagnose(typeStartLoc, diag::parameter_unnamed_warn)
-              .fixItInsert(typeStartLoc, "_: ");
+            // An exception to this rule is when the type is declared with type sugar
+            // Reference: SR-11724
+            if (param.Type->getKind() == TypeReprKind::Optional
+                || param.Type->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+                diagnose(typeStartLoc, diag::parameter_unnamed)
+                    .fixItInsert(typeStartLoc, "_: ");
+            } else {
+                diagnose(typeStartLoc, diag::parameter_unnamed_warn)
+                    .fixItInsert(typeStartLoc, "_: ");
+            }
           }
         }
       } else {
