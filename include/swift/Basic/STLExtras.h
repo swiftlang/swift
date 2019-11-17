@@ -639,12 +639,12 @@ inline T accumulate(const Container &C, T init, BinaryOperation op) {
 }
 
 template <typename Container, typename T>
-inline bool binary_search(const Container &C, T value) {
+inline bool binary_search(const Container &C, const T &value) {
   return std::binary_search(C.begin(), C.end(), value);
 }
 
 template <typename Container, typename T, typename BinaryOperation>
-inline bool binary_search(const Container &C, T value, BinaryOperation op) {
+inline bool binary_search(const Container &C, const T &value, BinaryOperation op) {
   return std::binary_search(C.begin(), C.end(), value, op);
 }
 
