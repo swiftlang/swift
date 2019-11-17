@@ -163,13 +163,6 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
-    // If v produces .none ownership, then we can ignore it. It is important
-    // that we put this before checking for guaranteed forwarding instructions,
-    // since we want to ignore guaranteed forwarding instructions that in this
-    // specific case produce a .none value.
-    if (v.getOwnershipKind() == ValueOwnershipKind::None)
-      continue;
-
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwardingValue(v)) {
@@ -180,9 +173,10 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
-    // Otherwise, this is an introducer we do not understand. Bail and return
-    // false.
-    return false;
+    // If v produces any ownership, then we can ignore it. Otherwise, we need to
+    // return false since this is an introducer we do not understand.
+    if (v.getOwnershipKind() != ValueOwnershipKind::None)
+      return false;
   }
 
   return true;
