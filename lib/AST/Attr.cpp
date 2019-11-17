@@ -857,6 +857,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
 
+  case DAK_Differentiable: {
+    Printer.printAttrName("@differentiable");
+    auto *attr = cast<DifferentiableAttr>(this);
+    printDifferentiableAttrArguments(attr, Printer, Options, D);
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
