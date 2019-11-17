@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "predictable-memopt"
 
 #include "PMOMemoryUseCollector.h"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
@@ -423,7 +424,13 @@ class AvailableValueAggregator {
   /// take.
   SmallVector<SILInstruction *, 16> insertedInsts;
 
+  /// The list of phi nodes inserted by the SSA updater.
   SmallVector<SILPhiArgument *, 16> insertedPhiNodes;
+
+  /// A set of copy_values whose lifetime we balanced while inserting phi
+  /// nodes. This means that these copy_value must be skipped in
+  /// addMissingDestroysForCopiedValues.
+  SmallPtrSet<CopyValueInst *, 16> copyValueProcessedWithPhiNodes;
 
 public:
   AvailableValueAggregator(SILInstruction *Inst,
@@ -468,16 +475,8 @@ public:
   void fixupOwnership(SILInstruction *load, SILValue newVal) {
     assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
 
-    // Sort phi nodes so we can use it for bisection operations.
-    sort(insertedPhiNodes);
-
-    // Sort inserted insts so we can bisect upon it and mark copy_value as needing
-    // to be skipped.
-    sort(insertedInsts);
-
-    SmallBitVector instsToSkip(insertedInsts.size());
-    addHandOffCopyDestroysForPhis(load, newVal, instsToSkip);
-    addMissingDestroysForCopiedValues(load, newVal, instsToSkip);
+    addHandOffCopyDestroysForPhis(load, newVal);
+    addMissingDestroysForCopiedValues(load, newVal);
   }
 
 private:
@@ -494,15 +493,13 @@ private:
   /// If as a result of us copying values, we may have unconsumed destroys, find
   /// the appropriate location and place the values there. Only used when
   /// ownership is enabled.
-  void addMissingDestroysForCopiedValues(SILInstruction *load, SILValue newVal,
-                                         const SmallBitVector &instsToSkip);
+  void addMissingDestroysForCopiedValues(SILInstruction *load, SILValue newVal);
 
   /// As a result of us using the SSA updater, insert hand off copy/destroys at
   /// each phi and make sure that intermediate phis do not leak by inserting
   /// destroys along paths that go through the intermediate phi that do not also
   /// go through the
-  void addHandOffCopyDestroysForPhis(SILInstruction *load, SILValue newVal,
-                                     SmallBitVector &instsToSkipOut);
+  void addHandOffCopyDestroysForPhis(SILInstruction *load, SILValue newVal);
 };
 
 } // end anonymous namespace
@@ -914,28 +911,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   return builder.emitCopyValueOperation(Loc, eltVal);
 }
 
-namespace {
-
-struct PhiNodeCleanupState {
-  /// The incoming value that we need to cleanup.
-  SILValue incomingValue;
-
-  /// The copy that we inserted right before the phi that will be fed into the
-  /// phi.
-  CopyValueInst *phiCopy;
-
-  PhiNodeCleanupState(SILValue incomingValue, CopyValueInst *phiCopy)
-      : incomingValue(incomingValue), phiCopy(phiCopy) {}
-
-  /// If our incoming value is not defined in the block in our phi node's block,
-  /// return the insertion point to use to insert destroy_value for the incoming
-  /// value. Otherwise, return nullptr.
-  SILInstruction *getNonPhiBlockIncomingValueDef() const;
-};
-
-} // end anonymous namespace
-
-SILInstruction *PhiNodeCleanupState::getNonPhiBlockIncomingValueDef() const {
+static SILInstruction *getNonPhiBlockIncomingValueDef(SILValue incomingValue,
+                                                      CopyValueInst *phiCopy) {
   auto *phiBlock = phiCopy->getParent();
   if (phiBlock == incomingValue->getParentBlock()) {
     return nullptr;
@@ -954,11 +931,150 @@ SILInstruction *PhiNodeCleanupState::getNonPhiBlockIncomingValueDef() const {
   return &*incomingValue->getParentBlock()->begin();
 }
 
+static bool
+terminatorHasAnyKnownPhis(TermInst *ti,
+                          ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
+  for (auto succArgList : ti->getSuccessorBlockArguments()) {
+    if (llvm::any_of(succArgList, [&](SILPhiArgument *arg) {
+          return binary_search(insertedPhiNodesSorted, arg);
+        })) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+namespace {
+
+class PhiNodeCopyCleanupInserter {
+  llvm::SmallMapVector<SILValue, unsigned, 8> incomingValues;
+
+  /// Map from index -> (incomingValueIndex, copy).
+  ///
+  /// We are going to stable_sort this array using the indices of
+  /// incomingValueIndex. This will ensure that we always visit in
+  /// insertion order our incoming values (since the indices we are
+  /// sorting by are the count of incoming values we have seen so far
+  /// when we see the incoming value) and maintain the internal
+  /// insertion sort within our range as well. This ensures that we
+  /// visit our incoming values in visitation order and that within
+  /// their own values, also visit them in visitation order with
+  /// respect to each other.
+  SmallVector<std::pair<unsigned, CopyValueInst *>, 16> copiesToCleanup;
+
+  /// The lifetime frontier that we use to compute lifetime endpoints
+  /// when emitting cleanups.
+  ValueLifetimeAnalysis::Frontier lifetimeFrontier;
+
+public:
+  PhiNodeCopyCleanupInserter() = default;
+
+  void trackNewCleanup(SILValue incomingValue, CopyValueInst *copy) {
+    auto entry = std::make_pair(incomingValue, incomingValues.size());
+    auto iter = incomingValues.insert(entry);
+    // If we did not succeed, then iter.first.second is the index of
+    // incoming value. Otherwise, it will be nextIndex.
+    copiesToCleanup.emplace_back(iter.first->second, copy);
+  }
+
+  void emit(DeadEndBlocks &deadEndBlocks) &&;
+};
+
+} // end anonymous namespace
+
+void PhiNodeCopyCleanupInserter::emit(DeadEndBlocks &deadEndBlocks) && {
+  // READ THIS: We are being very careful here to avoid allowing for
+  // non-determinism to enter here.
+  //
+  // 1. First we create a list of indices of our phi node data. Then we use a
+  //    stable sort those indices into the order in which our phi node cleanups
+  //    would be in if we compared just using incomingValues. We use a stable
+  //    sort here to ensure that within the same "cohort" of values, our order
+  //    is insertion order.
+  //
+  // 2. We go through the list of phiNodeCleanupStates in insertion order. We
+  //    also maintain a set of already visited base values. When we visit the
+  //    first phiNodeCleanupState for a specific phi, we process the phi
+  //    then. This ensures that we always process the phis in insertion order as
+  //    well.
+  SmallVector<unsigned, 32> copiesToCleanupIndicesSorted;
+  llvm::copy(indices(copiesToCleanup),
+             std::back_inserter(copiesToCleanupIndicesSorted));
+
+  stable_sort(copiesToCleanupIndicesSorted,
+              [&](unsigned lhsIndex, unsigned rhsIndex) {
+                unsigned lhs = copiesToCleanup[lhsIndex].first;
+                unsigned rhs = copiesToCleanup[rhsIndex].first;
+                return lhs < rhs;
+              });
+
+  for (auto ii = copiesToCleanupIndicesSorted.begin(),
+            ie = copiesToCleanupIndicesSorted.end();
+       ii != ie;) {
+    unsigned incomingValueIndex = copiesToCleanup[*ii].first;
+
+    // First find the end of the values for which ii does not equal baseValue.
+    auto rangeEnd = std::find_if_not(std::next(ii), ie, [&](unsigned index) {
+      return incomingValueIndex == copiesToCleanup[index].first;
+    });
+
+    SWIFT_DEFER {
+      // Once we have finished processing, set ii to rangeEnd. This ensures that
+      // the code below does not need to worry about updating the iterator.
+      ii = rangeEnd;
+    };
+
+    SILValue incomingValue =
+        std::next(incomingValues.begin(), incomingValueIndex)->first;
+    CopyValueInst *phiCopy = copiesToCleanup[*ii].second;
+    auto *insertPt = getNonPhiBlockIncomingValueDef(incomingValue, phiCopy);
+    auto loc = RegularLocation::getAutoGeneratedLocation();
+
+    // Before we do anything, see if we have a single cleanup state. In such a
+    // case, we could have that we have a phi node as an incoming value and a
+    // copy_value in that same block. In such a case, we want to just insert the
+    // copy and continue. This means that
+    // cleanupState.getNonPhiBlockIncomingValueDef() should always return a
+    // non-null value in the code below.
+    if (std::next(ii) == rangeEnd && isa<SILArgument>(incomingValue) &&
+        !insertPt) {
+      SILBasicBlock *phiBlock = phiCopy->getParent();
+      SILBuilderWithScope builder(phiBlock->getTerminator());
+      builder.createDestroyValue(loc, incomingValue);
+      continue;
+    }
+
+    // Otherwise, we know that we have for this incomingValue, multiple
+    // potential insert pts that we need to handle at the same time with our
+    // lifetime query. Gather up those uses.
+    SmallVector<SILInstruction *, 8> users;
+    transform(llvm::make_range(ii, rangeEnd), std::back_inserter(users),
+              [&](unsigned index) { return copiesToCleanup[index].second; });
+
+    // Then lifetime extend our base over the copy_value.
+    assert(lifetimeFrontier.empty());
+    auto *def = getNonPhiBlockIncomingValueDef(incomingValue, phiCopy);
+    assert(def && "Should never have a nullptr here since we handled all of "
+                  "the single block cases earlier");
+    ValueLifetimeAnalysis analysis(def, users);
+    bool foundCriticalEdges = !analysis.computeFrontier(
+        lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG, &deadEndBlocks);
+    (void)foundCriticalEdges;
+    assert(!foundCriticalEdges);
+
+    while (!lifetimeFrontier.empty()) {
+      auto *insertPoint = lifetimeFrontier.pop_back_val();
+      SILBuilderWithScope builder(insertPoint);
+      builder.createDestroyValue(loc, incomingValue);
+    }
+  }
+}
+
 void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
-    SILInstruction *load, SILValue newVal, SmallBitVector &instsToSkip) {
+    SILInstruction *load, SILValue newVal) {
   assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
 
-  ValueLifetimeAnalysis::Frontier lifetimeFrontier;
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
   SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> incomingValues;
@@ -976,18 +1092,20 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
   // the SSA updater just constructs the web without knowledge of ownership. So
   // if a phi node is only used by another phi node that we inserted, then we
   // have an intermediate phi node.
+  //
+  // TODO: There should be a better way of doing this than doing a copy + sort.
+  SmallVector<SILPhiArgument *, 32> insertedPhiNodesSorted;
+  llvm::copy(insertedPhiNodes, std::back_inserter(insertedPhiNodesSorted));
+  llvm::sort(insertedPhiNodesSorted);
+
   SmallBitVector intermediatePhiOffsets(insertedPhiNodes.size());
   for (unsigned i : indices(insertedPhiNodes)) {
-    if (auto *termInst = insertedPhiNodes[i]->getSingleUserOfType<TermInst>()) {
+    if (TermInst *termInst =
+            insertedPhiNodes[i]->getSingleUserOfType<TermInst>()) {
       // Only set the value if we find termInst has a successor with a phi node
       // in our insertedPhiNodes.
-      for (auto succBBArgs : termInst->getSuccessorBlockArguments()) {
-        if (any_of(succBBArgs, [&](SILPhiArgument *arg) {
-              return binary_search(insertedPhiNodes, arg);
-            })) {
-          intermediatePhiOffsets.set(i);
-          break;
-        }
+      if (terminatorHasAnyKnownPhis(termInst, insertedPhiNodesSorted)) {
+        intermediatePhiOffsets.set(i);
       }
     }
   }
@@ -1020,7 +1138,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
   // NOTE: At first glance one may think that such a problem could not occur
   // with phi nodes as well. Sadly if we allow for double backedge loops, it is
   // possible (there may be more cases).
-  llvm::SmallVector<PhiNodeCleanupState, 8> phiNodeCleanupState;
+  PhiNodeCopyCleanupInserter cleanupInserter;
 
   for (unsigned i : indices(insertedPhiNodes)) {
     auto *phi = insertedPhiNodes[i];
@@ -1052,13 +1170,10 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
       // Otherwise, value should be from a copy_value or a phi node.
       assert(isa<CopyValueInst>(value) || isa<SILPhiArgument>(value));
 
-      // If we have a copy_value Set a bit for it in instsToSkip so that when we
-      // start processing insertedInstrs we know that we handled it here
-      // already.
+      // If we have a copy_value, remove it from the inserted insts set so we
+      // skip it when we start processing insertedInstrs.
       if (auto *cvi = dyn_cast<CopyValueInst>(value)) {
-        auto iter = lower_bound(insertedInsts, cvi);
-        assert(iter != insertedInsts.end() && *iter == cvi);
-        instsToSkip[std::distance(insertedInsts.begin(), iter)] = true;
+        copyValueProcessedWithPhiNodes.insert(cvi);
 
         // Then check if our termInst is in the same block as our copy_value. In
         // such a case, we can just use the copy_value as our phi's value
@@ -1079,7 +1194,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
       // Now that we know our base, phi, phiCopy for this specific incoming
       // value, append it to the phiNodeClenaupState so we can insert
       // destroy_values late after we visit all insertedPhiNodes.
-      phiNodeCleanupState.emplace_back(value, phiCopy);
+      cleanupInserter.trackNewCleanup(value, phiCopy);
     }
 
     // Then see if our phi is an intermediate phi. If it is an intermediate phi,
@@ -1139,85 +1254,18 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
     }
   }
 
-  // At this point, we have visited all of our phis, lifetime extended them to
-  // the the load block, and inserted phi copies at all of our intermediate phi
-  // nodes. Now we need to cleanup and insert all of the compensating
-  // destroy_value that we need. We do this by sorting our phiNodeCleanupState
-  // just by baseValue. This will ensure that all values with the same base
-  // value are able to have all of their phiCopies passed at the same time to
-  // the ValueLifetimeAnalysis.
-  stable_sort(phiNodeCleanupState, [](const PhiNodeCleanupState &lhs,
-                                      const PhiNodeCleanupState &rhs) {
-    return lhs.incomingValue < rhs.incomingValue;
-  });
-
-  for (auto ii = phiNodeCleanupState.begin(), ie = phiNodeCleanupState.end();
-       ii != ie;) {
-    SILValue incomingValue = ii->incomingValue;
-
-    // First find the end of the values for which ii does not equal baseValue.
-    auto rangeEnd = std::find_if_not(
-        std::next(ii), ie, [&](const PhiNodeCleanupState &next) {
-          return incomingValue == next.incomingValue;
-        });
-
-    SWIFT_DEFER {
-      // Once we have finished processing, set ii to rangeEnd. This ensures that
-      // the code below does not need to worry about updating the iterator.
-      ii = rangeEnd;
-    };
-
-    // Before we do anything, see if we have a single cleanup state. In such a
-    // case, we could have that we have a phi node as an incoming value and a
-    // copy_value in that same block. In such a case, we want to just insert the
-    // copy and continue. This means that
-    // cleanupState.getNonPhiBlockIncomingValueDef() should always return a
-    // non-null value in the code below.
-    if (std::next(ii) == rangeEnd && isa<SILArgument>(ii->incomingValue)) {
-      auto *insertPt = ii->getNonPhiBlockIncomingValueDef();
-      if (!insertPt) {
-        CopyValueInst *phiCopy = ii->phiCopy;
-        SILBasicBlock *phiBlock = phiCopy->getParent();
-        SILBuilderWithScope builder(phiBlock->getTerminator());
-        builder.createDestroyValue(loc, incomingValue);
-        continue;
-      }
-    }
-
-    // Otherwise, we know that we have for this incomingValue, multiple
-    // potential insert pts that we need to handle at the same time with our
-    // lifetime query. Gather up those uses.
-    SmallVector<SILInstruction *, 8> users;
-    transform(llvm::make_range(ii, rangeEnd), std::back_inserter(users),
-              [](const PhiNodeCleanupState &value) { return value.phiCopy; });
-
-    // Then lifetime extend our base over the copy_value.
-    assert(lifetimeFrontier.empty());
-    auto *def = ii->getNonPhiBlockIncomingValueDef();
-    assert(def && "Should never have a nullptr here since we handled all of "
-                  "the single block cases earlier");
-    ValueLifetimeAnalysis analysis(def, users);
-    bool foundCriticalEdges = !analysis.computeFrontier(
-        lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG, &deadEndBlocks);
-    (void)foundCriticalEdges;
-    assert(!foundCriticalEdges);
-
-    while (!lifetimeFrontier.empty()) {
-      auto *insertPoint = lifetimeFrontier.pop_back_val();
-      SILBuilderWithScope builder(insertPoint);
-      builder.createDestroyValue(loc, incomingValue);
-    }
-
-    visitedBlocks.clear();
-    leakingBlocks.clear();
-  }
+  // Alright! In summary, we just lifetime extended all of our phis,
+  // lifetime extended them to the load block, and inserted phi copies
+  // at all of our intermediate phi nodes. Now we need to cleanup and
+  // insert all of the compensating destroy_value that we need.
+  std::move(cleanupInserter).emit(deadEndBlocks);
 
   // Clear the phi node array now that we are done.
   insertedPhiNodes.clear();
 }
 
 void AvailableValueAggregator::addMissingDestroysForCopiedValues(
-    SILInstruction *load, SILValue newVal, const SmallBitVector &instsToSkip) {
+    SILInstruction *load, SILValue newVal) {
   assert(B.hasOwnership() &&
          "We assume this is only called if we have ownership");
 
@@ -1225,18 +1273,13 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
   auto loc = RegularLocation::getAutoGeneratedLocation();
 
-  for (unsigned i : indices(insertedInsts)) {
-    // If we already handled this instruction above when handling phi nodes,
-    // just continue.
-    if (instsToSkip[i])
-      continue;
-
+  for (auto *inst : insertedInsts) {
     // Otherwise, see if this is a load [copy]. It if it a load [copy], then we
     // know that the load [copy] must be in the load block meaing we can just
     // put a destroy_value /after/ the load_borrow to ensure that the value
     // lives long enough for us to copy_value it or a derived value for the
     // begin_borrow.
-    if (auto *li = dyn_cast<LoadInst>(insertedInsts[i])) {
+    if (auto *li = dyn_cast<LoadInst>(inst)) {
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
         assert(li->getParent() == load->getParent());
         auto next = std::next(load->getIterator());
@@ -1248,8 +1291,13 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
 
     // Our copy_value may have been unset above if it was used by a phi
     // (implying it does not dominate our final user).
-    auto *cvi = dyn_cast<CopyValueInst>(insertedInsts[i]);
+    auto *cvi = dyn_cast<CopyValueInst>(inst);
     if (!cvi)
+      continue;
+
+    // If we already handled this copy_value above when handling phi nodes, just
+    // continue.
+    if (copyValueProcessedWithPhiNodes.count(cvi))
       continue;
 
     // Clear our state.
