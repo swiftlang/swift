@@ -732,7 +732,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                      ctx.getIdentifier("$input_value"),
                                      dc);
     param->setSpecifier(ParamSpecifier::Owned);
-    param->setInterfaceType(function.getDecl()->getInterfaceType());
+    auto vd = cast<VarDecl>(function.getDecl());
+    param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
   }
@@ -783,8 +784,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   // will be in terms of the original property's type.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
     if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
-      interfaceType = originalProperty->getValueInterfaceType();
-      varType = originalProperty->getType();
+      interfaceType = originalProperty->getPropertyWrapperInitValueInterfaceType();
+      varType = originalProperty->getDeclContext()->mapTypeIntoContext(interfaceType);
     }
   }
 

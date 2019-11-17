@@ -2485,8 +2485,11 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 
   // Form the initialization of the backing property from a value of the
   // original property's type.
+  Type origValueInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+  Type origValueType =
+    var->getDeclContext()->mapTypeIntoContext(origValueInterfaceType);
   OpaqueValueExpr *origValue =
-      new (ctx) OpaqueValueExpr(var->getSourceRange(), var->getType(),
+      new (ctx) OpaqueValueExpr(var->getSourceRange(), origValueType,
                                 /*isPlaceholder=*/true);
   Expr *initializer = buildPropertyWrapperInitialValueCall(
       var, storageType, origValue,

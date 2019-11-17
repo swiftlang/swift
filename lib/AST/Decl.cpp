@@ -5848,6 +5848,25 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
   return allAttachedPropertyWrappersHaveInitialValueInit();
 }
 
+bool VarDecl::isInnermostPropertyWrapperInitUsesEscapingAutoClosure() const {
+  auto customAttrs = getAttachedPropertyWrappers();
+  if (customAttrs.empty())
+    return false;
+
+  unsigned innermostWrapperIndex = customAttrs.size() - 1;
+  auto typeInfo = getAttachedPropertyWrapperTypeInfo(innermostWrapperIndex);
+  return typeInfo.isWrappedValueInitUsingEscapingAutoClosure;
+}
+
+Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
+  Type valueInterfaceTy = getValueInterfaceType();
+
+  if (isInnermostPropertyWrapperInitUsesEscapingAutoClosure())
+    return FunctionType::get({}, valueInterfaceTy);
+
+  return valueInterfaceTy;
+}
+
 Identifier VarDecl::getObjCPropertyName() const {
   if (auto attr = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = attr->getName())
@@ -6286,8 +6305,11 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
   if (initArg) {
     initArg = initArg->getSemanticsProvidingExpr();
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-      initArg =
-          autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+      if (!var->isInnermostPropertyWrapperInitUsesEscapingAutoClosure()) {
+        // Remove the autoclosure part only for non-escaping autoclosures
+        initArg =
+            autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+      }
     }
   }
   return initArg;

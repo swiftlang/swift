@@ -2372,9 +2372,32 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   return visit(E->getClosureBody(), C);
 }
 
+static OpaqueValueExpr *opaqueValueExprToSubstituteForAutoClosure(
+    const AbstractClosureExpr *e) {
+  // When we find an autoclosure that just calls an opaque closure,
+  // this is a case where we've created the opaque closure as a
+  // stand-in for the autoclosure itself. Such an opaque closure is
+  // created when we have a property wrapper's 'init(wrappedValue:)'
+  // taking an autoclosure argument.
+  if (auto ace = dyn_cast<AutoClosureExpr>(e)) {
+    if (auto ce = dyn_cast<CallExpr>(ace->getSingleExpressionBody())) {
+      if (auto ove = dyn_cast<OpaqueValueExpr>(ce->getFn())) {
+        if (!ace->isImplicit() || !ove->isImplicit() || !ove->isPlaceholder())
+          return nullptr;
+
+        if (ace->getType()->isEqual(ove->getType()))
+          return ove;
+      }
+    }
+  }
+  return nullptr;
+}
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
+  if (auto ove = opaqueValueExprToSubstituteForAutoClosure(e))
+    return visitOpaqueValueExpr(ove, C);
+
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
