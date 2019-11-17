@@ -1316,6 +1316,13 @@ namespace {
           return false;
         }
 
+        // If this property wrapper uses autoclosure in it's initializer,
+        // the argument types of the setter and initializer shall be
+        // different, so we don't rewrite an assignment into an
+        // initialization.
+        if (VD->isInnermostPropertyWrapperInitUsesEscapingAutoClosure())
+          return false;
+
         return true;
       }
 
