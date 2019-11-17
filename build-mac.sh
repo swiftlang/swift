@@ -28,4 +28,4 @@ export sourcedir=$PWD/..
   --install-swift \
   --install-prefix="/opt/swiftwasm-sdk" \
   --install-destdir="$sourcedir/install" \
-  --installable-package="$sourcedir/swiftwasm-mac.tar.gz"
+  --installable-package="$sourcedir/swiftwasm-macos.tar.gz"
