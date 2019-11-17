@@ -1833,9 +1833,6 @@ is marked with `@noDerivative`.
   <img src="assets/DifferentiableProgramming/differentiable-function-subtyping.png">
 </p>
 
-_Note: `@noDerivative` stands for "not being differentiated", and will likely be
-unified with `@noDerivative`._
-
 #### Type conversion
 
 The subtyping relation among `@differentiable(linear)`, `@differentiable`, and
