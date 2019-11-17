@@ -422,8 +422,14 @@ int main(int argc, char **argv) {
 
   // If we're in verify mode, install a custom diagnostic handling for
   // SourceMgr.
-  if (VerifyMode)
-    enableDiagnosticVerifier(CI.getSourceMgr());
+  std::unique_ptr<DiagnosticVerifier> verifier;
+  if (VerifyMode) {
+    verifier = std::make_unique<DiagnosticVerifier>(
+        CI.getSourceMgr(), CI.getInputBufferIDs(), /*AutoApplyFixes*/ false,
+        /*IgnoreUnknown*/ false);
+    CI.addDiagnosticConsumer(verifier.get());
+    PrintDiags.setSuppressOutput(true);
+  }
 
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
@@ -506,12 +512,10 @@ int main(int argc, char **argv) {
 
   bool HadError = CI.getASTContext().hadError();
 
-  // If we're in -verify mode, we've buffered up all of the generated
-  // diagnostics.  Check now to ensure that they meet our expectations.
+  PrintDiags.setSuppressOutput(false);
+
   if (VerifyMode) {
-    HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
-                                 /*autoApplyFixes*/false,
-                                 /*ignoreUnknown*/false);
+    HadError = false;
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
@@ -521,5 +525,9 @@ int main(int argc, char **argv) {
     }
   }
 
+  // If we're in -verify mode, we've buffered up all of the generated
+  // diagnostics.  Check now by calling `finishProcessing` to ensure that they
+  // meet our expectations.
+  HadError |= CI.getDiags().finishProcessing();
   return HadError;
 }

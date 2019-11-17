@@ -2145,9 +2145,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
-  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    enableDiagnosticVerifier(Instance->getSourceMgr());
-  }
 
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasDependencyTrackerPath() ||
@@ -2163,6 +2160,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);
+  }
+
+  // The verifier must be setup after CompilerInstance::setup is called above to
+  // ensure the input buffer IDs have been added.
+  std::unique_ptr<DiagnosticVerifier> verifier;
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
+    verifier = llvm::make_unique<DiagnosticVerifier>(
+        Instance->getSourceMgr(), Instance->getInputBufferIDs(),
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
+        diagOpts.VerifyIgnoreUnknown);
+    Instance->addDiagnosticConsumer(verifier.get());
+    PDC.setSuppressOutput(true);
   }
 
   std::unique_ptr<UnifiedStatsReporter> StatsReporter =
@@ -2193,12 +2202,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
 
+  // If we disabled the PrintingDiagnosticConsumer earlier in verify mode,
+  // reenable it now.
+  PDC.setSuppressOutput(false);
+
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    HadError = verifyDiagnostics(
-        Instance->getSourceMgr(),
-        Instance->getInputBufferIDs(),
-        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown);
+    // If we're in -verify mode, temporarily ignore errors. If verification
+    // failed, we'll still report an error correctly when finishDiagProcessing
+    // runs.
+    HadError = false;
 
     DiagnosticEngine &diags = Instance->getDiags();
     if (diags.hasFatalErrorOccurred() &&

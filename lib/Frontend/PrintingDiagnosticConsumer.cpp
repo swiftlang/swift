@@ -65,6 +65,9 @@ namespace {
 
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                                   const DiagnosticInfo &Info) {
+  if (SuppressOutput)
+    return;
+
   if (Info.IsChildNote)
     return;
 
