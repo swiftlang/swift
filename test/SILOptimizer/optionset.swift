@@ -16,7 +16,6 @@ public struct TestOptions: OptionSet {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   return
 public func returnTestOptions() -> TestOptions {
@@ -27,7 +26,6 @@ public func returnTestOptions() -> TestOptions {
 // CHECK-NEXT:   global_addr
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   store
 // CHECK-NEXT:   tuple

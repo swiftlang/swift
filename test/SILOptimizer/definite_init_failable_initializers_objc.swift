@@ -38,32 +38,37 @@ class Cat : FakeNSObject {
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC'
 
   // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_Sbtcfc : $@convention(method) (Int, Bool, @owned Cat) -> @owned Optional<Cat>
-  // CHECK: bb0(%0 : $Int, %1 : $Bool, %2 : $Cat):
+  // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Bool, [[ARG2:%.*]] : $Cat):
     // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Cat
-    // CHECK:      store %2 to [[SELF_BOX]] : $*Cat
-    // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr %2 : $Cat, #Cat.x
+    // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
+    // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
     // CHECK-NEXT: store {{%.*}} to [[FIELD_ADDR]] : $*LifetimeTracked
+    // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[COND:%.*]] = struct_extract %1 : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
 
   // CHECK: bb1:
-    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr %2 : $Cat, #Cat.x
+    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
     // CHECK-NEXT: destroy_addr [[FIELD_ADDR]] : $*LifetimeTracked
+    // CHECK-NEXT: strong_release [[ARG2]]
+    // CHECK-NEXT: [[RELOAD_FROM_BOX:%.*]] = load [[SELF_BOX]]
     // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick Cat.Type
-    // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[METATYPE]] : $@thick Cat.Type
+    // CHECK-NEXT: dealloc_partial_ref [[RELOAD_FROM_BOX]] : $Cat, [[METATYPE]] : $@thick Cat.Type
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.none!enumelt
     // CHECK-NEXT: br bb3([[RESULT]] : $Optional<Cat>)
 
   // CHECK: bb2:
-    // CHECK-NEXT: [[SUPER:%.*]] = upcast %2 : $Cat to $FakeNSObject
+    // CHECK-NEXT: strong_release [[ARG2]]
+    // CHECK-NEXT: [[RELOAD_ARG2:%.*]] = load [[SELF_BOX]]
+    // CHECK-NEXT: [[SUPER:%.*]] = upcast [[RELOAD_ARG2]] : $Cat to $FakeNSObject
     // CHECK-NEXT: [[SUB:%.*]] = unchecked_ref_cast [[SUPER]] : $FakeNSObject to $Cat
     // CHECK-NEXT: [[SUPER_FN:%.*]] = objc_super_method [[SUB]] : $Cat, #FakeNSObject.init!initializer.1.foreign : (FakeNSObject.Type) -> () -> FakeNSObject, $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SUPER_SELF:%.*]] = apply [[SUPER_FN]]([[SUPER]]) : $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SUPER_SELF]] : $FakeNSObject to $Cat
-    // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
     // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
     // CHECK-NEXT: strong_retain [[NEW_SELF]]
+    // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
@@ -89,18 +94,19 @@ class Cat : FakeNSObject {
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_SbtcfC'
 
   // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_Sbtcfc : $@convention(method) (Bool, Bool, @owned Cat) -> @owned Optional<Cat>
-  // CHECK: bb0(%0 : $Bool, %1 : $Bool, %2 : $Cat):
+  // CHECK: bb0([[ARG0:%.*]] : $Bool, [[ARG1:%.*]] : $Bool, [[ARG2:%.*]] : $Cat):
     // CHECK-NEXT: [[HAS_RUN_INIT_BOX:%.+]] = alloc_stack $Builtin.Int1
     // CHECK-NEXT: [[SELF_BOX:%.+]] = alloc_stack [dynamic_lifetime] $Cat
-    // CHECK:      store %2 to [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: [[COND:%.+]] = struct_extract %0 : $Bool, #Bool._value
+    // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
+    // CHECK-NEXT: [[COND:%.+]] = struct_extract [[ARG0]] : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
   
   // CHECK: bb1:
     // CHECK-NEXT: br [[ERROR_BRANCH:bb[0-9]+]]
       
   // CHECK: bb{{[0-9]+}}:
-    // CHECK: [[SELF_INIT:%.+]] = objc_method %2 : $Cat, #Cat.init!initializer.1.foreign : (Cat.Type) -> (Int, Bool) -> Cat?
+    // CHECK: [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
+    // CHECK: [[SELF_INIT:%.+]] = objc_method [[RELOAD_SELF]] : $Cat, #Cat.init!initializer.1.foreign : (Cat.Type) -> (Int, Bool) -> Cat?
     // CHECK: [[NEW_OPT_SELF:%.+]] = apply [[SELF_INIT]]({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(objc_method) (Int, ObjCBool, @owned Cat) -> @owned Optional<Cat>
     // CHECK: [[COND:%.+]] = select_enum [[NEW_OPT_SELF]] : $Optional<Cat>
     // CHECK-NEXT: cond_br [[COND]], [[SUCCESS_BRANCH:bb[0-9]+]], [[RELEASE_THEN_ERROR_BRANCH:bb[0-9]+]]
@@ -111,9 +117,9 @@ class Cat : FakeNSObject {
 
   // CHECK: [[SUCCESS_BRANCH]]:
     // CHECK-NEXT: [[NEW_SELF:%.+]] = unchecked_enum_data [[NEW_OPT_SELF]] : $Optional<Cat>, #Optional.some!enumelt.1
-    // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
     // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
     // CHECK-NEXT: strong_retain [[NEW_SELF]]
+    // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[RESULT:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
@@ -127,8 +133,9 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: br [[ERROR_CLEANUP_BRANCH:bb[0-9]+]]
 
   // CHECK: [[ERROR_WITH_DESTROY_BRANCH]]:
-    // CHECK-NEXT: [[MOST_DERIVED_TYPE:%.+]] = value_metatype $@thick Cat.Type, %2 : $Cat
-    // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[MOST_DERIVED_TYPE]] : $@thick Cat.Type
+    // CHECK: [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
+    // CHECK-NEXT: [[MOST_DERIVED_TYPE:%.+]] = value_metatype $@thick Cat.Type, [[RELOAD_SELF]] : $Cat
+    // CHECK-NEXT: dealloc_partial_ref [[RELOAD_SELF]] : $Cat, [[MOST_DERIVED_TYPE]] : $@thick Cat.Type
     // CHECK-NEXT: br [[ERROR_CLEANUP_BRANCH]]
 
   // CHECK: [[ERROR_CLEANUP_BRANCH]]:

@@ -28,13 +28,10 @@
 // CHECK: [[DEST:%.*]] = bitcast [[FOO]]* [[COPY]] to %swift.opaque*
 // CHECK: [[SRC:%.*]] = bitcast [[FOO]]* %1 to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
-//   Perform 'initializeWithTake' via the VWT.
-// CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
-// CHECK: [[T1:%.*]] = load i8*, i8** [[T0]],
-// CHECK: [[TAKEFN:%.*]] = bitcast i8* [[T1]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
+//   Perform 'initializeWithCopy' via the VWT.
 // CHECK: [[DEST:%.*]] = bitcast [[FOO]]* %0 to %swift.opaque*
 // CHECK: [[SRC:%.*]] = bitcast [[FOO]]* [[COPY]] to %swift.opaque*
-// CHECK: call %swift.opaque* [[TAKEFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
+// CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 public func copyFoo(foo: Foo) -> Foo {
   let copy = foo
   return copy
