@@ -856,9 +856,12 @@ Driver::buildCompilation(const ToolChain &TC,
 
   const bool EnableSourceRangeDependencies =
       ArgList->hasArg(options::OPT_enable_source_range_dependencies);
+  const bool CompareIncrementalSchemes =
+      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes);
 
   Optional<OutputFileMap> OFM = buildOutputFileMap(
-      *TranslatedArgList, workingDirectory, EnableSourceRangeDependencies);
+      *TranslatedArgList, workingDirectory,
+      EnableSourceRangeDependencies || CompareIncrementalSchemes);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -978,7 +981,8 @@ Driver::buildCompilation(const ToolChain &TC,
         VerifyExperimentalDependencyGraphAfterEveryImport,
         EmitExperimentalDependencyDotFileAfterEveryImport,
         ExperimentalDependenciesIncludeIntrafileOnes,
-        EnableSourceRangeDependencies);
+        EnableSourceRangeDependencies,
+        CompareIncrementalSchemes);
     // clang-format on
   }
 
@@ -2989,7 +2993,7 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
   }
   if (C.getIncrementalBuildEnabled()) {
     file_types::forEachIncrementalOutputType([&](file_types::ID type) {
-      if (C.getEnableSourceRangeDependencies() ||
+      if (C.getEnableSourceRangeDependencies() || C.CompareIncrementalSchemes ||
           type == file_types::TY_SwiftDeps)
         addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
     });

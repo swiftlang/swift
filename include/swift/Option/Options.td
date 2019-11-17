@@ -143,6 +143,11 @@ def enable_source_range_dependencies :
 Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
 HelpText<"Try using source range information">;
 
+
+def driver_compare_incremental_schemes :
+Flag<["-"], "driver-compare-incremental-schemes">, Flags<[]>,
+HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
+
 def driver_verify_experimental_dependency_graph_after_every_import :
 Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
 InternalDebugOpt,

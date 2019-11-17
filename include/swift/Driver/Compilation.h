@@ -226,6 +226,25 @@ private:
   /// May not actually use them if e.g. there is a new input
   bool UseSourceRangeDependencies = false;
 
+public:
+  /// How many .swift input files?
+  unsigned countSwiftInputs() const;
+
+  /// Print out a short message comparing dependencies w/  source-ranges
+  const bool CompareIncrementalSchemes;
+
+  template <typename DepJobsT, typename RangeJobsT>
+  void updateJobsForComparison(const DepJobsT &depJobs,
+                               const RangeJobsT &rangeJobs);
+  void setFallingBackForComparison();
+  void printComparision() const;
+
+private:
+  llvm::SmallPtrSet<const Job *, 16> DependencyCompileJobs;
+  // Optional if would fall back
+  Optional<llvm::SmallPtrSet<const Job *, 16>> SourceRangeCompileJobs =
+      llvm::SmallPtrSet<const Job *, 16>();
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -260,7 +279,8 @@ public:
               bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
               bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
               bool ExperimentalDependenciesIncludeIntrafileOnes = false,
-              bool EnableSourceRangeDependencies = false);
+              bool EnableSourceRangeDependencies = false,
+              bool CompareIncrementalSchemes = false);
   // clang-format on
   ~Compilation();
 

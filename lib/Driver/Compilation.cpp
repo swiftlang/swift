@@ -125,7 +125,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool VerifyExperimentalDependencyGraphAfterEveryImport,
                          bool EmitExperimentalDependencyDotFileAfterEveryImport,
                          bool ExperimentalDependenciesIncludeIntrafileOnes,
-                         bool EnableSourceRangeDependencies)
+                         bool EnableSourceRangeDependencies,
+                         bool CompareIncrementalSchemes)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -154,8 +155,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitExperimentalDependencyDotFileAfterEveryImport),
     ExperimentalDependenciesIncludeIntrafileOnes(
       ExperimentalDependenciesIncludeIntrafileOnes),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
-      
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+    CompareIncrementalSchemes(CompareIncrementalSchemes) {
 };
 // clang-format on
 
@@ -623,12 +624,20 @@ namespace driver {
       }
 
       SmallVector<const Job *, 16> Dependents;
-      if (!Comp.getUseSourceRangeDependencies())
-        Dependents = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
-      else {
+      if (!Comp.getUseSourceRangeDependencies()) {
+        if (!Comp.CompareIncrementalSchemes)
+          Dependents = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
+        else {
+          SmallVector<const Job *, 16> DependentsForDeps;
+          std::tie(Dependents, DependentsForDeps) =
+              subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
+          Dependents = DependentsForDeps;
+        }
+      } else {
         SmallVector<const Job *, 16> DependentsForDeps;
         std::tie(Dependents, DependentsForDeps) =
             subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
+
         // Will reload again, sigh
         if (Comp.getShowIncrementalBuildDecisions() &&
             (!DependentsForDeps.empty() || !Dependents.empty())) {
@@ -732,6 +741,8 @@ namespace driver {
       return Dependents;
     }
 
+    // Returns a pair of jobs needed when using ranges, and jobs needed
+    // when using dependencies.
     std::pair<SmallVector<const Job *, 16>, SmallVector<const Job *, 16>>
     subsequentJobsNeededForRanges(const Job *FinishedCmd,
                                   const int ReturnCode) {
@@ -744,19 +755,25 @@ namespace driver {
              "only implementing this for those");
       const size_t topsBefore = countTopLevelProvides(FinishedCmd);
 
-      SmallVector<const Job *, 16> Dependents;
-      reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
+      SmallVector<const Job *, 16> jobsForDependencies;
+      reloadAndRemarkDeps(FinishedCmd, ReturnCode, jobsForDependencies);
 
       const size_t topsAfter = countTopLevelProvides(FinishedCmd);
-
-      if (topsAfter <= topsBefore)
-        return {{}, Dependents};
+      const bool fallBack = topsAfter > topsBefore;
 
       // TODO: instead of scheduling *all* the jobs, could figure out
       // which ones use the introduced top-level names and only schedule those.
       // However, as it stands, the caller will fall back to the old
       // dependency scheme in this case anyway.
-      return {Dependents, Dependents};
+      SmallVector<const Job *, 16> jobsForRanges =
+          fallBack ? jobsForDependencies : SmallVector<const Job *, 16>();
+
+      if (fallBack)
+        Comp.setFallingBackForComparison();
+
+      Comp.updateJobsForComparison(jobsForDependencies, jobsForRanges);
+
+      return {jobsForRanges, jobsForDependencies};
     }
 
     size_t countTopLevelProvides(const Job *Cmd) {
@@ -879,8 +896,25 @@ namespace driver {
       auto compileJobsToScheduleViaDependencies =
           computeDependenciesAndGetNeededCompileJobs(DepGraph);
 
-      if (!Comp.getEnableSourceRangeDependencies())
+      if (!Comp.getEnableSourceRangeDependencies()) {
+        if (Comp.CompareIncrementalSchemes) {
+#error factor
+          auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
+          auto &compileJobsToScheduleViaSourceRanges = jobs.first;
+          auto &jobsLackingSupplementaryOutputs = jobs.second;
+
+          const StringRef whyFallingBack =
+              reasonToFallBack(compileJobsToScheduleViaDependencies.size(),
+                               compileJobsToScheduleViaSourceRanges.size(),
+                               jobsLackingSupplementaryOutputs.size());
+
+          Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
+                                       compileJobsToScheduleViaSourceRanges);
+          if (!whyFallingBack.empty())
+            Comp.setFallingBackForComparison();
+        }
         return compileJobsToScheduleViaDependencies;
+      }
 
       auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
       auto &compileJobsToScheduleViaSourceRanges = jobs.first;
@@ -895,8 +929,11 @@ namespace driver {
         Comp.setUseSourceRangeDependencies(true);
         if (Comp.getShowIncrementalBuildDecisions())
           llvm::outs() << "Using ranges\n";
+        Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
+                                     compileJobsToScheduleViaSourceRanges);
         return compileJobsToScheduleViaSourceRanges;
       }
+      Comp.setFallingBackForComparison();
       Comp.setUseSourceRangeDependencies(false);
       // Even if dependencies would not schedule these, we want them to run
       // to create the supplementary outputs for next time.
@@ -916,9 +953,7 @@ namespace driver {
 
       // Unless the source-range scheme would compile every file,
       // it's likely a better bet.
-      const size_t inputCount = Comp.getInputFiles().size();
-
-      if (rangeCount < inputCount)
+      if (rangeCount < Comp.countSwiftInputs())
         return StringRef();
 
       (void)depCount; // Will likely compile more than this anyway
@@ -1855,6 +1890,8 @@ int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   bool abnormalExit;
   int result = performJobsImpl(abnormalExit, std::move(TQ));
 
+  printComparision();
+
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
       if (!abnormalExit || pathPair.getValue() == PreserveOnSignal::No)
@@ -1885,4 +1922,39 @@ const char *Compilation::getAllSourcesPath() const {
     mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
   }
   return AllSourceFilesPath;
+}
+
+template <typename DepJobsT, typename RangeJobsT>
+void Compilation::updateJobsForComparison(const DepJobsT &depJobs,
+                                          const RangeJobsT &rangeJobs) {
+  for (const auto *cmd : depJobs)
+    DependencyCompileJobs.insert(cmd);
+  if (SourceRangeCompileJobs)
+    for (const auto *cmd : rangeJobs)
+      SourceRangeCompileJobs->insert(cmd);
+}
+
+void Compilation::setFallingBackForComparison() {
+  SourceRangeCompileJobs = None;
+}
+
+void Compilation::printComparision() const {
+  if (!CompareIncrementalSchemes)
+    return;
+  if (SourceRangeCompileJobs)
+    llvm::outs() << "*** Comparing deps: " << DependencyCompileJobs.size()
+                 << ", ranges: " << SourceRangeCompileJobs->size()
+                 << ", total: " << countSwiftInputs() << " ***\n";
+  else
+    llvm::outs() << "*** Comparing moot: would fall back and run "
+                 << DependencyCompileJobs.size()
+                 << ", total: " << countSwiftInputs() << " ***\n";
+}
+
+unsigned Compilation::countSwiftInputs() const {
+  unsigned inputCount = 0;
+  for (const auto &p : InputFilesWithTypes)
+    if (p.first == file_types::TY_Swift)
+      ++inputCount;
+  return inputCount;
 }

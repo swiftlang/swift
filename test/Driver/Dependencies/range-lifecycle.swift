@@ -20,9 +20,9 @@
 // Ensure that the extra outputs are not generated when they should not be:
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t
-// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output1
+// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output0
 
-// RUN: %FileCheck -check-prefix=CHECK-NO-BUILD-REC %s < %t/output1
+// RUN: %FileCheck -check-prefix=CHECK-NO-BUILD-REC %s < %t/output0
 // CHECK-NO-BUILD-REC: Incremental compilation could not read build record.
 
 // RUN: ls %t | %FileCheck -check-prefix=CHECK-NO-RANGE-OUTPUTS %s
@@ -32,9 +32,34 @@
 // CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
 // CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
 
-// RUN: %FileCheck -check-prefix=CHECK-HAS-BATCHES %s < %t/output1
+// RUN: %FileCheck -check-prefix=CHECK-HAS-BATCHES %s < %t/output0
 
 // CHECK-HAS-BATCHES: Batchable: {compile:
+
+// RUN: %t/main | tee run0 | grep Any > /dev/null && rm %t/main
+
+// =============================================================================
+// Again, build without range dependencies to simulate the transition to turning
+// them on, with -driver-compare-incremental-schemes
+// =============================================================================
+
+
+// Copy in the inputs.
+// The lack of a build record or swiftdeps files should disable incremental compilation
+
+
+// Ensure that the extra outputs are not generated when they should not be:
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/range-lifecycle/* %t
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output1
+
+// RUN: %FileCheck -check-prefix=CHECK-NO-BUILD-REC %s < %t/output1
+
+// RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES %s < %t/output1
+// CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
+
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output1
+// CHECK-COMPARE-MOOT-3: *** Comparing moot: would fall back and run 3, total: 3 ***
 
 // RUN: %t/main | tee run1 | grep Any > /dev/null && rm %t/main
 
@@ -43,11 +68,10 @@
 // Now, do it again with range dependencies enabled:
 // =============================================================================
 
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output2
 
-// CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
 
 // RUN: %FileCheck -check-prefix=CHECK-TURN-ON-RANGES %s < %t/output2
 
@@ -55,6 +79,9 @@
 // CHECK-TURN-ON-RANGES-DAG: Added to TaskQueue: {compile: main.o <= main.swift}
 // CHECK-TURN-ON-RANGES-DAG: Added to TaskQueue: {compile: fileA.o <= fileA.swift}
 // CHECK-TURN-ON-RANGES-DAG: Added to TaskQueue: {compile: fileB.o <= fileB.swift}
+
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/output2
+// CHECK-COMPARE-0-0-3: *** Comparing deps: 0, ranges: 0, total: 3 ***
 
 // RUN: cmp main.swift main.compiledsource
 // RUN: cmp fileA.swift fileA.compiledsource
@@ -95,6 +122,8 @@
 // CHECK-FILEB-RANGES-1:  - { start: { line: 5, column: 50 }, end: { line: 5, column: 67 } }
 // CHECK-FILEB-RANGES-1: ...
 
+
+
 // RUN: %t/main | tee run2 | grep Any > /dev/null && rm %t/main
 
 // =============================================================================
@@ -102,9 +131,10 @@
 // =============================================================================
 
 
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output3
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/output3
 
 // RUN: %FileCheck -check-prefix=CHECK-INCREMENTAL-ENABLED %s < %t/output3
 // CHECK-INCREMENTAL-ENABLED-NOT: Incremental compilation has been disabled
@@ -122,11 +152,14 @@
 
 
 // RUN: cp %t/fileB2.swift %t/fileB.swift
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output4
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output4
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output4
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEB-ONLY %s < %t/output4
+
+// RUN: %FileCheck -check-prefix=COMPARE-2-1-3 %s < %t/output4
+// COMPARE-2-1-3: *** Comparing deps: 2, ranges: 1, total: 3 ***
 
 // CHECK-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
 // CHECK-FILEB-ONLY-NOT: Queuing{{.*}}<= fileA.swift
@@ -146,11 +179,15 @@
 // =============================================================================
 
 // RUN: cp %t/fileB3.swift %t/fileB.swift
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental -driver-dump-compiled-source-diffs >& %t/output5
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental -driver-dump-compiled-source-diffs >& %t/output5
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output5
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEA-AND-FILEB-ONLY %s < %t/output5
+
+// RUN: %FileCheck -check-prefix=COMPARE-2-2-3 %s < %t/output5
+// COMPARE-2-2-3: *** Comparing deps: 2, ranges: 2, total: 3 ***
+
 
 // CHECK-FILEA-AND-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
 
@@ -182,11 +219,15 @@
 // =============================================================================
 
 // RUN: cp %t/fileB4.swift %t/fileB.swift
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output6
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output6
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output6
 
 // RUN: %FileCheck -check-prefix=CHECK-INITIALLY-ABSENT-MAIN %s < %t/output6
+
+// RUN: %FileCheck -check-prefix=COMPARE-3-4-3 %s < %t/output6
+//COMPARE-3-4-3-NOT: *** Comparing deps: 3, ranges: 4, total: 3 ***
+
 
 // CHECK-INITIALLY-ABSENT-MAIN-NOT: Queueing{{.*}}<= main.swift
 
@@ -213,7 +254,7 @@
 // What happens when a new file is added?
 // =============================================================================
 
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift ./fileC.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output7
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift ./fileC.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output7
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output7
 
@@ -246,7 +287,7 @@
 // How about removing a file?
 // =============================================================================
 
-// RUN: cd %t && %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output8
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output8
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEC-REMOVED %s < %t/output8
 
@@ -263,13 +304,13 @@
 // =============================================================================
 
 // RUN: cp %t/fileB5.swift %t/fileB.swift
-// RUN: cd %t && not %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output9
+// RUN: cd %t && not %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output9
 
 // =============================================================================
 // And a fix:
 // =============================================================================
 
 // RUN: cp %t/fileB4.swift %t/fileB.swift
-// RUN: cd %t &&  %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output10
+// RUN: cd %t &&  %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output10
 
 // RUN: %t/main | tee run8 | grep SignedInteger > /dev/null && rm %t/main
