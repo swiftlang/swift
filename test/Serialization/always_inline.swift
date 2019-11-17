@@ -8,9 +8,9 @@
 
 import def_always_inline
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
+// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] [ossa] @$s17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] [ossa] @$s17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 
 // SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = global_addr @$s13always_inline3rawSbvp : $*Bool
