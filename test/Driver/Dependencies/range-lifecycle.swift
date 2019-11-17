@@ -250,12 +250,26 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEC-REMOVED %s < %t/output8
 
-
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output8
-
 
 // CHECK-FILEC-REMOVED: Incremental compilation has been disabled, because the following inputs were used in the previous compilation, but not in the current compilation:
 // CHECK-FILEC-REMOVED-NEXT: ./fileC.swift
 
 // RUN: %t/main | tee run8 | grep SignedInteger > /dev/null && rm %t/main
 
+
+// =============================================================================
+// How about an error?
+// =============================================================================
+
+// RUN: cp %t/fileB5.swift %t/fileB.swift
+// RUN: cd %t && not %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output9
+
+// =============================================================================
+// And a fix:
+// =============================================================================
+
+// RUN: cp %t/fileB4.swift %t/fileB.swift
+// RUN: cd %t &&  %swiftc_driver -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output10
+
+// RUN: %t/main | tee run8 | grep SignedInteger > /dev/null && rm %t/main
