@@ -100,7 +100,8 @@ enum Voluntary<T> : Equatable {
       ()
 
     case .Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
-         .Twain(_), // expected-warning {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+         .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
+                    // expected-note@-25 {{'Twain' declared here}}
          .Twain(_, _),
          .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
       ()
@@ -143,7 +144,8 @@ case Voluntary<Int>.Mere,
      .Mere(_):
   ()
 case .Twain,
-     .Twain(_), // expected-warning {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+     .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
+                // expected-note@-69 {{'Twain' declared here}}
      .Twain(_, _),
      .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int)'}}
   ()
