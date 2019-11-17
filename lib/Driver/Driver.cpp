@@ -1743,12 +1743,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
     return OutputInfo::Mode::SingleCompile;
   }
 
-  if (ArgRequiringSinglePrimaryCompile && BatchModeOut) {
-    BatchModeOut = false;
-    Diags.diagnose(
-        SourceLoc(), diag::warn_ignoring_batch_mode,
-        ArgRequiringSinglePrimaryCompile->getOption().getPrefixedName());
-  }
   return OutputInfo::Mode::StandardCompile;
 }
 
