@@ -25,6 +25,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-NO-BUILD-REC %s < %t/output0
 // CHECK-NO-BUILD-REC: Incremental compilation could not read build record.
 
+
 // RUN: ls %t | %FileCheck -check-prefix=CHECK-NO-RANGE-OUTPUTS %s
 // CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
 // CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
@@ -58,8 +59,8 @@
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES %s < %t/output1
 // CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output1
-// CHECK-COMPARE-MOOT-3: *** Comparing moot: would fall back and run 3, total: 3 ***
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output1
+// CHECK-COMPARE-DISABLED: *** Comparing incremental strategies is moot: incremental compilation disabled ***
 
 // RUN: %t/main | tee run1 | grep Any > /dev/null && rm %t/main
 
@@ -73,7 +74,6 @@
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output2
 
 // RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output2
-// CHECK-COMPARE-DISABLED: *** Comparing moot; incremental compilation disabled
 
 // RUN: %FileCheck -check-prefix=CHECK-TURN-ON-RANGES %s < %t/output2
 
@@ -228,7 +228,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-INITIALLY-ABSENT-MAIN %s < %t/output6
 
 // RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output6
-
+// CHECK-COMPARE-MOOT-3: *** Comparing incremental strategies is moot: would fall back and run 3, total: 3 ***
 
 // CHECK-INITIALLY-ABSENT-MAIN-NOT: Queueing{{.*}}<= main.swift
 
@@ -260,7 +260,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output7
 
 // RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-4-4 %s < %t/output7
-// CHECK-COMPARE-MOOT-4-4: *** Comparing moot: would fall back and run 4, total: 4 ***
+// CHECK-COMPARE-MOOT-4-4: *** Comparing incremental strategies is moot: would fall back and run 4, total: 4 ***
 
 // RUN: cmp fileB.swift fileB.compiledsource
 
@@ -312,6 +312,10 @@
 // RUN: cp %t/fileB5.swift %t/fileB.swift
 // RUN: cd %t && not %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output9
 
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output9
+// RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output9
+
+
 // =============================================================================
 // And a fix:
 // =============================================================================
@@ -319,4 +323,9 @@
 // RUN: cp %t/fileB4.swift %t/fileB.swift
 // RUN: cd %t &&  %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output10
 
-// RUN: %t/main | tee run8 | grep SignedInteger > /dev/null && rm %t/main
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output10
+// RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output10
+
+
+
+// RUN: %t/main | tee run10 | grep SignedInteger > /dev/null && rm %t/main
