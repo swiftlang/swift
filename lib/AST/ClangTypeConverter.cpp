@@ -26,6 +26,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
@@ -460,7 +461,10 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   if (type->getDecl()->isOptionalDecl()) {
     auto args = type->getGenericArgs();
     assert((args.size() == 1) && "Optional should have 1 generic argument.");
-    return convert(args[0]);
+    clang::QualType innerTy = convert(args[0]);
+    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()))
+      return innerTy;
+    return clang::QualType();
   }
 
   auto swiftStructDecl = type->getDecl();

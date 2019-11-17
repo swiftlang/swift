@@ -34,6 +34,7 @@ add_swift_host_library(swiftAST STATIC
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
+  ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
