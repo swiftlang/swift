@@ -259,7 +259,7 @@ foreach(SDK ${SWIFT_SDKS})
           TIMEOUT 1 # second
           ERROR_QUIET)
       if(NOT python_psutil_status)
-        list(APPEND LIT_ARGS "--timeout=3000") # 50 minutes
+        list(APPEND LIT_ARGS "--timeout=6000") # 100 minutes
       endif()
 
       list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
