@@ -6078,16 +6078,15 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
   AbstractionPattern origFnType(substFnType);
   auto fnType =
       getLoweredType(origFnType, substFnType).castTo<SILFunctionType>();
-  
+
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
-  ArgEmitter emitter(
-      *this, fnType->getRepresentation(),
-      /*yield*/ false,
-      /*isForCoroutine*/ false,
-      ClaimedParamsRef(fnType, fnType->getParameters()), argValues,
-      delayedArgs,
-      /*foreign error*/ None, ImportAsMemberStatus());
+  ArgEmitter emitter(*this, fnType->getRepresentation(),
+                     /*yield*/ false,
+                     /*isForCoroutine*/ false,
+                     ClaimedParamsRef(fnType, fnType->getParameters()),
+                     argValues, delayedArgs,
+                     /*foreign error*/ None, ImportAsMemberStatus());
 
   auto prepared =
       prepareSubscriptIndices(subscript, subs,
