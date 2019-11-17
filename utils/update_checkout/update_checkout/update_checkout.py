@@ -11,7 +11,6 @@
 from __future__ import print_function
 
 import argparse
-import errno
 import json
 import os
 import platform
