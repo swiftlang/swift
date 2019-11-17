@@ -1302,7 +1302,7 @@ namespace {
     {
     }
 
-    bool hasPropertyWrapper() const {
+    bool canRewriteSetAsPropertyWrapperInit() const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
         // If this is not a wrapper property that can be initialized from
         // a value of the wrapped type, we can't perform the initialization.
@@ -1396,9 +1396,8 @@ namespace {
       assert(getAccessorDecl()->isSetter());
       SILDeclRef setter = Accessor;
 
-      if (IsOnSelfParameter &&
+      if (IsOnSelfParameter && canRewriteSetAsPropertyWrapperInit() &&
           !Storage->isStatic() &&
-          hasPropertyWrapper() &&
           isBackingVarVisible(cast<VarDecl>(Storage),
                               SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
@@ -4301,7 +4300,7 @@ static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
   }
 
   auto &setterComponent = static_cast<GetterSetterComponent&>(component);
-  if (setterComponent.hasPropertyWrapper())
+  if (setterComponent.canRewriteSetAsPropertyWrapperInit())
     return false;
   setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),
                                        std::move(src));
