@@ -228,10 +228,10 @@ struct UseLazy<T: DefaultInit> {
   @Lazy var bar = T()
   @Lazy var wibble = [1, 2, 3]
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSi_xSaySiGtcfC : $@convention(method) <T where T : DefaultInit> (Int, @in T, @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV3fooSivpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (Int) -> @owned Lazy<Int>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@in τ_0_0) -> @out Lazy<τ_0_0>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV6wibbleSaySiGvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned Array<Int>) -> @owned Lazy<Array<Int>>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSiyXA_xyXASaySiGyXAtcfC : $@convention(method) <T where T : DefaultInit> (@owned @callee_guaranteed () -> Int, @owned @callee_guaranteed () -> @out T, @owned @callee_guaranteed () -> @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3fooSivpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> Int) -> @owned Lazy<Int>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> @out τ_0_0) -> @out Lazy<τ_0_0>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV6wibbleSaySiGvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned @callee_guaranteed () -> @owned Array<Int>) -> @owned Lazy<Array<Int>>
 }
 
 struct X { }
@@ -483,8 +483,7 @@ struct Inner<Value> {
 struct ComposedInit {
   @Outer @Inner var value: Int
 
-  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12ComposedInitV5valueSivpfP : $@convention(thin) (Int) -> Outer<Inner<Int>> {
-  // CHECK: function_ref @$s17property_wrappers12ComposedInitV6_value33_F728088E0028E14D18C6A10CF68512E8LLAA5OuterVyAA5InnerVySiGGvpfiSiycfu_
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12ComposedInitV5valueSivpfP : $@convention(thin) (@owned @callee_guaranteed () -> Int) -> Outer<Inner<Int>> {
   // CHECK: function_ref @$s17property_wrappers5InnerV12wrappedValue1dACyxGxyXA_SdtcfcfA0_
   // CHECK: function_ref @$s17property_wrappers5InnerV12wrappedValue1dACyxGxyXA_SdtcfC
   // CHECK: function_ref @$s17property_wrappers5OuterV1a12wrappedValue1sACyxGSi_xSStcfcfA_
