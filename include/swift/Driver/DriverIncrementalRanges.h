@@ -109,6 +109,7 @@ public:
   static bool shouldScheduleCompileJob(
       const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
       const driver::Job *, function_ref<void(Twine)>);
+
 private:
   static Optional<bool> isFileNewerThan(StringRef lhs, StringRef rhs,
                                         DiagnosticEngine&);

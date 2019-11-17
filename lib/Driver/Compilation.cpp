@@ -875,34 +875,44 @@ namespace driver {
     void scheduleFirstRoundJobsForIncrementalCompilation(
         DependencyGraphT &DepGraph) {
 
-      llvm::SmallPtrSet<const Job*, 16> compileJobsToSchedule;
-      for (const Job *Cmd: computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph))
+      llvm::SmallPtrSet<const Job *, 16> compileJobsToSchedule;
+      for (const Job *Cmd :
+           computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph))
         compileJobsToSchedule.insert(Cmd);
       for (const Job *Cmd : Comp.getJobs()) {
-        if (Cmd->getFirstSwiftPrimaryInput().empty() || compileJobsToSchedule.count(Cmd))
+        if (Cmd->getFirstSwiftPrimaryInput().empty() ||
+            compileJobsToSchedule.count(Cmd))
           scheduleCommandIfNecessaryAndPossible(Cmd);
         else
           DeferredCommands.insert(Cmd);
       }
     }
 
-    /// Figure out the best strategy and return those jobs. May return duplicates.
+    /// Figure out the best strategy and return those jobs. May return
+    /// duplicates.
     template <typename DependencyGraphT>
-    llvm::SmallVector<const Job*, 16>
-    computeFirstRoundCompileJobsForIncrementalCompilation(DependencyGraphT &DepGraph) {
+    llvm::SmallVector<const Job *, 16>
+    computeFirstRoundCompileJobsForIncrementalCompilation(
+        DependencyGraphT &DepGraph) {
       auto compileJobsToScheduleViaDependencies =
           computeDependenciesAndGetNeededCompileJobs(DepGraph);
 
-      const bool mustConsultRanges = Comp.getEnableSourceRangeDependencies() || Comp.CompareIncrementalSchemes;
+      const bool mustConsultRanges = Comp.getEnableSourceRangeDependencies() ||
+                                     Comp.CompareIncrementalSchemes;
 
       if (!mustConsultRanges)
-      return compileJobsToScheduleViaDependencies;
+        return compileJobsToScheduleViaDependencies;
 
       auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
-      llvm::SmallVector<const Job *, 16> &compileJobsToScheduleViaSourceRanges = jobs.first;
-      llvm::SmallVector<const Job *, 16> &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
+      llvm::SmallVector<const Job *, 16> &compileJobsToScheduleViaSourceRanges =
+          jobs.first;
+      llvm::SmallVector<const Job *, 16>
+          &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
 
-      const bool shouldFallBack = decideAndExplainWhetherToFallBackToDependencies(compileJobsToScheduleViaSourceRanges, jobsLackingSourceRangeSupplementaryOutputs);
+      const bool shouldFallBack =
+          decideAndExplainWhetherToFallBackToDependencies(
+              compileJobsToScheduleViaSourceRanges,
+              jobsLackingSourceRangeSupplementaryOutputs);
 
       Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
                                    compileJobsToScheduleViaSourceRanges);
@@ -910,7 +920,7 @@ namespace driver {
         Comp.setFallingBackForComparison();
 
       if (!Comp.getEnableSourceRangeDependencies())
-         return compileJobsToScheduleViaDependencies;
+        return compileJobsToScheduleViaDependencies;
 
       Comp.setUseSourceRangeDependencies(!shouldFallBack);
 
@@ -920,25 +930,32 @@ namespace driver {
         for (const Job *Cmd : jobsLackingSourceRangeSupplementaryOutputs)
           compileJobsToScheduleViaDependencies.push_back(Cmd);
       }
-      return shouldFallBack ? compileJobsToScheduleViaDependencies : compileJobsToScheduleViaSourceRanges;
+      return shouldFallBack ? compileJobsToScheduleViaDependencies
+                            : compileJobsToScheduleViaSourceRanges;
     }
 
-    bool decideAndExplainWhetherToFallBackToDependencies(llvm::SmallVector<const Job *, 16> &compileJobsToScheduleViaSourceRanges,
-    const llvm::SmallVector<const Job *, 16> &jobsLackingSourceRangeSupplementaryOutputs) {
+    bool decideAndExplainWhetherToFallBackToDependencies(
+        llvm::SmallVector<const Job *, 16>
+            &compileJobsToScheduleViaSourceRanges,
+        const llvm::SmallVector<const Job *, 16>
+            &jobsLackingSourceRangeSupplementaryOutputs) {
       if (!jobsLackingSourceRangeSupplementaryOutputs.empty()) {
         if (Comp.getShowIncrementalBuildDecisions()) {
-          llvm::outs() << "Using dependencies: At least one input ('"
-          <<   llvm::sys::path::filename(jobsLackingSourceRangeSupplementaryOutputs.front()->getFirstSwiftPrimaryInput())
-          << "') lacks a supplementary output needed for the source "
-          "range strategy.\n Maybe dependencies can do better than "
-          "recompiling every file.\n";
+          llvm::outs()
+              << "Using dependencies: At least one input ('"
+              << llvm::sys::path::filename(
+                     jobsLackingSourceRangeSupplementaryOutputs.front()
+                         ->getFirstSwiftPrimaryInput())
+              << "') lacks a supplementary output needed for the source "
+                 "range strategy.\n Maybe dependencies can do better than "
+                 "recompiling every file.\n";
         }
         return true;
-       }
+      }
       // Unless the source-range scheme would compile every file,
       // it's likely a better bet.
-      llvm::SmallPtrSet<const Job*, 16> uniqueJobs;
-      for (const auto* J: compileJobsToScheduleViaSourceRanges)
+      llvm::SmallPtrSet<const Job *, 16> uniqueJobs;
+      for (const auto *J : compileJobsToScheduleViaSourceRanges)
         uniqueJobs.insert(J);
       if (uniqueJobs.size() < Comp.countSwiftInputs()) {
         if (Comp.getShowIncrementalBuildDecisions())
@@ -946,11 +963,11 @@ namespace driver {
         return false;
       }
       if (Comp.getShowIncrementalBuildDecisions())
-        llvm::outs() << "Using dependencies: Range strategy would compile every input; dependencies cannot be "
-        "any worse.";
+        llvm::outs() << "Using dependencies: Range strategy would compile "
+                        "every input; dependencies cannot be "
+                        "any worse.";
       return true;
     }
-
 
     /// Return both the jobs to compile if using ranges, and also any jobs that
     /// must be compiled to use ranges in the future (because they were lacking
@@ -966,7 +983,7 @@ namespace driver {
       const bool dumpCompiledSourceDiffs =
           Comp.getArgs().hasArg(options::OPT_driver_dump_compiled_source_diffs);
 
-       const auto allSourceRangeInfo =
+      const auto allSourceRangeInfo =
           incremental_ranges::SourceRangeBasedInfo::loadAllInfo(Comp);
 
       incremental_ranges::SourceRangeBasedInfo::dumpAllInfo(
@@ -978,21 +995,21 @@ namespace driver {
       // load dependencies for external dependencies and interfacehashes
 
       llvm::SmallVector<const Job *, 16> neededJobs;
-      for (const Job *Cmd: Comp.getJobs()) {
-      if ( SourceRangeBasedInfo::shouldScheduleCompileJob(
-                allSourceRangeInfo, Cmd, [&](Twine why) { noteBuilding(Cmd, true, why.str()); }))
-        neededJobs.push_back(Cmd);
+      for (const Job *Cmd : Comp.getJobs()) {
+        if (SourceRangeBasedInfo::shouldScheduleCompileJob(
+                allSourceRangeInfo, Cmd,
+                [&](Twine why) { noteBuilding(Cmd, true, why.str()); }))
+          neededJobs.push_back(Cmd);
       }
 
       llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
-      for (const Job* Cmd: Comp.getJobs()) {
+      for (const Job *Cmd : Comp.getJobs()) {
         auto pri = Cmd->getFirstSwiftPrimaryInput();
         if (pri.empty() || allSourceRangeInfo.count(pri))
           continue;
-        noteBuilding(
-                     Cmd,
-                     true,
-                     "to create source-range and compiled-source files for the next time when falling back from source-ranges");
+        noteBuilding(Cmd, true,
+                     "to create source-range and compiled-source files for the "
+                     "next time when falling back from source-ranges");
         jobsLackingSupplementaryOutputs.push_back(Cmd);
       }
 
@@ -1941,13 +1958,15 @@ void Compilation::printComparision() const {
   if (!CompareIncrementalSchemes)
     return;
   if (!getIncrementalBuildEnabled())
-    llvm::outs() << "*** Comparing incremental strategies is moot: incremental compilation disabled ***\n";
+    llvm::outs() << "*** Comparing incremental strategies is moot: incremental "
+                    "compilation disabled ***\n";
   else if (SourceRangeCompileJobs)
     llvm::outs() << "*** Comparing deps: " << DependencyCompileJobs.size()
                  << ", ranges: " << SourceRangeCompileJobs->size()
                  << ", total: " << countSwiftInputs() << " ***\n";
   else
-    llvm::outs() << "*** Comparing incremental strategies is moot: would fall back and run "
+    llvm::outs() << "*** Comparing incremental strategies is moot: would fall "
+                    "back and run "
                  << DependencyCompileJobs.size()
                  << ", total: " << countSwiftInputs() << " ***\n";
 }
