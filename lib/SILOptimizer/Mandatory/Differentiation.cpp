@@ -92,9 +92,36 @@ static bool isArrayLiteralIntrinsic(ApplyInst *ai) {
 }
 
 static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
-  if (auto *applyInst = dyn_cast<ApplyInst>(v))
-    if (isArrayLiteralIntrinsic(applyInst))
-      return applyInst;
+  if (auto *ai = dyn_cast<ApplyInst>(v))
+    if (isArrayLiteralIntrinsic(ai))
+      return ai;
+  return nullptr;
+}
+
+/// Given an element address from an `array.uninitialized_intrinsic` `apply`
+/// instruction, returns the `apply` instruction. The element address is either
+/// a `pointer_to_address` or `index_addr` instruction to the `RawPointer`
+/// result of the instrinsic:
+///
+///     %result = apply %array.uninitialized_intrinsic : $(Array<T>, RawPointer)
+///     (%array, %ptr) = destructure_tuple %result
+///     %elt0 = pointer_to_address %ptr to $*T       // element address
+///     %index_1 = integer_literal $Builtin.Word, 1
+///     %elt1 = index_addr %elt0, %index_1           // element address
+///     ...
+static ApplyInst *
+getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
+  // Find the `pointer_to_address` result, peering through `index_addr`.
+  auto *ptai = dyn_cast<PointerToAddressInst>(v);
+  if (auto *iai = dyn_cast<IndexAddrInst>(v))
+    ptai = dyn_cast<PointerToAddressInst>(iai->getOperand(0));
+  if (!ptai)
+    return nullptr;
+  // Return the `array.uninitialized_intrinsic` application, if it exists.
+  if (auto *dti = dyn_cast<DestructureTupleInst>(
+          ptai->getOperand()->getDefiningInstruction()))
+    if (auto *ai = getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
+      return ai;
   return nullptr;
 }
 
@@ -1644,12 +1671,19 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
       [&](SILValue val) { return activityInfo.isActive(val, indices); });
   if (hasActiveOperands && hasActiveResults)
     return true;
-  // A `store`-like instruction does not have an SSA result, but has two
+  // `store`-like instructions do not have an SSA result, but have two
   // operands that represent the source and the destination. We treat them as
   // the input and the output, respectively.
-#define CHECK_INST_TYPE_ACTIVE_DEST(INST) \
-  if (auto *castInst = dyn_cast<INST##Inst>(inst)) \
-    return activityInfo.isActive(castInst->getDest(), indices);
+  // For `store`-like instructions whose destination is an element address from
+  // an `array.uninitialized_intrinsic` application, return true if the
+  // intrinsic application (representing the semantic destination) is active.
+#define CHECK_INST_TYPE_ACTIVE_DEST(INST)                                      \
+  if (auto *castInst = dyn_cast<INST##Inst>(inst)) {                           \
+    if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(       \
+            castInst->getDest()))                                              \
+      return activityInfo.isActive(ai, indices);                               \
+    return activityInfo.isActive(castInst->getDest(), indices);                \
+  }
   CHECK_INST_TYPE_ACTIVE_DEST(Store)
   CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
   CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
@@ -6759,145 +6793,144 @@ public:
     errorOccurred = true;
   }
 
-  AllocStackInst *
-  emitArrayTangentSubscript(ApplyInst *ai, SILType eltType,
-                            SILValue adjointArray, SILValue fnRef,
-                            CanGenericSignature genericSig, int index) {
+  /// Given an array adjoint value, array element index and element tangent
+  /// type, returns an `alloc_stack` containing the array element adjoint value.
+  AllocStackInst *getArrayAdjointElementBuffer(SILValue arrayAdjoint,
+                                               int eltIndex, SILType eltTanType,
+                                               SILLocation loc) {
+    // Get `function_ref` and generic signature of
+    // `Array.TangentVector.subscript.getter`.
+    auto arrayTanType = arrayAdjoint->getType().getASTType();
+    auto *arrayTanStructDecl = arrayTanType->getStructOrBoundGenericStruct();
+    auto subscriptLookup =
+        arrayTanStructDecl->lookupDirect(DeclBaseName::createSubscript());
+    auto *subscriptDecl = cast<SubscriptDecl>(subscriptLookup.front());
+    auto *subscriptGetterDecl = subscriptDecl->getAccessor(AccessorKind::Get);
+    assert(subscriptGetterDecl && "No `Array.TangentVector.subscript` getter");
+    SILOptFunctionBuilder fb(getContext().getTransform());
+    auto *subscriptGetterFn = fb.getOrCreateFunction(
+        loc, SILDeclRef(subscriptGetterDecl), NotForDefinition);
+    // %subscript_fn = function_ref @Array.TangentVector<T>.subscript.getter
+    auto *subscriptFnRef = builder.createFunctionRef(loc, subscriptGetterFn);
+    auto subscriptFnGenSig =
+        subscriptGetterFn->getLoweredFunctionType()->getSubstGenericSignature();
+    // Apply `Array.TangentVector.subscript.getter` to get array element adjoint
+    // buffer.
     auto &ctx = builder.getASTContext();
-    auto astType = eltType.getASTType();
-    auto literal = builder.createIntegerLiteral(
-        ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
+    auto eltTanAstType = eltTanType.getASTType();
+    // %index_literal = integer_literal $Builtin.Int64, <index>
+    auto *eltIndexLiteral = builder.createIntegerLiteral(
+        loc, SILType::getBuiltinIntegerType(64, ctx), eltIndex);
     auto intType = SILType::getPrimitiveObjectType(
         ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
-    auto intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
-    AllocStackInst *subscriptBuffer =
-        builder.createAllocStack(ai->getLoc(), eltType);
-    auto swiftModule = getModule().getSwiftModule();
-    auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-    auto diffConf = swiftModule->lookupConformance(astType, diffProto);
+    // %index_int = struct $Int (%index_literal)
+    auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
+    auto *swiftModule = getModule().getSwiftModule();
+    auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+    auto diffConf = swiftModule->lookupConformance(eltTanAstType, diffProto);
     assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
-    auto addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-    auto addArithConf = swiftModule->lookupConformance(astType, addArithProto);
+    auto *addArithProto =
+        ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+    auto addArithConf =
+        swiftModule->lookupConformance(eltTanAstType, addArithProto);
     assert(!addArithConf.isInvalid() &&
            "Missing conformance to `AdditiveArithmetic`");
-    auto subMap =
-        SubstitutionMap::get(genericSig, {astType}, {addArithConf, diffConf});
-    builder.createApply(ai->getLoc(), fnRef, subMap,
-                        {subscriptBuffer, intStruct, adjointArray});
-    return subscriptBuffer;
+    auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanAstType},
+                                       {addArithConf, diffConf});
+    // %elt_adj = alloc_stack $T.TangentVector
+    auto *eltAdjBuffer = builder.createAllocStack(loc, eltTanType);
+    // apply %subscript_fn<T.TangentVector>(%elt_adj, %index_int, %array_adj)
+    builder.createApply(loc, subscriptFnRef, subMap,
+                        {eltAdjBuffer, eltIndexInt, arrayAdjoint});
+    return eltAdjBuffer;
   }
 
-  void accumulateArrayTangentSubscriptDirect(ApplyInst *ai, SILType eltType,
-                                             StoreInst *si,
-                                             AllocStackInst *subscriptBuffer) {
-    auto newAdjValue = builder.emitLoadValueOperation(
-        ai->getLoc(), subscriptBuffer, LoadOwnershipQualifier::Take);
-    recordTemporary(newAdjValue);
+  /// Accumulate array element adjoint buffer into `store` source.
+  void accumulateArrayElementAdjointDirect(StoreInst *si,
+                                           AllocStackInst *eltAdjBuffer) {
+    auto eltAdjValue = builder.emitLoadValueOperation(
+        si->getLoc(), eltAdjBuffer, LoadOwnershipQualifier::Take);
+    recordTemporary(eltAdjValue);
     SILValue src = si->getSrc();
     // When the store's source is a `copy_value`, the `copy_value` is part of
     // array literal initialization. In this case, add the adjoint to the source
     // of the copy directly.
     if (auto *cvi = dyn_cast<CopyValueInst>(src))
       src = cvi->getOperand();
-    addAdjointValue(si->getParent(), src,
-                    makeConcreteAdjointValue(newAdjValue), si->getLoc());
-    builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
+    addAdjointValue(si->getParent(), src, makeConcreteAdjointValue(eltAdjValue),
+                    si->getLoc());
+    builder.createDeallocStack(si->getLoc(), eltAdjBuffer);
   }
 
-  void accumulateArrayTangentSubscriptIndirect(
-      ApplyInst *ai, CopyAddrInst *cai, AllocStackInst *subscriptBuffer) {
-    addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBuffer,
+  /// Accumulate array element adjoint buffer into `copy_addr` source.
+  void accumulateArrayElementAdjointIndirect(CopyAddrInst *cai,
+                                             AllocStackInst *eltAdjBuffer) {
+    addToAdjointBuffer(cai->getParent(), cai->getSrc(), eltAdjBuffer,
                        cai->getLoc());
-    builder.emitDestroyAddrAndFold(cai->getLoc(), subscriptBuffer);
-    builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
+    builder.emitDestroyAddrAndFold(cai->getLoc(), eltAdjBuffer);
+    builder.createDeallocStack(cai->getLoc(), eltAdjBuffer);
   }
 
-  void visitArrayInitialization(ApplyInst *ai) {
-    LLVM_DEBUG(getADDebugStream() << "Visiting array initialization:\n" << *ai);
-    SILValue adjointArray;
-    SILValue fnRef;
-    CanGenericSignature genericSig;
-    for (auto use : ai->getUses()) {
-      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-      if (!dti) continue;
-      // The first tuple field of the return value is the `Array`.
-      adjointArray = getAdjointValue(ai->getParent(), dti->getResult(0))
-          .getConcreteValue();
-      assert(adjointArray && "Array does not have adjoint value");
-      auto astType = adjointArray->getType().getASTType();
-      auto typeDecl = astType->getStructOrBoundGenericStruct();
-      auto subscriptDecl = cast<SubscriptDecl>(typeDecl->lookupDirect(
-          DeclBaseName::createSubscript()).front());
-      auto subscriptGet = subscriptDecl->getAccessor(AccessorKind::Get);
-      SILDeclRef subscriptRef(subscriptGet, SILDeclRef::Kind::Func);
-      auto fnBuilder = SILOptFunctionBuilder(getContext().getTransform());
-      auto fn = fnBuilder.getOrCreateFunction(
-          ai->getLoc(), subscriptRef, NotForDefinition);
-      genericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
-      fnRef = builder.createFunctionRef(ai->getLoc(), fn);
+  /// Given a `store` or `copy_addr` instruction whose destination is an element
+  /// address from an `array.uninitialized_intrinsic` application, accumulate
+  /// array element adjoint into the source's adjoint.
+  void accumulateArrayElementAdjoint(SILInstruction *inst) {
+    assert(isa<StoreInst>(inst) || isa<CopyAddrInst>(inst) &&
+           "Expected only `store` or `copy_addr` to "
+           "`array.uninitialized_intrinsic` result address");
+    LLVM_DEBUG(getADDebugStream()
+               << "Visiting array initialization element store instruction:\n"
+               << *inst);
+    // Get the source and destination of the `store` or `copy_addr`.
+    SILValue src;
+    SILValue dest;
+    if (auto *si = dyn_cast<StoreInst>(inst)) {
+      src = si->getSrc();
+      dest = si->getDest();
+    } else if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
+      src = cai->getSrc();
+      dest = cai->getDest();
     }
-    assert(adjointArray && "Array does not have adjoint value");
-    assert(genericSig && "No generic signature");
-    assert(fnRef && "Could not create `function_ref`");
-    // Two loops because the `tuple_extract` instructions can be reached in
-    // either order.
+    // Get the array element index of the result address.
+    int eltIndex = 0;
+    if (auto *iai = dyn_cast<IndexAddrInst>(dest->getDefiningInstruction())) {
+      auto *ili = cast<IntegerLiteralInst>(iai->getIndex());
+      eltIndex = ili->getValue().getLimitedValue();
+    } else {
+      assert(isa<PointerToAddressInst>(dest->getDefiningInstruction()));
+    }
+    // Get the array adjoint value.
+    SILValue arrayAdjoint;
+    auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(dest);
+    assert(ai && "Expected `array.uninitialized_intrinsic` application");
     for (auto use : ai->getUses()) {
       auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-      if (!dti) continue;
-      // The second tuple field is the `RawPointer`.
-      for (auto use : dti->getResult(1)->getUses()) {
-        // The `RawPointer` passes through a `pointer_to_address`. That
-        // instruction's first use is a `store` whose src is useful; its
-        // subsequent uses are `index_addr`s whose only use is a useful
-        // `store`. In the indirect case, each `store` is instead a
-        // `copy_addr`.
-        for (auto use : use->getUser()->getResult(0)->getUses()) {
-          auto inst = use->getUser();
-          if (auto si = dyn_cast<StoreInst>(inst)) {
-            auto tanType = getRemappedTangentType(si->getSrc()->getType());
-            auto subscriptBuffer = emitArrayTangentSubscript(
-                ai, tanType, adjointArray, fnRef, genericSig, 0);
-            accumulateArrayTangentSubscriptDirect(
-                ai, tanType, si, subscriptBuffer);
-          } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
-            auto tanType = getRemappedTangentType(cai->getSrc()->getType());
-            auto subscriptBuffer = emitArrayTangentSubscript(
-                ai, tanType, adjointArray, fnRef, genericSig, 0);
-            accumulateArrayTangentSubscriptIndirect(
-                ai, cai, subscriptBuffer);
-          } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
-            for (auto use : iai->getUses()) {
-              if (auto si = dyn_cast<StoreInst>(use->getUser())) {
-                auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
-                auto tanType = getRemappedTangentType(
-                    si->getSrc()->getType());
-                auto subscriptBuffer = emitArrayTangentSubscript(
-                    ai, tanType, adjointArray, fnRef,
-                    genericSig, literal->getValue().getLimitedValue());
-                accumulateArrayTangentSubscriptDirect(
-                    ai, tanType, si, subscriptBuffer);
-              } else if (auto cai = dyn_cast<CopyAddrInst>(use->getUser())) {
-                auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
-                auto tanType = getRemappedTangentType(
-                    cai->getSrc()->getType());
-                auto subscriptBuffer = emitArrayTangentSubscript(
-                    ai, tanType, adjointArray, fnRef,
-                    genericSig, literal->getValue().getLimitedValue());
-                accumulateArrayTangentSubscriptIndirect(
-                    ai, cai, subscriptBuffer);
-              }
-            }
-          }
-        }
-      }
+      if (!dti)
+        continue;
+      // The first `destructure_tuple` result is the `Array` value.
+      auto arrayValue = dti->getResult(0);
+      arrayAdjoint =
+          getAdjointValue(ai->getParent(), arrayValue).getConcreteValue();
+    }
+    assert(arrayAdjoint && "Array does not have adjoint value");
+    // Apply `Array.TangentVector.subscript` to get array element adjoint value.
+    auto eltTanType = getRemappedTangentType(src->getType());
+    auto *eltAdjBuffer = getArrayAdjointElementBuffer(arrayAdjoint, eltIndex,
+                                                      eltTanType, ai->getLoc());
+    // Accumulate array element adjoint into source's adjoint.
+    if (auto *si = dyn_cast<StoreInst>(inst)) {
+      accumulateArrayElementAdjointDirect(si, eltAdjBuffer);
+    } else if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
+      accumulateArrayElementAdjointIndirect(cai, eltAdjBuffer);
     }
   }
 
   void visitApplyInst(ApplyInst *ai) {
     assert(getPullbackInfo().shouldDifferentiateApplyInst(ai));
-    // Handle array uninitialized allocation intrinsic specially.
+    // Skip `array.uninitialized_intrinsic` intrinsic applications, which have
+    // special `store` and `copy_addr` support.
     if (isArrayLiteralIntrinsic(ai))
-      return visitArrayInitialization(ai);
+      return;
     // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo = getContext().getNestedApplyInfo();
     auto applyInfoLookup = nestedApplyInfo.find(ai);
@@ -7331,6 +7364,13 @@ public:
     emitZeroIndirect(bufType.getASTType(), adjBuf, loc);
   }
   void visitStoreInst(StoreInst *si) {
+    // Handle `store` to `array.uninitialized_intrinsic` element address
+    // specially.
+    if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
+            si->getDest())) {
+      accumulateArrayElementAdjoint(si);
+      return;
+    }
     visitStoreOperation(
         si->getParent(), si->getLoc(), si->getSrc(), si->getDest());
   }
@@ -7343,6 +7383,13 @@ public:
   ///   Original: copy_addr x to y
   ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
+    // Handle `copy_addr` to `array.uninitialized_intrinsic` element address
+    // specially.
+    if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
+            cai->getDest())) {
+      accumulateArrayElementAdjoint(cai);
+      return;
+    }
     auto *bb = cai->getParent();
     auto &adjDest = getAdjointBuffer(bb, cai->getDest());
     auto destType = remapType(adjDest->getType());

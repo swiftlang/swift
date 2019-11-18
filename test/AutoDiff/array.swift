@@ -35,9 +35,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
       return [x, y]
     }
     let pb = pullback(at: 1, 1, in: twoElementLiteral)
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([Tracked<Float>(1), Tracked<Float>(2)]))
-    expectEqual(1, gradX)
-    expectEqual(2, gradY)
+    expectEqual((1, 2), pb(TrackedFloatArrayTan([Tracked<Float>(1), Tracked<Float>(2)])))
   }
 
   do {
@@ -48,9 +46,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
       return [result, result]
     }
     let pb = pullback(at: 3, 4, in: twoElementLiteralAddress)
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    expectEqual(8, gradX)
-    expectEqual(6, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 
   do {
@@ -59,29 +55,53 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
       return [x * y, x * y]
     }
     let pb = pullback(at: 3, 4, in: twoElementLiteralFunctionResult)
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    // FIXME(TF-952): Fix incorrect zero derivatives.
-    // expectEqual(8, gradX)
-    // expectEqual(6, gradY)
-    expectEqual(0, gradX)
-    expectEqual(0, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 }
 
-ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
-  func twoElementLiteralIndirect<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T) -> [T] {
+struct ArrayLiteralFromStructElements<T> {
+  var x, y: T
+
+  @differentiable(where T: Differentiable)
+  func callAsFunction() -> [T] {
     return [x, y]
   }
+}
+extension ArrayLiteralFromStructElements: Differentiable where T: Differentiable {}
 
-  func twoElementLiteralIndirectWrapper(_ x: Float, _ y: Float) -> [Float] {
-    return twoElementLiteralIndirect(x, y)
+ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
+  do {
+    func twoElementLiteralIndirect<T: Differentiable>(_ x: T, _ y: T) -> [T] {
+      return [x, y]
+    }
+    let pb = pullback(at: Float(1), 1, in: { twoElementLiteralIndirect($0, $1) })
+    expectEqual((1, 2), pb(FloatArrayTan([1, 2])))
   }
 
-  let (gradX, gradY) = pullback(at: Float(1), Float(1), in: twoElementLiteralIndirectWrapper)(
-    Array<Float>.DifferentiableView([Float(1), Float(2)]))
+  do {
+    func twoElementLiteralIndirectVar<T: Differentiable>(_ x: T, _ y: T) -> [T] {
+      var result: [T] = []
+      result = result + [x]
+      result = result + [y]
+      return result
+    }
+    let pb = pullback(at: Float(1), 1, in: { twoElementLiteralIndirectVar($0, $1) })
+    expectEqual((1, 2), pb(FloatArrayTan([1, 2])))
+  }
 
-  expectEqual(Float(1), gradX)
-  expectEqual(Float(2), gradY)
+  let s = ArrayLiteralFromStructElements<Tracked<Float>>(x: 3, y: 4)
+  do {
+    func structGeneric<T>(_ s: ArrayLiteralFromStructElements<T>) -> T {
+      return s()[0]
+    }
+    typealias T = ArrayLiteralFromStructElements<Tracked<Float>>.TangentVector
+    expectEqual(T(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
+    expectEqual(T(x: 4, y: 3), gradient(at: s, in: { s in s()[0] * s()[1] }))
+    expectEqual(T(x: 4, y: 3), gradient(at: s, in: { s -> Tracked<Float> in
+      let array = s()
+      return array[0] * array[1]
+    }))
+  }
 }
 
 ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
@@ -96,12 +116,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
       return result3
     }
     let pb = pullback(at: 3, 4, in: { controlFlow($0, $1) })
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    // FIXME(TF-952): Fix incorrect zero derivatives.
-    // expectEqual(8, gradX)
-    // expectEqual(6, gradY)
-    expectEqual(0, gradX)
-    expectEqual(0, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 
   do {
@@ -116,9 +131,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
       return result3
     }
     let pb = pullback(at: 3, 4, in: { controlFlowAddress($0, $1) })
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    expectEqual(8, gradX)
-    expectEqual(6, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 
   do {
@@ -130,9 +143,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
       return result3
     }
     let pb = pullback(at: Tracked<Float>(3), 4, in: { controlFlowGeneric($0, $1) })
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    expectEqual(1, gradX)
-    expectEqual(1, gradY)
+    expectEqual((1, 1), pb(TrackedFloatArrayTan([1, 1])))
   }
 }
 
