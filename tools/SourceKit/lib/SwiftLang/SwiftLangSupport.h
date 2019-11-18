@@ -585,12 +585,14 @@ public:
 
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                 ArrayRef<const char *> Args,
-                                TypeContextInfoConsumer &Consumer) override;
+                                TypeContextInfoConsumer &Consumer,
+                                Optional<VFSOptions> vfsOptions) override;
 
   void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                ArrayRef<const char *> Args,
                                ArrayRef<const char *> ExpectedTypes,
-                               ConformingMethodListConsumer &Consumer) override;
+                               ConformingMethodListConsumer &Consumer,
+                               Optional<VFSOptions> vfsOptions) override;
 
   void getStatistics(StatisticsReceiver) override;
 

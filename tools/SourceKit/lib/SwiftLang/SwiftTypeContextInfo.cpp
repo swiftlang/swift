@@ -24,12 +24,12 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
-                                     llvm::MemoryBuffer *UnresolvedInputFile,
-                                     unsigned Offset,
-                                     ArrayRef<const char *> Args,
-                                     ide::TypeContextInfoConsumer &Consumer,
-                                     std::string &Error) {
+static bool swiftTypeContextInfoImpl(
+    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
+    unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
   auto bufferIdentifier =
       Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier());
 
@@ -59,7 +59,7 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
 
   CompilerInvocation Invocation;
   bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), bufferIdentifier, Error);
+      Invocation, Args, CI.getDiags(), bufferIdentifier, FileSystem, Error);
   if (Failed)
     return false;
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
@@ -80,6 +80,10 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
 
   Invocation.setCodeCompletionFactory(callbacksFactory.get());
 
+  if (FileSystem != llvm::vfs::getRealFileSystem()) {
+    CI.getSourceMgr().setFileSystem(FileSystem);
+  }
+
   if (CI.setup(Invocation)) {
     // FIXME: error?
     return true;
@@ -93,7 +97,16 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
 void SwiftLangSupport::getExpressionContextInfo(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
-    SourceKit::TypeContextInfoConsumer &SKConsumer) {
+    SourceKit::TypeContextInfoConsumer &SKConsumer,
+    Optional<VFSOptions> vfsOptions) {
+  std::string error;
+
+  // FIXME: the use of None as primary file is to match the fact we do not read
+  // the document contents using the editor documents infrastructure.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem)
+    return SKConsumer.failed(error);
+
   class Consumer : public ide::TypeContextInfoConsumer {
     SourceKit::TypeContextInfoConsumer &SKConsumer;
 
@@ -187,9 +200,8 @@ void SwiftLangSupport::getExpressionContextInfo(
     }
   } Consumer(SKConsumer);
 
-  std::string Error;
-  if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Args,
-                                Consumer, Error)) {
-    SKConsumer.failed(Error);
+  if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
+                                Args, fileSystem, error)) {
+    SKConsumer.failed(error);
   }
 }
