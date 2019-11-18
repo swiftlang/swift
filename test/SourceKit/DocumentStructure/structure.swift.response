@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2472,
+  key.length: 2587,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1519,22 +1519,100 @@
     {
       key.kind: source.lang.swift.decl.extension,
       key.name: "Result",
-      key.offset: 2425,
-      key.length: 38,
-      key.nameoffset: 2435,
+      key.offset: 2424,
+      key.length: 36,
+      key.nameoffset: 2434,
       key.namelength: 6,
-      key.bodyoffset: 2443,
-      key.bodylength: 19,
+      key.bodyoffset: 2442,
+      key.bodylength: 17,
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "foo()",
-          key.offset: 2447,
+          key.offset: 2445,
           key.length: 13,
-          key.nameoffset: 2452,
+          key.nameoffset: 2450,
           key.namelength: 5,
-          key.bodyoffset: 2459,
+          key.bodyoffset: 2457,
           key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "Outer",
+      key.offset: 2462,
+      key.length: 53,
+      key.nameoffset: 2472,
+      key.namelength: 5,
+      key.bodyoffset: 2479,
+      key.bodylength: 35,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.name: "Inner",
+          key.offset: 2482,
+          key.length: 31,
+          key.nameoffset: 2488,
+          key.namelength: 5,
+          key.bodyoffset: 2495,
+          key.bodylength: 17,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.function.method.instance,
+              key.name: "deinit",
+              key.offset: 2500,
+              key.length: 9,
+              key.nameoffset: 2500,
+              key.namelength: 6,
+              key.bodyoffset: 2508,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "Outer2",
+      key.offset: 2524,
+      key.length: 55,
+      key.nameoffset: 2534,
+      key.namelength: 6,
+      key.bodyoffset: 2542,
+      key.bodylength: 36,
+      key.attributes: [
+        {
+          key.offset: 2517,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.name: "Inner2",
+          key.offset: 2545,
+          key.length: 32,
+          key.nameoffset: 2551,
+          key.namelength: 6,
+          key.bodyoffset: 2559,
+          key.bodylength: 17,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.function.method.instance,
+              key.accessibility: source.lang.swift.accessibility.public,
+              key.name: "deinit",
+              key.offset: 2564,
+              key.length: 9,
+              key.nameoffset: 2564,
+              key.namelength: 6,
+              key.bodyoffset: 2572,
+              key.bodylength: 0
+            }
+          ]
         }
       ]
     }

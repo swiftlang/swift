@@ -149,7 +149,19 @@ deinit {
 }
 
 #if false
- extension Result {
-   func foo() {}
- }
- #endif
+extension Result {
+  func foo() {}
+}
+
+extension Outer {
+  class Inner {
+    deinit {}
+  }
+}
+
+public extension Outer2 {
+  class Inner2 {
+    deinit {}
+  }
+}
+#endif

@@ -1143,8 +1143,11 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
 
   if (D->getKind() == DeclKind::Destructor ||
       D->getKind() == DeclKind::EnumElement) {
-    if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext()))
-      return std::max(container->getFormalAccess(), AccessLevel::Internal);
+    if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
+      if (auto containerAccess = inferAccessSyntactically(container))
+        return std::max(containerAccess.getValue(), AccessLevel::Internal);
+      return None;
+    }
     return AccessLevel::Private;
   }
 
