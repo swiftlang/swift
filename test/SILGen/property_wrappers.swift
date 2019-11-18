@@ -243,6 +243,46 @@ func triggerUseLazy() {
   _ = UseLazy<Int>(wibble: [1, 2, 3])
 }
 
+func computeInt() -> Int {
+  return 42
+}
+
+func triggerUseLazyTestAutoclosure() {
+  _ = UseLazy(bar: computeInt())
+
+  // triggerUseLazyTestAutoclosure()
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers29triggerUseLazyTestAutoclosureyyF
+
+  // computeInt() must not get called here
+  // CHECK-NOT: // function_ref computeInt()
+  // CHECK-NOT: function_ref @$s17property_wrappers10computeIntSiyF : $@convention(thin) () -> Int
+
+  // Rather, an implicit closure is referenced
+  // CHECK: // function_ref implicit closure #1 in triggerUseLazyTestAutoclosure()
+  // CHECK: function_ref @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ : $@convention(thin) () -> Int
+
+  // And the implicit closure calls computeInt()
+  // CHECK: sil private [transparent] [ossa] @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ : $@convention(thin) () -> Int
+  // CHECK: // function_ref computeInt()
+  // CHECK: function_ref @$s17property_wrappers10computeIntSiyF : $@convention(thin) () -> Int
+}
+
+@propertyWrapper
+struct WrapperWithNonEscapingAutoclosure<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure () -> V) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct UseWrapperWithNonEscapingAutoclosure {
+  @WrapperWithNonEscapingAutoclosure var foo: Int
+
+  // Memberwise init should take an Int arg, not a closure
+  // CHECK: // UseWrapperWithNonEscapingAutoclosure.init(foo:)
+  // CHECK: sil hidden [ossa] @$s17property_wrappers36UseWrapperWithNonEscapingAutoclosureV3fooACSi_tcfC : $@convention(method) (Int, @thin UseWrapperWithNonEscapingAutoclosure.Type) -> UseWrapperWithNonEscapingAutoclosure
+}
+
 struct UseStatic {
   // CHECK: sil hidden [ossa] @$s17property_wrappers9UseStaticV12staticWibbleSaySiGvgZ
   // CHECK: sil private [global_init] [ossa] @$s17property_wrappers9UseStaticV13_staticWibble33_{{.*}}4LazyOySaySiGGvau
@@ -332,6 +372,24 @@ struct CompositionMembers {
 
 func testComposition() {
   _ = CompositionMembers(p1: nil)
+}
+
+@propertyWrapper
+struct WrapperWithAutoclosure<V> {
+  var wrappedValue: V
+  init(wrappedValue: @autoclosure @escaping () -> V) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct CompositionWithAutoclosure {
+  @WrapperA @WrapperB @WrapperWithAutoclosure var p1: Int
+  @WrapperA @WrapperWithAutoclosure @WrapperB var p2: Int
+  @WrapperWithAutoclosure @WrapperA @WrapperB var p3: Int
+
+  // In the memberwise init, only p1 should be a closure - p2 and p3 should be just Int
+  // CompositionWithAutoclosure.init(p1:p2:p3:)
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers26CompositionWithAutoclosureV2p12p22p3ACSiyXA_S2itcfC : $@convention(method) (@owned @callee_guaranteed () -> Int, Int, Int, @thin CompositionWithAutoclosure.Type) -> CompositionWithAutoclosure
 }
 
 // Observers with non-default mutatingness.
