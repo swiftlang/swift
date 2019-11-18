@@ -58,12 +58,12 @@ func checkGradient<T: BinaryFloatingPoint & Differentiable>(
   _ x: T,
   _ y: T)
 where T == T.TangentVector {
-  let eps = T(0.1)
+  let eps = T(0.01)
   let grad = gradient(at: x, y, in: f)
   let dfdx = (f(x + eps, y) - f(x, y)) / eps
   let dfdy = (f(x, y + eps) - f(x, y)) / eps
-  expectEqualWithTolerance(TestLiteralType(dfdx), grad.0, ulps: 32)
-  expectEqualWithTolerance(TestLiteralType(dfdy), grad.1, ulps: 32)
+  expectEqualWithTolerance(TestLiteralType(dfdx), grad.0, ulps: 192)
+  expectEqualWithTolerance(TestLiteralType(dfdy), grad.1, ulps: 192)
 }
 
 %{
