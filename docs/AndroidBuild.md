@@ -19,7 +19,7 @@ Windows.
   may not be supported.
 
 This guide assumes that your sources live at the root of `S:`.  If your sources
-live elsewhere, you can create a subsitution for this:
+live elsewhere, you can create a substitution for this:
 
 ```cmd
 subst S: <path to sources>
