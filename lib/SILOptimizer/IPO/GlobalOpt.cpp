@@ -73,6 +73,8 @@ class SILGlobalOpt {
   /// A map from each visited global let variable to the store instructions
   /// which initialize it.
   llvm::MapVector<SILGlobalVariable *, StoreInst *> GlobalVarStore;
+  
+  llvm::MapVector<SILGlobalVariable *, AllocGlobalInst *> AllocGlobalStore;
 
   /// A set of visited global variables that for some reason we have decided is
   /// not able to be optimized safely or for which we do not know how to
@@ -117,6 +119,9 @@ protected:
 
   /// This is the main entrypoint for collecting global accesses.
   void collectGlobalAccess(GlobalAddrInst *GAI);
+  
+  void collectAllocGlobal(SILGlobalVariable *global,
+                          AllocGlobalInst *allocGlobal);
 
   /// Returns true if we think that \p CurBB is inside a loop.
   bool isInLoop(SILBasicBlock *CurBB);
@@ -878,6 +883,10 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   }
 }
 
+void SILGlobalOpt::collectAllocGlobal(SILGlobalVariable *global, AllocGlobalInst *allocGlobal) {
+  AllocGlobalStore[global] = allocGlobal;
+}
+
 // Optimize access to the global variable, which is known to have a constant
 // value. Replace all loads from the global address by invocations of a getter
 // that returns the value of this variable.
@@ -955,12 +964,15 @@ bool SILGlobalOpt::run() {
           continue;
         }
 
-        auto *GAI = dyn_cast<GlobalAddrInst>(&I);
-        if (!GAI) {
+        if (auto *GAI = dyn_cast<GlobalAddrInst>(&I)) {
+          collectGlobalAccess(GAI);
           continue;
         }
 
-        collectGlobalAccess(GAI);
+        if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(&I)) {
+          collectAllocGlobal(allocGlobal->getReferencedGlobal(), allocGlobal);
+          continue;
+        }
       }
     }
   }
@@ -974,6 +986,24 @@ bool SILGlobalOpt::run() {
   for (auto &Init : GlobalVarStore) {
     // Optimize the access to globals if possible.
     optimizeGlobalAccess(Init.first, Init.second);
+    
+    if (Init.first->getLinkage() != SILLinkage::Private) continue;
+    bool canRemove = true;
+    auto globalAddr = cast<GlobalAddrInst>(Init.second->getDest());
+    for (auto *use : globalAddr->getUses()) {
+      if (!isa<StoreInst>(use->getUser())) {
+        canRemove = false;
+        break;
+      }
+    }
+    if (canRemove) {
+      Init.second->eraseFromParent();
+      assert(globalAddr->getUses().begin() == globalAddr->getUses().end());
+      globalAddr->eraseFromParent();
+      if (AllocGlobalStore.count(Init.first))
+        AllocGlobalStore[Init.first]->eraseFromParent();
+      Init.first->getModule().eraseGlobalVariable(Init.first);
+    }
   }
 
   return HasChanged;
