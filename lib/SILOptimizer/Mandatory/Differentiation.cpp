@@ -119,9 +119,10 @@ getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
     return nullptr;
   // Return the `array.uninitialized_intrinsic` application, if it exists.
   if (auto *dti = dyn_cast<DestructureTupleInst>(
-          ptai->getOperand()->getDefiningInstruction()))
+          ptai->getOperand()->getDefiningInstruction())) {
     if (auto *ai = getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
       return ai;
+  }
   return nullptr;
 }
 
@@ -1497,8 +1498,8 @@ private:
                                      unsigned dependentVariableIndex);
   /// If the given value is an `array.uninitialized_intrinsic` application,
   /// selectively propagate usefulness through its `RawPointer` result.
-  void setUsefulAcrossArrayInitialization(SILValue value,
-                                          unsigned dependentVariableIndex);
+  void setUsefulThroughArrayInitialization(SILValue value,
+                                           unsigned dependentVariableIndex);
 
 public:
   explicit DifferentiableActivityInfo(
@@ -1678,12 +1679,8 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // an `array.uninitialized_intrinsic` application, return true if the
   // intrinsic application (representing the semantic destination) is active.
 #define CHECK_INST_TYPE_ACTIVE_DEST(INST)                                      \
-  if (auto *castInst = dyn_cast<INST##Inst>(inst)) {                           \
-    if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(       \
-            castInst->getDest()))                                              \
-      return activityInfo.isActive(ai, indices);                               \
-    return activityInfo.isActive(castInst->getDest(), indices);                \
-  }
+  if (auto *castInst = dyn_cast<INST##Inst>(inst))                             \
+    return activityInfo.isActive(castInst->getDest(), indices);
   CHECK_INST_TYPE_ACTIVE_DEST(Store)
   CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
   CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
@@ -2106,7 +2103,7 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
 void DifferentiableActivityInfo::setUseful(SILValue value,
                                            unsigned dependentVariableIndex) {
   usefulValueSets[dependentVariableIndex].insert(value);
-  setUsefulAcrossArrayInitialization(value, dependentVariableIndex);
+  setUsefulThroughArrayInitialization(value, dependentVariableIndex);
 }
 
 void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
@@ -2202,7 +2199,7 @@ continue;
   }
 }
 
-void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
+void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
     SILValue value, unsigned dependentVariableIndex) {
   // Array initializer syntax is lowered to an intrinsic and one or more
   // stores to a `RawPointer` returned by the intrinsic.
@@ -2219,7 +2216,12 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
       auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
       assert(ptai && "Expected `pointer_to_address` user for uninitialized "
                      "array intrinsic");
-      // Propagate usefulness through `pointer_to_address` users' operands.
+      // Propagate usefulness through array element addresses.
+      // - Find `store` and `copy_addr` instructions with array element
+      //   address destinations.
+      // - For each instruction, set destination (array element address) as
+      //   useful and propagate usefulness through source.
+      //
       // Note: `propagateUseful(use->getUser(), ...)` is intentionally not used
       // because it marks more values than necessary as useful, including:
       // - The `RawPointer` result of the intrinsic.
@@ -2229,17 +2231,21 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
       for (auto use : ptai->getUses()) {
         auto *user = use->getUser();
         if (auto *si = dyn_cast<StoreInst>(user)) {
+          setUseful(si->getDest(), dependentVariableIndex);
           setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
         } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+          setUseful(cai->getDest(), dependentVariableIndex);
           setUsefulAndPropagateToOperands(cai->getSrc(),
                                           dependentVariableIndex);
         } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
           for (auto use : iai->getUses()) {
             auto *user = use->getUser();
             if (auto si = dyn_cast<StoreInst>(user)) {
+              setUseful(si->getDest(), dependentVariableIndex);
               setUsefulAndPropagateToOperands(si->getSrc(),
                                               dependentVariableIndex);
             } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+              setUseful(cai->getDest(), dependentVariableIndex);
               setUsefulAndPropagateToOperands(cai->getSrc(),
                                               dependentVariableIndex);
             }
@@ -7476,6 +7482,10 @@ public:
   // Address projections.
   NO_ADJOINT(StructElementAddr)
   NO_ADJOINT(TupleElementAddr)
+
+  // Array literal initialization address projections.
+  NO_ADJOINT(PointerToAddress)
+  NO_ADJOINT(IndexAddr)
 
   // Memory allocation/access.
   NO_ADJOINT(AllocStack)
