@@ -349,6 +349,14 @@ public:
                                  unsigned &Offset,
                                  const std::string bufferIdentifier);
 
+  bool setupCompilerInstanceForCodeCompletion(
+      swift::CompilerInstance &CI,
+      llvm::MemoryBuffer *completionBuffer, unsigned Offset,
+      ArrayRef<const char *> Args,
+      swift::CodeCompletionCallbacksFactory *callbacksFactory,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error);
+
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
   static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);

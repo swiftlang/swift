@@ -23,6 +23,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/SyntaxModel.h"
@@ -293,6 +294,45 @@ SwiftLangSupport::makeCodeCompletionMemoryBuffer(
   std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
 
   return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
+}
+
+bool SwiftLangSupport::setupCompilerInstanceForCodeCompletion(
+    swift::CompilerInstance &CI, llvm::MemoryBuffer *completionBuffer,
+    unsigned int Offset, ArrayRef<const char *> Args,
+    swift::CodeCompletionCallbacksFactory *callbacksFactory,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  assert(FileSystem);
+
+  CompilerInvocation Invocation;
+  bool Failed = getASTManager()->initCompilerInvocation(
+      Invocation, Args, CI.getDiags(), completionBuffer->getBufferIdentifier(),
+      FileSystem, Error);
+  if (Failed)
+    return false;
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
+    Error = "no input filenames specified";
+    return false;
+  }
+
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
+  Invocation.setCodeCompletionPoint(completionBuffer, Offset);
+  Invocation.setCodeCompletionFactory(callbacksFactory);
+
+  if (FileSystem != llvm::vfs::getRealFileSystem()) {
+    CI.getSourceMgr().setFileSystem(FileSystem);
+  }
+
+  if (CI.setup(Invocation)) {
+    Error = "failed to setup compiler instance";
+    return false;
+  }
+
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
+  return true;
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {

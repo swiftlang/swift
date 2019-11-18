@@ -59,39 +59,18 @@ static bool swiftConformingMethodListImpl(
          std::make_pair("Offset", std::to_string(Offset))});
   }
 
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), bufferIdentifier, FileSystem, Error);
-  if (Failed)
-    return false;
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
-  Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
-
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
                                                     Consumer));
 
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-
-  if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CI.getSourceMgr().setFileSystem(FileSystem);
+  if (!Lang.setupCompilerInstanceForCodeCompletion(CI, newBuffer.get(), Offset,
+                                                   Args, callbacksFactory.get(),
+                                                   FileSystem, Error)) {
+    return false;
   }
 
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
-  }
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performParseAndResolveImportsOnly();
 
   return true;

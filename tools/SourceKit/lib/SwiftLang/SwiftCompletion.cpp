@@ -90,7 +90,7 @@ struct SwiftCodeCompletionConsumer
       : handleResultsImpl(handleResultsImpl) {}
 
   void setContext(swift::ASTContext *context,
-                  swift::CompilerInvocation *invocation,
+                  const swift::CompilerInvocation *invocation,
                   swift::ide::CodeCompletionContext *completionContext) {
     swiftContext.swiftASTContext = context;
     swiftContext.invocation = invocation;
@@ -157,22 +157,6 @@ static bool swiftCodeCompleteImpl(
          std::make_pair("Offset", std::to_string(Offset))});
   }
 
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), bufferIdentifier, FileSystem, Error);
-  if (Failed)
-    return false;
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
-  Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
-
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
   auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
@@ -181,22 +165,16 @@ static bool swiftCodeCompleteImpl(
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext, SwiftConsumer));
 
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-
-  if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CI.getSourceMgr().setFileSystem(FileSystem);
-  }
-
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
+  if (!Lang.setupCompilerInstanceForCodeCompletion(CI, newBuffer.get(), Offset,
+                                                   Args, callbacksFactory.get(),
+                                                   FileSystem, Error)) {
+    return false;
   }
 
   CloseClangModuleFiles scopedCloseFiles(
       *CI.getASTContext().getClangModuleLoader());
-  SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
+  SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
                            &CompletionContext);
-  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
   CI.performParseAndResolveImportsOnly();
   SwiftConsumer.clearContext();
 

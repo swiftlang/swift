@@ -543,6 +543,10 @@ public:
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
+  const CompilerInvocation &getInvocation() {
+    return Invocation;
+  }
+
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
   /// files. If the process of validating VFS files failed, or the overlay
