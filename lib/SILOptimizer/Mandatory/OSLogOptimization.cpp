@@ -1063,7 +1063,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
 
 /// Constant evaluate instructions starting from 'start' and fold the uses
 /// of the value 'oslogMessage'. Stop when oslogMessageValue is released.
-static void constantFold(SILInstruction *start,
+static bool constantFold(SILInstruction *start,
                          SingleValueInstruction *oslogMessage,
                          unsigned assertConfig) {
   SILFunction *fun = start->getFunction();
@@ -1077,7 +1077,7 @@ static void constantFold(SILInstruction *start,
 
   auto errorInfo = collectConstants(state);
   if (errorInfo) // Evaluation failed with diagnostics.
-    return;
+    return false;
 
   // At this point, the `OSLogMessage` instance should be mapped to a constant
   // value in the interpreter state. If this is not the case, it means the
@@ -1085,9 +1085,10 @@ static void constantFold(SILInstruction *start,
   // incorrect. Detect and diagnose this scenario.
   bool errorDetected = checkOSLogMessageIsConstant(oslogMessage, state);
   if (errorDetected)
-    return;
+    return false;
 
   substituteConstants(state);
+  return true;
 }
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
@@ -1283,13 +1284,20 @@ class OSLogOptimization : public SILFunctionTransform {
       }
     }
 
+    bool madeChange = false;
+
     // Constant fold the uses of properties of OSLogMessage instance. Note that
     // the function body will change due to constant folding, after each
     // iteration.
     for (auto *oslogInit : oslogMessageInits) {
       SILInstruction *interpolationStart = beginOfInterpolation(oslogInit);
       assert(interpolationStart);
-      constantFold(interpolationStart, oslogInit, assertConfig);
+      madeChange |= constantFold(interpolationStart, oslogInit, assertConfig);
+    }
+
+    // TODO: Can we be more conservative here with our invalidation?
+    if (madeChange) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 };
