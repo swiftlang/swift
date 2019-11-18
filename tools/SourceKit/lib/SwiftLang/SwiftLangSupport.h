@@ -50,6 +50,7 @@ namespace syntax {
 
 namespace ide {
   class CodeCompletionCache;
+  class CompletionInstance;
   class OnDiskCodeCompletionCache;
   class SourceEditConsumer;
   enum class CodeCompletionDeclKind;
@@ -294,6 +295,7 @@ class SwiftLangSupport : public LangSupport {
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
+  std::unique_ptr<swift::ide::CompletionInstance> CompletionInst;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -311,6 +313,10 @@ public:
   SwiftInterfaceGenMap &getIFaceGenContexts() { return IFaceGenContexts; }
   IntrusiveRefCntPtr<SwiftCompletionCache> getCodeCompletionCache() {
     return CCCache;
+  }
+
+  swift::ide::CompletionInstance &getCompletionInstance() {
+    return *CompletionInst;
   }
 
   /// Returns the FileSystemProvider registered under Name, or nullptr if not
@@ -341,13 +347,6 @@ public:
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
   getFileSystem(const Optional<VFSOptions> &vfsOptions,
                 Optional<StringRef> primaryFile, std::string &error);
-
-  /// Copy a memory buffer inserting '0' at the position of \c origBuf.
-  // TODO: Share with code completion.
-  static std::unique_ptr<llvm::MemoryBuffer>
-  makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
-                                 unsigned &Offset,
-                                 const std::string bufferIdentifier);
 
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);

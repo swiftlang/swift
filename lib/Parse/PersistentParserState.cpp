@@ -27,9 +27,9 @@ PersistentParserState::PersistentParserState() { }
 PersistentParserState::~PersistentParserState() { }
 
 void PersistentParserState::setCodeCompletionDelayedDeclState(
-    SourceManager &SM, unsigned BufferID,
-    CodeCompletionDelayedDeclKind Kind, unsigned Flags,
-    DeclContext *ParentContext, SourceRange BodyRange, SourceLoc PreviousLoc) {
+    SourceManager &SM, unsigned BufferID, CodeCompletionDelayedDeclKind Kind,
+    unsigned Flags, DeclContext *ParentContext, SourceRange BodyRange,
+    SourceLoc PreviousLoc) {
   assert(!CodeCompletionDelayedDeclStat.get() &&
          "only one decl can be delayed for code completion");
   unsigned startOffset = SM.getLocOffsetInBuffer(BodyRange.Start, BufferID);
@@ -39,8 +39,16 @@ void PersistentParserState::setCodeCompletionDelayedDeclState(
     prevOffset = SM.getLocOffsetInBuffer(PreviousLoc, BufferID);
 
   CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
-      Kind, Flags, ParentContext, ScopeInfo.saveCurrentScope(),
-      startOffset, endOffset, prevOffset));
+      Kind, Flags, ParentContext, ScopeInfo.saveCurrentScope(), startOffset,
+      endOffset, prevOffset));
+}
+
+void PersistentParserState::restoreCodeCompletionDelayedDeclState(
+    const CodeCompletionDelayedDeclState &other) {
+  CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
+      other.Kind, other.Flags, other.ParentContext,
+      ScopeInfo.saveCurrentScope(), other.StartOffset, other.EndOffset,
+      other.PrevOffset));
 }
 
 void PersistentParserState::delayDeclList(IterableDeclContext *D) {

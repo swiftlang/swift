@@ -15,6 +15,7 @@
 #include "SwiftEditorDiagConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
@@ -30,25 +31,30 @@ static bool swiftTypeContextInfoImpl(
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
-  auto bufferIdentifier =
-      Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier());
+
+  // Resolve symlinks for the input file.
+  llvm::SmallString<128> bufferIdentifier;
+  if (auto err = FileSystem->getRealPath(
+          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
+    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
 
   auto origOffset = Offset;
-  auto newBuffer = SwiftLangSupport::makeCodeCompletionMemoryBuffer(
+  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
       UnresolvedInputFile, Offset, bufferIdentifier);
 
-  CompilerInstance CI;
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
   PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
   EditorDiagConsumer TraceDiags;
-  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
+  trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};
+
+  Diags.addConsumer(PrintDiags);
   if (TracedOp.enabled()) {
-    CI.addDiagnosticConsumer(&TraceDiags);
+    Diags.addConsumer(TraceDiags);
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
     TracedOp.setDiagnosticProvider(
-        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+        [&](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
           TraceDiags.getAllDiagnostics(diags);
         });
     TracedOp.start(
@@ -56,40 +62,35 @@ static bool swiftTypeContextInfoImpl(
         {std::make_pair("OriginalOffset", std::to_string(origOffset)),
          std::make_pair("Offset", std::to_string(Offset))});
   }
+  ForwardingDiagnosticConsumer CIDiags(Diags);
 
   CompilerInvocation Invocation;
   bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), bufferIdentifier, FileSystem, Error);
+      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
+      Error);
   if (Failed)
     return false;
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     Error = "no input filenames specified";
     return false;
   }
+  CompilerInstance *CI = Lang.getCompletionInstance().getCompilerInstance(
+      Invocation, FileSystem, newBuffer.get(), Offset, Error, &CIDiags);
+  if (!CI)
+    return false;
+  SWIFT_DEFER { CI->removeDiagnosticConsumer(&CIDiags); };
 
-  // Always disable source location resolutions from .swiftsourceinfo file
-  // because they're somewhat heavy operations and aren't needed for completion.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
-  Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
+  // Perform the parsing and completion.
+  if (!CI->hasPersistentParserState())
+    CI->performParseAndResolveImportsOnly();
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-
-  if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CI.getSourceMgr().setFileSystem(FileSystem);
-  }
-
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
-  }
-  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
+  performCodeCompletionSecondPass(CI->getPersistentParserState(),
+                                  *callbacksFactory);
 
   return true;
 }

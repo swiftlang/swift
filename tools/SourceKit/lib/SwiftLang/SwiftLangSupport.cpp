@@ -25,6 +25,7 @@
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 
@@ -266,6 +267,9 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments,
                                              SKCtx.getGlobalConfiguration(),
                                              Stats, RuntimeResourcePath);
+
+  CompletionInst = std::make_unique<CompletionInstance>();
+
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 
@@ -274,26 +278,6 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
-}
-
-std::unique_ptr<llvm::MemoryBuffer>
-SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
-    const std::string bufferIdentifier) {
-
-  auto origBuffSize = origBuf->getBufferSize();
-  if (Offset > origBuffSize)
-    Offset = origBuffSize;
-
-  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      origBuffSize + 1, bufferIdentifier);
-  auto *pos = origBuf->getBufferStart() + Offset;
-  auto *newPos =
-      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
-  *newPos = '\0';
-  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
-
-  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
 }
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
