@@ -17,11 +17,11 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/FileUnit.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TypeCheckRequests.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
@@ -189,6 +189,7 @@ getBuiltinGenericFunction(Identifier Id,
                           Type ResType,
                           GenericParamList *GenericParams,
                           // SWIFT_ENABLE_TENSORFLOW
+                          GenericSignature Sig,
                           bool Rethrows = false) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
@@ -227,8 +228,10 @@ getBuiltinGenericFunction(Identifier Id,
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
   // SWIFT_ENABLE_TENSORFLOW
+  func->setGenericSignature(Sig);
   if (Rethrows)
     func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
+  // SWIFT_ENABLE_TENSORFLOW END
 
   return func;
 }
@@ -468,6 +471,12 @@ namespace {
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams);
+      // SWIFT_ENABLE_TENSORFLOW
+      for (auto gp : TheGenericParamList->getParams()) {
+        genericParamTypes.push_back(
+            gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+      }
+      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     template <class G>
@@ -498,9 +507,18 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW END
 
     FuncDecl *build(Identifier name) {
+      // SWIFT_ENABLE_TENSORFLOW
+      auto GenericSig = evaluateOrDefault(
+        Context.evaluator,
+        AbstractGenericSignatureRequest{
+          nullptr, std::move(genericParamTypes), std::move(addedRequirements)},
+        nullptr);
+      // SWIFT_ENABLE_TENSORFLOW END
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
-                                       TheGenericParamList);
+                                       TheGenericParamList,
+                                       // SWIFT_ENABLE_TENSORFLOW
+                                       GenericSig);
     }
 
     // Don't use these generator classes directly; call the make{...}
