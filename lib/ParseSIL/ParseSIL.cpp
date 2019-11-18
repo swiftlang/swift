@@ -140,7 +140,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   if (SIL)
     DelayBodyParsing = false;
 
-  SharedTimer timer("Parsing");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
            PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);

@@ -1139,7 +1139,8 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
 /// These may change across compiler versions.
 static void performSILOptimizations(CompilerInvocation &Invocation,
                                     SILModule *SM) {
-  SharedTimer timer("SIL optimization");
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL optimization");
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules ||
       !Invocation.getSILOptions().shouldOptimize()) {
@@ -1182,7 +1183,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
     return true;
 
   {
-    SharedTimer timer("SIL verification, pre-optimization");
+    FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                               "SIL verification, pre-optimization");
     silModule->verify();
   }
 
@@ -1192,7 +1194,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
     countStatsPostSILOpt(*stats, *silModule);
 
   {
-    SharedTimer timer("SIL verification, post-optimization");
+    FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                               "SIL verification, post-optimization");
     silModule->verify();
   }
 

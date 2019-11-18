@@ -1689,7 +1689,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
                         SILOptions &options, FileUnit *SF) {
-  SharedTimer timer("SILGen");
+  FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
   const DeclContext *DC;
   if (SF) {
     DC = SF;

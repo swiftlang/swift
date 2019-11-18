@@ -340,7 +340,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   // Could build scope maps here because the AST is stable now.
 
   {
-    SharedTimer timer("Type checking and Semantic analysis");
+    FrontendStatsTracer tracer(Ctx.Stats, "Type checking and Semantic analysis");
 
     if (Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       // Disable this optimization if we're compiling SwiftOnoneSupport, because
@@ -388,7 +388,7 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
   SF.ASTStage = SourceFile::TypeChecked;
 
   {
-    SharedTimer timer("AST verification");
+    FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
     // Verify the SourceFile.
     verify(SF);
 
