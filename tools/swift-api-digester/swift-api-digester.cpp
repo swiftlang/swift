@@ -962,9 +962,6 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
     if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
       emitDiag(Loc, diag::var_has_fixed_order_change, hasFixedBinaryOrder());
     }
-    if (isLet() != RV->isLet()) {
-      emitDiag(Loc, diag::var_let_changed, isLet());
-    }
   }
 }
 

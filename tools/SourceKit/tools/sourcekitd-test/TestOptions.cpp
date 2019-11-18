@@ -16,6 +16,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace sourcekitd_test;
@@ -358,8 +359,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       for (const char *vfsFile : InputArg->getValues()) {
         StringRef name, target;
         std::tie(name, target) = StringRef(vfsFile).split('=');
+        llvm::SmallString<64> nativeName;
+        llvm::sys::path::native(name, nativeName);
         bool passAsSourceText = target.consume_front("@");
-        VFSFiles.try_emplace(name, VFSFile(target.str(), passAsSourceText));
+        VFSFiles.try_emplace(nativeName.str(), VFSFile(target.str(), passAsSourceText));
       }
       break;
 

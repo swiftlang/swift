@@ -68,13 +68,12 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVarAndOptions(typeVar, typeVar->getImpl().getRawOptions()),
+  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
-  auto *typeVar = getTypeVariable();
-  typeVar->getImpl().setRawOptions(getOptions());
-  typeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  TypeVar->getImpl().setRawOptions(Options);
+  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
 GenericTypeParamType *
@@ -2198,7 +2197,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
-  ConstraintSystem cs(dc, csOptions, expr);
+  ConstraintSystem cs(dc, csOptions);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is

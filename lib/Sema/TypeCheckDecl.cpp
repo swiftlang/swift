@@ -75,7 +75,7 @@ namespace {
 /// Float and integer literals are additionally keyed by numeric equivalence.
 struct RawValueKey {
   enum class Kind : uint8_t {
-    String, Float, Int, Tombstone, Empty
+    String, Float, Int, Bool, Tombstone, Empty
   } kind;
   
   struct IntValueTy {
@@ -101,6 +101,7 @@ struct RawValueKey {
     StringRef stringValue;
     IntValueTy intValue;
     FloatValueTy floatValue;
+    bool boolValue;
   };
   
   explicit RawValueKey(LiteralExpr *expr) {
@@ -136,6 +137,12 @@ struct RawValueKey {
       kind = Kind::String;
       stringValue = cast<StringLiteralExpr>(expr)->getValue();
       return;
+
+    case ExprKind::BooleanLiteral:
+      kind = Kind::Bool;
+      boolValue = cast<BooleanLiteralExpr>(expr)->getValue();
+      return;
+
     default:
       llvm_unreachable("not a valid literal expr for raw value");
     }
@@ -183,6 +190,8 @@ public:
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
       return DenseMapInfo<StringRef>::getHashValue(k.stringValue);
+    case RawValueKey::Kind::Bool:
+      return DenseMapInfo<uint64_t>::getHashValue(k.boolValue);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;
@@ -204,6 +213,8 @@ public:
              a.intValue.v1 == b.intValue.v1;
     case RawValueKey::Kind::String:
       return a.stringValue.equals(b.stringValue);
+    case RawValueKey::Kind::Bool:
+      return a.boolValue == b.boolValue;
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return true;
@@ -1655,6 +1666,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       continue;
     }
 
+
     // If the raw values of the enum case are fixed, then we trust our callers
     // to have set things up correctly.  This comes up with imported enums
     // and deserialized @objc enums which always have their raw values setup
@@ -1945,8 +1957,7 @@ getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
 }
 
 static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
-  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
-    return;
+  assert(PD->getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
 
   auto *DC = PD->getInnermostDeclContext();
   const SourceFile *SF = DC->getParentSourceFile();
@@ -1982,30 +1993,78 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
 
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(ParameterList *params) {
-  for (auto *param : *params) {
+  // Force the default values in case they produce diagnostics.
+  for (auto *param : *params)
+    (void)param->getTypeCheckedDefaultExpr();
+}
+
+llvm::Expected<Expr *>
+DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
+                                     ParamDecl *param) const {
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
+    // Inherited default arguments don't have expressions, but we need to
+    // perform a couple of semantic checks to make sure they're valid.
     checkInheritedDefaultValueRestrictions(param);
-    if (!param->getDefaultValue() ||
-        !param->hasInterfaceType() ||
-        param->getInterfaceType()->hasError())
+    return nullptr;
+  }
+
+  auto &ctx = param->getASTContext();
+  auto paramTy = param->getType();
+  auto *initExpr = param->getStructuralDefaultExpr();
+  assert(initExpr);
+
+  if (paramTy->hasError())
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+
+  auto *dc = param->getDefaultArgumentInitContext();
+  assert(dc);
+
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+  }
+
+  TypeChecker::checkInitializerErrorHandling(dc, initExpr);
+
+  // Walk the checked initializer and contextualize any closures
+  // we saw there.
+  (void)TypeChecker::contextualizeInitializer(dc, initExpr);
+  return initExpr;
+}
+
+llvm::Expected<Initializer *>
+DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
+                                            ParamDecl *param) const {
+  auto &ctx = param->getASTContext();
+  auto *parentDC = param->getDeclContext();
+  auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
+
+  // In order to compute the initializer context for this parameter, we need to
+  // know its index in the parameter list. Therefore iterate over the parameters
+  // looking for it and fill in the other parameter's contexts while we're here.
+  Initializer *result = nullptr;
+  for (auto idx : indices(*paramList)) {
+    auto *otherParam = paramList->get(idx);
+
+    // If this param doesn't need a context, we're done.
+    if (!otherParam->hasDefaultExpr() && !otherParam->getStoredProperty())
       continue;
 
-    Expr *e = param->getDefaultValue();
-    auto *initContext = param->getDefaultArgumentInitContext();
+    // If this param already has a context, continue using it.
+    if (otherParam->getCachedDefaultArgumentInitContext())
+      continue;
 
-    auto resultTy =
-        TypeChecker::typeCheckParameterDefault(e, initContext, param->getType(),
-                                               param->isAutoClosure());
-
-    if (resultTy) {
-      param->setDefaultValue(e);
-    }
-
-    TypeChecker::checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)TypeChecker::contextualizeInitializer(initContext, e);
+    // Create a new initializer context. If this is for the parameter that
+    // kicked off the request, make a note of it for when we return. Otherwise
+    // cache the result ourselves.
+    auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
+    if (param == otherParam)
+      result = initDC;
+    else
+      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, std::move(initDC));
   }
+  assert(result && "Didn't create init context?");
+  return result;
 }
 
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
@@ -4056,7 +4115,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {
     auto &ctx = param->getASTContext();
-    ctx.Diags.diagnose(param->getDefaultValue()->getLoc(),
+    ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
                        swift::diag::cannot_provide_default_value_inout,
                        param->getName());
     return ParamSpecifier::Default;

@@ -456,24 +456,18 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
                                                          CGNode *newPointsTo,
                                                          bool createEdge) {
   // Track nodes that require pointsTo edges.
-  llvm::SmallVector<CGNode *, 4> pointsToEdges;
+  llvm::SmallVector<CGNode *, 4> pointsToEdgeNodes;
+  if (createEdge)
+    pointsToEdgeNodes.push_back(initialNode);
 
   // Step 1: Visit each node that reaches or is reachable via defer edges until
   // reaching a node with the newPointsTo or with a proper pointsTo edge.
 
   // A worklist to gather updated nodes in the defer web.
   CGNodeWorklist updatedNodes(this);
-  updatedNodes.push(initialNode);
-  if (createEdge)
-    pointsToEdges.push_back(initialNode);
-  unsigned updateCount = 1;
-  assert(updateCount == updatedNodes.size());
-  // Augment the worlist with the nodes that were reached via backward
-  // traversal. It's not as precise as DFS, but helps avoid redundant pointsTo
-  // edges in most cases.
-  llvm::SmallPtrSet<CGNode *, 8> backwardReachable;
+  unsigned updateCount = 0;
 
-  auto visitDeferTarget = [&](CGNode *node, bool isSuccessor) {
+  auto visitDeferTarget = [&](CGNode *node, bool /*isSuccessor*/) {
     if (updatedNodes.contains(node))
       return true;
 
@@ -484,7 +478,7 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
       // nodes are initialized one at a time, each time a new defer edge is
       // created. If this were not complete, then the backward traversal below
       // in Step 2 could reach uninitialized nodes not seen here in Step 1.
-      pointsToEdges.push_back(node);
+      pointsToEdgeNodes.push_back(node);
       return true;
     }
     ++updateCount;
@@ -493,31 +487,29 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
       // edge. Create a "fake" pointsTo edge to maintain the graph invariant
       // (this changes the structure of the graph but adding this edge has no
       // effect on the process of merging nodes or creating new defer edges).
-      pointsToEdges.push_back(node);
+      pointsToEdgeNodes.push_back(node);
     }
     updatedNodes.push(node);
-    if (!isSuccessor)
-      backwardReachable.insert(node);
-
     return true;
   };
+  // Seed updatedNodes with initialNode.
+  visitDeferTarget(initialNode, true);
   // updatedNodes may grow during this loop.
-  unsigned nextUpdatedNodeIdx = 0;
-  for (; nextUpdatedNodeIdx < updatedNodes.size(); ++nextUpdatedNodeIdx)
-    updatedNodes[nextUpdatedNodeIdx]->visitDefers(visitDeferTarget);
+  for (unsigned idx = 0; idx < updatedNodes.size(); ++idx)
+    updatedNodes[idx]->visitDefers(visitDeferTarget);
   // Reset this worklist so others can be used, but updateNode.nodeVector still
   // holds all the nodes found by step 1.
   updatedNodes.reset();
 
   // Step 2: Update pointsTo fields by propagating backward from nodes that
   // already have a pointsTo edge.
-  assert(nextUpdatedNodeIdx == updatedNodes.size());
-  --nextUpdatedNodeIdx;
-  bool processBackwardReachable = false;
   do {
-    while (!pointsToEdges.empty()) {
-      CGNode *edgeNode = pointsToEdges.pop_back_val();
+    while (!pointsToEdgeNodes.empty()) {
+      CGNode *edgeNode = pointsToEdgeNodes.pop_back_val();
       if (!edgeNode->pointsTo) {
+        // This node is either (1) a leaf node in the defer web (identified in
+        // step 1) or (2) an arbitrary node in a defer-cycle (identified in a
+        // previous iteration of the outer loop).
         edgeNode->setPointsToEdge(newPointsTo);
         newPointsTo->mergeUsePoints(edgeNode);
         assert(updateCount--);
@@ -542,35 +534,19 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
         return Traversal::Follow;
       });
     }
-    // For all nodes visited in step 1, if any node was not backward-reachable
-    // from a pointsTo edge, create an edge for it and restart traversal.
-    //
-    // First process all forward-reachable nodes in backward order, then process
-    // all backwardReachable nodes in forward order.
-    while (nextUpdatedNodeIdx != updatedNodes.size()) {
-      CGNode *node = updatedNodes[nextUpdatedNodeIdx];
-      // When processBackwardReachable == true, the backwardReachable set is
-      // empty and all forward reachable nodes already have a pointsTo edge.
-      if (!backwardReachable.count(node)) {
-        if (!node->pointsTo) {
-          pointsToEdges.push_back(node);
-          break;
-        }
+    // For all nodes visited in step 1, pick a single node that was not
+    // backward-reachable from a pointsTo edge, create an edge for it and
+    // restart traversal. This only happens when step 1 fails to find leaves in
+    // the defer web because of defer edge cycles.
+    while (!updatedNodes.empty()) {
+      CGNode *node = updatedNodes.nodeVector.pop_back_val();
+      if (!node->pointsTo) {
+        pointsToEdgeNodes.push_back(node);
+        break;
       }
-      if (processBackwardReachable) {
-        ++nextUpdatedNodeIdx;
-        continue;
-      }
-      if (nextUpdatedNodeIdx > 0) {
-        --nextUpdatedNodeIdx;
-        continue;
-      }
-      // reverse direction
-      backwardReachable.clear();
-      processBackwardReachable = true;
     }
     // This outer loop is exceedingly unlikely to execute more than twice.
-  } while (!pointsToEdges.empty());
+  } while (!pointsToEdgeNodes.empty());
   assert(updateCount == 0);
 }
 

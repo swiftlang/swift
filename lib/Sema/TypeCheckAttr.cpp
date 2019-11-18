@@ -112,7 +112,8 @@ public:
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
 
-  // TODO: Changes are yet to be upstreamed from apple/tensorflow branch.
+  // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
+  // tensorflow branch.
   IGNORED_ATTR(Differentiable)
 #undef IGNORED_ATTR
 
@@ -2464,7 +2465,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
     if (!ED->getModuleContext()->isResilient()) {
-      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+      attr->setInvalid();
       return;
     }
 

@@ -4506,9 +4506,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   ASTContext &ctx = type->getASTContext();
 
   // In the absence of Objective-C interoperability, everything uses native
-  // reference counting.
-  if (!ctx.LangOpts.EnableObjCInterop)
-    return ReferenceCounting::Native;
+  // reference counting or is the builtin BridgeObject.
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    return type->getKind() == TypeKind::BuiltinBridgeObject
+             ? ReferenceCounting::Bridge
+             : ReferenceCounting::Native;
+  }
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
