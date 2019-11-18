@@ -1177,7 +1177,8 @@ static void transformAndForwardResults(
 void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
-    GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args, Optional<VFSOptions> vfsOptions) {
+    GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
+    Optional<VFSOptions> vfsOptions) {
   StringRef filterText;
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
