@@ -128,15 +128,12 @@ static bool swiftCodeCompleteImpl(
   // Resolve symlinks for the input file; we resolve them for the input files
   // in the arguments as well.
   // FIXME: We need the Swift equivalent of Clang's FileEntry.
-  auto InputFile = llvm::MemoryBuffer::getMemBuffer(
-      UnresolvedInputFile->getBuffer(),
-      Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier()));
+  auto bufferIdentifier =
+      Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier());
 
-  auto origBuffSize = InputFile->getBufferSize();
-  unsigned CodeCompletionOffset = Offset;
-  if (CodeCompletionOffset > origBuffSize) {
-    CodeCompletionOffset = origBuffSize;
-  }
+  auto origOffset = Offset;
+  auto newBuffer = SwiftLangSupport::makeCodeCompletionMemoryBuffer(
+      UnresolvedInputFile, Offset, bufferIdentifier);
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -148,24 +145,22 @@ static bool swiftCodeCompleteImpl(
   if (TracedOp.enabled()) {
     CI.addDiagnosticConsumer(&TraceDiags);
     trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
+    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
     TracedOp.setDiagnosticProvider(
         [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
           TraceDiags.getAllDiagnostics(diags);
         });
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("OriginalOffset", std::to_string(Offset)),
-                    std::make_pair("Offset",
-                      std::to_string(CodeCompletionOffset))});
+    TracedOp.start(
+        SwiftArgs,
+        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
+         std::make_pair("Offset", std::to_string(Offset))});
   }
 
   CompilerInvocation Invocation;
   bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(),
-      FileSystem, Error);
-  if (Failed) {
+      Invocation, Args, CI.getDiags(), bufferIdentifier, FileSystem, Error);
+  if (Failed)
     return false;
-  }
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     Error = "no input filenames specified";
     return false;
@@ -175,31 +170,17 @@ static bool swiftCodeCompleteImpl(
   // because they're somewhat heavy operations and aren't needed for completion.
   Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
-  const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
-  std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
-      llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-                                              InputFile->getBufferSize() + 1,
-                                              InputFile->getBufferIdentifier());
-  char *NewBuf = NewBuffer->getBufferStart();
-  char *NewPos = std::copy(InputFile->getBufferStart(), Position, NewBuf);
-  *NewPos = '\0';
-  std::copy(Position, InputFile->getBufferEnd(), NewPos+1);
-
-  Invocation.setCodeCompletionPoint(NewBuffer.get(), CodeCompletionOffset);
-
-  auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
-  ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
+  Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
-      ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              SwiftConsumer));
+  auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
+  ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
 
-  Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
+  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+      ide::makeCodeCompletionCallbacksFactory(CompletionContext, SwiftConsumer));
 
-  // FIXME: We need to be passing the buffers from the open documents.
-  // It is not a huge problem in practice because Xcode auto-saves constantly.
+  Invocation.setCodeCompletionFactory(callbacksFactory.get());
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
     CI.getSourceMgr().setFileSystem(FileSystem);
