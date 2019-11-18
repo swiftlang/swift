@@ -59,6 +59,7 @@ class SILGlobalOpt {
 
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   typedef SmallVector<LoadInst *, 4> GlobalLoads;
+  typedef SmallVector<BeginAccessInst *, 4> GlobalAccess;
 
   /// A map from each visited global initializer call to a list of call sites.
   llvm::MapVector<SILFunction *, GlobalInitCalls> GlobalInitCallMap;
@@ -70,10 +71,15 @@ class SILGlobalOpt {
   /// A map from each visited global let variable to its set of loads.
   llvm::MapVector<SILGlobalVariable *, GlobalLoads> GlobalLoadMap;
 
+  /// A map from each visited global to its set of begin_access instructions.
+  llvm::MapVector<SILGlobalVariable *, GlobalAccess> GlobalAccessMap;
+
   /// A map from each visited global let variable to the store instructions
   /// which initialize it.
   llvm::MapVector<SILGlobalVariable *, StoreInst *> GlobalVarStore;
-  
+
+  /// A map for each visited global variable to the alloc instruction that
+  /// allocated space for it.
   llvm::MapVector<SILGlobalVariable *, AllocGlobalInst *> AllocGlobalStore;
 
   /// A set of visited global variables that for some reason we have decided is
@@ -119,7 +125,9 @@ protected:
 
   /// This is the main entrypoint for collecting global accesses.
   void collectGlobalAccess(GlobalAddrInst *GAI);
-  
+
+  /// Simple function to collect globals and their corresponding alloc
+  /// instructions.
   void collectAllocGlobal(SILGlobalVariable *global,
                           AllocGlobalInst *allocGlobal);
 
@@ -143,6 +151,9 @@ protected:
   /// Set the static initializer and remove "once" from addressor if a global
   /// can be statically initialized.
   void optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls);
+
+  /// Remove private global variables that are never used.
+  void tryOptimizeUnusedGlobal(SILGlobalVariable *global, StoreInst *store);
 
   /// Optimize access to the global variable, which is known to have a constant
   /// value. Replace all loads from the global address by invocations of a
@@ -775,6 +786,35 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   HasChanged = true;
 }
 
+/// Look through all the uses of the global variable. If the only use is a
+/// store, and the global is private, then we can remove the global, the store,
+/// and the alloc. Otherwise, return.
+void SILGlobalOpt::tryOptimizeUnusedGlobal(SILGlobalVariable *global,
+                                           StoreInst *store) {
+  if (global->getLinkage() != SILLinkage::Private)
+    return;
+  if (GlobalLoadMap.count(global) || GlobalAccessMap.count(global))
+    return;
+
+  auto globalAddr = cast<GlobalAddrInst>(store->getDest());
+  bool canRemove = true;
+  for (auto *use : globalAddr->getUses()) {
+    if (!isa<StoreInst>(use->getUser())) {
+      canRemove = false;
+      break;
+    }
+  }
+
+  if (canRemove) {
+    store->eraseFromParent();
+    assert(globalAddr->getUses().begin() == globalAddr->getUses().end());
+    globalAddr->eraseFromParent();
+    if (AllocGlobalStore.count(global))
+      AllocGlobalStore[global]->eraseFromParent();
+    global->getModule().eraseGlobalVariable(global);
+  }
+}
+
 static bool canBeChangedExternally(SILGlobalVariable *SILG) {
   // Don't assume anything about globals which are imported from other modules.
   if (isAvailableExternally(SILG->getLinkage()))
@@ -873,6 +913,10 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
       continue;
     }
 
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(Op->getUser())) {
+      GlobalAccessMap[SILG].push_back(beginAccess);
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: has non-store, non-load use: "
                             << SILG->getName() << '\n';
                Op->getUser()->dump());
@@ -883,7 +927,8 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   }
 }
 
-void SILGlobalOpt::collectAllocGlobal(SILGlobalVariable *global, AllocGlobalInst *allocGlobal) {
+void SILGlobalOpt::collectAllocGlobal(SILGlobalVariable *global,
+                                      AllocGlobalInst *allocGlobal) {
   AllocGlobalStore[global] = allocGlobal;
 }
 
@@ -937,11 +982,6 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
 
 bool SILGlobalOpt::run() {
   for (auto &F : *Module) {
-
-    // Don't optimize functions that are marked with the opt.never attribute.
-    if (!F.shouldOptimize())
-      continue;
-
     // TODO: Add support for ownership.
     if (F.hasOwnership()) {
       continue;
@@ -978,32 +1018,30 @@ bool SILGlobalOpt::run() {
   }
 
   for (auto &InitCalls : GlobalInitCallMap) {
+    // Don't optimize functions that are marked with the opt.never attribute.
+    bool shouldOptimize = true;
+    for (auto *apply : InitCalls.second) {
+      if (!apply->getFunction()->shouldOptimize()) {
+        shouldOptimize = false;
+        break;
+      }
+    }
+    if (!shouldOptimize)
+      continue;
+
     // Optimize the addressors if possible.
     optimizeInitializer(InitCalls.first, InitCalls.second);
     placeInitializers(InitCalls.first, InitCalls.second);
   }
 
   for (auto &Init : GlobalVarStore) {
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (!Init.second->getFunction()->shouldOptimize())
+      continue;
+
     // Optimize the access to globals if possible.
     optimizeGlobalAccess(Init.first, Init.second);
-    
-    if (Init.first->getLinkage() != SILLinkage::Private) continue;
-    bool canRemove = true;
-    auto globalAddr = cast<GlobalAddrInst>(Init.second->getDest());
-    for (auto *use : globalAddr->getUses()) {
-      if (!isa<StoreInst>(use->getUser())) {
-        canRemove = false;
-        break;
-      }
-    }
-    if (canRemove) {
-      Init.second->eraseFromParent();
-      assert(globalAddr->getUses().begin() == globalAddr->getUses().end());
-      globalAddr->eraseFromParent();
-      if (AllocGlobalStore.count(Init.first))
-        AllocGlobalStore[Init.first]->eraseFromParent();
-      Init.first->getModule().eraseGlobalVariable(Init.first);
-    }
+    tryOptimizeUnusedGlobal(Init.first, Init.second);
   }
 
   return HasChanged;
