@@ -379,8 +379,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             // fix it.
             // An exception to this rule is when the type is declared with type sugar
             // Reference: SR-11724
-            if (param.Type->getKind() == TypeReprKind::Optional
-                || param.Type->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+            if ( isa<OptionalTypeRepr>(param.Type)
+                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
                 diagnose(typeStartLoc, diag::parameter_unnamed)
                     .fixItInsert(typeStartLoc, "_: ");
             } else {
