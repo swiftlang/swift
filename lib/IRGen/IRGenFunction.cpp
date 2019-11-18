@@ -20,6 +20,7 @@
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Explosion.h"
