@@ -119,15 +119,16 @@ void swift::performCodeCompletionSecondPass(
 void Parser::performCodeCompletionSecondPass(
     PersistentParserState &ParserState,
     CodeCompletionCallbacksFactory &Factory) {
-  SharedTimer timer("CodeCompletionSecondPass");
   if (!ParserState.hasCodeCompletionDelayedDeclState())
     return;
 
   auto state = ParserState.takeCodeCompletionDelayedDeclState();
-
   auto &SF = *state->ParentContext->getParentSourceFile();
-  auto &SM = SF.getASTContext().SourceMgr;
-  auto BufferID = SM.findBufferContainingLoc(state->BodyPos.Loc);
+  auto &Ctx = SF.getASTContext();
+
+  FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
+
+  auto BufferID = Ctx.SourceMgr.findBufferContainingLoc(state->BodyPos.Loc);
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(

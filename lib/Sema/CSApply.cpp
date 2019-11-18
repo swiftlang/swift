@@ -3179,7 +3179,7 @@ namespace {
           castKind == CheckedCastKind::SetDowncast) {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast = new (ctx) ConditionalCheckedCastExpr(
-            sub, expr->getLoc(), SourceLoc(), TypeLoc::withoutLoc(toType));
+            sub, expr->getLoc(), SourceLoc(), expr->getCastTypeLoc());
         cs.setType(cast, toOptType);
         cs.setType(cast->getCastTypeLoc(), toType);
         if (expr->isImplicit())

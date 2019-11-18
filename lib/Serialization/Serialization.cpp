@@ -4815,7 +4815,8 @@ void swift::serializeToBuffers(
 
   assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
   {
-    SharedTimer timer("Serialization, swiftmodule, to buffer");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     Serializer::writeToStream(stream, DC, M, options);
@@ -4833,7 +4834,8 @@ void swift::serializeToBuffers(
   }
 
   if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
-    SharedTimer timer("Serialization, swiftdoc, to buffer");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     writeDocToStream(stream, DC, options.GroupInfoPath);
@@ -4849,7 +4851,8 @@ void swift::serializeToBuffers(
   }
 
   if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
-    SharedTimer timer("Serialization, swiftsourceinfo, to buffer");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     writeSourceInfoToStream(stream, DC);
@@ -4880,7 +4883,8 @@ void swift::serialize(ModuleOrSourceFile DC,
   bool hadError = withOutputFile(getContext(DC).Diags,
                                  options.OutputPath,
                                  [&](raw_ostream &out) {
-    SharedTimer timer("Serialization, swiftmodule");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
     return false;
   });
@@ -4891,7 +4895,8 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
-      SharedTimer timer("Serialization, swiftdoc");
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, swiftdoc");
       writeDocToStream(out, DC, options.GroupInfoPath);
       return false;
     });
@@ -4901,7 +4906,8 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC).Diags,
                          options.SourceInfoOutputPath,
                          [&](raw_ostream &out) {
-      SharedTimer timer("Serialization, swiftsourceinfo");
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, swiftsourceinfo");
       writeSourceInfoToStream(out, DC);
       return false;
     });
