@@ -198,14 +198,14 @@ func moreComplexUnwrapFixes() {
   // expected-note@-2{{force-unwrap using '!'}}{{12-12=!}}
 
   takeOpt(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
-  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
-  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
 
   takeNon(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
-  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
-  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
   // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
 
   takeNon(os?.value) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
