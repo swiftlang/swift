@@ -1208,11 +1208,11 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     bool isUsableValue(ValueDecl *VD, DeclVisibilityKind Reason) {
 
       // Check "use within its own initial value" case.
-      if (auto *varD = dyn_cast<VarDecl>(VD))
-        if (auto *PBD = varD->getParentPatternBinding())
-          if (!PBD->isImplicit() &&
-              SM.rangeContainsTokenLoc(PBD->getSourceRange(), Loc))
+      if (auto *varD = dyn_cast<VarDecl>(VD)) {
+        if (auto *initExpr = varD->getParentInitializer())
+          if (SM.rangeContainsTokenLoc(initExpr->getSourceRange(), Loc))
             return false;
+      }
 
       switch (Reason) {
       case DeclVisibilityKind::LocalVariable:
