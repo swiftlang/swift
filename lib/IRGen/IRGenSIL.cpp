@@ -3739,6 +3739,14 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
+  // In CodeView, the debug info type for `inout` types really should be
+  // `inout` and should not be dereferenced in `dbg.declare`.
+  bool ForceDirectInOutType =
+      Decl->getSpecifier() == VarDecl::Specifier::InOut && IGM.DebugInfo &&
+      IGM.getOptions().DebugInfoFormat == IRGenDebugInfoFormat::CodeView;
+
+  if (ForceDirectInOutType)
+    RealType = CanInOutType::get(RealType);
 
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
@@ -3753,8 +3761,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
       emitShadowCopyIfNeeded(Addr, i->getDebugScope(), Name, VarInfo->ArgNo,
                              IsAnonymous),
       DbgTy, SILType(), i->getDebugScope(), Decl, Name, VarInfo->ArgNo,
-      (IsLoadablyByAddress || DbgTy.isImplicitlyIndirect()) ? DirectValue
-                                                            : IndirectValue);
+      (IsLoadablyByAddress || DbgTy.isImplicitlyIndirect() ||
+       ForceDirectInOutType) ? DirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {

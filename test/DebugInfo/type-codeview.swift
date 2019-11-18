@@ -20,6 +20,15 @@ struct MyStruct { // NOTE: Classes do not work in Windows yet.
   // CHECK-DAG: ![[MYFLOAT32]] = !DIDerivedType(tag: DW_TAG_member, name: "myFloat",{{.*}} baseType: ![[FLOAT32:[0-9]+]], size: 32, offset: 72)
   // CHECK-DAG: !DIBasicType(name: "$SBf32_D", size: 32, encoding: DW_ATE_float)
 }
+func useReference(_ inoutArg: inout Int64) {
+  // CHECK-DAG: distinct !DISubprogram(name: "useReference",{{.*}} type: ![[USEREFTYPE:[0-9]+]],
+  // CHECK-DAG: ![[USEREFTYPE]] = !DISubroutineType(types: ![[USEREFLIST:[0-9]+]])
+  // CHECK-DAG: ![[USEREFLIST]] = !{!{{[0-9]+}}, ![[INT64REF:[0-9]+]]}
+  // CHECK-DAG: ![[INT64REF]] = !DIDerivedType(tag: DW_TAG_reference_type, baseType: ![[INT64]], size: 64)
+  inoutArg += 1
+  // CHECK-DAG: ![[INOUTARG:[0-9]+]] = !DILocalVariable(name: "inoutArg", arg: 1,{{.*}} type: ![[INT64REF]])
+  // CHECK-DAG: call void @llvm.dbg.declare(metadata {{.*}}, metadata ![[INOUTARG:[0-9]+]], metadata !DIExpression())
+}
 func foo() {
   var myTuple: (real: Double, imaginary: Double, String) = (1.1, 2.2, "number")
   // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "(real: Swift.Double, imaginary: Swift.Double, Swift.String)",{{.*}} elements: ![[TUPLEELEMS:[0-9]+]],{{.*}} identifier: "$SSd4real_Sd9imaginarySStD"
