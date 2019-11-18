@@ -6857,14 +6857,8 @@ public:
     auto eltAdjValue = builder.emitLoadValueOperation(
         si->getLoc(), eltAdjBuffer, LoadOwnershipQualifier::Take);
     recordTemporary(eltAdjValue);
-    SILValue src = si->getSrc();
-    // When the store's source is a `copy_value`, the `copy_value` is part of
-    // array literal initialization. In this case, add the adjoint to the source
-    // of the copy directly.
-    if (auto *cvi = dyn_cast<CopyValueInst>(src))
-      src = cvi->getOperand();
-    addAdjointValue(si->getParent(), src, makeConcreteAdjointValue(eltAdjValue),
-                    si->getLoc());
+    addAdjointValue(si->getParent(), si->getSrc(),
+                    makeConcreteAdjointValue(eltAdjValue), si->getLoc());
     builder.createDeallocStack(si->getLoc(), eltAdjBuffer);
   }
 
