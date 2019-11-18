@@ -2186,10 +2186,10 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     // Propagate usefulness through user's operands.
     propagateUseful(use->getUser(), dependentVariableIndex);
     for (auto res : use->getUser()->getResults()) {
-#define SKIP_NODERIVATIVE(INST) \
-if (auto *sei = dyn_cast<INST##Inst>(res)) \
-if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-continue;
+#define SKIP_NODERIVATIVE(INST)                                                \
+      if (auto *sei = dyn_cast<INST##Inst>(res))                               \
+        if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())      \
+          continue;
       SKIP_NODERIVATIVE(StructExtract)
       SKIP_NODERIVATIVE(StructElementAddr)
 #undef SKIP_NODERIVATIVE
@@ -2616,9 +2616,9 @@ emitDerivativeFunctionReference(
 
   SILValue functionSource = original;
 
-  // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind matches
-  // the given kind and desired differentiation parameter indices, simply
-  // extract the derivative function of its function operand, retain the
+  // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind
+  // matches the given kind and desired differentiation parameter indices,
+  // simply extract the derivative function of its function operand, retain the
   // derivative function, and return it.
   if (auto *inst = original->getDefiningInstruction())
     if (auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(inst))
