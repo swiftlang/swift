@@ -37,13 +37,13 @@ enum class CodeCompletionDelayedDeclKind {
 
 class CodeCompletionDelayedDeclState {
 public:
-  const CodeCompletionDelayedDeclKind Kind;
-  const unsigned Flags;
-  DeclContext *const ParentContext;
+  CodeCompletionDelayedDeclKind Kind;
+  unsigned Flags;
+  DeclContext *ParentContext;
   SavedScope Scope;
-  const unsigned StartOffset;
-  const unsigned EndOffset;
-  const unsigned PrevOffset;
+  unsigned StartOffset;
+  unsigned EndOffset;
+  unsigned PrevOffset;
 
   SavedScope takeScope() { return std::move(Scope); }
 
@@ -95,9 +95,15 @@ public:
                                          DeclContext *ParentContext,
                                          SourceRange BodyRange,
                                          SourceLoc PreviousLoc);
+  void restoreCodeCompletionDelayedDeclState(
+      const CodeCompletionDelayedDeclState &other);
 
   bool hasCodeCompletionDelayedDeclState() {
     return CodeCompletionDelayedDeclStat.get() != nullptr;
+  }
+
+  CodeCompletionDelayedDeclState &getCodeCompletionDelayedDeclState() {
+    return *CodeCompletionDelayedDeclStat.get();
   }
 
   std::unique_ptr<CodeCompletionDelayedDeclState>

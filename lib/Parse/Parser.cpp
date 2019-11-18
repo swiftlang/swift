@@ -192,6 +192,11 @@ void Parser::performCodeCompletionSecondPassImpl(
 
   case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
+
+    if (auto *P = AFD->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(AFD->getParameters());
+
     ParseFunctionBody CC(*this, AFD);
     setLocalDiscriminatorToParamList(AFD->getParameters());
 
@@ -205,6 +210,8 @@ void Parser::performCodeCompletionSecondPassImpl(
          "Second pass should not set any code completion info");
 
   CodeCompletion->doneParsing();
+
+  State->restoreCodeCompletionDelayedDeclState(info);
 }
 
 swift::Parser::BacktrackingScope::~BacktrackingScope() {
@@ -430,11 +437,11 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(SourceFile &SF):
+  TokenRecorder(SourceFile &SF, unsigned BufferID):
   Ctx(SF.getASTContext()),
   SM(SF.getASTContext().SourceMgr),
   Bag(SF.getTokenVector()),
-  BufferID(SF.getBufferID().getValue()) {};
+  BufferID(BufferID) {};
 
   void finalize() override {
 
@@ -516,7 +523,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     Context(SF.getASTContext()),
     DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
-                new TokenRecorder(SF) :
+                new TokenRecorder(SF, L->getBufferID()) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
                                            L->getBufferID(),
