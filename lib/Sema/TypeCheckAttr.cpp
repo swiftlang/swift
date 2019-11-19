@@ -177,6 +177,7 @@ public:
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
+  void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
@@ -406,6 +407,11 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   else
     // macOS allows 1 parameter to an @IBAction method.
     validateIBActionSignature(Ctx, attr, FD, /*minParams=*/1, /*maxParams=*/1);
+}
+
+void
+AttributeChecker::visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *attr) {
+  // TODO: implement diagnostics
 }
 
 void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {

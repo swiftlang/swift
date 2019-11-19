@@ -1530,7 +1530,124 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                  /*Implicit=*/false));
     break;
   }
+  case DAK_OriginallyDefinedIn: {
+    auto LeftLoc = Tok.getLoc();
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    SourceLoc RightLoc;
+    enum class NextSegmentKind: uint8_t {
+      ModuleName = 0,
+      PlatformVersion,
+    };
+    NextSegmentKind NK = NextSegmentKind::ModuleName;
+    StringRef OriginalModuleName;
+    llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
+      PlatformAndVersions;
 
+    StringRef AttrName = "@_originalDefinedIn";
+    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
+                  diag::originally_defined_in_missing_rparen,
+                  SyntaxKind::Unknown, [&]() -> ParserStatus {
+      SWIFT_DEFER {
+        if (NK != NextSegmentKind::PlatformVersion) {
+          NK = (NextSegmentKind)((uint8_t)NK + (uint8_t)1);
+        }
+      };
+      switch (NK) {
+      // Parse 'module: "original_module_name"'.
+      case NextSegmentKind::ModuleName: {
+        // Parse 'module' ':'.
+        if (!Tok.is(tok::identifier) || Tok.getText() != "module" ||
+            !peekToken().is(tok::colon)) {
+          diagnose(Tok, diag::originally_defined_in_need_original_module_name);
+          return makeParserError();
+        }
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+        // Parse the next string literal as the original module name.
+        auto ModuleNameLoc = Tok.getLoc();
+        if (Tok.is(tok::string_literal)) {
+          auto NameOp = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                          "original module name");
+          if (NameOp.hasValue())
+            OriginalModuleName = *NameOp;
+          consumeToken();
+        }
+        if (OriginalModuleName.empty()) {
+          diagnose(ModuleNameLoc,
+                   diag::originally_defined_in_need_nonempty_module_name);
+          return makeParserError();
+        }
+        return makeParserSuccess();
+      }
+      // Parse 'OSX 13.13'.
+      case NextSegmentKind::PlatformVersion: {
+        if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
+            (peekToken().is(tok::floating_literal) ||
+             peekToken().is(tok::integer_literal))) {
+          PlatformKind Platform;
+          // Parse platform name.
+          auto Plat = platformFromString(Tok.getText());
+          if (!Plat.hasValue()) {
+            diagnose(Tok.getLoc(),
+                     diag::originally_defined_in_unrecognized_platform);
+            return makeParserError();
+          } else {
+            consumeToken();
+            Platform = *Plat;
+          }
+          // Parse version number
+          llvm::VersionTuple VerTuple;
+          SourceRange VersionRange;
+          if (parseVersionTuple(VerTuple, VersionRange,
+              Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+            return makeParserError();
+          } else {
+            if (VerTuple.getSubminor().hasValue() ||
+                VerTuple.getBuild().hasValue()) {
+              diagnose(Tok.getLoc(), diag::originally_defined_in_major_minor_only);
+            }
+            // * as platform name isn't supported.
+            if (Platform == PlatformKind::none) {
+              diagnose(AtLoc, diag::originally_defined_in_missing_platform_name);
+            } else {
+              PlatformAndVersions.emplace_back(Platform, VerTuple);
+            }
+            return makeParserSuccess();
+          }
+        }
+        diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+        return makeParserError();
+      }
+      }
+    }).isError()) {
+      return false;
+    }
+    if (OriginalModuleName.empty()) {
+      diagnose(AtLoc, diag::originally_defined_in_need_nonempty_module_name);
+      return false;
+    }
+    if (PlatformAndVersions.empty()) {
+      diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+      return false;
+    }
+
+    assert(!OriginalModuleName.empty());
+    assert(!PlatformAndVersions.empty());
+    assert(NK == NextSegmentKind::PlatformVersion);
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    for (auto &Item: PlatformAndVersions) {
+      Attributes.add(new (Context) OriginallyDefinedInAttr(AtLoc, AttrRange,
+                                                           OriginalModuleName,
+                                                           Item.first,
+                                                           Item.second,
+                                                           /*IsImplicit*/false));
+    }
+    break;
+  }
   case DAK_Available: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
