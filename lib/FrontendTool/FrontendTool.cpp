@@ -1337,6 +1337,12 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
 
+
+  PrettyStackTraceStringAction trace(
+      "running user code",
+      MSF.is<SourceFile *>() ? MSF.get<SourceFile *>()->getFilename()
+                     : MSF.get<ModuleDecl *>()->getModuleFilename());
+
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
   return Instance.getASTContext().hadError();
