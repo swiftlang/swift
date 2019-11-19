@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -2245,9 +2246,11 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
-    UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile());
-    for (auto result : lookup.Results) {
+    auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier(name),
+                                                  CI.getPrimarySourceFile());
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
+    for (auto result : lookup) {
       result.getValueDecl()->print(*Printer, Options);
 
       if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {

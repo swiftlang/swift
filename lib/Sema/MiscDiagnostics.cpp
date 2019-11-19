@@ -19,6 +19,7 @@
 #include "TypeCheckAvailability.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -531,13 +532,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
-                               /*Loc=*/SourceLoc(),
-                               UnqualifiedLookup::Flags::KnownPrivate);
+      auto descriptor = UnqualifiedLookupDescriptor(
+          VD->getBaseName(), topLevelContext, SourceLoc(),
+          UnqualifiedLookupFlags::KnownPrivate);
+      auto lookup = evaluateOrDefault(Ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
-      for (auto &result : lookup.Results) {
+      for (auto &result : lookup) {
         const ValueDecl *value = result.getValueDecl();
         resultsByModule.insert(std::make_pair(value->getModuleContext(),value));
       }
