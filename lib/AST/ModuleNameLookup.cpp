@@ -236,11 +236,7 @@ llvm::Expected<QualifiedLookupResult> LookupInModuleRequest::evaluate(
   assert(moduleScopeContext->isModuleScopeContext());
 
   auto &ctx = moduleOrFile->getASTContext();
-  auto *stats = ctx.Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupInModule++;
-
-  FrontendStatsTracer tracer(stats, "lookup-in-module");
+  FrontendStatsTracer tracer(ctx.Stats, "lookup-in-module");
 
   QualifiedLookupResult decls;
   LookupByName lookup(ctx, resolutionKind, name, lookupKind);
