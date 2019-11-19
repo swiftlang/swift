@@ -1492,6 +1492,69 @@ NSStringAPIs.test("padding(toLength:withPad:startingAtIndex:)") {
       toLength: 15, withPad: "XYZ", startingAt: 1))
 }
 
+NSStringAPIs.test("equality") {
+  var content = ("👩‍❤️‍👩" as String) as NSString
+
+  var strings = createMutableStringVariants(content)
+  
+  for str in strings {
+    for str2 in strings {
+      expectEqual(str, str2)
+    }
+  }
+  
+  content = ("Hello" as String) as NSString
+
+  strings = createMutableStringVariants(content)
+  
+  for str in strings {
+    for str2 in strings {
+      expectEqual(str, str2)
+    }
+  }
+}
+
+NSStringAPIs.test("deleteCharacters(in:)") {
+  let content = ("👩‍❤️‍👩" as String) as NSString
+
+  var strings = createMutableStringVariants(content)
+  
+  for str in strings {
+    str.deleteCharacters(in: NSMakeRange(0, str.length))
+  }
+  
+  for str in strings {
+    expectEqual(str, strings[0])
+  }
+  
+  strings = createMutableStringVariants(content)
+  
+  while strings[0].length > 0 {
+    for str in strings {
+      str.deleteCharacters(in: NSMakeRange(0, 1))
+    }
+    for str in strings {
+      expectEqual(str, strings[0])
+    }
+  }
+}
+
+NSStringAPIs.test("insert(str:,at:)") {
+  let content = ("👩‍❤️‍👩" as String) as NSString
+
+  for idx in 0 ..< content.length {
+    var strings = createMutableStringVariants(content)
+    
+    for str in strings {
+      str.insert(str as NSString as String, at: idx)    
+    }
+    
+    for str in strings {
+      expectEqual(str, strings[0])
+    }
+  }
+}
+
 NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
   let content = ("👩‍❤️‍👩" as String) as NSString
 
@@ -1978,4 +2041,5 @@ NSStringAPIs.test("copy construction") {
 }
 
 runAllTests()
+
 
