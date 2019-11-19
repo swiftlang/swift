@@ -68,6 +68,50 @@ func createNSStringTemporaryFile()
   return (existingPath, nonExistentPath)
 }
 
+func createMutableStringVariants(_ str: NSString) -> [NSMutableString] {
+  let mutable = str.mutableCopy() as! NSMutableString
+  let mutableSlow = str.mutableCopy() as! NSMutableString
+  mutableSlow.append("𐐷")
+  mutableSlow.deleteCharacters(in: NSMakeRange(mutableSlow.length - 2, 1))
+  mutableSlow.deleteCharacters(in: NSMakeRange(mutableSlow.length - 1, 1))
+  let cowImmutable = mutable.copy() as! NSString
+  let slowCoWImmutable = mutableSlow.copy() as! NSString
+  let utf8ptr = str.utf8String!
+  let plain = NSString(utf8String: utf8ptr)!
+  let bridged = plain as String
+  let rebridged = bridged as NSString
+  return [
+    mutable,
+    mutableSlow,
+    cowImmutable.mutableCopy() as! NSMutableString,
+    slowCoWImmutable.mutableCopy() as! NSMutableString,
+    plain.mutableCopy() as! NSMutableString,
+    rebridged.mutableCopy() as! NSMutableString
+  ]
+}
+
+func createStringVariants(_ str: NSString) -> [NSString] {
+  let mutable = str.mutableCopy() as! NSMutableString
+  let mutableSlow = str.mutableCopy() as! NSMutableString
+  mutableSlow.append("𐐷")
+  mutableSlow.deleteCharacters(in: NSMakeRange(mutableSlow.length - 2, 1))
+  mutableSlow.deleteCharacters(in: NSMakeRange(mutableSlow.length - 1, 1))
+  let cowImmutable = mutable.copy() as! NSString
+  let slowCoWImmutable = mutableSlow.copy() as! NSString
+  let utf8ptr = str.utf8String!
+  let plain = NSString(utf8String: utf8ptr)!
+  let bridged = plain as String
+  let rebridged = bridged as NSString
+  return [
+    mutable as NSString,
+    mutableSlow as NSString,
+    cowImmutable,
+    slowCoWImmutable,
+    plain,
+    rebridged
+  ]
+}
+
 var NSStringAPIs = TestSuite("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
@@ -1449,7 +1493,7 @@ NSStringAPIs.test("padding(toLength:withPad:startingAtIndex:)") {
 }
 
 NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
-  var content = (("👩‍❤️‍👩" as String) as NSString).mutableCopy() as! NSMutableString
+  let content = ("👩‍❤️‍👩" as String) as NSString
 
   let expectedResults = [
     [56425, 8205, 10084, 65039, 8205, 55357, 56425],
@@ -1462,20 +1506,22 @@ NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
     [55357, 56425, 8205, 10084, 65039, 8205, 55357]
   ]
   
-  for i in 0 ..< content.length {
-    let s = content.mutableCopy() as! NSMutableString
-    s.replaceCharacters(in: NSRange(location: i, length: 1), with: "")
-    expectEqual(7, s.length)
-    let result = [
-      Int(s.character(at: 0)),
-      Int(s.character(at: 1)),
-      Int(s.character(at: 2)),
-      Int(s.character(at: 3)),
-      Int(s.character(at: 4)),
-      Int(s.character(at: 5)),
-      Int(s.character(at: 6))
-    ]
-    expectEqual(expectedResults[i], result)
+   for s in createMutableStringVariants(content) {
+    for i in 0 ..< content.length {
+      let str = s.mutableCopy() as! NSMutableString
+      str.replaceCharacters(in: NSRange(location: i, length: 1), with: "") 
+      expectEqual(7, str.length)
+      let result = [
+        Int(str.character(at: 0)),
+        Int(str.character(at: 1)),
+        Int(str.character(at: 2)),
+        Int(str.character(at: 3)),
+        Int(str.character(at: 4)),
+        Int(str.character(at: 5)),
+        Int(str.character(at: 6))
+      ]
+      expectEqual(expectedResults[i], result)
+    }
   }
 }
 
@@ -1668,11 +1714,18 @@ NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
 
 NSStringAPIs.test("substring(from:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
-
+  
   expectEqual(s, s.substring(from: s.startIndex))
   expectEqual("せ\u{3099}そ\u{3099}",
-      s.substring(from: s.index(s.startIndex, offsetBy: 8)))
+              s.substring(from: s.index(s.startIndex, offsetBy: 8)))
   expectEqual("", s.substring(from: s.index(s.startIndex, offsetBy: 10)))
+    
+  for s in createStringVariants(s as NSString) {
+    expectEqual(s as String, s.substring(from: 0))
+    expectEqual("せ\u{3099}そ\u{3099}",
+                s.substring(from: 12))
+    expectEqual("", s.substring(from: 16))
+  }
 }
 
 NSStringAPIs.test("substring(to:)") {
@@ -1680,8 +1733,15 @@ NSStringAPIs.test("substring(to:)") {
 
   expectEqual("", s.substring(to: s.startIndex))
   expectEqual("\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}",
-      s.substring(to: s.index(s.startIndex, offsetBy: 8)))
+              s.substring(to: s.index(s.startIndex, offsetBy: 8)))
   expectEqual(s, s.substring(to: s.index(s.startIndex, offsetBy: 10)))
+  
+  for s in createStringVariants(s as NSString) {
+    expectEqual("", s.substring(to: 0))
+    expectEqual("\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}",
+                s.substring(to: 12))
+    expectEqual(s as String, s.substring(to: 16))
+  }
 }
 
 NSStringAPIs.test("substring(with:)") {
@@ -1696,6 +1756,18 @@ NSStringAPIs.test("substring(with:)") {
   expectEqual(
     "さ\u{3099}し\u{3099}す\u{3099}",
     s.substring(with: s.index(s.startIndex, offsetBy: 5)..<s.index(s.startIndex, offsetBy: 8)))
+  
+  for s in createStringVariants(s as NSString) {
+    expectEqual("", s.substring(with: NSMakeRange(0, 0)))
+    expectEqual(
+      "",
+      s.substring(with: NSMakeRange(1, 0)))
+    expectEqual("", s.substring(with: NSMakeRange(s.length, 0)))
+    expectEqual(s as String, s.substring(with: NSMakeRange(0, s.length)))
+    expectEqual(
+      "さ\u{3099}し\u{3099}す\u{3099}",
+      s.substring(with: NSMakeRange(6, 6)))
+  }
 }
 
 NSStringAPIs.test("localizedUppercase") {
@@ -1906,3 +1978,4 @@ NSStringAPIs.test("copy construction") {
 }
 
 runAllTests()
+

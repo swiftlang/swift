@@ -391,7 +391,6 @@ extension __SharedStringStorage {
   
 }
 
-@_fixed_layout
 @usableFromInline
 @objc internal final class _SwiftNSMutableString :
   _SwiftNativeNSMutableString, _AbstractStringStorage {
