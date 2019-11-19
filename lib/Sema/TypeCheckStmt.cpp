@@ -635,7 +635,6 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
-    // FIXME: Remove TypeChecker dependency.
     TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
                                      CTP_ThrowStmt);
     TS->setSubExpr(E);
