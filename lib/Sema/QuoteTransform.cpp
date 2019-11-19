@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeVisitor.h"
@@ -417,7 +418,7 @@ public:
           DeclRefExpr(ConcreteDeclRef(attr->getQuoteDecl()), DeclNameLoc(),
                       /*Implicit=*/true);
       auto quoteCall = CallExpr::createImplicit(ctx, quoteRef, {}, {});
-      auto &tc = TypeChecker::createForContext(ctx);
+      auto &tc = createTypeChecker(ctx);
       auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
       return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
     } else {
@@ -498,7 +499,7 @@ public:
         auto quoteDot =
             new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
         auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-        auto &tc = TypeChecker::createForContext(ctx);
+        auto &tc = createTypeChecker(ctx);
         auto type = tc.getTypeOfQuoteExpr(refType, ref->getLoc());
         return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
       } else {
@@ -531,7 +532,7 @@ public:
           auto quoteDot =
               new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
           auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-          auto &tc = TypeChecker::createForContext(ctx);
+          auto &tc = createTypeChecker(ctx);
           auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
           return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
         } else {
