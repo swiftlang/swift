@@ -3502,9 +3502,10 @@ NOTE(add_where_newline, none,
 NOTE(duplicate_where, none,
      "duplicate the 'where' on both patterns to check both patterns",())
 
-ERROR(trailing_closure_requires_parens,none,
-      "trailing closure requires parentheses for disambiguation in this"
-      " context", ())
+WARNING(trailing_closure_requires_parens,none,
+        "trailing closure in this context is confusable with the body of the"
+        " statement; pass as a parenthesized argument to silence this warning",
+        ())
 
 ERROR(opaque_type_var_no_init,none,
       "property declares an opaque return type, but has no initializer "
