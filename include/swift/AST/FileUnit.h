@@ -152,6 +152,20 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+  /// Finds top-level decls in this file filtered by their attributes.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  ///
+  /// \param Results Vector collecting the decls.
+  ///
+  /// \param matchAttributes Check on the attributes of a decl to
+  /// filter which decls to fully deserialize. Only decls with accepted
+  /// attributes are deserialized and added to Results.
+  virtual void
+  getTopLevelDeclsWhereAttributesMatch(
+              SmallVectorImpl<Decl*> &Results,
+              llvm::function_ref<bool(DeclAttributes)> matchAttributes) const;
 
   /// Finds all precedence group decls in this file.
   ///
