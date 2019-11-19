@@ -2143,13 +2143,16 @@ public:
 private:
   /// Predicate used to filter InoutArgumentRange.
   struct OperandToInoutArgument {
-    const Impl &inst;
-    OperandToInoutArgument(const Impl &inst) : inst(inst) {}
+    ArrayRef<SILParameterInfo> paramInfos;
+    OperandValueArrayRef arguments;
+    OperandToInoutArgument(const Impl &inst)
+        : paramInfos(inst.getSubstCalleeConv().getParameters()),
+          arguments(inst.getArgumentsWithoutIndirectResults()) {
+      assert(paramInfos.size() == arguments.size());
+    }
     Optional<SILValue> operator()(unsigned long i) const {
-      auto paramInfo = inst.getSubstCalleeConv().getParameters()[i];
-      auto argument = inst.getArgumentsWithoutIndirectResults()[i];
-      if (paramInfo.isIndirectMutating())
-        return argument;
+      if (paramInfos[i].isIndirectMutating())
+        return arguments[i];
       return None;
     }
   };
