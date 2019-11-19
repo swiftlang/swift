@@ -209,7 +209,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr) {
 
 TypeTransformContext::TypeTransformContext(Type T)
     : BaseType(T.getPointer()) {
-  assert(T->mayHaveMembers());
+//  assert(T->mayHaveMembers());
 }
 
 TypeTransformContext::TypeTransformContext(TypeOrExtensionDecl D)

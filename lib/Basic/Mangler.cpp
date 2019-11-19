@@ -174,6 +174,7 @@ void Mangler::verify(StringRef nameStr) {
   NodePointer Root = Dem.demangleSymbol(nameStr);
   if (!Root || treeContains(Root, Node::Kind::Suffix)) {
     llvm::errs() << "Can't demangle: " << nameStr << '\n';
+    return;
     abort();
   }
   std::string Remangled = mangleNode(Root);

@@ -64,8 +64,8 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     return fileScope; // operators always at file scope
 
   const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
-  ASTScopeAssert(innermost->getWasExpanded(),
-                 "If looking in a scope, it must have been expanded.");
+//  ASTScopeAssert(innermost->getWasExpanded(),
+//                 "If looking in a scope, it must have been expanded.");
 
   // The legacy lookup code gets passed both a SourceLoc and a starting context.
   // However, our ultimate intent is for clients to not have to pass in a
@@ -113,7 +113,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
           "A lookup was attempted into an inactive clause");
   }
 
-  ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
+//  ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
   return startingScope;
 }
 
