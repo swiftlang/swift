@@ -3697,7 +3697,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
         out << " as ";
-        fixed->print(out);
+        Type(fixed).print(out, PO);
       } else {
         getPotentialBindings(tv).dump(out, 1);
       }

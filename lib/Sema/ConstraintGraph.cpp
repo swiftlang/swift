@@ -1403,8 +1403,11 @@ void ConstraintGraphNode::dump() const {
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
                             llvm::raw_ostream &out) {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(out, 2);
+    (*this)[typeVar].print(out, 2, PO);
     out << "\n";
   }
 }
