@@ -3494,7 +3494,6 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
       expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
-  getTypeChecker().ClosuresWithUncomputedCaptures.push_back(closure);
 
   Expr *result = closure;
 

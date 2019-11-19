@@ -4494,10 +4494,6 @@ namespace {
       outerClosure->setType(outerClosureTy);
       cs.cacheType(outerClosure);
 
-      // The inner closure at least will definitely have a capture.
-      cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(outerClosure);
-      cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(closure);
-
       // let outerApply = "\( outerClosure )( \(E) )"
       auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
       outerApply->setType(closureTy);
@@ -7267,12 +7263,6 @@ namespace {
           Rewriter.solution.setExprTypes(closure);
           ClosuresToTypeCheck.push_back(closure);
         }
-
-        // Don't try to register captures if constraint system is used to
-        // produce diagnostics for one of the sub-expressions.
-        if (!cs.Options.contains(
-                ConstraintSystemFlags::SubExpressionDiagnostics))
-          cs.getTypeChecker().ClosuresWithUncomputedCaptures.push_back(closure);
 
         return { false, closure };
       }
