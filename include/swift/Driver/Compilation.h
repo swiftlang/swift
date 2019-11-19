@@ -113,8 +113,8 @@ public:
     /// vector-like collection of jobs that the range scheme would run because
     /// there are no incremental supplementary outputs such as swiftdeps,
     /// swiftranges, compiledsource
-    void update(ArrayRef<const Job *> depJobs, ArrayRef<const Job *> rangeJobs,
-                ArrayRef<const Job *> lackingSuppJobs);
+    void update(const CommandSet &depJobs, const CommandSet &rangeJobs,
+                const CommandSet &lackingSuppJobs);
 
     /// Write the information for the -compare-incremental-schemes[-path]
     /// options
@@ -505,9 +505,9 @@ public:
   /// How many .swift input files?
   unsigned countSwiftInputs() const;
 
-  void updateIncrementalComparison(ArrayRef<const Job *> depJobs,
-                                   ArrayRef<const Job *> rangeJobs,
-                                   ArrayRef<const Job *> lackingSuppJobs) {
+  void updateIncrementalComparison(const CommandSet &depJobs,
+                                   const CommandSet &rangeJobs,
+                                   const CommandSet &lackingSuppJobs) {
     if (IncrementalComparator.hasValue())
       IncrementalComparator.getValue().update(depJobs, rangeJobs,
                                               lackingSuppJobs);

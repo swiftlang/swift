@@ -633,22 +633,22 @@ namespace driver {
                                     static_cast<const BatchJob *>(FinishedCmd));
       }
 
-      SmallVector<const Job *, 16> Dependents;
+      CommandSet Dependents;
       if (!Comp.getUseSourceRangeDependencies()) {
+        // Can just do the cheapest thing
         if (!Comp.IncrementalComparator)
           Dependents = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
         else {
-          SmallVector<const Job *, 16> DependentsForDeps;
+          CommandSet DependentsForDeps;
           std::tie(Dependents, DependentsForDeps) =
-              subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
+              subsequentJobsNeededForDepsOrRanges(FinishedCmd, ReturnCode);
           Dependents = DependentsForDeps;
         }
       } else {
-        SmallVector<const Job *, 16> DependentsForDeps;
+        CommandSet DependentsForDeps;
         std::tie(Dependents, DependentsForDeps) =
-            subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
+            subsequentJobsNeededForDepsOrRanges(FinishedCmd, ReturnCode);
 
-        // Will reload again, sigh
         if (Comp.getShowIncrementalBuildDecisions() &&
             (!DependentsForDeps.empty() || !Dependents.empty())) {
           llvm::outs() << "After completion of " << LogJob(FinishedCmd)
@@ -742,20 +742,23 @@ namespace driver {
     ///
     /// FIXME: too much global state floating around, e.g.
     /// getIncrementalBuildEnabled
-    SmallVector<const Job *, 16>
-    subsequentJobsNeededForDeps(const Job *FinishedCmd, const int ReturnCode) {
+    CommandSet subsequentJobsNeededForDeps(const Job *FinishedCmd,
+                                           const int ReturnCode) {
       if (!Comp.getIncrementalBuildEnabled())
         return {};
       SmallVector<const Job *, 16> Dependents;
       reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
-      return Dependents;
+      CommandSet DepSet;
+      for (const Job *Cmd : Dependents)
+        DepSet.insert(Cmd);
+      return DepSet;
     }
 
     // Returns a pair of jobs needed when using ranges, and jobs needed
     // when using dependencies.
-    std::pair<SmallVector<const Job *, 16>, SmallVector<const Job *, 16>>
-    subsequentJobsNeededForRanges(const Job *FinishedCmd,
-                                  const int ReturnCode) {
+    std::pair<CommandSet, CommandSet>
+    subsequentJobsNeededForDepsOrRanges(const Job *FinishedCmd,
+                                        const int ReturnCode) {
 
       if (!Comp.getIncrementalBuildEnabled())
         return {};
@@ -763,18 +766,19 @@ namespace driver {
       // depending on the added tops
       const size_t topsBefore = countTopLevelProvides(FinishedCmd);
 
-      SmallVector<const Job *, 16> jobsForDependencies;
-      reloadAndRemarkDeps(FinishedCmd, ReturnCode, jobsForDependencies);
+      CommandSet jobsForDependencies =
+          subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
 
       const size_t topsAfter = countTopLevelProvides(FinishedCmd);
-      const bool fallBack = topsAfter > topsBefore;
+      // TODO: see if new type was added outside of a struct (etc) body
+      const bool userAddedTopLevel = topsAfter > topsBefore;
 
       // TODO: instead of scheduling *all* the jobs, could figure out
       // which ones use the introduced top-level names and only schedule those.
       // However, as it stands, the caller will fall back to the old
       // dependency scheme in this case anyway.
-      SmallVector<const Job *, 16> jobsForRanges =
-          fallBack ? jobsForDependencies : SmallVector<const Job *, 16>();
+      CommandSet jobsForRanges =
+          userAddedTopLevel ? jobsForDependencies : CommandSet();
 
       Comp.updateIncrementalComparison(jobsForDependencies, jobsForRanges, {});
 
@@ -880,10 +884,9 @@ namespace driver {
     void scheduleFirstRoundJobsForIncrementalCompilation(
         DependencyGraphT &DepGraph) {
 
-      CommandSet compileJobsToSchedule;
-      for (const Job *Cmd :
-           computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph))
-        compileJobsToSchedule.insert(Cmd);
+      CommandSet compileJobsToSchedule =
+          computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph);
+
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty() ||
             compileJobsToSchedule.count(Cmd))
@@ -896,8 +899,7 @@ namespace driver {
     /// Figure out the best strategy and return those jobs. May return
     /// duplicates.
     template <typename DependencyGraphT>
-    llvm::SmallVector<const Job *, 16>
-    computeFirstRoundCompileJobsForIncrementalCompilation(
+    CommandSet computeFirstRoundCompileJobsForIncrementalCompilation(
         DependencyGraphT &DepGraph) {
       auto compileJobsToScheduleViaDependencies =
           computeDependenciesAndGetNeededCompileJobs(DepGraph);
@@ -909,10 +911,8 @@ namespace driver {
         return compileJobsToScheduleViaDependencies;
 
       auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
-      llvm::SmallVector<const Job *, 16> &compileJobsToScheduleViaSourceRanges =
-          jobs.first;
-      llvm::SmallVector<const Job *, 16>
-          &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
+      CommandSet &compileJobsToScheduleViaSourceRanges = jobs.first;
+      CommandSet &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
 
       const bool shouldFallBack =
           decideAndExplainWhetherToFallBackToDependencies(
@@ -937,21 +937,20 @@ namespace driver {
       // Even if dependencies would not schedule these, we want them to run
       // to create the supplementary outputs for next time.
       for (const Job *Cmd : jobsLackingSourceRangeSupplementaryOutputs)
-        compileJobsToScheduleWhenFallingBack.push_back(Cmd);
+        compileJobsToScheduleWhenFallingBack.insert(Cmd);
 
       return compileJobsToScheduleWhenFallingBack;
     }
 
     bool decideAndExplainWhetherToFallBackToDependencies(
-        const ArrayRef<const Job *> compileJobsToScheduleViaSourceRanges,
-        const ArrayRef<const Job *>
-            &jobsLackingSourceRangeSupplementaryOutputs) {
+        const CommandSet &compileJobsToScheduleViaSourceRanges,
+        const CommandSet &jobsLackingSourceRangeSupplementaryOutputs) {
       if (!jobsLackingSourceRangeSupplementaryOutputs.empty()) {
         if (Comp.getShowIncrementalBuildDecisions()) {
           llvm::outs()
               << "Using dependencies: At least one input ('"
               << llvm::sys::path::filename(
-                     jobsLackingSourceRangeSupplementaryOutputs.front()
+                     (*jobsLackingSourceRangeSupplementaryOutputs.begin())
                          ->getFirstSwiftPrimaryInput())
               << "') lacks a supplementary output needed for the source "
                  "range strategy.\n Maybe dependencies can do better than "
@@ -961,10 +960,8 @@ namespace driver {
       }
       // Unless the source-range scheme would compile every file,
       // it's likely a better bet.
-      CommandSet uniqueJobs;
-      for (const auto *J : compileJobsToScheduleViaSourceRanges)
-        uniqueJobs.insert(J);
-      if (uniqueJobs.size() < Comp.countSwiftInputs()) {
+      if (compileJobsToScheduleViaSourceRanges.size() <
+          Comp.countSwiftInputs()) {
         if (Comp.getShowIncrementalBuildDecisions())
           llvm::outs() << "Using ranges\n";
         return false;
@@ -980,8 +977,7 @@ namespace driver {
     /// must be compiled to use ranges in the future (because they were lacking
     /// supplementary output files). May include duplicates.
     template <typename DependencyGraphT>
-    std::pair<llvm::SmallVector<const Job *, 16>,
-              llvm::SmallVector<const Job *, 16>>
+    std::pair<CommandSet, CommandSet>
     computeRangesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
       using namespace incremental_ranges;
 
@@ -1001,16 +997,16 @@ namespace driver {
       // primaries, could just keep on.
       // load dependencies for external dependencies and interfacehashes
 
-      llvm::SmallVector<const Job *, 16> neededJobs;
+      CommandSet neededJobs;
       for (const Job *Cmd : Comp.getJobs()) {
         if (SourceRangeBasedInfo::shouldScheduleCompileJob(
                 allSourceRangeInfo, Cmd, [&](const bool willBuild, Twine why) {
                   noteBuilding(Cmd, willBuild, true, why.str());
                 }))
-          neededJobs.push_back(Cmd);
+          neededJobs.insert(Cmd);
       }
 
-      llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
+      CommandSet jobsLackingSupplementaryOutputs;
       for (const Job *Cmd : Comp.getJobs()) {
         auto pri = Cmd->getFirstSwiftPrimaryInput();
         if (pri.empty())
@@ -1024,21 +1020,23 @@ namespace driver {
         noteBuilding(Cmd, true, true,
                      "to create source-range and compiled-source files for the "
                      "next time when falling back from source-ranges");
-        jobsLackingSupplementaryOutputs.push_back(Cmd);
+        jobsLackingSupplementaryOutputs.insert(Cmd);
       }
 
       for (const Job *Cmd :
            externallyDependentJobsForRangeBasedIncrementalCompilation(DepGraph))
-        neededJobs.push_back(Cmd);
+        neededJobs.insert(Cmd);
 
+      assert(neededJobs.size() <= Comp.countSwiftInputs());
+      assert(jobsLackingSupplementaryOutputs.size() <= Comp.countSwiftInputs());
       return {neededJobs, jobsLackingSupplementaryOutputs};
     }
 
     /// Return jobs to run if using dependencies, may include duplicates.
     template <typename DependencyGraphT>
-    llvm::SmallVector<const Job *, 16>
+    CommandSet
     computeDependenciesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
-      llvm::SmallVector<const Job *, 16> jobsToSchedule;
+      CommandSet jobsToSchedule;
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty())
           continue; // not Compile
@@ -1049,19 +1047,19 @@ namespace driver {
           // Dependency load error, just run them all
           for (const Job *Cmd : Comp.getJobs()) {
             if (!Cmd->getFirstSwiftPrimaryInput().empty())
-              jobsToSchedule.push_back(Cmd);
+              jobsToSchedule.insert(Cmd);
           }
           return jobsToSchedule;
         }
         if (shouldSched.getValue())
-          jobsToSchedule.push_back(Cmd);
+          jobsToSchedule.insert(Cmd);
       }
       {
         const auto additionalJobs =
             additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
                 DepGraph);
         for (const auto *Cmd : additionalJobs)
-          jobsToSchedule.push_back(Cmd);
+          jobsToSchedule.insert(Cmd);
       }
       return jobsToSchedule;
     }
@@ -1165,7 +1163,7 @@ namespace driver {
     SmallVector<const Job *, 16>
     additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
         DependencyGraphT &DepGraph) {
-      SmallVector<const Job *, 16> AdditionalOutOfDateCommands =
+      auto AdditionalOutOfDateCommands =
           collectSecondaryJobsFromDependencyGraph(DepGraph);
 
       size_t firstSize = AdditionalOutOfDateCommands.size();
@@ -1958,8 +1956,9 @@ const char *Compilation::getAllSourcesPath() const {
 }
 
 void Compilation::IncrementalSchemeComparator::update(
-    const ArrayRef<const Job *> depJobs, const ArrayRef<const Job *> rangeJobs,
-    const ArrayRef<const Job *> lackingSuppJobs) {
+    const CommandSet &depJobs,
+    const CommandSet &rangeJobs,
+    const CommandSet &lackingSuppJobs) {
   for (const auto *cmd : depJobs)
     DependencyCompileJobs.insert(cmd);
   for (const auto *cmd : rangeJobs)
@@ -1995,9 +1994,9 @@ void Compilation::IncrementalSchemeComparator::outputComparison(
       << "supplementary output creation: " << SourceRangeLackingSuppJobs.size()
       << ", "
       << "total: " << SwiftInputCount << ", "
-      << "scheme requested: "
+      << "requested: "
       << (EnableSourceRangeDependencies ? "ranges" : "deps") << ", "
-      << "scheme used: " << (UseSourceRangeDependencies ? "ranges" : "deps")
+      << "using: " << (UseSourceRangeDependencies ? "ranges" : "deps")
       << "\n";
 }
 
