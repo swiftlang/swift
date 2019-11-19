@@ -911,8 +911,12 @@ ERROR(invalid_arg_count_for_operator,none,
       "operators must have one or two arguments", ())
 ERROR(operator_in_local_scope,none,
       "operator functions can only be declared at global or in type scope", ())
-ERROR(nonstatic_operator_in_type,none,
-      "operator %0 declared in type %1 must be 'static'", (Identifier, Type))
+ERROR(nonstatic_operator_in_nominal,none,
+      "operator %0 declared in type %1 must be 'static'",
+      (Identifier, DeclName))
+ERROR(nonstatic_operator_in_extension,none,
+      "operator %0 declared in extension of %1 must be 'static'",
+      (Identifier, TypeRepr*))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
