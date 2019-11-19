@@ -1588,6 +1588,22 @@ NSStringAPIs.test("replaceCharacters(in:with:) (subscalar)") {
   }
 }
 
+NSStringAPIs.test("UTF8String") {
+  let content = ("👩‍❤️‍👩" as String) as NSString
+  let utf8Count = "👩‍❤️‍👩".utf8.count
+  let strings = createMutableStringVariants(content)
+  
+  let ptrs = strings.map {
+    UnsafeBufferPointer(start:$0.utf8String, count: utf8Count)
+  }
+  
+  for idx in 0 ..< utf8Count {
+    for ptr in ptrs {
+      expectEqual(ptr[idx], ptrs[0][idx])
+    }
+  }
+}
+
 NSStringAPIs.test("replacingCharacters(in:with:)") {
   do {
     let empty = ""
