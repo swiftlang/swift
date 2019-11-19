@@ -230,14 +230,10 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
   ArgStringList &Arguments = II.Arguments;
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
-    const auto whichFiles = context.Inputs.empty()
-                                ? FilelistInfo::WhichFiles::PrimaryInputs
-                                : FilelistInfo::WhichFiles::Input;
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back(
-        {Arguments.back(), file_types::TY_Object, whichFiles});
-    assert((context.Inputs.empty() || context.InputActions.empty()) &&
-           "If both are non-empty the filelist won't work");
+        {Arguments.back(), file_types::TY_Object,
+         FilelistInfo::WhichFiles::InputJobsAndSourceInputActions});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
@@ -648,7 +644,7 @@ toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
-                                FilelistInfo::WhichFiles::Input});
+                                FilelistInfo::WhichFiles::InputJobs});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
