@@ -3575,27 +3575,6 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   
   auto baseTy = rootTy;
   SmallVector<SILValue, 4> operands;
-  
-  auto lowerSubscriptOperands =
-    [this, &operands, E](const KeyPathExpr::Component &component) {
-      if (!component.getIndexExpr())
-        return;
-      
-      // Evaluate the index arguments.
-      SmallVector<RValue, 2> indexValues;
-      auto indexResult = visit(component.getIndexExpr(), SGFContext());
-      if (isa<TupleType>(indexResult.getType())) {
-        std::move(indexResult).extractElements(indexValues);
-      } else {
-        indexValues.push_back(std::move(indexResult));
-      }
-
-      for (auto &rv : indexValues) {
-        operands.push_back(
-          std::move(rv).forwardAsSingleValue(SGF, E));
-      }
-    };
-  
 
   for (auto &component : E->getComponents()) {
     switch (auto kind = component.getKind()) {
@@ -3615,11 +3594,18 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                             component.getSubscriptIndexHashableConformances(),
                             baseTy,
                             /*for descriptor*/ false));
-      lowerSubscriptOperands(component);
-    
-      assert(numOperands == operands.size()
-             && "operand count out of sync");
       baseTy = loweredComponents.back().getComponentType();
+      if (kind == KeyPathExpr::Component::Kind::Property)
+        break;
+
+      auto subscript = cast<SubscriptDecl>(decl);
+      auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
+          subscript, component.getDeclRef().getSubstitutions(),
+          component.getIndexExpr());
+
+      for (auto &arg : loweredArgs) {
+        operands.push_back(arg.forward(SGF));
+      }
 
       break;
     }
