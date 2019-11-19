@@ -15,7 +15,7 @@
 func f(crash crash: Bool) -> Int {
   if crash {
     return <#T#>
-    // CRASH-CHECK: {{[fF]}}atal error: attempt to evaluate editor placeholder: file main.swift (main), line [[@LINE-1]]
+    // CRASH-CHECK: {{[fF]}}atal error: attempt to evaluate editor placeholder: file {{.*}}/main.swift, line [[@LINE-1]]
   } else {
     return 42
   }

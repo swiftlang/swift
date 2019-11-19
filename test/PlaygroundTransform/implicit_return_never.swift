@@ -13,7 +13,7 @@
 
 func f() -> Int {
     fatalError()
-// CRASH-CHECK: {{[fF]}}atal error: file main.swift (main), line [[@LINE-1]]
+// CRASH-CHECK: {{[fF]}}atal error: file {{.*}}/main.swift, line [[@LINE-1]]
 }
 
 f()

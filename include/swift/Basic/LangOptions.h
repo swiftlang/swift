@@ -96,7 +96,7 @@ namespace swift {
 
     /// If true, '#file' evaluates to the full path rather than a
     /// human-readable string.
-    bool MagicFileIdentifierEvaluatesToPath = false;
+    bool MagicFileIdentifierEvaluatesToPath = true;
 
     ///
     /// Support for alternate usage modes
