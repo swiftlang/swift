@@ -6091,6 +6091,39 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
+SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
+    SubscriptDecl *subscript, SubstitutionMap subs, Expr *indexExpr) {
+  Type interfaceType = subscript->getInterfaceType();
+  CanFunctionType substFnType =
+      subs ? cast<FunctionType>(interfaceType->castTo<GenericFunctionType>()
+                                    ->substGenericArgs(subs)
+                                    ->getCanonicalType())
+           : cast<FunctionType>(interfaceType->getCanonicalType());
+  AbstractionPattern origFnType(substFnType);
+  auto fnType =
+      getLoweredType(origFnType, substFnType).castTo<SILFunctionType>();
+
+  SmallVector<ManagedValue, 4> argValues;
+  SmallVector<DelayedArgument, 2> delayedArgs;
+  ArgEmitter emitter(*this, fnType->getRepresentation(),
+                     /*yield*/ false,
+                     /*isForCoroutine*/ false,
+                     ClaimedParamsRef(fnType, fnType->getParameters()),
+                     argValues, delayedArgs,
+                     /*foreign error*/ None, ImportAsMemberStatus());
+
+  auto prepared =
+      prepareSubscriptIndices(subscript, subs,
+                              // Strategy doesn't matter
+                              AccessStrategy::getStorage(), indexExpr);
+  emitter.emitPreparedArgs(std::move(prepared), origFnType);
+
+  if (!delayedArgs.empty())
+    emitDelayedArguments(*this, delayedArgs, argValues);
+
+  return argValues;
+}
+
 ManagedValue ArgumentScope::popPreservingValue(ManagedValue mv) {
   formalEvalScope.pop();
   return normalScope.popPreservingValue(mv);

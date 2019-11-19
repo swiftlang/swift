@@ -4591,9 +4591,6 @@ namespace {
                               /*applyExpr*/ nullptr, labels,
                               /*hasTrailingClosure*/ false, locator);
 
-      auto component = KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
-          ref, newIndexExpr, labels, resolvedTy, componentLoc, {});
-
       // We need to be able to hash the captured index values in order for
       // KeyPath itself to be hashable, so check that all of the subscript
       // index components are hashable and collect their conformances here.
@@ -4603,7 +4600,10 @@ namespace {
           cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
 
       auto fnType = overload.openedType->castTo<FunctionType>();
-      for (const auto &param : fnType->getParams()) {
+      SmallVector<Identifier, 4> newLabels;
+      for (auto &param : fnType->getParams()) {
+        newLabels.push_back(param.getLabel());
+
         auto indexType = simplifyType(param.getPlainType());
         // Index type conformance to Hashable protocol has been
         // verified by the solver, we just need to get it again
@@ -4616,8 +4616,10 @@ namespace {
         conformances.push_back(hashableConformance);
       }
 
-      component.setSubscriptIndexHashableConformances(conformances);
-      return component;
+      return KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+          ref, newIndexExpr, cs.getASTContext().AllocateCopy(newLabels),
+          resolvedTy, componentLoc,
+          cs.getASTContext().AllocateCopy(conformances));
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
