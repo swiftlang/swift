@@ -1820,10 +1820,6 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   if (options & NL_OnlyTypes)
     return decls;
 
-  auto *stats = dc->getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInAnyObject++;
-
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
   for (auto import : namelookup::getAllImports(dc)) {
