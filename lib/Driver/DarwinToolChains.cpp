@@ -232,7 +232,7 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
     Arguments.push_back("-filelist");
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
     II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
-                                FilelistInfo::WhichFiles::Input});
+                                FilelistInfo::WhichFiles::PrimaryInputs});
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
