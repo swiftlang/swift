@@ -69,16 +69,14 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type fromType,
 }
 
 bool ForceOptional::diagnose(bool asNote) const {
-  MissingOptionalUnwrapFailure failure(getConstraintSystem(), BaseType,
-                                       UnwrappedType, getLocator());
+  MissingOptionalUnwrapFailure failure(getConstraintSystem(), getFromType(),
+                                       getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
-ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
-                                     Type unwrappedType,
-                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      ForceOptional(cs, baseType, unwrappedType, locator);
+ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type fromType,
+                                     Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ForceOptional(cs, fromType, toType, locator);
 }
 
 bool UnwrapOptionalBase::diagnose(bool asNote) const {
