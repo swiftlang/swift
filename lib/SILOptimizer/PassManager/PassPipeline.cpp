@@ -685,6 +685,20 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 }
 
 //===----------------------------------------------------------------------===//
+//                        Serialize SIL Pass Pipeline
+//===----------------------------------------------------------------------===//
+
+// Add to P a new pipeline that just serializes SIL. Meant to be used in
+// situations where perf optzns are disabled, but we may need to serialize.
+SILPassPipelinePlan
+SILPassPipelinePlan::getSerializeSILPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
+  P.startPipeline("Serialize SIL");
+  P.addSerializeSILPass();
+  return P;
+}
+
+//===----------------------------------------------------------------------===//
 //                          Inst Count Pass Pipeline
 //===----------------------------------------------------------------------===//
 
