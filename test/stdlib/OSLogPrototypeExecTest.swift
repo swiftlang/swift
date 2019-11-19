@@ -8,8 +8,6 @@
 // interpolations. The new APIs are still prototypes and must be used only in
 // tests.
 
-// REQUIRES: disabled_temporarily_for_ownership_transition
-
 import OSLogPrototype
 import StdlibUnittest
 
