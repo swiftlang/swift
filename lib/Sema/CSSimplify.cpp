@@ -3287,6 +3287,10 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ClosureResult: {
+    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
+                                locator))
+      return true;
+
     // If we could record a generic arguments mismatch instead of this fix,
     // don't record a ContextualMismatch here.
     if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
@@ -3391,9 +3395,15 @@ bool ConstraintSystem::repairFailures(
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
       auto *argExpr = simplifyLocatorToAnchor(loc);
       if (argExpr && isa<ClosureExpr>(argExpr)) {
-        conversionsOrFixes.push_back(ContextualMismatch::create(
-            *this, lhs, rhs,
-            getConstraintLocator(argExpr, ConstraintLocator::ClosureResult)));
+        auto *locator =
+            getConstraintLocator(argExpr, ConstraintLocator::ClosureResult);
+
+        if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                    conversionsOrFixes, locator))
+          break;
+
+        conversionsOrFixes.push_back(
+            IgnoreContextualType::create(*this, lhs, rhs, locator));
         break;
       }
     }
