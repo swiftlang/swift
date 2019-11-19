@@ -6,7 +6,7 @@
 // RUN: %target-swift-emit-silgen -pound-file compact -module-name Foo %s | %FileCheck --check-prefixes=BOTH,COMPACT %s
 // RUN: not %target-swift-emit-silgen -pound-file zyzyx -module-name Foo %s 2>&1 | %FileCheck --check-prefix=ZYZYX %s
 
-// RUN: %target-swift-emit-silgen %s -module-name Foo | %FileCheck --check-prefixes=BOTH,COMPACT %s
+// RUN: %target-swift-emit-silgen %s -module-name Foo | %FileCheck --check-prefixes=BOTH,PATH %s
 
 // ZYZYX: error: invalid value 'zyzyx' in '-pound-file'
 
