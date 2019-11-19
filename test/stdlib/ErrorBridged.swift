@@ -767,12 +767,6 @@ ErrorBridgingTests.test("@objc error domains for nested types") {
               String(reflecting: NonPrintAsObjCError.self))
 }
 
-@inline(never)
-@_optimize(none)
-func anyToAny<T, U>(_ a: T, _ : U.Type) -> U {
-  return a as! U
-}
-
 ErrorBridgingTests.test("error-to-NSObject casts") {
   let error = MyCustomizedError(code: 12345)
 
