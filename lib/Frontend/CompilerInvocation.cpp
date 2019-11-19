@@ -887,7 +887,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.StripOwnershipAfterSerialization |= Args.hasArg(OPT_enable_ownership_stripping_after_serialization);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
 

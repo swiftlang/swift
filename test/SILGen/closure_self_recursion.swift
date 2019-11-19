@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-silgen -module-name foo %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name foo -verify %s
-// RUN: %target-swift-frontend -emit-sil -module-name foo -verify %s -enable-ownership-stripping-after-serialization
 
 // CHECK-LABEL: sil [ossa] @main
 

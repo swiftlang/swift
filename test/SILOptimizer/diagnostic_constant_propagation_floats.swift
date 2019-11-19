@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify -enable-ownership-stripping-after-serialization
 //
 // These are tests for diagnostics produced by constant propagation pass
 // on floating-point operations.

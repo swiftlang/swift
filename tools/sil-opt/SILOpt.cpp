@@ -346,8 +346,6 @@ int main(int argc, char **argv) {
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
-  SILOpts.StripOwnershipAfterSerialization =
-      EnableOwnershipLoweringAfterDiagnostics;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

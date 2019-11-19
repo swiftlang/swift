@@ -260,10 +260,6 @@ def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
-def enable_ownership_stripping_after_serialization
-  : Flag<["-"], "enable-ownership-stripping-after-serialization">,
-  HelpText<"Strip ownership after serialization">;
-
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
 def enable_access_control : Flag<["-"], "enable-access-control">,
