@@ -312,6 +312,20 @@ struct TF_775: Differentiable {
 }
 
 //===----------------------------------------------------------------------===//
+// Tuple differentiability
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
+  // `Array<(Float, Float)>` does not conform to `Differentiable`.
+  let array = [(x * y, x * y)]
+  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+  return array[0].0
+}
+
+//===----------------------------------------------------------------------===//
 // Subset parameters
 //===----------------------------------------------------------------------===//
 

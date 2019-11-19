@@ -35,9 +35,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
       return [x, y]
     }
     let pb = pullback(at: 1, 1, in: twoElementLiteral)
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([Tracked<Float>(1), Tracked<Float>(2)]))
-    expectEqual(1, gradX)
-    expectEqual(2, gradY)
+    expectEqual((1, 2), pb(TrackedFloatArrayTan([Tracked<Float>(1), Tracked<Float>(2)])))
   }
 
   do {
@@ -48,9 +46,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
       return [result, result]
     }
     let pb = pullback(at: 3, 4, in: twoElementLiteralAddress)
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    expectEqual(8, gradX)
-    expectEqual(6, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 
   do {
@@ -59,29 +55,197 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteral") {
       return [x * y, x * y]
     }
     let pb = pullback(at: 3, 4, in: twoElementLiteralFunctionResult)
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    // FIXME(TF-952): Fix incorrect zero derivatives.
-    // expectEqual(8, gradX)
-    // expectEqual(6, gradY)
-    expectEqual(0, gradX)
-    expectEqual(0, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
+  }
+
+  do {
+    // TF-975: Test multiple array literals.
+    func twoElementLiterals(_ x: Tracked<Float>, _ y: Tracked<Float>) -> [Tracked<Float>] {
+      let array = [x * y, x * y]
+      return [array[0], array[1]]
+    }
+    let pb = pullback(at: 3, 4, in: twoElementLiterals)
+    // FIXME(TF-975): Fix incorrect derivatives for multiple array literals.
+    // expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
+    expectEqual((0, 0), pb(TrackedFloatArrayTan([1, 1])))
   }
 }
 
 ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
-  func twoElementLiteralIndirect<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T) -> [T] {
-    return [x, y]
+  do {
+    func twoElementLiteralIndirect<T: Differentiable>(_ x: T, _ y: T) -> [T] {
+      return [x, y]
+    }
+    let pb = pullback(at: Float(1), 1, in: { twoElementLiteralIndirect($0, $1) })
+    expectEqual((1, 2), pb(FloatArrayTan([1, 2])))
   }
 
-  func twoElementLiteralIndirectWrapper(_ x: Float, _ y: Float) -> [Float] {
-    return twoElementLiteralIndirect(x, y)
+  do {
+    func twoElementLiteralIndirectVar<T: Differentiable>(_ x: T, _ y: T) -> [T] {
+      var result: [T] = []
+      result = result + [x]
+      result = result + [y]
+      return result
+    }
+    let pb = pullback(at: Float(1), 1, in: { twoElementLiteralIndirectVar($0, $1) })
+    expectEqual((1, 2), pb(FloatArrayTan([1, 2])))
+  }
+}
+
+struct Struct<T> {
+  var x, y: T
+}
+extension Struct: Differentiable where T: Differentiable {}
+
+ArrayAutoDiffTests.test("ArrayLiteralStruct") {
+  typealias TV = Struct<Tracked<Float>>.TangentVector
+  let s = Struct<Tracked<Float>>(x: 3, y: 4)
+
+  do {
+    func structElementLiteral<T>(_ s: Struct<T>) -> [T] {
+      return [s.x, s.y]
+    }
+    func structGeneric<T>(_ s: Struct<T>) -> T {
+      return structElementLiteral(s)[0]
+    }
+    func structConcrete1(_ s: Struct<Tracked<Float>>) -> Tracked<Float> {
+      return structElementLiteral(s)[0] * structElementLiteral(s)[1]
+    }
+    func structConcrete2(_ s: Struct<Tracked<Float>>) -> Tracked<Float> {
+      let array = structElementLiteral(s)
+      return array[0] * array[1]
+    }
+    expectEqual(TV(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete1))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete2))
   }
 
-  let (gradX, gradY) = pullback(at: Float(1), Float(1), in: twoElementLiteralIndirectWrapper)(
-    Array<Float>.DifferentiableView([Float(1), Float(2)]))
+  do {
+    func structElementAddressLiteral<T>(_ s: Struct<T>) -> [T] {
+      var s2 = Struct<T>(x: s.x, y: s.y)
+      return [s2.x, s2.y]
+    }
+    func structGeneric<T>(_ s: Struct<T>) -> T {
+      return structElementAddressLiteral(s)[0]
+    }
+    func structConcrete1(_ s: Struct<Tracked<Float>>) -> Tracked<Float> {
+      return structElementAddressLiteral(s)[0] *
+             structElementAddressLiteral(s)[1]
+    }
+    func structConcrete2(_ s: Struct<Tracked<Float>>) -> Tracked<Float> {
+      let array = structElementAddressLiteral(s)
+      return array[0] * array[1]
+    }
+    expectEqual(TV(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete1))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete2))
+  }
 
-  expectEqual(Float(1), gradX)
-  expectEqual(Float(2), gradY)
+  do {
+    func structElementAddressLiteral2<T>(_ s: Struct<T>) -> [T] {
+      var s2 = Struct<T>(x: s.x, y: s.y)
+      let array = [s2.x, s2.y]
+      return [array[0], array[1]]
+    }
+    func structGeneric<T>(_ s: Struct<T>) -> T {
+      return structElementAddressLiteral2(s)[0]
+    }
+    func structConcrete1(_ s: Struct<Tracked<Float>>) -> Tracked<Float> {
+      return structElementAddressLiteral2(s)[0] *
+             structElementAddressLiteral2(s)[1]
+    }
+    func structConcrete2(_ s: Struct<Tracked<Float>>) -> Tracked<Float> {
+      let array = structElementAddressLiteral2(s)
+      return array[0] * array[1]
+    }
+    // FIXME(TF-975): Fix incorrect derivatives for multiple array literals.
+    // expectEqual(TV(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
+    // expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete1))
+    // expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete2))
+    expectEqual(TV(x: 0, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
+    expectEqual(TV(x: 0, y: 0), gradient(at: s, in: structConcrete1))
+    expectEqual(TV(x: 0, y: 0), gradient(at: s, in: structConcrete2))
+  }
+
+  do {
+    func arrayApplyIndirectResult<T>(_ x: T, _ y: T) -> [Struct<T>] {
+      return [Struct(x: x, y: y), Struct(x: x, y: y)]
+    }
+    let pb = pullback(at: Tracked<Float>(3), 4, in: { arrayApplyIndirectResult($0, $1) })
+    let v = TV(x: 1, y: 1)
+    // FIXME(TF-978): Fix incorrect derivatives for `apply` with array literal
+    // address as indirect result.
+    // expectEqual((2, 2), pb(.init([v, v])))
+    expectEqual((0, 0), pb(.init([v, v])))
+  }
+}
+
+ArrayAutoDiffTests.test("ArrayLiteralTuple") {
+  do {
+    func tupleElementGeneric<T>(_ x: T, _ y: T) -> [T] {
+      var tuple = (x, y)
+      return [tuple.0, tuple.1]
+    }
+    let pb = pullback(at: Tracked<Float>(3), 4, in: { tupleElementGeneric($0, $1) })
+    // FIXME(TF-977): Fix incorrect derivative for array literal with
+    // `tuple_element_addr` elements.
+    // expectEqual((1, 1), pb(TrackedFloatArrayTan([1, 1])))
+    expectEqual((0, 2), pb(TrackedFloatArrayTan([1, 1])))
+  }
+}
+
+ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralNested") {
+  do {
+    func nested0(
+        _ x: Tracked<Float>, _ y: Tracked<Float>, _ bool: Bool = true
+    ) -> [Tracked<Float>] {
+      let result = [[[[x, y]]]]
+      return result[0][0][0]
+    }
+    let pb = pullback(at: 3, 4, in: { nested0($0, $1) })
+    expectEqual((1, 1), pb(TrackedFloatArrayTan([1, 1, 1, 1])))
+  }
+
+  do {
+    func nested1(
+        _ x: Tracked<Float>, _ y: Tracked<Float>, _ bool: Bool = true
+    ) -> [Tracked<Float>] {
+      var result = [[x, y], [x, y]]
+      return result[0] + result[1]
+    }
+    let pb = pullback(at: 3, 4, in: { nested1($0, $1) })
+    expectEqual((2, 2), pb(TrackedFloatArrayTan([1, 1, 1, 1])))
+  }
+
+  do {
+    // Convoluted function computing `[x + y]`.
+    func nested2(
+        _ x: Tracked<Float>, _ y: Tracked<Float>, _ bool: Bool = true
+    ) -> [Tracked<Float>] {
+      var result = [[], [x]]
+      result = result + []
+      result = result + [[]]
+      result = result + [[y]]
+      var nested = [result, [], result]
+      return nested[0][1] + result[3]
+    }
+    let (value, pb) = valueWithPullback(at: 3, 4, in: { nested2($0, $1) })
+    expectEqual([3, 4], value)
+    expectEqual((1, 1), pb(TrackedFloatArrayTan([1, 1])))
+  }
+
+  do {
+    func nestedControlFlow(
+        _ x: Tracked<Float>, _ y: Tracked<Float>, _ bool: Bool = true
+    ) -> [Tracked<Float>] {
+      var result: [Tracked<Float>] = []
+      var result2 = bool ? result + [x] : result + [x]
+      var result3 = bool ? (bool ? result2 + [y] : result2 + [y]) : result2 + [y]
+      return result3
+    }
+    let pb = pullback(at: 3, 4, in: { nestedControlFlow($0, $1) })
+    expectEqual((1, 1), pb(TrackedFloatArrayTan([1, 1])))
+  }
 }
 
 ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
@@ -96,12 +260,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
       return result3
     }
     let pb = pullback(at: 3, 4, in: { controlFlow($0, $1) })
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    // FIXME(TF-952): Fix incorrect zero derivatives.
-    // expectEqual(8, gradX)
-    // expectEqual(6, gradY)
-    expectEqual(0, gradX)
-    expectEqual(0, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 
   do {
@@ -116,9 +275,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
       return result3
     }
     let pb = pullback(at: 3, 4, in: { controlFlowAddress($0, $1) })
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    expectEqual(8, gradX)
-    expectEqual(6, gradY)
+    expectEqual((8, 6), pb(TrackedFloatArrayTan([1, 1])))
   }
 
   do {
@@ -130,9 +287,7 @@ ArrayAutoDiffTests.testWithLeakChecking("ArrayLiteralControlFlow") {
       return result3
     }
     let pb = pullback(at: Tracked<Float>(3), 4, in: { controlFlowGeneric($0, $1) })
-    let (gradX, gradY) = pb(TrackedFloatArrayTan([1, 1]))
-    expectEqual(1, gradX)
-    expectEqual(1, gradY)
+    expectEqual((1, 1), pb(TrackedFloatArrayTan([1, 1])))
   }
 }
 
