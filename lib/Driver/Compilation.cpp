@@ -1960,13 +1960,12 @@ void Compilation::updateJobsForComparison(const DepJobsT &depJobs,
                                           const RangeJobsT &rangeJobs) {
   for (const auto *cmd : depJobs)
     DependencyCompileJobs.insert(cmd);
-  if (SourceRangeCompileJobs)
-    for (const auto *cmd : rangeJobs)
-      SourceRangeCompileJobs->insert(cmd);
+  for (const auto *cmd : rangeJobs)
+    SourceRangeCompileJobs.insert(cmd);
 }
 
 void Compilation::setFallingBackForComparison() {
-  SourceRangeCompileJobs = None;
+  FallingBackToDependiesFromSourceRanges = true;
 }
 
 void Compilation::outputComparison() const {
@@ -1996,14 +1995,17 @@ void Compilation::outputComparison(llvm::raw_ostream &out) const {
   if (!getIncrementalBuildEnabled())
     out << "*** Comparing incremental strategies is moot: incremental "
            "compilation disabled ***\n";
-  else if (SourceRangeCompileJobs)
+  else if (FallingBackToDependiesFromSourceRanges)
     out << "*** Comparing deps: " << DependencyCompileJobs.size()
-        << ", ranges: " << SourceRangeCompileJobs->size()
+        << ", ranges: " << SourceRangeCompileJobs.size()
         << ", total: " << countSwiftInputs() << " ***\n";
   else
     out << "*** Comparing incremental strategies is moot: would fall "
            "back and run "
-        << DependencyCompileJobs.size() << ", total: " << countSwiftInputs()
+        << DependencyCompileJobs.size()
+        << ", ranges: " << SourceRangeCompileJobs.size()
+        << ", total: " << countSwiftInputs()
+        << ", plus more to create source-range and compiled-source files"
         << " ***\n";
 }
 

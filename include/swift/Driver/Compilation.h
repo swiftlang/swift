@@ -249,9 +249,8 @@ private:
 
 private:
   llvm::SmallPtrSet<const Job *, 16> DependencyCompileJobs;
-  // Optional if would fall back
-  Optional<llvm::SmallPtrSet<const Job *, 16>> SourceRangeCompileJobs =
-      llvm::SmallPtrSet<const Job *, 16>();
+  llvm::SmallPtrSet<const Job *, 16> SourceRangeCompileJobs;
+  bool FallingBackToDependiesFromSourceRanges = false;
 
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
