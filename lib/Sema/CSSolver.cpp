@@ -16,6 +16,7 @@
 #include "CSStep.h"
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
+#include "SolutionResult.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
@@ -1121,10 +1122,27 @@ bool ConstraintSystem::solve(Expr *&expr,
     if (shouldSuppressDiagnostics())
       return true;
 
-    // Try to provide a decent diagnostic.
-    if (salvage(solutions, expr)) {
-      // If salvage produced an error message, then it failed to salvage the
-      // expression, just bail out having reported the error.
+    // Try to fix the system or provide a decent diagnostic.
+    auto salvagedResult = salvage();
+    switch (salvagedResult.getKind()) {
+    case SolutionResult::Kind::Success:
+      solutions.clear();
+      solutions.push_back(std::move(salvagedResult).takeSolution());
+      break;
+
+    case SolutionResult::Kind::Error:
+    case SolutionResult::Kind::Ambiguous:
+      return true;
+
+    case SolutionResult::Kind::UndiagnosedError:
+      diagnoseFailureForExpr(expr);
+      salvagedResult.markAsDiagnosed();
+      return true;
+
+    case SolutionResult::Kind::TooComplex:
+      getASTContext().Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
+        .highlight(expr->getSourceRange());
+      salvagedResult.markAsDiagnosed();
       return true;
     }
 

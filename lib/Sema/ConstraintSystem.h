@@ -1707,6 +1707,9 @@ private:
   /// constraint system for further exploration.
   void applySolution(const Solution &solution);
 
+  // FIXME: Allows the type checker to apply solutions.
+  friend class swift::TypeChecker;
+
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
@@ -2078,17 +2081,8 @@ public:
   ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
 
   /// Try to salvage the constraint system by applying (speculative)
-  /// fixes to the underlying expression.
-  ///
-  /// \param viable the set of viable solutions produced by the initial
-  /// solution attempt.
-  ///
-  /// \param expr the expression we're trying to salvage.
-  ///
-  /// \returns false if we were able to salvage the system, in which case
-  /// \c viable[0] contains the resulting solution. Otherwise, emits a
-  /// diagnostic and returns true.
-  bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
+  /// fixes.
+  SolutionResult salvage();
   
   /// Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
@@ -2101,7 +2095,7 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(ArrayRef<Solution> solutions);
 
   /// Give the deprecation warning for referring to a global function

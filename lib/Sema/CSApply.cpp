@@ -20,6 +20,7 @@
 #include "CodeSynthesis.h"
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
+#include "SolutionResult.h"
 #include "TypeCheckProtocol.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -7334,10 +7335,6 @@ namespace {
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
-  // First transfer all of the deduced information back
-  // to the constraint system.
-  applySolution(solution);
-
   /// Collect the fixes on a per-expression basis.
   llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
   for (auto *fix : solution.Fixes) {
@@ -7392,11 +7389,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
                                       bool skipClosures) {
-  // Add the node types back.
-  for (auto &nodeType : solution.addedNodeTypes) {
-    setType(nodeType.first, nodeType.second);
-  }
-
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7539,4 +7531,51 @@ void Solution::setExprTypes(Expr *expr) const {
 
   SetExprTypes SET(*this);
   expr->walk(SET);
+}
+
+/// MARK: SolutionResult implementation.
+
+SolutionResult SolutionResult::forSolved(Solution &&solution) {
+  SolutionResult result(Kind::Success);
+  result.solutions = new Solution(std::move(solution));
+  result.numSolutions = 1;
+  return result;
+}
+
+SolutionResult SolutionResult::forAmbiguous(
+    MutableArrayRef<Solution> solutions) {
+  assert(solutions.size() > 1 && "Not actually ambiguous");
+  SolutionResult result(Kind::Ambiguous);
+  result.solutions =
+      (Solution *)malloc(sizeof(Solution) * solutions.size());
+  result.numSolutions = solutions.size();
+  std::uninitialized_copy(std::make_move_iterator(solutions.begin()),
+                          std::make_move_iterator(solutions.end()),
+                          result.solutions);
+  return result;
+}
+
+SolutionResult::~SolutionResult() {
+  assert((!requiresDiagnostic() || emittedDiagnostic) &&
+         "SolutionResult was destroyed without emitting a diagnostic");
+
+  for (unsigned i : range(numSolutions)) {
+    solutions[i].~Solution();
+  }
+  free(solutions);
+}
+
+const Solution &SolutionResult::getSolution() const {
+  assert(numSolutions == 1 && "Wrong number of solutions");
+  return solutions[0];
+}
+
+Solution &&SolutionResult::takeSolution() && {
+  assert(numSolutions == 1 && "Wrong number of solutions");
+  return std::move(solutions[0]);
+}
+
+ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
+  assert(getKind() == Ambiguous);
+  return makeArrayRef(solutions, numSolutions);
 }

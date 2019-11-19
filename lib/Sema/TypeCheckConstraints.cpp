@@ -18,6 +18,7 @@
 
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
@@ -2261,6 +2262,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!result)
     return Type();
 
+  // Apply this solution to the constraint system.
+  cs.applySolution(solution);
+
   // Apply the solution to the expression.
   result = cs.applySolution(
       solution, result, convertType.getType(),
@@ -3462,9 +3466,30 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if ((cs.solve(viable) || viable.size() != 1) &&
-      cs.salvage(viable, expr)) {
-    return true;
+  if ((cs.solve(viable) || viable.size() != 1)) {
+    // Try to fix the system or provide a decent diagnostic.
+    auto salvagedResult = cs.salvage();
+    switch (salvagedResult.getKind()) {
+    case SolutionResult::Kind::Success:
+      viable.clear();
+      viable.push_back(std::move(salvagedResult).takeSolution());
+      break;
+
+    case SolutionResult::Kind::Error:
+    case SolutionResult::Kind::Ambiguous:
+      return true;
+
+    case SolutionResult::Kind::UndiagnosedError:
+      cs.diagnoseFailureForExpr(expr);
+      salvagedResult.markAsDiagnosed();
+      return true;
+
+    case SolutionResult::Kind::TooComplex:
+      Context.Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
+        .highlight(expr->getSourceRange());
+      salvagedResult.markAsDiagnosed();
+      return true;
+    }
   }
 
   auto &solution = viable[0];
