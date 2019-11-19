@@ -509,6 +509,216 @@ mirrors.test("struct/WrapNSArray") {
 
 #endif // _runtime(_ObjC)
 
+//===--- Weak and Unowned References --------------------------------------===//
+
+// Check that Mirror correctly reflects weak/unowned refs to both
+// Swift and ObjC objects from Swift structs and classes.
+
+protocol WeakUnownedTestsP1: class {
+  func f1() -> Int
+}
+protocol WeakUnownedTestsP2: class {
+  func f2() -> String
+}
+
+class WeakUnownedSwiftClass: WeakUnownedTestsP1, WeakUnownedTestsP2 {
+  let tracker = LifetimeTracked(0)
+  func f1() -> Int { return 2 }
+  func f2() -> String { return "b" }
+}
+
+#if _runtime(_ObjC)
+@objc class WeakUnownedObjCClass: NSObject, WeakUnownedTestsP1, WeakUnownedTestsP2 {
+  let tracker = LifetimeTracked(0)
+  func f1() -> Int { return 2 }
+  func f2() -> String { return "b" }
+}
+#endif
+
+// The four tests below populate objects with different types
+// but identical overall structure.
+// This function is used by all four to verify that the resulting
+// Mirror objects have the expected entries.
+func verifyWeakUnownedReflection
+  <ExpectedClass: WeakUnownedTestsP1 & WeakUnownedTestsP2>
+  (_ m: Mirror, expectedClass: ExpectedClass.Type )
+{
+  let i = m.children.makeIterator()
+
+  func verifyClassField(child: (label: String?, value: Any), name: String) {
+    expectEqual(child.label, name)
+    let v = child.value as? ExpectedClass
+    expectEqual(v!.f1(), 2)
+  }
+
+  func verifyExistentialField(child: (label: String?, value: Any), name: String) {
+    expectEqual(child.label, name)
+    let vp1 = child.value as? WeakUnownedTestsP1
+    expectEqual(vp1!.f1(), 2)
+    let vp2 = child.value as? WeakUnownedTestsP2
+    expectEqual(vp2!.f2(), "b")
+    let v = child.value as? ExpectedClass
+    expectEqual(v!.f1(), 2)
+    let m = Mirror(reflecting: v!)
+    expectEqual(m.displayStyle, .`class`)
+    // TODO: Find a way to verify that the existential wrapper carries
+    // the expected protocol witnesses.  The current Swift runtime does
+    // a very good job of hiding this from users.
+  }
+
+  verifyClassField(child: i.next()!, name: "strong_class")
+  verifyExistentialField(child: i.next()!, name: "strong_existential")
+  verifyClassField(child: i.next()!, name: "weak_class")
+  verifyExistentialField(child: i.next()!, name: "weak_existential")
+  verifyClassField(child: i.next()!, name: "unowned_safe_class")
+  verifyExistentialField(child: i.next()!, name: "unowned_safe_existential")
+
+  verifyClassField(child: i.next()!, name: "unowned_unsafe_class")
+  verifyExistentialField(child: i.next()!, name: "unowned_unsafe_existential")
+  expectNil(i.next())
+
+  // The original bug report from SR-5289 crashed when the print() code
+  // attempted to reflect the contents of an unowned field.
+  // The tests above _should_ suffice to check this, but let's print everything
+  // anyway just to be sure.
+  for c in m.children {
+    print(c.label ?? "?", c.value)
+  }
+}
+
+#if _runtime(_ObjC)
+// Related: SR-5289 reported a crash when using Mirror to inspect Swift
+// class objects containing unowned pointers to Obj-C class objects.
+mirrors.test("Weak and Unowned Obj-C refs in class (SR-5289)") {
+  class SwiftClassWithWeakAndUnowned {
+    var strong_class: WeakUnownedObjCClass
+    var strong_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+    weak var weak_class: WeakUnownedObjCClass?
+    weak var weak_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)?
+    unowned(safe) let unowned_safe_class: WeakUnownedObjCClass
+    unowned(safe) let unowned_safe_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+    unowned(unsafe) let unowned_unsafe_class: WeakUnownedObjCClass
+    unowned(unsafe) let unowned_unsafe_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+
+    init(_ objc: WeakUnownedObjCClass) {
+      self.strong_class = objc
+      self.strong_existential = objc
+      self.weak_class = objc
+      self.weak_existential = objc
+      self.unowned_safe_class = objc
+      self.unowned_safe_existential = objc
+      self.unowned_unsafe_class = objc
+      self.unowned_unsafe_existential = objc
+    }
+  }
+
+  let objc = WeakUnownedObjCClass()
+  let classWithReferences = SwiftClassWithWeakAndUnowned(objc)
+  let m = Mirror(reflecting: classWithReferences)
+  expectEqual(m.displayStyle, .`class`)
+  expectEqual(m.description, "Mirror for SwiftClassWithWeakAndUnowned")
+  expectEqual(m.subjectType, SwiftClassWithWeakAndUnowned.self)
+  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedObjCClass.self)
+}
+
+mirrors.test("Weak and Unowned Obj-C refs in struct") {
+  struct SwiftStructWithWeakAndUnowned {
+    var strong_class: WeakUnownedObjCClass
+    var strong_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+    weak var weak_class: WeakUnownedObjCClass?
+    weak var weak_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)?
+    unowned(safe) let unowned_safe_class: WeakUnownedObjCClass
+    unowned(safe) let unowned_safe_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+    unowned(unsafe) let unowned_unsafe_class: WeakUnownedObjCClass
+    unowned(unsafe) let unowned_unsafe_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+
+    init(_ objc: WeakUnownedObjCClass) {
+      self.strong_class = objc
+      self.strong_existential = objc
+      self.weak_class = objc
+      self.weak_existential = objc
+      self.unowned_safe_class = objc
+      self.unowned_safe_existential = objc
+      self.unowned_unsafe_class = objc
+      self.unowned_unsafe_existential = objc
+    }
+  }
+
+  let objc = WeakUnownedObjCClass()
+  let structWithReferences = SwiftStructWithWeakAndUnowned(objc)
+  let m = Mirror(reflecting: structWithReferences)
+  expectEqual(m.displayStyle, .`struct`)
+  expectEqual(m.description, "Mirror for SwiftStructWithWeakAndUnowned")
+  expectEqual(m.subjectType, SwiftStructWithWeakAndUnowned.self)
+  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedObjCClass.self)
+}
+
+#endif
+
+mirrors.test("Weak and Unowned Swift refs in class") {
+  class SwiftClassWithWeakAndUnowned {
+    var strong_class: WeakUnownedSwiftClass
+    var strong_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+    weak var weak_class: WeakUnownedSwiftClass?
+    weak var weak_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)?
+    unowned(safe) let unowned_safe_class: WeakUnownedSwiftClass
+    unowned(safe) let unowned_safe_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)
+    unowned(unsafe) let unowned_unsafe_class: WeakUnownedSwiftClass
+    unowned(unsafe) let unowned_unsafe_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)
+
+    init(_ swift: WeakUnownedSwiftClass) {
+      self.strong_class = swift
+      self.strong_existential = swift
+      self.weak_class = swift
+      self.weak_existential = swift
+      self.unowned_safe_class = swift
+      self.unowned_safe_existential = swift
+      self.unowned_unsafe_class = swift
+      self.unowned_unsafe_existential = swift
+    }
+  }
+
+  let swift = WeakUnownedSwiftClass()
+  let classWithReferences = SwiftClassWithWeakAndUnowned(swift)
+  let m = Mirror(reflecting: classWithReferences)
+  expectEqual(m.displayStyle, .`class`)
+  expectEqual(m.description, "Mirror for SwiftClassWithWeakAndUnowned")
+  expectEqual(m.subjectType, SwiftClassWithWeakAndUnowned.self)
+  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedSwiftClass.self)
+}
+
+mirrors.test("Weak and Unowned Swift refs in struct") {
+  struct SwiftStructWithWeakAndUnowned {
+    var strong_class: WeakUnownedSwiftClass
+    var strong_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2
+    weak var weak_class: WeakUnownedSwiftClass?
+    weak var weak_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)?
+    unowned(safe) let unowned_safe_class: WeakUnownedSwiftClass
+    unowned(safe) let unowned_safe_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)
+    unowned(unsafe) let unowned_unsafe_class: WeakUnownedSwiftClass
+    unowned(unsafe) let unowned_unsafe_existential: (WeakUnownedTestsP1 & WeakUnownedTestsP2)
+
+    init(_ swift: WeakUnownedSwiftClass) {
+      self.strong_class = swift
+      self.strong_existential = swift
+      self.weak_class = swift
+      self.weak_existential = swift
+      self.unowned_safe_class = swift
+      self.unowned_safe_existential = swift
+      self.unowned_unsafe_class = swift
+      self.unowned_unsafe_existential = swift
+    }
+  }
+
+  let swift = WeakUnownedSwiftClass()
+  let structWithReferences = SwiftStructWithWeakAndUnowned(swift)
+  let m = Mirror(reflecting: structWithReferences)
+  expectEqual(m.displayStyle, .`struct`)
+  expectEqual(m.description, "Mirror for SwiftStructWithWeakAndUnowned")
+  expectEqual(m.subjectType, SwiftStructWithWeakAndUnowned.self)
+  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedSwiftClass.self)
+}
+
 //===--- Suppressed Superclass Mirrors ------------------------------------===//
 mirrors.test("Class/Root/NoSuperclassMirror") {
   class B : CustomReflectable {
