@@ -53,23 +53,37 @@ func calls_diff_of_nested(_ x: Float) -> Float {
 // Inout arguments
 //===----------------------------------------------------------------------===//
 
-func activeInoutArg(_ x: Float) -> Float {
-  var a = x
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
-  a += x
-  return a
-}
 // expected-error @+1 {{function is not differentiable}}
-_ = differential(at: .zero, in: activeInoutArg(_:))
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
+  var result: Float = 1
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result += x
+  return result
+}
 
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgTuple(_ x: Float) -> Float {
   var tuple = (x, x)
   // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   tuple.0 *= x
   return x * tuple.0
 }
+
 // expected-error @+1 {{function is not differentiable}}
-_ = differential(at: .zero, in: activeInoutArgTuple(_:))
+@differentiable
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{forward-mode differentiation does not yet support control flow}}
+func activeInoutArgControlFlow(_ array: [Float]) -> Float {
+  var result: Float = 1
+  for i in withoutDerivative(at: array).indices {
+    result += array[i]
+  }
+  return result
+}
 
 //===----------------------------------------------------------------------===//
 // Non-varied results

@@ -1622,11 +1622,8 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
 ///    active argument.
 bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   // Function applications with an inout argument should be differentiated.
-  auto paramInfos = ai->getSubstCalleeConv().getParameters();
-  auto arguments = ai->getArgumentsWithoutIndirectResults();
-  for (auto i : swift::indices(paramInfos))
-    if (paramInfos[i].isIndirectInOut() &&
-        activityInfo.isActive(arguments[i], indices))
+  for (auto inoutArg : ai->getInoutArguments())
+    if (activityInfo.isActive(inoutArg, indices))
       return true;
 
   bool hasActiveDirectResults = false;
@@ -1642,6 +1639,7 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
     return true;
 
+  auto arguments = ai->getArgumentsWithoutIndirectResults();
   bool hasActiveArguments = llvm::any_of(arguments,
       [&](SILValue arg) { return activityInfo.isActive(arg, indices); });
   return hasActiveResults && hasActiveArguments;
@@ -1834,20 +1832,13 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   for (auto &origBB : *original) {
     for (auto &inst : origBB) {
       if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
-        // Check for active 'inout' arguments.
-        bool isInout = false;
-        auto paramInfos = ai->getSubstCalleeConv().getParameters();
-        for (unsigned i : swift::indices(paramInfos)) {
-          if (paramInfos[i].isIndirectInOut() &&
-              activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
-                                    indices)) {
-            // Reject functions with active inout arguments. It's not yet
-            // supported.
-            isInout = true;
-            break;
-          }
-        }
-        if (isInout)
+        // Skip `apply` instructions with active `inout` arguments.
+        // TODO(TF-129): Support `inout` argument differentiation.
+        bool hasActiveInoutArgument =
+            llvm::any_of(ai->getInoutArguments(), [&](SILValue inoutArg) {
+              return activityInfo.isActive(inoutArg, indices);
+            });
+        if (hasActiveInoutArgument)
           continue;
 
         // Add linear map field to struct for active `apply` instructions.
@@ -2008,10 +1999,13 @@ void DifferentiableActivityInfo::propagateVaried(
     // If callee is non-varying, skip.
     if (isWithoutDerivative(ai->getCallee()))
       return;
-    // If operand is varied, set all direct and indirect results as varied.
+    // If operand is varied, set all direct/indirect results and inout arguments
+    // as varied.
     if (isVaried(operand->get(), i)) {
       for (auto indRes : ai->getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
+      for (auto inoutArg : ai->getInoutArguments())
+        propagateVariedInwardsThroughProjections(inoutArg, i);
       forEachApplyDirectResult(ai, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
       });
@@ -3778,7 +3772,7 @@ public:
         sei->getLoc(), getOpValue(sei->getOperand()), newDefaultBB, caseBBs);
   }
 
-  // If an `apply` has active results or active inout parameters, replace it
+  // If an `apply` has active results or active inout arguments, replace it
   // with an `apply` of its VJP.
   void visitApplyInst(ApplyInst *ai) {
     // If the function should not be differentiated or its the array literal
@@ -3790,13 +3784,10 @@ public:
       return;
     }
 
-    // Check and reject functions with active inout arguments. It's not yet
-    // supported.
-    auto paramInfos = ai->getSubstCalleeConv().getParameters();
-    auto paramArgs = ai->getArgumentsWithoutIndirectResults();
-    for (unsigned i : swift::indices(paramInfos)) {
-      if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(paramArgs[i], getIndices())) {
+    // Diagnose functions with active inout arguments.
+    // TODO(TF-129): Support `inout` argument differentiation.
+    for (auto inoutArg : ai->getInoutArguments()) {
+      if (activityInfo.isActive(inoutArg, getIndices())) {
         context.emitNondifferentiabilityError(ai, invoker,
             diag::autodiff_cannot_differentiate_through_inout_arguments);
         errorOccurred = true;
@@ -5472,13 +5463,10 @@ public:
       return;
     }
 
-    // Check and reject functions with active inout arguments. It's not yet
-    // supported.
-    auto paramInfos = ai->getSubstCalleeConv().getParameters();
-    auto paramArgs = ai->getArgumentsWithoutIndirectResults();
-    for (unsigned i : swift::indices(paramInfos)) {
-      if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(paramArgs[i], getIndices())) {
+    // Diagnose functions with active inout arguments.
+    // TODO(TF-129): Support `inout` argument differentiation.
+    for (auto inoutArg : ai->getInoutArguments()) {
+      if (activityInfo.isActive(inoutArg, getIndices())) {
         context.emitNondifferentiabilityError(ai, invoker,
             diag::autodiff_cannot_differentiate_through_inout_arguments);
         errorOccurred = true;

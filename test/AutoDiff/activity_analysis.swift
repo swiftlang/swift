@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s
 
 // Check that `@noDerivative` struct projections have "NONE" activity.
 
@@ -203,3 +203,50 @@ func TF_954(_ x: Float) -> Float {
 // CHECK: bb5:
 // CHECK: [ACTIVE]   %40 = begin_access [read] [static] %2 : $*Float
 // CHECK: [ACTIVE]   %41 = load [trivial] %40 : $*Float
+
+//===----------------------------------------------------------------------===//
+// Non-differentiable functions
+//===----------------------------------------------------------------------===//
+
+// Check `inout` arguments.
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArg(_ x: Float) -> Float {
+  var result = x
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result += x
+  return result
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArg{{.*}} at (source=0 parameters=(0))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE]   %2 = alloc_stack $Float, var, name "result"
+// CHECK: [ACTIVE]   %5 = begin_access [modify] [static] %2 : $*Float
+// CHECK: [NONE]   // function_ref static Float.+= infix(_:_:)
+// CHECK: [NONE]   %7 = apply %6(%5, %0, %4) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
+// CHECK: [ACTIVE]   %9 = begin_access [read] [static] %2 : $*Float
+// CHECK: [ACTIVE]   %10 = load [trivial] %9 : $*Float
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
+  var result: Float = 1
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result += x
+  return result
+}
+
+// CHECK-LABEL: [AD] Activity info for ${{.*}}activeInoutArgNonactiveInitialResult{{.*}} at (source=0 parameters=(0))
+// CHECK-LABEL: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK-LABEL: [ACTIVE]   %2 = alloc_stack $Float, var, name "result"
+// CHECK-LABEL: [NONE]   // function_ref Float.init(_builtinIntegerLiteral:)
+// CHECK-LABEL: [USEFUL]   %6 = apply %5(%3, %4) : $@convention(method) (Builtin.IntLiteral, @thin Float.Type) -> Float
+// CHECK-LABEL: [USEFUL]   %8 = metatype $@thin Float.Type
+// CHECK-LABEL: [ACTIVE]   %9 = begin_access [modify] [static] %2 : $*Float
+// CHECK-LABEL: [NONE]   // function_ref static Float.+= infix(_:_:)
+// CHECK-LABEL: [NONE]   %11 = apply %10(%9, %0, %8) : $@convention(method) (@inout Float, Float, @thin Float.Type) -> ()
+// CHECK-LABEL: [ACTIVE]   %13 = begin_access [read] [static] %2 : $*Float
+// CHECK-LABEL: [ACTIVE]   %14 = load [trivial] %13 : $*Float

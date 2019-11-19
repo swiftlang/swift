@@ -2046,6 +2046,11 @@ protected:
   ApplyInstBase(As &&...args)
     : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
 
+// SWIFT_ENABLE_TENSORFLOW
+private:
+  const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
+// SWIFT_ENABLE_TENSORFLOW END
+
 public:
   using super::getCallee;
   using super::getSubstCalleeType;
@@ -2133,6 +2138,32 @@ public:
   bool hasSemantics(StringRef semanticsString) const {
     return doesApplyCalleeHaveSemantics(getCallee(), semanticsString);
   }
+
+// SWIFT_ENABLE_TENSORFLOW
+private:
+  /// Predicate used to filter InoutArgumentRange.
+  struct OperandToInoutArgument {
+    const Impl &inst;
+    OperandToInoutArgument(const Impl &inst) : inst(inst) {}
+    Optional<SILValue> operator()(unsigned long i) const {
+      auto paramInfo = inst.getSubstCalleeConv().getParameters()[i];
+      auto argument = inst.getArgumentsWithoutIndirectResults()[i];
+      if (paramInfo.isIndirectMutating())
+        return argument;
+      return None;
+    }
+  };
+
+public:
+  using InoutArgumentRange =
+      OptionalTransformRange<IntRange<unsigned long>, OperandToInoutArgument>;
+  /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
+  /// instruction.
+  InoutArgumentRange getInoutArguments() const {
+    return InoutArgumentRange(indices(getArgumentsWithoutIndirectResults()),
+                              OperandToInoutArgument(asImpl()));
+  }
+// SWIFT_ENABLE_TENSORFLOW END
 };
 
 /// ApplyInst - Represents the full application of a function value.
