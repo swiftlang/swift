@@ -23,7 +23,7 @@
 
 namespace swift {
 namespace semantics {
-#define SEMANTICS_ATTR(NAME, C_STR) constexpr static const StringLiteral NAME = #C_STR;
+#define SEMANTICS_ATTR(NAME, C_STR) constexpr static const StringLiteral NAME = C_STR;
 #include "SemanticAttrs.def"
 }
 }
