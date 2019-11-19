@@ -172,6 +172,10 @@ static bool swiftCodeCompleteImpl(
     return false;
   }
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
   std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
       llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
