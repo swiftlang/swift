@@ -864,7 +864,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   Optional<OutputFileMap> OFM = buildOutputFileMap(
       *TranslatedArgList, workingDirectory,
-      EnableSourceRangeDependencies || CompareIncrementalSchemes);
+      /*addEntriesForSourceFileDependencies=*/EnableSourceRangeDependencies ||
+          CompareIncrementalSchemes);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -2997,7 +2998,7 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
   }
   if (C.getIncrementalBuildEnabled()) {
     file_types::forEachIncrementalOutputType([&](file_types::ID type) {
-      if (C.getEnableSourceRangeDependencies() || C.CompareIncrementalSchemes ||
+      if (C.getEnableSourceRangeDependencies() || C.IncrementalComparator ||
           type == file_types::TY_SwiftDeps)
         addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
     });

@@ -74,7 +74,56 @@ enum class PreserveOnSignal : bool {
   Yes
 };
 
+using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
+
 class Compilation {
+public:
+  class IncrementalSchemeComparator {
+    const bool EnableSourceRangeDependencies;
+    const bool &UseSourceRangeDependencies;
+
+    /// If not empty, the path to use to log the comparision.
+    const StringRef CompareIncrementalSchemesPath;
+
+    const unsigned SwiftInputCount;
+
+    DiagnosticEngine &Diags;
+
+    CommandSet DependencyCompileJobs;
+    CommandSet SourceRangeCompileJobs;
+    CommandSet SourceRangeLackingSuppJobs;
+
+  public:
+    IncrementalSchemeComparator(bool EnableSourceRangeDependencies,
+                                const bool &UseSourceRangeDependencies,
+                                const StringRef CompareIncrementalSchemesPath,
+                                unsigned SwiftInputCount,
+                                DiagnosticEngine &Diags)
+        : EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+          UseSourceRangeDependencies(UseSourceRangeDependencies),
+          CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
+          SwiftInputCount(SwiftInputCount), Diags(Diags) {}
+
+    /// Record scheduled jobs in support of the
+    /// -compare-incremental-schemes[-path] options
+    ///
+    /// \param depJobs A vector-like collection of jobs that the dependency
+    /// scheme would run \param rangeJobs A vector-like collection of jobs that
+    /// the range scheme would run because of changes \param lackingSuppJobs A
+    /// vector-like collection of jobs that the range scheme would run because
+    /// there are no incremental supplementary outputs such as swiftdeps,
+    /// swiftranges, compiledsource
+    void update(ArrayRef<const Job *> depJobs, ArrayRef<const Job *> rangeJobs,
+                ArrayRef<const Job *> lackingSuppJobs);
+
+    /// Write the information for the -compare-incremental-schemes[-path]
+    /// options
+    void outputComparison() const;
+
+  private:
+    void outputComparison(llvm::raw_ostream &) const;
+  };
+
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -228,30 +277,10 @@ private:
   bool UseSourceRangeDependencies = false;
 
 public:
-  /// How many .swift input files?
-  unsigned countSwiftInputs() const;
-
-  /// Print out a short message comparing dependencies w/  source-ranges, or
-  /// output it to the path below
-  const bool CompareIncrementalSchemes;
-
-  /// If not empty, the path to use to log the comparision.
-  const StringRef CompareIncrementalSchemesPath;
-
-  template <typename DepJobsT, typename RangeJobsT>
-  void updateJobsForComparison(const DepJobsT &depJobs,
-                               const RangeJobsT &rangeJobs);
-  void setFallingBackForComparison();
-  void outputComparison() const;
+  /// Will contain a comparator if an argument demands it.
+  Optional<IncrementalSchemeComparator> IncrementalComparator;
 
 private:
-  void outputComparison(llvm::raw_ostream &) const;
-
-private:
-  llvm::SmallPtrSet<const Job *, 16> DependencyCompileJobs;
-  llvm::SmallPtrSet<const Job *, 16> SourceRangeCompileJobs;
-  bool FallingBackToDependiesFromSourceRanges = false;
-
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -471,6 +500,17 @@ public:
       PassedEmitLoadedModuleTraceToFrontendJob = true;
       return true;
     }
+  }
+
+  /// How many .swift input files?
+  unsigned countSwiftInputs() const;
+
+  void updateIncrementalComparison(ArrayRef<const Job *> depJobs,
+                                   ArrayRef<const Job *> rangeJobs,
+                                   ArrayRef<const Job *> lackingSuppJobs) {
+    if (IncrementalComparator.hasValue())
+      IncrementalComparator.getValue().update(depJobs, rangeJobs,
+                                              lackingSuppJobs);
   }
 
 private:

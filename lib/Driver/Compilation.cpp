@@ -156,16 +156,17 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitExperimentalDependencyDotFileAfterEveryImport),
     ExperimentalDependenciesIncludeIntrafileOnes(
       ExperimentalDependenciesIncludeIntrafileOnes),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies),
-    CompareIncrementalSchemes(CompareIncrementalSchemes),
-    CompareIncrementalSchemesPath(CompareIncrementalSchemesPath) {
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
+    if (CompareIncrementalSchemes)
+      IncrementalComparator.emplace(
+      EnableSourceRangeDependencies, UseSourceRangeDependencies,
+      CompareIncrementalSchemesPath, countSwiftInputs(), getDiags());
 };
 // clang-format on
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
                                      DiagnosticEngine &diags);
 
-using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 using CommandSetVector = llvm::SetVector<const Job*>;
 using BatchPartition = std::vector<std::vector<const Job*>>;
 
@@ -265,7 +266,7 @@ namespace driver {
       if (ScheduledCommands.count(cmd))
         return;
       if (!Comp.getEnableSourceRangeDependencies() &&
-          !Comp.CompareIncrementalSchemes && !willBeBuilding)
+          !Comp.IncrementalComparator && !willBeBuilding)
         return; // preserve legacy behavior
       const bool isHypothetical =
           Comp.getUseSourceRangeDependencies() == forRanges;
@@ -634,7 +635,7 @@ namespace driver {
 
       SmallVector<const Job *, 16> Dependents;
       if (!Comp.getUseSourceRangeDependencies()) {
-        if (!Comp.CompareIncrementalSchemes)
+        if (!Comp.IncrementalComparator)
           Dependents = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
         else {
           SmallVector<const Job *, 16> DependentsForDeps;
@@ -775,10 +776,7 @@ namespace driver {
       SmallVector<const Job *, 16> jobsForRanges =
           fallBack ? jobsForDependencies : SmallVector<const Job *, 16>();
 
-      if (fallBack)
-        Comp.setFallingBackForComparison();
-
-      Comp.updateJobsForComparison(jobsForDependencies, jobsForRanges);
+      Comp.updateIncrementalComparison(jobsForDependencies, jobsForRanges, {});
 
       return {jobsForRanges, jobsForDependencies};
     }
@@ -882,7 +880,7 @@ namespace driver {
     void scheduleFirstRoundJobsForIncrementalCompilation(
         DependencyGraphT &DepGraph) {
 
-      llvm::SmallPtrSet<const Job *, 16> compileJobsToSchedule;
+      CommandSet compileJobsToSchedule;
       for (const Job *Cmd :
            computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph))
         compileJobsToSchedule.insert(Cmd);
@@ -904,8 +902,8 @@ namespace driver {
       auto compileJobsToScheduleViaDependencies =
           computeDependenciesAndGetNeededCompileJobs(DepGraph);
 
-      const bool mustConsultRanges = Comp.getEnableSourceRangeDependencies() ||
-                                     Comp.CompareIncrementalSchemes;
+      const bool mustConsultRanges =
+          Comp.getEnableSourceRangeDependencies() || Comp.IncrementalComparator;
 
       if (!mustConsultRanges)
         return compileJobsToScheduleViaDependencies;
@@ -921,30 +919,32 @@ namespace driver {
               compileJobsToScheduleViaSourceRanges,
               jobsLackingSourceRangeSupplementaryOutputs);
 
-      Comp.updateJobsForComparison(compileJobsToScheduleViaDependencies,
-                                   compileJobsToScheduleViaSourceRanges);
-      if (shouldFallBack)
-        Comp.setFallingBackForComparison();
+      Comp.updateIncrementalComparison(
+          compileJobsToScheduleViaDependencies,
+          compileJobsToScheduleViaSourceRanges,
+          jobsLackingSourceRangeSupplementaryOutputs);
 
       if (!Comp.getEnableSourceRangeDependencies())
         return compileJobsToScheduleViaDependencies;
 
       Comp.setUseSourceRangeDependencies(!shouldFallBack);
 
-      if (shouldFallBack) {
-        // Even if dependencies would not schedule these, we want them to run
-        // to create the supplementary outputs for next time.
-        for (const Job *Cmd : jobsLackingSourceRangeSupplementaryOutputs)
-          compileJobsToScheduleViaDependencies.push_back(Cmd);
-      }
-      return shouldFallBack ? compileJobsToScheduleViaDependencies
-                            : compileJobsToScheduleViaSourceRanges;
+      if (!shouldFallBack)
+        return compileJobsToScheduleViaSourceRanges;
+
+      auto compileJobsToScheduleWhenFallingBack =
+          std::move(compileJobsToScheduleViaDependencies);
+      // Even if dependencies would not schedule these, we want them to run
+      // to create the supplementary outputs for next time.
+      for (const Job *Cmd : jobsLackingSourceRangeSupplementaryOutputs)
+        compileJobsToScheduleWhenFallingBack.push_back(Cmd);
+
+      return compileJobsToScheduleWhenFallingBack;
     }
 
     bool decideAndExplainWhetherToFallBackToDependencies(
-        llvm::SmallVector<const Job *, 16>
-            &compileJobsToScheduleViaSourceRanges,
-        const llvm::SmallVector<const Job *, 16>
+        const ArrayRef<const Job *> compileJobsToScheduleViaSourceRanges,
+        const ArrayRef<const Job *>
             &jobsLackingSourceRangeSupplementaryOutputs) {
       if (!jobsLackingSourceRangeSupplementaryOutputs.empty()) {
         if (Comp.getShowIncrementalBuildDecisions()) {
@@ -961,7 +961,7 @@ namespace driver {
       }
       // Unless the source-range scheme would compile every file,
       // it's likely a better bet.
-      llvm::SmallPtrSet<const Job *, 16> uniqueJobs;
+      CommandSet uniqueJobs;
       for (const auto *J : compileJobsToScheduleViaSourceRanges)
         uniqueJobs.insert(J);
       if (uniqueJobs.size() < Comp.countSwiftInputs()) {
@@ -1921,7 +1921,8 @@ int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   bool abnormalExit;
   int result = performJobsImpl(abnormalExit, std::move(TQ));
 
-  outputComparison();
+  if (IncrementalComparator)
+    IncrementalComparator->outputComparison();
 
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
@@ -1955,23 +1956,18 @@ const char *Compilation::getAllSourcesPath() const {
   return AllSourceFilesPath;
 }
 
-template <typename DepJobsT, typename RangeJobsT>
-void Compilation::updateJobsForComparison(const DepJobsT &depJobs,
-                                          const RangeJobsT &rangeJobs) {
+void Compilation::IncrementalSchemeComparator::update(
+    const ArrayRef<const Job *> depJobs, const ArrayRef<const Job *> rangeJobs,
+    const ArrayRef<const Job *> lackingSuppJobs) {
   for (const auto *cmd : depJobs)
     DependencyCompileJobs.insert(cmd);
   for (const auto *cmd : rangeJobs)
     SourceRangeCompileJobs.insert(cmd);
+  for (const auto *cmd : lackingSuppJobs)
+    SourceRangeLackingSuppJobs.insert(cmd);
 }
 
-void Compilation::setFallingBackForComparison() {
-  FallingBackToDependiesFromSourceRanges = true;
-}
-
-void Compilation::outputComparison() const {
-  if (!CompareIncrementalSchemes)
-    return;
-
+void Compilation::IncrementalSchemeComparator::outputComparison() const {
   if (CompareIncrementalSchemesPath.empty()) {
     outputComparison(llvm::outs());
     return;
@@ -1983,30 +1979,25 @@ void Compilation::outputComparison() const {
                           FA_Write, OF_Append | OF_Text);
 
   if (EC) {
-    getDiags().diagnose(SourceLoc(),
-                        diag::unable_to_open_incremental_comparison_log,
-                        CompareIncrementalSchemesPath);
+    Diags.diagnose(SourceLoc(), diag::unable_to_open_incremental_comparison_log,
+                   CompareIncrementalSchemesPath);
     return;
   }
   outputComparison(OS);
 }
 
-void Compilation::outputComparison(llvm::raw_ostream &out) const {
-  if (!getIncrementalBuildEnabled())
-    out << "*** Comparing incremental strategies is moot: incremental "
-           "compilation disabled ***\n";
-  else if (FallingBackToDependiesFromSourceRanges)
-    out << "*** Comparing deps: " << DependencyCompileJobs.size()
-        << ", ranges: " << SourceRangeCompileJobs.size()
-        << ", total: " << countSwiftInputs() << " ***\n";
-  else
-    out << "*** Comparing incremental strategies is moot: would fall "
-           "back and run "
-        << DependencyCompileJobs.size()
-        << ", ranges: " << SourceRangeCompileJobs.size()
-        << ", total: " << countSwiftInputs()
-        << ", plus more to create source-range and compiled-source files"
-        << " ***\n";
+void Compilation::IncrementalSchemeComparator::outputComparison(
+    llvm::raw_ostream &out) const {
+  out << "*** Comparing incremental schemes: "
+      << "deps: " << DependencyCompileJobs.size() << ", "
+      << "ranges: " << SourceRangeCompileJobs.size() << ", "
+      << "supplementary output creation: " << SourceRangeLackingSuppJobs.size()
+      << ", "
+      << "total: " << SwiftInputCount << ", "
+      << "scheme requested: "
+      << (EnableSourceRangeDependencies ? "ranges" : "deps") << ", "
+      << "scheme used: " << (UseSourceRangeDependencies ? "ranges" : "deps")
+      << "\n";
 }
 
 unsigned Compilation::countSwiftInputs() const {
