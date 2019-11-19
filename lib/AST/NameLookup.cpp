@@ -2635,3 +2635,15 @@ void FindLocalVal::visitCatchStmt(CatchStmt *S) {
     checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
   visit(S->getBody());
 }
+
+void swift::simple_display(llvm::raw_ostream &out, NLKind kind) {
+  switch (kind) {
+  case NLKind::QualifiedLookup:
+    out << "QualifiedLookup";
+    return;
+  case NLKind::UnqualifiedLookup:
+    out << "UnqualifiedLookup";
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}

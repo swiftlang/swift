@@ -48,3 +48,8 @@ SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
 SWIFT_REQUEST(NameLookup, UnqualifiedLookupRequest,
               LookupResult(UnqualifiedLookupDescriptor), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(NameLookup, LookupInModuleRequest,
+              QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+                                    namelookup::ResolutionKind,
+                                    const DeclContext *),
+              Uncached, NoLocationInfo)
