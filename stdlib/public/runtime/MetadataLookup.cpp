@@ -1691,6 +1691,26 @@ swift_getTypeByMangledNameInEnvironment(
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 const Metadata * _Nullable
+swift_getTypeByMangledNameInEnvironmentInMetadataState(
+                        size_t metadataState,
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetGenericEnvironment<InProcess> *environment,
+                        const void * const *genericArgs) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
+    genericArgs,
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+const Metadata * _Nullable
 swift_getTypeByMangledNameInContext(
                         const char *typeNameStart,
                         size_t typeNameLength,
