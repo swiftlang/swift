@@ -616,6 +616,10 @@ RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
 }
 
+bool ASTContext::areSemanticQueriesEnabled() const {
+  return getLegacyGlobalTypeChecker() != nullptr;
+}
+
 TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
   return getImpl().Checker;
 }

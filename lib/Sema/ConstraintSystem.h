@@ -1671,11 +1671,6 @@ public:
                    ConstraintSystemOptions options);
   ~ConstraintSystem();
 
-  /// Retrieve the type checker associated with this constraint system.
-  TypeChecker &getTypeChecker() const {
-    return *Context.getLegacyGlobalTypeChecker();
-  }
-
   /// Retrieve the constraint graph associated with this constraint system.
   ConstraintGraph &getConstraintGraph() const { return CG; }
 

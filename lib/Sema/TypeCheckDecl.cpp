@@ -3265,8 +3265,6 @@ public:
       }
     }
 
-    // FIXME: Remove TypeChecker dependencies below.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       FD->diagnose(diag::func_decl_without_brace);
@@ -3276,7 +3274,8 @@ public:
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
-      // Record the body.
+      // FIXME: Remove TypeChecker dependency.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.definedFunctions.push_back(FD);
     }
 
@@ -3595,8 +3594,6 @@ public:
 
     checkAccessControl(CD);
 
-    // FIXME: Remove TypeChecker dependencies below.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       CD->diagnose(diag::missing_initializer_def);
@@ -3606,6 +3603,8 @@ public:
     } else if (shouldSkipBodyTypechecking(CD)) {
       CD->setBodySkipped(CD->getBodySourceRange());
     } else {
+      // FIXME: Remove TypeChecker dependency.
+      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
       TC.definedFunctions.push_back(CD);
     }
 

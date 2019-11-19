@@ -121,8 +121,6 @@ public:
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
-  TypeChecker &getTypeChecker() const { return CS.getTypeChecker(); }
-
   DeclContext *getDC() const { return CS.DC; }
 
   ASTContext &getASTContext() const { return CS.getASTContext(); }
