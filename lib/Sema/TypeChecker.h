@@ -50,6 +50,7 @@ namespace constraints {
   enum class SolutionKind : char;
   class ConstraintSystem;
   class Solution;
+  class SolutionResult;
 }
 
 /// A mapping from substitutable types to the protocol-conformance
