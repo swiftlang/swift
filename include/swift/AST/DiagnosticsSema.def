@@ -3578,8 +3578,6 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
-NOTE(note_maybe_forgot_to_form_tuple,none,
-     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,

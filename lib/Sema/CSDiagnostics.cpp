@@ -5199,23 +5199,9 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     }
   }
 
-  // If the parameter is a generic parameter, it's hard to say
-  // whether use of a tuple is really intended here, so let's
-  // attach a fix-it to a note instead of the diagnostic message
-  // to indicate that it's not the only right solution possible.
-  if (auto *typeVar = ParamType->getAs<TypeVariableType>()) {
-    if (typeVar->getImpl().getGenericParameter()) {
-      diagnostic.flush();
-
-      emitDiagnostic(argExpr->getLoc(), diag::note_maybe_forgot_to_form_tuple)
-          .fixItInsertAfter(newLeftParenLoc, "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    }
-  } else {
-    diagnostic.highlight(argExpr->getSourceRange())
-        .fixItInsertAfter(newLeftParenLoc, "(")
-        .fixItInsert(argExpr->getEndLoc(), ")");
-  }
+  diagnostic.highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(newLeftParenLoc, "(")
+      .fixItInsert(argExpr->getEndLoc(), ")");
 
   return true;
 }
