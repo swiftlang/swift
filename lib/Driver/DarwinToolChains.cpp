@@ -230,15 +230,20 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
   ArgStringList &Arguments = II.Arguments;
   if (context.shouldUseInputFileList()) {
     Arguments.push_back("-filelist");
+    const auto whichFiles = context.Inputs.empty()
+                                ? FilelistInfo::WhichFiles::PrimaryInputs
+                                : FilelistInfo::WhichFiles::Input;
     Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
-                                FilelistInfo::WhichFiles::PrimaryInputs});
+    II.FilelistInfos.push_back(
+        {Arguments.back(), file_types::TY_Object, whichFiles});
+    assert((context.Inputs.empty() || context.InputActions.empty()) &&
+           "If both are non-empty the filelist won't work");
   } else {
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
   }
 
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
 
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
     addInputsOfType(Arguments, context.Inputs, context.Args,
