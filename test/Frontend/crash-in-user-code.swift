@@ -9,7 +9,7 @@
 // CHECK-NEXT: ---
 // CHECK-NEXT: crash-in-user-code.swift
 // CHECK-NEXT: ---
-// CHECK-NEXT: While running user code "SOURCE_DIR/test/FrontEnd/crash-in-user-code.swift"
+// CHECK-NEXT: While running user code "SOURCE_DIR/test/Front{{e|E}}nd/crash-in-user-code.swift"
 
 let x: Int? = nil
 x!
