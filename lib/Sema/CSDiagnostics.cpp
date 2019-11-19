@@ -1216,6 +1216,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
+  if (!getUnwrappedType()->isBool()) {
+    if (diagnoseConversionToBool())
+      return true;
+  }
+
   auto *anchor = getAnchor();
 
   // If this is an unresolved member expr e.g. `.foo` its
