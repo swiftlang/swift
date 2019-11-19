@@ -219,21 +219,20 @@ Ranges SourceRangeBasedInfo::computeNonlocalChangedRanges(
 // MARK: scheduling
 //==============================================================================
 
-
 bool SourceRangeBasedInfo::shouldScheduleCompileJob(
     const llvm::StringMap<SourceRangeBasedInfo> &allInfos, const Job *Cmd,
-    function_ref<void(Twine)> noteBuilding) {
+    function_ref<void(bool, Twine)> noteBuilding) {
   const auto primary = Cmd->getFirstSwiftPrimaryInput();
   if (primary.empty())
     return false; // not a compile
 
   auto iter = allInfos.find(primary);
   if (iter == allInfos.end()) {
-    noteBuilding("(could not obtain range info from frontend)");
+    noteBuilding(true, "(could not obtain range info from frontend)");
     return true;
   }
   if (!iter->second.changedRanges.empty()) {
-    noteBuilding("(this file changed)");
+    noteBuilding(true, "(this file changed)");
     return true;
   }
   return iter->second.didPrimaryParseAnyNonlocalNonprimaryChanges(
@@ -242,14 +241,14 @@ bool SourceRangeBasedInfo::shouldScheduleCompileJob(
 
 bool SourceRangeBasedInfo::didPrimaryParseAnyNonlocalNonprimaryChanges(
     StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-    function_ref<void(Twine)> noteBuilding) const {
+    function_ref<void(bool, Twine)> noteBuilding) const {
   return !wasEveryNonprimaryNonlocalChangeUnparsed(primary, allInfos,
                                                    noteBuilding);
 }
 
 bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
     StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-    function_ref<void(Twine)> noteBuilding) const {
+    function_ref<void(bool, Twine)> noteBuilding) const {
 
   const auto &myUnparsedRangesByNonPri =
       swiftRangesFileContents.unparsedRangesByNonPrimary;
@@ -261,18 +260,21 @@ bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
     auto unparsedRanges = myUnparsedRangesByNonPri.find(nonPri);
     const auto nonPriFilename = llvm::sys::path::filename(nonPri);
     if (unparsedRanges == myUnparsedRangesByNonPri.end()) {
-      noteBuilding(Twine(nonPriFilename) +
-                   " changed non-locally but I have no unparsed ranges there");
+      noteBuilding(
+          true, Twine(nonPriFilename) +
+                    " changed non-locally but I have no unparsed ranges there");
       return false;
     }
     const auto whatChanged = SerializableSourceRange::findOutlierIfAny(
         nonPriInfo.nonlocalChangedRanges, unparsedRanges->second);
     if (whatChanged) {
-      noteBuilding(Twine("(changed: ") + nonPriFilename + ":" +
-                   whatChanged->printString() + ")");
+      noteBuilding(true, Twine("(changed: ") + nonPriFilename + ":" +
+                             whatChanged->printString() + ")");
       return false;
     }
   }
+  noteBuilding(false,
+               "nothing that this file parsed changed in any other file");
   return true;
 }
 

@@ -258,12 +258,19 @@ namespace driver {
     llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
 
-    void noteBuilding(const Job *cmd, const bool forRanges, StringRef reason) {
+    void noteBuilding(const Job *cmd, const bool willBeBuilding,
+                      const bool forRanges, StringRef reason) {
       if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
         return;
-      llvm::outs() << "Queuing "
+      if (!Comp.getEnableSourceRangeDependencies() &&
+          !Comp.CompareIncrementalSchemes && !willBeBuilding)
+        return; // preserve legacy behavior
+      const bool isHypothetical =
+          Comp.getUseSourceRangeDependencies() == forRanges;
+      llvm::outs() << (isHypothetical ? "Hypothetically: " : "")
+                   << (willBeBuilding ? "Queuing " : "Skipping ")
                    << (forRanges ? "<Ranges> "
                                  : Comp.getEnableSourceRangeDependencies()
                                        ? "<Dependencies> "
@@ -666,7 +673,7 @@ namespace driver {
 
       for (const Job *Cmd : Dependents) {
         DeferredCommands.erase(Cmd);
-        noteBuilding(Cmd, Comp.getUseSourceRangeDependencies(),
+        noteBuilding(Cmd, true, Comp.getUseSourceRangeDependencies(),
                      "because of dependencies discovered later");
         scheduleCommandIfNecessaryAndPossible(Cmd);
       }
@@ -753,8 +760,6 @@ namespace driver {
         return {};
       // FIXME: crude, could just use dependencies to schedule only those jobs
       // depending on the added tops
-      assert(Comp.getEnableSourceRangeDependencies() &&
-             "only implementing this for those");
       const size_t topsBefore = countTopLevelProvides(FinishedCmd);
 
       SmallVector<const Job *, 16> jobsForDependencies;
@@ -999,17 +1004,23 @@ namespace driver {
       llvm::SmallVector<const Job *, 16> neededJobs;
       for (const Job *Cmd : Comp.getJobs()) {
         if (SourceRangeBasedInfo::shouldScheduleCompileJob(
-                allSourceRangeInfo, Cmd,
-                [&](Twine why) { noteBuilding(Cmd, true, why.str()); }))
+                allSourceRangeInfo, Cmd, [&](const bool willBuild, Twine why) {
+                  noteBuilding(Cmd, willBuild, true, why.str());
+                }))
           neededJobs.push_back(Cmd);
       }
 
       llvm::SmallVector<const Job *, 16> jobsLackingSupplementaryOutputs;
       for (const Job *Cmd : Comp.getJobs()) {
         auto pri = Cmd->getFirstSwiftPrimaryInput();
-        if (pri.empty() || allSourceRangeInfo.count(pri))
-          continue;
-        noteBuilding(Cmd, true,
+        if (pri.empty())
+          if (allSourceRangeInfo.count(pri)) {
+            noteBuilding(
+                Cmd, false, true,
+                "already have source-range and compiled-source files.");
+            continue;
+          }
+        noteBuilding(Cmd, true, true,
                      "to create source-range and compiled-source files for the "
                      "next time when falling back from source-ranges");
         jobsLackingSupplementaryOutputs.push_back(Cmd);
@@ -1140,9 +1151,10 @@ namespace driver {
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
-        noteBuilding(Cmd, false, "(initial)");
+        noteBuilding(Cmd, true, false, "(initial)");
         return true;
       case Job::Condition::CheckDependencies:
+        noteBuilding(Cmd, false, false, "flie is up-to-date and output exists");
         return false;
       }
     }
@@ -1167,7 +1179,8 @@ namespace driver {
 
       for (auto *externalCmd :
            llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
-        noteBuilding(externalCmd, false, "because of external dependencies");
+        noteBuilding(externalCmd, true, false,
+                     "because of external dependencies");
       }
       return AdditionalOutOfDateCommands;
     }
@@ -1183,7 +1196,7 @@ namespace driver {
                 externalSwiftDeps, [&](const void *node) {
                   // Sadly, the non-experimental dependency graph is type-unsafe
                   const Job *externalCmd = reinterpret_cast<const Job *>(node);
-                  noteBuilding(externalCmd, true,
+                  noteBuilding(externalCmd, true, true,
                                "because of external dependencies");
                   results.push_back(externalCmd);
                 });
@@ -1218,7 +1231,7 @@ namespace driver {
                                 IncrementalTracer);
       }
       for (auto *transitiveCmd : AdditionalOutOfDateCommands)
-        noteBuilding(transitiveCmd, false, "because of the initial set");
+        noteBuilding(transitiveCmd, true, false, "because of the initial set");
 
       return AdditionalOutOfDateCommands;
     }

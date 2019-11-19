@@ -95,20 +95,9 @@ private:
   //==============================================================================
 
 public:
-  /// Return both the jobs to compile if using ranges, and also any jobs that
-  /// must be compiled to use ranges in the future (because they were lacking
-  /// supplementary output files).
-  static std::pair<llvm::SmallPtrSet<const driver::Job *, 16>,
-                   llvm::SmallVector<const driver::Job *, 16>>
-  neededCompileJobsForRangeBasedIncrementalCompilation(
-      const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-      std::vector<const driver::Job *>,
-      function_ref<void(const driver::Job *, Twine)> noteBuilding);
-
-public:
   static bool shouldScheduleCompileJob(
       const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-      const driver::Job *, function_ref<void(Twine)>);
+      const driver::Job *, function_ref<void(bool, Twine)>);
 
 private:
   static Optional<bool> isFileNewerThan(StringRef lhs, StringRef rhs,
@@ -119,11 +108,11 @@ private:
 
   bool didPrimaryParseAnyNonlocalNonprimaryChanges(
       StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &,
-      function_ref<void(Twine)>) const;
+      function_ref<void(bool, Twine)>) const;
 
   bool wasEveryNonprimaryNonlocalChangeUnparsed(
       StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &,
-      function_ref<void(Twine)>) const;
+      function_ref<void(bool, Twine)>) const;
 
   //==============================================================================
   // MARK: printing
