@@ -29,6 +29,7 @@
 
 
 #if SWIFT_OBJC_INTEROP
+#if __OBJC__
 
 // Source code: "SwiftObject"
 // Real class name: mangled "Swift._SwiftObject"
@@ -83,5 +84,13 @@ id getDescription(OpaqueValue *value, const Metadata *type);
 }
 
 #endif
+#endif
+
+namespace swift {
+
+/// Get the NSObject metadata.
+const Metadata *getNSObjectMetadata();
+
+}
 
 #endif
