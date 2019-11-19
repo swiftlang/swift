@@ -59,8 +59,8 @@
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES %s < %t/output1
 // CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output1
-// CHECK-COMPARE-DISABLED: *** Comparing incremental strategies is moot: incremental compilation disabled ***
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED-NO-BUILD-RECORD %s < %t/output1
+// CHECK-COMPARE-DISABLED-NO-BUILD-RECORD: *** Incremental build disabled because could not read build record, cannot compare ***
 
 // RUN: %t/main | tee run1 | grep Any > /dev/null && rm %t/main
 
@@ -73,7 +73,8 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output2
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/comparo
+// RUN: tail -1 %t/comparo | %FileCheck -check-prefix=CHECK-COMPARE-DISABLED-ARGUMENTS %s
+// CHECK-COMPARE-DISABLED-ARGUMENTS: *** Incremental build disabled because different arguments passed to compiler, cannot compare ***
 
 // RUN: %FileCheck -check-prefix=CHECK-TURN-ON-RANGES %s < %t/output2
 
@@ -134,10 +135,10 @@
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes-path ./comparo -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output3
+// RUN: head -1 %t/comparo | %FileCheck -check-prefix=CHECK-COMPARE-DISABLED-ARGUMENTS %s
+// RUN: tail -1 %t/comparo | %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/comparo
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/comparo
-// CHECK-COMPARE-0-0-3: *** Comparing deps: 0, ranges: 0, total: 3 ***
+// CHECK-COMPARE-0-0-3: *** Comparing incremental schemes: deps: 0, ranges: 0, total: 3,
 
 // RUN: %FileCheck -check-prefix=CHECK-INCREMENTAL-ENABLED %s < %t/output3
 // CHECK-INCREMENTAL-ENABLED-NOT: Incremental compilation has been disabled
@@ -162,7 +163,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-FILEB-ONLY %s < %t/output4
 
 // RUN: %FileCheck -check-prefix=COMPARE-2-1-3 %s < %t/output4
-// COMPARE-2-1-3: *** Comparing deps: 2, ranges: 1, total: 3 ***
+// COMPARE-2-1-3: *** Comparing incremental schemes: deps: 2, ranges: 1, total: 3, requested: ranges, using: ranges
 
 // CHECK-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
 // CHECK-FILEB-ONLY-NOT: Queuing{{.*}}<= fileA.swift
@@ -189,7 +190,8 @@
 // RUN: %FileCheck -check-prefix=CHECK-FILEA-AND-FILEB-ONLY %s < %t/output5
 
 // RUN: %FileCheck -check-prefix=COMPARE-2-2-3 %s < %t/output5
-// COMPARE-2-2-3: *** Comparing deps: 2, ranges: 2, total: 3 ***
+// COMPARE-2-2-3: *** Comparing incremental schemes: deps: 2, ranges: 2, total: 3, requested: ranges, using: ranges
+
 
 
 // CHECK-FILEA-AND-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
@@ -228,8 +230,8 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-INITIALLY-ABSENT-MAIN %s < %t/output6
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output6
-// CHECK-COMPARE-MOOT-3: *** Comparing incremental strategies is moot: would fall back and run 3, total: 3 ***
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-3-3-3-RANGES %s < %t/output6
+// CHECK-COMPARE-3-3-3-RANGES: *** Comparing incremental schemes: deps: 3, ranges: 3, total: 3, requested: ranges, using: ranges
 
 // CHECK-INITIALLY-ABSENT-MAIN-NOT: Queueing{{.*}}<= main.swift
 
@@ -260,8 +262,8 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output7
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-4-4 %s < %t/output7
-// CHECK-COMPARE-MOOT-4-4: *** Comparing incremental strategies is moot: would fall back and run 4, total: 4 ***
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-4-4-4 %s < %t/output7
+// CHECK-COMPARE-4-4-4: *** Comparing incremental schemes: deps: 4, ranges: 4, total: 4, requested: ranges, using: deps
 
 // RUN: cmp fileB.swift fileB.compiledsource
 
@@ -296,7 +298,8 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-FILEC-REMOVED %s < %t/output8
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output8
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED-INPUT-REMOVED %s < %t/output8
+// CHECK-COMPARE-DISABLED-INPUT-REMOVED: *** Incremental build disabled because an input was removed, cannot compare ***
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output8
 
@@ -313,7 +316,9 @@
 // RUN: cp %t/fileB5.swift %t/fileB.swift
 // RUN: cd %t && not %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output9
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output9
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-3-3-3-DEPS %s < %t/output9
+// CHECK-COMPARE-3-3-3-DEPS: *** Comparing incremental schemes: deps: 3, ranges: 3, total: 3, requested: ranges, using: deps
+
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output9
 
 
@@ -324,7 +329,7 @@
 // RUN: cp %t/fileB4.swift %t/fileB.swift
 // RUN: cd %t &&  %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output10
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-MOOT-3 %s < %t/output10
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-3-3-3-DEPS %s < %t/output10
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output10
 
 

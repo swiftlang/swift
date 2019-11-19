@@ -375,18 +375,19 @@ static bool getCompilationRecordPath(std::string &buildRecordPath,
   return false;
 }
 
-static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
-                                     StringRef buildRecordPath,
-                                     StringRef reason = "") {
-  if (ShowIncrementalBuildDecisions) {
-    llvm::outs() << "Incremental compilation has been disabled due to "
-                 << "malformed build record file '" << buildRecordPath << "'.";
-    if (!reason.empty()) {
-      llvm::outs() << " " << reason;
-    }
-    llvm::outs() << "\n";
+static StringRef failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
+                                          StringRef buildRecordPath,
+                                          StringRef reason = "") {
+  std::string why = "malformed build record file";
+  if (!reason.empty()) {
+    why += " ";
+    why += reason;
   }
-  return true;
+  if (ShowIncrementalBuildDecisions) {
+    llvm::outs() << "Incremental compilation has been disabled due to " << why
+                 << " '" << buildRecordPath << "'.\n";
+  }
+  return why;
 }
 
 static SmallVector<StringRef, 8> findRemovedInputs(
@@ -396,20 +397,19 @@ static SmallVector<StringRef, 8> findRemovedInputs(
 static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
                                   bool ShowIncrementalBuildDecisions);
 
-/// Returns true on error.
-static bool populateOutOfDateMap(InputInfoMap &map,
-                                 llvm::sys::TimePoint<> &LastBuildTime,
-                                 StringRef argsHashStr,
-                                 const InputFileList &inputs,
-                                 StringRef buildRecordPath,
-                                 const bool EnableSourceRangeDependencies,
-                                 const bool ShowIncrementalBuildDecisions) {
+/// Returns why ignore incrementality
+static StringRef
+populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
+                     StringRef argsHashStr, const InputFileList &inputs,
+                     StringRef buildRecordPath,
+                     const bool EnableSourceRangeDependencies,
+                     const bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
   if (!buffer) {
     if (ShowIncrementalBuildDecisions)
       llvm::outs() << "Incremental compilation could not read build record.\n";
-    return false;
+    return "could not read build record";
   }
 
   namespace yaml = llvm::yaml;
@@ -499,7 +499,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
     } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
-        return true;
+        return "no name node in build record";
       optionsMatch = (argsHashStr == value->getValue(scratch));
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
@@ -512,7 +512,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
       }
       llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
-        return true;
+        return "could not read time value in build record";
       LastBuildTime = timeVal;
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
@@ -529,21 +529,21 @@ static bool populateOutOfDateMap(InputInfoMap &map,
       for (auto i = inputMap->begin(), e = inputMap->end(); i != e; ++i) {
         auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
         if (!key)
-          return true;
+          return "no input entry in build record";
 
         auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
         if (!value)
-          return true;
+          return "no sequence node for input entry in build record";
 
         using compilation_record::getInfoStatusForIdentifier;
         auto previousBuildState =
           getInfoStatusForIdentifier(value->getRawTag());
         if (!previousBuildState)
-          return true;
+          return "no previous build state in build record";
 
         llvm::sys::TimePoint<> timeValue;
         if (readTimeValue(value, timeValue))
-          return true;
+          return "could not read time value in build record";
 
         auto inputName = key->getValue(scratch);
         previousInputs[inputName] = { *previousBuildState, timeValue };
@@ -561,7 +561,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
                    << "\tPreviously compiled with: "
                    << CompilationRecordSwiftVersion << "\n";
     }
-    return true;
+    return "compiler version mismatch";
   }
 
   if (!optionsMatch) {
@@ -569,7 +569,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
       llvm::outs() << "Incremental compilation has been disabled, because "
                    << "different arguments were passed to the compiler.\n";
     }
-    return true;
+    return "different arguments passed to compiler";
   }
 
   unsigned numMatchingPreviouslyCompiledInputs = 0;
@@ -586,13 +586,14 @@ static bool populateOutOfDateMap(InputInfoMap &map,
   auto const wereAnyInputsRemoved =
       numMatchingPreviouslyCompiledInputs < previousInputs.size();
   if (!wereAnyInputsRemoved)
-    return false;
+    return "";
 
   const auto removedInputs = findRemovedInputs(inputs, previousInputs);
   assert(!removedInputs.empty());
 
   dealWithRemovedInputs(removedInputs, ShowIncrementalBuildDecisions);
-  return true; // recompile everything; could do better someday
+  return "an input was removed"; // recompile everything; could do better
+                                 // someday
 }
 
 static SmallVector<StringRef, 8> findRemovedInputs(
@@ -892,16 +893,16 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  bool rebuildEverything = true;
-  if (Incremental && !buildRecordPath.empty()) {
-    if (populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash, Inputs,
-                             buildRecordPath, EnableSourceRangeDependencies,
-                             ShowIncrementalBuildDecisions)) {
-      // FIXME: Distinguish errors from "file removed", which is benign.
-    } else {
-      rebuildEverything = false;
-    }
-  }
+  StringRef whyIgnoreIncrementallity =
+      !Incremental
+          ? ""
+          : buildRecordPath.empty()
+                ? "no build record path"
+                : populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash,
+                                       Inputs, buildRecordPath,
+                                       EnableSourceRangeDependencies,
+                                       ShowIncrementalBuildDecisions);
+  // FIXME: Distinguish errors from "file removed", which is benign.
 
   size_t DriverFilelistThreshold;
   if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
@@ -994,7 +995,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI,
-               rebuildEverything ? nullptr : &outOfDateMap, *C);
+               whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -1025,8 +1026,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
-  if (rebuildEverything)
-    C->disableIncrementalBuild();
+  if (!whyIgnoreIncrementallity.empty())
+    C->disableIncrementalBuild(whyIgnoreIncrementallity.str());
 
   if (Diags.hadAnyError())
     return nullptr;

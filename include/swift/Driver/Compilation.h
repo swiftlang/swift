@@ -79,6 +79,7 @@ using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 class Compilation {
 public:
   class IncrementalSchemeComparator {
+    const bool &EnableIncrementalBuild;
     const bool EnableSourceRangeDependencies;
     const bool &UseSourceRangeDependencies;
 
@@ -87,6 +88,10 @@ public:
 
     const unsigned SwiftInputCount;
 
+  public:
+    std::string WhyIncrementalWasDisabled = "";
+
+  private:
     DiagnosticEngine &Diags;
 
     CommandSet DependencyCompileJobs;
@@ -94,12 +99,14 @@ public:
     CommandSet SourceRangeLackingSuppJobs;
 
   public:
-    IncrementalSchemeComparator(bool EnableSourceRangeDependencies,
+    IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
+                                bool EnableSourceRangeDependencies,
                                 const bool &UseSourceRangeDependencies,
                                 const StringRef CompareIncrementalSchemesPath,
                                 unsigned SwiftInputCount,
                                 DiagnosticEngine &Diags)
-        : EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+        : EnableIncrementalBuild(EnableIncrementalBuild),
+          EnableSourceRangeDependencies(EnableSourceRangeDependencies),
           UseSourceRangeDependencies(UseSourceRangeDependencies),
           CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
           SwiftInputCount(SwiftInputCount), Diags(Diags) {}
@@ -374,9 +381,7 @@ public:
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
-  void disableIncrementalBuild() {
-    EnableIncrementalBuild = false;
-  }
+  void disableIncrementalBuild(Twine why);
 
   bool getEnableExperimentalDependencies() const {
     return EnableExperimentalDependencies;

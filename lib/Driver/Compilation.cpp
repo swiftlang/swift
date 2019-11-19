@@ -159,7 +159,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
     if (CompareIncrementalSchemes)
       IncrementalComparator.emplace(
-      EnableSourceRangeDependencies, UseSourceRangeDependencies,
+      // Ensure the references are to inst vars, NOT arguments
+      this->EnableIncrementalBuild,
+      EnableSourceRangeDependencies,
+      this->UseSourceRangeDependencies,
       CompareIncrementalSchemesPath, countSwiftInputs(), getDiags());
 };
 // clang-format on
@@ -418,10 +421,9 @@ namespace driver {
         Comp.getDiags().diagnose(SourceLoc(),
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
-      Comp.disableIncrementalBuild();
-      if (Comp.getShowIncrementalBuildDecisions())
-         llvm::outs() << "Incremental compilation has been disabled due to "
-                      << "malformed swift dependencies file '" << DependenciesFile << "'.\n";
+      Comp.disableIncrementalBuild(
+          Twine("Malformed swift dependencies file ' ") + DependenciesFile +
+          "'");
     }
 
     /// Helper that attempts to reload a job's .swiftdeps file after the job
@@ -1955,6 +1957,15 @@ const char *Compilation::getAllSourcesPath() const {
   return AllSourceFilesPath;
 }
 
+void Compilation::disableIncrementalBuild(Twine why) {
+  if (getShowIncrementalBuildDecisions())
+    llvm::outs() << "Disabling incremental build: " << why << "\n";
+
+  EnableIncrementalBuild = false;
+  if (IncrementalComparator)
+    IncrementalComparator->WhyIncrementalWasDisabled = why.str();
+}
+
 void Compilation::IncrementalSchemeComparator::update(
     const CommandSet &depJobs,
     const CommandSet &rangeJobs,
@@ -1988,15 +1999,34 @@ void Compilation::IncrementalSchemeComparator::outputComparison() const {
 
 void Compilation::IncrementalSchemeComparator::outputComparison(
     llvm::raw_ostream &out) const {
+  if (!EnableIncrementalBuild) {
+    // No stats will have been gathered
+    assert(!WhyIncrementalWasDisabled.empty() && "Must be a reason");
+    out << "*** Incremental build disabled because "
+        << WhyIncrementalWasDisabled << ", cannot compare ***\n";
+    return;
+  }
+  unsigned additionalDependencyJobsToCreateSupps = 0;
+  for (const Job *Cmd : SourceRangeLackingSuppJobs) {
+    if (!DependencyCompileJobs.count(Cmd))
+      ++additionalDependencyJobsToCreateSupps;
+  }
+  unsigned jobsWhenEnablingDeps = DependencyCompileJobs.size();
+  unsigned jobsWhenEnablingRanges =
+      UseSourceRangeDependencies ? SourceRangeCompileJobs.size()
+                                 : DependencyCompileJobs.size() +
+                                       additionalDependencyJobsToCreateSupps;
+
   out << "*** Comparing incremental schemes: "
-      << "deps: " << DependencyCompileJobs.size() << ", "
-      << "ranges: " << SourceRangeCompileJobs.size() << ", "
-      << "supplementary output creation: " << SourceRangeLackingSuppJobs.size()
-      << ", "
+      << "deps: " << jobsWhenEnablingDeps << ", "
+      << "ranges: " << jobsWhenEnablingRanges << ", "
       << "total: " << SwiftInputCount << ", "
-      << "requested: "
-      << (EnableSourceRangeDependencies ? "ranges" : "deps") << ", "
-      << "using: " << (UseSourceRangeDependencies ? "ranges" : "deps")
+      << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps")
+      << ", "
+      << "using: "
+      << (!EnableIncrementalBuild
+              ? "neither"
+              : UseSourceRangeDependencies ? "ranges" : "deps")
       << "\n";
 }
 
