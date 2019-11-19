@@ -1064,7 +1064,7 @@ struct GenericStructWithDefaultMirror<T, U> {
 
 mirrors.test("Struct/Generic/DefaultMirror") {
   do {
-    var value = GenericStructWithDefaultMirror<Int, [Any?]>(
+    let value = GenericStructWithDefaultMirror<Int, [Any?]>(
       first: 123,
       second: ["abc", 456, 789.25])
     var output = ""
@@ -1826,7 +1826,7 @@ mirrors.test("Float") {
   }
 
   do {
-    var input: Float = 42.125
+    let input: Float = 42.125
     var output = ""
     dump(input, to: &output)
 
@@ -1859,7 +1859,7 @@ mirrors.test("Double") {
   }
 
   do {
-    var input: Double = 42.125
+    let input: Double = 42.125
     var output = ""
     dump(input, to: &output)
 
@@ -1955,9 +1955,9 @@ mirrors.test("FieldNamesBug") {
 }
 
 mirrors.test("MirrorMirror") {
-  var object = 1
-  var mirror = Mirror(reflecting: object)
-  var mirrorMirror = Mirror(reflecting: mirror)
+  let object = 1
+  let mirror = Mirror(reflecting: object)
+  let mirrorMirror = Mirror(reflecting: mirror)
 
   expectEqual(0, mirrorMirror.children.count)
 }
@@ -1965,7 +1965,7 @@ mirrors.test("MirrorMirror") {
 mirrors.test("OpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
   let pointer: OpaquePointer? = nil
-  let mirror = Mirror(reflecting: pointer)
+  let mirror = Mirror(reflecting: pointer as Any)
   expectEqual(0, mirror.children.count)
 }
 
