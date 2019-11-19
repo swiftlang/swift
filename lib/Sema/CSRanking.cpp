@@ -35,7 +35,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
   CurrentScore.Data[index] += value;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().LangOpts.DebugConstraintSolver && value > 0) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
       log.indent(solverState->depth * 2);
@@ -390,8 +390,8 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *tc = static_cast<TypeChecker *>(C.getLazyResolver());
+  // FIXME: Remove dependency on the global type checker.
+      auto *tc = C.getLegacyGlobalTypeChecker();
 
   if (C.LangOpts.DebugConstraintSolver) {
     auto &log = C.TypeCheckerDebug->getStream();
@@ -998,7 +998,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // compatibility under Swift 4 mode by ensuring we don't introduce any new
     // ambiguities. This will become a more general "is more specialised" rule
     // in Swift 5 mode.
-    if (!tc.Context.isSwiftVersionAtLeast(5) &&
+    if (!cs.getASTContext().isSwiftVersionAtLeast(5) &&
         choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
@@ -1158,7 +1158,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // All other things being equal, apply the Swift 4.1 compatibility hack for
   // preferring var members in concrete types over a protocol requirement
   // (see the comment above for the rationale of this hack).
-  if (!tc.Context.isSwiftVersionAtLeast(5) && score1 == score2) {
+  if (!cs.getASTContext().isSwiftVersionAtLeast(5) && score1 == score2) {
     score1 += isVarAndNotProtocol1;
     score2 += isVarAndNotProtocol2;
   }

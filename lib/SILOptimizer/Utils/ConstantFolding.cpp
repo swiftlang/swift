@@ -1415,9 +1415,22 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
             auto ownershipKind = operandValue.getOwnershipKind();
-            if (ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
-              return operandValue;
-            return SILValue();
+
+            // First check if we are not compatible with guaranteed. This means
+            // we would be Owned or Unowned. If so, return SILValue().
+            if (!ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+              return SILValue();
+
+            // Otherwise check if our operand is non-trivial and None. In cases
+            // like that, the non-trivial type could be replacing an owned value
+            // where we lost that our underlying value is None due to
+            // intermediate aggregate literal operations. In that case, we /do
+            // not/ want to eliminate the destructure.
+            if (ownershipKind == ValueOwnershipKind::None &&
+                !operandValue->getType().isTrivial(*Struct->getFunction()))
+              return SILValue();
+
+            return operandValue;
           });
       return true;
     }
@@ -1436,9 +1449,22 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
             auto ownershipKind = operandValue.getOwnershipKind();
-            if (ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
-              return operandValue;
-            return SILValue();
+
+            // First check if we are not compatible with guaranteed. This means
+            // we would be Owned or Unowned. If so, return SILValue().
+            if (!ownershipKind.isCompatibleWith(ValueOwnershipKind::Guaranteed))
+              return SILValue();
+
+            // Otherwise check if our operand is non-trivial and None. In cases
+            // like that, the non-trivial type could be replacing an owned value
+            // where we lost that our underlying value is None due to
+            // intermediate aggregate literal operations. In that case, we /do
+            // not/ want to eliminate the destructure.
+            if (ownershipKind == ValueOwnershipKind::None &&
+                !operandValue->getType().isTrivial(*Tuple->getFunction()))
+              return SILValue();
+
+            return operandValue;
           });
       return true;
     }

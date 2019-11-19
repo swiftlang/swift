@@ -938,11 +938,12 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
     suggestionText += name;
   }
 
+  auto &DE = CS.getASTContext().Diags;
   if (sorted.size() == 1) {
-    CS.TC.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
+    DE.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
   } else {
-    CS.TC.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
-                   suggestionText);
+    DE.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
+                suggestionText);
   }
 }
 
@@ -967,15 +968,14 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
 
     InaccessibleMemberFailure failure(
-        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+        CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
     auto diagnosed = failure.diagnoseAsError();
     assert(diagnosed && "failed to produce expected diagnostic");
 
     for (auto cand : candidates) {
       auto *candidate = cand.getDecl();
       if (candidate && candidate != decl)
-        CS.TC.diagnose(candidate, diag::decl_declared_here,
-                       candidate->getFullName());
+        candidate->diagnose(diag::decl_declared_here, candidate->getFullName());
     }
     
     return true;

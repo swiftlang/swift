@@ -52,8 +52,12 @@
 using namespace swift;
 
 TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
-  (void)ctx.createLazyResolverIfMissing<TypeChecker>();
-  return *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  assert(!ctx.getLegacyGlobalTypeChecker() &&
+         "Cannot install more than one instance of the global type checker!");
+  auto *TC = new TypeChecker(ctx);
+  ctx.installGlobalTypeChecker(TC);
+  ctx.addCleanup([=](){ delete TC; });
+  return *ctx.getLegacyGlobalTypeChecker();
 }
 
 TypeChecker::TypeChecker(ASTContext &Ctx)
@@ -159,7 +163,8 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   return nullptr;
 }
 
-DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
+DeclName TypeChecker::getObjectLiteralConstructorName(ASTContext &Context,
+                                                      ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
     return DeclName(Context, DeclBaseName::createConstructor(),
@@ -198,6 +203,7 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
   newParams.append(params.begin(), params.end());
 
   auto replace = [&](StringRef replacement) -> Type {
+    auto &Context = ctor->getASTContext();
     newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
                                           Context.getIdentifier(replacement),
                                           newParams[0].getParameterFlags());
@@ -289,22 +295,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   unsigned currentFunctionIdx = 0;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
-    // Type check conformance contexts.
-    for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
-      auto decl = TC.ConformanceContexts[i];
-      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-        TC.checkConformancesInContext(ext, ext);
-      else {
-        auto *ntd = cast<NominalTypeDecl>(decl);
-        TC.checkConformancesInContext(ntd, ntd);
-
-        // Finally, we can check classes for missing initializers.
-        if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
-          TypeChecker::maybeDiagnoseClassWithoutInitializers(classDecl);
-      }
-    }
-    TC.ConformanceContexts.clear();
-
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
@@ -313,7 +303,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
       assert(!AFD->getDeclContext()->isLocalContext());
 
-      TC.typeCheckAbstractFunctionBody(AFD);
+      TypeChecker::typeCheckAbstractFunctionBody(AFD);
     }
 
     // Type check synthesized functions and their bodies.
@@ -325,8 +315,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     }
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           !TC.ConformanceContexts.empty());
+           currentSynthesizedDecl < SF.SynthesizedDecls.size());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
@@ -424,16 +413,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // to work.
     bindExtensions(SF);
 
-    // Look for bridging functions. This only matters when
-    // -enable-source-import is provided.
-    checkBridgedFunctions(TC.Context);
-
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
-        TC.contextualizeTopLevelCode(TLC, TLCD);
+        TypeChecker::contextualizeTopLevelCode(TLC, TLCD);
       } else {
         TC.typeCheckDecl(D);
       }
@@ -614,8 +599,9 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-  return TypeChecker::validateType(TC.Context, T, resolution, options);
+  assert(Ctx.getLegacyGlobalTypeChecker() &&
+         "Should have a TypeChecker registered");
+  return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -720,8 +706,8 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeChecker &TC = createTypeChecker(Ctx);
-  return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  (void)createTypeChecker(Ctx);
+  return !TypeChecker::typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -733,6 +719,8 @@ bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
 }
 
 TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
+  if (auto *TC = Ctx.getLegacyGlobalTypeChecker())
+    return *TC;
   return TypeChecker::createForContext(Ctx);
 }
 

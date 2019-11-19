@@ -29,6 +29,11 @@ class Klass {}
 sil @klass_allocator : $@convention(method) (@thick Klass.Type) -> @owned Klass
 sil @generic_user : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
+struct NativeObjectOptNativeObjectPair {
+  var lhs: Builtin.NativeObject
+  var rhs: Optional<Builtin.NativeObject>
+}
+
 ///////////
 // Tests //
 ///////////
@@ -1178,6 +1183,42 @@ bb2:
   br bb3
 
 bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_tuple : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: ({{%.*}}, [[DESTRUCTURE_RESULT_2:%.*]]) = destructure_tuple
+// CHECK: store [[DESTRUCTURE_RESULT_2]] to [init]
+// CHECK: } // end sil function 'do_not_RAUW_owned_destructure_with_nontrivial_none_value_tuple'
+sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_tuple : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%arg : @owned $Builtin.NativeObject):
+  %0 = alloc_stack $Optional<Builtin.NativeObject>
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  %2 = tuple(%arg : $Builtin.NativeObject, %1 : $Optional<Builtin.NativeObject>)
+  (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Optional<Builtin.NativeObject>)
+  store %4 to [init] %0 : $*Optional<Builtin.NativeObject>
+  destroy_addr %0 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %0 : $*Optional<Builtin.NativeObject>
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_struct : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: ({{%.*}}, [[DESTRUCTURE_RESULT_2:%.*]]) = destructure_struct
+// CHECK: store [[DESTRUCTURE_RESULT_2]] to [init]
+// CHECK: } // end sil function 'do_not_RAUW_owned_destructure_with_nontrivial_none_value_struct'
+sil [ossa] @do_not_RAUW_owned_destructure_with_nontrivial_none_value_struct : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%arg : @owned $Builtin.NativeObject):
+  %0 = alloc_stack $Optional<Builtin.NativeObject>
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  %2 = struct $NativeObjectOptNativeObjectPair (%arg : $Builtin.NativeObject, %1 : $Optional<Builtin.NativeObject>)
+  (%3, %4) = destructure_struct %2 : $NativeObjectOptNativeObjectPair
+  store %4 to [init] %0 : $*Optional<Builtin.NativeObject>
+  destroy_addr %0 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %0 : $*Optional<Builtin.NativeObject>
+  destroy_value %3 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

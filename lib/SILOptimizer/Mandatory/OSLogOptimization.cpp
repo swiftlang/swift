@@ -224,20 +224,20 @@ static bool isStdlibIntegerOrBoolDecl(NominalTypeDecl *numberDecl,
           numberDecl == astCtx.getBoolDecl());
 }
 
-/// Return true if and only if the given SIL type represents a String or
-/// a Stdlib or builtin integer type.
-static bool isIntegerOrStringType(SILType silType, ASTContext &astContext) {
+/// Return true if and only if the given SIL type represents a Stdlib or builtin
+/// integer type or a Bool type.
+static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   if (silType.is<BuiltinIntegerType>()) {
     return true;
   }
-
   NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
-  if (!nominalDecl) {
-    return false;
-  }
+  return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
+}
 
-  return (nominalDecl == astContext.getStringDecl()) ||
-         isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
+/// Return true if and only if the given SIL type represents a String type.
+static bool isStringType(SILType silType, ASTContext &astContext) {
+  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
+  return nominalDecl && nominalDecl == astContext.getStringDecl();
 }
 
 /// Decide if the given instruction (which could possibly be a call) should
@@ -273,32 +273,43 @@ evaluateOrSkip(ConstExprStepEvaluator &stepEval,
   return stepEval.skipByMakingEffectsNonConstant(instI);
 }
 
-/// Check whether a single-valued instruction is foldable. String or integer
-/// valued instructions are foldable with the exceptions:
-///   - Addresses-valued instructions cannot be folded.
-///   - Literal instruction need not be folded.
-///   - "String.makeUTF8" instrinsic initializer need not be folded as it is
-///     used only on string literals.
-///   - StructInst cannot be folded. We can only fold its arguments and not the
-///     instruction itself.
+/// Return true iff the given value is a stdlib Int or Bool and it not a direct
+/// construction of Int or Bool.
+static bool isFoldableIntOrBool(SILValue value, SILInstruction *definingInst,
+                                ASTContext &astContext) {
+  assert(definingInst);
+  return !isa<StructInst>(definingInst) &&
+         isIntegerOrBoolType(value->getType(), astContext);
+}
+
+/// Return true iff the given value is a string and is not an initialization
+/// of an string from a string literal.
+static bool isFoldableString(SILValue value, SILInstruction *definingInst,
+                             ASTContext &astContext) {
+  assert(definingInst);
+  return isStringType(value->getType(), astContext) &&
+         !getStringMakeUTF8Init(definingInst);
+}
+
+/// Check whether a SILValue is foldable. String, integer, array and
+/// function values are foldable with the following exceptions:
+///  - Addresses cannot be folded.
+///  - Literals need not be folded.
+///  - Results of ownership instructions like load_borrow/copy_value need not
+///  be folded
+///  - Constructors such as \c struct Int or \c string.init() need not be folded.
 static bool isSILValueFoldable(SILValue value) {
   SILInstruction *definingInst = value->getDefiningInstruction();
   if (!definingInst)
     return false;
-
   ASTContext &astContext = definingInst->getFunction()->getASTContext();
   SILType silType = value->getType();
-
-  // Fold only SIL values of integer or string type that are not one of the
-  // following: addresses, literals, instructions marking ownership access and
-  // scope, copy_value (as its operand will be folded), struct creations, or
-  // call to string literal initializer.
   return (!silType.isAddress() && !isa<LiteralInst>(definingInst) &&
           !isa<LoadBorrowInst>(definingInst) &&
           !isa<BeginBorrowInst>(definingInst) &&
-          !isa<CopyValueInst>(definingInst) && !isa<StructInst>(definingInst) &&
-          !getStringMakeUTF8Init(definingInst) &&
-          isIntegerOrStringType(silType, astContext));
+          !isa<CopyValueInst>(definingInst) &&
+          (isFoldableIntOrBool(value, definingInst, astContext) ||
+           isFoldableString(value, definingInst, astContext)));
 }
 
 /// Diagnose failure during evaluation of a call to a constant-evaluable
@@ -454,15 +465,15 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
 /// \param stringInfo String.init and metatype information for generating code
 /// for string literals.
 static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
-                                         SILType &expectedType,
-                                         SILBuilder &builder, SILLocation &loc,
+                                         Type expectedType, SILBuilder &builder,
+                                         SILLocation &loc,
                                          StringSILInfo &stringInfo) {
-  ASTContext &astContext = expectedType.getASTContext();
+  ASTContext &astContext = expectedType->getASTContext();
 
   switch (symVal.getKind()) {
   case SymbolicValue::String: {
     assert(astContext.getStringDecl() ==
-           expectedType.getNominalOrBoundGenericNominal());
+           expectedType->getNominalOrBoundGenericNominal());
 
     StringRef stringVal = symVal.getStringValue();
     StringLiteralInst *stringLitInst = builder.createStringLiteral(
@@ -492,26 +503,34 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
   case SymbolicValue::Integer: { // Builtin integer types.
     APInt resInt = symVal.getIntegerValue();
-    assert(expectedType.is<BuiltinIntegerType>());
+    assert(expectedType->is<BuiltinIntegerType>());
 
+    SILType builtinIntType =
+        SILType::getPrimitiveObjectType(expectedType->getCanonicalType());
     IntegerLiteralInst *intLiteralInst =
-        builder.createIntegerLiteral(loc, expectedType, resInt);
+        builder.createIntegerLiteral(loc, builtinIntType, resInt);
     return intLiteralInst;
   }
   case SymbolicValue::Aggregate: {
     // Support only stdlib integer or bool structs.
-    StructDecl *structDecl = expectedType.getStructOrBoundGenericStruct();
+    StructDecl *structDecl = expectedType->getStructOrBoundGenericStruct();
     assert(structDecl);
     assert(isStdlibIntegerOrBoolDecl(structDecl, astContext));
+    assert(symVal.getAggregateType()->isEqual(expectedType) &&
+           "aggregate symbolic value's type and expected type do not match");
 
     VarDecl *propertyDecl = structDecl->getStoredProperties().front();
-    SILType propertyType =
-        expectedType.getFieldType(propertyDecl, builder.getModule());
+    Type propertyType = expectedType->getTypeOfMember(
+        propertyDecl->getModuleContext(), propertyDecl);
     SymbolicValue propertyVal = symVal.lookThroughSingleElementAggregates();
     SILValue newPropertySIL = emitCodeForSymbolicValue(
         propertyVal, propertyType, builder, loc, stringInfo);
+    // The lowered SIL type of an integer/bool type is just the primitive
+    // object type containing the Swift type.
+    SILType aggregateType =
+        SILType::getPrimitiveObjectType(expectedType->getCanonicalType());
     StructInst *newStructInst = builder.createStruct(
-        loc, expectedType, ArrayRef<SILValue>(newPropertySIL));
+        loc, aggregateType, ArrayRef<SILValue>(newPropertySIL));
     return newStructInst;
   }
   default: {
@@ -685,7 +704,7 @@ static void substituteConstants(FoldState &foldState) {
 
     SILBuilderWithScope builder(definingInst);
     SILLocation loc = definingInst->getLoc();
-    SILType instType = constantSILValue->getType();
+    CanType instType = constantSILValue->getType().getASTType();
     SILValue foldedSILVal = emitCodeForSymbolicValue(
         constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
 
@@ -723,7 +742,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   // The first (and only) property of OSLogMessage is the OSLogInterpolation
   // instance.
   SymbolicValue osLogInterpolationValue =
-      osLogMessageValueOpt->getAggregateValue()[0];
+      osLogMessageValueOpt->getAggregateMembers()[0];
   if (!osLogInterpolationValue.isConstant()) {
     diagnose(astContext, sourceLoc, diag::oslog_non_constant_interpolation);
     return true;
@@ -744,7 +763,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
 
   auto propertyDecls = interpolationStruct->getStoredProperties();
   ArrayRef<SymbolicValue> propertyValues =
-      osLogInterpolationValue.getAggregateValue();
+      osLogInterpolationValue.getAggregateMembers();
   auto propValueI = propertyValues.begin();
   bool errorDetected = false;
 

@@ -49,7 +49,6 @@ class DependentMemberType;
 class GenericParamList;
 class GenericSignatureBuilder;
 class GenericTypeParamType;
-class LazyResolver;
 class ModuleDecl;
 class Pattern;
 class ProtocolConformance;
@@ -535,9 +534,6 @@ public:
   ProtocolConformanceRef lookupConformance(CanType dependentType,
                                            Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol);
-
-  /// Retrieve the lazy resolver, if there is one.
-  LazyResolver *getLazyResolver() const;
 
   /// Enumerate the requirements that describe the signature of this
   /// generic signature builder.

@@ -428,9 +428,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
-  // Compute the interface type of the initializer.
-  (void)initDecl->getInterfaceType();
-
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
 
   // If the containing module is not resilient, make sure clients can construct

@@ -174,13 +174,12 @@ Type TypeResolution::resolveDependentMemberType(
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-    TypoCorrectionResults corrections(tc, ref->getIdentifier(),
+    TypoCorrectionResults corrections(ref->getIdentifier(),
                                       DeclNameLoc(ref->getIdLoc()));
-    tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
-                             MetatypeType::get(baseTy),
-                             NameLookupFlags::ProtocolMembers,
-                             corrections, builder);
+    TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
+                                       MetatypeType::get(baseTy),
+                                       NameLookupFlags::ProtocolMembers,
+                                       corrections, builder);
 
     // Check whether we have a single type result.
     auto singleType = cast_or_null<TypeDecl>(
@@ -376,47 +375,39 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getStringType(DeclContext *dc) {
+Type TypeChecker::getStringType(ASTContext &Context) {
   if (auto typeDecl = Context.getStringDecl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getSubstringType(DeclContext *dc) {
+Type TypeChecker::getSubstringType(ASTContext &Context) {
   if (auto typeDecl = Context.getSubstringDecl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getIntType(DeclContext *dc) {
+Type TypeChecker::getIntType(ASTContext &Context) {
   if (auto typeDecl = Context.getIntDecl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getInt8Type(DeclContext *dc) {
+Type TypeChecker::getInt8Type(ASTContext &Context) {
   if (auto typeDecl = Context.getInt8Decl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
 }
 
-Type TypeChecker::getUInt8Type(DeclContext *dc) {
+Type TypeChecker::getUInt8Type(ASTContext &Context) {
   if (auto typeDecl = Context.getUInt8Decl())
     return typeDecl->getDeclaredInterfaceType();
 
   return Type();
-}
-
-/// Find the standard type of exceptions.
-///
-/// We call this the "exception type" to try to avoid confusion with
-/// the AST's ErrorType node.
-Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
-  return Context.getErrorDecl()->getDeclaredType();
 }
 
 Type
@@ -2062,7 +2053,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_escaping, TAK_yield_once, TAK_yield_many
+    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2209,6 +2200,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          : diag::attr_only_on_parameters,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
+      }
+
+      if (attrs.has(TAK_differentiable) &&
+          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+        diagnose(attrs.getLoc(TAK_differentiable),
+                 diag::experimental_differentiable_programming_disabled);
       }
 
       // Resolve the function type directly with these attributes.
@@ -2415,7 +2412,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       break;
     }
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-        ty, variadic, autoclosure, ownership);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 

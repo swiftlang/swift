@@ -91,13 +91,13 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::incrementScopeCounter() {
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (TC.Context.Stats)
-    TC.Context.Stats->getFrontendCounters().NumConstraintScopes++;
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumConstraintScopes++;
 }
 
 void ConstraintSystem::incrementLeafScopes() {
-  if (TC.Context.Stats)
-    TC.Context.Stats->getFrontendCounters().NumLeafScopes++;
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -190,7 +190,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
     // If the protocol has a default type, check it.
     if (literalProtocol) {
-      if (auto defaultType = TC.getDefaultType(literalProtocol, DC)) {
+      if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
         if (defaultType->getAnyNominal() != type->getAnyNominal())
@@ -206,14 +206,11 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
-  // Gather the constraints affected by a change to this type variable.
-  auto inactiveConstraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::AllMentions,
-      [](Constraint *constraint) { return !constraint->isActive(); });
-
-  // Add any constraints that aren't already active to the worklist.
-  for (auto *constraint : inactiveConstraints)
-    activateConstraint(constraint);
+  // Activate the constraints affected by a change to this type variable.
+  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
+  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
+    if (!constraint->isActive())
+      activateConstraint(constraint);
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -276,8 +273,9 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
     // If the entry we recorded was unavailable but this new entry is not,
     // replace the recorded entry with this one.
-    if (uniqueEntry->getAttrs().isUnavailable(TC.Context) &&
-        !decl->getAttrs().isUnavailable(TC.Context)) {
+    auto &ctx = getASTContext();
+    if (uniqueEntry->getAttrs().isUnavailable(ctx) &&
+        !decl->getAttrs().isUnavailable(ctx)) {
       uniqueEntry = decl;
     }
   }
@@ -351,9 +349,9 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 
   case KnownProtocolKind::ExpressibleByIntegerLiteral:
     // Integer literals can be treated as floating point literals.
-    if (auto floatProto = TC.Context.getProtocol(
+    if (auto floatProto = getASTContext().getProtocol(
                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      if (auto defaultType = TC.getDefaultType(floatProto, DC)) {
+      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC)) {
         types.push_back(defaultType);
       }
     }
@@ -485,9 +483,9 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
 
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     return getConstraintLocator(
-        anchor, TC.getSelfForInitDelegationInConstructor(DC, UDE)
-                  ? ConstraintLocator::ConstructorMember
-                  : ConstraintLocator::Member);
+        anchor, TypeChecker::getSelfForInitDelegationInConstructor(DC, UDE)
+                    ? ConstraintLocator::ConstructorMember
+                    : ConstraintLocator::Member);
   }
 
   if (isa<UnresolvedMemberExpr>(anchor))
@@ -666,7 +664,7 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
         // drop outer generic parameters.
         // assert(known != replacements.end());
         if (known == replacements.end())
-          return ErrorType::get(TC.Context);
+          return ErrorType::get(getASTContext());
         return known->second;
       }
 
@@ -818,14 +816,14 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   DeclContext *UseDC,
                                                   const DeclRefExpr *base,
                                                   bool wantInterfaceType) {
-  return TC.getUnopenedTypeOfReference(
+  return TypeChecker::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
         if (auto *param = dyn_cast<ParamDecl>(var))
           return getType(param);
 
         if (!var->hasInterfaceType()) {
-          return ErrorType::get(TC.Context);
+          return ErrorType::get(getASTContext());
         }
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
@@ -898,7 +896,7 @@ void ConstraintSystem::recordOpenedTypes(
 
 /// Determine how many levels of argument labels should be removed from the
 /// function type when referencing the given declaration.
-static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
+static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
   unsigned numParameterLists = decl->getNumCurryLevels();
@@ -967,8 +965,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
-        TC, funcDecl,
-        /*isCurriedInstanceReference=*/false, functionRefKind);
+        funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -1239,8 +1236,8 @@ ConstraintSystem::getTypeOfMemberReference(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
-    auto memberTy = TC.substMemberTypeWithBase(DC->getParentModule(),
-                                               typeDecl, baseObjTy);
+    auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
+                                                         typeDecl, baseObjTy);
     // Open the type if it was a reference to a generic type.
     memberTy = openUnboundGenericType(memberTy, locator);
 
@@ -1260,8 +1257,7 @@ ConstraintSystem::getTypeOfMemberReference(
   OpenedTypeMap localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
-      TC, value, /*isCurriedInstanceReference*/ !hasAppliedSelf,
-      functionRefKind);
+      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
   AnyFunctionType *funcType;
 
@@ -1294,8 +1290,9 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       refType = FunctionType::get(indices, elementTy);
     } else {
-      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
-                                           base, /*wantInterfaceType=*/true);
+      refType = TypeChecker::getUnopenedTypeOfReference(
+          cast<VarDecl>(value), baseTy, useDC, base,
+          /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -2253,9 +2250,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-template <typename Fn>
-Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
-                      Fn getFixedTypeFn) {
+Type ConstraintSystem::simplifyTypeImpl(Type type,
+    llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
       return getFixedTypeFn(tvt);
@@ -2264,7 +2260,7 @@ Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
-      Type newBase = simplifyTypeImpl(cs, depMemTy->getBase(), getFixedTypeFn);
+      Type newBase = simplifyTypeImpl(depMemTy->getBase(), getFixedTypeFn);
 
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
@@ -2282,7 +2278,7 @@ Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
 
       if (lookupBaseType->mayHaveMembers()) {
         auto *proto = assocType->getProtocol();
-        auto conformance = cs.DC->getParentModule()->lookupConformance(
+        auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance)
           return DependentMemberType::get(lookupBaseType, assocType);
@@ -2306,8 +2302,7 @@ Type ConstraintSystem::simplifyType(Type type) const {
     return type;
 
   // Map type variables down to the fixed types of their representatives.
-  return simplifyTypeImpl(
-      *this, type,
+  return simplifyTypeImpl(type,
       [&](TypeVariableType *tvt) -> Type {
         if (auto fixed = getFixedType(tvt))
           return simplifyType(fixed);
@@ -2321,8 +2316,7 @@ Type Solution::simplifyType(Type type) const {
     return type;
 
   // Map type variables to fixed types from bindings.
-  return simplifyTypeImpl(
-      getConstraintSystem(), type,
+  return getConstraintSystem().simplifyTypeImpl(type,
       [&](TypeVariableType *tvt) -> Type {
         auto known = typeBindings.find(tvt);
         assert(known != typeBindings.end());
@@ -2391,8 +2385,9 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
-    auto &log = TC.Context.TypeCheckerDebug->getStream();
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.DebugConstraintSolver) {
+    auto &log = ctx.TypeCheckerDebug->getStream();
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
 
@@ -2409,7 +2404,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     state.recordFixes = true;
 
     // Solve the system.
-    solve(viable);
+    solveImpl(viable);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
@@ -2457,8 +2452,8 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   }
 
   if (getExpressionTooComplex(viable)) {
-    TC.diagnose(expr->getLoc(), diag::expression_too_complex)
-        .highlight(expr->getSourceRange());
+    ctx.Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
+                .highlight(expr->getSourceRange());
     return true;
   }
 
@@ -2472,7 +2467,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
                                       Identifier operatorName,
                                       ArrayRef<Solution> solutions,
                                       ConstraintLocator *locator) {
-  auto &TC = cs.getTypeChecker();
+  auto &DE = cs.getASTContext().Diags;
   auto *anchor = locator->getAnchor();
 
   auto *applyExpr = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(anchor));
@@ -2488,19 +2483,19 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     auto rhsType = solution.simplifyType(cs.getType(rhs))->getRValueType();
 
     if (lhsType->isEqual(rhsType)) {
-      TC.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
+      DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
                   operatorName.str(), lhsType)
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
     } else {
-      TC.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
+      DE.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
                   operatorName.str(), lhsType, rhsType)
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
     }
   } else {
     auto argType = solution.simplifyType(cs.getType(applyExpr->getArg()));
-    TC.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
+    DE.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
                 operatorName.str(), argType->getRValueType());
   }
 
@@ -2520,7 +2515,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           FunctionType::getParamListAsString(fnType->getParams()));
   }
 
-  TC.diagnose(anchor->getLoc(), diag::suggest_partial_overloads,
+  DE.diagnose(anchor->getLoc(), diag::suggest_partial_overloads,
               /*isResult=*/false, operatorName.str(),
               llvm::join(parameters, ", "));
 }
@@ -2548,7 +2543,16 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     const auto *fix = fixes.front();
-    auto *calleeLocator = getCalleeLocator(fix->getLocator());
+    auto  *locator = fix->getLocator();
+
+    // Assignment failures are all about the source expression,
+    // because they treat destination as a contextual type.
+    if (auto *anchor = locator->getAnchor()) {
+      if (auto *assignExpr = dyn_cast<AssignExpr>(anchor))
+        locator = getConstraintLocator(assignExpr->getSrc());
+    }
+
+    auto *calleeLocator = getCalleeLocator(locator);
     if (commonCalleeLocator && commonCalleeLocator != calleeLocator)
       return false;
 
@@ -2578,13 +2582,14 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   bool diagnosed = true;
   {
-    DiagnosticTransaction transaction(TC.Diags);
+    DiagnosticTransaction transaction(getASTContext().Diags);
 
     const auto *fix = viableSolutions.front().second;
     auto *commonAnchor = commonCalleeLocator->getAnchor();
+    auto &DE = getASTContext().Diags;
     if (fix->getKind() == FixKind::UseSubscriptOperator) {
       auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
-      TC.diagnose(commonAnchor->getLoc(),
+      DE.diagnose(commonAnchor->getLoc(),
                   diag::could_not_find_subscript_member_did_you_mean,
                   getType(UDE->getBase()));
     } else {
@@ -2596,7 +2601,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       // 3. If labels in different choices are different, it means
       //    that we can only print a base name.
       if (name.isSpecial()) {
-        TC.diagnose(commonAnchor->getLoc(),
+        DE.diagnose(commonAnchor->getLoc(),
                     diag::no_overloads_match_exactly_in_call_special,
                     decl->getDescriptiveKind());
       } else if (name.isOperator()) {
@@ -2607,11 +2612,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
                               [&name](const ValueDecl *choice) {
                                 return choice->getFullName() == name;
                               })) {
-        TC.diagnose(commonAnchor->getLoc(),
+        DE.diagnose(commonAnchor->getLoc(),
                     diag::no_overloads_match_exactly_in_call,
                     decl->getDescriptiveKind(), name);
       } else {
-        TC.diagnose(commonAnchor->getLoc(),
+        DE.diagnose(commonAnchor->getLoc(),
                     diag::no_overloads_match_exactly_in_call_no_labels,
                     decl->getDescriptiveKind(), name.getBaseName());
       }
@@ -2622,7 +2627,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       ConstraintSystem::SolverScope scope(*this);
       applySolution(*viable.first);
       // All of the solutions supposed to produce a "candidate" note.
-      diagnosed &= viable.second->diagnose(expr, /*asNote*/ true);
+      diagnosed &= viable.second->diagnose(/*asNote*/ true);
     }
 
     // If not all of the fixes produced a note, we can't diagnose this.
@@ -2741,13 +2746,13 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
     auto anchor = simplifyLocatorToAnchor(overload.locator);
 
     // Emit the ambiguity diagnostic.
-    auto &tc = getTypeChecker();
-    tc.diagnose(anchor->getLoc(),
+    auto &DE = getASTContext().Diags;
+    DE.diagnose(anchor->getLoc(),
                 name.isOperator() ? diag::ambiguous_operator_ref
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    TrailingClosureAmbiguityFailure failure(expr, *this, anchor,
+    TrailingClosureAmbiguityFailure failure(*this, anchor,
                                             overload.choices);
     if (failure.diagnoseAsNote())
       return true;
@@ -2764,7 +2769,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         // FIXME: show deduced types, etc, etc.
         if (EmittedDecls.insert(choice.getDecl()).second)
-          tc.diagnose(choice.getDecl(), diag::found_candidate);
+          DE.diagnose(choice.getDecl(), diag::found_candidate);
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
@@ -3084,7 +3089,6 @@ bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
 /// Check whether given type conforms to `RawPepresentable` protocol
 /// and return the witness type.
 Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
-  auto &TC = cs.TC;
   auto *DC = cs.DC;
 
   auto rawReprType = TypeChecker::getProtocol(
@@ -3097,7 +3101,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(type, TC.Context.Id_RawValue);
+  return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
 }
 
 Type constraints::isRawRepresentable(
@@ -3244,4 +3248,148 @@ bool constraints::isArgumentOfReferenceEqualityOperator(
     ConstraintLocator *locator) {
   return isOperatorArgument(locator, "===") ||
          isOperatorArgument(locator, "!==");
+}
+
+ConversionEphemeralness
+ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
+                                        ConstraintLocatorBuilder locator) {
+  switch (conversion) {
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::StringToPointer:
+    // Always ephemeral.
+    return ConversionEphemeralness::Ephemeral;
+  case ConversionRestrictionKind::InoutToPointer: {
+
+    // Ephemeral, except if the expression is a reference to a global or
+    // static stored variable, or a directly accessed stored property on such a
+    // variable.
+
+    auto isDirectlyAccessedStoredVar = [&](ValueDecl *decl) -> bool {
+      auto *asd = dyn_cast_or_null<AbstractStorageDecl>(decl);
+      if (!asd)
+        return false;
+
+      // Check what access strategy is used for a read-write access. It must be
+      // direct-to-storage in order for the conversion to be non-ephemeral.
+      auto access = asd->getAccessStrategy(
+          AccessSemantics::Ordinary, AccessKind::ReadWrite,
+          DC->getParentModule(), DC->getResilienceExpansion());
+      return access.getKind() == AccessStrategy::Storage;
+    };
+
+    SourceRange range;
+    auto *argLoc = simplifyLocator(*this, getConstraintLocator(locator), range);
+    auto *subExpr = argLoc->getAnchor()->getSemanticsProvidingExpr();
+
+    // Look through an InOutExpr if we have one. This is usually the case, but
+    // might not be if e.g we're applying an 'add missing &' fix.
+    if (auto *ioe = dyn_cast<InOutExpr>(subExpr))
+      subExpr = ioe->getSubExpr();
+
+    while (true) {
+      subExpr = subExpr->getSemanticsProvidingExpr();
+
+      // Look through force unwraps, which can be modelled as physical lvalue
+      // components.
+      if (auto *fve = dyn_cast<ForceValueExpr>(subExpr)) {
+        subExpr = fve->getSubExpr();
+        continue;
+      }
+
+      // Look through a member reference if it's directly accessed.
+      if (auto *ude = dyn_cast<UnresolvedDotExpr>(subExpr)) {
+        // FIXME: This is an O(N) search.
+        auto overload = findSelectedOverloadFor(ude);
+
+        // If we didn't find an overload, it hasn't been resolved yet.
+        if (!overload)
+          return ConversionEphemeralness::Unresolved;
+
+        // Tuple indices are always non-ephemeral.
+        auto *base = ude->getBase();
+        if (overload->Choice.getKind() == OverloadChoiceKind::TupleIndex) {
+          subExpr = base;
+          continue;
+        }
+
+        // If we don't have a directly accessed declaration associated with the
+        // choice, it's ephemeral.
+        auto *member = overload->Choice.getDeclOrNull();
+        if (!isDirectlyAccessedStoredVar(member))
+          return ConversionEphemeralness::Ephemeral;
+
+        // If we found a static member, the conversion is non-ephemeral. We can
+        // stop iterating as there's nothing interesting about the base.
+        if (member->isStatic())
+          return ConversionEphemeralness::NonEphemeral;
+
+        // For an instance member, the base must be an @lvalue struct type.
+        if (auto *lvt = simplifyType(getType(base))->getAs<LValueType>()) {
+          auto *nominal = lvt->getObjectType()->getAnyNominal();
+          if (nominal && isa<StructDecl>(nominal)) {
+            subExpr = base;
+            continue;
+          }
+        }
+        return ConversionEphemeralness::Ephemeral;
+      }
+
+      break;
+    }
+
+    auto getBaseEphemeralness =
+        [&](ValueDecl *base) -> ConversionEphemeralness {
+      // We must have a base decl that's directly accessed.
+      if (!isDirectlyAccessedStoredVar(base))
+        return ConversionEphemeralness::Ephemeral;
+
+      // The base decl must either be static or global in order for it to be
+      // non-ephemeral.
+      if (base->isStatic() || base->getDeclContext()->isModuleScopeContext()) {
+        return ConversionEphemeralness::NonEphemeral;
+      } else {
+        return ConversionEphemeralness::Ephemeral;
+      }
+    };
+
+    // Fast path: We have a direct decl ref.
+    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr))
+      return getBaseEphemeralness(dre->getDecl());
+
+    // Otherwise, try to find an overload for the base.
+    // FIXME: This is an O(N) search.
+    if (auto baseOverload = findSelectedOverloadFor(subExpr))
+      return getBaseEphemeralness(baseOverload->Choice.getDeclOrNull());
+
+    // If we didn't find a base overload for a unresolved member or overloaded
+    // decl, it hasn't been resolved yet.
+    if (isa<UnresolvedMemberExpr>(subExpr) ||
+        isa<OverloadedDeclRefExpr>(subExpr))
+      return ConversionEphemeralness::Unresolved;
+
+    // Otherwise, we don't know what we're dealing with. Default to ephemeral.
+    return ConversionEphemeralness::Ephemeral;
+  }
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    // @_nonEphemeral has no effect on these conversions, so treat them as all
+    // being non-ephemeral in order to allow their passing to an @_nonEphemeral
+    // parameter.
+    return ConversionEphemeralness::NonEphemeral;
+  }
 }

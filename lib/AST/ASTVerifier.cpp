@@ -2645,7 +2645,8 @@ public:
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType = normal->getTypeWitness(assocType);
+          auto replacementType =
+              normal->getTypeWitnessUncached(assocType).getWitnessType();
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;
@@ -2677,7 +2678,7 @@ public:
           }
 
           // Check the witness substitutions.
-          const auto &witness = normal->getWitness(req);
+          const auto &witness = normal->getWitnessUncached(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             Generics.push_back(genericEnv->getGenericSignature());
@@ -2969,15 +2970,8 @@ public:
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
-      if (!AFD->hasInterfaceType()) {
-        if (isa<AccessorDecl>(AFD) && AFD->isImplicit())
-          return;
-
-        Out << "All functions except implicit accessors should be "
-               "validated by now\n";
-        AFD->dump(Out);
-        abort();
-      }
+      if (!AFD->hasInterfaceType())
+        return;
 
       // If this function is generic or is within a generic context, it should
       // have an interface type.
@@ -3639,17 +3633,7 @@ public:
     void checkErrors(Stmt *S) {}
     void checkErrors(Pattern *P) {}
     void checkErrors(Decl *D) {}
-    void checkErrors(ValueDecl *D) {
-      PrettyStackTraceDecl debugStack("verifying errors", D);
-
-      if (!D->hasInterfaceType())
-        return;
-      if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
-        Out << "Valid decl has error type!\n";
-        D->dump(Out);
-        abort();
-      }
-    }
+    void checkErrors(ValueDecl *D) {}
   };
 } // end anonymous namespace
 

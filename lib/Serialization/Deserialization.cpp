@@ -2564,7 +2564,6 @@ public:
     }
 
     ctor->setImplicitlyUnwrappedOptional(isIUO);
-    (void)ctor->getInterfaceType();
 
     return ctor;
   }
@@ -3040,9 +3039,6 @@ public:
           OpaqueResultTypeRequest{fn},
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
-
-    // Compute the interface type.
-    (void)fn->getInterfaceType();
 
     return fn;
   }
@@ -3825,7 +3821,6 @@ public:
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    (void)dtor->getInterfaceType();
 
     if (isImplicit)
       dtor->setImplicit();
@@ -4629,10 +4624,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure;
+      bool isVariadic, isAutoClosure, isNonEphemeral;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
+                                                   isNonEphemeral,
                                                    rawOwnership);
 
       auto ownership =
@@ -4647,7 +4643,7 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             *ownership));
+                                             isNonEphemeral, *ownership));
     }
 
     if (!isGeneric) {
@@ -5471,14 +5467,15 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // rest of the compiler.
       third = nullptr;
     }
-    typeWitnesses[first] = std::make_pair(second, third);
+    typeWitnesses[first] = {second, third};
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
-    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
-                                typeWitness.second.second);
+    conformance->setTypeWitness(typeWitness.first,
+                                typeWitness.second.getWitnessType(),
+                                typeWitness.second.getWitnessDecl());
   }
 
   // An imported requirement may have changed type between Swift versions.

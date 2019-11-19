@@ -596,6 +596,8 @@ public:
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
+  static void expandFunctionBody(AbstractFunctionDecl *);
+
   /// Flesh out the tree for dumping
   void buildFullyExpandedTree();
 
@@ -627,8 +629,12 @@ public:
     return Mem;
   }
 
+  static bool areInactiveIfConfigClausesSupported();
+
 private:
   static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);
+
+  void expandFunctionBodyImpl(AbstractFunctionDecl *);
 };
 
 } // end namespace swift

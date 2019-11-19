@@ -99,7 +99,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   switch (getKind()) {
   case ConstraintLocator::ApplyArgument:
   case ConstraintLocator::ApplyFunction:
-  case ConstraintLocator::ApplyArgToParam:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ConstructorMember:
@@ -139,6 +138,11 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::FunctionArgument:
   case ConstraintLocator::FunctionResult:
     return IsFunctionConversion;
+
+  case ConstraintLocator::ApplyArgToParam: {
+    auto flags = castTo<LocatorPathElt::ApplyArgToParam>().getParameterFlags();
+    return flags.isNonEphemeral() ? IsNonEphemeralParam : 0;
+  }
   }
 
   llvm_unreachable("Unhandled PathElementKind in switch.");
@@ -240,7 +244,9 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
-  return castLastElementTo<LocatorPathElt::GenericParameter>().getType();
+  // Check whether we have a path that terminates at a generic parameter.
+  return isForGenericParameter() ?
+      castLastElementTo<LocatorPathElt::GenericParameter>().getType() : nullptr;
 }
 
 void ConstraintLocator::dump(SourceManager *sm) const {
@@ -249,7 +255,7 @@ void ConstraintLocator::dump(SourceManager *sm) const {
 }
 
 void ConstraintLocator::dump(ConstraintSystem *CS) const {
-  dump(&CS->TC.Context.SourceMgr, llvm::errs());
+  dump(&CS->getASTContext().SourceMgr, llvm::errs());
   llvm::errs() << "\n";
 }
 
@@ -308,6 +314,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       auto argElt = elt.castTo<LocatorPathElt::ApplyArgToParam>();
       out << "comparing call argument #" << llvm::utostr(argElt.getArgIdx())
           << " to parameter #" << llvm::utostr(argElt.getParamIdx());
+      if (argElt.getParameterFlags().isNonEphemeral())
+        out << " (non-ephemeral)";
       break;
     }
     case ClosureResult:

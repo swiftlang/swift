@@ -36,7 +36,7 @@ struct Broken {
 
 // rdar://16252090 - Warning when inferring empty tuple type for declarations
 var emptyTuple = testShadowing()  // expected-warning {{variable 'emptyTuple' inferred to have type '()'}} \
-                                  // expected-note {{add an explicit type annotation to silence this warning}}
+                                  // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: ()}}
 
 // rdar://15263687 - Diagnose variables inferenced to 'AnyObject'
 var ao1 : AnyObject
@@ -44,7 +44,7 @@ var ao2 = ao1
 
 var aot1 : AnyObject.Type
 var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
-                       // expected-note {{add an explicit type annotation to silence this warning}}
+                       // expected-note {{add an explicit type annotation to silence this warning}} {{9-9=: AnyObject.Type}}
 
 
 for item in [AnyObject]() {  // No warning in for-each loop.
@@ -59,6 +59,16 @@ func testAnyObjectOptional() -> AnyObject? {
   let x = testAnyObjectOptional()
   return x
 }
+
+// SR-11511 Warning for inferring an array of empty tuples
+var arrayOfEmptyTuples = [""].map { print($0) } // expected-warning {{variable 'arrayOfEmptyTuples' inferred to have type '[()]'}} \
+                                                // expected-note {{add an explicit type annotation to silence this warning}} {{23-23=: [()]}}
+
+var maybeEmpty = Optional(arrayOfEmptyTuples) // expected-warning {{variable 'maybeEmpty' inferred to have type '[()]?'}} \
+                                              // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: [()]?}}
+
+var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warning {{variable 'shouldWarnWithoutSugar' inferred to have type 'Array<()>'}} \
+                                 // expected-note {{add an explicit type annotation to silence this warning}} {{27-27=: Array<()>}}
 
 class SomeClass {}
 

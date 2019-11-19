@@ -226,6 +226,10 @@ public:
 #pragma mark - source range queries
 
 public:
+  /// Return signum of ranges. Centralize the invariant that ASTScopes use ends.
+  static int compare(SourceRange, SourceRange, const SourceManager &,
+                     bool ensureDisjoint);
+
   SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
 
   /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
@@ -427,12 +431,12 @@ protected:
 
 protected:
   /// Not const because may reexpand some scopes.
-  const ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
-                                                  NullablePtr<raw_ostream>);
-  const ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
-                                                      NullablePtr<raw_ostream>,
-                                                      SourceManager &,
-                                                      ScopeCreator &);
+  ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
+                                            NullablePtr<raw_ostream>);
+  ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
+                                                NullablePtr<raw_ostream>,
+                                                SourceManager &,
+                                                ScopeCreator &);
 
 private:
   NullablePtr<ASTScopeImpl> findChildContaining(SourceLoc loc,
@@ -562,6 +566,8 @@ public:
   void buildFullyExpandedTree();
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+
+  void expandFunctionBody(AbstractFunctionDecl *AFD);
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }

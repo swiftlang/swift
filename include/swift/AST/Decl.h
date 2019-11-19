@@ -477,13 +477,16 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
-    HasLazyConformances : 1
+    HasLazyConformances : 1,
+
+    /// Whether this nominal type is having its semantic members resolved.
+    IsComputingSemanticMembers : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
@@ -3328,6 +3331,7 @@ protected:
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
+    Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
   }
 
   friend class ProtocolType;
@@ -3474,6 +3478,8 @@ public:
   /// Retrieves the synthesized zero parameter default initializer for this
   /// declaration, or \c nullptr if it doesn't have one.
   ConstructorDecl *getDefaultInitializer() const;
+
+  void synthesizeSemanticMembersIfNeeded(DeclName member);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5179,6 +5185,20 @@ public:
   /// backing property will be treated as the member-initialized property.
   bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
 
+  /// Return the range of semantics attributes attached to this VarDecl.
+  auto getSemanticsAttrs() const
+      -> decltype(getAttrs().getAttributes<SemanticsAttr>()) {
+    return getAttrs().getAttributes<SemanticsAttr>();
+  }
+
+  /// Returns true if this VarDelc has the string \p attrValue as a semantics
+  /// attribute.
+  bool hasSemanticsAttr(StringRef attrValue) const {
+    return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
+      return attrValue.equals(attr->Value);
+    });
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
@@ -5335,6 +5355,37 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
                                       : flags - Flags::IsAutoClosure);
+  }
+
+  /// Does this parameter reject temporary pointer conversions?
+  bool isNonEphemeral() const {
+    if (getAttrs().hasAttribute<NonEphemeralAttr>())
+      return true;
+
+    // Only pointer parameters can be non-ephemeral.
+    auto ty = getInterfaceType();
+    if (!ty->lookThroughSingleOptionalType()->getAnyPointerElementType())
+      return false;
+
+    // Enum element pointer parameters are always non-ephemeral.
+    auto *parentDecl = getDeclContext()->getAsDecl();
+    if (parentDecl && isa<EnumElementDecl>(parentDecl))
+      return true;
+
+    return false;
+  }
+
+  /// Attempt to apply an implicit `@_nonEphemeral` attribute to this parameter.
+  void setNonEphemeralIfPossible() {
+    // Don't apply the attribute if this isn't a pointer param.
+    auto type = getInterfaceType();
+    if (!type->lookThroughSingleOptionalType()->getAnyPointerElementType())
+      return;
+
+    if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
+      auto &ctx = getASTContext();
+      getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+    }
   }
 
   /// Remove the type of this varargs element designator, without the array
@@ -7286,6 +7337,11 @@ inline void simple_display(llvm::raw_ostream &out, const ExtensionDecl *decl) {
 /// Display NominalTypeDecls.
 inline void simple_display(llvm::raw_ostream &out,
                            const NominalTypeDecl *decl) {
+  simple_display(out, static_cast<const Decl *>(decl));
+}
+
+inline void simple_display(llvm::raw_ostream &out,
+                           const AssociatedTypeDecl *decl) {
   simple_display(out, static_cast<const Decl *>(decl));
 }
 

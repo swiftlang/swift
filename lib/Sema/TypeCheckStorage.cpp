@@ -170,11 +170,9 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   auto &Context = binding->getASTContext();
 
   // Resolve the pattern.
-  auto *TC =
-      static_cast<TypeChecker *>(binding->getASTContext().getLazyResolver());
-  auto *pattern = TC->resolvePattern(binding->getPattern(entryNumber),
-                                     binding->getDeclContext(),
-                                     /*isStmtCondition*/ true);
+  auto *pattern = TypeChecker::resolvePattern(binding->getPattern(entryNumber),
+                                              binding->getDeclContext(),
+                                              /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
@@ -214,6 +212,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
+  auto *TC = binding->getASTContext().getLegacyGlobalTypeChecker();
   if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
@@ -824,7 +823,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     };
 
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
-    auto &tc = static_cast<TypeChecker&>(*ctx.getLazyResolver());
+    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     lookupExpr = SubscriptExpr::create(
         ctx, wrapperMetatype, SourceLoc(), args,
         subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
@@ -1161,7 +1160,7 @@ static std::pair<BraceStmt *, bool>
 synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                          ASTContext &Ctx) {
   // FIXME: Remove TypeChecker dependencies below.
-  auto &TC = *(TypeChecker *) Ctx.getLazyResolver();
+  auto &TC = *Ctx.getLegacyGlobalTypeChecker();
 
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
@@ -2212,12 +2211,12 @@ static void typeCheckSynthesizedWrapperInitializer(
 
   // Type-check the initialization.
   ASTContext &ctx = pbd->getASTContext();
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  auto &tc = *ctx.getLegacyGlobalTypeChecker();
   tc.typeCheckExpression(initializer, originalDC);
   const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
-    tc.contextualizeInitializer(initializerContext, initializer);
+    TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
   TypeChecker::checkPropertyWrapperErrorHandling(pbd, initializer);
 }
@@ -2344,6 +2343,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
         !propertyType->isEqual(expectedPropertyType)) {
       var->diagnose(diag::property_wrapper_incompatible_property,
                     propertyType, wrapperType);
+      var->setInvalid();
       if (auto nominalWrapper = wrapperType->getAnyNominal()) {
         nominalWrapper->diagnose(diag::property_wrapper_declared_here,
                                  nominalWrapper->getFullName());
@@ -2386,7 +2386,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!parentPBD->isInitialized(patternNumber)
       && parentPBD->isDefaultInitializable(patternNumber)
       && !wrapperInfo.defaultInit) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     auto ty = parentPBD->getPattern(patternNumber)->getType();
     if (auto defaultInit = tc.buildDefaultInitializer(ty))
       parentPBD->setInit(patternNumber, defaultInit);
@@ -2394,7 +2394,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    auto &tc = *ctx.getLegacyGlobalTypeChecker();
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
   }
 
