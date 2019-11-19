@@ -811,10 +811,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Diagnose if the class has no designated initializers.
-  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
-
-  ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
