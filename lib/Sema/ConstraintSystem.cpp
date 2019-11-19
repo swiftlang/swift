@@ -19,6 +19,7 @@
 #include "ConstraintGraph.h"
 #include "CSDiagnostics.h"
 #include "CSFix.h"
+#include "SolutionResult.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2444,7 +2445,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   llvm_unreachable("unhandled kind");
 }
 
-bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
+SolutionResult ConstraintSystem::salvage() {
   auto &ctx = getASTContext();
   if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
@@ -2456,6 +2457,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   //
   // FIXME: can this be removed?  We need to arrange for recordFixes to be
   // eliminated.
+  SmallVector<Solution, 2> viable;
   viable.clear();
 
   {
@@ -2472,13 +2474,13 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
-      return false;
+      return SolutionResult::forSolved(std::move(viable[0]));
     }
 
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
     if (diagnoseAmbiguityWithFixes(viable))
-      return true;
+      return SolutionResult::forAmbiguous(viable);
 
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
@@ -2503,24 +2505,19 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         }
       }
 
-      if (diagnoseAmbiguity(expr, viable)) {
-        return true;
+      if (diagnoseAmbiguity(viable)) {
+        return SolutionResult::forAmbiguous(viable);
       }
     }
 
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex(viable)) {
-    ctx.Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
-                .highlight(expr->getSourceRange());
-    return true;
-  }
+  if (getExpressionTooComplex(viable))
+    return SolutionResult::forTooComplex();
 
-  // If all else fails, diagnose the failure by looking through the system's
-  // constraints.
-  diagnoseFailureForExpr(expr);
-  return true;
+  // Could not produce a specific diagnostic; punt to the client.
+  return SolutionResult::forUndiagnosedError();
 }
 
 static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
@@ -2757,8 +2754,7 @@ static void extendPreorderIndexMap(
   expr->walk(traversal);
 }
 
-bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
-                                         ArrayRef<Solution> solutions) {
+bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 
