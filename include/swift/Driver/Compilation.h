@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
@@ -230,14 +231,21 @@ public:
   /// How many .swift input files?
   unsigned countSwiftInputs() const;
 
-  /// Print out a short message comparing dependencies w/  source-ranges
+  /// Print out a short message comparing dependencies w/  source-ranges, or
+  /// output it to the path below
   const bool CompareIncrementalSchemes;
+
+  /// If not empty, the path to use to log the comparision.
+  const StringRef CompareIncrementalSchemesPath;
 
   template <typename DepJobsT, typename RangeJobsT>
   void updateJobsForComparison(const DepJobsT &depJobs,
                                const RangeJobsT &rangeJobs);
   void setFallingBackForComparison();
-  void printComparision() const;
+  void outputComparison() const;
+
+private:
+  void outputComparison(llvm::raw_ostream &) const;
 
 private:
   llvm::SmallPtrSet<const Job *, 16> DependencyCompileJobs;
@@ -280,7 +288,8 @@ public:
               bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
               bool ExperimentalDependenciesIncludeIntrafileOnes = false,
               bool EnableSourceRangeDependencies = false,
-              bool CompareIncrementalSchemes = false);
+              bool CompareIncrementalSchemes = false,
+              StringRef CompareIncrementalSchemesPath = "");
   // clang-format on
   ~Compilation();
 

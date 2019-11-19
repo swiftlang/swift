@@ -145,8 +145,18 @@ HelpText<"Try using source range information">;
 
 
 def driver_compare_incremental_schemes :
-Flag<["-"], "driver-compare-incremental-schemes">, Flags<[]>,
+Flag<["-"], "driver-compare-incremental-schemes">, Flags<[DoesNotAffectIncrementalBuild]>,
 HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
+
+def driver_compare_incremental_schemes_path :
+Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
+HelpText<"Path to use for machine-readable comparision">,
+MetaVarName<"<path>">;
+
+def driver_compare_incremental_schemes_path_EQ :
+Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
+Alias<driver_compare_incremental_schemes_path>;
+
 
 def driver_verify_experimental_dependency_graph_after_every_import :
 Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,

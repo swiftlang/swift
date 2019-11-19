@@ -107,6 +107,9 @@ WARNING(incremental_requires_build_record_entry,none,
         "ignoring -incremental; output file map has no master dependencies "
         "entry (\"%0\" under \"\")", (StringRef))
 
+WARNING(unable_to_open_incremental_comparison_log,none,
+"unable to open incremental comparison log file '%0'", (StringRef))
+
 ERROR(error_os_minimum_deployment,none,
       "Swift requires a minimum deployment target of %0", (StringRef))
 ERROR(error_sdk_too_old,none,

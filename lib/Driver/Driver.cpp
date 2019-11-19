@@ -857,7 +857,10 @@ Driver::buildCompilation(const ToolChain &TC,
   const bool EnableSourceRangeDependencies =
       ArgList->hasArg(options::OPT_enable_source_range_dependencies);
   const bool CompareIncrementalSchemes =
-      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes);
+      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes) ||
+      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes_path);
+  const StringRef CompareIncrementalSchemesPath = ArgList->getLastArgValue(
+      options::OPT_driver_compare_incremental_schemes_path);
 
   Optional<OutputFileMap> OFM = buildOutputFileMap(
       *TranslatedArgList, workingDirectory,
@@ -982,7 +985,8 @@ Driver::buildCompilation(const ToolChain &TC,
         EmitExperimentalDependencyDotFileAfterEveryImport,
         ExperimentalDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
-        CompareIncrementalSchemes);
+        CompareIncrementalSchemes,
+        CompareIncrementalSchemesPath);
     // clang-format on
   }
 

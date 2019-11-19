@@ -126,7 +126,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EmitExperimentalDependencyDotFileAfterEveryImport,
                          bool ExperimentalDependenciesIncludeIntrafileOnes,
                          bool EnableSourceRangeDependencies,
-                         bool CompareIncrementalSchemes)
+                         bool CompareIncrementalSchemes,
+                         StringRef CompareIncrementalSchemesPath)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -156,7 +157,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ExperimentalDependenciesIncludeIntrafileOnes(
       ExperimentalDependenciesIncludeIntrafileOnes),
     EnableSourceRangeDependencies(EnableSourceRangeDependencies),
-    CompareIncrementalSchemes(CompareIncrementalSchemes) {
+    CompareIncrementalSchemes(CompareIncrementalSchemes),
+    CompareIncrementalSchemesPath(CompareIncrementalSchemesPath) {
 };
 // clang-format on
 
@@ -1906,7 +1908,7 @@ int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   bool abnormalExit;
   int result = performJobsImpl(abnormalExit, std::move(TQ));
 
-  printComparision();
+  outputComparison();
 
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
@@ -1954,21 +1956,42 @@ void Compilation::setFallingBackForComparison() {
   SourceRangeCompileJobs = None;
 }
 
-void Compilation::printComparision() const {
+void Compilation::outputComparison() const {
   if (!CompareIncrementalSchemes)
     return;
+
+  if (CompareIncrementalSchemesPath.empty()) {
+    outputComparison(llvm::outs());
+    return;
+  }
+
+  std::error_code EC;
+  using namespace llvm::sys::fs;
+  llvm::raw_fd_ostream OS(CompareIncrementalSchemesPath, EC, CD_OpenAlways,
+                          FA_Write, OF_Append | OF_Text);
+
+  if (EC) {
+    getDiags().diagnose(SourceLoc(),
+                        diag::unable_to_open_incremental_comparison_log,
+                        CompareIncrementalSchemesPath);
+    return;
+  }
+  outputComparison(OS);
+}
+
+void Compilation::outputComparison(llvm::raw_ostream &out) const {
   if (!getIncrementalBuildEnabled())
-    llvm::outs() << "*** Comparing incremental strategies is moot: incremental "
-                    "compilation disabled ***\n";
+    out << "*** Comparing incremental strategies is moot: incremental "
+           "compilation disabled ***\n";
   else if (SourceRangeCompileJobs)
-    llvm::outs() << "*** Comparing deps: " << DependencyCompileJobs.size()
-                 << ", ranges: " << SourceRangeCompileJobs->size()
-                 << ", total: " << countSwiftInputs() << " ***\n";
+    out << "*** Comparing deps: " << DependencyCompileJobs.size()
+        << ", ranges: " << SourceRangeCompileJobs->size()
+        << ", total: " << countSwiftInputs() << " ***\n";
   else
-    llvm::outs() << "*** Comparing incremental strategies is moot: would fall "
-                    "back and run "
-                 << DependencyCompileJobs.size()
-                 << ", total: " << countSwiftInputs() << " ***\n";
+    out << "*** Comparing incremental strategies is moot: would fall "
+           "back and run "
+        << DependencyCompileJobs.size() << ", total: " << countSwiftInputs()
+        << " ***\n";
 }
 
 unsigned Compilation::countSwiftInputs() const {

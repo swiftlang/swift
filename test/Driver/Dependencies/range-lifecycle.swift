@@ -69,11 +69,11 @@
 // Now, do it again with range dependencies enabled:
 // =============================================================================
 
-// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes-path=./comparo -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output2
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/output2
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/comparo
 
 // RUN: %FileCheck -check-prefix=CHECK-TURN-ON-RANGES %s < %t/output2
 
@@ -131,11 +131,12 @@
 // =============================================================================
 
 
-// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
+// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes-path ./comparo -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output3
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/output3
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-DISABLED %s < %t/comparo
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s < %t/comparo
 // CHECK-COMPARE-0-0-3: *** Comparing deps: 0, ranges: 0, total: 3 ***
 
 // RUN: %FileCheck -check-prefix=CHECK-INCREMENTAL-ENABLED %s < %t/output3
