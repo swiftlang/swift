@@ -1552,6 +1552,11 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   free(nullTerminatedFilename);
 }
 
+const Metadata *swift::getNSObjectMetadata() {
+  return SWIFT_LAZY_CONSTANT(
+      swift_getObjCClassMetadata((const ClassMetadata *)[NSObject class]));
+}
+
 #endif
 
 const ClassMetadata *swift::getRootSuperclass() {
