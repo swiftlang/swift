@@ -3026,6 +3026,10 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
+
 private:
   /// Determines whether or not a given conversion at a given locator requires
   /// the creation of a temporary value that's only valid for a limited scope.

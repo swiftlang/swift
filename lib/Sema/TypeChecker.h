@@ -1333,11 +1333,6 @@ public:
   static Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                             DeclNameLoc NameLoc, bool Implicit,
                             FunctionRefKind functionRefKind);
-
-  /// Build implicit autoclosure expression wrapping a given expression.
-  /// Given expression represents computed result of the closure.
-  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.
