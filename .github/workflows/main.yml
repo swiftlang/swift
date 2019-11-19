@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - swiftwasm
+      - swiftwasm
   pull_request:
     branches:
-    - swiftwasm
+      - swiftwasm
 
 jobs:
   linux_build:
@@ -14,34 +14,39 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Build Linux installable archive
-      run: ./ci-linux.sh
-    - name: Upload Linux installable archive
-      uses: actions/upload-artifact@v1
-      with:
-        name: linux-installable
-        path: ../swiftwasm-linux.tar.gz
+      - uses: actions/checkout@v1
+      - name: Build Linux installable archive
+        run: ./ci-linux.sh
+      - name: Upload Linux installable archive
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux-installable
+          path: ../swiftwasm-linux.tar.gz
 
   macos_build:
     timeout-minutes: 0
     runs-on: macOS-10.14
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Build macOS installable archive
-      run: ./ci-mac.sh
-    - name: Upload macOS installable archive
-      uses: actions/upload-artifact@v1
-      with:
-        name: macos-installable
-        path: ../swiftwasm-macos.tar.gz
+      - uses: actions/checkout@v1
+      - name: Build macOS installable archive
+        run: ./ci-mac.sh
+      - name: Upload macOS installable archive
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos-installable
+          path: ../swiftwasm-macos.tar.gz
+      - name: Upload packaging scripts
+        uses: actions/upload-artifact@v1
+        with:
+          name: packaging-scripts
+          path: utils/webassembly
 
   package:
     name: Build SwiftWasm packages
     needs:
-    - linux_build
-    - macos_build
+      - linux_build
+      - macos_build
     runs-on: ubuntu-18.04
     steps:
       - name: Download installable Linux archive
@@ -52,11 +57,16 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: macos-installable
+      - name: Download packaging scripts
+        uses: actions/download-artifact@v1
+        with:
+          name: packaging-scripts
       - name: Build the packages
         shell: bash
         run: |
-          git clone https://github.com/swiftwasm/swiftwasm-package-sdk.git
-          cd swiftwasm-package-sdk
+          cd packaging-scripts
+          find . -name '*.sh' -exec chmod +x {} \;
+          chmod +x sdkroot/swiftwasm
           ./download-prebuilts.sh
 
           cp ../linux-installable/swiftwasm-linux.tar.gz \
@@ -74,19 +84,19 @@ jobs:
         uses: actions/upload-artifact@v1
         with:
           name: macos-package
-          path: swiftwasm-package-sdk/output/swiftwasm-sdk-macos.tar.xz
+          path: packaging-scripts/output/swiftwasm-sdk-macos.tar.xz
 
       - name: Upload Linux package
         uses: actions/upload-artifact@v1
         with:
           name: linux-package
-          path: swiftwasm-package-sdk/output/swiftwasm-sdk-linux.tar.xz
+          path: packaging-scripts/output/swiftwasm-sdk-linux.tar.xz
 
       - name: Upload hello.wasm compiled with Linux package
         uses: actions/upload-artifact@v1
         with:
           name: linux-hello.wasm
-          path: swiftwasm-package-sdk/output/swiftwasm-sdk/hello.wasm
+          path: packaging-scripts/output/swiftwasm-sdk/hello.wasm
 
   macos_smoke_test:
     name: Compile hello.swift on macOS

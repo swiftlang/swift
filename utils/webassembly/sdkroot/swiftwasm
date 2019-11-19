@@ -1,0 +1,40 @@
+#!/bin/bash
+set -e
+
+if [ "$#" -lt 2 ]
+then
+	echo "usage: swiftwasm file1.swift file2.swift.... output.wasm"
+	exit 1
+fi
+sdk="$(dirname $0)"
+tmpobj="$(mktemp -t swiftwasm-XXXXXXXX)"
+outputfile="${@: -1}"
+if [[ "$outputfile" != *.wasm ]]
+then
+	echo "output should end in .wasm"
+	exit 1
+fi
+sysroot="$(dirname $0)/wasi-sdk/share/sysroot"
+abssysroot="$(cd "$(dirname "$sysroot")" && pwd)/$(basename "$sysroot")"
+
+"$sdk/extra_utils/generateModulemap.sh" "$abssysroot" >"$sdk/opt/swiftwasm-sdk/lib/swift/wasm/wasm32/glibc.modulemap"
+
+"$sdk/opt/swiftwasm-sdk/bin/swiftc" -target wasm32-unknown-unknown-wasm \
+	-sdk "$sysroot" -O -c \
+	-o "$tmpobj" \
+	"${@:1:$#-1}"
+"$sdk/wasi-sdk/bin/wasm-ld" --error-limit=0 -o "$outputfile" \
+	"$sysroot/lib/wasm32-wasi/crt1.o" \
+	"$sdk/opt/swiftwasm-sdk/lib/swift_static/wasm/wasm32/swiftrt.o" \
+	"$tmpobj" \
+	"-L$sdk/opt/swiftwasm-sdk/lib/swift_static/wasm" \
+	"-L$sysroot/lib/wasm32-wasi" \
+	"-L$sdk/icu_out/lib" \
+	-lswiftCore \
+	-lc -lc++ -lc++abi -lswiftImageInspectionShared \
+	-licuuc -licudata \
+	"$sdk/wasi-sdk/lib/clang/9.0.0/lib/wasi/libclang_rt.builtins-wasm32.a" \
+	"$sdk/extra_objs/fakepthread.o" \
+	--no-gc-sections \
+	--no-threads
+rm "$tmpobj"
