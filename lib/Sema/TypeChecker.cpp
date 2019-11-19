@@ -289,6 +289,7 @@ static void bindExtensions(SourceFile &SF) {
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
+  unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
@@ -300,7 +301,18 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
       TypeChecker::typeCheckAbstractFunctionBody(AFD);
     }
-  } while (currentFunctionIdx < TC.definedFunctions.size());
+
+    // Type check synthesized functions and their bodies.
+    for (unsigned n = SF.SynthesizedDecls.size();
+         currentSynthesizedDecl != n;
+         ++currentSynthesizedDecl) {
+      auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
+      TypeChecker::typeCheckDecl(decl);
+    }
+
+  } while (currentFunctionIdx < TC.definedFunctions.size() ||
+           currentSynthesizedDecl < SF.SynthesizedDecls.size());
+
 
   for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
     TypeChecker::computeCaptures(FD);
