@@ -17,16 +17,19 @@
 @_exported import os
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@frozen
 public struct Logger {
   @usableFromInline
   internal let logObject: OSLog
 
   /// Create a custom OS log object.
+  @_transparent
   public init(subsystem: String, category: String) {
     logObject = OSLog(subsystem: subsystem, category: category)
   }
 
   /// Return the default OS log object.
+  @_transparent
   public init() {
     logObject = OSLog.default
   }
@@ -66,6 +69,7 @@ internal func osLog(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let uint32bufferSize = UInt32(bufferSize)
   let argumentClosures = message.interpolation.arguments.argumentClosures
 
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
@@ -77,8 +81,8 @@ internal func osLog(
   // allocated as it is local to this function and also its size is a
   // compile-time constant.
   let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-  // Array of references to auxiliary storage created during serialization of
-  // strings. This array can be stack allocated.
+  //Array of references to auxiliary storage created during serialization of
+  //strings. This array can be stack allocated.
   var stringStorageObjects: [AnyObject] = []
 
   var currentBufferPosition = bufferMemory
@@ -91,7 +95,7 @@ internal func osLog(
                  logLevel,
                  formatStringPointer,
                  bufferMemory,
-                 UInt32(bufferSize))
+                 uint32bufferSize)
 
   // The following operation extends the lifetime of stringStorageObjects
   // and also of the objects stored in it till this point.
