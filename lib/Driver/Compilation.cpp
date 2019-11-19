@@ -1014,12 +1014,13 @@ namespace driver {
       for (const Job *Cmd : Comp.getJobs()) {
         auto pri = Cmd->getFirstSwiftPrimaryInput();
         if (pri.empty())
-          if (allSourceRangeInfo.count(pri)) {
-            noteBuilding(
-                Cmd, false, true,
-                "already have source-range and compiled-source files.");
-            continue;
-          }
+          continue;
+        if (allSourceRangeInfo.count(pri)) {
+          noteBuilding(
+                       Cmd, false, true,
+                       "already have source-range and compiled-source files.");
+          continue;
+        }
         noteBuilding(Cmd, true, true,
                      "to create source-range and compiled-source files for the "
                      "next time when falling back from source-ranges");
