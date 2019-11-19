@@ -128,6 +128,25 @@ void GenericParamListRequest::cacheResult(GenericParamList *params) const {
   context->GenericParamsAndBit.setPointerAndInt(params, true);
 }
 
+//----------------------------------------------------------------------------//
+// UnqualifiedLookupRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const UnqualifiedLookupDescriptor &desc) {
+  out << "looking up ";
+  simple_display(out, desc.Name);
+  out << " from ";
+  simple_display(out, desc.DC);
+  out << " with options ";
+  simple_display(out, desc.Options);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.DC);
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

@@ -15,6 +15,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1181,14 +1182,16 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
 
-  UnqualifiedLookup::Options options;
+  UnqualifiedLookupOptions options;
   if (typeLookup)
-    options |= UnqualifiedLookup::Flags::TypeLookup;
+    options |= UnqualifiedLookupFlags::TypeLookup;
 
-  UnqualifiedLookup DeclLookup(Name, &P.SF, SourceLoc(), options);
-  assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
-  ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
-  return VD;
+  auto &ctx = P.SF.getASTContext();
+  auto descriptor = UnqualifiedLookupDescriptor(Name, &P.SF);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
+  assert(lookup.size() == 1);
+  return lookup.back().getValueDecl();
 }
 
 /// Find the ValueDecl given an interface type and a member name.
