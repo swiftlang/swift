@@ -372,7 +372,7 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
   auto &clangCtx = ClangASTContext;
 
   if (!proto->isObjC())
-    return getClangIdType(ClangASTContext);
+    return clang::QualType();
 
   assert(!cast_or_null<clang::ObjCProtocolDecl>(proto->getClangDecl())
          && "We shouldn't be creating duplicate decls; see `convert`");
@@ -416,6 +416,8 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
   auto &clangCtx = ClangASTContext;
   auto swiftDecl = type->getDecl();
 
+  // TODO: [non-objc-class-clang-type-conversion]
+  // See the corresponding note in GenClangType.cpp
   if (!swiftDecl->isObjC())
     return getClangIdType(clangCtx);
 

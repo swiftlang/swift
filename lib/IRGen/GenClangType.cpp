@@ -374,8 +374,13 @@ clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
   auto proto = type->getDecl();
   auto &clangCtx = getClangASTContext();
 
-  if (!proto->isObjC())
-    return getClangIdType(clangCtx);
+  if (!proto->isObjC()) {
+    std::string s;
+    llvm::raw_string_ostream err(s);
+    err << "Trying to compute the clang type for a non-ObjC protocol type\n";
+    proto->dump(err);
+    llvm::report_fatal_error(err.str());
+  }
 
   // Single protocol -> id<Proto>
   clang::IdentifierInfo *name = &clangCtx.Idents.get(proto->getName().get());
@@ -410,6 +415,9 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   auto &clangCtx = getClangASTContext();
   auto swiftDecl = type->getDecl();
 
+  // TODO: [non-objc-class-clang-type-conversion]
+  // Crashing here instead of returning a bogus 'id' leads to test failures,
+  // which is surprising.
   if (!swiftDecl->isObjC())
     return getClangIdType(clangCtx);
 
