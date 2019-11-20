@@ -270,23 +270,68 @@ func roundingGivesError(x: Float) -> Float {
 // Inout arguments
 //===----------------------------------------------------------------------===//
 
-func activeInoutArg(_ x: Float) -> Float {
-  var a = x
-  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
-  a += x
-  return a
-}
 // expected-error @+1 {{function is not differentiable}}
-_ = pullback(at: .zero, in: activeInoutArg(_:))
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArg(_ x: Float) -> Float {
+  var result = x
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result += x
+  return result
+}
 
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
+  var result: Float = 1
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result += x
+  return result
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
 func activeInoutArgTuple(_ x: Float) -> Float {
   var tuple = (x, x)
   // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
   tuple.0 *= x
   return x * tuple.0
 }
+
 // expected-error @+1 {{function is not differentiable}}
-_ = pullback(at: .zero, in: activeInoutArgTuple(_:))
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgControlFlow(_ array: [Float]) -> Float {
+  var result: Float = 1
+  for i in withoutDerivative(at: array).indices {
+    // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+    result += array[i]
+  }
+  return result
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
+  var result: Float = 1
+  if bool {
+    if bool {}
+    for i in withoutDerivative(at: array).indices {
+      switch i % 2 {
+      case 0: continue
+      case 1: break
+      default: break
+      }
+      result = result + 1
+      // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+      result += array[i]
+    }
+  }
+  return result
+}
 
 //===----------------------------------------------------------------------===//
 // Non-varied results
@@ -309,6 +354,20 @@ struct TF_775: Differentiable {
   func nonVariedResult(_ input: Float) -> Float {
     withoutDerivative(at: input)
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Tuple differentiability
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
+  // `Array<(Float, Float)>` does not conform to `Differentiable`.
+  let array = [(x * y, x * y)]
+  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+  return array[0].0
 }
 
 //===----------------------------------------------------------------------===//
