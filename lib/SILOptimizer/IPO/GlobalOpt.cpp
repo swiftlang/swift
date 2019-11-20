@@ -1088,6 +1088,7 @@ bool SILGlobalOpt::run() {
     optimizeGlobalAccess(Init.first, Init.second);
   }
 
+  SmallVector<SILGlobalVariable *, 8> addrGlobals;
   for (auto &addrPair : GlobalAddrMap) {
     // Don't optimize functions that are marked with the opt.never attribute.
     bool shouldOptimize = true;
@@ -1100,13 +1101,22 @@ bool SILGlobalOpt::run() {
     if (!shouldOptimize)
       continue;
 
-    HasChanged |= tryRemoveGlobalAddr(addrPair.first);
+    addrGlobals.push_back(addrPair.first);
+  }
+  
+  for (auto *global : addrGlobals) {
+    HasChanged |= tryRemoveGlobalAddr(global);
   }
 
+  SmallVector<std::pair<SILGlobalVariable *, AllocGlobalInst *>, 12> globalAllocPairs;
   for (auto &alloc : AllocGlobalStore) {
     if (!alloc.second->getFunction()->shouldOptimize())
       continue;
-    HasChanged |= tryRemoveGlobalAlloc(alloc.first, alloc.second);
+    globalAllocPairs.push_back(std::make_pair(alloc.first, alloc.second));
+  }
+  
+  for (auto &allocPair : globalAllocPairs) {
+    HasChanged |= tryRemoveGlobalAlloc(allocPair.first, allocPair.second);
   }
 
   // Copy the globals so we don't get issues with modifying while iterating.
@@ -1114,6 +1124,7 @@ bool SILGlobalOpt::run() {
   for (auto &global : Module->getSILGlobals()) {
     globals.push_back(&global);
   }
+  
   for (auto *global : globals) {
     HasChanged |= tryRemoveUnusedGlobal(global);
   }
