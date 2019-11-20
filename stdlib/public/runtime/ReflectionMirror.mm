@@ -164,6 +164,11 @@ static void copyUnownedFieldContents(OpaqueValue *destContainer, const Metadata 
 }
 
 static void copyUnmanagedFieldContents(OpaqueValue *destContainer, const Metadata *type, OpaqueValue *fieldData) {
+  // Also known as "unowned(unsafe)".
+  // This is simpler than the unowned/weak cases because unmanaged
+  // references are fundamentally the same as strong ones, so we
+  // can use the regular strong reference support that already
+  // knows how to handle existentials and Obj-C references.
   type->vw_initializeWithCopy(destContainer, fieldData);
 }
 
@@ -179,7 +184,7 @@ static AnyReturn copyFieldContents(OpaqueValue *fieldData,
     type->vw_initializeWithCopy(destContainer, fieldData);
   }
 
-  // Generate a conditional clause for every known ownership type
+  // Generate a conditional clause for every known ownership type.
   // If this causes errors, it's because someone added a new ownership type
   // to ReferenceStorage.def and missed some related updates.
 #define REF_STORAGE(Name, ...) \
