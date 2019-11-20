@@ -80,6 +80,15 @@ char *strndup(const char *s, size_t n) {
 
 using namespace swift;
 
+#if SWIFT_OBJC_INTEROP
+// Declare the debugQuickLookObject selector.
+@interface DeclareSelectors
+- (id)debugQuickLookObject;
+@end
+#endif
+
+namespace {
+
 class FieldType {
   const Metadata *type;
   bool indirect;
@@ -102,15 +111,6 @@ public:
     referenceOwnership = newOwnership;
   }
 };
-
-#if SWIFT_OBJC_INTEROP
-// Declare the debugQuickLookObject selector.
-@interface DeclareSelectors
-- (id)debugQuickLookObject;
-@end
-#endif
-
-namespace {
 
 /// The layout of Any.
 using Any = OpaqueExistentialContainer;
