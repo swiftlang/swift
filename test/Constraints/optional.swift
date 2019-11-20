@@ -394,3 +394,11 @@ func sr8411() {
   _ = S.foo(&foo)  // Ok
   _ = S.bar(&foo, 42) // Ok
 }
+
+// SR-11104 - Slightly misleading diagnostics for contextual failures with multiple fixes
+func sr_11104() {
+  func bar(_: Int) {}
+
+  bar(["hello"].first)
+  // expected-error@-1 {{cannot convert value of type 'String?' to expected argument type 'Int'}}
+}
