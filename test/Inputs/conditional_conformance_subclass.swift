@@ -94,7 +94,7 @@ public func subclassgeneric_concrete() {
 // tvos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
 // tvos-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // tvos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
-// linux-NEXT:     [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
+// linux-gnu-NEXT:     [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
