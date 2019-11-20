@@ -11,9 +11,7 @@ target_link_libraries(SourceKitSupport PRIVATE
   swiftSyntax
   clangBasic
   clangRewrite)
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  target_link_libraries(SourceKitSupport INTERFACE
-    dispatch
-    BlocksRuntime)
+if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
+  target_link_libraries(SourceKitSupport INTERFACE dispatch BlocksRuntime)
 endif()
 
