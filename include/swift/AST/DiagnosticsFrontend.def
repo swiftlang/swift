@@ -316,9 +316,6 @@ NOTE(compiled_module_invalid,none,
 NOTE(compiled_module_invalid_reason,none,
      "unable to load compiled module '%0': %1",
      (StringRef, StringRef))
-ERROR(error_extracting_dependencies_from_cached_module,none,
-      "error extracting dependencies from cached module '%0'",
-      (StringRef))
 ERROR(unknown_forced_module_loading_mode,none,
       "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))
