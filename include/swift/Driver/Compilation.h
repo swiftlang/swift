@@ -98,6 +98,9 @@ public:
     CommandSet SourceRangeCompileJobs;
     CommandSet SourceRangeLackingSuppJobs;
 
+    unsigned DependencyCompileStages = 0;
+    unsigned SourceRangeCompileStages = 0;
+
   public:
     IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
                                 bool EnableSourceRangeDependencies,

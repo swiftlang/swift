@@ -1976,6 +1976,11 @@ void Compilation::IncrementalSchemeComparator::update(
     SourceRangeCompileJobs.insert(cmd);
   for (const auto *cmd : lackingSuppJobs)
     SourceRangeLackingSuppJobs.insert(cmd);
+
+  if (!depJobs.empty())
+    ++DependencyCompileStages;
+  if (!rangeJobs.empty() || !lackingSuppJobs.empty())
+    ++SourceRangeCompileStages;
 }
 
 void Compilation::IncrementalSchemeComparator::outputComparison() const {
@@ -2011,23 +2016,26 @@ void Compilation::IncrementalSchemeComparator::outputComparison(
     if (!DependencyCompileJobs.count(Cmd))
       ++additionalDependencyJobsToCreateSupps;
   }
-  unsigned jobsWhenEnablingDeps = DependencyCompileJobs.size();
-  unsigned jobsWhenEnablingRanges =
+  unsigned depsCount = DependencyCompileJobs.size();
+  unsigned rangesCount =
       UseSourceRangeDependencies ? SourceRangeCompileJobs.size()
-                                 : DependencyCompileJobs.size() +
+                                 : depsCount +
                                        additionalDependencyJobsToCreateSupps;
 
-  out << "*** Comparing incremental schemes: "
-      << "deps: " << jobsWhenEnablingDeps << ", "
-      << "ranges: " << jobsWhenEnablingRanges << ", "
+  const bool fellBack = EnableSourceRangeDependencies && !UseSourceRangeDependencies;
+
+  const int rangeBenefit = depsCount - rangesCount;
+  const int rangeStageBenefit = DependencyCompileStages - SourceRangeCompileStages;
+
+  out << "*** "
+      << "Range benefit: " << rangeBenefit << " compilations, "
+      << rangeStageBenefit << " stages, "
+      << "deps: " << depsCount << ", "
+      << "ranges" << (fellBack ? " (falling back)" : "") << ": " << rangesCount << ", "
       << "total: " << SwiftInputCount << ", "
-      << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps")
-      << ", "
-      << "using: "
-      << (!EnableIncrementalBuild
-              ? "neither"
-              : UseSourceRangeDependencies ? "ranges" : "deps")
-      << "\n";
+      << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps") << ", "
+      << "used: " << (UseSourceRangeDependencies ? "ranges" : "deps")
+      << "***\n";
 }
 
 unsigned Compilation::countSwiftInputs() const {
