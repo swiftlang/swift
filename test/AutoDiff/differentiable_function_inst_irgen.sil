@@ -5,6 +5,10 @@ sil_stage raw
 import Swift
 import Builtin
 
+sil_differentiability_witness hidden [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
+  vjp: @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
 // The adjoint function emitted by the compiler. Parameters are a vector, as in
 // vector-Jacobian products, and pullback struct value. The function is not
 // itself a pullback, but to be partially applied to form a pullback, which

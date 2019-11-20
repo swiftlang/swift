@@ -5405,6 +5405,11 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
   if (!M.getOptions().VerifyAll)
     return;
 #endif
+  // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
+  // TODO: Check that derivative function types match excluding
+  // parameter/result conventions in lowered SIL.
+  if (M.getStage() == SILStage::Lowered)
+    return;
   auto origFnType = getOriginalFunction()->getLoweredFunctionType();
   CanGenericSignature derivativeCanGenSig;
   if (auto derivativeGenSig = getDerivativeGenericSignature())

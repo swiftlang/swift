@@ -342,6 +342,56 @@ static Inst *peerThroughFunctionConversions(SILValue value) {
   return nullptr;
 }
 
+/// Finds the differentiability witness corresponding to `attr` in `module`.
+static SILDifferentiabilityWitness *
+findDifferentiabilityWitness(SILModule &module, SILDifferentiableAttr *attr) {
+  auto *resultIndices =
+      IndexSubset::get(module.getASTContext(), 1, {attr->getIndices().source});
+  AutoDiffConfig config(attr->getIndices().parameters, resultIndices,
+                        attr->getDerivativeGenericSignature());
+  return module.lookUpDifferentiabilityWitness(
+      {attr->getOriginal()->getName(), config});
+}
+
+/// Sets the differentiability witness JVP and VJP to the JVP and VJP in `attr`.
+///
+/// `attr` must have a JVP and VJP.
+static void fillDifferentiabilityWitness(SILModule &module,
+                                         const SILDifferentiableAttr *attr,
+                                         SILDifferentiabilityWitness *witness) {
+  auto jvpName = attr->getJVPName();
+  assert(!jvpName.empty() && "Expected JVP name");
+  auto *jvpFn = module.lookUpFunction(attr->getJVPName());
+  assert(jvpFn && "Expected JVP function");
+  assert(!witness->getJVP() ||
+         witness->getJVP() == jvpFn && "Pass trying to change witness jvp");
+  witness->setJVP(jvpFn);
+  auto vjpName = attr->getVJPName();
+  assert(!vjpName.empty() && "Expected VJP name");
+  auto *vjpFn = module.lookUpFunction(attr->getVJPName());
+  assert(vjpFn && "Expected VJP function");
+  assert(!witness->getVJP() ||
+         witness->getVJP() == vjpFn && "Pass trying to change witness vjp");
+  witness->setVJP(vjpFn);
+}
+
+/// Creates a differentiability witness definition corresponding to `attr` in
+/// `module`.
+///
+/// `attr` must have a JVP and VJP.
+static SILDifferentiabilityWitness *
+createDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
+                               SILDifferentiableAttr *attr) {
+  auto *resultIndices =
+      IndexSubset::get(module.getASTContext(), 1, {attr->getIndices().source});
+  auto *witness = SILDifferentiabilityWitness::createDefinition(
+      module, linkage, attr->getOriginal(), attr->getIndices().parameters,
+      resultIndices, attr->getDerivativeGenericSignature(), /*jvp*/ nullptr,
+      /*vjp*/ nullptr, /*isSerialized*/ false);
+  fillDifferentiabilityWitness(module, attr, witness);
+  return witness;
+}
+
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
 //===----------------------------------------------------------------------===//
@@ -2703,6 +2753,8 @@ emitDerivativeFunctionReference(
           originalFn, desiredIndices, contextualDerivativeGenSig);
       if (context.processDifferentiableAttribute(originalFn, newAttr, invoker))
         return None;
+      createDifferentiabilityWitness(context.getModule(), SILLinkage::Hidden,
+                                     newAttr);
       minimalAttr = newAttr;
     }
     assert(minimalAttr);
@@ -8945,8 +8997,23 @@ void Differentiation::run() {
     auto *attr = invokerPair.first;
     auto *original = attr->getOriginal();
     auto invoker = invokerPair.second;
-    errorOccurred |=
-        context.processDifferentiableAttribute(original, attr, invoker);
+
+    if (context.processDifferentiableAttribute(original, attr, invoker)) {
+      errorOccurred = true;
+      continue;
+    }
+
+    // External function witnesses are defined externally, so we don't need to
+    // define them here.
+    if (original->isExternalDeclaration())
+      continue;
+
+    auto *witness = findDifferentiabilityWitness(module, attr);
+    assert(
+        witness &&
+        "SILGen should create a witness for every [differentiable] attribute");
+    assert(witness->isDefinition());
+    fillDifferentiabilityWitness(module, attr, witness);
   }
 
   // Iteratively process `differentiable_function` instruction worklist.
