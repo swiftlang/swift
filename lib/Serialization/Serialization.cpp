@@ -3071,9 +3071,7 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
 
-    bool inheritsSuperclassInitializers =
-        const_cast<ClassDecl *>(theClass)->
-          inheritsSuperclassInitializers();
+    auto mutableClass = const_cast<ClassDecl *>(theClass);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3081,7 +3079,8 @@ public:
                             contextID.getOpaqueValue(),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            inheritsSuperclassInitializers,
+                            mutableClass->inheritsSuperclassInitializers(),
+                            mutableClass->hasMissingDesignatedInitializers(),
                             S.addGenericSignatureRef(
                                              theClass->getGenericSignature()),
                             S.addTypeRef(theClass->getSuperclass()),
