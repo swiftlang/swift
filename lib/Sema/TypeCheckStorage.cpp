@@ -2263,9 +2263,15 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
     isProjectedValue = true;
   }
 
-  if (var->getParsedAccessor(AccessorKind::Get))
+  // Make sure we don't ignore .swiftinterface files, because those will
+  // have the accessors printed
+  auto varSourceFile = var->getDeclContext()->getParentSourceFile();
+  auto isVarNotInInterfaceFile =
+      varSourceFile && varSourceFile->Kind != SourceFileKind::Interface;
+
+  if (var->getParsedAccessor(AccessorKind::Get) && isVarNotInInterfaceFile)
     return None;
-  if (var->getParsedAccessor(AccessorKind::Set))
+  if (var->getParsedAccessor(AccessorKind::Set) && isVarNotInInterfaceFile)
     return None;
 
   // Figure out which member we're looking through.
