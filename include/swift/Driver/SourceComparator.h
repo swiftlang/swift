@@ -211,14 +211,11 @@ private:
 
   /// Chains matching lines together (I think)
   struct PRLink {
-    LineIndices lines;
-    PRLink *next;
+    const LineIndices lines;
+    const PRLink *const next;
+    PRLink(LineIndices lines, const PRLink *next) : lines(lines), next(next) {}
   };
 
-  /// An allocation pool for the PRLinks.
-  std::vector<PRLink> linkVec;
-  /// Next link to allocate in the linkVec
-  size_t nextLink = 0;
 
   //==============================================================================
   // MARK: SortedSequence
@@ -272,13 +269,14 @@ private:
   std::unordered_map<std::string, std::vector<size_t>>
   buildEquivalenceClasses();
 
-  PRLink *newPRLink(LineIndices, PRLink *next);
+  std::unique_ptr<PRLink> newPRLink(LineIndices, PRLink *next);
 
-  std::pair<std::vector<PRLink *>, SortedSequence> buildDAGOfSubsequences(
+  std::pair<std::vector<std::unique_ptr<PRLink>>, SortedSequence>
+  buildDAGOfSubsequences(
       std::unordered_map<std::string, std::vector<size_t>> rhsMap);
 
-  void scanMatchedLines(
-      std::pair<std::vector<PRLink *>, SortedSequence> linksAndThres);
+  void scanMatchedLines(std::pair<std::vector<std::unique_ptr<PRLink>>,
+                                  SortedSequence> &&linksAndThres);
 
   //==============================================================================
   // MARK: summarizing

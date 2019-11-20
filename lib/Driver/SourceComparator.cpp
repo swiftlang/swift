@@ -29,8 +29,7 @@ using namespace incremental_ranges;
 SourceComparator::SourceComparator(StringRef s1, StringRef s2)
     : linesToCompare(splitIntoLines(s1), splitIntoLines(s2)),
       regionsToCompare(LineSpan({0, 0}, linesToCompare.size())),
-      matches(linesToCompare.lhs().size(), None),
-      linkVec(regionsToCompare.end.min(), PRLink()) {}
+      matches(linesToCompare.lhs().size(), None) {}
 
 std::vector<StringRef> SourceComparator::splitIntoLines(const StringRef s) {
   std::vector<StringRef> result;
@@ -75,24 +74,19 @@ SourceComparator::buildEquivalenceClasses() {
   return rhsMap;
 }
 
-SourceComparator::PRLink *SourceComparator::newPRLink(LineIndices lines,
-                                                      PRLink *next) {
-  if (nextLink >= linkVec.size())
-    linkVec.emplace_back();
-  assert(nextLink < linkVec.size());
-  PRLink &link = linkVec[nextLink++];
-  link.lines = lines;
-  link.next = next;
-  return &link;
+std::unique_ptr<SourceComparator::PRLink>
+SourceComparator::newPRLink(LineIndices lines, PRLink *next) {
+  return llvm::make_unique<PRLink>(lines, next);
 }
 
-std::pair<std::vector<SourceComparator::PRLink *>,
+std::pair<std::vector<std::unique_ptr<SourceComparator::PRLink>>,
           SourceComparator::SortedSequence>
 SourceComparator::buildDAGOfSubsequences(
     std::unordered_map<std::string, std::vector<size_t>> rhsMap) {
   SortedSequence thresh;
   const size_t linksSize = regionsToCompare.size().min();
-  std::vector<PRLink *> links(linksSize, nullptr);
+  std::vector<std::unique_ptr<PRLink>> links;
+  links.resize(linksSize);
 
   for (auto i = regionsToCompare.start.lhs(); i < regionsToCompare.end.lhs();
        ++i) {
@@ -114,23 +108,24 @@ SourceComparator::buildDAGOfSubsequences(
         auto k = optK.getValue();
         // prev match (of what?) was at links[k-1]?
         // chain to that match
-        PRLink *newNext = k == 0 ? nullptr : links[k - 1];
+        PRLink *newNext = k == 0 ? nullptr : links[k - 1].get();
         links[k] = newPRLink(LineIndices(i, j), newNext);
       }
     }
   }
-  return {links, thresh};
+  return {std::move(links), thresh};
 }
 
 void SourceComparator::scanMatchedLines(
-    std::pair<std::vector<PRLink *>, SortedSequence> linksAndThres) {
-  auto links = linksAndThres.first;
-  auto thresh = linksAndThres.second;
+    std::pair<std::vector<std::unique_ptr<PRLink>>, SortedSequence>
+        &&linksAndThres) {
+  const auto &links = linksAndThres.first;
+  const auto &thresh = linksAndThres.second;
 
   // For every match put rhs index in matches[col2 index]
-  for (auto lnk = thresh.empty() ? nullptr : links[thresh.size() - 1];
-       lnk;
-       lnk = lnk->next)
+  for (const PRLink *lnk = thresh.empty() ? nullptr
+                                          : links[thresh.size() - 1].get();
+       lnk; lnk = lnk->next)
     matches[lnk->lines.lhs()] = lnk->lines.rhs();
 }
 
