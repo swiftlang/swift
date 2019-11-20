@@ -789,6 +789,22 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
         emitDiag(Loc, diag::super_class_changed, LSuperClass, RSuperClass);
       }
     }
+
+    // Check for @_hasMissingDesignatedInitializers and
+    // @_inheritsConvenienceInitializers changes.
+    if (isOpen() && R->isOpen()) {
+      // It's not safe to add new, invisible designated inits to open
+      // classes.
+      if (!hasMissingDesignatedInitializers() &&
+          R->hasMissingDesignatedInitializers())
+        R->emitDiag(R->getLoc(), diag::added_invisible_designated_init);
+    }
+
+    // It's not safe to stop inheriting convenience inits, it changes
+    // the set of initializers that are available.
+    if (inheritsConvenienceInitializers() &&
+        !R->inheritsConvenienceInitializers())
+      R->emitDiag(R->getLoc(), diag::not_inheriting_convenience_inits);
     break;
   }
   default:
