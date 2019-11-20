@@ -17,10 +17,8 @@ if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
 else()
   target_link_libraries(sourcekitd-test PRIVATE sourcekitd)
 endif()
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  target_link_libraries(sourcekitd-test PRIVATE
-    dispatch
-    BlocksRuntime)
+if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
+  target_link_libraries(sourcekitd-test PRIVATE dispatch BlocksRuntime)
 endif()
 
 add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)
