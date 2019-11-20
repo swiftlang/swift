@@ -696,6 +696,13 @@ GraphVisPath("output-request-graphviz",
 static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+EnableSwiftSourceInfo("enable-swiftsourceinfo",
+                 llvm::cl::desc("Whether to consume .swiftsourceinfo files"),
+                 llvm::cl::cat(Category),
+                 llvm::cl::init(false));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -740,11 +747,6 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
                << " at offset " << Offset << "\n";
 
   CompilerInvocation Invocation(InitInvok);
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
   // Create a CodeCompletionConsumer.
@@ -805,11 +807,6 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
                << " at offset " << Offset << "\n";
 
   CompilerInvocation Invocation(InitInvok);
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
   SmallVector<const char *, 4> typeNames;
@@ -878,10 +875,6 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
 
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
@@ -3319,6 +3312,11 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
   }
+
+  // We disable source location resolutions from .swiftsourceinfo files by
+  // default to match SourceKit's behavior.
+  if (!options::EnableSwiftSourceInfo)
+    InitInvok.getFrontendOptions().IgnoreSwiftSourceInfo = true;
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {

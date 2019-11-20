@@ -535,6 +535,11 @@ bool SwiftASTManager::initCompilerInvocation(
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
 
+  // We only report diagnostics coming from the primary file, so getting valid
+  // source locations for diagnostics coming from loaded modules has no effect
+  // other than degrading performance slightly.
+  FrontendOpts.IgnoreSwiftSourceInfo = true;
+
   // Disable expensive SIL options to reduce time spent in SILGen.
   disableExpensiveSILOptions(Invocation.getSILOptions());
 
