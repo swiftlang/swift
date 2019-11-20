@@ -93,6 +93,8 @@ public:
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(HasStorage)
+  IGNORED_ATTR(HasMissingDesignatedInitializers)
+  IGNORED_ATTR(InheritsConvenienceInitializers)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
