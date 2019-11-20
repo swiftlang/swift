@@ -462,10 +462,6 @@ public:
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
-  /// A list of closures for the most recently type-checked function, which we
-  /// will need to compute captures for.
-  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
-
 private:
   TypeChecker() = default;
   ~TypeChecker() = default;
@@ -815,10 +811,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Diagnose if the class has no designated initializers.
-  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
-
-  ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
@@ -878,12 +870,12 @@ public:
   }
 
 private:
-  Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                               TypeLoc convertType,
-                               ContextualTypePurpose convertTypePurpose,
-                               TypeCheckExprOptions options,
-                               ExprTypeCheckListener &listener,
-                               constraints::ConstraintSystem *baseCS);
+  static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
+                                      TypeLoc convertType,
+                                      ContextualTypePurpose convertTypePurpose,
+                                      TypeCheckExprOptions options,
+                                      ExprTypeCheckListener &listener,
+                                      constraints::ConstraintSystem *baseCS);
 
 public:
   /// Type check the given expression and return its type without
@@ -1333,11 +1325,6 @@ public:
   static Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                             DeclNameLoc NameLoc, bool Implicit,
                             FunctionRefKind functionRefKind);
-
-  /// Build implicit autoclosure expression wrapping a given expression.
-  /// Given expression represents computed result of the closure.
-  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.

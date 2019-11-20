@@ -6166,7 +6166,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto innerTV = createTypeVariable(locator,
                                         TVO_CanBindToLValue |
                                         TVO_CanBindToNoEscape);
-      Type optTy = getTypeChecker().getOptionalType(SourceLoc(), innerTV);
+      Type optTy = TypeChecker::getOptionalType(SourceLoc(), innerTV);
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,

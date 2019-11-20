@@ -2160,10 +2160,8 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ConstraintSystem *baseCS) {
   auto &Context = dc->getASTContext();
   FallbackDiagnosticListener diagListener(Context, options, listener);
-  auto *TC = Context.getLegacyGlobalTypeChecker();
-  assert(TC && "Must have a global type checker set");
-  return TC->typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
-                                     options, diagListener, baseCS);
+  return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
+                                 options, diagListener, baseCS);
 }
 
 Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
@@ -2308,24 +2306,21 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   if (isAutoClosure) {
     class AutoClosureListener : public ExprTypeCheckListener {
-      DeclContext *DC;
       FunctionType *ParamType;
 
     public:
-      AutoClosureListener(DeclContext *DC, FunctionType *paramType)
-          : DC(DC), ParamType(paramType) {}
+      AutoClosureListener(FunctionType *paramType)
+          : ParamType(paramType) {}
 
       Expr *appliedSolution(constraints::Solution &solution,
                             Expr *expr) override {
         auto &cs = solution.getConstraintSystem();
-        auto *closure = TypeChecker::buildAutoClosureExpr(DC, expr, ParamType);
-        cs.cacheExprTypes(closure);
-        return closure;
+        return cs.buildAutoClosureExpr(expr, ParamType);
       }
     };
 
     auto *fnType = paramType->castTo<FunctionType>();
-    AutoClosureListener listener(DC, fnType);
+    AutoClosureListener listener(fnType);
     return typeCheckExpression(defaultValue, DC,
                                TypeLoc::withoutLoc(fnType->getResult()),
                                canFail ? CTP_DefaultParameter : CTP_CannotFail,

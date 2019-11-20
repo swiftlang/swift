@@ -112,6 +112,8 @@ namespace {
         ParentDC = CE;
         CE->getBody()->walk(*this);
         ParentDC = oldParentDC;
+
+        TypeChecker::computeCaptures(CE);
         return { false, E };
       } 
 
@@ -148,7 +150,7 @@ namespace {
         if (CE->hasSingleExpressionBody())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
-        // In neither case do we need to continue the *current* walk.
+        TypeChecker::computeCaptures(CE);
         return { false, E };
       }
 

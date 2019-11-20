@@ -2135,7 +2135,7 @@ namespace {
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                        TVO_CanBindToNoEscape);
-          return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+          return TypeChecker::getOptionalType(var->getLoc(), ty);
         case ReferenceOwnershipOptionality::Allowed:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
@@ -2852,7 +2852,7 @@ namespace {
     /// diagnosing ill-formed standard libraries, so it really isn't
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
-      auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
+      auto optTy = TypeChecker::getOptionalType(optLoc, valueTy);
       if (!optTy ||
           TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
         return Type();
@@ -3863,8 +3863,7 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  assert(DC.getASTContext().getLegacyGlobalTypeChecker() &&
-         "Must have type checker to make global query!");
+  assert(DC.getASTContext().areSemanticQueriesEnabled());
   ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.
