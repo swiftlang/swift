@@ -6976,8 +6976,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   // Parse '[serialized]' flag (optional).
   bool isSerialized = false;
   SourceLoc serializedTokLoc;
-  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
-      P.peekToken().getText() == "serialized") {
+  if (P.Tok.is(tok::l_square) && P.isIdentifier(P.peekToken(), "serialized")) {
     isSerialized = true;
     serializedTokLoc = P.Tok.getLoc();
     P.consumeToken(tok::l_square);
@@ -7023,7 +7022,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     SourceLoc lBraceLoc;
     P.consumeIf(tok::l_brace, lBraceLoc);
     // Parse JVP (optional).
-    if (P.isJVPIdentifier(P.Tok)) {
+    if (P.isIdentifier(P.Tok, "jvp")) {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
@@ -7032,7 +7031,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
         return true;
     }
     // Parse VJP (optional).
-    if (P.isVJPIdentifier(P.Tok)) {
+    if (P.isIdentifier(P.Tok, "vjp")) {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
