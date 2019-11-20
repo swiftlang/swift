@@ -51,9 +51,8 @@ public typealias Codable = Encodable & Decodable
 //===----------------------------------------------------------------------===//
 
 /// A type that can be used as a key for encoding and decoding.
-public protocol CodingKey :
-  CustomStringConvertible, CustomDebugStringConvertible
-{
+public protocol CodingKey: CustomStringConvertible,
+                           CustomDebugStringConvertible {
   /// The string to use in a named collection (e.g. a string-keyed dictionary).
   var stringValue: String { get }
 
@@ -153,7 +152,9 @@ public protocol Decoder {
   /// - returns: A keyed decoding container view into this decoder.
   /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
   ///   not a keyed container.
-  func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key>
+  func container<Key>(
+    keyedBy type: Key.Type
+  ) throws -> KeyedDecodingContainer<Key>
 
   /// Returns the data stored in this decoder as represented in a container
   /// appropriate for holding values with no keys.
@@ -328,7 +329,6 @@ public protocol KeyedEncodingContainerProtocol {
     _ object: T,
     forKey key: Key
   ) throws
-
 
   /// Encodes the given value for the given key if it is not `nil`.
   ///
@@ -3398,7 +3398,8 @@ extension DecodingError {
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError<C: KeyedDecodingContainerProtocol>(
     forKey key: C.Key,
-    in container: C, debugDescription: String
+    in container: C,
+    debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(
       codingPath: container.codingPath + [key],
@@ -3440,7 +3441,8 @@ extension DecodingError {
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError(
-    in container: SingleValueDecodingContainer, debugDescription: String
+    in container: SingleValueDecodingContainer,
+    debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(codingPath: container.codingPath,
       debugDescription: debugDescription)
@@ -5730,7 +5732,6 @@ extension KeyedDecodingContainerProtocol {
     return try self.decode(UInt64.self, forKey: key)
   }
 
-
   public func decodeIfPresent<T: Decodable>(
     _ type: T.Type,
     forKey key: Key
@@ -5971,7 +5972,6 @@ extension UnkeyedDecodingContainer {
     guard try !self.isAtEnd && !self.decodeNil() else { return nil }
     return try self.decode(UInt64.self)
   }
-
 
   public mutating func decodeIfPresent<T: Decodable>(
     _ type: T.Type

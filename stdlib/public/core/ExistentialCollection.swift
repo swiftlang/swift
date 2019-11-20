@@ -112,8 +112,10 @@ internal struct _ClosureBasedIterator<Element>: IteratorProtocol {
   internal init(_ body: @escaping () -> Element?) {
     self._body = body
   }
+
   @inlinable
   internal func next() -> Element? { return _body() }
+
   @usableFromInline
   internal let _body: () -> Element?
 }
@@ -126,6 +128,7 @@ internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
 
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -138,15 +141,18 @@ internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
 
 @_fixed_layout
 @usableFromInline
-internal final class _IteratorBox<
-  Base: IteratorProtocol
->: _AnyIteratorBoxBase<Base.Element> {
+internal final class _IteratorBox<Base: IteratorProtocol>
+  : _AnyIteratorBoxBase<Base.Element> {
+
   @inlinable
   internal init(_ base: Base) { self._base = base }
+  
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
+  
   @inlinable
   internal override func next() -> Base.Element? { return _base.next() }
+  
   @usableFromInline
   internal var _base: Base
 }
@@ -200,11 +206,13 @@ internal class _AnySequenceBox<Element> {
   }
 
   @inlinable
-  internal func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
-    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+  internal func __copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (AnyIterator<Element>, UnsafeMutableBufferPointer<Element>.Index) {
     _abstract()
   }
 
+  // This deinit has to be present on all the types
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
@@ -246,6 +254,8 @@ internal class _AnySequenceBox<Element> {
 @_fixed_layout
 @usableFromInline
 internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
+
+  // This deinit has to be present on all the types
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
@@ -267,7 +277,9 @@ internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
   }
 
   @inlinable
-  internal override func _prefix(_ maxLength: Int) -> _AnyCollectionBox<Element> {
+  internal override func _prefix(
+    _ maxLength: Int
+  ) -> _AnyCollectionBox<Element> {
     _abstract()
   }
 
@@ -294,14 +306,17 @@ internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
 
   @inlinable
   internal func _index(
-    _ i: _AnyIndexBox, offsetBy n: Int
+    _ i: _AnyIndexBox,
+    offsetBy n: Int
   ) -> _AnyIndexBox {
     _abstract()
   }
 
   @inlinable
   internal func _index(
-    _ i: _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
+    _ i: _AnyIndexBox,
+    offsetBy n: Int,
+    limitedBy limit: _AnyIndexBox
   ) -> _AnyIndexBox? {
     _abstract()
   }
@@ -313,14 +328,17 @@ internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element> {
 
   @inlinable
   internal func _formIndex(
-    _ i: inout _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
+    _ i: inout _AnyIndexBox,
+    offsetBy n: Int,
+    limitedBy limit: _AnyIndexBox
   ) -> Bool {
     _abstract()
   }
 
   @inlinable
   internal func _distance(
-    from start: _AnyIndexBox, to end: _AnyIndexBox
+    from start: _AnyIndexBox,
+    to end: _AnyIndexBox
   ) -> Int {
     _abstract()
   }
@@ -385,17 +403,23 @@ internal class _AnyBidirectionalCollectionBox<Element>
   }
 
   @inlinable
-  internal override func _dropFirst(_ n: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _dropFirst(
+    _ n: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     _abstract()
   }
 
   @inlinable
-  internal override func _dropLast(_ n: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _dropLast(
+    _ n: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     _abstract()
   }
 
   @inlinable
-  internal override func _prefix(_ maxLength: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _prefix(
+    _ maxLength: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     _abstract()
   }
 
@@ -407,7 +431,9 @@ internal class _AnyBidirectionalCollectionBox<Element>
   }
 
   @inlinable
-  internal override func _suffix(_ maxLength: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _suffix(
+    _ maxLength: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     _abstract()
   }
 
@@ -440,17 +466,23 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   @inlinable
-  internal override func _dropFirst(_ n: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _dropFirst(
+    _ n: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     _abstract()
   }
 
   @inlinable
-  internal override func _dropLast(_ n: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _dropLast(
+    _ n: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     _abstract()
   }
 
   @inlinable
-  internal override func _prefix(_ maxLength: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _prefix(
+    _ maxLength: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     _abstract()
   }
 
@@ -462,7 +494,9 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   @inlinable
-  internal override func _suffix(_ maxLength: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _suffix(
+    _ maxLength: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     _abstract()
   }
 
@@ -517,8 +551,9 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
     return _base._copyToContiguousArray()
   }
   @inlinable
-  internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
-    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+  internal override func __copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
@@ -609,8 +644,9 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
     return _base._copyToContiguousArray()
   }
   @inlinable
-  internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
-    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+  internal override func __copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
@@ -641,12 +677,16 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   }
   @inline(__always)
   @inlinable
-  internal override func _prefix(_ maxLength: Int) -> _AnyCollectionBox<Element> {
+  internal override func _prefix(
+    _ maxLength: Int
+  ) -> _AnyCollectionBox<Element> {
     return _CollectionBox<S.SubSequence>(_base: _base.prefix(maxLength))
   }
   @inline(__always)
   @inlinable
-  internal override func _suffix(_ maxLength: Int) -> _AnyCollectionBox<Element> {
+  internal override func _suffix(
+    _ maxLength: Int
+  ) -> _AnyCollectionBox<Element> {
     return _CollectionBox<S.SubSequence>(_base: _base.suffix(maxLength))
   }
 
@@ -805,8 +845,9 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
     return _base._copyToContiguousArray()
   }
   @inlinable
-  internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
-    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+  internal override func __copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
@@ -820,12 +861,16 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   }
   @inline(__always)
   @inlinable
-  internal override func _dropFirst(_ n: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _dropFirst(
+    _ n: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     return _BidirectionalCollectionBox<S.SubSequence>(_base: _base.dropFirst(n))
   }
   @inline(__always)
   @inlinable
-  internal override func _dropLast(_ n: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _dropLast(
+    _ n: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     return _BidirectionalCollectionBox<S.SubSequence>(_base: _base.dropLast(n))
   }
   @inline(__always)
@@ -837,12 +882,16 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   }
   @inline(__always)
   @inlinable
-  internal override func _prefix(_ maxLength: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _prefix(
+    _ maxLength: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     return _BidirectionalCollectionBox<S.SubSequence>(_base: _base.prefix(maxLength))
   }
   @inline(__always)
   @inlinable
-  internal override func _suffix(_ maxLength: Int) -> _AnyBidirectionalCollectionBox<Element> {
+  internal override func _suffix(
+    _ maxLength: Int
+  ) -> _AnyBidirectionalCollectionBox<Element> {
     return _BidirectionalCollectionBox<S.SubSequence>(_base: _base.suffix(maxLength))
   }
 
@@ -1016,8 +1065,9 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
     return _base._copyToContiguousArray()
   }
   @inlinable
-  internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
-    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+  internal override func __copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
@@ -1031,12 +1081,16 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   }
   @inline(__always)
   @inlinable
-  internal override func _dropFirst(_ n: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _dropFirst(
+    _ n: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     return _RandomAccessCollectionBox<S.SubSequence>(_base: _base.dropFirst(n))
   }
   @inline(__always)
   @inlinable
-  internal override func _dropLast(_ n: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _dropLast(
+    _ n: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     return _RandomAccessCollectionBox<S.SubSequence>(_base: _base.dropLast(n))
   }
   @inline(__always)
@@ -1048,12 +1102,16 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   }
   @inline(__always)
   @inlinable
-  internal override func _prefix(_ maxLength: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _prefix(
+    _ maxLength: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     return _RandomAccessCollectionBox<S.SubSequence>(_base: _base.prefix(maxLength))
   }
   @inline(__always)
   @inlinable
-  internal override func _suffix(_ maxLength: Int) -> _AnyRandomAccessCollectionBox<Element> {
+  internal override func _suffix(
+    _ maxLength: Int
+  ) -> _AnyRandomAccessCollectionBox<Element> {
     return _RandomAccessCollectionBox<S.SubSequence>(_base: _base.suffix(maxLength))
   }
 
@@ -1179,7 +1237,6 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   @usableFromInline
   internal var _base: S
 }
-
 
 @usableFromInline
 @frozen
@@ -1714,7 +1771,6 @@ protocol _AnyCollectionProtocol: Collection {
   var _boxID: ObjectIdentifier { get }
 }
 
-
 /// A type-erased wrapper over any collection with indices that
 /// support forward traversal.
 ///
@@ -1912,12 +1968,10 @@ extension AnyCollection: Collection {
 
   /// The number of elements.
   ///
-
   /// To check whether a collection is empty, use its `isEmpty` property
   /// instead of comparing `count` to zero. Calculating `count` can be an O(*n*)
   /// operation.
   ///
-
   /// - Complexity: O(*n*)
   @inlinable
   public var count: Int {
@@ -2233,7 +2287,6 @@ extension AnyRandomAccessCollection: RandomAccessCollection {
     }
     self._box = box
   }
-
 
   /// The position of the first element in a non-empty collection.
   ///

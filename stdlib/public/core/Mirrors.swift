@@ -1,4 +1,4 @@
-//===--- Mirrors.swift --- Common _Mirror implementations -----*- swift -*-===//
+//===--- Mirrors.swift - Common _Mirror implementations -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

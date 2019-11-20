@@ -300,12 +300,14 @@ internal struct _Buffer72 {
 @_silgen_name("swift_float32ToString")
 internal func _float32ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt, _ value: Float32,
+  _ bufferLength: UInt,
+  _ value: Float32,
   _ debug: Bool
 ) -> UInt64
 
 internal func _float32ToString(
-  _ value: Float32, debug: Bool
+  _ value: Float32,
+  debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
   _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
@@ -322,12 +324,14 @@ internal func _float32ToString(
 @_silgen_name("swift_float64ToString")
 internal func _float64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt, _ value: Float64,
+  _ bufferLength: UInt,
+  _ value: Float64,
   _ debug: Bool
 ) -> UInt64
 
 internal func _float64ToString(
-  _ value: Float64, debug: Bool
+  _ value: Float64,
+  debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
   _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
@@ -347,12 +351,14 @@ internal func _float64ToString(
 @_silgen_name("swift_float80ToString")
 internal func _float80ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt, _ value: Float80,
+  _ bufferLength: UInt,
+  _ value: Float80,
   _ debug: Bool
 ) -> UInt64
 
 internal func _float80ToString(
-  _ value: Float80, debug: Bool
+  _ value: Float80,
+  debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
   _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
@@ -370,12 +376,16 @@ internal func _float80ToString(
 @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt, _ value: Int64,
-  _ radix: Int64, _ uppercase: Bool
+  _ bufferLength: UInt,
+  _ value: Int64,
+  _ radix: Int64,
+  _ uppercase: Bool
 ) -> UInt64
 
 internal func _int64ToString(
-  _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
+  _ value: Int64,
+  radix: Int64 = 10,
+  uppercase: Bool = false
 ) -> String {
   if radix >= 10 {
     var buffer = _Buffer32()
@@ -403,12 +413,17 @@ internal func _int64ToString(
 @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
+  _ bufferLength: UInt,
+  _ value: UInt64,
+  _ radix: Int64,
+  _ uppercase: Bool
 ) -> UInt64
 
 public // @testable
 func _uint64ToString(
-    _ value: UInt64, radix: Int64 = 10, uppercase: Bool = false
+    _ value: UInt64,
+    radix: Int64 = 10,
+    uppercase: Bool = false
 ) -> String {
   if radix >= 10 {
     var buffer = _Buffer32()
