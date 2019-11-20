@@ -941,13 +941,13 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-    // Check that token after comma is 'wrt:' or a function specifier label.
-    if (!(isWRTIdentifier(Tok) || isJVPIdentifier(Tok) ||
-          isVJPIdentifier(Tok))) {
-      diagnose(Tok, diag::attr_differentiable_expected_label);
-      return true;
+    // Check that token after comma is 'wrt' or a function specifier label.
+    if (isIdentifier(Tok, "wrt") || isIdentifier(Tok, "jvp") ||
+        isIdentifier(Tok, "vjp")) {
+      return false;
     }
-    return false;
+    diagnose(Tok, diag::attr_differentiable_expected_label);
+    return true;
   };
 
   // Store starting parser position.
@@ -958,7 +958,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse optional differentiation parameters.
   // Parse 'linear' label (optional).
   linear = false;
-  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
+  if (isIdentifier(Tok, "linear")) {
     linear = true;
     consumeToken(tok::identifier);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -969,14 +969,15 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
-  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+  if (isIdentifier(Tok, "withRespectTo")) {
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();
   }
-  if (isWRTIdentifier(Tok)) {
+  // Parse differentiation parameters' clause.
+  if (isIdentifier(Tok, "wrt")) {
     if (parseDifferentiationParametersClause(params, AttrName))
       return true;
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -1014,7 +1015,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   bool terminateParsingArgs = false;
 
   // Parse 'jvp: <func_name>' (optional).
-  if (isJVPIdentifier(Tok)) {
+  if (isIdentifier(Tok, "jvp")) {
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
@@ -1027,7 +1028,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // Parse 'vjp: <func_name>' (optional).
-  if (isVJPIdentifier(Tok)) {
+  if (isIdentifier(Tok, "vjp")) {
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();

@@ -717,15 +717,6 @@ public:
     return Tok.is(tok::identifier) && Tok.getText() == value;
   }
 
-  /// Returns true if token is the identifier "wrt".
-  bool isWRTIdentifier(Token tok) { return isIdentifier(Tok, "wrt"); }
-
-  /// Returns true if token is the identifier "jvp".
-  bool isJVPIdentifier(Token Tok) { return isIdentifier(Tok, "jvp"); }
-
-  /// Returns true if token is the identifier "vjp".
-  bool isVJPIdentifier(Token Tok) { return isIdentifier(Tok, "vjp"); }
-
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
