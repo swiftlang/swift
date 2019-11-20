@@ -2657,6 +2657,19 @@ public:
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
 
+private:
+  /// Adjust the constraint system to accomodate the given selected overload, and
+  /// recompute the type of the referenced declaration.
+  ///
+  /// \returns a pair containing the adjusted opened type of a reference to
+  /// this member and a bit indicating whether or not a bind constraint was added.
+  std::pair<Type, bool> adjustTypeOfOverloadReference(
+      const OverloadChoice &choice, ConstraintLocator *locator, Type boundType,
+      Type refType, DeclContext *useDC,
+      llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
+          verifyThatArgumentIsHashable);
+
+public:
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
   ///
