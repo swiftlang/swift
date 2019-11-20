@@ -201,7 +201,8 @@
       "declKind": "Class",
       "usr": "s:4cake2C0C",
       "moduleName": "cake",
-      "genericSig": "<T1, T2, T3>"
+      "genericSig": "<T1, T2, T3>",
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeAlias",
@@ -425,6 +426,8 @@
       "usr": "s:4cake2C1C",
       "moduleName": "cake",
       "superclassUsr": "s:4cake2C0C",
+      "hasMissingDesignatedInitializers": true,
+      "inheritsConvenienceInitializers": true,
       "superclassNames": [
         "cake.C0<cake.S1, cake.S1, cake.S1>"
       ]
@@ -1235,6 +1238,7 @@
       "declKind": "Class",
       "usr": "s:4cake15FutureContainerC",
       "moduleName": "cake",
+      "hasMissingDesignatedInitializers": true,
       "conformances": [
         {
           "kind": "Conformance",
@@ -1266,7 +1270,8 @@
         "Available",
         "Available",
         "Available"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1278,7 +1283,8 @@
       "intro_swift": "5",
       "declAttributes": [
         "Available"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
@@ -1330,7 +1336,8 @@
       "objc_name": "NewObjCClass",
       "declAttributes": [
         "ObjC"
-      ]
+      ],
+      "hasMissingDesignatedInitializers": true
     },
     {
       "kind": "TypeDecl",
