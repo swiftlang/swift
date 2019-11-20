@@ -1587,21 +1587,16 @@ void ConstraintSystem::addOverloadSet(ArrayRef<Constraint *> choices,
 }
 
 /// If we're resolving an overload set with a decl that has special type
-/// checking semantics, set up the special-case type system and return true;
-/// otherwise return false.
-static bool
-resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
-                                                     ConstraintLocator *locator,
-                                                     Type boundType,
-                                                     OverloadChoice choice,
-                                                     Type &refType,
-                                                     Type &openedFullType) {
-  assert(choice.getKind() == OverloadChoiceKind::Decl);
-
-  switch (TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl())) {
+/// checking semantics, compute the type of the reference.  For now, follow
+/// the lead of \c getTypeOfMemberReference and return a pair of
+/// the full opened type and the reference's type.
+static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+    ConstraintSystem &CS, ConstraintLocator *locator,
+    DeclTypeCheckingSemantics sema) {
+  switch (sema) {
   case DeclTypeCheckingSemantics::Normal:
-    return false;
-    
+    llvm_unreachable("Decl does not have special type checking semantics!");
+
   case DeclTypeCheckingSemantics::TypeOf: {
     // Proceed with a "DynamicType" operation. This produces an existential
     // metatype from existentials, or a concrete metatype from non-
@@ -1619,9 +1614,8 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     
     CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
-    refType = FunctionType::get({inputArg}, output);
-    openedFullType = refType;
-    return true;
+    auto refType = FunctionType::get({inputArg}, output);
+    return {refType, refType};
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
     // Proceed with a "WithoutActuallyEscaping" operation. The body closure
@@ -1649,14 +1643,14 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    
-    refType = FunctionType::get(args, result,
-      FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*noescape*/ false,
-                            /*throws*/ true,
-                            DifferentiabilityKind::NonDifferentiable));
-    openedFullType = refType;
-    return true;
+
+    auto refType = FunctionType::get(
+        args, result,
+        FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                              /*noescape*/ false,
+                              /*throws*/ true,
+                              DifferentiabilityKind::NonDifferentiable));
+    return {refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
     // The body closure receives a freshly-opened archetype constrained by the
@@ -1683,13 +1677,13 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    refType = FunctionType::get(args, result,
-      FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*noescape*/ false,
-                            /*throws*/ true,
-                            DifferentiabilityKind::NonDifferentiable));
-    openedFullType = refType;
-    return true;
+    auto refType = FunctionType::get(
+        args, result,
+        FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                              /*noescape*/ false,
+                              /*throws*/ true,
+                              DifferentiabilityKind::NonDifferentiable));
+    return {refType, refType};
   }
   }
 
@@ -1799,21 +1793,25 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
-    // If we refer to a top-level decl with special type-checking semantics,
-    // handle it now.
-    if (resolveOverloadForDeclWithSpecialTypeCheckingSemantics(
-          *this, locator, boundType, choice, refType, openedFullType))
-      break;
-    
-    LLVM_FALLTHROUGH;
-
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
-    // Retrieve the type of a reference to the specific declaration choice.
-    if (auto baseTy = choice.getBaseType()) {
+    // If we refer to a top-level decl with special type-checking semantics,
+    // handle it now.
+    const auto semantics =
+        TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
+    if (semantics != DeclTypeCheckingSemantics::Normal) {
+      std::tie(openedFullType, refType) =
+          getTypeOfReferenceWithSpecialTypeCheckingSemantics(*this, locator,
+                                                             semantics);
+      // Declarations with special type checking semantics do not require
+      // any further adjustments to the constraint system. Break out of
+      // here so we don't do any more work.
+      break;
+    } else if (auto baseTy = choice.getBaseType()) {
+      // Retrieve the type of a reference to the specific declaration choice.
       assert(!baseTy->hasTypeParameter());
 
       auto getDotBase = [](const Expr *E) -> const DeclRefExpr * {
