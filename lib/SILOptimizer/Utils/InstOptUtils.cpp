@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -725,7 +726,7 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr("string.concat"))
+  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr(semantics::STRING_CONCAT))
     return false;
 
   // Left and right operands of a string concatenation operation.
@@ -756,9 +757,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
 
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((friLeftFun->hasSemanticsAttr("string.makeUTF8")
+  if (!((friLeftFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
          && aiLeftOperandsNum == 5)
-        || (friRightFun->hasSemanticsAttr("string.makeUTF8")
+        || (friRightFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
             && aiRightOperandsNum == 5)))
     return false;
 

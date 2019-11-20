@@ -21,6 +21,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/AST/SemanticAttrs.h"
 
 #include "IRGenModule.h"
 #include "NonFixedTypeInfo.h"
@@ -349,7 +350,7 @@ bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
   auto *Apply = dyn_cast<ApplyInst>(I);
   if (!Apply)
     return false;
-  if (Apply->hasSemantics("availability.osversion"))
+  if (Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION))
     return true;
   auto *FunRef = Apply->getReferencedFunctionOrNull();
   if (!FunRef)
