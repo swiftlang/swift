@@ -1671,11 +1671,6 @@ public:
                    ConstraintSystemOptions options);
   ~ConstraintSystem();
 
-  /// Retrieve the type checker associated with this constraint system.
-  TypeChecker &getTypeChecker() const {
-    return *Context.getLegacyGlobalTypeChecker();
-  }
-
   /// Retrieve the constraint graph associated with this constraint system.
   ConstraintGraph &getConstraintGraph() const { return CG; }
 
@@ -3025,6 +3020,10 @@ public:
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
+
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
 
 private:
   /// Determines whether or not a given conversion at a given locator requires

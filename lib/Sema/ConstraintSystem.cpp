@@ -3474,3 +3474,37 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
     return ConversionEphemeralness::NonEphemeral;
   }
 }
+
+Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
+                                             FunctionType *closureType) {
+  auto &Context = DC->getASTContext();
+  bool isInDefaultArgumentContext = false;
+  if (auto *init = dyn_cast<Initializer>(DC))
+    isInDefaultArgumentContext =
+        init->getInitializerKind() == InitializerKind::DefaultArgument;
+
+  auto info = closureType->getExtInfo();
+  auto newClosureType = closureType;
+
+  if (isInDefaultArgumentContext && info.isNoEscape())
+    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
+                         ->castTo<FunctionType>();
+
+  auto *closure = new (Context) AutoClosureExpr(
+      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
+
+  closure->setParameterList(ParameterList::createEmpty(Context));
+
+  Expr *result = closure;
+
+  if (!newClosureType->isEqual(closureType)) {
+    assert(isInDefaultArgumentContext);
+    assert(newClosureType
+               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
+               ->isEqual(closureType));
+    result = new (Context) FunctionConversionExpr(closure, closureType);
+  }
+
+  cacheExprTypes(result);
+  return result;
+}
