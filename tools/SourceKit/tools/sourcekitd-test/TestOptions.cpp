@@ -154,6 +154,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("stats", SourceKitRequest::Statistics)
         .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
         .Case("collect-type", SourceKitRequest::CollectExpresstionType)
+        .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
@@ -368,6 +369,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_vfs_name:
       VFSName = InputArg->getValue();
+      break;
+
+    case OPT_optimize_for_ide: {
+      bool Value;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Value)) {
+        llvm::errs() << "error: expected 0 or 1 for 'for-ide'\n";
+        return true;
+      }
+      OptimizeForIde = Value;
+      break;
+    }
+
+    case OPT_suppress_config_request:
+      SuppressDefaultConfigRequest = true;
       break;
 
     case OPT_UNKNOWN:
