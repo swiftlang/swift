@@ -527,7 +527,7 @@ protected:
     RawForeignKind : 2,
 
     /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,     
+    HasForcedEmittedMembers : 1,
 
     HasMissingDesignatedInitializers : 1,
     ComputedHasMissingDesignatedInitializers : 1,
@@ -3793,6 +3793,25 @@ class ClassDecl final : public NominalTypeDecl {
     return None;
   }
 
+  Optional<bool> getCachedHasMissingDesignatedInitializers() const {
+    if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
+      // Force loading all the members, which will add this attribute if any of
+      // members are determined to be missing while loading.
+      auto mutableThis = const_cast<ClassDecl *>(this);
+      (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
+    }
+
+    if (Bits.ClassDecl.ComputedHasMissingDesignatedInitializers)
+      return Bits.ClassDecl.HasMissingDesignatedInitializers;
+
+    return None;
+  }
+
+  void setHasMissingDesignatedInitializers(bool value) {
+    Bits.ClassDecl.HasMissingDesignatedInitializers = value;
+    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = true;
+  }
+
   /// Marks that this class inherits convenience initializers from its
   /// superclass.
   void setInheritsSuperclassInitializers(bool value) {
@@ -3803,6 +3822,7 @@ class ClassDecl final : public NominalTypeDecl {
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class EmittedMembersRequest;
+  friend class HasMissingDesignatedInitializersRequest;
   friend class InheritsSuperclassInitializersRequest;
   friend class TypeChecker;
 
@@ -3909,11 +3929,6 @@ public:
   /// initializers that cannot be represented in Swift.
   bool hasMissingDesignatedInitializers() const;
 
-  void setHasMissingDesignatedInitializers(bool newValue = true) {
-    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
-    Bits.ClassDecl.HasMissingDesignatedInitializers = newValue;
-  }
-
   /// Returns true if the class has missing members that require vtable entries.
   ///
   /// In this case, the class cannot be subclassed, because we cannot construct
@@ -3952,7 +3967,7 @@ public:
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
-  bool inheritsSuperclassInitializers();
+  bool inheritsSuperclassInitializers() const;
 
   /// Walks the class hierarchy starting from this class, checking various
   /// conditions.

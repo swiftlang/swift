@@ -7638,7 +7638,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
         if (getClangModuleForDecl(theClass) == getClangModuleForDecl(method)) {
           if (auto swiftClass = castIgnoringCompatibilityAlias<ClassDecl>(
                   importDecl(theClass, CurrentVersion))) {
-            swiftClass->setHasMissingDesignatedInitializers();
+            SwiftContext.evaluator.cacheOutput(
+                HasMissingDesignatedInitializersRequest{swiftClass}, true);
           }
         }
       }
