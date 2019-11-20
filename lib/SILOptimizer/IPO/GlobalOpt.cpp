@@ -116,6 +116,12 @@ public:
   bool run();
 
 protected:
+  /// Reset all the maps of global variables.
+  void reset();
+
+  /// Collect all global variables.
+  void collect();
+
   /// If this is a call to a global initializer, map it.
   void collectGlobalInitCall(ApplyInst *AI);
 
@@ -807,11 +813,12 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
     return false;
 
   for (auto *addr : GlobalAddrMap[global]) {
-    eraseUsesOfInstruction(addr, [](SILInstruction *) {});
+    eraseUsesOfInstruction(addr);
     addr->eraseFromParent();
   }
 
-  GlobalAddrMap.erase(global);
+  reset();
+  collect();
   return true;
 }
 
@@ -821,7 +828,8 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
     return false;
 
   alloc->eraseFromParent();
-  AllocGlobalStore.erase(global);
+  reset();
+  collect();
   return true;
 }
 
@@ -1002,7 +1010,16 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
 
 }
 
-bool SILGlobalOpt::run() {
+void SILGlobalOpt::reset() {
+  AllocGlobalStore.clear();
+  GlobalVarStore.clear();
+  GlobalAddrMap.clear();
+  GlobalAccessMap.clear();
+  GlobalLoadMap.clear();
+  GlobalInitCallMap.clear();
+}
+
+void SILGlobalOpt::collect() {
   for (auto &F : *Module) {
     // TODO: Add support for ownership.
     if (F.hasOwnership()) {
@@ -1038,7 +1055,13 @@ bool SILGlobalOpt::run() {
       }
     }
   }
+}
 
+bool SILGlobalOpt::run() {
+  // Collect all the global variables and associated instructions.
+  collect();
+
+  // Optimize based on what we just collected.
   for (auto &InitCalls : GlobalInitCallMap) {
     // Don't optimize functions that are marked with the opt.never attribute.
     bool shouldOptimize = true;
@@ -1086,10 +1109,13 @@ bool SILGlobalOpt::run() {
     HasChanged |= tryRemoveGlobalAlloc(alloc.first, alloc.second);
   }
 
+  // Copy the globals so we don't get issues with modifying while iterating.
+  SmallVector<SILGlobalVariable *, 12> globals;
   for (auto &global : Module->getSILGlobals()) {
-    // TODO: For some reaons, if we keep iterating through `getSILGlobals`
-    // after `tryRemoveUnusedGlobal` is called, we gen an error.
-    HasChanged |= tryRemoveUnusedGlobal(&global);
+    globals.push_back(&global);
+  }
+  for (auto *global : globals) {
+    HasChanged |= tryRemoveUnusedGlobal(global);
   }
 
   return HasChanged;
