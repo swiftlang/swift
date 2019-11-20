@@ -1,15 +1,25 @@
 // Tests the diff algorithm (the SourceComparator) used for range-based
 // incremental compilation.
+//
+// If you try to add inputs, be sure to update output.json and add a swiftranges
+// input.
 
 // Copy in the inputs.
-// The lack of a build record or swiftdeps files should disable incremental compilation
+
 
 // Ensure that the extra outputs are not generated when they should not be:
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/range-sourcecomparator/* %t
-// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -c ./in1.swift ./in2.swift ./in3.swift ./in4.swift ./in5.swift -module-name main -incremental -enable-source-range-dependencies -driver-dump-compiled-source-diffs -driver-skip-execution >& output
 
-// RUN: %FileCheck  %s <%t/output --match-full-lines
+// The lack of a build record or swiftdeps files should disable incremental compilation
+// So, do one run just to build the build record
+
+// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -c ./in1.swift ./in2.swift ./in3.swift ./in4.swift ./in5.swift ./in6.swift -module-name main -incremental -enable-source-range-dependencies -driver-dump-compiled-source-diffs -driver-skip-execution -driver-compare-incremental-schemes >& output
+
+// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -c ./in1.swift ./in2.swift ./in3.swift ./in4.swift ./in5.swift ./in6.swift -module-name main -incremental -enable-source-range-dependencies -driver-dump-compiled-source-diffs -driver-skip-execution -driver-compare-incremental-schemes >& output1
+
+
+// RUN: %FileCheck  %s <%t/output1 --match-full-lines
 // CHECK: *** all changed ranges in 'in1.swift' (w.r.t previously-compiled) ***
 // CHECK-NEXT: - [2:1--2:15)
 // CHECK-NEXT: *** all changed ranges in 'in1.swift' (w.r.t to-be-compiled) ***
