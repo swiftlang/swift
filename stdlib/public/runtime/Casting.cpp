@@ -37,7 +37,6 @@
 #include "llvm/Support/Compiler.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
-#include "SwiftObject.h"
 #include "SwiftValue.h"
 #endif
 
@@ -2331,10 +2330,9 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
 #if SWIFT_OBJC_INTEROP
-    // If the destination type is an NSError or NSObject, and the source type
-    // is an Error, then the cast can succeed by NSError bridging.
-    if (targetType == getNSErrorMetadata() ||
-        targetType == getNSObjectMetadata()) {
+    // If the destination type is an NSError, and the source type is an
+    // Error, then the cast can succeed by NSError bridging.
+    if (targetType == getNSErrorMetadata()) {
       // Don't rebridge if the source is already some kind of NSError.
       if (srcType->isAnyClass()
           && swift_dynamicCastObjCClass(*reinterpret_cast<id*>(src),
