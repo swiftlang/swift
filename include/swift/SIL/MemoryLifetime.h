@@ -287,6 +287,21 @@ private:
 /// for memory locations. Consider renaming it.
 class MemoryDataflow {
 
+  /// What kind of terminators can be reached from a block.
+  enum class ExitReachability : uint8_t {
+    /// Worst case: the block is part of a cycle which neither reaches a
+    /// function-exit nor an unreachable-instruction.
+    InInfiniteLoop,
+
+    /// An unreachable-instruction can be reached from the block, but not a
+    /// function-exit (like "return" or "throw").
+    ReachesUnreachable,
+
+    /// A function-exit can be reached from the block.
+    /// This is the case for most basic blocks.
+    ReachesExit
+  };
+
 public:
   using Bits = MemoryLocations::Bits;
 
@@ -313,11 +328,10 @@ public:
     /// This flag is only computed if entryReachabilityAnalysis is called.
     bool reachableFromEntry = false;
 
-    /// True, if any function-exit block can be reached from this block, i.e. is
-    /// not a block which eventually ends in an unreachable instruction.
+    /// What kind of terminators can be reached from this block.
     ///
-    /// This flag is only computed if exitReachableAnalysis is called.
-    bool exitReachable = false;
+    /// This is only computed if exitReachableAnalysis is called.
+    ExitReachability exitReachability = ExitReachability::InInfiniteLoop;
 
     BlockState(SILBasicBlock *block = nullptr) : block(block) { }
 
@@ -335,6 +349,14 @@ public:
         genSet.reset(loc->subLocations);
         killSet |= loc->subLocations;
       }
+    }
+
+    bool exitReachable() const {
+      return exitReachability == ExitReachability::ReachesExit;
+    }
+
+    bool isInInfiniteLoop() const {
+      return exitReachability == ExitReachability::InInfiniteLoop;
     }
   };
 
