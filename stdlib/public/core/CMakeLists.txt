@@ -168,6 +168,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
+  UnavailableStringAPIs.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
@@ -193,7 +194,6 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
-  UnavailableStringAPIs.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )
