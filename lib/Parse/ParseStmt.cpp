@@ -257,7 +257,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   State->setCodeCompletionDelayedDeclState(
-      PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl,
+      SourceMgr, L->getBufferID(),
+      CodeCompletionDelayedDeclKind::TopLevelCodeDecl,
       PD_Default, TLCD, {BeginLoc, EndLoc}, BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
