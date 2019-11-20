@@ -77,10 +77,13 @@ SourceComparator::buildEquivalenceClasses() {
 
 SourceComparator::PRLink *SourceComparator::newPRLink(LineIndices lines,
                                                       PRLink *next) {
+  if (nextLink >= linkVec.size())
+    linkVec.emplace_back();
   assert(nextLink < linkVec.size());
-  linkVec[nextLink].lines = lines;
-  linkVec[nextLink].next = next;
-  return &linkVec[nextLink++];
+  PRLink &link = linkVec[nextLink++];
+  link.lines = lines;
+  link.next = next;
+  return &link;
 }
 
 std::pair<std::vector<SourceComparator::PRLink *>,
