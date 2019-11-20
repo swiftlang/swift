@@ -110,3 +110,51 @@ public struct Foo: Differentiable {
 // CHECK-NEXT: sil_differentiability_witness [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooVSfycig : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 }
+
+// Test function that is differentiable wrt subset of its parameters:
+// - wrt x: explicit @differentiable attribute, with no custom derivative specified
+// - wrt y: explicit @differentiable attribute, with custom derivative specified
+// - wrt x, y: custom deriviative specified, with no explicit @differentiable attribute
+// Has a tuple argument to verify that indices are correctly lowered to SIL.
+
+@differentiable(wrt: x)
+@differentiable(wrt: y)
+public func wrt_subset(_ tup: (Int, Int), _ x: Float, _ y: Float) -> Float {
+  return 0
+}
+
+@differentiating(wrt_subset, wrt: y)
+public func wrt_subset_jvp_wrt_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, differential: (Float) -> Float) {
+  return (0, { $0 })
+}
+
+@differentiating(wrt_subset, wrt: y)
+public func wrt_subset_vjp_wrt_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (0, { $0 })
+}
+
+@differentiating(wrt_subset)
+public func wrt_subset_jvp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, differential: (Float, Float) -> Float) {
+  return (0, { $0 + $1 })
+}
+
+@differentiating(wrt_subset)
+public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (0, { ($0, $0) })
+}
+
+// CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
+// CHECK-NEXT: sil_differentiability_witness [parameters 2 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT:   jvp:
+// CHECK-NEXT:   vjp:
+// CHECK-NEXT: }
+
+// CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
+// CHECK-NEXT: sil_differentiability_witness [parameters 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT:   jvp:
+// CHECK-NEXT:   vjp:
+// CHECK-NEXT: }
+
+// CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
+// CHECK-NEXT: sil_differentiability_witness [parameters 2] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT: }
