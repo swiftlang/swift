@@ -2892,7 +2892,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
+auto TypeChecker::typeCheckForEachBinding(
+    DeclContext *dc, ForEachStmt *stmt) -> Optional<ForEachBinding> {
   /// Type checking listener for for-each binding.
   class BindingListener : public ExprTypeCheckListener {
     /// The for-each statement.
@@ -2901,11 +2902,35 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The locator we're using.
     ConstraintLocator *Locator;
 
+    /// The contextual locator we're using.
+    ConstraintLocator *ContextualLocator;
+
+    /// The Sequence protocol.
+    ProtocolDecl *SequenceProto;
+
+    /// The IteratorProtocol.
+    ProtocolDecl *IteratorProto;
+
     /// The type of the initializer.
     Type InitType;
 
     /// The type of the sequence.
     Type SequenceType;
+
+    /// The conformance of the sequence type to the Sequence protocol.
+    ProtocolConformanceRef SequenceConformance;
+
+    /// The type of the element.
+    Type ElementType;
+
+    /// The type of the iterator.
+    Type IteratorType;
+
+    /// The conformance of the iterator type to IteratorProtocol.
+    ProtocolConformanceRef IteratorConformance;
+
+    /// The type of makeIterator.
+    Type MakeIteratorType;
 
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
@@ -2913,33 +2938,30 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
-      auto *contextualLocator =
+      ContextualLocator =
           cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
-      // The expression type must conform to the Sequence.
-      ProtocolDecl *sequenceProto = TypeChecker::getProtocol(
+      // The expression type must conform to the Sequence protocol.
+      SequenceProto = TypeChecker::getProtocol(
           cs.getASTContext(), Stmt->getForLoc(), KnownProtocolKind::Sequence);
-      if (!sequenceProto) {
+      if (!SequenceProto) {
         return true;
       }
-
-      auto elementAssocType =
-          sequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
 
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       sequenceProto->getDeclaredType(), contextualLocator);
+                       SequenceProto->getDeclaredType(), ContextualLocator);
 
       // Since we are using "contextual type" here, it has to be recorded
       // in the constraint system for diagnostics to have access to "purpose".
       cs.setContextualType(
-          expr, TypeLoc::withoutLoc(sequenceProto->getDeclaredType()),
+          expr, TypeLoc::withoutLoc(SequenceProto->getDeclaredType()),
           CTP_ForEachStmt);
 
       auto elementLocator = cs.getConstraintLocator(
-          contextualLocator, ConstraintLocator::SequenceElementType);
+          ContextualLocator, ConstraintLocator::SequenceElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
@@ -2949,9 +2971,35 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
-      auto elementType = DependentMemberType::get(SequenceType, elementAssocType);
-      cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
+      auto elementAssocType =
+          SequenceProto->getAssociatedType(cs.getASTContext().Id_Element);
+      ElementType = DependentMemberType::get(SequenceType, elementAssocType);
+      cs.addConstraint(ConstraintKind::Conversion, ElementType, InitType,
                        elementLocator);
+
+      // Determine the iterator type.
+      auto iteratorAssocType =
+          SequenceProto->getAssociatedType(cs.getASTContext().Id_Iterator);
+      IteratorType = DependentMemberType::get(SequenceType, iteratorAssocType);
+
+      // The iterator type must conform to IteratorProtocol.
+      IteratorProto = TypeChecker::getProtocol(
+          cs.getASTContext(), Stmt->getForLoc(),
+          KnownProtocolKind::IteratorProtocol);
+      if (!IteratorProto) {
+        return true;
+      }
+
+      // Reference the makeIterator witness.
+      // FIXME: Not tied to the actual witness.
+      ASTContext &ctx = cs.getASTContext();
+      DeclName makeIteratorName(ctx, ctx.Id_makeIterator,
+                                ArrayRef<Identifier>());
+      MakeIteratorType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
+      cs.addValueMemberConstraint(
+          LValueType::get(SequenceType), DeclNameRef(makeIteratorName),
+          MakeIteratorType, cs.DC, FunctionRefKind::Compound, { },
+          ContextualLocator);
 
       Stmt->setSequence(expr);
       return false;
@@ -2962,13 +3010,24 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       auto &cs = solution.getConstraintSystem();
       InitType = solution.simplifyType(InitType);
       SequenceType = solution.simplifyType(SequenceType);
+      ElementType = solution.simplifyType(ElementType);
+      IteratorType = solution.simplifyType(IteratorType);
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
-      expr = solution.coerceToType(expr, SequenceType, cs.getConstraintLocator(expr));
+      expr = solution.coerceToType(expr, SequenceType, Locator);
       
       if (!expr) return nullptr;
 
+      // Convert the sequence as appropriate for the makeIterator() call.
+      auto makeIteratorOverload = solution.getOverloadChoice(ContextualLocator);
+      auto makeIteratorSelfType = solution.simplifyType(
+          makeIteratorOverload.openedFullType
+        )->castTo<AnyFunctionType>()->getParams()[0].getPlainType();
+      expr = solution.coerceToType(expr, makeIteratorSelfType,
+                                   ContextualLocator);
+
       cs.cacheExprTypes(expr);
+      Stmt->setSequence(expr);
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
@@ -2981,10 +3040,41 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       Stmt->setPattern(pattern);
-      Stmt->setSequence(expr);
+
+      // Get the conformance of the sequence type to the Sequence protocol.
+      // FIXME: Get this from the solution and substitute into that.
+      SequenceConformance = TypeChecker::conformsToProtocol(
+          SequenceType, SequenceProto, cs.DC,
+          ConformanceCheckFlags::InExpression,
+          expr->getLoc());
+      assert(!SequenceConformance.isInvalid() &&
+             "Couldn't find sequence conformance");
+      Stmt->setSequenceConformance(SequenceConformance);
+
+      // Retrieve the conformance of the iterator type to IteratorProtocol.
+      // FIXME: Get this from the solution and substitute into that.
+      IteratorConformance = TypeChecker::conformsToProtocol(
+          IteratorType, IteratorProto, cs.DC,
+          ConformanceCheckFlags::InExpression,
+          expr->getLoc());
+
+      // Record the makeIterator declaration we used.
+      auto makeIteratorDecl = makeIteratorOverload.choice.getDecl();
+      auto makeIteratorSubs = SequenceType->getMemberSubstitutionMap(
+          cs.DC->getParentModule(), makeIteratorDecl);
+      auto makeIteratorDeclRef =
+          ConcreteDeclRef(makeIteratorDecl, makeIteratorSubs);
+      Stmt->setMakeIterator(makeIteratorDeclRef);
 
       solution.setExprTypes(expr);
       return expr;
+    }
+
+    ForEachBinding getBinding() const {
+      return {
+          SequenceType, SequenceConformance, IteratorType, IteratorConformance,
+          ElementType
+      };
     }
   };
 
@@ -2994,7 +3084,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
   // Type-check the for-each loop sequence and element pattern.
   auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
-  return !resultTy;
+  if (!resultTy)
+    return None;
+  return listener.getBinding();
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -3425,88 +3517,6 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 
   // Nothing to do.
   return expr;
-}
-
-bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
-                                Optional<Pattern*> typeFromPattern) {
-  // TODO: need to add kind arg?
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
-    
-  // Cache the expression type on the system to ensure it is available
-  // on diagnostics if the convertion fails.
-  cs.cacheExprTypes(expr);
-
-  // If there is a type that we're expected to convert to, add the conversion
-  // constraint.
-  cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
-                   cs.getConstraintLocator(expr));
-
-  auto &Context = dc->getASTContext();
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->dump(log);
-    log << "\n";
-    cs.print(log);
-  }
-
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if ((cs.solve(viable) || viable.size() != 1)) {
-    // Try to fix the system or provide a decent diagnostic.
-    auto salvagedResult = cs.salvage();
-    switch (salvagedResult.getKind()) {
-    case SolutionResult::Kind::Success:
-      viable.clear();
-      viable.push_back(std::move(salvagedResult).takeSolution());
-      break;
-
-    case SolutionResult::Kind::Error:
-    case SolutionResult::Kind::Ambiguous:
-      return true;
-
-    case SolutionResult::Kind::UndiagnosedError:
-      cs.diagnoseFailureForExpr(expr);
-      salvagedResult.markAsDiagnosed();
-      return true;
-
-    case SolutionResult::Kind::TooComplex:
-      Context.Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
-        .highlight(expr->getSourceRange());
-      salvagedResult.markAsDiagnosed();
-      return true;
-    }
-  }
-
-  auto &solution = viable[0];
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(log);
-  }
-
-  cs.cacheExprTypes(expr);
-
-  // Perform the conversion.
-  Expr *result = solution.coerceToType(expr, type,
-                                       cs.getConstraintLocator(expr),
-                                       typeFromPattern);
-  if (!result) {
-    return true;
-  }
-
-  solution.setExprTypes(expr);
-
-  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-    log << "\n";
-  }
-
-  expr = result;
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
