@@ -12,10 +12,8 @@ if(HAVE_UNICODE_LIBEDIT)
   else()
     target_link_libraries(sourcekitd-repl PRIVATE sourcekitd)
   endif()
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-    target_link_libraries(sourcekitd-repl PRIVATE
-      dispatch
-      BlocksRuntime)
+  if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
+    target_link_libraries(sourcekitd-repl PRIVATE dispatch BlocksRuntime)
   endif()
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
