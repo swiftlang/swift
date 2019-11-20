@@ -353,16 +353,19 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
+// Returns the differentiation parameters clause string for the given function,
+// parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
-    const AbstractFunctionDecl *function, IndexSubset *indices,
+    const AbstractFunctionDecl *function, IndexSubset *paramIndices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
-  bool isInstanceMethod = function && function->isInstanceMember();
+  assert(function);
+  bool isInstanceMethod = function->isInstanceMember();
   std::string result;
   llvm::raw_string_ostream printer(result);
 
-  // Use parameter indices from `IndexSubset`, if specified.
-  if (indices) {
-    auto parameters = indices->getBitVector();
+  // Use the parameter indices, if specified.
+  if (paramIndices) {
+    auto parameters = paramIndices->getBitVector();
     auto parameterCount = parameters.count();
     printer << "wrt: ";
     if (parameterCount > 1)
@@ -410,19 +413,25 @@ static std::string getDifferentiationParametersClauseString(
 }
 
 // Print the arguments of the given `@differentiable` attribute.
+// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
+//   parameters clause.
+// - If `omitDerivativeFunctions` is true, omit printing the JVP/VJP derivative
+//   functions.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
     const Decl *D, bool omitWrtClause = false,
-    bool omitAssociatedFunctions = false) {
+    bool omitDerivativeFunctions = false) {
+  assert(D);
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
 
   // Get original function.
-  auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
+  auto *original = dyn_cast<AbstractFunctionDecl>(D);
   // Handle stored/computed properties and subscript methods.
-  if (auto *asd = dyn_cast_or_null<AbstractStorageDecl>(D))
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D))
     original = asd->getAccessor(AccessorKind::Get);
+  assert(original && "Must resolve original declaration");
 
   // Print comma if not leading clause.
   bool isLeadingClause = true;
@@ -440,7 +449,7 @@ static void printDifferentiableAttrArguments(
     stream << "linear";
   }
 
-  // Print differentiation parameters, unless they are to be omitted.
+  // Print differentiation parameters clause, unless it is to be omitted.
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
         original, attr->getParameterIndices(), attr->getParsedParameters());
@@ -453,8 +462,8 @@ static void printDifferentiableAttrArguments(
       stream << diffParamsString;
     }
   }
-  // Print associated function names, unless they are to be omitted.
-  if (!omitAssociatedFunctions) {
+  // Print derivative function names, unless they are to be omitted.
+  if (!omitDerivativeFunctions) {
     // Print jvp function name, if specified.
     if (auto jvp = attr->getJVP()) {
       printCommaIfNecessary();
