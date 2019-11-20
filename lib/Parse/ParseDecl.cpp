@@ -3118,7 +3118,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   SourceLoc BeginLoc = Tok.getLoc();
 
   State->setCodeCompletionDelayedDeclState(
-      PersistentParserState::CodeCompletionDelayedDeclKind::Decl,
+      SourceMgr, L->getBufferID(),
+      CodeCompletionDelayedDeclKind::Decl,
       Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
       BeginParserPosition.PreviousLoc);
 
@@ -3634,7 +3635,7 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
     return { };
   }
 
-  auto BeginParserPosition = getParserPosition({BodyRange.Start,BodyRange.End});
+  auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
   auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -5695,7 +5696,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   if (isCodeCompletionFirstPass()) {
     if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
       State->setCodeCompletionDelayedDeclState(
-          PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody,
+          SourceMgr, L->getBufferID(),
+          CodeCompletionDelayedDeclKind::FunctionBody,
           PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
     } else {
       AFD->setBodySkipped(BodyRange);
@@ -5983,7 +5985,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
          "function body should be delayed");
 
   auto bodyRange = AFD->getBodySourceRange();
-  auto BeginParserPosition = getParserPosition({bodyRange.Start,bodyRange.End});
+  auto BeginParserPosition = getParserPosition({bodyRange.Start,SourceLoc()});
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.

@@ -29,6 +29,33 @@ class SourceFile;
 class DeclContext;
 class IterableDeclContext;
 
+enum class CodeCompletionDelayedDeclKind {
+  TopLevelCodeDecl,
+  Decl,
+  FunctionBody,
+};
+
+class CodeCompletionDelayedDeclState {
+public:
+  const CodeCompletionDelayedDeclKind Kind;
+  const unsigned Flags;
+  DeclContext *const ParentContext;
+  SavedScope Scope;
+  const unsigned StartOffset;
+  const unsigned EndOffset;
+  const unsigned PrevOffset;
+
+  SavedScope takeScope() { return std::move(Scope); }
+
+  CodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
+                                 unsigned Flags, DeclContext *ParentContext,
+                                 SavedScope &&Scope, unsigned StartOffset,
+                                 unsigned EndOffset, unsigned PrevOffset)
+      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
+        Scope(std::move(Scope)), StartOffset(StartOffset), EndOffset(EndOffset),
+        PrevOffset(PrevOffset) {}
+};
+
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
 public:
@@ -37,36 +64,6 @@ public:
     SourceLoc PrevLoc;
 
     bool isValid() const { return Loc.isValid(); }
-  };
-
-  enum class CodeCompletionDelayedDeclKind {
-    TopLevelCodeDecl,
-    Decl,
-    FunctionBody,
-  };
-
-  class CodeCompletionDelayedDeclState {
-    friend class PersistentParserState;
-    friend class Parser;
-    CodeCompletionDelayedDeclKind Kind;
-    unsigned Flags;
-    DeclContext *ParentContext;
-    ParserPos BodyPos;
-    SourceLoc BodyEnd;
-    SavedScope Scope;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    CodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
-                                   unsigned Flags, DeclContext *ParentContext,
-                                   SourceRange BodyRange, SourceLoc PreviousLoc,
-                                   SavedScope &&Scope)
-        : Kind(Kind), Flags(Flags),
-          ParentContext(ParentContext), BodyPos{BodyRange.Start, PreviousLoc},
-          BodyEnd(BodyRange.End), Scope(std::move(Scope)) {}
   };
 
   bool InPoundLineEnvironment = false;
@@ -92,7 +89,8 @@ public:
   PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
 
-  void setCodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
+  void setCodeCompletionDelayedDeclState(SourceManager &SM, unsigned BufferID,
+                                         CodeCompletionDelayedDeclKind Kind,
                                          unsigned Flags,
                                          DeclContext *ParentContext,
                                          SourceRange BodyRange,

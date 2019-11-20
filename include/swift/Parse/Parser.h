@@ -1578,12 +1578,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  static void
-  performCodeCompletionSecondPass(PersistentParserState &ParserState,
-                                  CodeCompletionCallbacksFactory &Factory);
-
   void performCodeCompletionSecondPassImpl(
-      PersistentParserState::CodeCompletionDelayedDeclState &info);
+      CodeCompletionDelayedDeclState &info);
 };
 
 /// Describes a parsed declaration name.
