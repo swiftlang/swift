@@ -119,7 +119,6 @@ func testOutParametersBad() {
 
   let power: CCPowerSupply?
   CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
-  // expected-error@-1 {{cannot convert value of type 'CCPowerSupply?' to expected argument type 'AutoreleasingUnsafeMutablePointer<CCPowerSupply?>'}}
 
   let item: CCItem?
   CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
