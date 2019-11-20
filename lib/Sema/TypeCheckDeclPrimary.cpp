@@ -2265,6 +2265,8 @@ public:
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
+    TypeChecker::checkPatternBindingCaptures(ED);
+
     TypeChecker::checkConformancesInContext(ED, ED);
 
     TypeChecker::checkDeclAttributes(ED);

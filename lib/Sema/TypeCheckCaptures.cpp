@@ -660,10 +660,8 @@ static bool isLazy(PatternBindingDecl *PBD) {
   return false;
 }
 
-void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
-  auto &ctx = typeDecl->getASTContext();
-
-  for (auto member : typeDecl->getMembers()) {
+void TypeChecker::checkPatternBindingCaptures(IterableDeclContext *DC) {
+  for (auto member : DC->getMembers()) {
     // Ignore everything other than PBDs.
     auto *PBD = dyn_cast<PatternBindingDecl>(member);
     if (!PBD) continue;
