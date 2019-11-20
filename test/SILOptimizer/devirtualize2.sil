@@ -35,7 +35,7 @@ bb0:
   %1 = alloc_ref $Foo                             // users: %5, %3, %2
   strong_retain %1 : $Foo                         // id: %2
   %3 = upcast %1 : $Foo to $Bar                   // user: %4
-  %4 = unconditional_checked_cast %3 : $Bar to $Foo // user: %6
+  %4 = unconditional_checked_cast %3 : $Bar to Foo // user: %6
   strong_release %1 : $Foo                        // id: %5
   %6 = upcast %4 : $Foo to $Bar                   // user: %7
   store %6 to %0 : $*Bar                          // id: %7
@@ -55,7 +55,7 @@ bb0:
 // CHECK: return
 sil @function_with_cm_with_dynamic_type_known_from_checked_cast_br : $@convention(thin) (Bar) -> () {
 bb0(%0 : $Bar):
-  checked_cast_br [exact] %0 : $Bar to $Bar, bb1, bb5
+  checked_cast_br [exact] %0 : $Bar to Bar, bb1, bb5
 
 bb1(%1 : $Bar):
   br bb2(%1 : $Bar)

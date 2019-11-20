@@ -1025,10 +1025,12 @@ public:
   }
 
   UncheckedRefCastAddrInst *
-  createUncheckedRefCastAddr(SILLocation Loc, SILValue src, CanType sourceType,
-                             SILValue dest, CanType targetType) {
+  createUncheckedRefCastAddr(SILLocation Loc,
+                             SILValue src, CanType sourceFormalType,
+                             SILValue dest, CanType targetFormalType) {
     return insert(new (getModule()) UncheckedRefCastAddrInst(
-        getSILDebugLocation(Loc), src, sourceType, dest, targetType));
+        getSILDebugLocation(Loc), src, sourceFormalType,
+        dest, targetFormalType));
   }
 
   UncheckedAddrCastInst *createUncheckedAddrCast(SILLocation Loc, SILValue Op,
@@ -1135,26 +1137,32 @@ public:
   }
 
   UnconditionalCheckedCastInst *
-  createUnconditionalCheckedCast(SILLocation Loc, SILValue op, SILType destTy) {
+  createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
+                                 SILType destLoweredTy,
+                                 CanType destFormalTy) {
     return insert(UnconditionalCheckedCastInst::create(
-        getSILDebugLocation(Loc), op, destTy, getFunction(),
-        C.OpenedArchetypes));
+        getSILDebugLocation(Loc), op, destLoweredTy, destFormalTy,
+        getFunction(), C.OpenedArchetypes));
   }
 
   UnconditionalCheckedCastAddrInst *
-  createUnconditionalCheckedCastAddr(SILLocation Loc, SILValue src,
-                                     CanType sourceType, SILValue dest,
-                                     CanType targetType) {
+  createUnconditionalCheckedCastAddr(SILLocation Loc,
+                                     SILValue src, CanType sourceFormalType,
+                                     SILValue dest, CanType targetFormalType) {
     return insert(new (getModule()) UnconditionalCheckedCastAddrInst(
-        getSILDebugLocation(Loc), src, sourceType, dest, targetType));
+        getSILDebugLocation(Loc), src, sourceFormalType,
+        dest, targetFormalType));
   }
 
   UnconditionalCheckedCastValueInst *
   createUnconditionalCheckedCastValue(SILLocation Loc,
-                                      SILValue op, SILType destTy) {
+                                      SILValue op, CanType srcFormalTy,
+                                      SILType destLoweredTy,
+                                      CanType destFormalTy) {
     return insert(UnconditionalCheckedCastValueInst::create(
-        getSILDebugLocation(Loc), op, destTy, getFunction(),
-        C.OpenedArchetypes));
+        getSILDebugLocation(Loc), op, srcFormalTy,
+        destLoweredTy, destFormalTy,
+        getFunction(), C.OpenedArchetypes));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
@@ -1957,30 +1965,36 @@ public:
 
   CheckedCastBranchInst *
   createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
-                          SILType destTy, SILBasicBlock *successBB,
+                          SILType destLoweredTy, CanType destFormalTy,
+                          SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastValueBranchInst *
-  createCheckedCastValueBranch(SILLocation Loc, SILValue op, SILType destTy,
+  createCheckedCastValueBranch(SILLocation Loc,
+                               SILValue op, CanType srcFormalTy,
+                               SILType destLoweredTy,
+                               CanType destFormalTy,
                                SILBasicBlock *successBB,
                                SILBasicBlock *failureBB) {
     return insertTerminator(CheckedCastValueBranchInst::create(
-        getSILDebugLocation(Loc), op, destTy, successBB, failureBB,
-        getFunction(), C.OpenedArchetypes));
+        getSILDebugLocation(Loc), op, srcFormalTy,
+        destLoweredTy, destFormalTy,
+        successBB, failureBB, getFunction(), C.OpenedArchetypes));
   }
 
   CheckedCastAddrBranchInst *
   createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
-                              SILValue src, CanType sourceType, SILValue dest,
-                              CanType targetType, SILBasicBlock *successBB,
+                              SILValue src, CanType sourceFormalType,
+                              SILValue dest, CanType targetFormalType,
+                              SILBasicBlock *successBB,
                               SILBasicBlock *failureBB,
                               ProfileCounter Target1Count = ProfileCounter(),
                               ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(new (getModule()) CheckedCastAddrBranchInst(
-        getSILDebugLocation(Loc), consumption, src, sourceType, dest,
-        targetType, successBB, failureBB, Target1Count, Target2Count));
+        getSILDebugLocation(Loc), consumption, src, sourceFormalType, dest,
+        targetFormalType, successBB, failureBB, Target1Count, Target2Count));
   }
 
   //===--------------------------------------------------------------------===//

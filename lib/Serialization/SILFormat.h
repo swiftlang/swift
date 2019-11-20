@@ -157,7 +157,6 @@ namespace sil_block {
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
     SIL_GLOBALVAR,
-    SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESS_TABLE,
     SIL_WITNESS_METHOD_ENTRY,
@@ -350,18 +349,6 @@ namespace sil_block {
     TypeIDField,          // formal concrete type
     BCVBR<5>              // # of protocol conformances
     // Trailed by protocol conformance info (if any)
-  >;
-
-  // SIL Cast instructions with a cast kind, one type and one typed valueref.
-  using SILInstCastLayout = BCRecordLayout<
-    SIL_INST_CAST,
-    SILInstOpCodeField,
-    BCFixed<4>,          // Cast kind
-    TypeIDField,
-    SILTypeCategoryField,
-    TypeIDField,
-    SILTypeCategoryField,
-    ValueIDField
   >;
 
   // SIL instructions with one type and a list of values.
