@@ -767,29 +767,4 @@ ErrorBridgingTests.test("@objc error domains for nested types") {
               String(reflecting: NonPrintAsObjCError.self))
 }
 
-@inline(never)
-@_optimize(none)
-func anyToAny<T, U>(_ a: T, _ : U.Type) -> U {
-  return a as! U
-}
-
-ErrorBridgingTests.test("error-to-NSObject casts") {
-  let error = MyCustomizedError(code: 12345)
-
-  // Unconditional cast
-  let nsErrorAsObject1 = unconditionalCast(error, to: NSObject.self)
-  let nsError1 = unconditionalCast(nsErrorAsObject1, to: NSError.self)
-  expectEqual("custom", nsError1.domain)
-  expectEqual(12345, nsError1.code)
-
-  // Conditional cast
-  let nsErrorAsObject2 = conditionalCast(error, to: NSObject.self)!
-  let nsError2 = unconditionalCast(nsErrorAsObject2, to: NSError.self)
-  expectEqual("custom", nsError2.domain)
-  expectEqual(12345, nsError2.code)
-
-  // "is" check
-  expectTrue(error is NSObject)
-}
-
 runAllTests()
