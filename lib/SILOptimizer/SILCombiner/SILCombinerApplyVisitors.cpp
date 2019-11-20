@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -1648,7 +1649,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         return I;
       }
     }
-    if (SF->hasSemanticsAttr("array.uninitialized")) {
+    if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
       if (recursivelyCollectARCUsers(Users, AI)) {
