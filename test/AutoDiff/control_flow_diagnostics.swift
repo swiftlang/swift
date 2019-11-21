@@ -151,9 +151,7 @@ enum Tree : Differentiable & AdditiveArithmetic {
 // expected-note @+1 {{when differentiating this function definition}}
 func loop_array(_ array: [Float]) -> Float {
   var result: Float = 1
-  // TODO(TF-957): Improve non-differentiability errors for for-in loops
-  // (`Collection.makeIterator` and `IteratorProtocol.next`).
-  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
   for x in array {
     result = result * x
   }

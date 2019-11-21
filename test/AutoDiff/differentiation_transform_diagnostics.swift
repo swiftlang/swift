@@ -255,6 +255,22 @@ let no_return: @differentiable (Float) -> Float = { x in
 }
 
 //===----------------------------------------------------------------------===//
+// Multiple results
+//===----------------------------------------------------------------------===//
+
+func multipleResults(_ x: Float) -> (Float, Float) {
+  return (x, x)
+}
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func usesMultipleResults(_ x: Float) -> Float {
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  let tuple = multipleResults(x)
+  return tuple.0 + tuple.1
+}
+
+//===----------------------------------------------------------------------===//
 // Non-differentiable arguments and results
 //===----------------------------------------------------------------------===//
 
@@ -331,6 +347,50 @@ func activeInoutArgControlFlowComplex(_ array: [Float], _ bool: Bool) -> Float {
     }
   }
   return result
+}
+
+struct Mut: Differentiable {}
+extension Mut {
+  @differentiable(wrt: x)
+  mutating func mutatingMethod(_ x: Mut) -> Mut {
+    return x
+  }
+}
+
+// No error.
+@differentiable(wrt: x)
+func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+  return nonactive.mutatingMethod(x)
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
+  var result = x
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  result = result.mutatingMethod(result)
+  return result
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+  var result = nonactive
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  result = result.mutatingMethod(x)
+  return result
+}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+  var result = (nonactive, x)
+  // expected-note @+1 {{cannot differentiate through multiple results}}
+  let result2 = result.0.mutatingMethod(result.0)
+  return result2
 }
 
 //===----------------------------------------------------------------------===//

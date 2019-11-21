@@ -1528,24 +1528,11 @@ public:
                        const SILAutoDiffIndices &indices) const;
 };
 
-/// Given a parameter argument (not indirect result) and some differentiation
-/// indices, figure out whether the parent function is being differentiated with
-/// respect to this parameter, according to the indices.
-static bool isDifferentiationParameter(SILArgument *argument,
-                                       IndexSubset *indices) {
-  if (!argument) return false;
-  auto *function = argument->getFunction();
-  auto paramArgs = function->getArgumentsWithoutIndirectResults();
-  for (unsigned i : indices->getIndices())
-    if (paramArgs[i] == argument)
-      return true;
-  return false;
-}
-
 /// For an `apply` instruction with active results, compute:
 /// - The results of the `apply` instruction, in type order.
 /// - The set of minimal parameter and result indices for differentiating the
-///   `apply` instruction.
+///   `apply` instruction. Result indices for `inout` arguments start after the
+///   last formal result index.
 static void collectMinimalIndicesForFunctionCall(
     ApplyInst *ai, const SILAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
@@ -1558,9 +1545,7 @@ static void collectMinimalIndicesForFunctionCall(
   // Record all parameter indices in type order.
   unsigned currentParamIdx = 0;
   for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
-        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
-                                   parentIndices.parameters))
+    if (activityInfo.isActive(applyArg, parentIndices))
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
@@ -1572,6 +1557,7 @@ static void collectMinimalIndicesForFunctionCall(
   });
   auto indirectResults = ai->getIndirectSILResults();
   // Record all results and result indices in type order.
+  bool foundActiveResult = false;
   results.reserve(calleeFnTy->getNumResults());
   unsigned dirResIdx = 0;
   unsigned indResIdx = calleeConvs.getSILArgIndexOfFirstIndirectResult();
@@ -1580,23 +1566,37 @@ static void collectMinimalIndicesForFunctionCall(
     unsigned idx = resAndIdx.index();
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
-      if (auto dirRes = directResults[dirResIdx])
-        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
+      if (auto dirRes = directResults[dirResIdx]) {
+        if (dirRes && activityInfo.isActive(dirRes, parentIndices)) {
+          foundActiveResult = true;
           resultIndices.push_back(idx);
+        }
+      }
       ++dirResIdx;
     } else {
       results.push_back(indirectResults[indResIdx]);
-      if (activityInfo.isUseful(indirectResults[indResIdx],
-                                parentIndices.source))
+      if (activityInfo.isActive(indirectResults[indResIdx], parentIndices)) {
+        foundActiveResult = true;
         resultIndices.push_back(idx);
+      }
       ++indResIdx;
+    }
+  }
+  // Record active `inout` arguments in result indices.
+  // Result indices for `inout` arguments start after the last formal result
+  // index.
+  if (!ai->getInoutArguments().empty()) {
+    unsigned idx = calleeConvs.getResults().size();
+    for (auto inoutArg : ai->getInoutArguments()) {
+      if (activityInfo.isActive(inoutArg, parentIndices)) {
+        foundActiveResult = true;
+        resultIndices.push_back(idx++);
+      }
     }
   }
   // Make sure the function call has active results.
   assert(results.size() == calleeFnTy->getNumResults());
-  assert(llvm::any_of(results, [&](SILValue result) {
-    return activityInfo.isActive(result, parentIndices);
-  }));
+  assert(foundActiveResult);
 }
 
 LinearMapInfo::LinearMapInfo(ADContext &context,
@@ -2134,8 +2134,17 @@ void DifferentiableActivityInfo::propagateUseful(
   if (auto *ai = dyn_cast<ApplyInst>(inst)) {
     if (isWithoutDerivative(ai->getCallee()))
       return;
-    for (auto arg : ai->getArgumentsWithoutIndirectResults())
-      setUsefulAndPropagateToOperands(arg, i);
+    // Propagate usefulness to non-`inout` arguments.
+    // Skip `inout` arguments to avoid propagating usefulness from results to
+    // non-useful `inout` arguments (representing results).
+    auto paramInfos = ai->getSubstCalleeConv().getParameters();
+    auto arguments = ai->getArgumentsWithoutIndirectResults();
+    assert(paramInfos.size() == arguments.size());
+    for (auto argIdx : range(paramInfos.size())) {
+      if (paramInfos[argIdx].isIndirectMutating())
+        continue;
+      setUsefulAndPropagateToOperands(arguments[argIdx], i);
+    }
   }
   // Handle store-like instructions:
   //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
@@ -3784,17 +3793,6 @@ public:
       return;
     }
 
-    // Diagnose functions with active inout arguments.
-    // TODO(TF-129): Support `inout` argument differentiation.
-    for (auto inoutArg : ai->getInoutArguments()) {
-      if (activityInfo.isActive(inoutArg, getIndices())) {
-        context.emitNondifferentiabilityError(ai, invoker,
-            diag::autodiff_cannot_differentiate_through_inout_arguments);
-        errorOccurred = true;
-        return;
-      }
-    }
-
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
 
     // Get the minimal parameter and result indices required for differentiating
@@ -3814,10 +3812,12 @@ public:
                    activeResultIndices.begin(), activeResultIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
                s << "}\n";);
-    // FIXME: We don't support multiple active results yet.
+    // Diagnose multiple active results.
+    // TODO(TF-983): Support multiple active results.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(
-          ai, invoker, diag::autodiff_expression_not_differentiable_note);
+          ai, invoker,
+          diag::autodiff_cannot_differentiate_through_multiple_results);
       errorOccurred = true;
       return;
     }
@@ -3828,6 +3828,22 @@ public:
         IndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
+
+    // Diagnose functions with active inout arguments.
+    // TODO(TF-129): Support `inout` argument differentiation.
+    auto paramInfos = ai->getSubstCalleeConv().getParameters();
+    auto arguments = ai->getArgumentsWithoutIndirectResults();
+    for (auto i : swift::indices(paramInfos)) {
+      if (!paramInfos[i].isIndirectMutating())
+        continue;
+      if (activityInfo.isActive(arguments[i], indices)) {
+        context.emitNondifferentiabilityError(
+            ai, invoker,
+            diag::autodiff_cannot_differentiate_through_inout_arguments);
+        errorOccurred = true;
+        return;
+      }
+    }
 
     // Emit the VJP.
     auto loc = ai->getLoc();
@@ -5463,17 +5479,6 @@ public:
       return;
     }
 
-    // Diagnose functions with active inout arguments.
-    // TODO(TF-129): Support `inout` argument differentiation.
-    for (auto inoutArg : ai->getInoutArguments()) {
-      if (activityInfo.isActive(inoutArg, getIndices())) {
-        context.emitNondifferentiabilityError(ai, invoker,
-            diag::autodiff_cannot_differentiate_through_inout_arguments);
-        errorOccurred = true;
-        return;
-      }
-    }
-
     LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
 
     // Get the minimal parameter and result indices required for differentiating
@@ -5493,19 +5498,38 @@ public:
                    activeResultIndices.begin(), activeResultIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
                s << "}\n";);
-    // FIXME: We don't support multiple active results yet.
+    // Diagnose multiple active results.
+    // TODO(TF-983): Support multiple active results.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(
-          ai, invoker, diag::autodiff_expression_not_differentiable_note);
+          ai, invoker,
+          diag::autodiff_cannot_differentiate_through_multiple_results);
       errorOccurred = true;
       return;
     }
+
     // Form expected indices, assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
         IndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
+
+    // Diagnose functions with active inout arguments.
+    // TODO(TF-129): Support `inout` argument differentiation.
+    auto paramInfos = ai->getSubstCalleeConv().getParameters();
+    auto arguments = ai->getArgumentsWithoutIndirectResults();
+    for (auto i : swift::indices(paramInfos)) {
+      if (!paramInfos[i].isIndirectMutating())
+        continue;
+      if (activityInfo.isActive(arguments[i], indices)) {
+        context.emitNondifferentiabilityError(
+            ai, invoker,
+            diag::autodiff_cannot_differentiate_through_inout_arguments);
+        errorOccurred = true;
+        return;
+      }
+    }
 
     // Emit the JVP.
     auto loc = ai->getLoc();
