@@ -213,9 +213,16 @@ namespace swift {
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
 
+    /// Enable SIL type lowering
+    bool EnableSubstSILFunctionTypesForFunctionValues = false;
+
     /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
+
+    /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
+    /// error.
+    bool DiagnoseInvalidEphemeralnessAsError = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
@@ -322,7 +329,10 @@ namespace swift {
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
-    bool EnableExperimentalDifferentiableProgramming = false;
+    // SWIFT_ENABLE_TENSORFLOW
+    // Use default value to true on `tensorflow` branch.
+    bool EnableExperimentalDifferentiableProgramming = true;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     // SWIFT_ENABLE_TENSORFLOW
     /// Whether to enable forward mode differentiation.

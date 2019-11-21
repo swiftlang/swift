@@ -56,7 +56,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!ED->isConstrainedExtension())
     return true;
 
-  (void)TypeChecker::createForContext(DC->getASTContext());
+  (void)swift::createTypeChecker(DC->getASTContext());
   GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());
@@ -107,8 +107,10 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
     break;
   }
   assert(CKind.hasValue());
-  return canSatisfy(Owner.Pair.FirstTy, Owner.Pair.SecondTy, Owner.OpenArchetypes,
-                    *CKind, Owner.DC);
+  return TypeChecker::typesSatisfyConstraint(Owner.Pair.FirstTy,
+                                             Owner.Pair.SecondTy,
+                                             Owner.OpenArchetypes,
+                                             *CKind, Owner.DC);
 }
 
 llvm::Expected<TypePair>

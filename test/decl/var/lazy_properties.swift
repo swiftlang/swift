@@ -112,7 +112,7 @@ struct Outer {
 
     lazy var y = {_ = 3}()
     // expected-warning@-1 {{variable 'y' inferred to have type '()', which may be unexpected}}
-    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}} {{15-15=: ()}}
   }
 }
 

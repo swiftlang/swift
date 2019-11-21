@@ -788,7 +788,8 @@ public:
                                       Alignment Align = Alignment(0)) {
     // Never emit shadow copies when optimizing, or if already on the stack.
     // No debug info is emitted for refcounts either.
-    if (IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
+    if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
         Storage->getType() == IGM.RefCountedPtrTy)
       return Storage;
@@ -831,7 +832,8 @@ public:
     Explosion e = getLoweredExplosion(SILVal);
 
     // Only do this at -O0.
-    if (IGM.IRGen.Opts.shouldOptimize() || IsAnonymous) {
+    if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous) {
       auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
       return;
@@ -1925,9 +1927,30 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
 }
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
-DifferentiabilityWitnessFunctionInst *i) {
-  // TODO(TF-916): Implement IRGen for `differentiability_witness_function`.
-  llvm_unreachable("unimplemented");
+    DifferentiabilityWitnessFunctionInst *i) {
+  llvm::Value *diffWitness =
+      IGM.getAddrOfDifferentiabilityWitness(i->getWitness());
+  unsigned offset = 0;
+  switch (i->getWitnessKind()) {
+  case DifferentiabilityWitnessFunctionKind::JVP:
+    offset = 0;
+    break;
+  case DifferentiabilityWitnessFunctionKind::VJP:
+    offset = 1;
+    break;
+  case DifferentiabilityWitnessFunctionKind::Transpose:
+    llvm_unreachable("Not yet implemented");
+  }
+
+  diffWitness = Builder.CreateStructGEP(diffWitness, offset);
+  diffWitness = Builder.CreateLoad(diffWitness, IGM.getPointerAlignment());
+
+  auto fnType = cast<SILFunctionType>(i->getType().getASTType());
+  Signature signature = IGM.getSignature(fnType);
+  diffWitness =
+      Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
+
+  setLoweredFunctionPointer(i, FunctionPointer(diffWitness, signature));
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
@@ -4101,7 +4124,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
          isa<llvm::IntrinsicInst>(addr));
 
   auto Indirection = DirectValue;
-  if (!IGM.IRGen.Opts.shouldOptimize())
+  if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
+      !IGM.IRGen.Opts.shouldOptimize())
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
@@ -5734,6 +5758,15 @@ void IRGenModule::emitSILStaticInitializers() {
     SILInstruction *InitValue = Global.getStaticInitializerValue();
     if (!InitValue)
       continue;
+
+#ifndef NDEBUG
+    SILType loweredTy = Global.getLoweredType();
+    auto &ti = getTypeInfo(loweredTy);
+
+    auto expansion = getResilienceExpansionForLayout(&Global);
+    assert(ti.isFixedSize(expansion) &&
+           "cannot emit a static initializer for dynamically-sized global");
+#endif
 
     auto *IRGlobal =
         Module.getGlobalVariable(Global.getName(), true /* = AllowLocal */);

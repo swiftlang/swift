@@ -336,8 +336,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     return *NSErrorConformanceToError;
 
   auto &ctx = getASTContext();
-  auto nsError = ctx.getNSErrorDecl();
-  if (!nsError) {
+  auto nsErrorTy = ctx.getNSErrorType();
+  if (!nsErrorTy) {
     NSErrorConformanceToError = nullptr;
     return nullptr;
   }
@@ -349,8 +349,7 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   }
 
   auto conformance =
-    SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
-                                   cast<ProtocolDecl>(error));
+    SwiftModule->lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
 
   if (conformance.isConcrete())
     NSErrorConformanceToError = conformance.getConcrete();
@@ -767,19 +766,25 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
       constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
       !constant.isThunk()) {
     auto *AFD = constant.getAbstractFunctionDecl();
-    // Visit all `@differentiable` attributes.
-    for (auto *diffAttr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
-      SILFunction *jvp = nullptr;
-      SILFunction *vjp = nullptr;
-      if (auto *jvpDecl = diffAttr->getJVPFunction())
-        jvp = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
-      if (auto *vjpDecl = diffAttr->getVJPFunction())
-        vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
-      auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
-      AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
-                            diffAttr->getDerivativeGenericSignature().getPointer());
-      emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
-    }
+    auto emitWitnesses = [&](DeclAttributes &Attrs) {
+      for (auto *diffAttr : Attrs.getAttributes<DifferentiableAttr>()) {
+        SILFunction *jvp = nullptr;
+        SILFunction *vjp = nullptr;
+        if (auto *jvpDecl = diffAttr->getJVPFunction())
+          jvp = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
+        if (auto *vjpDecl = diffAttr->getVJPFunction())
+          vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
+        auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+        AutoDiffConfig config(
+            diffAttr->getParameterIndices(), resultIndices,
+            diffAttr->getDerivativeGenericSignature().getPointer());
+        emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
+      }
+    };
+    if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+      if (accessor->isGetter())
+        emitWitnesses(accessor->getStorage()->getAttrs());
+    emitWitnesses(AFD->getAttrs());
   }
   F->verify();
 }
@@ -817,21 +822,6 @@ void SILGenModule::emitDifferentiabilityWitness(
   CanGenericSignature derivativeCanGenSig;
   if (auto derivativeGenSig = config.derivativeGenericSignature)
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
-  // TODO(TF-835): Use simpler derivative generic signature logic below when
-  // type-checking no longer generates implicit `@differentiable` attributes.
-  // See TF-835 for replacement code.
-  if (jvp) {
-    auto jvpCanGenSig = jvp->getLoweredFunctionType()->getSubstGenericSignature();
-    if (!derivativeCanGenSig && jvpCanGenSig)
-      derivativeCanGenSig = jvpCanGenSig;
-    assert(derivativeCanGenSig == jvpCanGenSig);
-  }
-  if (vjp) {
-    auto vjpCanGenSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
-    if (!derivativeCanGenSig && vjpCanGenSig)
-      derivativeCanGenSig = vjpCanGenSig;
-    assert(derivativeCanGenSig == vjpCanGenSig);
-  }
   // Create new SIL differentiability witness.
   // Witness JVP and VJP are set below.
   // TODO(TF-919): Explore creating serialized differentiability witnesses.
@@ -1112,7 +1102,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && !dd->getBody()->empty())
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.

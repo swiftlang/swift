@@ -167,14 +167,14 @@ public:
   LocalContext *CurLocalContext = nullptr;
 
   bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || SourceMgr.getCodeCompletionLoc().isValid();
+    return DelayBodyParsing || isCodeCompletionFirstPass();
   }
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
   }
 
-  bool isCodeCompletionFirstPass() {
+  bool isCodeCompletionFirstPass() const {
     return L->isCodeCompletion() && !CodeCompletion;
   }
 
@@ -716,15 +716,6 @@ public:
     return Tok.is(tok::identifier) && Tok.getText() == value;
   }
 
-  /// Returns true if token is the identifier "wrt".
-  bool isWRTIdentifier(Token tok) { return isIdentifier(Tok, "wrt"); }
-
-  /// Returns true if token is the identifier "jvp".
-  bool isJVPIdentifier(Token Tok) { return isIdentifier(Tok, "jvp"); }
-
-  /// Returns true if token is the identifier "vjp".
-  bool isVJPIdentifier(Token Tok) { return isIdentifier(Tok, "vjp"); }
-
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
@@ -1107,6 +1098,7 @@ public:
                                        bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+  void parseAbstractFunctionBodyDelayed();
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
@@ -1271,6 +1263,9 @@ public:
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
+
+    /// True if this parameter is potentially destructuring a tuple argument.
+    bool isPotentiallyDestructured = false;
   };
 
   /// Describes the context in which the given parameter is being parsed.

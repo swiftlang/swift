@@ -2821,8 +2821,8 @@ static void printSILDifferentiabilityWitnesses(
     [] (const SILDifferentiabilityWitness *w1,
         const SILDifferentiabilityWitness *w2) -> bool {
       // TODO(TF-893): Sort based on more criteria for deterministic ordering.
-      return w1->getOriginalFunction()->getName()
-          .compare(w2->getOriginalFunction()->getName());
+      return w1->getOriginalFunction()->getName().compare(
+                 w2->getOriginalFunction()->getName()) == -1;
     }
   );
   for (auto *dw : sortedDiffWitnesses)

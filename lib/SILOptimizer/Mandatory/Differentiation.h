@@ -103,7 +103,6 @@ inline void createEntryArguments(SILFunction *f) {
     auto *decl = new (ctx) ParamDecl(loc, loc, Identifier(), loc,
                                      Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
-//    decl->setType(type.getASTType());
     entry->createFunctionArgument(type, decl);
   };
   for (auto indResTy : conv.getIndirectSILResultTypes())

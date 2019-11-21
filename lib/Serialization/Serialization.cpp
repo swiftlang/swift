@@ -3267,8 +3267,8 @@ public:
         defaultArgumentText);
 
     if (interfaceType->hasError()) {
-      param->getDeclContext()->dumpContext();
-      interfaceType->dump();
+      param->getDeclContext()->printContext(llvm::errs());
+      interfaceType->dump(llvm::errs());
       llvm_unreachable("error in interface type of parameter");
     }
   }
@@ -3990,7 +3990,8 @@ public:
           S.addDeclBaseNameRef(param.getLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           // SWIFT_ENABLE_TENSORFLOW
-          paramFlags.isAutoClosure(), rawOwnership,
+          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(),
+          rawOwnership,
           paramFlags.isNonDifferentiable());
     }
   }

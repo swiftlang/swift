@@ -11,11 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dump-ea"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+// For manual debugging, dump graphs in DOT format.
+llvm::cl::opt<bool> EnableGraphWriter(
+    "escapes-enable-graphwriter", llvm::cl::init(false),
+    llvm::cl::desc("With -escapes-dump, also write .dot files."));
 
 namespace {
 
@@ -35,6 +41,8 @@ class EscapeAnalysisDumper : public SILModuleTransform {
       if (!F.isExternalDeclaration()) {
         auto *ConnectionGraph = EA->getConnectionGraph(&F);
         ConnectionGraph->print(llvm::outs());
+        if (EnableGraphWriter)
+          ConnectionGraph->dumpCG();
       }
     }
 #endif

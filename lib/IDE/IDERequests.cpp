@@ -267,6 +267,12 @@ bool CursorInfoResolver::visitCallArgName(Identifier Name,
                                           ValueDecl *D) {
   if (isDone())
     return false;
+
+  // Handle invalid code where the called decl isn't actually callable, so this
+  // argument label doesn't really refer to it.
+  if (isa<ModuleDecl>(D))
+    return true;
+
   bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
     CursorInfo.IsKeywordArgument = true;
@@ -486,7 +492,7 @@ private:
           // Unbox the brace statement to find its type.
           if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
             if (!BS->getElements().empty()) {
-              return resolveNodeType(BS->getElements().back(),
+              return resolveNodeType(BS->getLastElement(),
                                      RangeKind::SingleStatement);
             }
           }

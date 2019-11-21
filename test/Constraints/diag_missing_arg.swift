@@ -19,11 +19,11 @@ func attributedInOutFunc(x: inout @convention(c) () -> Int32) {} // expected-not
 attributedInOutFunc() // expected-error {{missing argument for parameter 'x' in call}} {{21-21=x: &<#@convention(c) () -> Int32#>}}
 
 func genericFunc1<T>(x: T) {} // expected-note * {{here}}
-genericFunc1() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#Any#>}}
+genericFunc1() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#_#>}}
 
 protocol P {}
 func genericFunc2<T : P>(x: T) {} // expected-note * {{here}}
-genericFunc2() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#Any#>}}
+genericFunc2() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#_#>}}
 
 typealias MyInt = Int
 func aliasedFunc(x: MyInt) {} // expected-note * {{here}}
@@ -34,8 +34,12 @@ trailingClosureSingle1 { 1 } // expected-error {{missing argument for parameter 
 trailingClosureSingle1() { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{24-24=x: <#Int#>}}
 
 func trailingClosureSingle2(x: () -> Int, y: Int) {} // expected-note * {{here}}
-trailingClosureSingle2 { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
-trailingClosureSingle2() { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureSingle2 { 1 }
+// expected-error@-1 {{missing argument for parameter 'x' in call}} {{23-23=(x: <#() -> Int#>)}}
+// expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureSingle2() { 1 }
+// expected-error@-1 {{missing argument for parameter 'x' in call}} {{24-24=x: <#() -> Int#>}}
+// expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
 
 func trailingClosureMulti1(x: Int, y: Int, z: () -> Int) {} // expected-note * {{here}}
 trailingClosureMulti1(y: 1) { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{23-23=x: <#Int#>, }}
@@ -43,9 +47,15 @@ trailingClosureMulti1(x: 1) { 1 } // expected-error {{missing argument for param
 trailingClosureMulti1(x: 1, y: 1) // expected-error {{missing argument for parameter 'z' in call}} {{33-33=, z: <#() -> Int#>}}
 
 func trailingClosureMulti2(x: Int, y: () -> Int, z: Int) {} // expected-note * {{here}}
-trailingClosureMulti2 { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
-trailingClosureMulti2() { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
-trailingClosureMulti2(x: 1) { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureMulti2 { 1 }
+// expected-error@-1 {{missing arguments for parameters 'x', 'y' in call}}
+// expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureMulti2() { 1 }
+// expected-error@-1 {{missing arguments for parameters 'x', 'y' in call}}
+// expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureMulti2(x: 1) { 1 }
+// expected-error@-1 {{missing argument for parameter 'y' in call}} {{27-27=, y: <#() -> Int#>}}
+// expected-error@-2 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
 
 func param2Func(x: Int, y: Int) {} // expected-note * {{here}}
 param2Func(x: 1) // expected-error {{missing argument for parameter 'y' in call}} {{16-16=, y: <#Int#>}}

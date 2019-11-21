@@ -154,6 +154,7 @@ set(SWIFTLIB_ESSENTIAL
   StringNormalization.swift
   StringRangeReplaceableCollection.swift
   StringStorage.swift
+  StringStorageBridge.swift
   StringSwitch.swift
   StringTesting.swift
   StringUnicodeScalarView.swift

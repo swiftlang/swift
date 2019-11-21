@@ -147,14 +147,15 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/SmallVector.h"
 
 struct CGForDotView;
 
@@ -236,8 +237,10 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
 public:
   class CGNode;
   class ConnectionGraph;
+
 private:
   class CGNodeMap;
+  struct CGNodeWorklist;
 
   /// The int-part is an EdgeType and specifies which kind of predecessor it is.
   typedef llvm::PointerIntPair<CGNode *, 1> Predecessor;
@@ -249,9 +252,15 @@ public:
   /// pointer points to (see NodeType).
   class CGNode {
 
-    /// The associated value in the function. It is only used for debug printing.
-    /// There may be multiple nodes associated to the same value, e.g. a Content
-    /// node has the same V as its points-to predecessor.
+    /// The associated value in the function. This is always valid for Argument
+    /// and Value nodes, and always nullptr for Return nodes. For Content nodes,
+    /// i is only used for debug printing. A Content's value 'V' is unreliable
+    /// because it can change as a result of the order the the graph is
+    /// constructed and summary graphs are merged. Sometimes it is derived from
+    /// the instructions that access the content, other times, it's simply
+    /// inherited from its parent. There may be multiple nodes associated to the
+    /// same value, e.g. a Content node has the same V as its points-to
+    /// predecessor.
     ValueBase *V;
 
     /// The outgoing points-to edge (if any) to a Content node. See also:
@@ -259,8 +268,13 @@ public:
     /// If we ever want to distinguish between different fields of an object,
     /// then we should replace the single pointsTo edge with multiple edges -
     /// one for each field.
+    ///
+    /// Note: A content node with proper a "pointsTo" edge to another content
+    /// node often does *not* represent a pointer. There is no
+    /// indirection. Instead, these content nodes are all part of the same
+    /// object and only represent different layers within the object.
     CGNode *pointsTo = nullptr;
-    
+
     /// The outgoing defer edges.
     llvm::SmallVector<CGNode *, 8> defersTo;
     
@@ -281,7 +295,7 @@ public:
     EscapeState State = EscapeState::None;
 
     /// If true, the pointsTo is a real edge in the graph. Otherwise it is not
-    /// and edge (e.g. this does not appear in the pointsTo Preds list), but
+    /// an edge (e.g. this does not appear in the pointsTo Preds list), but
     /// still must point to the same Content node as all successor nodes.
     bool pointsToIsEdge = false;
     
@@ -313,15 +327,6 @@ public:
       }
     }
 
-    /// Merges the state from another state and returns true if it changed.
-    bool mergeEscapeState(EscapeState OtherState) {
-      if (OtherState > State) {
-        State = OtherState;
-        return true;
-      }
-      return false;
-    }
-
     /// Merges the use points from another node and returns true if there are
     /// any changes.
     bool mergeUsePoints(CGNode *RHS) {
@@ -330,10 +335,8 @@ public:
       return Changed;
     }
 
-    /// Returns the Content node if this node has an outgoing points-to edge.
-    CGNode *getPointsToEdge() const {
-      return pointsToIsEdge ? pointsTo : nullptr;
-    }
+    // Merge the properties of \p fromNode into this node.
+    void mergeProperties(CGNode *fromNode);
 
     /// Finds a successor node in the outgoing defer edges.
     llvm::SmallVectorImpl<CGNode *>::iterator findDeferred(CGNode *Def) {
@@ -352,22 +355,28 @@ public:
       Preds.erase(Iter);
     }
 
-    /// Adds a defer-edge to another node \p To. Not done if \p To is this node.
-    bool addDeferred(CGNode *To) {
-      assert(!To->isMerged);
+    bool canAddDeferred(CGNode *To) {
       if (To == this)
         return false;
       for (auto *Def : defersTo) {
         if (Def == To)
           return false;
       }
+      return true;
+    }
+
+    /// Adds a defer-edge to another node \p To. Not done if \p To is this node.
+    bool addDeferred(CGNode *To) {
+      assert(!To->isMerged);
+      if (!canAddDeferred(To))
+        return false;
       To->Preds.push_back(Predecessor(this, EdgeType::Defer));
       defersTo.push_back(To);
       return true;
     }
 
     /// Sets the outgoing points-to edge. The \p To node must be a Content node.
-    void setPointsTo(CGNode *To) {
+    void setPointsToEdge(CGNode *To) {
       assert(!To->mergeTo);
       assert(To->Type == NodeType::Content &&
              "Wrong node type for points-to edge");
@@ -392,12 +401,6 @@ public:
       UsePoints.set(Idx);
     }
 
-    /// For debug dumping.
-    void dump() const;
-
-    /// Returns a string representation of the node type. Also for debug dumping.
-    const char *getTypeStr() const;
-
     /// Checks an invariant of the connection graph: The points-to nodes of
     /// the defer-successors must match with the points-to of this node.
     bool matchPointToOfDefers() const {
@@ -411,13 +414,26 @@ public:
         return false;
       return true;
     }
-    
+
     friend class CGNodeMap;
     friend class ConnectionGraph;
     friend struct ::CGForDotView;
+    friend struct CGNodeWorklist;
 
   public:
-    
+    SILValue getValue() const {
+      assert(Type == NodeType::Argument || Type == NodeType::Value);
+      return V;
+    }
+    SILValue getValueOrNull() const { return V; }
+
+    void updateValue(SILValue newValue) {
+      assert(isContent());
+      V = newValue;
+    }
+
+    /// Return true if this node represents content.
+    bool isContent() const { return Type == NodeType::Content; }
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
 
@@ -425,18 +441,38 @@ public:
     /// the return instruction.
     bool escapes() const { return getEscapeState() != EscapeState::None; }
 
+    /// Specifies that this content node's memory escapes to global or
+    /// unidentified memory.
+    void markEscaping() {
+      assert(Type == NodeType::Content);
+      mergeEscapeState(EscapeState::Global);
+    }
+
+    /// Merges the state from another state and returns true if it changed.
+    bool mergeEscapeState(EscapeState OtherState) {
+      if (OtherState > State) {
+        State = OtherState;
+        return true;
+      }
+      return false;
+    }
+
     /// Returns true if the node's value escapes within the function. This
     /// means that any unidentified pointer in the function may alias to
     /// the node's value.
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
-    bool escapesInsideFunction(bool isNotAliasingArgument) const {
+    ///
+    /// \p nodeValue is often the same as 'this->V', but is sometimes a more
+    /// refined value. For content nodes, 'this->V' is only a placeholder that
+    /// does not necessarilly represent the node's memory.
+    bool escapesInsideFunction(SILValue nodeValue) const {
       switch (getEscapeState()) {
         case EscapeState::None:
         case EscapeState::Return:
           return false;
         case EscapeState::Arguments:
-          return !isNotAliasingArgument;
+          return !isExclusiveArgument(nodeValue);
         case EscapeState::Global:
           return true;
       }
@@ -448,44 +484,31 @@ public:
     CGNode *getContentNodeOrNull() const {
       return pointsTo;
     }
-  };
 
-private:
-
-  /// Mapping from nodes in a callee-graph to nodes in a caller-graph.
-  class CGNodeMap {
-    /// The map itself.
-    llvm::DenseMap<CGNode *, CGNode *> Map;
-
-    /// The list of source nodes (= keys in Map), which is used as a work-list.
-    llvm::SmallVector<CGNode *, 8> MappedNodes;
-  public:
-
-    /// Adds a mapping and pushes the \p From node into the work-list
-    /// MappedNodes.
-    void add(CGNode *From, CGNode *To) {
-      assert(From && To && !From->isMerged && !To->isMerged);
-      Map[From] = To;
-      if (!From->isInWorkList) {
-        MappedNodes.push_back(From);
-        From->isInWorkList = true;
-      }
+    /// Returns the Content node if this node has an outgoing points-to edge.
+    CGNode *getPointsToEdge() const {
+      return pointsToIsEdge ? pointsTo : nullptr;
     }
-    /// Looks up a node in the mapping.
-    CGNode *get(CGNode *From) const {
-      auto Iter = Map.find(From);
-      if (Iter == Map.end())
-        return nullptr;
 
-      return Iter->second->getMergeTarget();
-    }
-    const SmallVectorImpl<CGNode *> &getMappedNodes() const {
-      return MappedNodes;
-    }
+    /// Visit all successors of this node in the connection graph until \p
+    /// visitor returns false. Return true if all successors were visited
+    /// without \p visitor returning false.
+    ///
+    /// Note that a node may be the pointsTo successor of itself.
+    template <typename Visitor> bool visitSuccessors(Visitor &&visitor) const;
+
+    /// Visit all adjacent defers. Halt when the visitor returns false. Return
+    /// true if the visitor returned true for all defers.
+    template <typename Visitor> bool visitDefers(Visitor &&visitor) const;
+
+    /// For debug dumping.
+    void dump() const;
+
+    /// Returns a string representation of the node type. For debug dumping.
+    const char *getTypeStr() const;
   };
 
 public:
-
   /// The connection graph for a function. See also: EdgeType, NodeType and
   /// CGNode.
   /// A connection graph has these invariants:
@@ -497,10 +520,18 @@ public:
   /// 4) For any node N, all paths starting at N which consist of only
   ///    defer-edges and a single trailing points-to edge must lead to the same
   ///    Content node.
+  ///
+  /// Additionally, all nodes in a path consisting of defer-edges must have the
+  /// same pointsTo field--either all pointsTo fields are null, or they all
+  /// point to the same target of the points-to edges at the leaves of the defer
+  /// web, which must have been merged into a single content node.
+  ///
+  /// Paths comprised of points-to edges may contain cycles and self-cycles.
   class ConnectionGraph {
-
     /// Backlink to the graph's function.
     SILFunction *F;
+    /// Backlink to the EscapeAnalysis
+    EscapeAnalysis *EA;
 
     /// Mapping from pointer SIL values to nodes in the graph. Such a value can
     /// never be a projection, because in case of projection-instruction the
@@ -529,11 +560,13 @@ public:
 
     /// True if this is a summary graph.
     bool isSummaryGraph;
-    
+
+    /// Track the currently active intrusive worklist -- one at a time.
+    CGNodeWorklist *activeWorklist = nullptr;
+
     /// Constructs a connection graph for a function.
-    ConnectionGraph(SILFunction *F, bool isSummaryGraph) :
-      F(F), isSummaryGraph(isSummaryGraph) {
-    }
+    ConnectionGraph(SILFunction *F, EscapeAnalysis *EA, bool isSummaryGraph)
+        : F(F), EA(EA), isSummaryGraph(isSummaryGraph) {}
 
     /// Returns true if the connection graph is empty.
     bool isEmpty() {
@@ -564,6 +597,7 @@ public:
       CGNode *FromMergeTarget = From->getMergeTarget();
       CGNode *ToMergeTarget = To->getMergeTarget();
       if (FromMergeTarget != ToMergeTarget) {
+        ToMergeTarget->mergeProperties(FromMergeTarget);
         FromMergeTarget->mergeTo = ToMergeTarget;
         ToMerge.push_back(FromMergeTarget);
       }
@@ -591,7 +625,7 @@ public:
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded = true);
+    CGNode *getNode(ValueBase *V, bool createIfNeeded = true);
 
     /// Gets or creates a content node to which \a AddrNode points to during
     /// initial graph construction. This may not be called after defer edges
@@ -676,8 +710,8 @@ public:
     /// Returns the \p From node or its merge-target in case \p From was merged
     /// during adding the edge.
     CGNode *defer(CGNode *From, CGNode *To) {
-      bool UnusedEdgeAddedFlag = false;
-      return defer(From, To, UnusedEdgeAddedFlag);
+      bool UnusedChangedFlag = false;
+      return defer(From, To, UnusedChangedFlag);
     }
 
     /// Merges the \p SourceGraph into this graph. The \p Mapping contains the
@@ -692,19 +726,41 @@ public:
     /// lookup-up with getNode() anymore.
     void removeFromGraph(ValueBase *V) { Values2Nodes.erase(V); }
 
-    /// Returns true if there is a path from \p From to \p To.
-    bool isReachable(CGNode *From, CGNode *To);
+    enum class Traversal { Follow, Backtrack, Halt };
+
+    /// Traverse backward from startNode, following predecessor edges.
+    ///
+    /// CGNodeVisitor takes the current CGNode and returns Traversal::Follow if
+    /// traversal should proceed along its predecessors, Traversal::Backtrack,
+    /// if it should not follow its predecessors, and Traversal::Halt if it
+    /// should immediately stop visiting nodes.
+    ///
+    /// Return true if the visitor did not halt traversal.
+    template <typename CGPredVisitor>
+    bool backwardTraverse(CGNode *startNode, CGPredVisitor &&visitor);
+
+    /// Traverse forward from startNode, following defer edges.
+    ///
+    /// CGNodeVisitor takes the current CGNode and returns Traversal::Follow if
+    /// traversal should proceed along its predecessors, Traversal::Backtrack,
+    /// if it should not follow its predecessors, and Traversal::Halt if it
+    /// should immediately stop visiting nodes.
+    ///
+    /// Return true if the visitor did not halt traversal.
+    template <typename CGNodeVisitor>
+    bool forwardTraverseDefer(CGNode *startNode, CGNodeVisitor &&visitor);
+
+    /// Return true if \p pointer may indirectly point to \pointee via pointers
+    /// and object references.
+    bool mayReach(CGNode *pointer, CGNode *pointee);
 
   public:
-
     /// Gets or creates a node for a value \p V.
     /// If V is a projection(-path) then the base of the projection(-path) is
     /// taken. This means the node is always created for the "outermost" value
     /// where V is contained.
     /// Returns null, if V is not a "pointer".
-    CGNode *getNodeOrNull(ValueBase *V, EscapeAnalysis *EA) {
-      return getNode(V, EA, false);
-    }
+    CGNode *getNodeOrNull(ValueBase *V) { return getNode(V, false); }
 
     /// Returns the number of use-points of a node.
     int getNumUsePoints(CGNode *Node) {
@@ -742,6 +798,9 @@ public:
     /// Global escaping nodes are red, argument escaping nodes are blue.
     void viewCG() const;
 
+    /// Dump the connection graph to a DOT file for remote debugging.
+    void dumpCG() const;
+
     /// Checks if the graph is OK.
     void verify() const;
 
@@ -751,13 +810,15 @@ public:
 
     friend struct ::CGForDotView;
     friend class EscapeAnalysis;
+    friend struct CGNodeWorklist;
   };
 
 private:
 
   /// All the information we keep for a function.
   struct FunctionInfo : public FunctionInfoBase<FunctionInfo> {
-    FunctionInfo(SILFunction *F) : Graph(F, false), SummaryGraph(F, true) { }
+    FunctionInfo(SILFunction *F, EscapeAnalysis *EA)
+        : Graph(F, EA, false), SummaryGraph(F, EA, true) {}
 
     /// The connection graph for the function. This is what clients of the
     /// analysis will see.
@@ -815,11 +876,21 @@ private:
 
   /// Returns true if \p V may encapsulate a "pointer" value.
   /// See EscapeAnalysis::NodeType::Value.
-  bool isPointer(ValueBase *V);
+  bool isPointer(ValueBase *V) const;
+
+  /// If EscapeAnalysis should consider the given value to be a derived address
+  /// or pointer based on one of its address or pointer operands, then return
+  /// that operand value. Otherwise, return an invalid value.
+  SILValue getPointerBase(SILValue value) const;
+
+  /// Recursively find the given value's pointer base. If the value cannot be
+  /// represented in EscapeAnalysis as one of its operands, then return the same
+  /// value.
+  SILValue getPointerRoot(SILValue value) const;
 
   /// If \p pointer is a pointer, set it to global escaping.
   void setEscapesGlobal(ConnectionGraph *ConGraph, ValueBase *pointer) {
-    if (CGNode *Node = ConGraph->getNode(pointer, this))
+    if (CGNode *Node = ConGraph->getNode(pointer))
       ConGraph->setEscapesGlobal(Node);
   }
 
@@ -827,7 +898,7 @@ private:
   FunctionInfo *getFunctionInfo(SILFunction *F) {
     FunctionInfo *&FInfo = Function2Info[F];
     if (!FInfo)
-      FInfo = new (Allocator.Allocate()) FunctionInfo(F);
+      FInfo = new (Allocator.Allocate()) FunctionInfo(F, this);
     return FInfo;
   }
 

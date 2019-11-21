@@ -619,7 +619,7 @@ class WrongInheritanceClause6(Int {}
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base.Type'}}
+Base=1 as Base=1  // expected-error {{cannot convert value of type 'Int' to type 'Base' in coercion}}
 
 
 
@@ -761,7 +761,7 @@ let ￼tryx  = 123        // expected-error 2 {{invalid character in source file
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
-enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{do you want to add protocol stubs?}}
+enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ace = 1
   case Two = 2.1  // expected-error {{cannot convert value of type 'Double' to raw type 'Int'}}
 }
@@ -849,3 +849,7 @@ func f() {
 // <rdar://problem/22478168> | SR-11006
 // expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
 func SR11006(a: Int == 0) {}
+
+// rdar://38225184
+extension Collection where Element == Int && Index == Int {}
+// expected-error@-1 {{expected ',' to separate the requirements of this 'where' clause}} {{43-45=,}}

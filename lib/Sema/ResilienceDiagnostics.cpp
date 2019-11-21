@@ -84,17 +84,6 @@ TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   llvm_unreachable("Context is not nested inside a fragile function");
 }
 
-void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
-  auto *DC = NTD->getDeclContext();
-  auto expansion = DC->getResilienceExpansion();
-  if (expansion == ResilienceExpansion::Minimal) {
-    auto kind = getFragileFunctionKind(DC);
-    diagnose(NTD, diag::local_type_in_inlinable_function,
-             NTD->getFullName(),
-             static_cast<unsigned>(kind.first));
-  }
-}
-
 /// A uniquely-typed boolean to reduce the chances of accidentally inverting
 /// a check.
 enum class DowngradeToWarning: bool {

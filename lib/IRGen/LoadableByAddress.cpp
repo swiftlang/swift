@@ -2365,7 +2365,8 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     rewrittenReturn = rewriteFunctionReturn(pass);
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName(); F->dump());
+  LLVM_DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName();
+             F->print(llvm::dbgs()));
 
   // Rewrite instructions relating to the loadable struct.
   rewriteFunction(pass, allocator);

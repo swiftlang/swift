@@ -111,8 +111,7 @@ public:
   /// invalidating parts of the call graph.
   const FunctionInfo &getFunctionInfo(SILFunction *f) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Print the state of the caller analysis as a sequence of yaml documents for
   /// each callee we are tracking.
@@ -120,9 +119,7 @@ public:
 
   /// Print the state of the caller analysis as a sequence of yaml documents for
   /// each callee we are tracking to the passed in file path.
-  LLVM_ATTRIBUTE_DEPRECATED(void print(const char *filePath)
-                                const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMPER(print(const char *filePath));
 
   void verify() const override;
   void verify(SILFunction *f) const override;
@@ -349,8 +346,7 @@ public:
     return llvm::make_range(callerStates.begin(), callerStates.end());
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   void print(llvm::raw_ostream &os) const;
 };

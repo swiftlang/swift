@@ -540,8 +540,6 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
   ctorDecl->setAccess(AccessLevel::Public);
-
-  (void)ctorDecl->getInterfaceType();
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
 }
@@ -616,8 +614,6 @@ static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
-
-  (void)getterDecl->getInterfaceType();
 
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
@@ -698,8 +694,6 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
 
-  (void)getterDecl->getInterfaceType();
-
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
   return getterDecl;
@@ -728,8 +722,6 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
-
-  (void)getterDecl->getInterfaceType();
 
   return getterDecl;
 }
@@ -764,8 +756,6 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   setterDecl->setAccess(AccessLevel::Public);
-
-  (void)setterDecl->getInterfaceType();
 
   return setterDecl;
 }
@@ -1308,9 +1298,6 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), emptyPL,
       /*GenericParams=*/nullptr, structDecl);
 
-  // Set the constructor's type.
-  (void)constructor->getInterfaceType();
-
   constructor->setAccess(AccessLevel::Public);
 
   // Mark the constructor transparent so that we inline it away completely.
@@ -1424,6 +1411,10 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(var->getInterfaceType());
     Impl.recordImplicitUnwrapForDecl(param, var->isImplicitlyUnwrappedOptional());
+
+    // Don't allow the parameter to accept temporary pointer conversions.
+    param->setNonEphemeralIfPossible();
+
     valueParameters.push_back(param);
   }
 
@@ -1436,9 +1427,6 @@ createValueConstructor(ClangImporter::Implementation &Impl,
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
       /*GenericParams=*/nullptr, structDecl);
-
-  // Set the constructor's type.
-  (void)constructor->getInterfaceType();
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -1714,8 +1702,6 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(elementTy), dc,
                      getter->getClangNode());
 
-  (void)thunk->getInterfaceType();
-
   thunk->setAccess(getOverridableAccessLevel(dc));
 
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
@@ -1767,7 +1753,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      valueIndicesPL,
                      TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
                      setter->getClangNode());
-  (void)thunk->getInterfaceType();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
 
@@ -1952,7 +1937,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*GenericParams=*/nullptr,
                      params,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
-  (void)getterDecl->getInterfaceType();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
@@ -3739,7 +3723,6 @@ namespace {
 
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      (void)result->getInterfaceType();
 
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -4321,9 +4304,6 @@ namespace {
         result->setStatic();
       if (forceClassMethod)
         result->setImplicit();
-
-      // Compute the interface type.
-      (void)result->getInterfaceType();
 
       Impl.recordImplicitUnwrapForDecl(result, isIUO);
 
@@ -5861,8 +5841,6 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                                 std::move(initKind));
   result->setImportAsStaticMember();
 
-  // Set the constructor's type.
-  (void)result->getInterfaceType();
   Impl.recordImplicitUnwrapForDecl(result,
                                    importedType.isImplicitlyUnwrapped());
   result->setOverriddenDecls({ });
@@ -6340,9 +6318,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*GenericParams=*/nullptr, dc);
 
   addObjCAttribute(result, selector);
-
-  // Calculate the function type of the result.
-  (void)result->getInterfaceType();
 
   Impl.recordImplicitUnwrapForDecl(result,
                                    importedType.isImplicitlyUnwrapped());
@@ -8384,7 +8359,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      params,
                      TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
-  (void)func->getInterfaceType();
   func->setAccess(getOverridableAccessLevel(dc));
   func->setIsObjC(false);
   func->setIsDynamic(false);

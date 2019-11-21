@@ -50,7 +50,7 @@ namespace {
     }
   };
 
-  DiagnosticInfo testDiagnosticInfo(SourceLoc Loc, std::string Message,
+  DiagnosticInfo testDiagnosticInfo(SourceLoc Loc, const char *Message,
                                     DiagnosticKind Kind) {
     return DiagnosticInfo(DiagID(0), Loc, Kind, Message, /*args*/ {},
                           /*indirectBuffer*/ SourceLoc(), /*childInfo*/ {},

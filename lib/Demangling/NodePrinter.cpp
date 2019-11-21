@@ -1517,7 +1517,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::PartialApplyObjCForwarder:
@@ -1528,7 +1528,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 
     if (Node->hasChildren()) {
       Printer << " for ";
-      print(Node->getFirstChild());
+      printChildren(Node);
     }
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:

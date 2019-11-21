@@ -17,6 +17,7 @@
 #ifndef SWIFT_BASIC_SOURCELOC_H
 #define SWIFT_BASIC_SOURCELOC_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
@@ -77,7 +78,7 @@ public:
     print(OS, SM, Tmp);
   }
 
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 
 	friend size_t hash_value(SourceLoc loc) {
 		return reinterpret_cast<uintptr_t>(loc.getOpaquePointerValue());
@@ -128,7 +129,7 @@ public:
     print(OS, SM, Tmp, PrintText);
   }
 
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
 /// A half-open character-based source range.
@@ -219,7 +220,7 @@ public:
     print(OS, SM, Tmp, PrintText);
   }
   
-  void dump(const SourceManager &SM) const;
+  SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
 } // end namespace swift

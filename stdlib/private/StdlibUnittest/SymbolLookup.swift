@@ -26,9 +26,9 @@
 #elseif os(Linux)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
 #elseif os(Android)
-  #if arch(arm)
+  #if arch(arm) || arch(i386)
     let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff as UInt)
-  #elseif arch(arm64)
+  #elseif arch(arm64) || arch(x86_64)
     let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
   #else
     #error("Unsupported platform")

@@ -37,7 +37,7 @@ static bool checkCompilerRepresentable(const Type &type) {
 
 /// Checks that the body of a function is compiler evaluable.
 class CheckCompilerEvaluableBody : public ASTWalker {
-  TypeChecker &TC;
+  ASTContext &Ctx;
 
   // The function whose body we are checking.
   const AbstractFunctionDecl *CheckingFunc;
@@ -46,9 +46,9 @@ class CheckCompilerEvaluableBody : public ASTWalker {
   bool CompilerEvaluable = true;
 
 public:
-  CheckCompilerEvaluableBody(TypeChecker &TC,
+  CheckCompilerEvaluableBody(ASTContext &Ctx,
                              const AbstractFunctionDecl *CheckingFunc)
-      : TC(TC), CheckingFunc(CheckingFunc) {}
+      : Ctx(Ctx), CheckingFunc(CheckingFunc) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     // If this is the ignored part of a DotSyntaxBaseIgnored, then we can accept
@@ -59,7 +59,7 @@ public:
         return {false, E};
 
     if (!checkCompilerRepresentable(E->getType())) {
-      TC.diagnose(E->getLoc(), diag::compiler_evaluable_forbidden_type,
+      Ctx.Diags.diagnose(E->getLoc(), diag::compiler_evaluable_forbidden_type,
                   E->getType())
           .highlight(E->getSourceRange());
       CompilerEvaluable = false;
@@ -123,7 +123,7 @@ public:
     #include "swift/AST/ExprNodes.def"
 
     default:
-      TC.diagnose(E->getStartLoc(),
+      Ctx.Diags.diagnose(E->getStartLoc(),
                   diag::compiler_evaluable_forbidden_expression)
           .highlight(E->getSourceRange());
       CompilerEvaluable = false;
@@ -141,7 +141,7 @@ public:
     // Strings and they call functions imported from C).
     if (auto *calleeRef = dyn_cast<DeclRefExpr>(call->getDirectCallee()))
       if (auto *callee = dyn_cast<AbstractFunctionDecl>(calleeRef->getDecl()))
-        if (callee->isChildContextOf(TC.Context.TheStdlibModule) &&
+        if (callee->isChildContextOf(Ctx.TheStdlibModule) &&
             (callee->getNameStr() == "_precondition" ||
              callee->getNameStr() == "_preconditionFailure" ||
              callee->getNameStr() == "_sanityCheck" ||
@@ -165,7 +165,7 @@ public:
           varDecl->getDeclContext()->isChildContextOf(CheckingFunc))
         return {true, declRef};
 
-      TC.diagnose(declRef->getLoc(),
+      Ctx.Diags.diagnose(declRef->getLoc(),
                   diag::compiler_evaluable_non_local_mutable);
       CompilerEvaluable = false;
       return {false, declRef};
@@ -174,7 +174,7 @@ public:
     } else if (isa<EnumElementDecl>(decl)) {
       return {true, declRef};
     } else {
-      TC.diagnose(declRef->getLoc(),
+      Ctx.Diags.diagnose(declRef->getLoc(),
                   diag::compiler_evaluable_forbidden_expression)
           .highlight(declRef->getSourceRange());
       CompilerEvaluable = false;
@@ -201,7 +201,7 @@ public:
 
     // For now, allow all builtins.
     // TODO: Mark which builtins are actually compiler evaluable.
-    if (decl->isChildContextOf(TC.Context.TheBuiltinModule))
+    if (decl->isChildContextOf(Ctx.TheBuiltinModule))
       return {true, declRef};
 
     // Allow all protocol methods. Later, the interpreter looks up the actual
@@ -209,7 +209,7 @@ public:
     if (isa<ProtocolDecl>(decl->getDeclContext()))
       return {true, declRef};
 
-    TC.diagnose(declRef->getLoc(),
+    Ctx.Diags.diagnose(declRef->getLoc(),
                 diag::compiler_evaluable_ref_non_compiler_evaluable);
     CompilerEvaluable = false;
     return {false, declRef};
@@ -217,7 +217,7 @@ public:
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (S->getKind() == StmtKind::While) {
-      TC.diagnose(S->getStartLoc(), diag::compiler_evaluable_loop);
+      Ctx.Diags.diagnose(S->getStartLoc(), diag::compiler_evaluable_loop);
       CompilerEvaluable = false;
       return {false, S};
     }
@@ -241,7 +241,7 @@ void TypeChecker::checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D) {
   assert(D->getBodyKind() == AbstractFunctionDecl::BodyKind::TypeChecked &&
          "cannot check @compilerEvaluable body that is not type checked");
 
-  CheckCompilerEvaluableBody Checker(*this, D);
+  CheckCompilerEvaluableBody Checker(this->Context, D);
   D->getBody()->walk(Checker);
   if (!Checker.getCompilerEvaluable()) {
     compilerEvaluableAttr->setInvalid();

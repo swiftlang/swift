@@ -14,6 +14,7 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -177,8 +178,7 @@ public:
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger") {
+  SWIFT_DEBUG_DUMP {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->dump();
     }

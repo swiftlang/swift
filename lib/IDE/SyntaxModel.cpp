@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
@@ -345,6 +346,21 @@ class ModelASTWalker : public ASTWalker {
   /// When non-zero, we should avoid passing tokens as syntax nodes since a parent of several tokens
   /// is considered as one, e.g. object literal expression.
   uint8_t AvoidPassingSyntaxToken = 0;
+
+  class InactiveClauseRAII {
+    const bool wasInInactiveClause;
+    bool &isInInactiveClause;
+
+  public:
+    InactiveClauseRAII(bool &isInInactiveClauseArg, bool enteringInactiveClause)
+        : wasInInactiveClause(isInInactiveClauseArg),
+          isInInactiveClause(isInInactiveClauseArg) {
+      isInInactiveClause |= enteringInactiveClause;
+    }
+    ~InactiveClauseRAII() { isInInactiveClause = wasInInactiveClause; }
+  };
+  friend class InactiveClauseRAII;
+  bool inInactiveClause = false;
 
 public:
   SyntaxModelWalker &Walker;
@@ -890,7 +906,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     // Normally bindExtension() would take care of computing the extended
     // nominal. It must be done before asking for generic parameters.
-    ED->computeExtendedNominal();
+    if (!inInactiveClause || ASTScope::areInactiveIfConfigClausesSupported())
+      ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;
@@ -967,6 +984,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
+      InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
       for (auto &Element : Clause.Elements) {
         if (auto *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);

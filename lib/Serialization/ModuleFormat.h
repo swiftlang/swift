@@ -904,6 +904,7 @@ namespace decls_block {
     TypeIDField,         // type
     BCFixed<1>,          // vararg?
     BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // non-ephemeral?
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>           // nondifferentiable?
   >;

@@ -14,7 +14,8 @@ func differentiate_foo_wrt_0(_ x: Float) -> Float {
   foo(x, 1)
 }
 
-// CHECK-LABEL: @{{.*}}differentiate_foo_wrt_0{{.*}}__vjp
+// Intentional "//" in the label so that this doesn't match a [differentiable] attr pointing at the vjp.
+// CHECK-LABEL: // {{.*}}differentiate_foo_wrt_0{{.*}}__vjp
 // CHECK: bb0
 // CHECK:   [[FOO_ORIG:%.*]] = function_ref @{{.*}}foo{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   [[FOO_FLOAT:%.*]] = partial_apply [callee_guaranteed] [[FOO_ORIG]]<Float>() : $@convention(thin) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> @out τ_0_0

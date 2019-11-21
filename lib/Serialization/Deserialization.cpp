@@ -2590,7 +2590,6 @@ public:
     }
 
     ctor->setImplicitlyUnwrappedOptional(isIUO);
-    (void)ctor->getInterfaceType();
 
     return ctor;
   }
@@ -2753,7 +2752,19 @@ public:
 
     // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
-      VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
+      auto backingDecl = MF.getDeclChecked(backingPropertyIDs[0]);
+      if (!backingDecl) {
+        if (numBackingProperties > 1 &&
+            backingDecl.errorIsA<XRefNonLoadedModuleError>()) {
+            // A property wrapper defined behind an implementation-only import
+            // is safe to drop when it can't be deserialized.
+            // rdar://problem/56599179
+            consumeError(backingDecl.takeError());
+        } else
+          return backingDecl.takeError();
+      }
+
+      VarDecl *backingVar = cast<VarDecl>(backingDecl.get());
       VarDecl *storageWrapperVar = nullptr;
       if (numBackingProperties > 1) {
         storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
@@ -2812,8 +2823,8 @@ public:
     if (paramTy->hasError()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
-      DC->dumpContext();
-      paramTy->dump();
+      DC->printContext(llvm::errs());
+      paramTy->dump(llvm::errs());
       MF.fatal();
     }
 
@@ -3054,9 +3065,6 @@ public:
           OpaqueResultTypeRequest{fn},
           cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
-
-    // Compute the interface type.
-    (void)fn->getInterfaceType();
 
     return fn;
   }
@@ -3435,8 +3443,8 @@ public:
       theClass->setImplicit();
     theClass->setIsObjC(isObjC);
     theClass->setSuperclass(MF.getType(superclassID));
-    if (inheritsSuperclassInitializers)
-      theClass->setInheritsSuperclassInitializers();
+    ctx.evaluator.cacheOutput(InheritsSuperclassInitializersRequest{theClass},
+                              std::move(inheritsSuperclassInitializers));
 
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -3839,7 +3847,6 @@ public:
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    (void)dtor->getInterfaceType();
 
     if (isImplicit)
       dtor->setImplicit();
@@ -3899,6 +3906,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
+      bool skipAttr = false;
       switch (recordID) {
       case decls_block::SILGenName_DECL_ATTR: {
         bool isImplicit;
@@ -4150,13 +4158,19 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
-          MF.fatal(deserialized.takeError());
-          break;
+          if (deserialized.errorIsA<XRefNonLoadedModuleError>()) {
+            // A custom attribute defined behind an implementation-only import
+            // is safe to drop when it can't be deserialized.
+            // rdar://problem/56599179
+            consumeError(deserialized.takeError());
+            skipAttr = true;
+          } else
+            return deserialized.takeError();
+        } else {
+          Attr = CustomAttr::create(ctx, SourceLoc(),
+                                    TypeLoc::withoutLoc(deserialized.get()),
+                                    isImplicit);
         }
-
-        Attr = CustomAttr::create(ctx, SourceLoc(),
-                                  TypeLoc::withoutLoc(deserialized.get()),
-                                  isImplicit);
         break;
       }
 
@@ -4202,10 +4216,12 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         MF.fatal();
       }
 
-      if (!Attr)
-        return llvm::Error::success();
+      if (!skipAttr) {
+        if (!Attr)
+          return llvm::Error::success();
 
-      AddAttribute(Attr);
+        AddAttribute(Attr);
+      }
 
     } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
       IdentifierID discriminatorID;
@@ -4753,11 +4769,13 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isNonDifferentiable;
+        bool isVariadic, isAutoClosure, isNonEphemeral, isNonDifferentiable;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   rawOwnership, isNonDifferentiable);
+                                                   isNonEphemeral,
+                                                   rawOwnership,
+                                                   isNonDifferentiable);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4771,7 +4789,8 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             *ownership, isNonDifferentiable));
+                                             isNonEphemeral, *ownership,
+                                             isNonDifferentiable));
     }
 
     if (!isGeneric) {
@@ -5310,7 +5329,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
   if (typeOrOffset.get()->hasError()) {
-    typeOrOffset.get()->dump();
+    typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
   }
@@ -5628,14 +5647,15 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // rest of the compiler.
       third = nullptr;
     }
-    typeWitnesses[first] = std::make_pair(second, third);
+    typeWitnesses[first] = {second, third};
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
-    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
-                                typeWitness.second.second);
+    conformance->setTypeWitness(typeWitness.first,
+                                typeWitness.second.getWitnessType(),
+                                typeWitness.second.getWitnessDecl());
   }
 
   // An imported requirement may have changed type between Swift versions.

@@ -14,6 +14,7 @@
 #define SWIFT_IDE_CODECOMPLETION_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -314,7 +315,7 @@ public:
 
   /// Print a debug representation of the code completion string to \p OS.
   void print(raw_ostream &OS) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 };
 
 /// Describes the origin of the code completion result.
@@ -763,7 +764,7 @@ public:
 
   /// Print a debug representation of the code completion result to \p OS.
   void print(raw_ostream &OS) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
   static CodeCompletionOperatorKind

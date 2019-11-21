@@ -154,6 +154,7 @@ func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
 
   // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
   t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'Int' to subscript of type 'T.ElementType'}}
 }
 
 //===----------------------------------------------------------------------===//

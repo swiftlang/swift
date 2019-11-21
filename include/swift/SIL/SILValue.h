@@ -537,7 +537,7 @@ struct OperandOwnershipKindMap {
   UseLifetimeConstraint getLifetimeConstraint(ValueOwnershipKind kind) const;
 
   void print(llvm::raw_ostream &os) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

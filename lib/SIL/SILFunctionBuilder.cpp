@@ -93,15 +93,25 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
       (void)A->getParameterIndices();
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
+      auto &ctx = F->getASTContext();
       // Get lowered argument indices.
       auto *paramIndices = A->getParameterIndices();
       assert(paramIndices && "Parameter indices should have been resolved");
       auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
           paramIndices, decl->getInterfaceType()->castTo<AnyFunctionType>());
+      // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
+      // parameters corresponding to captured variables. These parameters do not
+      // appear in the type of `origFnType`.
+      // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+      // take `CaptureInfo` into account.
+      auto origSilFnType = F->getLoweredFunctionType();
+      if (origSilFnType->getNumParameters() >
+          loweredParamIndices->getCapacity())
+        loweredParamIndices = loweredParamIndices->extendingCapacity(
+            ctx, origSilFnType->getNumParameters());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       // Get JVP/VJP names.
       std::string jvpName, vjpName;
-      auto &ctx = F->getASTContext();
       if (auto *jvpFn = A->getJVPFunction()) {
         Mangle::ASTMangler mangler;
         jvpName = ctx.getIdentifier(

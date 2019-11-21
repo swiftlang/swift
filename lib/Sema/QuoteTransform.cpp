@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeVisitor.h"
@@ -66,8 +67,8 @@ protected:
   ASTContext &ctx;
   Breadcrumbs &bcs;
 
-  AbstractQuoter(TypeChecker &tc, Breadcrumbs &bcs)
-      : tc(tc), ctx(tc.Context), bcs(bcs) {}
+  AbstractQuoter(TypeChecker &tc, ASTContext& ctx, Breadcrumbs &bcs)
+      : tc(tc), ctx(ctx), bcs(bcs) {}
 
   Expr *quoteArray(ArrayRef<Expr *> quotedTrees) {
     auto arrayExpr =
@@ -133,9 +134,9 @@ protected:
     if (culprit) {
       auto str =
           allocateString([&](raw_ostream &os) { return culprit->dump(os); });
-      tc.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_detailed, str);
+      ctx.Diags.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_detailed, str);
     } else {
-      tc.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_brief);
+      ctx.Diags.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_brief);
     }
   }
 
@@ -158,7 +159,8 @@ private:
 class TypeQuoter : public TypeVisitor<TypeQuoter, Expr *>,
                    private AbstractQuoter {
 public:
-  TypeQuoter(TypeChecker &tc, Breadcrumbs &bcs) : AbstractQuoter(tc, bcs) {}
+  TypeQuoter(TypeChecker &tc, ASTContext &ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(tc, ctx, bcs) {}
 
 #define UNSUPPORTED_TYPE(TYPE)                                                 \
   Expr *visit##TYPE(TYPE *type) { return unknownTree(type); }
@@ -296,8 +298,8 @@ class ASTQuoter
   TypeQuoter typeQuoter;
 
 public:
-  ASTQuoter(TypeChecker &tc, Breadcrumbs &bcs)
-      : AbstractQuoter(tc, bcs), typeQuoter(TypeQuoter(tc, bcs)) {}
+  ASTQuoter(TypeChecker &tc, ASTContext& ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(tc, ctx, bcs), typeQuoter(TypeQuoter(tc, ctx, bcs)) {}
 
 #define UNSUPPORTED_EXPR(EXPR)                                                 \
   Expr *visit##EXPR(EXPR *expr) {                                              \
@@ -416,7 +418,7 @@ public:
           DeclRefExpr(ConcreteDeclRef(attr->getQuoteDecl()), DeclNameLoc(),
                       /*Implicit=*/true);
       auto quoteCall = CallExpr::createImplicit(ctx, quoteRef, {}, {});
-      auto &tc = TypeChecker::createForContext(ctx);
+      auto &tc = createTypeChecker(ctx);
       auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
       return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
     } else {
@@ -497,7 +499,7 @@ public:
         auto quoteDot =
             new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
         auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-        auto &tc = TypeChecker::createForContext(ctx);
+        auto &tc = createTypeChecker(ctx);
         auto type = tc.getTypeOfQuoteExpr(refType, ref->getLoc());
         return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
       } else {
@@ -530,7 +532,7 @@ public:
           auto quoteDot =
               new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
           auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-          auto &tc = TypeChecker::createForContext(ctx);
+          auto &tc = createTypeChecker(ctx);
           auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
           return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
         } else {
@@ -1222,7 +1224,7 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
   assert(expr->getType());
 
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, bcs);
+  ASTQuoter astQuoter(*this, Context, bcs);
   Expr *quotedExpr = astQuoter.visit(expr);
   if (!quotedExpr) {
     return nullptr;
@@ -1271,14 +1273,15 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
 Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
   assert(exprType);
   if (!Context.getQuoteModule()) {
-    diagnose(loc, diag::quote_literal_no_quote_module);
+    Context.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
   if (auto fnExprType = exprType->getAs<FunctionType>()) {
     auto n = fnExprType->getParams().size();
     auto quoteClass = Context.getFunctionQuoteDecl(n);
     if (!quoteClass) {
-      diagnose(loc, diag::quote_literal_no_function_quote_class, n);
+      Context.Diags.diagnose(loc, diag::quote_literal_no_function_quote_class,
+                             n);
       return Type();
     }
     SmallVector<Type, 4> typeArgs;
@@ -1294,7 +1297,7 @@ Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
   } else {
     auto quoteClass = Context.getQuoteDecl();
     if (!quoteClass) {
-      diagnose(loc, diag::quote_literal_no_quote_class);
+      Context.Diags.diagnose(loc, diag::quote_literal_no_quote_class);
       return Type();
     }
     if (auto lvalueExprType = exprType->getAs<LValueType>()) {
@@ -1327,18 +1330,18 @@ Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
       }
       return FunctionType::get(paramTypes, typeArgs[typeArgs.size() - 1]);
     } else {
-      diagnose(loc, diag::unquote_wrong_type);
+      Context.Diags.diagnose(loc, diag::unquote_wrong_type);
       return Type();
     }
   } else {
-    diagnose(loc, diag::unquote_wrong_type);
+    Context.Diags.diagnose(loc, diag::unquote_wrong_type);
     return Type();
   }
 }
 
 Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, bcs);
+  ASTQuoter astQuoter(*this, Context, bcs);
   Expr *quotedDecl = astQuoter.visit(decl);
   if (!quotedDecl) {
     return nullptr;
@@ -1354,12 +1357,12 @@ Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
 
 Type TypeChecker::getTypeOfQuoteDecl(SourceLoc loc) {
   if (!Context.getQuoteModule()) {
-    diagnose(loc, diag::quote_literal_no_quote_module);
+    Context.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
   auto treeProto = Context.getTreeDecl();
   if (!treeProto) {
-    diagnose(loc, diag::quote_literal_no_tree_proto);
+    Context.Diags.diagnose(loc, diag::quote_literal_no_tree_proto);
     return Type();
   }
   return treeProto->getDeclaredType();

@@ -1906,7 +1906,7 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getFirstElement();
   if (body.is<Stmt *>())
     return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
   return body.get<Expr *>();
@@ -1914,16 +1914,16 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getFirstElement();
   if (body.is<Stmt *>()) {
     cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
     return;
   }
-  getBody()->setElement(0, NewBody);
+  getBody()->setFirstElement(NewBody);
 }
 
 bool ClosureExpr::hasEmptyBody() const {
-  return getBody()->getNumElements() == 0;
+  return getBody()->empty();
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -1935,7 +1935,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getElement(0).get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(Body->getFirstElement().get<Stmt *>())->getResult();
 }
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
@@ -2274,14 +2274,14 @@ TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
     : Expr(ExprKind::Tap, /*Implicit=*/true),
       SubExpr(SubExpr), Body(Body) {
   if (Body) {
-    assert(Body->getNumElements() > 0 &&
-         Body->getElement(0).isDecl(DeclKind::Var) &&
+    assert(!Body->empty() &&
+         Body->getFirstElement().isDecl(DeclKind::Var) &&
          "First element of Body should be a variable to init with the subExpr");
   }
 }
 
 VarDecl * TapExpr::getVar() const {
-  return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
+  return dyn_cast<VarDecl>(Body->getFirstElement().dyn_cast<Decl *>());
 }
 
 SourceLoc TapExpr::getEndLoc() const {
@@ -2296,6 +2296,19 @@ SourceLoc TapExpr::getEndLoc() const {
   if (auto *const se = getSubExpr())
     return se->getEndLoc();
   return SourceLoc();
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
+  if (!CE) {
+    out << "(null)";
+    return;
+  }
+
+  if (CE->hasSingleExpressionBody()) {
+    out << "single expression closure";
+  } else {
+    out << "closure";
+  }
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is

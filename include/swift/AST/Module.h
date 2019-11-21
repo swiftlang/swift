@@ -58,7 +58,6 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
-  class LazyResolver;
   class LinkLibrary;
   class ModuleLoader;
   class NominalTypeDecl;

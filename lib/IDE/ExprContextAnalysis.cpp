@@ -74,7 +74,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
     break;
   }
 
@@ -756,7 +756,7 @@ class ExprContextAnalyzer {
   /// in order to avoid a base expression affecting the type. However, now that
   /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
-    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
+    return body->getNumElements() == 1 && body->getFirstElement().is<Expr *>();
   }
 
 public:

@@ -1,6 +1,6 @@
 // FIXME: This should be linear instead of exponential.
-// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes --invert-result %s
-// REQUIRES: asserts
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes --invert-result %s -Xfrontend=-solver-expression-time-threshold=1
+// REQUIRES: asserts,no_asan
 
 enum Val {
   case d([String: Val])

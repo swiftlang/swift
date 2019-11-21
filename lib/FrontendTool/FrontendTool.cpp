@@ -359,15 +359,15 @@ static void computeSwiftModuleTraceInfo(
     // FIXME: The behavior of fs::exists for relative paths is undocumented.
     // Use something else instead?
     if (fs::exists(moduleAdjacentInterfacePath)) {
-      err << "Found swiftinterface at\n" << moduleAdjacentInterfacePath
-          << "\nbut it was not recorded\n";
-      errorUnexpectedPath(err);
+      // This should be an error but it is not because of funkiness around
+      // compatible modules such as us having both armv7s.swiftinterface
+      // and armv7.swiftinterface in the dependency tracker.
+      continue;
     }
     buffer.clear();
 
-    err << "Don't know how to handle the dependency at:\n" << depPath
-        << "\nfor module trace emission.\n";
-    errorUnexpectedPath(err);
+    // We might land here when we have a arm.swiftmodule in the cache path
+    // which added a dependency on a arm.swiftinterface (which was not loaded).
   }
 
   // Almost a re-implementation of reversePathSortedFilenames :(.

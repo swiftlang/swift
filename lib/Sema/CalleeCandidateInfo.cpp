@@ -89,30 +89,36 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
   }
 }
 
-void OverloadCandidate::dump() const {
+void OverloadCandidate::dump(llvm::raw_ostream &os) const {
   if (auto decl = getDecl())
-    decl->dumpRef(llvm::errs());
+    decl->dumpRef(os);
   else
-    llvm::errs() << "<<EXPR>>";
-  llvm::errs() << " - ignore curried self = " << (skipCurriedSelf ? "yes"
-                                                                  : "no");
+    os << "<<EXPR>>";
+  os << " - ignore curried self = " << (skipCurriedSelf ? "yes" : "no");
 
   if (auto FT = getFunctionType())
-    llvm::errs() << " - type: " << Type(FT) << "\n";
+    os << " - type: " << Type(FT) << "\n";
   else
-    llvm::errs() << " - type <<NONFUNCTION>>: " << entityType << "\n";
+    os << " - type <<NONFUNCTION>>: " << entityType << "\n";
 }
 
-void CalleeCandidateInfo::dump() const {
-  llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
+void CalleeCandidateInfo::dump(llvm::raw_ostream &os) const {
+  os << "CalleeCandidateInfo for '" << declName << "': closeness="
   << unsigned(closeness) << "\n";
-  llvm::errs() << candidates.size() << " candidates:\n";
+  os << candidates.size() << " candidates:\n";
   for (auto c : candidates) {
-    llvm::errs() << "  ";
-    c.dump();
+    os << "  ";
+    c.dump(os);
   }
 }
 
+void OverloadCandidate::dump() const {
+  dump(llvm::errs());
+}
+
+void CalleeCandidateInfo::dump() const {
+  dump(llvm::errs());
+}
 
 /// Given a candidate list, this computes the narrowest closeness to the match
 /// we're looking for and filters out any worse matches.  The predicate
@@ -381,7 +387,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       // type is identical to the argument type, or substitutable via handling
       // of functions with primary archetypes in one or more parameters.
       // We can still do something more sophisticated with this.
-      // FIXME: Use TC.isConvertibleTo?
+      // FIXME: Use TypeChecker::isConvertibleTo?
       
       TypeSubstitutionMap archetypesMap;
       bool matched;
@@ -932,11 +938,12 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
     suggestionText += name;
   }
 
+  auto &DE = CS.getASTContext().Diags;
   if (sorted.size() == 1) {
-    CS.TC.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
+    DE.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
   } else {
-    CS.TC.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
-                   suggestionText);
+    DE.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
+                suggestionText);
   }
 }
 
@@ -961,15 +968,14 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
 
     InaccessibleMemberFailure failure(
-        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+        CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
     auto diagnosed = failure.diagnoseAsError();
     assert(diagnosed && "failed to produce expected diagnostic");
 
     for (auto cand : candidates) {
       auto *candidate = cand.getDecl();
       if (candidate && candidate != decl)
-        CS.TC.diagnose(candidate, diag::decl_declared_here,
-                       candidate->getFullName());
+        candidate->diagnose(diag::decl_declared_here, candidate->getFullName());
     }
     
     return true;

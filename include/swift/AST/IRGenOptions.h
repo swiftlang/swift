@@ -209,6 +209,10 @@ public:
   /// Disable round-trip verification of mangled debug types.
   unsigned DisableRoundTripDebugTypes : 1;
 
+  /// Whether to disable shadow copies for local variables on the stack. This is
+  /// only used for testing.
+  unsigned DisableDebuggerShadowCopies : 1;
+
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
@@ -237,8 +241,7 @@ public:
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
-        DisableClangModuleSkeletonCUs(false),
-        UseJIT(false),
+        DisableClangModuleSkeletonCUs(false), UseJIT(false),
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
@@ -252,8 +255,8 @@ public:
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         // SWIFT_ENABLE_TENSORFLOW
         // TODO(TF-486): Reenable round type debug types.
-        DisableRoundTripDebugTypes(true), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableRoundTripDebugTypes(true), DisableDebuggerShadowCopies(false),
+        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   /// Appends to \p os an arbitrary string representing all options which
