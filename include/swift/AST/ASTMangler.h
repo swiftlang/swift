@@ -192,7 +192,8 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
-                                        StringRef USRPrefix);
+                                        StringRef USRPrefix,
+                                        bool IsStatic);
 
   std::string mangleLocalTypeDecl(const TypeDecl *type);
 

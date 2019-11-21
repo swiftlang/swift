@@ -525,11 +525,12 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   const AbstractStorageDecl *decl,
-                                                  StringRef USRPrefix) {
+                                                  StringRef USRPrefix,
+                                                  bool isStatic) {
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
-  appendAccessorEntity(getCodeForAccessorKind(kind), decl, /*isStatic*/ false);
+  appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
   // We have a custom prefix, so finalize() won't verify for us. Do it manually.
   verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
