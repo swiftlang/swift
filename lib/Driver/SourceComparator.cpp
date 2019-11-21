@@ -74,18 +74,14 @@ SourceComparator::buildEquivalenceClasses() {
   return rhsMap;
 }
 
-std::unique_ptr<SourceComparator::PRLink>
-SourceComparator::newPRLink(LineIndices lines, PRLink *next) {
-  return llvm::make_unique<PRLink>(lines, next);
-}
 
-std::pair<std::vector<std::unique_ptr<SourceComparator::PRLink>>,
+std::pair<std::vector<SourceComparator::PRLink>,
           SourceComparator::SortedSequence>
 SourceComparator::buildDAGOfSubsequences(
     std::unordered_map<std::string, std::vector<size_t>> rhsMap) {
   SortedSequence thresh;
   const size_t linksSize = regionsToCompare.size().min();
-  std::vector<std::unique_ptr<PRLink>> links;
+  std::vector<PRLink> links;
   links.resize(linksSize);
 
   for (auto i = regionsToCompare.start.lhs(); i < regionsToCompare.end.lhs();
@@ -108,8 +104,8 @@ SourceComparator::buildDAGOfSubsequences(
         auto k = optK.getValue();
         // prev match (of what?) was at links[k-1]?
         // chain to that match
-        PRLink *newNext = k == 0 ? nullptr : links[k - 1].get();
-        links[k] = newPRLink(LineIndices(i, j), newNext);
+        Optional<size_t> newNext = k == 0 ? None : Optional<size_t>(k - 1);
+        links.emplace(links.begin() + k, LineIndices(i, j), newNext);
       }
     }
   }
@@ -117,16 +113,18 @@ SourceComparator::buildDAGOfSubsequences(
 }
 
 void SourceComparator::scanMatchedLines(
-    std::pair<std::vector<std::unique_ptr<PRLink>>, SortedSequence>
+    std::pair<std::vector<PRLink>, SortedSequence>
         &&linksAndThres) {
   const auto &links = linksAndThres.first;
   const auto &thresh = linksAndThres.second;
 
+  if (thresh.empty())
+    return;
   // For every match put rhs index in matches[col2 index]
-  for (const PRLink *lnk = thresh.empty() ? nullptr
-                                          : links[thresh.size() - 1].get();
-       lnk; lnk = lnk->next)
-    matches[lnk->lines.lhs()] = lnk->lines.rhs();
+  for (const auto *p = &links[thresh.size() - 1];
+       p;
+       p = p->next ? &links[p->next.getValue()] : nullptr)
+    matches[p->lines.lhs()] = p->lines.rhs();
 }
 
 //==============================================================================

@@ -97,6 +97,7 @@ public:
   struct LineIndices : public Indices<LineIndices> {
     LineIndices() : Indices(~0, ~0) {}
     LineIndices(size_t lhs, size_t rhs) : Indices(lhs, rhs) {}
+    LineIndices & operator=(const LineIndices&) = default;
     LineIndices &operator++() {
       ++lhs(), ++rhs();
       return *this;
@@ -211,9 +212,10 @@ private:
 
   /// Chains matching lines together (I think)
   struct PRLink {
-    const LineIndices lines;
-    const PRLink *const next;
-    PRLink(LineIndices lines, const PRLink *next) : lines(lines), next(next) {}
+    LineIndices lines;
+    Optional<size_t> next;
+    PRLink(LineIndices lines, const Optional<size_t> next) : lines(lines), next(next) {}
+    PRLink() : PRLink(LineIndices(), None) {}
   };
 
 
@@ -269,13 +271,12 @@ private:
   std::unordered_map<std::string, std::vector<size_t>>
   buildEquivalenceClasses();
 
-  std::unique_ptr<PRLink> newPRLink(LineIndices, PRLink *next);
 
-  std::pair<std::vector<std::unique_ptr<PRLink>>, SortedSequence>
+  std::pair<std::vector<PRLink>, SortedSequence>
   buildDAGOfSubsequences(
       std::unordered_map<std::string, std::vector<size_t>> rhsMap);
 
-  void scanMatchedLines(std::pair<std::vector<std::unique_ptr<PRLink>>,
+  void scanMatchedLines(std::pair<std::vector<PRLink>,
                                   SortedSequence> &&linksAndThres);
 
   //==============================================================================
