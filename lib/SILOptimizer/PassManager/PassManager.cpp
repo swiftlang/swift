@@ -273,8 +273,8 @@ public:
 } // end anonymous namespace
 
 SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
-                               bool isMandatoryPipeline)
-    : Mod(M), StageName(Stage), isMandatoryPipeline(isMandatoryPipeline),
+                               bool isMandatory)
+    : Mod(M), StageName(Stage), isMandatory(isMandatory),
       deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
@@ -292,13 +292,13 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
 }
 
 SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                               llvm::StringRef Stage, bool isMandatoryPipeline)
-    : SILPassManager(M, Stage, isMandatoryPipeline) {
+                               llvm::StringRef Stage, bool isMandatory)
+    : SILPassManager(M, Stage, isMandatory) {
   this->IRMod = IRMod;
 }
 
 bool SILPassManager::continueTransforming() {
-  if (isMandatoryPipeline)
+  if (isMandatory)
     return true;
   return NumPassesRun < SILNumOptPassesToRun;
 }
@@ -467,7 +467,7 @@ runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx) {
 
     // Only include functions that are definitions, and which have not
     // been intentionally excluded from optimization.
-    if (F.isDefinition() && (isMandatoryPipeline || F.shouldOptimize()))
+    if (F.isDefinition() && (isMandatory || F.shouldOptimize()))
       FunctionWorklist.push_back(*I);
   }
 
@@ -675,8 +675,8 @@ void SILPassManager::notifyOfNewFunction(SILFunction *F, SILTransform *T) {
 
 void SILPassManager::addFunctionToWorklist(SILFunction *F,
                                            SILFunction *DerivedFrom) {
-  assert(F && F->isDefinition() && (isMandatoryPipeline || F->shouldOptimize())
-         && "Expected optimizable function definition!");
+  assert(F && F->isDefinition() && (isMandatory || F->shouldOptimize()) &&
+         "Expected optimizable function definition!");
 
   constexpr int MaxDeriveLevels = 10;
 
