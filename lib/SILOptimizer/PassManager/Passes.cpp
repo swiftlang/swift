@@ -96,12 +96,27 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
 
-  if (Module.getOptions().DisableSILPerfOptimizations)
+  if (Module.getOptions().DisableSILPerfOptimizations) {
+    // If we are not supposed to run SIL perf optzns, we may still need to
+    // serialize. So serialize now.
+    SILPassManager PM(&Module, "" /*stage*/, true /*isMandatory*/);
+    PM.executePassPipelinePlan(
+        SILPassPipelinePlan::getSerializeSILPassPipeline(Module.getOptions()));
     return;
+  }
 
-  SILPassManager PM(&Module);
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPerformancePassPipeline(Module.getOptions()));
+  {
+    SILPassManager PM(&Module);
+    PM.executePassPipelinePlan(
+        SILPassPipelinePlan::getPerformancePassPipeline(Module.getOptions()));
+  }
+
+  // Check if we actually serialized our module. If we did not, serialize now.
+  if (!Module.isSerialized()) {
+    SILPassManager PM(&Module, "" /*stage*/, true /*isMandatory*/);
+    PM.executePassPipelinePlan(
+        SILPassPipelinePlan::getSerializeSILPassPipeline(Module.getOptions()));
+  }
 
   // If we were asked to debug serialization, exit now.
   if (Module.getOptions().DebugSerialization)
