@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -279,9 +280,42 @@ namespace {
 class MandatoryCombine final : public SILFunctionTransform {
 
   SmallVector<SILInstruction *, 64> createdInstructions;
+  
+  // If the function can be removed, remove it and return true.
+  // Otherwise, return false.
+  bool tryRemoveUnusedFunction(SILFunction *function) {
+    SILOptFunctionBuilder funcBuilder(*this);
+    
+    if (function->getRefCount() != 0) return false;
+
+    // Leave non-transparent functions alone.
+    if (!function->isTransparent())
+     return false;
+
+    // We discard functions that don't have external linkage,
+    // e.g. deserialized functions, internal functions, and thunks.
+    // Being marked transparent controls this.
+    if (function->isPossiblyUsedExternally()) return false;
+
+    // ObjC functions are called through the runtime and are therefore alive
+    // even if not referenced inside SIL.
+    if (function->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
+     return false;
+
+    // Okay, just erase the function from the module.
+    funcBuilder.eraseFunction(function);
+    return true;
+  }
 
   void run() override {
     auto *function = getFunction();
+    
+    // If the function can be removed, remove it and
+    // don't do all the extra work below.
+    if (tryRemoveUnusedFunction(function)) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+      return;
+    }
 
     // If this function is an external declaration, bail. We only want to visit
     // functions with bodies.

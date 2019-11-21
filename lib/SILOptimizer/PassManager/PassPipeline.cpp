@@ -117,6 +117,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   if (!Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
+  P.addMandatoryCombine();
   P.addMandatorySILLinker();
 
   // Promote loads as necessary to ensure we have enough SSA formation to emit

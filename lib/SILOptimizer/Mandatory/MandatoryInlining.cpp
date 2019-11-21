@@ -967,7 +967,6 @@ class MandatoryInlining : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
-    bool ShouldCleanup = !getOptions().DebugSerialization;
     bool SILVerifyAll = getOptions().VerifyAll;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
@@ -997,35 +996,10 @@ class MandatoryInlining : public SILFunctionTransform {
       F->verify();
     }
 
-    if (!ShouldCleanup)
-      return;
-
-    // Now that we've inlined some functions, clean up.  If there are any
-    // transparent functions that are deserialized from another module that are
-    // now unused, just remove them from the module.
-    //
-    // We do this with a simple linear scan, because transparent functions that
-    // reference each other have already been flattened.
     invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
 
-    if (F->getRefCount() != 0) return;
-
-    // Leave non-transparent functions alone.
-    if (!F->isTransparent())
-     return;
-
-    // We discard functions that don't have external linkage,
-    // e.g. deserialized functions, internal functions, and thunks.
-    // Being marked transparent controls this.
-    if (F->isPossiblyUsedExternally()) return;
-
-    // ObjC functions are called through the runtime and are therefore alive
-    // even if not referenced inside SIL.
-    if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
-     return;
-
-    // Okay, just erase the function from the module.
-    FuncBuilder.eraseFunction(F);
+    // If there are any transparent functions that are deserialized from
+    // another module that are now unused, MandatoryCombine will remove them.
   }
 
 };
