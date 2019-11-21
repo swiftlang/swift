@@ -7334,13 +7334,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
   // is true.
-  auto hasCallAsFunctionMethods =
-      desugar2->mayHaveMembers() &&
-      llvm::any_of(lookupMember(desugar2, DeclName(ctx.Id_callAsFunction)),
-                   [](LookupResultEntry entry) {
-                     return isa<FuncDecl>(entry.getValueDecl());
-                   });
-  if (hasCallAsFunctionMethods) {
+  if (desugar2->isCallableNominalType(DC)) {
     auto memberLoc = getConstraintLocator(
         outerLocator.withPathElement(ConstraintLocator::Member));
     // Add a `callAsFunction` member constraint, binding the member type to a
