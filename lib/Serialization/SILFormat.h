@@ -56,22 +56,6 @@ enum SILVTableEntryKindEncoding : uint8_t {
 };
 using SILVTableEntryKindField = BCFixed<2>;
 
-enum CheckedCastKindEncoding : uint8_t {
-  SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE,
-  SIL_CHECKED_CAST_ARRAY_DOWNCAST,
-  SIL_CHECKED_CAST_ARRAY_DOWNCAST_BRIDGED,
-  SIL_CHECKED_CAST_DICTIONARY_DOWNCAST,
-  SIL_CHECKED_CAST_DICTIONARY_DOWNCAST_BRIDGED,
-  SIL_CHECKED_CAST_DOWNCAST,
-  SIL_CHECKED_CAST_IDENTICAL,
-  SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE,
-  SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE,
-  SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL,
-};
-
 enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
@@ -93,15 +77,6 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
   Function,
   DeclRef,
-};
-
-// Constants for packing an encoded CheckedCastKind and
-// CastConsumptionKind together.
-enum {
-  // Must be large enough to store all the CheckedCastKindEncodings
-  SIL_CAST_CONSUMPTION_BIT_OFFSET = 4,
-  SIL_CHECKED_CAST_MASK =
-    (1 << SIL_CAST_CONSUMPTION_BIT_OFFSET) - 1
 };
 
 /// The record types within the "sil-index" block.
