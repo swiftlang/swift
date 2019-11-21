@@ -19,7 +19,7 @@ using namespace swift;
 
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
-         v.getOwnershipKind() == ValueOwnershipKind::Any;
+         v.getOwnershipKind() == ValueOwnershipKind::None;
 }
 
 // These operations forward both owned and guaranteed ownership.
@@ -44,6 +44,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
+  case SILNodeKind::MarkDependenceInst:
     return true;
   default:
     return false;
@@ -81,22 +82,22 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
 
-void BorrowScopeIntroducerKind::print(llvm::raw_ostream &os) const {
+void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
   switch (value) {
-  case BorrowScopeIntroducerKind::SILFunctionArgument:
+  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     os << "SILFunctionArgument";
     return;
-  case BorrowScopeIntroducerKind::BeginBorrow:
+  case BorrowScopeIntroducingValueKind::BeginBorrow:
     os << "BeginBorrowInst";
     return;
-  case BorrowScopeIntroducerKind::LoadBorrow:
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
     os << "LoadBorrowInst";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducerKind::dump() const {
+void BorrowScopeIntroducingValueKind::dump() const {
 #ifndef NDEBUG
   print(llvm::dbgs());
 #endif
@@ -107,13 +108,13 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   assert(isLocalScope() && "Should only call this given a local scope");
 
   switch (kind) {
-  case BorrowScopeIntroducerKind::SILFunctionArgument:
+  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducerKind::BeginBorrow:
+  case BorrowScopeIntroducingValueKind::BeginBorrow:
     llvm::copy(cast<BeginBorrowInst>(value)->getEndBorrows(),
                std::back_inserter(scopeEndingInsts));
     return;
-  case BorrowScopeIntroducerKind::LoadBorrow:
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
     llvm::copy(cast<LoadBorrowInst>(value)->getEndBorrows(),
                std::back_inserter(scopeEndingInsts));
     return;
@@ -121,20 +122,24 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValue::visitLocalScopeEndingInstructions(
-    function_ref<void(SILInstruction *)> visitor) const {
+void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
+    function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
-  case BorrowScopeIntroducerKind::SILFunctionArgument:
+  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducerKind::BeginBorrow:
-    for (auto *inst : cast<BeginBorrowInst>(value)->getEndBorrows()) {
-      visitor(inst);
+  case BorrowScopeIntroducingValueKind::BeginBorrow:
+    for (auto *use : value->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        visitor(use);
+      }
     }
     return;
-  case BorrowScopeIntroducerKind::LoadBorrow:
-    for (auto *inst : cast<LoadBorrowInst>(value)->getEndBorrows()) {
-      visitor(inst);
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
+    for (auto *use : value->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        visitor(use);
+      }
     }
     return;
   }
@@ -158,6 +163,13 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
+    // If v produces .none ownership, then we can ignore it. It is important
+    // that we put this before checking for guaranteed forwarding instructions,
+    // since we want to ignore guaranteed forwarding instructions that in this
+    // specific case produce a .none value.
+    if (v.getOwnershipKind() == ValueOwnershipKind::None)
+      continue;
+
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwardingValue(v)) {
@@ -168,17 +180,16 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
-    // If v produces any ownership, then we can ignore it. Otherwise, we need to
-    // return false since this is an introducer we do not understand.
-    if (v.getOwnershipKind() != ValueOwnershipKind::Any)
-      return false;
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // false.
+    return false;
   }
 
   return true;
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     BorrowScopeIntroducerKind kind) {
+                                     BorrowScopeIntroducingValueKind kind) {
   kind.print(os);
   return os;
 }
@@ -203,8 +214,8 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
     return true;
 
   // Otherwise, gather up our local scope ending instructions.
-  visitLocalScopeEndingInstructions(
-      [&scratchSpace](SILInstruction *i) { scratchSpace.emplace_back(i); });
+  visitLocalScopeEndingUses(
+      [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
   return checker.validateLifetime(value, scratchSpace, instructions);

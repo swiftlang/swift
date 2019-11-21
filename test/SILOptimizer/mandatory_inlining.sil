@@ -1401,3 +1401,30 @@ bb6:
   %tuple = tuple()
   return %tuple : $()
 }
+
+sil [transparent] @escaping_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%1 : $@callee_guaranteed () -> ()):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we do not crash here.
+//
+// CHECK-LABEL: sil @partial_apply_stack_failure : $@convention(thin) (@callee_guaranteed () -> ()) -> () {
+// CHECK: } // end sil function 'partial_apply_stack_failure'
+sil @partial_apply_stack_failure : $@convention(thin) (@callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = alloc_stack $@callee_guaranteed () -> ()
+  store %0 to %1 : $*@callee_guaranteed () -> ()
+  %2 = load %1 : $*@callee_guaranteed () -> ()
+  strong_retain %2 : $@callee_guaranteed () -> ()
+  %thunk = function_ref @escaping_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %2a = partial_apply [callee_guaranteed] [on_stack] %thunk(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %2b = mark_dependence %2a : $@noescape @callee_guaranteed () -> () on %2 : $@callee_guaranteed () -> ()
+  apply %2b() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %2a : $@noescape @callee_guaranteed () -> ()
+  destroy_addr %1 : $*@callee_guaranteed () -> ()
+  dealloc_stack %1 : $*@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

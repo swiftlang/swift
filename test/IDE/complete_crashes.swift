@@ -355,8 +355,8 @@ extension Foo {
 }
 #endif
 // RDAR_41234606: Begin completion
-// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Element; name=Element
-// RDAR_41234606-DAG: Decl[AssociatedType]/Super:         .Iterator; name=Iterator
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Element; name=Element
+// RDAR_41234606-DAG: Decl[AssociatedType]/CurrNominal:         .Iterator; name=Iterator
 // RDAR_41234606: End completions
 
 // rdar://problem/41071587

@@ -14,6 +14,7 @@
 #define ExperimentalDependencyGraph_h
 
 #include "swift/AST/ExperimentalDependencies.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/DependencyGraph.h"
@@ -89,7 +90,7 @@ public:
     return DepGraphNode::humanReadableName(where);
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   bool assertProvidedEntityMustBeInAFile() const {
     assert((getSwiftDeps().hasValue() || !getKey().isImplementation()) &&

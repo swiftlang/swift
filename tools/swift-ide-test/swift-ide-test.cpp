@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -309,13 +310,6 @@ ImportObjCHeader("import-objc-header",
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-DisableFunctionBuilderOneWayConstraints(
-    "disable-function-builder-one-way-constraints",
-    llvm::cl::desc("Disable one-way constraints in function builders"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
@@ -747,6 +741,10 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
   // Create a CodeCompletionConsumer.
@@ -773,7 +771,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -808,6 +806,10 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
   SmallVector<const char *, 4> typeNames;
@@ -838,7 +840,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -877,6 +879,13 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
+  // Disable to build syntax tree because code-completion skips some portion of
+  // source text. That breaks an invariant of syntax tree building.
+  Invocation.getLangOptions().BuildSyntaxTree = false;
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -912,7 +921,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -1510,7 +1519,7 @@ private:
 
   void printLoc(SourceLoc Loc, raw_ostream &OS) {
     OS << '@';
-    if (Loc.isValid()) {
+    if (Loc.isValid() && SM.findBufferContainingLoc(Loc) == BufferID) {
       auto LineCol = SM.getLineAndColumn(Loc, BufferID);
       OS  << LineCol.first << ':' << LineCol.second;
     }
@@ -1527,16 +1536,16 @@ private:
         OS << 'i';
       if (isa<ConstructorDecl>(D) && Entity.IsRef) {
         OS << "Ctor";
-        printLoc(D->getLoc(), OS);
+        printLoc(D->getLoc(/*SerializedOK*/false), OS);
         if (Entity.CtorTyRef) {
           OS << '-';
           OS << Decl::getKindName(Entity.CtorTyRef->getKind());
-          printLoc(Entity.CtorTyRef->getLoc(), OS);
+          printLoc(Entity.CtorTyRef->getLoc(/*SerializedOK*/false), OS);
         }
       } else {
         OS << Decl::getKindName(D->getKind());
         if (Entity.IsRef)
-          printLoc(D->getLoc(), OS);
+          printLoc(D->getLoc(/*SerializedOK*/false), OS);
       }
 
     } else {
@@ -2237,9 +2246,11 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
-    UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile());
-    for (auto result : lookup.Results) {
+    auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier(name),
+                                                  CI.getPrimarySourceFile());
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
+    for (auto result : lookup) {
       result.getValueDecl()->print(*Printer, Options);
 
       if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
@@ -2510,6 +2521,18 @@ public:
     }
   }
 
+  void printSerializedLoc(Decl *D) {
+    auto moduleLoc = cast<FileUnit>(D->getDeclContext()->getModuleScopeContext())->
+      getBasicLocsForDecl(D);
+    if (!moduleLoc.hasValue())
+      return;
+    if (!moduleLoc->Loc.isValid())
+      return;
+    OS << moduleLoc->SourceFilePath
+       << ":" << moduleLoc->Loc.Line
+       << ":" << moduleLoc->Loc.Column << ": ";
+  }
+
   bool walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return true;
@@ -2518,8 +2541,10 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << SM.getDisplayNameForLoc(VD->getLoc())
+        OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      } else {
+        printSerializedLoc(D);
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
       printDeclName(VD);
@@ -2535,8 +2560,10 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << SM.getDisplayNameForLoc(D->getLoc())
+        OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      } else {
+        printSerializedLoc(D);
       }
       OS << Decl::getKindName(D->getKind()) << "/";
       OS << " ";
@@ -2803,7 +2830,7 @@ private:
   void printUSR(const ValueDecl *VD, SourceLoc Loc) {
     printLoc(Loc);
     OS << ' ';
-    if (ide::printDeclUSR(VD, OS))
+    if (ide::printValueDeclUSR(VD, OS))
       OS << "ERROR:no-usr";
     OS << '\n';
   }
@@ -2889,7 +2916,7 @@ private:
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
-      printDeclUSR(VD, OS);
+      printValueDeclUSR(VD, OS);
     }
 
     std::string error;
@@ -3329,8 +3356,6 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
-  InitInvok.getLangOptions().FunctionBuilderOneWayConstraints =
-    !options::DisableFunctionBuilderOneWayConstraints;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
@@ -3349,12 +3374,11 @@ int main(int argc, char *argv[]) {
   for (auto &Arg : options::ClangXCC) {
     InitInvok.getClangImporterOptions().ExtraArgs.push_back(Arg);
   }
-  InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
-    options::DebugForbidTypecheckPrefix;
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-
-  InitInvok.getLangOptions().DebugConstraintSolver =
+  InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
+    options::DebugForbidTypecheckPrefix;
+  InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
       options::DebugConstraintSolver;
 
   for (auto ConfigName : options::BuildConfigs)

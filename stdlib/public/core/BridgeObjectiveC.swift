@@ -85,6 +85,32 @@ public protocol _ObjectiveCBridgeable {
 
 #if _runtime(_ObjC)
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedArray")
+@usableFromInline
+internal func _SwiftCreateBridgedArray(
+  values: UnsafePointer<AnyObject>,
+  numValues: Int
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = Array(bufPtr)._bridgeToObjectiveCImpl()
+  return Unmanaged<AnyObject>.passRetained(bridged)
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedMutableArray")
+@usableFromInline
+internal func _SwiftCreateBridgedMutableArray(
+  values: UnsafePointer<AnyObject>,
+  numValues: Int
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = _SwiftNSMutableArray(Array(bufPtr))
+  return Unmanaged<AnyObject>.passRetained(bridged)
+}
+
 @_silgen_name("swift_stdlib_connectNSBaseClasses")
 internal func _connectNSBaseClasses() -> Bool
 
@@ -483,7 +509,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @usableFromInline @_transparent
-  internal init<U>(_ from: UnsafePointer<U>) {
+  internal init<U>(
+    @_nonEphemeral _ from: UnsafePointer<U>
+  ) {
     self._rawValue = from._rawValue
   }
 
@@ -497,7 +525,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @usableFromInline @_transparent
-  internal init?<U>(_ from: UnsafePointer<U>?) {
+  internal init?<U>(
+    @_nonEphemeral _ from: UnsafePointer<U>?
+  ) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -509,7 +539,9 @@ extension UnsafeMutableRawPointer {
   ///
   /// - Parameter other: The pointer to convert.
   @_transparent
-  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+  public init<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>
+  ) {
     _rawValue = other._rawValue
   }
 
@@ -519,7 +551,9 @@ extension UnsafeMutableRawPointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+  public init?<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>?
+  ) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }
@@ -531,7 +565,9 @@ extension UnsafeRawPointer {
   ///
   /// - Parameter other: The pointer to convert.
   @_transparent
-  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+  public init<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>
+  ) {
     _rawValue = other._rawValue
   }
 
@@ -541,7 +577,9 @@ extension UnsafeRawPointer {
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
   @_transparent
-  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+  public init?<T>(
+    @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>?
+  ) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }

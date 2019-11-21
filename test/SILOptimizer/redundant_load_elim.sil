@@ -588,8 +588,10 @@ bb5:
 // CHECK: store
 // CHECK-NOT: = load
 // CHECK: bb2:
-// CHECK: bb3:
-// CHECK: = load
+// CHECK: bb3([[A:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NOT: = load
+// CHECK: apply %{{[0-9]+}}([[A]])
+// CHECK-LABEL: } // end sil function 'load_to_load_conflicting_branches_diamond'
 sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
 // %0                                             // users: %1, %4, %9, %11, %16, %21
 bb0(%0 : $*Builtin.Int32):

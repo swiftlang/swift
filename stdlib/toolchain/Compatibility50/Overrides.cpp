@@ -17,6 +17,8 @@
 #include "Overrides.h"
 #include "../../public/runtime/CompatibilityOverride.h"
 
+#include <dlfcn.h>
+
 using namespace swift;
 
 struct OverrideSection {

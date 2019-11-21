@@ -140,7 +140,7 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddMember(Decl *member) {
-    if (auto *ad = dyn_cast<AccessorDecl>(member))
+    if (isa<AccessorDecl>(member))
       /* handled as part of its storage */;
     else if (auto *fd = dyn_cast<FuncDecl>(member))
       maybeAddMethod(fd);

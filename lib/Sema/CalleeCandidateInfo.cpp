@@ -49,8 +49,7 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
   }
 
   for (auto proto : archetype->getConformsTo()) {
-    if (!dc->getParentModule()->lookupConformance(
-          type, proto))
+    if (dc->getParentModule()->lookupConformance(type, proto).isInvalid())
       return false;
   }
 
@@ -61,7 +60,7 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
     : declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
 
   if (auto *PD = dyn_cast<ParamDecl>(decl)) {
-    if (PD->hasValidSignature())
+    if (PD->hasInterfaceType())
       entityType = PD->getType();
     else
       entityType = PD->getASTContext().TheUnresolvedType;
@@ -90,30 +89,36 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
   }
 }
 
-void OverloadCandidate::dump() const {
+void OverloadCandidate::dump(llvm::raw_ostream &os) const {
   if (auto decl = getDecl())
-    decl->dumpRef(llvm::errs());
+    decl->dumpRef(os);
   else
-    llvm::errs() << "<<EXPR>>";
-  llvm::errs() << " - ignore curried self = " << (skipCurriedSelf ? "yes"
-                                                                  : "no");
+    os << "<<EXPR>>";
+  os << " - ignore curried self = " << (skipCurriedSelf ? "yes" : "no");
 
   if (auto FT = getFunctionType())
-    llvm::errs() << " - type: " << Type(FT) << "\n";
+    os << " - type: " << Type(FT) << "\n";
   else
-    llvm::errs() << " - type <<NONFUNCTION>>: " << entityType << "\n";
+    os << " - type <<NONFUNCTION>>: " << entityType << "\n";
 }
 
-void CalleeCandidateInfo::dump() const {
-  llvm::errs() << "CalleeCandidateInfo for '" << declName << "': closeness="
+void CalleeCandidateInfo::dump(llvm::raw_ostream &os) const {
+  os << "CalleeCandidateInfo for '" << declName << "': closeness="
   << unsigned(closeness) << "\n";
-  llvm::errs() << candidates.size() << " candidates:\n";
+  os << candidates.size() << " candidates:\n";
   for (auto c : candidates) {
-    llvm::errs() << "  ";
-    c.dump();
+    os << "  ";
+    c.dump(os);
   }
 }
 
+void OverloadCandidate::dump() const {
+  dump(llvm::errs());
+}
+
+void CalleeCandidateInfo::dump() const {
+  dump(llvm::errs());
+}
 
 /// Given a candidate list, this computes the narrowest closeness to the match
 /// we're looking for and filters out any worse matches.  The predicate
@@ -138,7 +143,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       // treat it as unavailable, which is a very close failure.
       if (declCloseness.first == CC_ExactMatch &&
           VD->getAttrs().isUnavailable(CS.getASTContext()) &&
-          !CS.TC.getLangOpts().DisableAvailabilityChecking)
+          !CS.getASTContext().LangOpts.DisableAvailabilityChecking)
         declCloseness.first = CC_Unavailable;
       
       // Likewise, if the candidate is inaccessible from the scope it is being
@@ -281,11 +286,13 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     CandidateCloseness getResult() const {
       return result;
     }
-    void extraArgument(unsigned argIdx) override {
+    bool extraArgument(unsigned argIdx) override {
       result = CC_ArgumentCountMismatch;
+      return true;
     }
-    void missingArgument(unsigned paramIdx) override {
+    Optional<unsigned> missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
+      return None;
     }
     bool missingLabel(unsigned paramIdx) override {
       result = CC_ArgumentLabelMismatch;
@@ -312,12 +319,14 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
   } listener;
-  
+
   // Use matchCallArguments to determine how close the argument list is (in
   // shape) to the specified candidates parameters.  This ignores the concrete
   // types of the arguments, looking only at the argument labels etc.
+  SmallVector<AnyFunctionType::Param, 4> arguments(actualArgs.begin(),
+                                                   actualArgs.end());
   SmallVector<ParamBinding, 4> paramBindings;
-  if (matchCallArguments(actualArgs, candArgs,
+  if (matchCallArguments(arguments, candArgs,
                          candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,
@@ -378,7 +387,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       // type is identical to the argument type, or substitutable via handling
       // of functions with primary archetypes in one or more parameters.
       // We can still do something more sophisticated with this.
-      // FIXME: Use TC.isConvertibleTo?
+      // FIXME: Use TypeChecker::isConvertibleTo?
       
       TypeSubstitutionMap archetypesMap;
       bool matched;
@@ -593,10 +602,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = TypeChecker::lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
-        if (!ctor.getValueDecl()->hasInterfaceType())
-          CS.getTypeChecker().validateDecl(ctor.getValueDecl());
-        if (ctor.getValueDecl()->hasInterfaceType())
-          candidates.push_back({ ctor.getValueDecl(), 1 });
+        candidates.push_back({ ctor.getValueDecl(), 1 });
       }
     }
     
@@ -931,11 +937,12 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
     suggestionText += name;
   }
 
+  auto &DE = CS.getASTContext().Diags;
   if (sorted.size() == 1) {
-    CS.TC.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
+    DE.diagnose(loc, diag::suggest_expected_match, isResult, suggestionText);
   } else {
-    CS.TC.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
-                   suggestionText);
+    DE.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
+                suggestionText);
   }
 }
 
@@ -960,15 +967,14 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
 
     InaccessibleMemberFailure failure(
-        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+        CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
     auto diagnosed = failure.diagnoseAsError();
     assert(diagnosed && "failed to produce expected diagnostic");
 
     for (auto cand : candidates) {
       auto *candidate = cand.getDecl();
       if (candidate && candidate != decl)
-        CS.TC.diagnose(candidate, diag::decl_declared_here,
-                       candidate->getFullName());
+        candidate->diagnose(diag::decl_declared_here, candidate->getFullName());
     }
     
     return true;

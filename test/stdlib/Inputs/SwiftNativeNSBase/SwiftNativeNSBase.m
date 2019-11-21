@@ -65,6 +65,7 @@ BOOL TestSwiftNativeNSBase_UnwantedCdtors()
   NSMutableSet *expectedClasses =
     [NSMutableSet setWithObjects:
       @"__SwiftNativeNSArrayBase",
+      @"__SwiftNativeNSMutableArrayBase",
       @"__SwiftNativeNSDictionaryBase",
       @"__SwiftNativeNSSetBase",
       @"__SwiftNativeNSStringBase",

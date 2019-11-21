@@ -80,8 +80,6 @@ ERROR(decl_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRe
 
 ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
 
-ERROR(var_let_changed,none,"%0 changes from %select{var|let}1 to %select{let|var}1", (StringRef, bool))
-
 ERROR(no_longer_open,none,"%0 is no longer open for subclassing", (StringRef))
 
 ERROR(func_type_escaping_changed,none,"%0 has %select{removed|added}2 @escaping in %1", (StringRef, StringRef, bool))

@@ -19,6 +19,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/ParsedSyntax.h"
+#include "swift/Parse/ParsedRawSyntaxRecorder.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingCache.h"
@@ -34,18 +35,21 @@ using RootContextData = SyntaxParsingContext::RootContextData;
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF, unsigned BufferID,
-                                 std::shared_ptr<HiddenLibSyntaxAction> SPActions)
+                                 std::shared_ptr<SyntaxParseActions> SPActions)
     : RootDataOrParent(new RootContextData(
           SF, SF.getASTContext().Diags, SF.getASTContext().SourceMgr, BufferID,
           std::move(SPActions))),
       CtxtHolder(CtxtHolder),
       RootData(RootDataOrParent.get<RootContextData *>()), Offset(0),
-      Mode(AccumulationMode::Root) {
+      Mode(AccumulationMode::Root), Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
   getStorage().reserve(128);
 }
 
 size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
+  if (!Enabled)
+    return 0;
+
   assert(getStorage().size() == Offset &&
          "Cannot do lookup if nodes have already been gathered");
   assert(Mode == AccumulationMode::CreateSyntax &&
@@ -173,6 +177,9 @@ ParsedTokenSyntax SyntaxParsingContext::popToken() {
 void SyntaxParsingContext::addToken(Token &Tok,
                                     const ParsedTrivia &LeadingTrivia,
                                     const ParsedTrivia &TrailingTrivia) {
+  if (!Enabled)
+    return;
+
   ParsedRawSyntaxNode raw;
   if (shouldDefer())
     raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
@@ -184,6 +191,8 @@ void SyntaxParsingContext::addToken(Token &Tok,
 
 /// Add Syntax to the parts.
 void SyntaxParsingContext::addSyntax(ParsedSyntax Node) {
+  if (!Enabled)
+    return;
   addRawSyntax(Node.takeRaw());
 }
 
@@ -204,6 +213,8 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N,
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
                                           SyntaxNodeCreationKind nodeCreateK) {
   assert(isTopOfContextStack());
+  if (!Enabled)
+    return;
 
   switch (Kind) {
   case SyntaxKind::SuperRefExpr:
@@ -238,6 +249,8 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
                                          SyntaxNodeCreationKind nodeCreateK) {
   assert(isCollectionKind(ColletionKind));
   assert(isTopOfContextStack());
+  if (!Enabled)
+    return;
   auto Parts = getParts();
   auto Count = 0;
   for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
@@ -249,14 +262,15 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
     createNodeInPlace(ColletionKind, Count, nodeCreateK);
 }
 
-ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
-  ParsedRawSyntaxRecorder &Recorder = getRecorder();
-  auto Parts = getParts();
+static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
+                                           MutableArrayRef<ParsedRawSyntaxNode> Parts) {
+  ParsedRawSyntaxRecorder &Recorder = RootData.Recorder;
   ParsedRawSyntaxNode Layout[2];
 
   assert(!Parts.empty() && Parts.back().isToken(tok::eof));
   Layout[1] = std::move(Parts.back());
   Parts = Parts.drop_back();
+
 
   assert(llvm::all_of(Parts, [](const ParsedRawSyntaxNode& node) {
     return node.getKind() == SyntaxKind::CodeBlockItem;
@@ -269,23 +283,28 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
 }
 
 OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
+  if (!Enabled)
+    return nullptr;
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
-  if (getStorage().empty()) {
+  auto parts = getParts();
+  if (parts.empty()) {
     return nullptr; // already finalized.
   }
-  ParsedRawSyntaxNode root = finalizeSourceFile();
-  auto opaqueRoot = getSyntaxCreator().finalizeNode(root.takeOpaqueNode());
+  ParsedRawSyntaxNode root = finalizeSourceFile(*getRootData(), parts);
 
   // Clear the parts because we will call this function again when destroying
   // the root context.
   getStorage().clear();
 
-  return opaqueRoot;
+  return root.takeOpaqueNode();
 }
 
 void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
+  if (!Enabled)
+    return;
+
   ParsedRawSyntaxNode raw;
   if (shouldDefer())
     raw = ParsedRawSyntaxNode::makeDeferredMissing(Kind, Loc);
@@ -315,6 +334,9 @@ SyntaxParsingContext::~SyntaxParsingContext() {
     else
       delete RootDataOrParent.get<RootContextData*>();
   };
+
+  if (!Enabled)
+    return;
 
   auto &Storage = getStorage();
 
@@ -371,6 +393,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
 
   // Never.
   case AccumulationMode::NotSet:
-    llvm_unreachable("Accumulation mode not set.");
+    assert(!Enabled && "Cleanup mode must be specified before destruction");
+    break;
   }
 }

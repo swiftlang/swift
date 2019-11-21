@@ -31,11 +31,23 @@ class Base {
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage4Base{{.*}}5other0
   fileprivate func other() {
   }
+
+  // CHECK: define hidden swiftcc void @"$s14method_linkage4BaseC4prop{{.*}}LLytvg
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage4BaseC4prop{{.*}}LLytvg
+  fileprivate var prop: () {
+    return ()
+  }
 }
 class Derived : Base {
-  // CHECK: define internal swiftcc void @"$s14method_linkage7Derived{{.*}}3foo0
-  // RESILIENT: define internal swiftcc void @"$s14method_linkage7Derived{{.*}}3foo0
+  // CHECK: define hidden swiftcc void @"$s14method_linkage7Derived{{.*}}3foo0
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage7Derived{{.*}}3foo0
   fileprivate final override func foo() {
+  }
+
+  // CHECK: define hidden swiftcc void @"$s14method_linkage7DerivedC4prop{{.*}}LLytvg
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage7DerivedC4prop{{.*}}LLytvg
+  fileprivate final override var prop: () {
+    return ()
   }
 }
 
@@ -92,6 +104,20 @@ open class OpenClass {
   // RESILIENT: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC5pquuxyyF"
   public final func pquux() {
   }
+
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC4prop{{.*}}LLytvg
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage9OpenClassC4prop{{.*}}LLytvg
+  fileprivate var prop: () {
+    return ()
+  }
+}
+
+open class OpenSubclass : OpenClass {
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage12OpenSubclassC4prop{{.*}}LLytvg
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage12OpenSubclassC4prop{{.*}}LLytvg
+  fileprivate final override var prop: () {
+    return ()
+  }
 }
 
 // Just in case anyone wants to delete unused methods...
@@ -100,4 +126,5 @@ func callit(b: Base) {
   b.bar()
   b.other()
   b.extfunc()
+  _ = b.prop
 }

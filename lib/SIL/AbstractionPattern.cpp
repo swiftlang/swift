@@ -368,7 +368,7 @@ AbstractionPattern::getCXXMethodSelfPattern(CanType selfType) const {
     // insufficient --- if we have interesting bridging to do to
     // 'self' --- we have the right information to be more exact.
     auto clangSelfType =
-        CXXMethod->getThisType(CXXMethod->getASTContext()).getTypePtr();
+        CXXMethod->getThisType().getTypePtr();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               selfType, clangSelfType);
   }
@@ -595,6 +595,8 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
 
   case Kind::Type:
     if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
+    if (isa<OpaqueTypeArchetypeType>(getType()))
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               ::getOptionalObjectType(getType()));

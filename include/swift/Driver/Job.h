@@ -13,6 +13,7 @@
 #ifndef SWIFT_DRIVER_JOB_H
 #define SWIFT_DRIVER_JOB_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -220,7 +221,7 @@ public:
   void writeOutputFileMap(llvm::raw_ostream &out) const;
 
   void print(raw_ostream &Stream) const;
-  void dump() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMP;
 
   /// For use in assertions: check the CommandOutput's state is consistent with
   /// its invariants.
@@ -373,7 +374,7 @@ public:
     Callback(this, static_cast<Job::PID>(OSPid));
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED;
+  SWIFT_DEBUG_DUMP;
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);

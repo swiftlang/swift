@@ -83,3 +83,22 @@ extension D {
 // TYPE5-DAG: public func formIndex(_ i: inout Int, offsetBy distance: Int)
 // TYPE5-DAG: public func distance(from start: Int, to end: Int) -> Int
 // TYPE5-DAG: public func joined(separator: String = "") -> String
+
+extension Array {
+  public struct Inner {}
+}
+
+public protocol P2 {}
+
+extension Array.Inner where Element: P2 {
+  public func innerFoo() {}
+}
+
+extension Int: P2 {}
+
+// Print interface for Array<Int>.Inner
+// RUN: %target-swift-ide-test -print-type-interface -usr='$sSa20print_type_interfaceE5InnerVySi_GD' -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE6
+
+// TYPE6-LABEL: public struct Inner {
+// TYPE6:   public func innerFoo()
+// TYPE6: }

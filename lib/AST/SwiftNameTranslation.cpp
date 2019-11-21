@@ -72,7 +72,7 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   }
 
   std::string buffer = ED->getParentModule()->getNameStr();
-  for (auto D : reversed(outerTypes)) {
+  for (auto D : llvm::reverse(outerTypes)) {
     buffer += ".";
     buffer += D->getNameStr();
   }

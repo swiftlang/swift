@@ -75,8 +75,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_1 | %FileCheck %s -check-prefix=IN_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_2 | %FileCheck %s -check-prefix=IN_TUPLE_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
+// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
+// RUN-FIXME(rdar56755598): %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_3 | %FileCheck %s -check-prefix=OWN_INIT_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_4 | %FileCheck %s -check-prefix=OWN_INIT_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_5 | %FileCheck %s -check-prefix=OWN_INIT_5
@@ -563,6 +563,7 @@ func testTuple(localInt: Int) {
 var ownInit1: Int = #^OWN_INIT_1^#
 // OWN_INIT_1: Begin completions
 // OWN_INIT_1-NOT: ownInit1
+func sync() {}
 var ownInit2: () -> Void = { #^OWN_INIT_2^# }
 // OWN_INIT_2: Begin completions
 // OWN_INIT_2-NOT: ownInit2

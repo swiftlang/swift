@@ -224,7 +224,7 @@ void InlineTree::buildTree(Function *F) {
       }
       Node *Nd = nullptr;
       DILocation *PrevDL = nullptr;
-      for (DILocation *DL : reversed(InlineChain)) {
+      for (DILocation *DL : llvm::reverse(InlineChain)) {
         DILocalScope *Sc = DL->getScope();
         DISubprogram *SP = Sc->getSubprogram();
         assert(SP);

@@ -1009,8 +1009,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
-    // witnesses.
+    // Blocks are ObjC objects, so can share the AnyObject value
+    // witnesses (stored as "BO" rather than "yXl" for ABI compat).
     Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
     assert(false && "objc block without objc interop?");
@@ -3956,6 +3956,24 @@ void Metadata::dump() const {
 
   if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
     printf("Labels: %s.\n", tuple->Labels);
+  }
+
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this)) {
+    printf("Is class bounded: %s.\n",
+           existential->isClassBounded() ? "true" : "false");
+    auto protocols = existential->getProtocols();
+    bool first = true;
+    printf("Protocols: ");
+    for (auto protocol : protocols) {
+      if (!first)
+        printf(" & ");
+      printf("%s", protocol.getName());
+      first = false;
+    }
+    if (auto *superclass = existential->getSuperclassConstraint())
+      if (auto *contextDescriptor = superclass->getTypeContextDescriptor())
+        printf("Superclass constraint: %s.\n", contextDescriptor->Name.get());
+    printf("\n");
   }
 
   printf("Generic Args: %p.\n", getGenericArgs());

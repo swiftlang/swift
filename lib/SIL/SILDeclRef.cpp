@@ -313,6 +313,13 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     limit = Limit::NeverPublic;
   }
 
+  // The property wrapper backing initializer is never public for resilient
+  // properties.
+  if (kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+    if (cast<VarDecl>(d)->isResilient())
+      limit = Limit::NeverPublic;
+  }
+
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
     // Three cases:
@@ -788,6 +795,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     assert(!isCurried);
     return mangler.mangleInitializerEntity(cast<VarDecl>(getDecl()), SKind);
+
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    assert(!isCurried);
+    return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
+                                                  SKind);
   }
 
   llvm_unreachable("bad entity kind!");
@@ -978,12 +990,13 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
-  // Only non-final methods in non-final classes go in the vtable.
+  // Only methods in non-final classes go in the vtable.
   auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
-  if (decl->isFinal())
+  // Final methods only go in the vtable if they override something.
+  if (decl->isFinal() && !decl->getOverriddenDecl())
     return SubclassScope::NotApplicable;
 
   assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&

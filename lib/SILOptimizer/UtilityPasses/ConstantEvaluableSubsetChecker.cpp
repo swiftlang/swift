@@ -29,7 +29,6 @@ using namespace swift;
 
 namespace {
 
-static const StringRef constantEvaluableSemanticsAttr = "constant_evaluable";
 static const StringRef testDriverSemanticsAttr = "test_driver";
 
 template <typename... T, typename... U>
@@ -74,10 +73,6 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       if (isa<ReturnInst>(inst))
         break;
 
-      assert(!previousEvaluationHadFatalError &&
-             "cannot continue evaluation of test driver as previous call "
-             "resulted in non-skippable evaluation error.");
-
       auto *applyInst = dyn_cast<ApplyInst>(inst);
       SILFunction *callee = nullptr;
       if (applyInst) {
@@ -87,8 +82,17 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       Optional<SILBasicBlock::iterator> nextInstOpt;
       Optional<SymbolicValue> errorVal;
 
-      if (!applyInst || !callee ||
-          !callee->hasSemanticsAttr(constantEvaluableSemanticsAttr)) {
+      if (!applyInst || !callee || !isConstantEvaluable(callee)) {
+
+        // Ignore these instructions if we had a fatal error already.
+        if (previousEvaluationHadFatalError) {
+          if (isa<TermInst>(inst)) {
+            assert(false && "non-constant control flow in the test driver");
+          }
+          ++currI;
+          continue;
+        }
+
         std::tie(nextInstOpt, errorVal) =
             stepEvaluator.tryEvaluateOrElseMakeEffectsNonConstant(currI);
         if (!nextInstOpt) {
@@ -99,6 +103,10 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
         currI = nextInstOpt.getValue();
         continue;
       }
+
+      assert(!previousEvaluationHadFatalError &&
+             "cannot continue evaluation of test driver as previous call "
+             "resulted in non-skippable evaluation error.");
 
       // Here, a function annotated as "constant_evaluable" is called.
       llvm::errs() << "@" << demangleSymbolName(callee->getName()) << "\n";
@@ -137,8 +145,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       evaluatedFunctions.insert(callee);
 
       SILModule &calleeModule = callee->getModule();
-      if (callee->isAvailableExternally() &&
-          callee->hasSemanticsAttr(constantEvaluableSemanticsAttr) &&
+      if (callee->isAvailableExternally() && isConstantEvaluable(callee) &&
           callee->getOptimizationMode() != OptimizationMode::NoOptimization) {
         diagnose(calleeModule.getASTContext(),
                  callee->getLocation().getSourceLoc(),
@@ -154,7 +161,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
 
     for (SILFunction &fun : *module) {
       // Record functions annotated as constant evaluable.
-      if (fun.hasSemanticsAttr(constantEvaluableSemanticsAttr)) {
+      if (isConstantEvaluable(&fun)) {
         constantEvaluableFunctions.insert(&fun);
         continue;
       }

@@ -186,6 +186,13 @@ extension _StringGuts {
       return String.Index(_encodedOffset: idx._encodedOffset)._scalarAligned
     }
     if _slowPath(self.isForeign) {
+      // In 5.1 this check was added to foreignScalarAlign, but when this is
+      // emitted into a client that then runs against a 5.0 stdlib, it calls
+      // a version of foreignScalarAlign that doesn't check for this, which
+      // ends up asking CFString for its endIndex'th character, which throws
+      // an exception. So we duplicate the check here for back deployment.
+      guard idx._encodedOffset != self.count else { return idx._scalarAligned }
+
       let foreignIdx = foreignScalarAlign(idx)
       _internalInvariant_5_1(foreignIdx._isScalarAligned)
       return foreignIdx

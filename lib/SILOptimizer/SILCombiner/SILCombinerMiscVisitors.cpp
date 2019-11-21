@@ -22,10 +22,10 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1519,7 +1519,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       return nullptr;
     auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredBB->getTerminator());
     if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
-      auto MetaTy = CCBI->getCastType().castTo<MetatypeType>();
+      auto MetaTy = cast<MetatypeType>(CCBI->getTargetFormalType());
       auto InstanceTy = MetaTy.getInstanceType();
       if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
         InstanceTy = SelfTy.getSelfType();

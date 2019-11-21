@@ -23,10 +23,10 @@
 
 using namespace swift;
 
-DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+DerivedConformance::DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                                        NominalTypeDecl *nominal,
                                        ProtocolDecl *protocol)
-    : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
+    : Context(ctx), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
   assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
@@ -35,12 +35,16 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
-void DerivedConformance::addMembersToConformanceContext(
+bool DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  bool anyInvalid = false;
   for (auto child : children) {
     IDC->addMember(child);
+    TypeChecker::typeCheckDecl(child);
+    anyInvalid |= child->isInvalid();
   }
+  return anyInvalid;
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -173,10 +177,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            nominal->getDeclaredInterfaceType(), proto, nominal,
-            ConformanceCheckFlags::SkipConditionalRequirements)) {
-      auto DC = conformance->getConcrete()->getDeclContext();
+    auto conformance = TypeChecker::conformsToProtocol(
+        nominal->getDeclaredInterfaceType(), proto, nominal,
+        ConformanceCheckFlags::SkipConditionalRequirements);
+    if (conformance) {
+      auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
       if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
@@ -289,8 +294,23 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 AccessorDecl *DerivedConformance::
 addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
-  auto getter =
-    declareDerivedPropertyGetter(property, propertyContextType);
+  auto &C = property->getASTContext();
+  auto parentDC = property->getDeclContext();
+  ParameterList *params = ParameterList::createEmpty(C);
+
+  Type propertyInterfaceType = property->getInterfaceType();
+
+  auto getter = AccessorDecl::create(C,
+    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+    AccessorKind::Get, property,
+    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+    /*GenericParams=*/nullptr, params,
+    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+  getter->setImplicit();
+  getter->setIsTransparent(false);
+
+  getter->copyFormalAccessFrom(property);
 
   property->setImplInfo(StorageImplInfo::getImmutableComputed());
   property->setAccessors(SourceLoc(), {getter}, SourceLoc());
@@ -298,64 +318,29 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   return getter;
 }
 
-AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
-                                                 Type propertyContextType) {
-  bool isStatic = property->isStatic();
-
-  auto &C = property->getASTContext();
-  auto parentDC = property->getDeclContext();
-  ParameterList *params = ParameterList::createEmpty(C);
-
-  Type propertyInterfaceType = property->getInterfaceType();
-  
-  auto getterDecl = AccessorDecl::create(C,
-    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, property,
-    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, params,
-    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
-  getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
-  getterDecl->setIsTransparent(false);
-
-  // Compute the interface type of the getter.
-  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  getterDecl->computeType();
-
-  getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationToChecked();
-
-  C.addSynthesizedDecl(getterDecl);
-
-  return getterDecl;
-}
-
 std::pair<VarDecl *, PatternBindingDecl *>
 DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
-  auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
-                                      /*IsCaptureList*/false, SourceLoc(), name,
-                                      parentDC);
+  VarDecl *propDecl = new (Context)
+      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
+              /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationToChecked();
 
-  Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
+  Pattern *propPat = new (Context) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  propPat = TypedPattern::createImplicit(C, propPat, propertyContextType);
+  propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
   propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
+      Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
+      parentDC);
   return {propDecl, pbDecl};
 }
 
@@ -374,11 +359,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (!allowCrossfileExtensions &&
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
-    TC.diagnose(ConformanceDecl->getLoc(),
-                diag::cannot_synthesize_in_crossfile_extension,
-                getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
-                DescriptiveDeclKind::Type);
+    ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
+                              getProtocolType());
+    Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
     return true;
   }
 
@@ -387,9 +370,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
         isa<ExtensionDecl>(ConformanceDecl)) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::cannot_synthesize_init_in_extension_of_nonfinal,
-                  getProtocolType(), synthesizing->getFullName());
+      ConformanceDecl->diagnose(
+          diag::cannot_synthesize_init_in_extension_of_nonfinal,
+          getProtocolType(), synthesizing->getFullName());
       return true;
     }
   }
@@ -417,11 +400,11 @@ static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
 /// \p indexName The name of the output variable.
 /// \return A DeclRefExpr of the output variable (of type Int).
 DeclRefExpr *swift::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
-                                DeclContext *parentDC,
-                                EnumDecl *enumDecl,
-                                VarDecl *enumVarDecl,
-                                AbstractFunctionDecl *funcDecl,
-                                const char *indexName) {
+                                       DeclContext *parentDC,
+                                       EnumDecl *enumDecl,
+                                       VarDecl *enumVarDecl,
+                                       AbstractFunctionDecl *funcDecl,
+                                       const char *indexName) {
   ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumVarDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
@@ -493,20 +476,17 @@ DeclRefExpr *swift::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 SmallVector<ParamDecl *, 3>
 swift::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(elt);
-
     auto PL = elt->getParameterList();
     if (!PL)
       continue;
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC, None)) {
+      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                          protocol, DC, None)
+              .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -607,7 +587,7 @@ VarDecl *swift::indexedVarDecl(char prefixChar, int index, Type type,
                                  /*IsCaptureList*/true, SourceLoc(),
                                  C.getIdentifier(indexStrRef),
                                  varContext);
-  varDecl->setType(type);
+  varDecl->setInterfaceType(type);
   varDecl->setHasNonPatternBindingInit(true);
   return varDecl;
 }

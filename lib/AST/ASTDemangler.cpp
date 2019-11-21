@@ -190,13 +190,11 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   auto *dc = aliasDecl->getDeclContext();
   auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
 
-  // FIXME: subst() should build the sugar for us
-  declaredType = declaredType.subst(subs);
-  return TypeAliasType::get(aliasDecl, parent, subs, declaredType);
+  return declaredType.subst(subs);
 }
 
 static SubstitutionMap
-createSubstitutionMapFromGenericArgs(GenericSignature *genericSig,
+createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
                                      ArrayRef<Type> args,
                                      ModuleDecl *moduleDecl) {
   if (!genericSig)
@@ -233,7 +231,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
     return Type();
 
   // Build a SubstitutionMap.
-  auto *genericSig = nominalDecl->getGenericSignature();
+  auto genericSig = nominalDecl->getGenericSignature();
   auto subs = createSubstitutionMapFromGenericArgs(
       genericSig, args, decl->getParentModule());
   if (!subs)
@@ -261,8 +259,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     if (!parentModule)
       return Type();
 
-    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName,
-                                                           Resolver);
+    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName);
     if (!opaqueDecl)
       return Type();
     // TODO: multiple opaque types
@@ -306,7 +303,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
 
-  auto *genericSig = aliasDecl->getGenericSignature();
+  auto genericSig = aliasDecl->getGenericSignature();
   for (unsigned i = 0, e = args.size(); i < e; i++) {
     auto origTy = genericSig->getInnermostGenericParams()[i];
     auto substTy = args[i];
@@ -323,9 +320,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   if (!subMap)
     return Type();
 
-  // FIXME: subst() should build the sugar for us
-  auto declaredType = aliasDecl->getDeclaredInterfaceType().subst(subMap);
-  return TypeAliasType::get(aliasDecl, parent, subMap, declaredType);
+  return aliasDecl->getDeclaredInterfaceType().subst(subMap);
 }
 
 Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
@@ -450,7 +445,7 @@ Type ASTBuilder::createImplFunctionType(
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
-  GenericSignature *genericSig = nullptr;
+  GenericSignature genericSig = GenericSignature();
 
   SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
@@ -484,9 +479,9 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  auto einfo = SILFunctionType::ExtInfo(representation,
-                                        flags.isPseudogeneric(),
-                                        !flags.isEscaping());
+  auto einfo = SILFunctionType::ExtInfo(
+      representation, flags.isPseudogeneric(), !flags.isEscaping(),
+      DifferentiabilityKind::NonDifferentiable);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
@@ -510,10 +505,10 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
-
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
-                              funcResults, funcErrorResult, Ctx);
+                              funcResults, funcErrorResult,
+                              SubstitutionMap(), false, Ctx);
 }
 
 Type ASTBuilder::createProtocolCompositionType(
@@ -862,8 +857,9 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   return evaluateOrDefault(
       Ctx.evaluator,
       AbstractGenericSignatureRequest{
-        nominalDecl->getGenericSignature(), { }, std::move(requirements)},
-      nullptr)->getCanonicalSignature();
+        nominalDecl->getGenericSignature().getPointer(), { },
+        std::move(requirements)},
+      GenericSignature())->getCanonicalSignature();
 }
 
 DeclContext *

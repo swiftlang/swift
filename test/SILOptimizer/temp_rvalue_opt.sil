@@ -31,6 +31,8 @@ bb0(%0 : $*Klass, %1 : $*Klass):
   return %9999 : $()
 }
 
+sil @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
+
 ///////////
 // Tests //
 ///////////
@@ -104,8 +106,11 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>):
 
 // CHECK-LABEL: sil @take_from_temp
 // CHECK:      bb0(%0 : $*B, %1 : $*GS<B>):
-// CHECK-NEXT:   struct_element_addr
-// CHECK-NEXT:   copy_addr [take]
+// CHECK-NEXT:   [[STK:%.*]] = alloc_stack
+// CHECK-NEXT:   copy_addr %1 to [initialization] [[STK]]
+// CHECK-NEXT:   [[INNER:%.*]] = struct_element_addr
+// CHECK-NEXT:   copy_addr [take] [[INNER]]
+// CHECK-NEXT:   dealloc_stack
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil @take_from_temp : $@convention(thin) <B> (@inout B, @inout GS<B>) -> () {
@@ -383,6 +388,26 @@ bb0(%0 : $*Klass):
   return %9 : $()
 }
 
+// CHECK-LABEL: sil @try_apply_argument : $@convention(thin) (@inout Klass) -> () {
+// CHECK-NOT: copy_addr
+// CHECK: try_apply {{%[0-9]+}}(%0)
+// CHECK: } // end sil function 'try_apply_argument'
+sil @try_apply_argument : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  copy_addr %0 to [initialization] %1 : $*Klass
+  %5 = function_ref @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
+  try_apply %5(%1) : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error), normal bb1, error bb2
+bb1(%r : $()):
+  br bb3
+bb2(%e : $Error):
+  br bb3
+bb3:
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
 
 // Make sure that we can eliminate temporaries passed via a temporary rvalue to
 // an @in_guaranteed function.
@@ -471,3 +496,162 @@ bb0(%0 : $*Klass):
   return %12 : $()
 }
 
+protocol P {
+  func foo()
+}
+
+sil @getP : $@convention(thin) () -> @out Optional<P>
+
+// CHECK-LABEL: sil @handle_open_existential_addr : $@convention(thin) () -> () {
+// CHECK: [[P:%.*]] = unchecked_take_enum_data_addr
+// CHECK-NOT: copy_addr
+// CHECK: open_existential_addr immutable_access [[P]]
+// CHECK: }
+sil @handle_open_existential_addr : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Optional<P>
+  %3 = function_ref @getP : $@convention(thin) () -> @out Optional<P>
+  %4 = apply %3(%2) : $@convention(thin) () -> @out Optional<P>
+  cond_br undef, bb1, bb3
+
+bb1:
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %10 = alloc_stack $P
+  copy_addr %9 to [initialization] %10 : $*P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %2 : $*Optional<P>
+  destroy_addr %10 : $*P
+  dealloc_stack %10 : $*P
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+
+bb2:
+  %23 = tuple ()
+  return %23 : $()
+
+bb3:
+  destroy_addr %2 : $*Optional<P>
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+}
+// CHECK-LABEL: sil @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
+// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: copy_addr {{.*}} to [initialization] [[P]]
+// CHECK: }
+sil @open_existential_addr_blocks_optimization : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Optional<P>
+  %3 = function_ref @getP : $@convention(thin) () -> @out Optional<P>
+  %4 = apply %3(%2) : $@convention(thin) () -> @out Optional<P>
+  cond_br undef, bb1, bb3
+
+bb1:
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %10 = alloc_stack $P
+  copy_addr %9 to [initialization] %10 : $*P
+  destroy_addr %2 : $*Optional<P>
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %10 : $*P
+  dealloc_stack %10 : $*P
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+
+bb2:
+  %23 = tuple ()
+  return %23 : $()
+
+bb3:
+  destroy_addr %2 : $*Optional<P>
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+}
+
+// CHECK-LABEL: sil @witness_method_blocks_optimization : $@convention(thin) () -> () {
+// CHECK: [[P:%.*]] = alloc_stack $P
+// CHECK: copy_addr {{.*}} to [initialization] [[P]]
+// CHECK: }
+sil @witness_method_blocks_optimization : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_stack $Optional<P>
+  %3 = function_ref @getP : $@convention(thin) () -> @out Optional<P>
+  %4 = apply %3(%2) : $@convention(thin) () -> @out Optional<P>
+  cond_br undef, bb1, bb3
+
+bb1:
+  %9 = unchecked_take_enum_data_addr %2 : $*Optional<P>, #Optional.some!enumelt.1
+  %10 = alloc_stack $P
+  copy_addr %9 to [initialization] %10 : $*P
+  %13 = open_existential_addr immutable_access %10 : $*P to $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P
+  destroy_addr %2 : $*Optional<P>
+  %14 = witness_method $@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> (), %13 : $*@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("5E7A6328-EF75-11E9-A383-D0817AD3F637") P>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %10 : $*P
+  dealloc_stack %10 : $*P
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+
+bb2:
+  %23 = tuple ()
+  return %23 : $()
+
+bb3:
+  destroy_addr %2 : $*Optional<P>
+  dealloc_stack %2 : $*Optional<P>
+  br bb2
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Test checkTempObjectDestroy
+// <rdar://problem/56393491> Use-after free crashing an XCTest.
+
+sil @takeGuaranteedObj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+// Do not remove a copy that is released via a load (because
+// TempRValueOpt is an address-based optimization does not know how to
+// remove releases, and trying to do that would reduce to ARC
+// optimization).
+// CHECK-LABEL: sil @copyWithLoadRelease : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $*Builtin.NativeObject):
+// CHECK:   [[STK:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr %0 to [initialization] [[STK]] : $*Builtin.NativeObject
+// CHECK:   [[VAL:%.*]] = load [[STK]] : $*Builtin.NativeObject
+// CHECK:   apply %{{.*}}([[VAL]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK:   release_value [[VAL]] : $Builtin.NativeObject
+// CHECK:   dealloc_stack [[STK]] : $*Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'copyWithLoadRelease'
+sil @copyWithLoadRelease : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %stk = alloc_stack $Builtin.NativeObject
+  copy_addr %0 to [initialization] %stk : $*Builtin.NativeObject
+  %obj = load %stk : $*Builtin.NativeObject
+  %f = function_ref @takeGuaranteedObj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %call = apply %f(%obj) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  release_value %obj : $Builtin.NativeObject
+  dealloc_stack %stk : $*Builtin.NativeObject
+  %v = tuple ()
+  return %v : $()
+}
+
+// Remove a copy that is released via a load as long as it was a copy [take].
+// CHECK-LABEL: sil @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0(%0 : $*Builtin.NativeObject):
+// CHECK:   [[V:%.*]] = load %0 : $*Builtin.NativeObject
+// CHECK:   apply %{{.*}}([[V]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK:   release_value [[V]] : $Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'takeWithLoadRelease'
+sil @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %stk = alloc_stack $Builtin.NativeObject
+  copy_addr [take] %0 to [initialization] %stk : $*Builtin.NativeObject
+  %obj = load %stk : $*Builtin.NativeObject
+  %f = function_ref @takeGuaranteedObj : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %call = apply %f(%obj) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  release_value %obj : $Builtin.NativeObject
+  dealloc_stack %stk : $*Builtin.NativeObject
+  %v = tuple ()
+  return %v : $()
+}

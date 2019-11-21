@@ -130,23 +130,32 @@ ERROR(capture_before_declaration_defer,none,
 NOTE(captured_value_declared_here,none,
      "captured value declared here", ())
 
+#define SELECT_ESCAPING_CLOSURE_KIND "escaping %select{local function|closure}0"
+
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
-      "escaping closure captures 'inout' parameter %0", (Identifier))
+      SELECT_ESCAPING_CLOSURE_KIND
+      " captures 'inout' parameter %1",
+      (unsigned, Identifier))
 NOTE(inout_param_defined_here,none,
      "parameter %0 is declared 'inout'", (Identifier))
 ERROR(escaping_mutable_self_capture,none,
-      "escaping closure captures mutating 'self' parameter", ())
+      SELECT_ESCAPING_CLOSURE_KIND
+      " captures mutating 'self' parameter", (unsigned))
 
 ERROR(escaping_noescape_param_capture,none,
-      "escaping closure captures non-escaping parameter %0", (Identifier))
+      SELECT_ESCAPING_CLOSURE_KIND
+      " captures non-escaping parameter %1", (unsigned, Identifier))
 NOTE(noescape_param_defined_here,none,
      "parameter %0 is implicitly non-escaping", (Identifier))
 
 ERROR(escaping_noescape_var_capture,none,
-      "escaping closure captures non-escaping value", ())
+      SELECT_ESCAPING_CLOSURE_KIND
+      " captures non-escaping value", (unsigned))
 
 NOTE(value_captured_here,none,"captured here", ())
+
+#undef SELECT_ESCAPING_CLOSURE_KIND
 
 NOTE(value_captured_transitively,none,
      "captured indirectly by this call", ())
@@ -213,8 +222,6 @@ ERROR(self_inside_catch_superselfinit,none,
       "'self' used inside 'catch' block reachable from "
       "%select{super|self}0.init call",
       (unsigned))
-ERROR(return_from_init_without_initing_self,none,
-      "return from initializer before 'self.init' call or assignment to 'self'", ())
 ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
@@ -315,9 +322,6 @@ ERROR(integer_conversion_overflow_builtin_types,none,
 WARNING(integer_conversion_overflow_warn,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
-ERROR(integer_conversion_sign_error,none,
-      "negative integer cannot be converted to unsigned type %0",
-      (Type))
 ERROR(negative_integer_literal_overflow_unsigned,none,
       "negative integer '%1' overflows when stored into unsigned type %0",
       (Type, StringRef))
@@ -399,10 +403,16 @@ NOTE(constexpr_unsupported_instruction_found_here,none, "operation"
 
 NOTE(constexpr_found_callee_with_no_body, none,
     "encountered call to '%0' whose body is not available. "
-    "Imported functions must be marked '@inlinable' to constant evaluate.",
+    "Imported functions must be marked '@inlinable' to constant evaluate",
     (StringRef))
 NOTE(constexpr_callee_with_no_body, none,
     "%select{|calls a }0function whose body is not available", (bool))
+
+NOTE(constexpr_found_call_with_unknown_arg, none,
+    "encountered call to '%0' where the %1 argument is not a constant",
+    (StringRef, StringRef))
+NOTE(constexpr_call_with_unknown_arg, none,
+    "%select{|makes a }0function call with non-constant arguments", (bool))
 
 NOTE(constexpr_untracked_sil_value_use_found, none,
     "encountered use of a variable not tracked by the evaluator", ())
@@ -422,7 +432,7 @@ NOTE(constexpr_witness_call_with_no_conformance, none,
 NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
      "non-constant value produced by an unevaluated instructions", ())
 NOTE(constexpr_returned_by_unevaluated_instruction,none,
-     "return value of an unevaluated instruction is not a constant", ())
+     "result of an unevaluated instruction is not a constant", ())
 NOTE(constexpr_mutated_by_unevaluated_instruction,none, "value mutable by an "
     "unevaluated instruction is not a constant", ())
 
@@ -500,27 +510,36 @@ NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
 
 // OS log optimization diagnostics.
 
-ERROR(oslog_message_argument_not_found, none, "no argument of type %0 in "
-  " the os log call", (Identifier))
+ERROR(oslog_non_const_interpolation_options, none, "interpolation arguments "
+      "like format and privacy options must be constants", ())
 
-ERROR(oslog_dynamic_message, none, "os log methods must be passed a string "
-      "interpolation literal. 'OSLogMessage' must not be constructed explicitly",
-      ())
+ERROR(oslog_const_evaluable_fun_error, none, "evaluation of constant-evaluable "
+      "function '%0' failed", (StringRef))
 
-ERROR(oslog_const_evaluation_error, none, "constant evaluating 'OSLogMessage'"
-  "implementation failed.", ())
+ERROR(oslog_fail_stop_error, none, "constant evaluation of log call failed "
+      "with fatal error", ())
 
-ERROR(oslog_non_constant_message, none, "'OSLogMessage' struct is "
-      "unoptimizable: 'init' is not constant evaluable", ())
+ERROR(oslog_non_constant_message, none, "'OSLogMessage' instance passed to the "
+      "log call is not a constant", ())
 
-ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' struct is "
-      "unoptimizable: 'init' is not constant evaluable", ())
+ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' instance "
+      "passed to 'OSLogMessage.init' is not a constant", ())
 
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
-      "constant: formatting and privacy options must be literals", (StringRef))
+      "constant", (StringRef))
 
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
       "builtin must used only on string literals", ())
+
+ERROR(polymorphic_builtin_passed_non_trivial_non_builtin_type, none, "Argument "
+      "of type %0 can not be passed as an argument to a Polymorphic "
+      "builtin. Polymorphic builtins can only be passed arguments that are "
+      "trivial builtin typed", (Type))
+
+ERROR(polymorphic_builtin_passed_type_without_static_overload, none, "Static"
+      " overload %0 does not exist for polymorphic builtin '%1'. Static "
+      "overload implied by passing argument of type %2",
+      (Identifier, StringRef, Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -4,27 +4,107 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Contents               |
-| :--------------------- |
-| [Swift Next](#swift-next) |
-| [Swift 5.1](#swift-51) |
-| [Swift 5.0](#swift-50) |
-| [Swift 4.2](#swift-42) |
-| [Swift 4.1](#swift-41) |
-| [Swift 4.0](#swift-40) |
-| [Swift 3.1](#swift-31) |
-| [Swift 3.0](#swift-30) |
-| [Swift 2.2](#swift-22) |
-| [Swift 2.1](#swift-21) |
-| [Swift 2.0](#swift-20) |
-| [Swift 1.2](#swift-12) |
-| [Swift 1.1](#swift-11) |
-| [Swift 1.0](#swift-10) |
+| Version                | Released   | Toolchain   |
+| :--------------------- | :--------- | :---------- |
+| [Swift 5.2](#swift-52) |            |             |
+| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
+| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
+| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
+| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
+| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
+| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
+| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
+| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
+| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
+| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
+| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
+| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
+| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
 
 </details>
 
-Swift Next
-----------
+Swift 5.2
+---------
+
+* [SR-2790][]:
+
+  The compiler will now emit a warning when attempting to pass a temporary
+  pointer argument produced from an array, string, or inout argument to a
+  parameter which is known to escape it. This includes the various initializers 
+  for the `UnsafePointer`/`UnsafeBufferPointer` family of types, as well as
+  memberwise initializers.
+
+  ```swift
+  struct S {
+    var ptr: UnsafePointer<Int8>
+  }
+
+  func foo() {
+    var i: Int8 = 0
+    let ptr = UnsafePointer(&i)
+    // warning: initialization of 'UnsafePointer<Int8>' results in a 
+    // dangling pointer
+    
+    let s1 = S(ptr: [1, 2, 3]) 
+    // warning: passing '[Int8]' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+    
+    let s2 = S(ptr: "hello")
+    // warning: passing 'String' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+  }
+  ```
+
+  All 3 of the above examples are unsound because each argument produces a
+  temporary pointer only valid for the duration of the call they are passed to.
+  Therefore the returned value in each case references a dangling pointer.
+
+* [SR-2189][]:
+
+  The compiler now supports local functions whose default arguments capture
+  values from outer scopes.
+
+  ```swift
+  func outer(x: Int) -> (Int, Int) {
+    func inner(y: Int = x) -> Int {
+      return y
+    }
+
+    return (inner(), inner(y: 0))
+  }
+  ```
+
+* [SR-11429][]:
+
+  The compiler will now correctly strip argument labels from function references
+  used with the `as` operator in a function call. As a result, the `as` operator
+  can now be used to disambiguate a call to a function with argument labels. 
+  
+  ```swift
+  func foo(x: Int) {}
+  func foo(x: UInt) {}
+  
+  (foo as (Int) -> Void)(5)  // Calls foo(x: Int)
+  (foo as (UInt) -> Void)(5) // Calls foo(x: UInt)
+  ```
+  
+  Previously this was only possible for functions without argument labels.
+  
+  This change also means that a generic type alias can no longer be used to
+  preserve the argument labels of a function reference through the `as`
+  operator. The following is now rejected:
+  
+  ```swift
+  typealias Magic<T> = T
+  func foo(x: Int) {}
+  (foo as Magic)(x: 5) // error: Extraneous argument label 'x:' in call
+  ```
+  
+  The function value must instead be called without argument labels:
+  
+  ```swift
+  (foo as Magic)(5)
+  ```
 
 * [SR-11298][]:
 
@@ -48,40 +128,6 @@ Swift Next
     }
   }
   ```
-  
-  As a result, this could lead to code that currently compiles today to throw an error.
-  
-  ```swift
-  protocol Foo {
-    var someProperty: Int { get set }
-  }
-  
-  class Bar: Foo {
-    var someProperty = 0
-  }
-  
-  extension Foo where Self: Bar {
-    var anotherProperty1: Int {
-      get { return someProperty }
-      // This will now error, because the protocol requirement
-      // is implicitly mutating and the setter is implicitly 
-      // nonmutating.
-      set { someProperty = newValue } // Error
-    }
-  }
-  ```
-
-  **Workaround**: Define a new mutable variable inside the setter that has a reference to `self`:
-  
-  ```swift
-  var anotherProperty1: Int {
-    get { return someProperty }
-    set {
-      var mutableSelf = self
-      mutableSelf.someProperty = newValue // Okay
-    }
-  }
-```
 
 * [SE-0253][]:
 
@@ -144,6 +190,8 @@ Swift Next
 
 Swift 5.1
 ---------
+
+### 2019-09-20 (Xcode 11.0)
 
 * [SR-8974][]:
 
@@ -7803,11 +7851,13 @@ Swift 1.0
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2176]: <https://bugs.swift.org/browse/SR-2176>
+[SR-2189]: <https://bugs.swift.org/browse/SR-2189>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-2790]: <https://bugs.swift.org/browse/SR-2790>
 [SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
@@ -7823,3 +7873,4 @@ Swift 1.0
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
+[SR-11429]: <https://bugs.swift.org/browse/SR-11429>

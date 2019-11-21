@@ -354,6 +354,11 @@ private:
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
 
+  void chooseSwiftSourceInfoOutputPath(Compilation &C,
+                                       const TypeToPathMap *OutputMap,
+                                       StringRef workingDirectory,
+                                       CommandOutput *Output) const;
+
   void chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                  StringRef workingDirectory,
                                  llvm::SmallString<128> &buffer,

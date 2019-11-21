@@ -37,6 +37,7 @@
 #include "llvm/Support/Compiler.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
+#include "SwiftObject.h"
 #include "SwiftValue.h"
 #endif
 
@@ -403,7 +404,7 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   for (auto protocol : existentialType->getProtocols()) {
     if (!_conformsToProtocol(value, type, protocol, conformances))
       return false;
-    if (protocol.needsWitnessTable()) {
+    if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
       ++conformances;
     }
@@ -1114,6 +1115,13 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
       return nullptr;
     }
     break;
+
+  case MetadataKind::Existential: {
+    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
+    if (!_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return nullptr;
+    return origSourceType;
+  }
 
   default:
     // The cast succeeds only if the metadata pointers are statically
@@ -2323,9 +2331,10 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
 #if SWIFT_OBJC_INTEROP
-    // If the destination type is an NSError, and the source type is an
-    // Error, then the cast can succeed by NSError bridging.
-    if (targetType == getNSErrorMetadata()) {
+    // If the destination type is an NSError or NSObject, and the source type
+    // is an Error, then the cast can succeed by NSError bridging.
+    if (targetType == getNSErrorMetadata() ||
+        targetType == getNSObjectMetadata()) {
       // Don't rebridge if the source is already some kind of NSError.
       if (srcType->isAnyClass()
           && swift_dynamicCastObjCClass(*reinterpret_cast<id*>(src),

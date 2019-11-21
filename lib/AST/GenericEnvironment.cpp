@@ -46,7 +46,7 @@ GenericEnvironment::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature *signature,
+GenericEnvironment::GenericEnvironment(GenericSignature signature,
                                        GenericSignatureBuilder *builder)
   : Signature(signature), Builder(builder)
 {
@@ -159,8 +159,8 @@ Type GenericEnvironment::mapTypeIntoContext(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(Type type) const {
-  auto *sig = getGenericSignature();
-  return mapTypeIntoContext(type, LookUpConformanceInSignature(*sig));
+  auto sig = getGenericSignature();
+  return mapTypeIntoContext(type, LookUpConformanceInSignature(sig.getPointer()));
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
@@ -193,7 +193,7 @@ Type GenericEnvironment::getSugaredType(Type type) const {
 }
 
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
-  auto *genericSig = getGenericSignature();
+  auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
                               QueryInterfaceTypeSubstitutions(this),
                               MakeAbstractConformanceForGenericType());
@@ -215,7 +215,7 @@ GenericEnvironment::mapConformanceRefIntoContext(
                                      ProtocolConformanceRef conformance) const {
   auto contextConformance = conformance.subst(conformingInterfaceType,
     QueryInterfaceTypeSubstitutions(this),
-    LookUpConformanceInSignature(*getGenericSignature()));
+    LookUpConformanceInSignature(getGenericSignature().getPointer()));
   
   auto contextType = mapTypeIntoContext(conformingInterfaceType);
   return {contextType, contextConformance};

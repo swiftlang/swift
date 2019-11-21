@@ -7,7 +7,9 @@
 func identity<T>(_ value: T) -> T { return value }
 
 func identity2<T>(_ value: T) -> T { return value }
+// expected-note@-1 {{candidate expects value of type 'X' for parameter #1}}
 func identity2<T>(_ value: T) -> Int { return 0 }
+// expected-note@-1 {{'identity2' produces 'Int', not the expected contextual result type 'X'}}
 
 struct X { }
 struct Y { }
@@ -22,8 +24,8 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
 
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
-  xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
+  xx = identity2(yy) // expected-error{{no exact matches in call to global function 'identity2'}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -194,7 +196,7 @@ protocol IsBefore {
   func isBefore(_ other: Self) -> Bool
 }
 
-func min2<T : IsBefore>(_ x: T, _ y: T) -> T {
+func min2<T : IsBefore>(_ x: T, _ y: T) -> T { // expected-note {{where 'T' = 'Float'}}
   if y.isBefore(x) { return y }
   return x
 }
@@ -205,23 +207,23 @@ extension Int : IsBefore {
 
 func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   _ = min2(x, y)
-  min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
+  min2(a, b) // expected-error{{global function 'min2' requires that 'Float' conform to 'IsBefore'}}
 }
 
-func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{'R.Element' = 'Double'}}
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{where 'R.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'Double' conform to 'IsBefore'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'IndexingIterator<[Double]>.Element' (aka 'Double') conform to 'IsBefore'}}
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{where 'A.Element' = 'Int', 'B.Element' = 'Double'}}
+// expected-note@-1 {{where 'A.Element' = 'IndexingIterator<[Int]>.Element' (aka 'Int'), 'B.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []
   testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
-  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'Int' and 'Double' be equivalent}}
+  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'IndexingIterator<[Int]>.Element' (aka 'Int') and 'IndexingIterator<[Double]>.Element' (aka 'Double') be equivalent}}
 }
 
 protocol P_GI {
@@ -241,11 +243,11 @@ genericInheritsA(C_GI())
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
-protocol Addable {
+protocol Addable { // expected-note {{where 'Self' = 'U'}}
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{argument type 'U' does not conform to expected type 'Addable'}}
+  u + u // expected-error{{protocol 'Addable' requires that 'U' conform to 'Addable'}}
   return x+y
 }
 
@@ -266,7 +268,7 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
 
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<Any>'}}
+  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<T>'}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   var x : X, y : Y
@@ -311,14 +313,13 @@ class DeducePropertyParams {
 // SR-69
 struct A {}
 func foo() {
-    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}}
+    for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
-    let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
+    let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+    let l = min(3, oi) // expected-error{{global function 'min' requires that 'Int?' conform to 'Comparable'}}
+  // expected-note@-1{{wrapped type 'Int' satisfies this requirement}}
 }
 
 infix operator +&

@@ -254,6 +254,10 @@ def stats_output_dir: Separate<["-"], "stats-output-dir">,
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
+def experimental_skip_non_inlinable_function_bodies:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;
@@ -364,6 +368,12 @@ def emit_module_interface_path :
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
+def emit_module_source_info_path :
+  Separate<["-"], "emit-module-source-info-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
+
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
@@ -413,6 +423,11 @@ def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
 def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
+
+// Experimental feature options
+def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental differentiable programming features">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -508,6 +523,9 @@ def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
 def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
+def no_toolchain_stdlib_rpath: Flag<["-"], "no-toolchain-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Do not add an rpath entry for the toolchain's standard library (default)">;
 def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't add any rpath entries.">;
@@ -730,6 +748,9 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_pcm : Flag<["-"], "emit-pcm">,
+  HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
@@ -772,6 +793,10 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_pcm : Flag<["-"], "dump-pcm">,
+  HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
@@ -870,6 +895,15 @@ def enable_private_imports : Flag<["-"], "enable-private-imports">,
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
+
+def sanitize_recover_EQ
+    : CommaJoined<["-"], "sanitize-recover=">,
+      Flags<[FrontendOption, NoInteractiveOption]>,
+      MetaVarName<"<check>">,
+      HelpText<"Specify which sanitizer runtime checks (see -sanitize=) will "
+               "generate instrumentation that allows error recovery. Listed "
+               "checks should be comma separated. Default behavior is to not "
+               "allow error recovery.">;
 
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,

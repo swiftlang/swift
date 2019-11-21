@@ -33,7 +33,7 @@ STATISTIC(NumRequirementEnvironments, "# of requirement environments");
 
 RequirementEnvironment::RequirementEnvironment(
                                            DeclContext *conformanceDC,
-                                           GenericSignature *reqSig,
+                                           GenericSignature reqSig,
                                            ProtocolDecl *proto,
                                            ClassDecl *covariantSelf,
                                            ProtocolConformance *conformance)
@@ -41,7 +41,7 @@ RequirementEnvironment::RequirementEnvironment(
   ASTContext &ctx = conformanceDC->getASTContext();
 
   auto concreteType = conformanceDC->getSelfInterfaceType();
-  auto *conformanceSig = conformanceDC->getGenericSignatureOfContext();
+  auto conformanceSig = conformanceDC->getGenericSignatureOfContext();
 
   // This is a substitution function from the generic parameters of the
   // conforming type to the synthetic environment.
@@ -111,7 +111,7 @@ RequirementEnvironment::RequirementEnvironment(
     },
     [selfType, substConcreteType, conformance, conformanceDC, &ctx](
         CanType type, Type replacement, ProtocolDecl *proto)
-          -> Optional<ProtocolConformanceRef> {
+          -> ProtocolConformanceRef {
       // The protocol 'Self' conforms concretely to the conforming type.
       if (type->isEqual(selfType)) {
         ProtocolConformance *specialized = conformance;
@@ -216,6 +216,6 @@ RequirementEnvironment::RequirementEnvironment(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
         nullptr, std::move(genericParamTypes), std::move(requirements)},
-      nullptr);
+      GenericSignature());
   syntheticEnvironment = syntheticSignature->getGenericEnvironment();
 }

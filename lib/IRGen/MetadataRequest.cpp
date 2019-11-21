@@ -470,15 +470,15 @@ namespace {
 
       auto subs =
         type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
-      requirements.enumerateFulfillments(IGF.IGM, subs,
-                                [&](unsigned reqtIndex, CanType type,
-                                    Optional<ProtocolConformanceRef> conf) {
-        if (conf) {
-          Values.push_back(emitWitnessTableRef(IGF, type, *conf));
-        } else {
-          Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
-        }
-      });
+      requirements.enumerateFulfillments(
+          IGF.IGM, subs,
+          [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
+            if (conf) {
+              Values.push_back(emitWitnessTableRef(IGF, type, conf));
+            } else {
+              Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
+            }
+          });
 
       collectTypes(IGF.IGM, decl);
       assert(Types.size() == Values.size());
@@ -516,11 +516,13 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
-                                                  ResilienceExpansion::Maximal);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        getSwiftModule(), ResilienceExpansion::Maximal,
+        getSILModule().isWholeModule());
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    return underlyingTy;
   }
 
   return type;
@@ -531,10 +533,13 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type.getASTType()->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
-                                                  ResilienceExpansion::Maximal);
-    type = type.subst(getSILModule(), replacer, replacer, genericSig,
-                      /*substitute opaque*/ true);
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        getSwiftModule(), ResilienceExpansion::Maximal,
+        getSILModule().isWholeModule());
+    auto underlyingTy =
+        type.subst(getSILModule(), replacer, replacer, genericSig,
+                   /*substitute opaque*/ true);
+    return underlyingTy;
   }
 
   return type;
@@ -546,13 +551,15 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
-                                                  ResilienceExpansion::Maximal);
-    conformance = conformance.subst(type, replacer, replacer,
-                                    SubstFlags::SubstituteOpaqueArchetypes);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        getSwiftModule(), ResilienceExpansion::Maximal,
+        getSILModule().isWholeModule());
+    auto substConformance = conformance.subst(
+        type, replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    return std::make_pair(underlyingTy, substConformance);
   }
 
   return std::make_pair(type, conformance);
@@ -990,12 +997,6 @@ namespace {
     MetadataResponse
     visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type,
                                  DynamicMetadataRequest request) {
-      return emitDirectMetadataRef(type);
-    }
-
-    MetadataResponse
-    visitBuiltinUnknownObjectType(CanBuiltinUnknownObjectType type,
-                                  DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -1729,7 +1730,7 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
                 IGM.Int8PtrTy, // arg 1
                 IGM.Int8PtrTy, // arg 2
                 IGM.TypeContextDescriptorPtrTy) // type context descriptor
-        ->stripPointerCasts());
+        .getCallee());
 
     if (thunkFn->empty()) {
       ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -2155,16 +2156,29 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   
 }
 
+static bool canIssueIncompleteMetadataRequests(IRGenModule &IGM) {
+  // We can only answer blocking complete metadata requests with the <=5.1
+  // runtime ABI entry points.
+  auto &context = IGM.getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return deploymentAvailability.isContainedIn(
+      context.getTypesInAbstractMetadataStateAvailability());
+}
+
 /// Emit a call to a type metadata accessor using a mangled name.
 static MetadataResponse
 emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                 DynamicMetadataRequest request) {
-  // TODO: We can only answer blocking complete metadata requests with the
-  // <=5.1 runtime ABI entry points.
-  assert(request.isStaticallyBlockingComplete()
-         && "can only form complete metadata by mangled name");
-  
   auto &IGM = IGF.IGM;
+
+  // We can only answer blocking complete metadata requests with the <=5.1
+  // runtime ABI entry points.
+  assert((request.isStaticallyBlockingComplete() ||
+          (request.isStaticallyAbstract() &&
+           canIssueIncompleteMetadataRequests(IGM))) &&
+         "can only form complete metadata by mangled name");
+
   llvm::Constant *mangledString;
   unsigned mangledStringSize;
   std::tie(mangledString, mangledStringSize) =
@@ -2197,11 +2211,15 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   }
 
   // Get or create a shared helper function to do the instantiation.
+  auto instantiationFnName =
+      request.isStaticallyAbstract()
+          ? "__swift_instantiateConcreteTypeFromMangledNameAbstract"
+          : "__swift_instantiateConcreteTypeFromMangledName";
   auto instantiationFn = cast<llvm::Function>(
-       IGM.getModule()
-         ->getOrInsertFunction("__swift_instantiateConcreteTypeFromMangledName",
-                               IGF.IGM.TypeMetadataPtrTy, cache->getType())
-         ->stripPointerCasts());
+      IGM.getModule()
+          ->getOrInsertFunction(instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
+                                cache->getType())
+          .getCallee());
   if (instantiationFn->empty()) {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(instantiationFn);
@@ -2211,7 +2229,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                   llvm::Attribute::NoInline);
     IGM.setHasFramePointer(instantiationFn, false);
 
-    [&IGM, instantiationFn]{
+    [&IGM, instantiationFn, request]{
       IRGenFunction subIGF(IGM, instantiationFn);
       
       auto params = subIGF.collectParameters();
@@ -2278,15 +2296,26 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
       auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
                                                  stringAddrOffset);
       stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
-      
-      auto call =
-        subIGF.Builder.CreateCall(IGM.getGetTypeByMangledNameInContextFn(),
-               {stringAddr,
-                size,
-                // TODO: Use mangled name lookup in generic
-                // contexts?
-                llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
-                llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+
+      llvm::CallInst *call;
+      if (request.isStaticallyAbstract()) {
+        call = subIGF.Builder.CreateCall(
+            IGM.getGetTypeByMangledNameInContextInMetadataStateFn(),
+            {llvm::ConstantInt::get(IGM.SizeTy, (size_t)MetadataState::Abstract),
+             stringAddr, size,
+             // TODO: Use mangled name lookup in generic
+             // contexts?
+             llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+             llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+      } else {
+        call = subIGF.Builder.CreateCall(
+            IGM.getGetTypeByMangledNameInContextFn(),
+            {stringAddr, size,
+             // TODO: Use mangled name lookup in generic
+             // contexts?
+             llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+             llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+      }
       call->setDoesNotThrow();
       call->setDoesNotAccessMemory();
       call->setCallingConv(IGM.SwiftCC);
@@ -2338,14 +2367,13 @@ emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF, CanType type,
   // single access by mangled name instead, if we're asking for complete
   // metadata.
   //
-  // TODO: The getTypeByMangledNameInContext entry point in Swift <=5.1 can
-  // only answer requests for complete metadata. We could introduce new
-  // entry points that could answer all metadata requests.
-  if (request.isStaticallyBlockingComplete()
-      && shouldAccessByMangledName(IGF.IGM, type)) {
+  if ((request.isStaticallyBlockingComplete() ||
+       (request.isStaticallyAbstract() &&
+        canIssueIncompleteMetadataRequests(IGF.IGM))) &&
+      shouldAccessByMangledName(IGF.IGM, type)) {
     return emitMetadataAccessByMangledName(IGF, type, request);
   }
-    
+
   llvm::Constant *accessor =
     getOrCreateTypeMetadataAccessFunction(IGF.IGM, type);
   llvm::CallInst *call = IGF.Builder.CreateCall(accessor, { request.get(IGF) });
@@ -2497,7 +2525,7 @@ namespace {
                                       DynamicMetadataRequest request) {
       // All function types have the same layout regardless of arguments or
       // abstraction level. Use the metadata for () -> () for thick functions,
-      // or Builtin.UnknownObject for block functions.
+      // or AnyObject for block functions.
       auto &C = type->getASTContext();
       switch (type->getRepresentation()) {
       case SILFunctionType::Representation::Thin:
@@ -2516,8 +2544,8 @@ namespace {
                  CanFunctionType::get({}, C.TheEmptyTupleType),
                                        request).getMetadata();
       case SILFunctionType::Representation::Block:
-        // All block types look like Builtin.UnknownObject.
-        return emitDirectMetadataRef(C.TheUnknownObjectType, request);
+        // All block types look like AnyObject.
+        return emitDirectMetadataRef(C.getAnyObjectType(), request);
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -2646,9 +2674,9 @@ namespace {
       auto &C = IGF.IGM.Context;
       if (t == C.TheEmptyTupleType
           || t == C.TheNativeObjectType
-          || t == C.TheUnknownObjectType
           || t == C.TheBridgeObjectType
-          || t == C.TheRawPointerType)
+          || t == C.TheRawPointerType
+          || t == C.getAnyObjectType())
         return true;
       if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
         auto width = intTy->getWidth();
@@ -2725,8 +2753,8 @@ namespace {
         return emitFromValueWitnessTable(
                  CanFunctionType::get({}, C.TheEmptyTupleType));
       case SILFunctionType::Representation::Block:
-        // All block types look like Builtin.UnknownObject.
-        return emitFromValueWitnessTable(C.TheUnknownObjectType);
+        // All block types look like AnyObject.
+        return emitFromValueWitnessTable(C.getAnyObjectType());
       }
 
       llvm_unreachable("Not a valid SILFunctionType.");
@@ -2769,7 +2797,7 @@ namespace {
       case ReferenceCounting::ObjC:
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
-        return emitFromValueWitnessTable(IGF.IGM.Context.TheUnknownObjectType);
+        return emitFromValueWitnessTable(IGF.IGM.Context.getAnyObjectType());
 
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:

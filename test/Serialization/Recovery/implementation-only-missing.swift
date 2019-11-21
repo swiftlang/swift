@@ -13,8 +13,22 @@
 //// private module is superfluous but makes sure that it's not somehow loaded.
 // RUN: rm %t/private_lib.swiftmodule
 // RUN: %target-swift-frontend -typecheck -DCLIENT_APP -primary-file %s -I %t -index-system-modules -index-store-path %t
+// RUN: %target-swift-frontend -emit-sil -DCLIENT_APP -primary-file %s -I %t -module-name client
 
 #if PRIVATE_LIB
+
+@propertyWrapper
+public struct IoiPropertyWrapper<V> {
+  var content: V
+
+  public init(_ v: V) {
+    content = v
+  }
+
+  public var wrappedValue: V {
+    return content
+  }
+}
 
 public struct HiddenGenStruct<A: HiddenProtocol> {
   public init() {}
@@ -49,11 +63,18 @@ extension LibProtocol where TA == LibProtocolTA {
 
 public struct PublicStruct: LibProtocol {
   typealias TA = LibProtocolTA
+
   public init() { }
+
+  @IoiPropertyWrapper("some text")
+  public var wrappedVar: String
 }
 
 #elseif CLIENT_APP
 
 import public_lib
+
+var s = PublicStruct()
+print(s.wrappedVar)
 
 #endif

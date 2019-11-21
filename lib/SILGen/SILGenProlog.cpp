@@ -85,20 +85,27 @@ public:
   SILGenFunction &SGF;
   SILBasicBlock *parent;
   SILLocation loc;
+  CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
+                  CanSILFunctionType fnTy,
                   ArrayRef<SILParameterInfo> &parameters)
-    : SGF(sgf), parent(parent), loc(l), parameters(parameters) {}
+    : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters) {}
 
   ManagedValue visitType(CanType t) {
     return visitType(t, /*isInOut=*/false);
   }
 
   ManagedValue visitType(CanType t, bool isInOut) {
-    // The calling convention always uses minimal resilience expansion.
-    auto argType =
-        SGF.SGM.Types.getLoweredType(t, ResilienceExpansion::Minimal);
+    // The calling convention always uses minimal resilience expansion but
+    // inside the function we lower/expand types in context of the current
+    // function.
+    auto argType = SGF.SGM.Types.getLoweredType(t, SGF.getTypeExpansionContext());
+    auto argTypeConv =
+        SGF.SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
+    argType = argType.getCategoryType(argTypeConv.getCategory());
+
     if (isInOut)
       argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
@@ -106,7 +113,8 @@ public:
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
 
-    auto paramType = SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo));
+    auto paramType =
+      SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, loc.getAsASTNode<ValueDecl>());
 
@@ -153,7 +161,7 @@ public:
   ManagedValue visitTupleType(CanTupleType t) {
     SmallVector<ManagedValue, 4> elements;
 
-    auto &tl = SGF.SGM.Types.getTypeLowering(t, ResilienceExpansion::Minimal);
+    auto &tl = SGF.SGM.Types.getTypeLowering(t, SGF.getTypeExpansionContext());
     bool canBeGuaranteed = tl.isLoadable();
 
     // Collect the exploded elements.
@@ -223,9 +231,10 @@ struct ArgumentInitHelper {
   uint16_t ArgNo = 0;
 
   ArgumentInitHelper(SILGenFunction &SGF, SILFunction &f)
-    : SGF(SGF), f(f), initB(SGF.B),
-      parameters(f.getLoweredFunctionType()->getParameters()) {
-  }
+      : SGF(SGF), f(f), initB(SGF.B),
+        parameters(
+            f.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+                ->getParameters()) {}
 
   unsigned getNumArgs() const { return ArgNo; }
 
@@ -235,7 +244,8 @@ struct ArgumentInitHelper {
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    EmitBBArguments argEmitter(SGF, parent, l, parameters);
+    EmitBBArguments argEmitter(SGF, parent, l,
+                               f.getLoweredFunctionType(), parameters);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     if (isInOut)
@@ -316,8 +326,7 @@ static void makeArgument(Type ty, ParamDecl *decl,
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
-    auto loweredTy = SGF.SGM.Types.getLoweredType(ty,
-                                                  ResilienceExpansion::Minimal);
+    auto loweredTy = SGF.getLoweredTypeForFunctionArgument(ty);
     if (decl->isInOut())
       loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
     auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
@@ -338,7 +347,7 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
 }
 
 static void emitCaptureArguments(SILGenFunction &SGF,
-                                 GenericSignature *origGenericSig,
+                                 GenericSignature origGenericSig,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
 
@@ -354,7 +363,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     return SGF.F.mapTypeIntoContext(interfaceType);
   };
 
-  auto expansion = SGF.F.getResilienceExpansion();
+  auto expansion = SGF.getTypeExpansionContext();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
@@ -396,9 +405,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // LValues are captured as a retained @box that owns
     // the captured value.
     auto type = getVarTypeInCaptureContext();
-    auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(VD,
-                               SGF.SGM.Types.getLoweredRValueType(type),
-                               SGF.F.getGenericEnvironment(), /*mutable*/ true);
+    // Get the content for the box in the minimal  resilience domain because we
+    // are declaring a type.
+    auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(
+        VD,
+        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                           type),
+        SGF.F.getGenericEnvironment(), /*mutable*/ true);
     SILValue box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
@@ -420,7 +433,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
+void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 ParameterList *paramList,
                                 ParamDecl *selfParam,
                                 DeclContext *DC,
@@ -445,6 +458,9 @@ void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
+  assert((captureInfo.hasBeenComputed() ||
+          !TypeConverter::canCaptureFromParent(DC)) &&
+         "can't emit prolog of function with uncomputed captures");
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(
@@ -492,21 +508,23 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   // The calling convention always uses minimal resilience expansion.
   auto &resultTI =
     SGF.SGM.Types.getTypeLowering(DC->mapTypeIntoContext(resultType),
-                                  ResilienceExpansion::Minimal);
+                                  SGF.getTypeExpansionContext());
+  auto &resultTIConv = SGF.SGM.Types.getTypeLowering(
+      DC->mapTypeIntoContext(resultType), TypeExpansionContext::minimal());
+
   if (!SILModuleConventions::isReturnedIndirectlyInSIL(
-          resultTI.getLoweredType(), SGF.SGM.M)) {
+          resultTIConv.getLoweredType(), SGF.SGM.M)) {
     return;
   }
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(ParamDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
+  var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
-
-  auto *arg =
-      SGF.F.begin()->createFunctionArgument(resultTI.getLoweredType(), var);
+  auto *arg = SGF.F.begin()->createFunctionArgument(
+      resultTI.getLoweredType().getAddressType(), var);
   (void)arg;
 }
 
@@ -517,7 +535,7 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
                                     bool throws,
                                     SourceLoc throwsLoc) {
   // Create the indirect result parameters.
-  auto *genericSig = DC->getGenericSignatureOfContext();
+  auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getCanonicalType(genericSig);
 
   emitIndirectResultParameters(*this, resultType, DC);
@@ -547,4 +565,3 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
 
   return ArgNo;
 }
-

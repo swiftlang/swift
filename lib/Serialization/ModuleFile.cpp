@@ -14,6 +14,7 @@
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "DocFormat.h"
+#include "SourceInfoFormat.h"
 #include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
@@ -43,16 +44,31 @@ static_assert(IsTriviallyDestructible<SerializedASTFile>::value,
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
                                  ArrayRef<unsigned char> signature) {
-  for (unsigned char byte : signature)
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
+  for (unsigned char byte : signature) {
+    if (cursor.AtEndOfStream())
       return false;
+    if (Expected<llvm::SimpleBitstreamCursor::word_t> maybeRead =
+            cursor.Read(8)) {
+      if (maybeRead.get() != byte)
+        return false;
+    } else {
+      consumeError(maybeRead.takeError());
+      return false;
+    }
+  }
   return true;
 }
 
 static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
                                      unsigned ID,
                                      bool shouldReadBlockInfo = true) {
-  auto next = cursor.advance();
+  Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
+  if (!maybeNext) {
+    // FIXME this drops the error on the floor.
+    consumeError(maybeNext.takeError());
+    return false;
+  }
+  llvm::BitstreamEntry next = maybeNext.get();
 
   if (next.Kind != llvm::BitstreamEntry::SubBlock)
     return false;
@@ -71,7 +87,12 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
   if (next.ID != ID)
     return false;
 
-  cursor.EnterSubBlock(ID);
+  if (llvm::Error Err = cursor.EnterSubBlock(ID)) {
+    // FIXME this drops the error on the floor.
+    consumeError(std::move(Err));
+    return false;
+  }
+
   return true;
 }
 
@@ -82,7 +103,13 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
                              SmallVectorImpl<uint64_t> &scratch,
                              ExtendedValidationInfo &extendedInfo) {
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       break;
 
@@ -99,7 +126,14 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 
     scratch.clear();
     StringRef blobData;
-    unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        cursor.readRecord(entry.ID, scratch, &blobData);
+    if (!maybeKind) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeKind.takeError());
+      return false;
+    }
+    unsigned kind = maybeKind.get();
     switch (kind) {
     case options_block::SDK_PATH:
       extendedInfo.setSDKPath(blobData);
@@ -144,7 +178,14 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   bool versionSeen = false;
 
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      result.status = Status::Malformed;
+      return result;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       break;
 
@@ -155,7 +196,12 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 
     if (entry.Kind == llvm::BitstreamEntry::SubBlock) {
       if (entry.ID == OPTIONS_BLOCK_ID && extendedInfo) {
-        cursor.EnterSubBlock(OPTIONS_BLOCK_ID);
+        if (llvm::Error Err = cursor.EnterSubBlock(OPTIONS_BLOCK_ID)) {
+          // FIXME this drops the error on the floor.
+          consumeError(std::move(Err));
+          result.status = Status::Malformed;
+          return result;
+        }
         if (!readOptionsBlock(cursor, scratch, *extendedInfo)) {
           result.status = Status::Malformed;
           return result;
@@ -173,7 +219,15 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 
     scratch.clear();
     StringRef blobData;
-    unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        cursor.readRecord(entry.ID, scratch, &blobData);
+    if (!maybeKind) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeKind.takeError());
+      result.status = Status::Malformed;
+      return result;
+    }
+    unsigned kind = maybeKind.get();
     switch (kind) {
     case control_block::METADATA: {
       if (versionSeen) {
@@ -246,7 +300,13 @@ static bool validateInputBlock(
   SmallString<256> dependencyFullPathBuffer;
 
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      return true;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       break;
 
@@ -255,7 +315,14 @@ static bool validateInputBlock(
 
     scratch.clear();
     StringRef blobData;
-    unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        cursor.readRecord(entry.ID, scratch, &blobData);
+    if (!maybeKind) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeKind.takeError());
+      return true;
+    }
+    unsigned kind = maybeKind.get();
     switch (kind) {
     case input_block::FILE_DEPENDENCY: {
       bool isHashBased = scratch[2] != 0;
@@ -322,12 +389,25 @@ ValidationInfo serialization::validateSerializedAST(
   llvm::BitstreamEntry topLevelEntry;
 
   while (!cursor.AtEndOfStream()) {
-    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        cursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      result.status = Status::Malformed;
+      return result;
+    }
+    topLevelEntry = maybeEntry.get();
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
-      cursor.EnterSubBlock(CONTROL_BLOCK_ID);
+      if (llvm::Error Err = cursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        result.status = Status::Malformed;
+        return result;
+      }
       result = validateControlBlock(cursor, scratch,
                                     {SWIFTMODULE_VERSION_MAJOR,
                                      SWIFTMODULE_VERSION_MINOR},
@@ -337,7 +417,12 @@ ValidationInfo serialization::validateSerializedAST(
     } else if (dependencies &&
                result.status == Status::Valid &&
                topLevelEntry.ID == INPUT_BLOCK_ID) {
-      cursor.EnterSubBlock(INPUT_BLOCK_ID);
+      if (llvm::Error Err = cursor.EnterSubBlock(INPUT_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        result.status = Status::Malformed;
+        return result;
+      }
       if (validateInputBlock(cursor, scratch, *dependencies)) {
         result.status = Status::Malformed;
         return result;
@@ -826,13 +911,23 @@ ModuleFile::readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 }
 
 bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
-  cursor.EnterSubBlock(INDEX_BLOCK_ID);
+  if (llvm::Error Err = cursor.EnterSubBlock(INDEX_BLOCK_ID)) {
+    // FIXME this drops the error on the floor.
+    consumeError(std::move(Err));
+    return false;
+  }
 
   SmallVector<uint64_t, 4> scratch;
   StringRef blobData;
 
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
     switch (entry.Kind) {
     case llvm::BitstreamEntry::EndBlock:
       return true;
@@ -843,13 +938,25 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
     case llvm::BitstreamEntry::SubBlock:
       if (entry.ID == DECL_MEMBER_TABLES_BLOCK_ID) {
         DeclMemberTablesCursor = cursor;
-        DeclMemberTablesCursor.EnterSubBlock(DECL_MEMBER_TABLES_BLOCK_ID);
+        if (llvm::Error Err = DeclMemberTablesCursor.EnterSubBlock(
+                DECL_MEMBER_TABLES_BLOCK_ID)) {
+          // FIXME this drops the error on the floor.
+          consumeError(std::move(Err));
+          return false;
+        }
         llvm::BitstreamEntry subentry;
         do {
           // Scan forward, to load the cursor with any abbrevs we'll need while
           // seeking inside this block later.
-          subentry = DeclMemberTablesCursor.advance(
-            llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+          Expected<llvm::BitstreamEntry> maybeEntry =
+              DeclMemberTablesCursor.advance(
+                  llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+          if (!maybeEntry) {
+            // FIXME this drops the error on the floor.
+            consumeError(maybeEntry.takeError());
+            return false;
+          }
+          subentry = maybeEntry.get();
         } while (!DeclMemberTablesCursor.AtEndOfStream() &&
                  subentry.Kind != llvm::BitstreamEntry::Record &&
                  subentry.Kind != llvm::BitstreamEntry::EndBlock);
@@ -861,7 +968,14 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
     case llvm::BitstreamEntry::Record:
       scratch.clear();
       blobData = {};
-      unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
+      if (!maybeKind) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeKind.takeError());
+        return false;
+      }
+      unsigned kind = maybeKind.get();
 
       switch (kind) {
       case index_block::DECL_OFFSETS:
@@ -1043,13 +1157,23 @@ ModuleFile::readGroupTable(ArrayRef<uint64_t> Fields, StringRef BlobData) {
 }
 
 bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
-  cursor.EnterSubBlock(COMMENT_BLOCK_ID);
+  if (llvm::Error Err = cursor.EnterSubBlock(COMMENT_BLOCK_ID)) {
+    // FIXME this drops the error on the floor.
+    consumeError(std::move(Err));
+    return false;
+  }
 
   SmallVector<uint64_t, 4> scratch;
   StringRef blobData;
 
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
     switch (entry.Kind) {
     case llvm::BitstreamEntry::EndBlock:
       return true;
@@ -1065,7 +1189,14 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
 
     case llvm::BitstreamEntry::Record:
       scratch.clear();
-      unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
+      if (!maybeKind) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeKind.takeError());
+        return false;
+      }
+      unsigned kind = maybeKind.get();
 
       switch (kind) {
       case comment_block::DECL_COMMENTS:
@@ -1180,13 +1311,24 @@ bool ModuleFile::readModuleDocIfPresent() {
   ValidationInfo info;
 
   while (!docCursor.AtEndOfStream()) {
-    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        docCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    topLevelEntry = maybeEntry.get();
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
     switch (topLevelEntry.ID) {
     case CONTROL_BLOCK_ID: {
-      docCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+      if (llvm::Error Err = docCursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        return false;
+      }
 
       info = validateControlBlock(docCursor, scratch,
                                   {SWIFTDOC_VERSION_MAJOR,
@@ -1222,13 +1364,185 @@ bool ModuleFile::readModuleDocIfPresent() {
   return true;
 }
 
+class ModuleFile::DeclUSRTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = StringRef;
+  using data_type = uint32_t;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type key) { return key; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    assert(!key.empty());
+    return llvm::djbHash(key, SWIFTSOURCEINFO_HASH_SEED);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned dataLength = 4;
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char*>(data), length);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data, unsigned length) {
+    assert(length == 4);
+    return endian::readNext<uint32_t, little, unaligned>(data);
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedDeclUSRTable>
+ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  if (fields.empty() || blobData.empty())
+    return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+  return std::unique_ptr<SerializedDeclUSRTable>(
+    SerializedDeclUSRTable::Create(base + tableOffset, base + sizeof(uint32_t),
+                                   base));
+}
+
+bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
+  if (llvm::Error Err = cursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+    consumeError(std::move(Err));
+    return false;
+  }
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  while (!cursor.AtEndOfStream()) {
+    Expected<llvm::BitstreamEntry> entry = cursor.advance();
+    if (!entry) {
+      consumeError(entry.takeError());
+      return false;
+    }
+    switch (entry->Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      // Unknown sub-block, which this version of the compiler won't use.
+      if (cursor.SkipBlock())
+        return false;
+      break;
+
+    case llvm::BitstreamEntry::Record:
+      scratch.clear();
+      Expected<unsigned> kind =
+          cursor.readRecord(entry->ID, scratch, &blobData);
+      if (!kind) {
+        consumeError(kind.takeError());
+        return false;
+      }
+      switch (*kind) {
+      case decl_locs_block::BASIC_DECL_LOCS:
+        BasicDeclLocsData = blobData;
+        break;
+      case decl_locs_block::TEXT_DATA:
+        SourceLocsTextData = blobData;
+        break;
+      case decl_locs_block::DECL_USRS:
+        DeclUSRsTable = readDeclUSRsTable(scratch, blobData);
+        break;
+      default:
+        // Unknown index kind, which this version of the compiler won't use.
+        break;
+      }
+      break;
+    }
+  }
+
+  return false;
+}
+
+bool ModuleFile::readModuleSourceInfoIfPresent() {
+  if (!this->ModuleSourceInfoInputBuffer)
+    return true;
+
+  llvm::BitstreamCursor infoCursor{ModuleSourceInfoInputBuffer->getMemBufferRef()};
+  if (!checkModuleSignature(infoCursor, SWIFTSOURCEINFO_SIGNATURE) ||
+      !enterTopLevelModuleBlock(infoCursor, MODULE_SOURCEINFO_BLOCK_ID)) {
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+
+  bool hasValidControlBlock = false;
+  ValidationInfo info;
+  unsigned kind = llvm::BitstreamEntry::Error;
+
+  while (!infoCursor.AtEndOfStream()) {
+    Expected<llvm::BitstreamEntry> topLevelEntry =
+        infoCursor.advance(AF_DontPopBlockAtEnd);
+    if (!topLevelEntry) {
+      consumeError(topLevelEntry.takeError());
+      return false;
+    }
+    kind = topLevelEntry->Kind;
+    if (kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry->ID) {
+    case CONTROL_BLOCK_ID: {
+      if (llvm::Error Err = infoCursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+        consumeError(std::move(Err));
+        return false;
+      }
+      info = validateControlBlock(infoCursor, scratch,
+                                  {SWIFTSOURCEINFO_VERSION_MAJOR,
+                                   SWIFTSOURCEINFO_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
+      if (info.status != Status::Valid)
+        return false;
+      // Check that the swiftsourceinfo is actually for this module.
+      if (info.name != Name)
+        return false;
+      hasValidControlBlock = true;
+      break;
+    }
+
+    case DECL_LOCS_BLOCK_ID: {
+      if (!hasValidControlBlock || !readDeclLocsBlock(infoCursor))
+        return false;
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (infoCursor.SkipBlock())
+        return false;
+      break;
+    }
+  }
+
+  if (kind != llvm::BitstreamEntry::EndBlock)
+    return false;
+
+  return true;
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework, serialization::ValidationInfo &info,
     serialization::ExtendedValidationInfo *extInfo)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
+      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
       DeserializedTypeCallback([](Type ty) {}) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
@@ -1251,13 +1565,26 @@ ModuleFile::ModuleFile(
   llvm::BitstreamEntry topLevelEntry;
 
   while (!cursor.AtEndOfStream()) {
-    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        cursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry) {
+      // FIXME this drops the error diagnostic on the floor.
+      consumeError(maybeEntry.takeError());
+      info.status = error(Status::Malformed);
+      return;
+    }
+    topLevelEntry = maybeEntry.get();
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
     switch (topLevelEntry.ID) {
     case CONTROL_BLOCK_ID: {
-      cursor.EnterSubBlock(CONTROL_BLOCK_ID);
+      if (llvm::Error Err = cursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
 
       info = validateControlBlock(cursor, scratch,
                                   {SWIFTMODULE_VERSION_MAJOR,
@@ -1282,13 +1609,33 @@ ModuleFile::ModuleFile(
         return;
       }
 
-      cursor.EnterSubBlock(INPUT_BLOCK_ID);
+      if (llvm::Error Err = cursor.EnterSubBlock(INPUT_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
 
-      auto next = cursor.advance();
+      Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
+      if (!maybeNext) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeNext.takeError());
+        info.status = error(Status::Malformed);
+        return;
+      }
+      llvm::BitstreamEntry next = maybeNext.get();
       while (next.Kind == llvm::BitstreamEntry::Record) {
         scratch.clear();
         StringRef blobData;
-        unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+        Expected<unsigned> maybeKind =
+            cursor.readRecord(next.ID, scratch, &blobData);
+        if (!maybeKind) {
+          // FIXME this drops the error on the floor.
+          consumeError(maybeKind.takeError());
+          info.status = error(Status::Malformed);
+          return;
+        }
+        unsigned kind = maybeKind.get();
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
           unsigned rawImportControl;
@@ -1350,7 +1697,14 @@ ModuleFile::ModuleFile(
           break;
         }
 
-        next = cursor.advance();
+        maybeNext = cursor.advance();
+        if (!maybeNext) {
+          // FIXME this drops the error on the floor.
+          consumeError(maybeNext.takeError());
+          info.status = error(Status::Malformed);
+          return;
+        }
+        next = maybeNext.get();
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock)
@@ -1368,8 +1722,22 @@ ModuleFile::ModuleFile(
       // The decls-and-types block is lazily loaded. Save the cursor and load
       // any abbrev records at the start of the block.
       DeclTypeCursor = cursor;
-      DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID);
-      if (DeclTypeCursor.advance().Kind == llvm::BitstreamEntry::Error)
+      if (llvm::Error Err =
+              DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
+
+      Expected<llvm::BitstreamEntry> maybeCursor = DeclTypeCursor.advance();
+      if (!maybeCursor) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeCursor.takeError());
+        info.status = error(Status::Malformed);
+        return;
+      }
+      if (maybeCursor.get().Kind == llvm::BitstreamEntry::Error)
         info.status = error(Status::Malformed);
 
       // With the main cursor, skip over the block and continue.
@@ -1386,13 +1754,34 @@ ModuleFile::ModuleFile(
         return;
       }
 
-      cursor.EnterSubBlock(IDENTIFIER_DATA_BLOCK_ID);
+      if (llvm::Error Err = cursor.EnterSubBlock(IDENTIFIER_DATA_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
 
-      auto next = cursor.advanceSkippingSubblocks();
+      Expected<llvm::BitstreamEntry> maybeNext =
+          cursor.advanceSkippingSubblocks();
+      if (!maybeNext) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeNext.takeError());
+        info.status = error(Status::Malformed);
+        return;
+      }
+      llvm::BitstreamEntry next = maybeNext.get();
       while (next.Kind == llvm::BitstreamEntry::Record) {
         scratch.clear();
         StringRef blobData;
-        unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+        Expected<unsigned> maybeKind =
+            cursor.readRecord(next.ID, scratch, &blobData);
+        if (!maybeKind) {
+          // FIXME this drops the error on the floor.
+          consumeError(maybeKind.takeError());
+          info.status = error(Status::Malformed);
+          return;
+        }
+        unsigned kind = maybeKind.get();
 
         switch (kind) {
         case identifier_block::IDENTIFIER_DATA:
@@ -1405,7 +1794,14 @@ ModuleFile::ModuleFile(
           break;
         }
 
-        next = cursor.advanceSkippingSubblocks();
+        maybeNext = cursor.advanceSkippingSubblocks();
+        if (!maybeNext) {
+          // FIXME this drops the error on the floor.
+          consumeError(maybeNext.takeError());
+          info.status = error(Status::Malformed);
+          return;
+        }
+        next = maybeNext.get();
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock) {
@@ -1427,7 +1823,12 @@ ModuleFile::ModuleFile(
     case SIL_INDEX_BLOCK_ID: {
       // Save the cursor.
       SILIndexCursor = cursor;
-      SILIndexCursor.EnterSubBlock(SIL_INDEX_BLOCK_ID);
+      if (llvm::Error Err = SILIndexCursor.EnterSubBlock(SIL_INDEX_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
@@ -1440,7 +1841,12 @@ ModuleFile::ModuleFile(
     case SIL_BLOCK_ID: {
       // Save the cursor.
       SILCursor = cursor;
-      SILCursor.EnterSubBlock(SIL_BLOCK_ID);
+      if (llvm::Error Err = SILCursor.EnterSubBlock(SIL_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        info.status = error(Status::Malformed);
+        return;
+      }
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
@@ -1465,7 +1871,8 @@ ModuleFile::ModuleFile(
     info.status = error(Status::Malformed);
     return;
   }
-
+  // Read source info file.
+  readModuleSourceInfoIfPresent();
   if (!readModuleDocIfPresent()) {
     info.status = error(Status::MalformedDocumentation);
     return;
@@ -1983,16 +2390,17 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     DeclMembersTables[subTableOffset];
   if (!subTable) {
     BCOffsetRAII restoreOffset(DeclMemberTablesCursor);
-    DeclMemberTablesCursor.JumpToBit(subTableOffset);
-    auto entry = DeclMemberTablesCursor.advance();
+    fatalIfNotSuccess(DeclMemberTablesCursor.JumpToBit(subTableOffset));
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       fatal();
       return None;
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
-    unsigned kind = DeclMemberTablesCursor.readRecord(entry.ID, scratch,
-                                                      &blobData);
+    unsigned kind = fatalIfUnexpected(
+        DeclMemberTablesCursor.readRecord(entry.ID, scratch, &blobData));
     assert(kind == decl_member_tables_block::DECL_MEMBERS);
     (void)kind;
     subTable = readDeclMembersTable(scratch, blobData);
@@ -2011,7 +2419,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
-        llvm::consumeError(mem.takeError());
+        consumeError(mem.takeError());
 
         // Treat this as a cache-miss to the caller and let them attempt
         // to refill through the normal loadAllMembers() path.
@@ -2138,7 +2546,7 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
     if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
-      llvm::consumeError(declOrError.takeError());
+      consumeError(declOrError.takeError());
       continue;
     }
     results.push_back(declOrError.get());
@@ -2202,34 +2610,70 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 
   if (!DeclCommentTable)
     return None;
-
   if (D->isImplicit())
     return None;
-
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    // Compute the USR.
-    llvm::SmallString<128> USRBuffer;
-    {
-      llvm::raw_svector_ostream OS(USRBuffer);
-      if (ide::printExtensionUSR(ED, OS))
-        return None;
-    }
-     return getCommentForDeclByUSR(USRBuffer.str());
-  }
-
-  auto *VD = dyn_cast<ValueDecl>(D);
-  if (!VD)
-    return None;
-
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
-  {
-    llvm::raw_svector_ostream OS(USRBuffer);
-    if (ide::printDeclUSR(VD, OS))
-      return None;
-  }
+  llvm::raw_svector_ostream OS(USRBuffer);
+  if (ide::printDeclUSR(D, OS))
+    return None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+Optional<BasicDeclLocs>
+ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
+  assert(D);
+
+  // Keep these as assertions instead of early exits to ensure that we are not
+  // doing extra work.  These cases should be handled by clients of this API.
+  assert(!D->hasClangNode() &&
+         "cannot find comments for Clang decls in Swift modules");
+  assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
+         "Decl is from a different serialized file");
+  if (!DeclUSRsTable)
+    return None;
+  // Future compilers may not provide BasicDeclLocsData anymore.
+  if (BasicDeclLocsData.empty())
+    return None;
+  if (D->isImplicit())
+    return None;
+  // Compute the USR.
+  llvm::SmallString<128> USRBuffer;
+  llvm::raw_svector_ostream OS(USRBuffer);
+  if (ide::printDeclUSR(D, OS))
+    return None;
+
+  auto It = DeclUSRsTable->find(OS.str());
+  if (It == DeclUSRsTable->end())
+    return None;
+  auto UsrId = *It;
+  uint32_t NumSize = 4;
+  // Size of BasicDeclLocs in the buffer.
+  // FilePathOffset + LocNum * LineColumn
+  uint32_t LineColumnCount = 3;
+  uint32_t RecordSize = NumSize + NumSize * 2 * LineColumnCount;
+  uint32_t RecordOffset = RecordSize * UsrId;
+  assert(RecordOffset < BasicDeclLocsData.size());
+  assert(BasicDeclLocsData.size() % RecordSize == 0);
+  BasicDeclLocs Result;
+  auto *Record = BasicDeclLocsData.data() + RecordOffset;
+  auto ReadNext = [&Record]() {
+    return endian::readNext<uint32_t, little, unaligned>(Record);
+  };
+
+  auto FilePath = SourceLocsTextData.substr(ReadNext());
+  size_t TerminatorOffset = FilePath.find('\0');
+  assert(TerminatorOffset != StringRef::npos && "unterminated string data");
+  Result.SourceFilePath = FilePath.slice(0, TerminatorOffset);
+#define READ_FIELD(X)                                                         \
+Result.X.Line = ReadNext();                                                   \
+Result.X.Column = ReadNext();
+  READ_FIELD(Loc)
+  READ_FIELD(StartLoc)
+  READ_FIELD(EndLoc)
+#undef READ_FIELD
+  return Result;
 }
 
 const static StringRef Separator = "/";
@@ -2342,7 +2786,7 @@ bool SerializedASTFile::hasEntryPoint() const {
 }
 
 bool SerializedASTFile::getAllGenericSignatures(
-                       SmallVectorImpl<GenericSignature*> &genericSignatures) {
+                       SmallVectorImpl<GenericSignature> &genericSignatures) {
   genericSignatures.clear();
   for (unsigned index : indices(File.GenericSignatures)) {
     if (auto genericSig = File.getGenericSignature(index + 1))

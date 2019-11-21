@@ -371,12 +371,13 @@ public:
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
-
-    auto boxType = SGF.SGM.Types
-      .getContextBoxTypeForCapture(decl,
-                     SGF.SGM.Types.getLoweredRValueType(decl->getType()),
-                     SGF.F.getGenericEnvironment(),
-                     /*mutable*/ true);
+    // The box type's context is lowered in the minimal resilience domain.
+    auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
+        decl,
+        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                           decl->getType()),
+        SGF.F.getGenericEnvironment(),
+        /*mutable*/ true);
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
@@ -850,7 +851,8 @@ void EnumElementPatternInitialization::emitEnumMatch(
         }
 
         // Otherwise, the bound value for the enum case is available.
-        SILType eltTy = value.getType().getEnumElementType(eltDecl, SGF.SGM.M);
+        SILType eltTy = value.getType().getEnumElementType(
+            eltDecl, SGF.SGM.M, SGF.getTypeExpansionContext());
         auto &eltTL = SGF.getTypeLowering(eltTy);
 
         if (mv.getType().isAddress()) {
@@ -1166,14 +1168,13 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 }
 
 void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
-                                        unsigned pbdEntry) {
-  auto &entry = PBD->getPatternList()[pbdEntry];
-  auto initialization = emitPatternBindingInitialization(entry.getPattern(),
+                                        unsigned idx) {
+  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getExecutableInit()) {
+  if (auto *Init = PBD->getExecutableInit(idx)) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
@@ -1185,7 +1186,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  for (unsigned i : indices(PBD->getPatternList())) {
+  for (unsigned i : range(PBD->getNumPatternEntries())) {
     emitPatternBinding(PBD, i);
   }
 }
@@ -1238,7 +1239,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 
   auto silDeclRef = SILDeclRef(versionQueryDecl);
   SILValue availabilityGTEFn = emitGlobalFunctionRef(
-      loc, silDeclRef, getConstantInfo(silDeclRef));
+      loc, silDeclRef, getConstantInfo(getTypeExpansionContext(), silDeclRef));
 
   SILValue args[] = {majorValue, minorValue, subminorValue};
   return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);

@@ -1410,6 +1410,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_PCH;
       break;
 
+    case options::OPT_emit_pcm:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      OI.CompilerOutputType = file_types::TY_ClangModuleFile;
+      break;
+
     case options::OPT_emit_imported_modules:
       OI.CompilerOutputType = file_types::TY_ImportedModules;
       // We want the imported modules from the module as a whole, not individual
@@ -1439,6 +1444,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
     case options::OPT_verify_debug_info:
+      OI.CompilerOutputType = file_types::TY_Nothing;
+      break;
+
+    case options::OPT_dump_pcm:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_Nothing;
       break;
 
@@ -1636,6 +1646,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           return TC.sanitizerRuntimeLibExists(Args, sanitizerName, shared);
         });
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
+    // Just validate the args. The frontend will parse these again and actually
+    // use them. To avoid emitting warnings multiple times we surpress warnings
+    // here but not in the frontend.
+    (void)parseSanitizerRecoverArgValues(A, OI.SelectedSanitizers, Diags,
+                                         /*emitWarnings=*/false);
+  }
+
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
 
     // Check that the sanitizer coverage flags are supported if supplied.
@@ -1782,6 +1800,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
       case file_types::TY_SwiftModuleFile:
       case file_types::TY_SwiftModuleDocFile:
+      case file_types::TY_SwiftSourceInfoFile:
         if (OI.ShouldGenerateModule && !OI.shouldLink()) {
           // When generating a .swiftmodule as a top-level output (as opposed
           // to, for example, linking an image), treat .swiftmodule files as
@@ -1841,6 +1860,11 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   }
   case OutputInfo::Mode::SingleCompile: {
     if (Inputs.empty()) break;
+    if (Args.hasArg(options::OPT_emit_pcm) && Inputs.size() != 1) {
+      // -emit-pcm mode requires exactly one input (the module map).
+      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
+      return;
+    }
     if (Args.hasArg(options::OPT_embed_bitcode)) {
       // Make sure we can handle the inputs.
       bool HandledHere = true;
@@ -2541,9 +2565,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   if (OI.ShouldGenerateModule &&
-      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
-    chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
-                                   Output.get());
+      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
+    chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory, Output.get());
+    chooseSwiftSourceInfoOutputPath(C, OutputMap, workingDirectory, Output.get());
+  }
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path))
@@ -2786,35 +2811,68 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C,
   }
 }
 
+static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
+                                                const TypeToPathMap *OutputMap,
+                                                StringRef workingDirectory,
+                                                CommandOutput *Output,
+                                                file_types::ID fileID,
+                                                bool shouldUseProjectFolder = false,
+                                                Optional<options::ID> optId = llvm::None) {
+  if (hasExistingAdditionalOutput(*Output, fileID))
+    return;
+  // Honor driver option for this path if it's given
+  if (optId.hasValue()) {
+    if (const Arg *A = C.getArgs().getLastArg(*optId)) {
+      Output->setAdditionalOutputForType(fileID, StringRef(A->getValue()));
+      return;
+    }
+  }
+
+  StringRef OFMOutputPath;
+  if (OutputMap) {
+    auto iter = OutputMap->find(fileID);
+    if (iter != OutputMap->end())
+      OFMOutputPath = iter->second;
+  }
+  if (!OFMOutputPath.empty()) {
+    // Prefer a path from the OutputMap.
+    Output->setAdditionalOutputForType(fileID, OFMOutputPath);
+  } else if (Output->getPrimaryOutputType() != file_types::TY_Nothing) {
+    auto ModulePath = Output->getAnyOutputForType(file_types::TY_SwiftModuleFile);
+    bool isTempFile = C.isTemporaryFile(ModulePath);
+    auto ModuleName = llvm::sys::path::filename(ModulePath);
+    llvm::SmallString<128> Path(llvm::sys::path::parent_path(ModulePath));
+    if (shouldUseProjectFolder) {
+      llvm::sys::path::append(Path, "Project");
+      // If the build system has created a Project dir for us to include the file, use it.
+      if (!llvm::sys::fs::exists(Path)) {
+        llvm::sys::path::remove_filename(Path);
+      }
+    }
+    llvm::sys::path::append(Path, ModuleName);
+    llvm::sys::path::replace_extension(Path, file_types::getExtension(fileID));
+    Output->setAdditionalOutputForType(fileID, Path);
+    if (isTempFile)
+      C.addTemporaryFile(Path);
+  }
+}
+
+void Driver::chooseSwiftSourceInfoOutputPath(Compilation &C,
+                                             const TypeToPathMap *OutputMap,
+                                             StringRef workingDirectory,
+                                             CommandOutput *Output) const {
+  chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
+                                      file_types::TY_SwiftSourceInfoFile,
+                                      /*shouldUseProjectFolder*/true,
+                                      options::OPT_emit_module_source_info_path);
+}
+
 void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
                                             const TypeToPathMap *OutputMap,
                                             StringRef workingDirectory,
                                             CommandOutput *Output) const {
-
-  if (hasExistingAdditionalOutput(*Output, file_types::TY_SwiftModuleDocFile))
-    return;
-
-  StringRef OFMModuleDocOutputPath;
-  if (OutputMap) {
-    auto iter = OutputMap->find(file_types::TY_SwiftModuleDocFile);
-    if (iter != OutputMap->end())
-      OFMModuleDocOutputPath = iter->second;
-  }
-  if (!OFMModuleDocOutputPath.empty()) {
-    // Prefer a path from the OutputMap.
-    Output->setAdditionalOutputForType(file_types::TY_SwiftModuleDocFile,
-                                       OFMModuleDocOutputPath);
-  } else if (Output->getPrimaryOutputType() != file_types::TY_Nothing) {
-    // Otherwise, put it next to the swiftmodule file.
-    llvm::SmallString<128> Path(
-        Output->getAnyOutputForType(file_types::TY_SwiftModuleFile));
-    bool isTempFile = C.isTemporaryFile(Path);
-    llvm::sys::path::replace_extension(
-        Path, file_types::getExtension(file_types::TY_SwiftModuleDocFile));
-    Output->setAdditionalOutputForType(file_types::TY_SwiftModuleDocFile, Path);
-    if (isTempFile)
-      C.addTemporaryFile(Path);
-  }
+  chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
+                                      file_types::TY_SwiftModuleDocFile);
 }
 
 void Driver::chooseRemappingOutputPath(Compilation &C,

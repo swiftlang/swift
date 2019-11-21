@@ -36,7 +36,7 @@ struct Broken {
 
 // rdar://16252090 - Warning when inferring empty tuple type for declarations
 var emptyTuple = testShadowing()  // expected-warning {{variable 'emptyTuple' inferred to have type '()'}} \
-                                  // expected-note {{add an explicit type annotation to silence this warning}}
+                                  // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: ()}}
 
 // rdar://15263687 - Diagnose variables inferenced to 'AnyObject'
 var ao1 : AnyObject
@@ -44,7 +44,7 @@ var ao2 = ao1
 
 var aot1 : AnyObject.Type
 var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
-                       // expected-note {{add an explicit type annotation to silence this warning}}
+                       // expected-note {{add an explicit type annotation to silence this warning}} {{9-9=: AnyObject.Type}}
 
 
 for item in [AnyObject]() {  // No warning in for-each loop.
@@ -60,14 +60,28 @@ func testAnyObjectOptional() -> AnyObject? {
   return x
 }
 
+// SR-11511 Warning for inferring an array of empty tuples
+var arrayOfEmptyTuples = [""].map { print($0) } // expected-warning {{variable 'arrayOfEmptyTuples' inferred to have type '[()]'}} \
+                                                // expected-note {{add an explicit type annotation to silence this warning}} {{23-23=: [()]}}
+
+var maybeEmpty = Optional(arrayOfEmptyTuples) // expected-warning {{variable 'maybeEmpty' inferred to have type '[()]?'}} \
+                                              // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: [()]?}}
+
+var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warning {{variable 'shouldWarnWithoutSugar' inferred to have type 'Array<()>'}} \
+                                 // expected-note {{add an explicit type annotation to silence this warning}} {{27-27=: Array<()>}}
+
 class SomeClass {}
 
 // <rdar://problem/16877304> weak let's should be rejected
 weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
 
 let a = b ; let b = a
-// expected-note@-1 {{'a' declared here}}
-// expected-error@-2 {{ambiguous use of 'a'}}
+// expected-error@-1 {{circular reference}}
+// expected-note@-2 {{through reference here}}
+// expected-note@-3 {{through reference here}}
+// expected-note@-4 {{through reference here}}
+// expected-note@-5 {{through reference here}}
+// expected-note@-6 {{through reference here}}
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
 let uselessValue : String?

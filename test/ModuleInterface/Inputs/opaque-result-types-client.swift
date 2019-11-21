@@ -17,14 +17,14 @@ struct YourFoo: Foo {}
 func someTypeIsTheSame() {
   var a = foo(0)
   a = foo(0)
-  a = foo("") // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
+  a = foo("") // expected-error{{cannot assign value of type 'some Foo' (result of 'foo') to type 'some Foo' (result of 'foo')}}
 
   var b = foo("")
-  b = foo(0) // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
+  b = foo(0) // expected-error{{cannot assign value of type 'some Foo' (result of 'foo') to type 'some Foo' (result of 'foo')}}
   b = foo("")
 
   var c = foo(MyFoo())
-  c = foo(0) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyFoo'}}
+  c = foo(0) // expected-error{{cannot assign value of type 'some Foo' (result of 'foo') to type 'some Foo' (result of 'foo')}}
   c = foo(MyFoo())
   c = foo(YourFoo()) // expected-error{{cannot convert value of type 'YourFoo' to expected argument type 'MyFoo'}}
 

@@ -60,7 +60,10 @@ public:
     /// Swift code.
     Normal,
     /// Set up Clang for backend compilation only.
-    EmbedBitcode
+    EmbedBitcode,
+    /// Set up Clang to emit a precompiled module from a C/Objective-C module
+    /// map or dump debugging info about a precompiled module.
+    PrecompiledModule
   };
 
   /// Controls how Clang is initially set up.
@@ -96,29 +99,24 @@ public:
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
 
-  /// When set, clobber the Clang instance's virtual file system with the Swift
-  /// virtual file system.
-  bool ForceUseSwiftVirtualFileSystem = false;
-
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
-    using llvm::hash_value;
     using llvm::hash_combine;
+    using llvm::hash_combine_range;
 
-    auto Code = hash_value(ModuleCachePath);
-    // ExtraArgs ignored - already considered in Clang's module hashing.
-    Code = hash_combine(Code, OverrideResourceDir);
-    Code = hash_combine(Code, TargetCPU);
-    Code = hash_combine(Code, BridgingHeader);
-    Code = hash_combine(Code, PrecompiledHeaderOutputDir);
-    Code = hash_combine(Code, static_cast<uint8_t>(Mode));
-    Code = hash_combine(Code, DetailedPreprocessingRecord);
-    Code = hash_combine(Code, ImportForwardDeclarations);
-    Code = hash_combine(Code, InferImportAsMember);
-    Code = hash_combine(Code, DisableSwiftBridgeAttr);
-    Code = hash_combine(Code, DisableOverlayModules);
-    return Code;
+    return hash_combine(ModuleCachePath,
+                        hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
+                        OverrideResourceDir,
+                        TargetCPU,
+                        BridgingHeader,
+                        PrecompiledHeaderOutputDir,
+                        static_cast<uint8_t>(Mode),
+                        DetailedPreprocessingRecord,
+                        ImportForwardDeclarations,
+                        InferImportAsMember,
+                        DisableSwiftBridgeAttr,
+                        DisableOverlayModules);
   }
 };
 

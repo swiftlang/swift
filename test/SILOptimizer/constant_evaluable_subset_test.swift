@@ -4,7 +4,7 @@
 // Run the (mandatory) passes on which constant evaluator depends, and test the
 // constant evaluator on the SIL produced after the dependent passes are run.
 //
-// RUN: not %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > /dev/null 2> %t/error-output
+// RUN: not %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > %t/constant_evaluable_subset_test.sil 2> %t/error-output
 //
 // RUN: %FileCheck %s < %t/error-output
 //
@@ -253,7 +253,7 @@ internal func interpretInvalidSingedUnsignedConversions() -> UInt64 {
 @_semantics("constant_evaluable")
 internal func testIO() -> String? {
   return readLine()
-    // CHECK: note: encountered call to 'Swift.readLine(strippingNewline: Swift.Bool) -> Swift.Optional<Swift.String>' whose body is not available
+    // CHECK: note: encountered call to 'readLine(strippingNewline:)' whose body is not available
     // CHECK: note: function whose body is not available
 }
 
@@ -350,6 +350,19 @@ func interpretDivideByZero() -> Int {
   return testDivideByZero(127, 0)
 }
 
+// CHECK-LABEL: @testDividingFullWidthByZero
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testDividingFullWidthByZero(_ x: Int, _ y: Int, _ z: UInt) -> Int {
+  return x.dividingFullWidth((y, z)).1
+} // CHECK: note: {{.*}}: Division by zero
+  // CHECK: note: operation performed during this call traps
+
+@_semantics("test_driver")
+func interpretDividingFullWidthByZero() -> Int {
+  return testDividingFullWidthByZero(0, 1, 1)
+}
+
 // CHECK-LABEL: @testDivideOverflow
 // CHECK: error: not constant evaluable
 @_semantics("constant_evaluable")
@@ -362,6 +375,20 @@ func testDivideOverflow(_ x: Int8, _ y: Int8) -> Int8 {
 @_semantics("test_driver")
 func interpretDivideOverflow() -> Int8 {
   return testDivideOverflow(-128, -1)
+}
+
+// CHECK-LABEL: @testDistance
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testDistance(_ x: UInt, _ y: UInt) -> Int {
+  return x.distance(to: y)
+    // CHECK: note: {{.*}}: Distance is not representable in Int
+    // CHECK: note: operation performed during this call traps
+}
+
+@_semantics("test_driver")
+func interpretDistanceTest() -> Int {
+  return testDistance(0, UInt.max)
 }
 
 // CHECK-LABEL: @testInOut
@@ -692,4 +719,176 @@ func testIndirectEnum(_ nat: Nat) -> Bool {
 @_semantics("test_driver")
 func interpretIndirectEnum() -> Bool {
   return testIndirectEnum(.succ(.zero))
+}
+
+// CHECK-LABEL: @testEmptyArrayInit
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testEmptyArrayInit() -> [Int] {
+  return Array<Int>()
+}
+
+@_semantics("test_driver")
+func interpretEmptyArrayInit() -> [Int] {
+  return testEmptyArrayInit()
+}
+
+// CHECK-LABEL: @testEmptyArrayLiteral
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testEmptyArrayLiteral() -> [Int] {
+  return []
+}
+
+@_semantics("test_driver")
+func interpretEmptyArrayLiteral() -> [Int] {
+  return testEmptyArrayLiteral()
+}
+
+// CHECK-LABEL: @testArrayLiteral
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayLiteral(_ x: Int, _ y: Int) -> [Int] {
+  return [x, y, 4]
+}
+
+@_semantics("test_driver")
+func interpretArrayLiteral() -> [Int] {
+  return testArrayLiteral(2, 3)
+}
+
+// CHECK-LABEL: @testArrayAppend
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayAppend(_ x: Int) -> [Int] {
+  var a: [Int] = []
+  a.append(x)
+  return a
+}
+
+@_semantics("test_driver")
+func interpretArrayAppend() -> [Int] {
+  return testArrayAppend(25)
+}
+
+// CHECK-LABEL: @testArrayAppendNonEmpty
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayAppendNonEmpty(_ x: String) -> [String] {
+  var a: [String] = ["ls", "cat", "echo", "cd"]
+  a.append(x)
+  return a
+}
+
+@_semantics("test_driver")
+func interpretArrayAppendNonEmpty() -> [String] {
+  return testArrayAppendNonEmpty("mkdir")
+}
+
+struct StructContaningArray {
+  var array: [Int]
+}
+
+// CHECK-LABEL: @testArrayFieldAppend
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayFieldAppend(_ x: Int) -> StructContaningArray {
+  var s = StructContaningArray(array: [])
+  s.array.append(x)
+  return s
+}
+
+@_semantics("test_driver")
+func interpretArrayFieldAppend() -> StructContaningArray {
+  return testArrayFieldAppend(0)
+}
+
+// CHECK-LABEL: @testClosureInit
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureInit(_ x: Int) -> () -> Int {
+  return { x }
+}
+
+@_semantics("test_driver")
+func interpretClosureCreation() -> () -> Int {
+  return testClosureInit(19)
+}
+
+// CHECK-LABEL: @testClosureChaining
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureChaining(_ x: Int, _ y: Int) -> () -> Int {
+  let clo: (Int) -> Int = { $0 + x }
+  return { clo(y) }
+}
+
+@_semantics("test_driver")
+func interpretClosureChains() -> () -> Int {
+  return testClosureChaining(191, 201)
+}
+
+// CHECK-LABEL: @testClosureWithNonConstantCaptures
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureWithNonConstantCaptures(_ x: @escaping () -> Int) -> () -> Int {
+  return x
+}
+
+@_semantics("test_driver")
+func interpretClosureWithNonConstantCaptures(_ x: Int) -> () -> Int {
+  return testClosureWithNonConstantCaptures({ x })
+}
+
+// CHECK-LABEL: @testAutoClosure
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testAutoClosure(_ x: @escaping @autoclosure () -> Int) -> () -> Int {
+  return x
+}
+
+@_semantics("test_driver")
+func interpretAutoClosure(_ x: Int) -> () -> Int {
+  return testAutoClosure(x)
+}
+
+// Test thin-to-thick function conversion.
+
+func someFunction(_ x: Int) -> Int {
+  return x + 1
+}
+
+// CHECK-LABEL: @testThinToThick
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testThinToThick() -> (Int) -> Int {
+  return someFunction
+}
+
+@_semantics("test_driver")
+func interpretThinToThick() -> (Int) -> Int {
+  return testThinToThick()
+}
+
+// Test closures and arrays combination.
+
+// CHECK-LABEL: @testArrayOfClosures
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayOfClosures(_ byte: @escaping () -> Int) -> [(Int) -> Int] {
+  var closureArray: [(Int) -> Int] = []
+  // Append a simple closure.
+  closureArray.append({ arg in
+    return 0
+  })
+  // Append a closure that does computation.
+  closureArray.append({ arg in
+    return byte() + arg
+  })
+  return closureArray
+}
+
+@_semantics("test_driver")
+func interpretArrayOfClosures() -> [(Int) -> Int] {
+  return testArrayOfClosures({ 10 })
 }

@@ -32,11 +32,11 @@ using namespace swift;
 using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
-                                     GenericSignature *specializedSig)
+                                     GenericSignature specializedSig)
     : kind(kind), exported(exported), specializedSignature(specializedSig) { }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             GenericSignature *specializedSig,
+                                             GenericSignature specializedSig,
                                              bool exported,
                                              SpecializationKind kind) {
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
@@ -44,7 +44,7 @@ SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
-  if (getLoweredFunctionType()->getGenericSignature()) {
+  if (getLoweredFunctionType()->getInvocationGenericSignature()) {
     Attr->F = this;
     SpecializeAttrSet.push_back(Attr);
   }
@@ -223,46 +223,49 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   auto genericSig = getGenericSignature()->getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInSignature(*genericSig),
+                    LookUpConformanceInSignature(genericSig.getPointer()),
                     genericSig);
 }
 
 bool SILFunction::isNoReturnFunction() const {
   return SILType::getPrimitiveObjectType(getLoweredFunctionType())
-      .isNoReturnFunction();
+      .isNoReturnFunction(getModule());
 }
 
 const TypeLowering &
 SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
   return getModule().Types.getTypeLowering(orig, subst,
-                                           getResilienceExpansion());
+                                           TypeExpansionContext(*this));
 }
 
 const TypeLowering &SILFunction::getTypeLowering(Type t) const {
-  return getModule().Types.getTypeLowering(t, getResilienceExpansion());
+  return getModule().Types.getTypeLowering(t, TypeExpansionContext(*this));
 }
 
 SILType
 SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getLoweredType(orig, subst,
-                                          getResilienceExpansion());
+                                          TypeExpansionContext(*this));
 }
 
 SILType SILFunction::getLoweredType(Type t) const {
-  return getModule().Types.getLoweredType(t, getResilienceExpansion());
+  return getModule().Types.getLoweredType(t, TypeExpansionContext(*this));
 }
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
   auto &M = getModule();
-  return M.Types.getLoweredLoadableType(t, getResilienceExpansion(), M);
+  return M.Types.getLoweredLoadableType(t, TypeExpansionContext(*this), M);
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
-  return getModule().Types.getTypeLowering(type, getResilienceExpansion());
+  return getModule().Types.getTypeLowering(type, TypeExpansionContext(*this));
 }
 
+SILType SILFunction::getLoweredType(SILType t) const {
+  return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
+}
 bool SILFunction::isTypeABIAccessible(SILType type) const {
-  return getModule().isTypeABIAccessible(type, getResilienceExpansion());
+  return getModule().isTypeABIAccessible(type, TypeExpansionContext(*this));
 }
 
 bool SILFunction::isWeakImported() const {

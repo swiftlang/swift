@@ -274,3 +274,10 @@ func autoclosure_param_returning_func_type() {
   func biz_5(_ fn: @escaping () -> (() -> Int)) { fiz(fn) } // Can't forward in Swift >= 5 mode
   // expected-error@-1 {{add () to forward @autoclosure parameter}} {{57-57=()}}
 }
+
+func test_autoclosure_with_generic_argument_mismatch() {
+  struct S<T> {} // expected-note {{arguments to generic parameter 'T' ('String' and 'Int') are expected to be equal}}
+  func foo(_: @autoclosure () -> S<Int>) {}
+
+  foo(S<String>()) // expected-error {{cannot convert value of type 'S<String>' to expected argument type 'S<Int>'}}
+}

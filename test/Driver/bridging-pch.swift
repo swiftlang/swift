@@ -11,14 +11,14 @@
 // NOPCHACT: 1: compile, {0}, none
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=YESPCHJOB
-// YESPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -emit-pch -o {{.*}}bridging-header-{{.*}}.pch
-// YESPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header-{{.*}}.pch
+// YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -emit-pch -o {{.*}}bridging-header-{{.*}}.pch
+// YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header-{{.*}}.pch
 
 // RUN: %target-build-swift -typecheck -disable-bridging-pch  -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=NOPCHJOB
-// NOPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -import-objc-header {{.*}}Inputs/bridging-header.h
+// NOPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -import-objc-header {{.*}}Inputs/bridging-header.h
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -index-store-path %t/idx -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=INDEXSTORE
-// INDEXSTORE: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -index-store-path {{.*}}/idx{{"?}} -emit-pch -o {{.*}}bridging-header-{{.*}}.pch
+// INDEXSTORE: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -index-store-path {{.*}}/idx{{"?}} -emit-pch -o {{.*}}bridging-header-{{.*}}.pch
 
 // RUN: echo "{\"\": {\"swift-dependencies\": \"%/t/master.swiftdeps\"}, \"%/s\": {\"swift-dependencies\": \"%/t/bridging-header.swiftdeps\"}}" > %t.json
 // RUN: %target-build-swift -typecheck -incremental -enable-bridging-pch -output-file-map %t.json -import-objc-header %S/Inputs/bridging-header.h %s
@@ -48,25 +48,25 @@
 // PERSISTENT-DISABLED-YESPCHJOB-NOT: -pch-output-dir
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB
-// PERSISTENT-YESPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
-// PERSISTENT-YESPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch{{"?}} -pch-disable-validation
+// PERSISTENT-YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
+// PERSISTENT-YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch{{"?}} -pch-disable-validation
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -serialize-diagnostics %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB-DIAG1
-// PERSISTENT-YESPCHJOB-DIAG1: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -serialize-diagnostics-path {{.*}}bridging-header-{{.*}}.dia{{"?}} {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
+// PERSISTENT-YESPCHJOB-DIAG1: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -serialize-diagnostics-path {{.*}}bridging-header-{{.*}}.dia{{"?}} {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch-out-dir -serialize-diagnostics %s -emit-module -emit-module-path /module-path-dir 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB-DIAG2
-// PERSISTENT-YESPCHJOB-DIAG2: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -serialize-diagnostics-path {{.*}}/pch-out-dir{{/|\\\\}}bridging-header-{{.*}}.dia{{"?}} {{.*}} -emit-pch -pch-output-dir {{.*}}/pch-out-dir
+// PERSISTENT-YESPCHJOB-DIAG2: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -serialize-diagnostics-path {{.*}}/pch-out-dir{{/|\\\\}}bridging-header-{{.*}}.dia{{"?}} {{.*}} -emit-pch -pch-output-dir {{.*}}/pch-out-dir
 
 // RUN: %target-build-swift -typecheck -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -parseable-output -driver-skip-execution %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-OUTPUT
 // PERSISTENT-OUTPUT-NOT: "outputs": [
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -whole-module-optimization %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-WMO-YESPCHJOB --implicit-check-not pch-disable-validation
-// PERSISTENT-WMO-YESPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch
+// PERSISTENT-WMO-YESPCHJOB: {{.*}}swift{{c?(\.exe)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch
 
 // RUN: %target-build-swift -typecheck -disable-bridging-pch  -driver-print-jobs -import-objc-header %/S/Inputs/bridging-header.h -pch-output-dir %t/pch %/s 2>&1 | %FileCheck %s -check-prefix=NOPCHJOB
 // RUN: %target-build-swift -typecheck -incremental -enable-bridging-pch -output-file-map %t.json -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s
 
 // RUN: %target-build-swift -### -typecheck -O -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=OPTPCH
-// OPTPCH: swift{{c?(\.EXE)?"?}} -frontend
+// OPTPCH: swift{{c?(\.exe)?"?}} -frontend
 // OPTPCH-SAME: -O{{ }}
 // OPTPCH-SAME: -emit-pch

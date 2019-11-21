@@ -12,9 +12,12 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -167,15 +170,15 @@ bool EnumRawTypeRequest::isCached() const {
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {
   auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.RawType.getInt())
-    return enumDecl->LazySemanticInfo.RawType.getPointer();
+  if (enumDecl->LazySemanticInfo.hasRawType())
+    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
 
   return None;
 }
 
 void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+  enumDecl->LazySemanticInfo.cacheRawType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -335,12 +338,20 @@ void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const
 // Requirement computation.
 //----------------------------------------------------------------------------//
 
-WhereClauseOwner::WhereClauseOwner(Decl *decl)
-  : dc(decl->getInnermostDeclContext()), source(decl) { }
+WhereClauseOwner::WhereClauseOwner(GenericContext *genCtx): dc(genCtx) {
+  if (const auto whereClause = genCtx->getTrailingWhereClause())
+    source = whereClause;
+  else
+    source = genCtx->getGenericParams();
+}
+
+WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
+    : dc(atd->getInnermostDeclContext()),
+      source(atd->getTrailingWhereClause()) {}
 
 SourceLoc WhereClauseOwner::getLoc() const {
-  if (auto decl = source.dyn_cast<Decl *>())
-    return decl->getLoc();
+  if (auto where = source.dyn_cast<TrailingWhereClause *>())
+    return where->getWhereLoc();
 
   if (auto attr = source.dyn_cast<SpecializeAttr *>())
     return attr->getLocation();
@@ -350,8 +361,8 @@ SourceLoc WhereClauseOwner::getLoc() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
-  if (auto decl = owner.source.dyn_cast<Decl *>()) {
-    simple_display(out, decl);
+  if (auto where = owner.source.dyn_cast<TrailingWhereClause *>()) {
+    simple_display(out, owner.dc->getAsDecl());
   } else if (owner.source.is<SpecializeAttr *>()) {
     out << "@_specialize";
   } else {
@@ -373,36 +384,13 @@ void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
-  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
+  if (const auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
-  }
-
-  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
-    
-    return { };
-  }
-
-  auto decl = source.dyn_cast<Decl *>();
-  if (!decl)
-    return { };
-
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (auto whereClause = proto->getTrailingWhereClause())
-      return whereClause->getRequirements();
-
-    return { };
-  }
-
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-    if (auto whereClause = assocType->getTrailingWhereClause())
-      return whereClause->getRequirements();
-  }
-
-  if (auto genericContext = decl->getAsGenericContext()) {
-    if (auto genericParams = genericContext->getGenericParams())
-      return genericParams->getRequirements();
+  } else if (const auto whereClause = source.get<TrailingWhereClause *>()) {
+    return whereClause->getRequirements();
   }
 
   return { };
@@ -562,11 +550,6 @@ void swift::simple_display(
   out << "{ ";
   if (propertyWrapper.valueVar)
     out << propertyWrapper.valueVar->printRef();
-  else
-    out << "null";
-  out << ", ";
-  if (propertyWrapper.wrappedValueInit)
-    out << propertyWrapper.wrappedValueInit->printRef();
   else
     out << "null";
   out << " }";
@@ -818,7 +801,7 @@ void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
 // GenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
-Optional<GenericSignature *> GenericSignatureRequest::getCachedResult() const {
+Optional<GenericSignature> GenericSignatureRequest::getCachedResult() const {
   auto *GC = std::get<0>(getStorage());
   if (GC->GenericSigAndBit.getInt()) {
     return GC->GenericSigAndBit.getPointer();
@@ -826,13 +809,13 @@ Optional<GenericSignature *> GenericSignatureRequest::getCachedResult() const {
   return None;
 }
 
-void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
+void GenericSignatureRequest::cacheResult(GenericSignature value) const {
   auto *GC = std::get<0>(getStorage());
   GC->GenericSigAndBit.setPointerAndInt(value, true);
 }
 
 //----------------------------------------------------------------------------//
-// GenericSignatureRequest computation.
+// InferredGenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
 void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
@@ -844,7 +827,7 @@ void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsImplicitlyUnwrappedOptionalRequest computation.
+// UnderlyingTypeRequest computation.
 //----------------------------------------------------------------------------//
 
 Optional<Type>
@@ -858,4 +841,380 @@ UnderlyingTypeRequest::getCachedResult() const {
 void UnderlyingTypeRequest::cacheResult(Type value) const {
   auto *typeAlias = std::get<0>(getStorage());
   typeAlias->UnderlyingTy.setType(value);
+}
+
+void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// EnumRawValuesRequest computation.
+//----------------------------------------------------------------------------//
+
+bool EnumRawValuesRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
+}
+
+Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+  auto *ED = std::get<0>(getStorage());
+  if (ED->LazySemanticInfo.hasCheckedRawValues())
+    return true;
+  return None;
+}
+
+void EnumRawValuesRequest::cacheResult(bool) const {
+  auto *ED = std::get<0>(getStorage());
+  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues |
+      EnumDecl::HasFixedRawValuesAndTypes;
+  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+}
+
+void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // This request computes the raw type, and so participates in cycles involving
+  // it. For now, the raw type provides a rich enough circularity diagnostic
+  // that we can silence ourselves.
+}
+
+void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
+
+}
+
+//----------------------------------------------------------------------------//
+// IsStaticRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsStaticRequest::getCachedResult() const {
+  auto *FD = std::get<0>(getStorage());
+  return FD->getCachedIsStatic();
+}
+
+void IsStaticRequest::cacheResult(bool result) const {
+  auto *FD = std::get<0>(getStorage());
+  FD->setStatic(result);
+}
+
+//----------------------------------------------------------------------------//
+// NeedsNewVTableEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> NeedsNewVTableEntryRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.NeedsNewVTableEntryComputed)
+    return decl->LazySemanticInfo.NeedsNewVTableEntry;
+  return None;
+}
+
+void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
+  decl->LazySemanticInfo.NeedsNewVTableEntry = value;
+}
+
+//----------------------------------------------------------------------------//
+// ParamSpecifierRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ParamSpecifier> ParamSpecifierRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedSpecifier();
+}
+
+void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setSpecifier(specifier);
+}
+
+//----------------------------------------------------------------------------//
+// ResultTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
+    return funcDecl->getBodyResultTypeLoc();
+  auto *subscriptDecl = cast<SubscriptDecl>(decl);
+  return subscriptDecl->getElementTypeLoc();
+}
+
+Optional<Type> ResultTypeRequest::getCachedResult() const {
+  if (auto type = getResultTypeLoc().getType())
+    return type;
+
+  return None;
+}
+
+void ResultTypeRequest::cacheResult(Type type) const {
+  getResultTypeLoc().setType(type);
+}
+
+//----------------------------------------------------------------------------//
+// PatternBindingEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<const PatternBindingEntry *>
+PatternBindingEntryRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  if (!PBD->getPatternList()[idx].isFullyValidated()) {
+    return None;
+  }
+  return &PBD->getPatternList()[idx];
+}
+
+void PatternBindingEntryRequest::cacheResult(
+    const PatternBindingEntry *value) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setFullyValidated();
+}
+
+//----------------------------------------------------------------------------//
+// NamingPatternRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
+  auto *VD = std::get<0>(getStorage());
+  if (auto *Pat = VD->NamingPattern) {
+    return Pat;
+  }
+  return None;
+}
+
+void NamingPatternRequest::cacheResult(NamedPattern *value) const {
+  auto *VD = std::get<0>(getStorage());
+  VD->NamingPattern = value;
+}
+
+//----------------------------------------------------------------------------//
+// InterfaceTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type> InterfaceTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto Ty = decl->TypeAndAccess.getPointer()) {
+    return Ty;
+  }
+  return None;
+}
+
+void InterfaceTypeRequest::cacheResult(Type type) const {
+  auto *decl = std::get<0>(getStorage());
+  if (type) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+    assert(!type->hasArchetype() && "Archetype in interface type");
+  }
+  decl->TypeAndAccess.setPointer(type);
+}
+
+//----------------------------------------------------------------------------//
+// LookupPrecedenceGroupRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc.getLoc();
+}
+
+void LookupPrecedenceGroupRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto &desc = std::get<0>(getStorage());
+  if (auto pathDir = desc.pathDirection) {
+    diags.diagnose(desc.nameLoc, diag::precedence_group_cycle, (bool)*pathDir);
+  } else {
+    diags.diagnose(desc.nameLoc, diag::circular_reference);
+  }
+}
+
+void LookupPrecedenceGroupRequest::noteCycleStep(DiagnosticEngine &diag) const {
+  auto &desc = std::get<0>(getStorage());
+  diag.diagnose(desc.nameLoc,
+                 diag::circular_reference_through_precedence_group, desc.ident);
+}
+
+SourceLoc PrecedenceGroupDescriptor::getLoc() const {
+  return nameLoc;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const PrecedenceGroupDescriptor &desc) {
+  out << "precedence group " << desc.ident << " at ";
+  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+}
+
+//----------------------------------------------------------------------------//
+// InheritsSuperclassInitializersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> InheritsSuperclassInitializersRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedInheritsSuperclassInitializers();
+}
+
+void InheritsSuperclassInitializersRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setInheritsSuperclassInitializers(value);
+}
+
+//----------------------------------------------------------------------------//
+// ResolveImplicitMemberRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ImplicitMemberAction action) {
+  switch (action) {
+  case ImplicitMemberAction::ResolveImplicitInit:
+    out << "resolve implicit initializer";
+    break;
+  case ImplicitMemberAction::ResolveCodingKeys:
+    out << "resolve CodingKeys";
+    break;
+  case ImplicitMemberAction::ResolveEncodable:
+    out << "resolve Encodable.encode(to:)";
+    break;
+  case ImplicitMemberAction::ResolveDecodable:
+    out << "resolve Decodable.init(from:)";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// TypeWitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<TypeWitnessAndDecl> TypeWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->TypeWitnesses.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->TypeWitnesses[requirement];
+}
+
+void TypeWitnessRequest::cacheResult(TypeWitnessAndDecl typeWitAndDecl) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// WitnessRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Witness> ValueWitnessRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  auto *requirement = std::get<1>(getStorage());
+  if (conformance->Mapping.count(requirement) == 0) {
+    return None;
+  }
+  return conformance->Mapping[requirement];
+}
+
+void ValueWitnessRequest::cacheResult(Witness type) const {
+  // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// PreCheckFunctionBuilderRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FunctionBuilderClosurePreCheck value) {
+  switch (value) {
+  case FunctionBuilderClosurePreCheck::Okay:
+    out << "okay";
+    break;
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+    out << "has return statement";
+    break;
+  case FunctionBuilderClosurePreCheck::Error:
+    out << "error";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritanceRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritanceRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
+}
+
+void HasCircularInheritanceRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritedProtocolsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void HasCircularInheritedProtocolsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularRawValueRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_enum_inheritance, decl->getName());
+}
+
+void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentInitContextRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Initializer *>
+DefaultArgumentInitContextRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  return param->getCachedDefaultArgumentInitContext();
+}
+
+void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultArgumentInitContext(init);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  auto *defaultInfo = param->DefaultValueAndFlags.getPointer();
+  if (!defaultInfo)
+    return None;
+
+  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
+    return None;
+
+  return defaultInfo->DefaultArg.get<Expr *>();
+}
+
+void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultExpr(expr, /*isTypeChecked*/ true);
 }

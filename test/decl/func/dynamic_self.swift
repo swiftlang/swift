@@ -62,7 +62,7 @@ extension P1 {
 // ----------------------------------------------------------------------------
 // The 'self' type of a Self method is based on Self
 class C1 {
-  required init(int i: Int) {}
+  required init(int i: Int) {} // expected-note {{'init(int:)' declared here}}
 
   // Instance methods have a self of type Self.
   func f(_ b: Bool) -> Self {
@@ -89,7 +89,7 @@ class C1 {
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{non-nominal type 'Self' does not support explicit initialization}}
+    return Self() // expected-error{{missing argument for parameter 'int' in call}} {{17-17=int: <#Int#>}}
   }
 
   // This used to crash because metatype construction went down a
@@ -386,8 +386,7 @@ class Factory : FactoryPattern {
 
   convenience init(string: String) {
     self.init(factory: Factory(_string: string))
-    // expected-error@-1 {{incorrect argument label in call (have 'factory:', expected '_string:')}}
-    // FIXME: Bogus diagnostic
+    // expected-error@-1 {{cannot convert value of type 'Factory' to expected argument type 'Self'}}
   }
 }
 

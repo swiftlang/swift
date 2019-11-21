@@ -51,6 +51,7 @@ TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
 TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
+TYPE_ATTR(differentiable)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -202,7 +203,7 @@ DECL_ATTR(inline, Inline,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   20)
 DECL_ATTR(_semantics, Semantics,
-  OnAbstractFunction | OnSubscript |
+  OnAbstractFunction | OnSubscript | OnNominalType | OnVar |
   AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   21)
@@ -496,6 +497,16 @@ DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
   OnVar | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   89)
+SIMPLE_DECL_ATTR(_nonEphemeral, NonEphemeral,
+  OnParam | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  90)
+
+DECL_ATTR(differentiable, Differentiable,
+  OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
+  AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  91)
 
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |

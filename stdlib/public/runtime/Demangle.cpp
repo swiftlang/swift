@@ -68,7 +68,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       return genericArgsList;
     };
   
-  for (auto component : reversed(descriptorPath)) {
+  for (auto component : llvm::reverse(descriptorPath)) {
     switch (auto kind = component->getKind()) {
     case ContextDescriptorKind::Module: {
       assert(node == nullptr && "module should be top level");

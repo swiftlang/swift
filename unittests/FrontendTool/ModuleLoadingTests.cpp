@@ -94,10 +94,12 @@ protected:
     PrintingDiagnosticConsumer printingConsumer;
     DiagnosticEngine diags(sourceMgr);
     diags.addConsumer(printingConsumer);
+    TypeCheckerOptions typeckOpts;
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
-    auto ctx = ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags);
+    auto ctx =
+        ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags);
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, cacheDir, prebuiltCacheDir,
@@ -108,11 +110,13 @@ protected:
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
     std::unique_ptr<llvm::MemoryBuffer> moduleDocBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoBuffer;
 
     auto error =
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()}, tempDir,
-        "Library.swiftmodule", "Library.swiftdoc",
-        &moduleBuffer, &moduleDocBuffer);
+        "Library.swiftmodule", "Library.swiftdoc", "Library.swiftsourceinfo",
+        /*ModuleInterfacePath*/nullptr,
+        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 

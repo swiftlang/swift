@@ -168,8 +168,7 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               ValueDecl *VarDecl, StringRef Name,
-                               unsigned ArgNo = 0,
+                               ValueDecl *VarDecl, SILDebugVariable VarInfo,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
@@ -309,7 +308,7 @@ private:
     // reports back a size.
     while (isa<llvm::DIDerivedType>(Ty) && !Ty->getSizeInBits()) {
       auto *DT = cast<llvm::DIDerivedType>(Ty);
-      Ty = DT->getBaseType().resolve();
+      Ty = DT->getBaseType();
       if (!Ty)
         return 0;
     }
@@ -320,7 +319,7 @@ private:
 
   /// Return the size reported by the variable's type.
   static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
-    llvm::DIType *Ty = Var->getType().resolve();
+    llvm::DIType *Ty = Var->getType();
     return getSizeInBits(Ty);
   }
 
@@ -445,7 +444,7 @@ private:
         Dir = CurDir;
     }
     llvm::DIFile *F = DBuilder.createFile(File, Dir, CSInfo, Source);
-    DIFileCache[FileName.data()].reset(F);
+    DIFileCache[FileName].reset(F);
     return F;
   }
 
@@ -516,7 +515,8 @@ private:
 
     auto FnTy = SILTy.getAs<SILFunctionType>();
     if (!FnTy) {
-      LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
+      LLVM_DEBUG(llvm::dbgs() << "Unexpected function type: ";
+                 SILTy.print(llvm::dbgs());
                  llvm::dbgs() << "\n");
       return CanSILFunctionType();
     }
@@ -585,15 +585,16 @@ private:
 
   // This is different from SILFunctionType::getAllResultsType() in some subtle
   // ways.
-  static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
+  static SILType getResultTypeForDebugInfo(IRGenModule &IGM,
+                                           CanSILFunctionType fnTy) {
     if (fnTy->getNumResults() == 1) {
-      return fnTy->getResults()[0].getSILStorageType();
+      return fnTy->getResults()[0].getSILStorageType(IGM.getSILModule(), fnTy);
     } else if (!fnTy->getNumIndirectFormalResults()) {
-      return fnTy->getDirectFormalResultsType();
+      return fnTy->getDirectFormalResultsType(IGM.getSILModule());
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {
-        eltTys.push_back(result.getType());
+        eltTys.push_back(result.getReturnValueType(IGM.getSILModule(), fnTy));
       }
       return SILType::getPrimitiveAddressType(
           CanType(TupleType::get(eltTys, fnTy->getASTContext())));
@@ -609,16 +610,16 @@ private:
   llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy) {
     SmallVector<llvm::Metadata *, 16> Parameters;
 
-    GenericContextScope scope(IGM, FnTy->getGenericSignature());
+    GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());
 
     // The function return type is the first element in the list.
-    createParameterType(Parameters, getResultTypeForDebugInfo(FnTy));
+    createParameterType(Parameters, getResultTypeForDebugInfo(IGM, FnTy));
 
     // Actually, the input type is either a single type or a tuple
     // type. We currently represent a function with one n-tuple argument
     // as an n-ary function.
     for (auto Param : FnTy->getParameters())
-      createParameterType(Parameters, IGM.silConv.getSILType(Param));
+      createParameterType(Parameters, IGM.silConv.getSILType(Param, FnTy));
 
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
@@ -734,8 +735,6 @@ private:
         NoLoc, NoLoc, IGM.Context.getIdentifier(ArchetypeName), NoLoc,
         /*genericparams*/ nullptr, IGM.Context.TheBuiltinModule);
     Entry->setUnderlyingType(IGM.Context.TheRawPointerType);
-    Entry->setValidationToChecked();
-    Entry->computeType();
     return Entry;
   }
 
@@ -805,14 +804,14 @@ private:
       if (!Reconstructed) {
         llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
-        Ty->dump();
+        Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty)) {
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
-        Ty->dump();
+        Ty->dump(llvm::errs());
         llvm::errs() << "Reconstructed type:\n";
-        Reconstructed->dump();
+        Reconstructed->dump(llvm::errs());
         abort();
       }
 #endif
@@ -1002,6 +1001,29 @@ private:
     return BitWidth;
   }
 
+  /// Create a sized container for a sizeless type. Used to represent
+  /// BoundGenericEnums that may have different sizes depending on what they are
+  /// bound to, but still share a mangled name.
+  llvm::DIType *createOpaqueStructWithSizedContainer(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName) {
+    // Let the MDNode folding set do the work of uniquing the inner type. This
+    // should be cheap.
+    llvm::DICompositeType *UniqueType = DBuilder.createStructType(
+        Scope, Name, File, Line, 0, 0, Flags, nullptr,
+        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+    llvm::Metadata *Elements[] = {
+        DBuilder.createMemberType(Scope, "", File, 0, SizeInBits,
+                                  AlignInBits, 0, Flags, UniqueType)};
+
+    return DBuilder.createStructType(
+        Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
+        llvm::dwarf::DW_LANG_Swift);
+  }
+
   llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
                                          llvm::DIFile *File, unsigned Line,
                                          llvm::DINode::DIFlags Flags,
@@ -1174,7 +1196,7 @@ private:
 
     if (!BaseTy) {
       LLVM_DEBUG(llvm::dbgs() << "Type without TypeBase: ";
-                 DbgTy.getType()->dump();
+                 DbgTy.getType()->dump(llvm::dbgs());
                  llvm::dbgs() << "\n");
       if (!InternalType) {
         StringRef Name = "<internal>";
@@ -1205,18 +1227,6 @@ private:
       SizeInBits = FloatTy->getBitWidth();
       Encoding = llvm::dwarf::DW_ATE_float;
       break;
-    }
-
-    case TypeKind::BuiltinUnknownObject: {
-      // The builtin opaque Objective-C pointer type. Useful for pushing
-      // an Objective-C type through swift.
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-      auto IdTy = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
-                                             MangledName, Scope, File, 0,
-                                             llvm::dwarf::DW_LANG_ObjC, 0, 0);
-      return DBuilder.createPointerType(IdTy, PtrSize, 0,
-                                        /* DWARFAddressSpace */ None,
-                                        MangledName);
     }
 
     case TypeKind::BuiltinNativeObject: {
@@ -1318,9 +1328,9 @@ private:
       auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, L.Line, SizeInBits, AlignInBits, Flags,
-                                MangledName);
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl ? Decl->getNameStr() : "", File, L.Line, SizeInBits,
+          AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::BoundGenericClass: {
@@ -1427,12 +1437,9 @@ private:
       auto *Decl = EnumTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       auto *File = getOrCreateFile(L.Filename);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createEnumType(DbgTy, Decl, MangledName, Scope, File, L.Line,
-                              Flags);
-      else
-        return createOpaqueStruct(Scope, Decl->getName().str(), File, L.Line,
-                                  SizeInBits, AlignInBits, Flags, MangledName);
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl->getName().str(), File, L.Line, SizeInBits, AlignInBits,
+          Flags, MangledName);
     }
 
     case TypeKind::BuiltinVector: {
@@ -1513,8 +1520,9 @@ private:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
-      LLVM_DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
-                 llvm::errs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
+                 DbgTy.getType()->dump(llvm::dbgs());
+                 llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
@@ -2097,8 +2105,8 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (FnTy)
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
       auto DTI = DebugTypeInfo::getFromTypeInfo(
-          ErrorInfo->getType(),
-          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo)));
+          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy),
+          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo, FnTy)));
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
 
@@ -2145,7 +2153,7 @@ void IRGenDebugInfoImpl::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name, unsigned ArgNo,
+    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   assert(DS && "variable has no scope");
 
@@ -2165,7 +2173,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
-  if (ArgNo > 0) {
+  if (VarInfo.ArgNo > 0) {
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
   }
@@ -2173,11 +2181,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   llvm::DIFile *Unit = getFile(Scope);
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   assert(DITy && "could not determine debug type of variable");
+  if (VarInfo.Constant)
+    DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
   unsigned Line = Loc.Line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!Line || (ArgNo > 0 && Name == IGM.Context.Id_self.str()))
+  if (!Line || (VarInfo.ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
@@ -2188,10 +2198,11 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   bool Optimized = false;
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var =
-      (ArgNo > 0) ? DBuilder.createParameterVariable(
-                        Scope, Name, ArgNo, Unit, Line, DITy, Optimized, Flags)
-                  : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
-                                                Optimized, Flags);
+      (VarInfo.ArgNo > 0)
+          ? DBuilder.createParameterVariable(Scope, VarInfo.Name, VarInfo.ArgNo,
+                                             Unit, Line, DITy, Optimized, Flags)
+          : DBuilder.createAutoVariable(Scope, VarInfo.Name, Unit, Line, DITy,
+                                        Optimized, Flags);
 
   // Running variables for the current/previous piece.
   bool IsPiece = Storage.size() > 1;
@@ -2275,8 +2286,14 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  llvm::DIType *Ty = getOrCreateType(DbgTy);
-  if (Ty->isArtificial() || Ty == InternalType || !Loc)
+  llvm::DIType *DITy = getOrCreateType(DbgTy);
+  VarDecl *VD = nullptr;
+  if (Loc)
+    VD = dyn_cast_or_null<VarDecl>(Loc->getAsASTNode<Decl>());
+  if (!VD || VD->isLet())
+    DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
+
+  if (DITy->isArtificial() || DITy == InternalType || !Loc)
     // FIXME: Really these should be marked as artificial, but LLVM
     // currently has no support for flags to be put on global
     // variables. In the mean time, elide these variables, they
@@ -2284,7 +2301,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     return;
 
   if (InFixedBuffer)
-    Ty = createFixedValueBufferStruct(Ty);
+    DITy = createFixedValueBufferStruct(DITy);
 
   auto L = getStartLocation(Loc);
   auto File = getOrCreateFile(L.Filename);
@@ -2294,7 +2311,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (!Var)
     Expr = DBuilder.createConstantValueExpression(0);
   auto *GV = DBuilder.createGlobalVariableExpression(
-      MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
+      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
@@ -2320,7 +2337,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          nullptr, OS.str().str(), 0,
+                          nullptr, {OS.str().str(), 0, false},
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -2419,11 +2436,10 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name,
-    unsigned ArgNo, IndirectionKind Indirection,
-      ArtificialKind Artificial) {
+    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
+    IndirectionKind Indirection, ArtificialKind Artificial) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarDecl, Name, ArgNo, Indirection, Artificial);
+      Builder, Storage, Ty, DS, VarDecl, VarInfo, Indirection, Artificial);
 }
 
 void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,

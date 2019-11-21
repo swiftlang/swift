@@ -13,6 +13,6 @@ endif()
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
-  add_dependencies(swift clang-headers)
+  add_dependencies(swift clang-resource-headers)
 endif()
 

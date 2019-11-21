@@ -389,7 +389,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     Arguments.push_back(context.Args.MakeArgString(path));
   }
 
-  if (context.Args.hasArg(options::OPT_toolchain_stdlib_rpath)) {
+  if (context.Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
+                           options::OPT_no_toolchain_stdlib_rpath, false)) {
     // If the user has explicitly asked for a toolchain stdlib, we should
     // provide one using -rpath. This used to be the default behaviour but it
     // was considered annoying in at least the SwiftPM scenario (see

@@ -71,6 +71,10 @@ ERROR(error_option_requires_sanitizer, none,
       "option '%0' requires a sanitizer to be enabled. Use -sanitize= to "
       "enable a sanitizer", (StringRef))
 
+WARNING(warning_option_requires_specific_sanitizer, none,
+      "option '%0' has no effect when '%1' sanitizer is disabled. Use -sanitize=%1 to "
+      "enable the sanitizer", (StringRef, StringRef))
+
 ERROR(error_option_missing_required_argument, none,
       "option '%0' is missing a required argument (%1)", (StringRef, StringRef))
 
@@ -124,8 +128,13 @@ ERROR(error_mode_cannot_emit_module,none,
       "this mode does not support emitting modules", ())
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
+ERROR(error_mode_cannot_emit_module_source_info,none,
+      "this mode does not support emitting module source info files", ())
 ERROR(error_mode_cannot_emit_interface,none,
       "this mode does not support emitting module interface files", ())
+ERROR(cannot_emit_ir_skipping_function_bodies,none,
+      "-experimental-skip-non-inlinable-function-bodies does not support "
+      "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -227,6 +236,15 @@ ERROR(error_formatting_invalid_range,none,
 WARNING(stats_disabled,none,
         "compiler was not built with support for collecting statistics", ())
 
+WARNING(tbd_warn_truncating_version,none,
+        "truncating %select{current|compatibility}0 version '%1' in TBD file "
+        "to fit in 32-bit space used by old mach-o format",
+        (unsigned, StringRef))
+
+ERROR(tbd_err_invalid_version,none,
+      "invalid dynamic library %select{current|compatibility}0 version '%1'",
+      (unsigned, StringRef))
+
 WARNING(tbd_only_supported_in_whole_module,none,
         "TBD generation is only supported when the whole module can be seen",
         ())
@@ -302,9 +320,6 @@ NOTE(compiled_module_invalid,none,
 NOTE(compiled_module_invalid_reason,none,
      "unable to load compiled module '%0': %1",
      (StringRef, StringRef))
-ERROR(error_extracting_dependencies_from_cached_module,none,
-      "error extracting dependencies from cached module '%0'",
-      (StringRef))
 ERROR(unknown_forced_module_loading_mode,none,
       "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))

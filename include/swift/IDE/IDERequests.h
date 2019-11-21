@@ -38,8 +38,7 @@ struct CursorInfoOwner {
   CursorInfoOwner(SourceFile *File, SourceLoc Loc): File(File), Loc(Loc) { }
 
   friend llvm::hash_code hash_value(const CursorInfoOwner &CI) {
-    return hash_combine(hash_value(CI.File),
-      hash_value(CI.Loc.getOpaquePointerValue()));
+    return llvm::hash_combine(CI.File, CI.Loc.getOpaquePointerValue());
   }
 
   friend bool operator==(const CursorInfoOwner &lhs, const CursorInfoOwner &rhs) {
@@ -97,9 +96,9 @@ struct RangeInfoOwner {
   RangeInfoOwner(SourceFile *File, unsigned Offset, unsigned Length);
 
   friend llvm::hash_code hash_value(const RangeInfoOwner &CI) {
-    return hash_combine(hash_value(CI.File),
-                        hash_value(CI.StartLoc.getOpaquePointerValue()),
-                        hash_value(CI.EndLoc.getOpaquePointerValue()));
+    return llvm::hash_combine(CI.File,
+                              CI.StartLoc.getOpaquePointerValue(),
+                              CI.EndLoc.getOpaquePointerValue());
   }
 
   friend bool operator==(const RangeInfoOwner &lhs, const RangeInfoOwner &rhs) {
@@ -183,9 +182,9 @@ struct OverridenDeclsOwner {
       Transitive(Transitive) {}
 
   friend llvm::hash_code hash_value(const OverridenDeclsOwner &CI) {
-    return hash_combine(hash_value(CI.VD),
-                        hash_value(CI.IncludeProtocolRequirements),
-                        hash_value(CI.Transitive));
+    return llvm::hash_combine(CI.VD,
+                              CI.IncludeProtocolRequirements,
+                              CI.Transitive);
   }
 
   friend bool operator==(const OverridenDeclsOwner &lhs,

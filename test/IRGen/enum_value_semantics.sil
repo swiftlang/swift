@@ -56,7 +56,7 @@ enum MultiPayloadEmptyPayload {
 enum MultiPayloadNontrivial {
   case payload1(Builtin.NativeObject)
   case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.UnknownObject)
+  case payload3(Builtin.Int64, Builtin.NativeObject)
   case payload4(Builtin.Int64, Builtin.Int64)
   case a
   case b
@@ -76,7 +76,7 @@ enum MultiPayloadGeneric<T> {
 enum MultiPayloadNontrivialSpareBits {
   case payload1(Builtin.NativeObject)
   case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.UnknownObject)
+  case payload3(Builtin.Int64, Builtin.NativeObject)
   case a
   case b
   case c
@@ -279,13 +279,13 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-objc-simulator-true:        i64 2, label %[[DONE]]
 // CHECK:      ]
 
-// CHECK:      ; <label>:[[RELEASE_PAYLOAD]]
+// CHECK:      [[RELEASE_PAYLOAD]]:
 // CHECK-NEXT: [[DATA_ADDR:%.*]] = bitcast %T20enum_value_semantics23SinglePayloadNontrivialO* [[ADDR]] to %swift.refcounted**
 // CHECK-NEXT: [[DATA:%.*]] = load %swift.refcounted*, %swift.refcounted** [[DATA_ADDR]], align 8
 // CHECK-NEXT: call void @swift_release(%swift.refcounted* [[DATA]])
 // CHECK-NEXT: br label %[[DONE]]
 
-// CHECK:      ; <label>:[[DONE]]
+// CHECK:      [[DONE]]:
 // CHECK-NEXT: ret void
 
 
@@ -330,7 +330,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[IS_PAYLOAD:%.*]] = icmp uge i32 %tag, 2
 // CHECK-NEXT: br i1 [[IS_PAYLOAD]], label %[[HAS_NO_PAYLOAD:.*]], label %[[HAS_PAYLOAD:.*]]
 
-// CHECK:      ; <label>:[[HAS_NO_PAYLOAD]]
+// CHECK:      [[HAS_NO_PAYLOAD]]:
 
 //   -- Compute the no-payload tag
 // CHECK-NEXT: [[NO_PAYLOAD_TAG:%.*]] = sub i32 %tag, 2
@@ -346,7 +346,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: store i8 2, i8* [[EXTRA_TAG_ADDR]], align 8
 // CHECK-NEXT: br label %[[DONE:.*]]
 
-// CHECK:      ; <label>:[[HAS_PAYLOAD]]
+// CHECK:      [[HAS_PAYLOAD]]:
 
 //   -- Store the tag in the extra tag area
 // CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i8
@@ -355,7 +355,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: store i8 [[TAG]], i8* [[EXTRA_TAG_ADDR]], align 8
 // CHECK-NEXT: br label %[[DONE]]
 
-// CHECK:      ; <label>:[[DONE]]
+// CHECK:      [[DONE]]:
 // CHECK-NEXT: ret void
 
 
@@ -541,7 +541,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[IS_PAYLOAD:%.*]] = icmp uge i32 %tag, 3
 // CHECK-NEXT: br i1 [[IS_PAYLOAD]], label %[[HAS_NO_PAYLOAD:.*]], label %[[HAS_PAYLOAD:.*]]
 
-// CHECK:      ; <label>:[[HAS_NO_PAYLOAD]]
+// CHECK:      [[HAS_NO_PAYLOAD]]:
 
 //   -- Turn the case index into a no-payload case index
 // CHECK-NEXT: [[NO_PAYLOAD_TAG:%.*]] = sub i32 %tag, 3
@@ -558,7 +558,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: store i64 -4611686018427387904, i64* [[SECOND_ADDR]], align 8
 // CHECK-NEXT: br label %[[END:.*]]
 
-// CHECK:      ; <label>:[[HAS_PAYLOAD]]
+// CHECK:      [[HAS_PAYLOAD]]:
 
 //   -- Not really necessary
 // CHECK-NEXT: [[TAG_TMP:%.*]] = and i32 %tag, 3
@@ -591,7 +591,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: store i64 [[SECOND_NEW]], i64* [[SECOND_ADDR]], align 8
 // CHECK-NEXT: br label %[[END]]
 
-// CHECK:      ; <label>:[[END]]
+// CHECK:      [[END]]:
 // CHECK-NEXT: ret void
 
 

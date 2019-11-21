@@ -89,7 +89,7 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
 
   if (Loc.isValid()) {
     os << " loc=";
-    Loc.dump(getProtocol()->getASTContext().SourceMgr);
+    Loc.print(os, getProtocol()->getASTContext().SourceMgr);
   }
 
   switch (getKind()) {
@@ -795,16 +795,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   if (!conformingDC)
     return nullptr;
 
-  // Everything about this conformance is nailed down, so we can now ensure that
-  // the extension is fully resolved.
-  if (auto resolver = nominal->getASTContext().getLazyResolver()) {
-    if (auto ED = dyn_cast<ExtensionDecl>(conformingDC)) {
-      resolver->resolveExtension(ED);
-    } else {
-      resolver->resolveDeclSignature(cast<NominalTypeDecl>(conformingDC));
-    }
-  }
-
   auto *conformingNominal = conformingDC->getSelfNominalTypeDecl();
 
   // Form the conformance.
@@ -829,7 +819,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
     // Form the inherited conformance.
     entry->Conformance =
-        ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
+        ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
     // Create or find the normal conformance.
     Type conformingType = conformingDC->getDeclaredInterfaceType();

@@ -67,8 +67,7 @@ class Z0 {
   init() { // expected-error {{designated initializer for 'Z0' cannot delegate (with 'self.init'); did you mean this to be a convenience initializer?}} {{3-3=convenience }}
     // expected-note @+2 {{delegation occurs here}}
 
-    self.init(5, 5) // expected-error{{cannot invoke 'Z0.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'Z0.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
+    self.init(5, 5) // expected-error{{extra argument in call}}
   }
 
   init(value: Int) { /* ... */ }
@@ -77,8 +76,7 @@ class Z0 {
 
 struct Z1 {
   init() {
-    self.init(5, 5) // expected-error{{cannot invoke 'Z1.init' with an argument list of type '(Int, Int)'}}
-  // expected-note @-1 {{overloads for 'Z1.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
+    self.init(5, 5) // expected-error{{extra argument in call}}
   }
 
   init(value: Int) { /* ... */ }
@@ -90,8 +88,7 @@ enum Z2 {
   case B
 
   init() {
-    self.init(5, 5) // expected-error{{cannot invoke 'Z2.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'Z2.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
+    self.init(5, 5) // expected-error{{extra argument in call}}
   }
 
   init(value: Int) { /* ... */ }
@@ -159,7 +156,7 @@ class RDar16666631 {
    var i: Int
    var d: Double
    var s: String
-   init(i: Int, d: Double, s: String) {
+   init(i: Int, d: Double, s: String) { // expected-note {{'init(i:d:s:)' declared here}}
       self.i = i
       self.d = d
       self.s = s
@@ -168,9 +165,7 @@ class RDar16666631 {
       self.init(i: i, d: 0.1, s: s)
    }
 }
-let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{incorrect argument label in call (have 'i:d:', expected 'i:s:')}}
-// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
-
+let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{missing argument for parameter 's' in call}} {{43-43=, s: <#String#>}}
 
 struct S {
   init() {
@@ -325,8 +320,7 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
 
 class TestOverloadSets {
   convenience init() {
-    self.init(5, 5) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (), (a: Z0), (value: Double), (value: Int)}}
+    self.init(5, 5) // expected-error{{extra argument in call}}
   }
   
   convenience init(a : Z0) {
@@ -551,10 +545,9 @@ struct MultipleMemberAccesses {
 
 func sr10670() {
   struct S {
-    init(_ x: inout String) {}
-    init(_ x: inout [Int]) {}
+    init(_ x: inout String) {} // expected-note {{candidate expects in-out value of type 'String' for parameter #1}}
+    init(_ x: inout [Int]) {}  // expected-note {{candidate expects in-out value of type '[Int]' for parameter #1}}
   }
   var a = 0
-  S.init(&a) // expected-error {{cannot invoke 'S.Type.init' with an argument list of type '(inout Int)'}}
-  // expected-note@-1 {{overloads for 'S.Type.init' exist with these partially matching parameter lists: (inout String), (inout [Int])}}
+  S.init(&a) // expected-error {{no exact matches in call to initializer}}
 }

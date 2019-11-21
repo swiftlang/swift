@@ -41,6 +41,7 @@ func test() {
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
 // CONTEXT: key.name: "#column"
+// CONTEXT: key.name: "complete_sort_order"
 
 // RUN: %complete-test -tok=STMT_0 %s | %FileCheck %s -check-prefix=STMT
 func test1() {

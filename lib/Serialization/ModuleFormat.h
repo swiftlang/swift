@@ -22,7 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/Bitcode/RecordLayout.h"
-#include "llvm/Bitcode/BitCodes.h"
+#include "llvm/Bitstream/BitCodes.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 519; // SIL function availability
+const uint16_t SWIFTMODULE_VERSION_MINOR = 525; // target formal type for casts
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -222,6 +222,15 @@ enum class FunctionTypeRepresentation : uint8_t {
   CFunctionPointer,
 };
 using FunctionTypeRepresentationField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal,
+  Linear,
+};
+using DifferentiabilityKindField = BCFixed<2>;
 
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
@@ -638,6 +647,28 @@ enum BlockID {
   ///
   /// \sa comment_block
   COMMENT_BLOCK_ID,
+
+  /// The module source location container block, which contains all other
+  /// source location blocks.
+  ///
+  /// This is part of a stable format and should not be renumbered.
+  ///
+  /// Though we strive to keep the format stable, breaking the format of
+  /// .swiftsourceinfo doesn't have consequences as serious as breaking the
+  /// format of .swiftdoc because .swiftsourceinfo file is for local development
+  /// use only.
+  MODULE_SOURCEINFO_BLOCK_ID = 192,
+
+  /// The source location block, which contains decl locations.
+  ///
+  /// This is part of a stable format and should not be renumbered.
+  ///
+  /// Though we strive to keep the format stable, breaking the format of
+  /// .swiftsourceinfo doesn't have consequences as serious as breaking the format
+  /// of .swiftdoc because .swiftsourceinfo file is for local development use only.
+  ///
+  /// \sa decl_locs_block
+  DECL_LOCS_BLOCK_ID,
 };
 
 /// The record types within the control block.
@@ -854,7 +885,8 @@ namespace decls_block {
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // noescape?
-    BCFixed<1>   // throws?
+    BCFixed<1>,   // throws?
+    DifferentiabilityKindField // differentiability kind
 
     // trailed by parameters
   >;
@@ -865,6 +897,7 @@ namespace decls_block {
     TypeIDField,        // type
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
+    BCFixed<1>,         // non-ephemeral?
     ValueOwnershipField // inout, shared or owned?
   >;
 
@@ -927,6 +960,7 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
+    DifferentiabilityKindField, // differentiability kind
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -939,6 +973,7 @@ namespace decls_block {
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
+    DifferentiabilityKindField, // differentiability kind
     BCFixed<1>,            // error result?
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields
@@ -1178,6 +1213,7 @@ namespace decls_block {
     BCFixed<1>,   // IUO result?
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
+    BCFixed<1>,   // whether the overridden decl affects ABI
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     AccessLevelField, // access level
@@ -1219,6 +1255,7 @@ namespace decls_block {
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?
     DeclIDField,  // overridden function
+    BCFixed<1>,   // whether the overridden decl affects ABI
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
     AccessLevelField, // access level
@@ -1709,7 +1746,19 @@ namespace decls_block {
     GenericSignatureIDField // specialized signature
   >;
 
-#define SIMPLE_DECL_ATTR(X, CLASS, ...) \
+  using DifferentiableDeclAttrLayout = BCRecordLayout<
+    Differentiable_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    BCFixed<1>, // Linear flag.
+    IdentifierIDField, // JVP name.
+    DeclIDField, // JVP function declaration.
+    IdentifierIDField, // VJP name.
+    DeclIDField, // VJP function declaration.
+    GenericSignatureIDField, // Derivative generic signature.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+#define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
     BCFixed<1> /* implicit flag */ \

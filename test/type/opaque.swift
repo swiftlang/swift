@@ -122,7 +122,8 @@ func typeIdentity() {
     var af = alice
     af = alice
     af = bob // expected-error{{}}
-    af = grace // expected-error{{}}
+    af = grace // expected-error{{generic parameter 'T' could not be inferred}}
+    // expected-error@-1 {{cannot assign value of type '(T) -> some P' to type '() -> some P'}}
   }
 
   do {
@@ -402,9 +403,8 @@ func testCoercionDiagnostics() {
   opaque = SubscriptTest()[0] // expected-error {{cannot assign value of type 'some P' (result of 'SubscriptTest.subscript(_:)') to type 'some P' (result of 'foo()')}} {{none}}
 
   var opaqueOpt: Optional = opaque
-  // FIXME: It would be nice to show the "from" info here as well.
-  opaqueOpt = bar() // expected-error {{cannot assign value of type 'some P' to type '(some P)?'}} {{none}}
-  opaqueOpt = () // expected-error {{cannot assign value of type '()' to type '(some P)?'}} {{none}}
+  opaqueOpt = bar() // expected-error {{cannot assign value of type 'some P' (result of 'bar()') to type 'some P' (result of 'foo()')}} {{none}}
+  opaqueOpt = () // expected-error {{cannot assign value of type '()' to type 'some P'}} {{none}}
 }
 
 var globalVar: some P = 17

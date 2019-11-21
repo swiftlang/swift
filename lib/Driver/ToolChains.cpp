@@ -214,6 +214,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
@@ -499,6 +500,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-ir";
   case file_types::TY_LLVM_BC:
     return "-emit-bc";
+  case file_types::TY_ClangModuleFile:
+    return "-emit-pcm";
   case file_types::TY_Assembly:
     return "-S";
   case file_types::TY_SwiftModuleFile:
@@ -522,7 +525,6 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_AutolinkFile:
   case file_types::TY_Dependencies:
   case file_types::TY_SwiftModuleDocFile:
-  case file_types::TY_ClangModuleFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
@@ -531,6 +533,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_SwiftSourceInfoFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -638,6 +641,9 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
 
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftModuleDocFile,
                    "-emit-module-doc-path");
+
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftSourceInfoFile,
+                   "-emit-module-source-info-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
@@ -754,6 +760,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
+    case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
@@ -761,7 +768,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_AutolinkFile:
     case file_types::TY_Dependencies:
     case file_types::TY_SwiftModuleDocFile:
-    case file_types::TY_ClangModuleFile:
     case file_types::TY_SerializedDiagnostics:
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
@@ -770,6 +776,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
+    case file_types::TY_SwiftSourceInfoFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -907,6 +914,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_SwiftSourceInfoFile,
+                   "-emit-module-source-info-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");

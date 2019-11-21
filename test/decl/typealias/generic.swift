@@ -68,7 +68,7 @@ typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 // expected-note@-1 {{'T1' declared as parameter to type 'E'}}
 // expected-note@-2 {{'T2' declared as parameter to type 'E'}}
 
-typealias F<T1, T2> = (T1) -> T2
+typealias F<T1, T2> = (T1) -> T2 // expected-note {{'T1' declared as parameter to type 'F'}}
 
 // Type alias of type alias.
 typealias G<S1, S2> = A<S1, S2>
@@ -94,8 +94,7 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
-// TODO QoI: Cannot infer T1/T2.
-let _ : F = { a in a }  // expected-error {{type of expression is ambiguous without more context}}
+let _ : F = { a in a } // expected-error {{generic parameter 'T1' could not be inferred}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)
@@ -158,7 +157,7 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'MyType<T, Int>'}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
@@ -303,9 +302,9 @@ func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
 extension A {}
 
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
-extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'A' with constraints specified by a 'where' clause}}
-extension C<T> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'C' with constraints specified by a 'where' clause}}
-extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'C' with constraints specified by a 'where' clause}}
+extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
+extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
+extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
 
 protocol ErrorQ {

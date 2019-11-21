@@ -131,7 +131,10 @@ public:
 
 /// Turn a string like "release" into the LLVM enum.
 llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O);
-  
+
+/// Returns true if the builtin with ID \p ID has a defined static overload for
+/// the type \p Ty.
+bool canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty);
 }
 
 #endif

@@ -50,7 +50,7 @@ using namespace swift;
 // NOTE: older runtimes called these _SwiftNativeNSXXXBase. The two must
 // coexist, so these were renamed. The old names must not be used in the new
 // runtime.
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
+% for Class in ('Array', 'MutableArray', 'Dictionary', 'Set', 'String', 'Enumerator'):
 SWIFT_RUNTIME_STDLIB_API
 @interface __SwiftNativeNS${Class}Base : NSObject
 {
@@ -120,7 +120,7 @@ swift_stdlib_NSObject_isEqual(id lhs,
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 swift_stdlib_connectNSBaseClasses() {
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
+% for Class in ('Array', 'MutableArray', 'Dictionary', 'Set', 'String', 'Enumerator'):
   Class NS${Class}Super = objc_lookUpClass("NS${Class}");
   if (!NS${Class}Super) return false;
   Class NS${Class}OurClass = objc_lookUpClass("__SwiftNativeNS${Class}Base");

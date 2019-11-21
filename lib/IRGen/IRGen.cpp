@@ -70,6 +70,8 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
 
 #include <thread>
@@ -124,13 +126,19 @@ static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
 
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
                                       legacy::PassManagerBase &PM) {
-  PM.add(createAddressSanitizerFunctionPass());
-  PM.add(createAddressSanitizerModulePass());
+  auto &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper &>(Builder);
+  auto recover =
+      bool(BuilderWrapper.IRGOpts.SanitizersWithRecoveryInstrumentation &
+           SanitizerKind::Address);
+  PM.add(createAddressSanitizerFunctionPass(/*CompileKernel=*/false, recover));
+  PM.add(createModuleAddressSanitizerLegacyPassPass(/*CompileKernel=*/false,
+                                                    recover));
 }
 
 static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
                                    legacy::PassManagerBase &PM) {
-  PM.add(createThreadSanitizerPass());
+  PM.add(createThreadSanitizerLegacyPassPass());
 }
 
 static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
@@ -383,11 +391,13 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
     StringRef SectionName;
     Section.getName(SectionName);
     if (SectionName == HashSectionName) {
-      StringRef SectionData;
-      Section.getContents(SectionData);
+      llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
+      if (!SectionData) {
+        return true;
+      }
       ArrayRef<uint8_t> PrevHashData(
-          reinterpret_cast<const uint8_t *>(SectionData.data()),
-          SectionData.size());
+          reinterpret_cast<const uint8_t *>(SectionData->data()),
+          SectionData->size());
       LLVM_DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
         if (DiagMutex) DiagMutex->lock();
         SmallString<32> HashStr;
@@ -666,10 +676,17 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   }
 
 
+  // On Cygwin 64 bit, dlls are loaded above the max address for 32 bits.
+  // This means that the default CodeModel causes generated code to segfault
+  // when run.
+  Optional<CodeModel::Model> cmodel = None;
+  if (EffectiveTriple.isArch64Bit() && EffectiveTriple.isWindowsCygwinEnvironment())
+    cmodel = CodeModel::Large;
+
   // Create a target machine.
   llvm::TargetMachine *TargetMachine = Target->createTargetMachine(
       EffectiveTriple.str(), CPU, targetFeatures, TargetOpts, Reloc::PIC_,
-      None, OptLevel);
+      cmodel, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                        EffectiveTriple.str(), "no LLVM target machine");
@@ -860,7 +877,7 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   runIRGenPreparePasses(*SILMod, IGM);
   
   {
-    SharedTimer timer("IRGen");
+    FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
     // Emit the module contents.
     irgen.emitGlobalTopLevel();
 
@@ -931,7 +948,7 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   if (outModuleHash) {
     *outModuleHash = IGM.ModuleHash;
   } else {
-    SharedTimer timer("LLVM pipeline");
+    FrontendStatsTracer tracer(Ctx.Stats, "LLVM pipeline");
 
     // Since no out module hash was set, we need to performLLVM.
     if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
@@ -1219,7 +1236,7 @@ static void performParallelIRGeneration(
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
 
-  SharedTimer timer("LLVM pipeline");
+  FrontendStatsTracer tracer(Ctx.Stats, "LLVM pipeline");
 
   llvm::sys::Mutex DiagMutex;
 
@@ -1298,6 +1315,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     Section = COFFASTSectionName;
     break;

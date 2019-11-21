@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SEARCHPATHOPTIONS_H
 #define SWIFT_AST_SEARCHPATHOPTIONS_H
 
+#include "swift/Basic/ArrayRefView.h"
 #include "llvm/ADT/Hashing.h"
 
 #include <string>
@@ -81,30 +82,38 @@ public:
   /// would for a non-system header.
   bool DisableModulesValidateSystemDependencies = false;
 
+private:
+  static StringRef
+  pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {
+    return next.Path;
+  };
+
+public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
-    using llvm::hash_value;
     using llvm::hash_combine;
-    auto Code = hash_value(SDKPath);
-    for (auto Import : ImportSearchPaths) {
-      Code = hash_combine(Code, Import);
-    }
-    for (auto VFSFile : VFSOverlayFiles) {
-      Code = hash_combine(Code, VFSFile);
-    }
-    for (const auto &FrameworkPath : FrameworkSearchPaths) {
-      Code = hash_combine(Code, FrameworkPath.Path);
-    }
-    for (auto LibraryPath : LibrarySearchPaths) {
-      Code = hash_combine(Code, LibraryPath);
-    }
-    Code = hash_combine(Code, RuntimeResourcePath);
-    for (auto RuntimeLibraryImportPath : RuntimeLibraryImportPaths) {
-      Code = hash_combine(Code, RuntimeLibraryImportPath);
-    }
-    Code = hash_combine(Code, DisableModulesValidateSystemDependencies);
-    return Code;
+    using llvm::hash_combine_range;
+
+    using FrameworkPathView = ArrayRefView<FrameworkSearchPath, StringRef,
+                                           pathStringFromFrameworkSearchPath>;
+    FrameworkPathView frameworkPathsOnly{FrameworkSearchPaths};
+
+    return hash_combine(SDKPath,
+                        hash_combine_range(ImportSearchPaths.begin(),
+                                           ImportSearchPaths.end()),
+                        hash_combine_range(VFSOverlayFiles.begin(),
+                                           VFSOverlayFiles.end()),
+                        // FIXME: Should we include the system-ness of framework
+                        // search paths too?
+                        hash_combine_range(frameworkPathsOnly.begin(),
+                                           frameworkPathsOnly.end()),
+                        hash_combine_range(LibrarySearchPaths.begin(),
+                                           LibrarySearchPaths.end()),
+                        RuntimeResourcePath,
+                        hash_combine_range(RuntimeLibraryImportPaths.begin(),
+                                           RuntimeLibraryImportPaths.end()),
+                        DisableModulesValidateSystemDependencies);
   }
 };
 

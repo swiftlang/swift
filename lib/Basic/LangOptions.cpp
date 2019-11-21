@@ -156,7 +156,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
 StringRef
 LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
   // Last one wins.
-  for (auto &Opt : reversed(PlatformConditionValues)) {
+  for (auto &Opt : llvm::reverse(PlatformConditionValues)) {
     if (Opt.first == Kind)
       return Opt.second;
   }
@@ -169,7 +169,7 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
 
-  for (auto &Opt : reversed(PlatformConditionValues)) {
+  for (auto &Opt : llvm::reverse(PlatformConditionValues)) {
     if (Opt.first == Kind)
       if (Opt.second == Value)
         return true;

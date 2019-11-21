@@ -55,6 +55,12 @@ public:
   // When printing diagnostics, include the diagnostic name at the end
   bool PrintDiagnosticNames = false;
 
+  /// If set to true, produce more descriptive diagnostic output if available.
+  /// Descriptive diagnostic output is not intended to be machine-readable.
+  bool EnableDescriptiveDiagnostics = false;
+
+  std::string DiagnosticDocumentationPath = "";
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

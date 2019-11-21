@@ -20,6 +20,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -326,6 +327,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // was invalid.  Remember that.
         if (type.isParseError() && !type.hasCodeCompletion())
           param.isInvalid = true;
+      } else if (paramContext != Parser::ParameterContextKind::Closure) {
+        diagnose(Tok, diag::expected_parameter_colon);
+        param.isInvalid = true;
       }
     } else {
       // Otherwise, we have invalid code.  Check to see if this looks like a
@@ -357,13 +361,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // on is most likely argument destructuring, we are going
         // to diagnose that after all of the parameters are parsed.
         if (param.Type) {
-          // Mark current parameter as invalid so it is possible
+          // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
-          param.isInvalid = true;
+          param.isPotentiallyDestructured = true;
           if (!isClosure) {
             // Unnamed parameters must be written as "_: Type".
             diagnose(typeStartLoc, diag::parameter_unnamed)
                 .fixItInsert(typeStartLoc, "_: ");
+          } else {
+            // Unnamed parameters were accidentally possibly accepted after
+            // SE-110 depending on the kind of declaration.  We now need to
+            // warn about the misuse of this syntax and offer to
+            // fix it.
+            diagnose(typeStartLoc, diag::parameter_unnamed_warn)
+              .fixItInsert(typeStartLoc, "_: ");
           }
         }
       } else {
@@ -471,19 +482,11 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                     paramInfo.SpecifierLoc,
+    auto param = new (ctx) ParamDecl(paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName,
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
-
-    auto setInvalid = [&]{
-      if (param->isInvalid())
-        return;
-      param->getTypeLoc().setInvalidType(ctx);
-      param->setInvalid();
-    };
 
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
@@ -494,8 +497,14 @@ mapParsedParameters(Parser &parser,
     
     // If we diagnosed this parameter as a parse error, propagate to the decl.
     if (paramInfo.isInvalid)
-      setInvalid();
-    
+      param->setInvalid();
+
+    // If we need to diagnose this parameter as a destructuring, propagate that
+    // to the decl.
+    // FIXME: This is a terrible way to catch this.
+    if (paramInfo.isPotentiallyDestructured)
+      param->setDestructured(true);
+
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
@@ -512,7 +521,7 @@ mapParsedParameters(Parser &parser,
                                                              "__owned",
                                                              parsingEnumElt);
       }
-      param->getTypeLoc() = TypeLoc(type);
+      param->setTypeRepr(type);
 
       // If there is `@autoclosure` attribute associated with the type
       // let's mark that in the declaration as well, because it
@@ -525,12 +534,6 @@ mapParsedParameters(Parser &parser,
         // or typealias with underlying function type.
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
       }
-    } else if (paramContext != Parser::ParameterContextKind::Closure) {
-      // Non-closure parameters require a type.
-      if (!param->isInvalid())
-        parser.diagnose(param->getLoc(), diag::missing_parameter_type);
-      
-      setInvalid();
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
       switch (paramInfo.SpecifierKind) {
@@ -551,7 +554,12 @@ mapParsedParameters(Parser &parser,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
+
+      param->setSpecifier(ParamSpecifier::Default);
+    } else {
+      param->setSpecifier(ParamSpecifier::Default);
     }
+
     return param;
   };
 
@@ -623,7 +631,7 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(param.EllipsisLoc);
 
         param.EllipsisLoc = SourceLoc();
-      } else if (!result->getTypeLoc().getTypeRepr()) {
+      } else if (!result->getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(result->getSourceRange());
 
@@ -646,7 +654,7 @@ mapParsedParameters(Parser &parser,
     if (param.DefaultArg) {
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
-      result->setDefaultValue(param.DefaultArg);
+      result->setDefaultExpr(param.DefaultArg, /*isTypeChecked*/ false);
     } else if (param.hasInheritedDefaultArg) {
       result->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
     }
@@ -703,7 +711,7 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
                                  defaultArgs, paramContext);
-  
+
   // Turn the parameter clause into argument and body patterns.
   auto paramList = mapParsedParameters(*this, leftParenLoc, params,
                                        rightParenLoc, namePieces, paramContext);
@@ -777,7 +785,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   } else if (Tok.is(tok::kw_rethrows)) {
     throwsLoc = consumeToken();
     rethrows = true;
-  } else if (Tok.is(tok::kw_throw)) {
+  } else if (Tok.isAny(tok::kw_throw, tok::kw_try)) {
     throwsLoc = consumeToken();
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
@@ -1170,17 +1178,18 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
-  DeferringContextRAII Deferring(*SyntaxContext);
   ParserResult<Expr> subExpr =
     parseExprImpl(diag::expected_pattern, isExprBasic);
   ParserStatus status = subExpr;
   if (subExpr.isNull())
     return status;
 
-  if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
-    PatternCtx.addSyntax(UPES->getDeferredPattern());
-  } else {
-    PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+  if (SyntaxContext->isEnabled()) {
+    if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getDeferredPattern());
+    } else {
+      PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+    }
   }
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate

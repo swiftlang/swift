@@ -38,6 +38,12 @@ def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
 
+def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
+  HelpText<"Output module source info file">;
+
+def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
+  HelpText<"Avoid getting source location from .swiftsourceinfo files">;
+
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
     HelpText<"Merge the input modules without otherwise processing them">;
@@ -86,6 +92,10 @@ def tbd_compatibility_version
 def tbd_compatibility_version_EQ : Joined<["-"], "tbd-compatibility-version=">,
   Alias<tbd_compatibility_version>;
 
+def tbd_is_installapi: Flag<["-"], "tbd-is-installapi">,
+  HelpText<"If the TBD file should indicate it's being generated during "
+           "InstallAPI">;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
@@ -102,6 +112,13 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
+  
+def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
+  HelpText<"Show descriptive diagnostic information, if available.">;
+  
+def diagnostic_documentation_path
+  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
+  HelpText<"Path to diagnostic documentation resources">;
 
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
@@ -122,8 +139,8 @@ def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
   
-def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
-  HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
+def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
+  HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
 def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
   HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
@@ -237,6 +254,8 @@ def debugger_support : Flag<["-"], "debugger-support">,
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
+def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
+  HelpText<"Don't run SIL OSSA optimization passes.">;
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
@@ -331,6 +350,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_subst_sil_function_types_for_function_values :
+  Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
+  HelpText<"Use substituted function types for SIL type lowering of function values">;
+  
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -341,10 +364,6 @@ def disable_deserialization_recovery :
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
-
-def disable_tsan_inout_instrumentation : Flag<["-"],
-  "disable-tsan-inout-instrumentation">,
-  HelpText<"Disable treatment of inout parameters as Thread Sanitizer accesses">;
 
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
@@ -407,14 +426,6 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
-def enable_function_builder_one_way_constraints : Flag<["-"],
-  "enable-function-builder-one-way-constraints">,
-  HelpText<"Enable one-way constraints in the function builder transformation">;
-
-def disable_function_builder_one_way_constraints : Flag<["-"],
-  "disable-function-builder-one-way-constraints">,
-  HelpText<"Disable one-way constraints in the function builder transformation">;
-
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
@@ -429,6 +440,14 @@ def enable_operator_designated_types :
 def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
+
+def enable_invalid_ephemeralness_as_error :
+  Flag<["-"], "enable-invalid-ephemeralness-as-error">,
+  HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as errors">;
+
+def disable_invalid_ephemeralness_as_error :
+  Flag<["-"], "disable-invalid-ephemeralness-as-error">,
+  HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as warnings">;
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
@@ -451,6 +470,11 @@ def check_onone_completeness : Flag<["-"], "check-onone-completeness">,
 def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
   HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
            "local variables so they can be compared against the results from the debugger.">;
+
+def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies">,
+  HelpText<"Disable debugger shadow copies of local variables."
+           "This option is only useful for testing the compiler.">,
+  Flags<[FrontendOption, HelpHidden]>;
 
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;

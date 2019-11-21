@@ -317,6 +317,7 @@ Node::iterator Node::end() const {
 }
 
 void Node::addChild(NodePointer Child, NodeFactory &Factory) {
+  assert(Child);
   switch (NodePayloadKind) {
     case PayloadKind::None:
       InlineChildren[0] = Child;
@@ -411,7 +412,7 @@ void NodeFactory::clear() {
   assert(!isBorrowed);
   if (CurrentSlab) {
 #ifdef NODE_FACTORY_DEBUGGING
-    std::cerr << indent() << "## clear: allocated memory = " << allocatedMemory  << "\n";
+    fprintf(stderr, "%s## clear: allocated memory = %zu\n", indent().c_str(), allocatedMemory);
 #endif
 
     freeSlabs(CurrentSlab->Previous);
@@ -1577,6 +1578,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::ExplicitClosure:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
       return false;
     default:
       return true;
@@ -2337,7 +2339,7 @@ std::string Demangler::demangleBridgedMethodParams() {
 
   while (!nextIf('_')) {
     auto c = nextChar();
-    if (!c && c != 'n' && c != 'b')
+    if (c != 'n' && c != 'b')
       return std::string();
     Str.push_back(c);
   }
@@ -2934,6 +2936,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
+    case 'P':
+      Args = None;
+      Kind = Node::Kind::PropertyWrapperBackingInitializer;
+      break;
     default: return nullptr;
   }
 

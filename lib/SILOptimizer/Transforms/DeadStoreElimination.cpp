@@ -60,16 +60,17 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -148,11 +149,11 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::Copy##Name##ValueInst:
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
@@ -268,6 +269,8 @@ public:
       : BB(B), LocationNum(LocationNum) {
     init(LocationNum, Optimistic);
   }
+
+  void dump();
 
   /// Initialize the bitvectors for the current basic block.
   void init(unsigned LocationNum, bool Optimistic);
@@ -448,6 +451,8 @@ public:
              llvm::SpecificBumpPtrAllocator<BlockState> &BPA) 
     : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BPA(BPA) {}
 
+  void dump();
+
   /// Entry point for dead store elimination.
   bool run();
 
@@ -481,6 +486,12 @@ public:
 
 } // end anonymous namespace
 
+void BlockState::dump() {
+  llvm::dbgs() << "  block " << BB->getDebugID() << ": in=" << BBWriteSetIn
+               << ", out=" << BBWriteSetOut << ", mid=" << BBWriteSetMid
+               << ", gen=" << BBGenSet << ", kill=" << BBKillSet << '\n';
+}
+
 void BlockState::init(unsigned LocationNum, bool Optimistic) {
   // For function that requires just 1 iteration of the data flow to converge
   // we set the initial state of BBWriteSetIn to 0.
@@ -511,6 +522,21 @@ void BlockState::init(unsigned LocationNum, bool Optimistic) {
 
   // DeallocateLocation initially empty.
   BBDeallocateLocation.resize(LocationNum, false);
+}
+
+#if __has_attribute(used)
+__attribute((used))
+#endif
+void DSEContext::dump() {
+  llvm::dbgs() << "Locations:\n";
+  unsigned idx = 0;
+  for (const LSLocation &loc : LocationVault) {
+    llvm::dbgs() << "  #" << idx << ": " << loc.getBase();
+    ++idx;
+  }
+  for (SILBasicBlock &BB : *F) {
+    getBlockState(&BB)->dump();
+  }
 }
 
 unsigned DSEContext::getLocationBit(const LSLocation &Loc) {
@@ -691,6 +717,10 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   // dead for block with no successor.
   BlockState *C = getBlockState(BB);
   if (BB->succ_empty()) {
+    if (isa<UnreachableInst>(BB->getTerminator())) {
+      C->BBWriteSetOut.set();
+      return;
+    }
     C->BBWriteSetOut |= C->BBDeallocateLocation;
     return;
   }
@@ -825,7 +855,8 @@ void DSEContext::processRead(SILInstruction *I, SILValue Mem, DSEKind Kind) {
   // Expand the given Mem into individual fields and process them as separate
   // reads.
   LSLocationList Locs;
-  LSLocation::expand(L, &I->getModule(), Locs, TE);
+  LSLocation::expand(L, &I->getModule(),
+                     TypeExpansionContext(*I->getFunction()), Locs, TE);
 
   // Are we building the genset and killset.
   if (isBuildingGenKillSet(Kind)) {
@@ -910,7 +941,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // writes.
   bool Dead = true;
   LSLocationList Locs;
-  LSLocation::expand(L, Mod, Locs, TE);
+  LSLocation::expand(L, Mod, TypeExpansionContext(*I->getFunction()), Locs, TE);
   SmallBitVector V(Locs.size());
 
   // Are we computing max store set.
@@ -967,7 +998,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    LSLocation::reduce(L, Mod, Alives);
+    LSLocation::reduce(L, Mod, TypeExpansionContext(*I->getFunction()), Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (Alives.size() > MaxPartialStoreCount)

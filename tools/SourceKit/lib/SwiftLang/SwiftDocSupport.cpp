@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
@@ -263,7 +264,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   if (DC == nullptr || !DC->isInnermostContextGeneric())
     return;
 
-  GenericSignature *GenericSig = DC->getGenericSignatureOfContext();
+  GenericSignature GenericSig = DC->getGenericSignatureOfContext();
 
   if (!GenericSig)
     return;
@@ -400,7 +401,7 @@ static bool initDocEntityInfo(const Decl *D,
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
-      if (auto *Sig = E->getGenericSignature()) {
+      if (auto Sig = E->getGenericSignature()) {
         // The extension under printing is potentially part of a synthesized
         // extension. Thus it's hard to print the fully annotated decl. We
         // need to at least print the generic signature here.
@@ -533,10 +534,9 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    if (TAD->hasInterfaceType()) {
+    if (auto Ty = TAD->getDeclaredInterfaceType()) {
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
-      auto Ty = TAD->getDeclaredInterfaceType();
       if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
@@ -814,8 +814,8 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
       ArgNames = ArgNames.slice(1);
     }
 
-    if (auto typeRepr = param->getTypeLoc().getTypeRepr()) {
-      SourceRange TypeRange = param->getTypeLoc().getSourceRange();
+    if (auto typeRepr = param->getTypeRepr()) {
+      SourceRange TypeRange = typeRepr->getSourceRange();
       if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
@@ -1185,12 +1185,8 @@ accept(SourceManager &SM, RegionType RegionType,
 }
 
 void RequestRefactoringEditConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info, bufferIndirectlyCausingDiagnostic);
+    SourceManager &SM, const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 class RequestRenameRangeConsumer::Implementation {
@@ -1244,13 +1240,9 @@ void RequestRenameRangeConsumer::accept(
   Impl.accept(SM, RegionType, Ranges);
 }
 
-void RequestRenameRangeConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info, bufferIndirectlyCausingDiagnostic);
+void RequestRenameRangeConsumer::handleDiagnostic(SourceManager &SM,
+                                                  const DiagnosticInfo &Info) {
+  Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 static NameUsage getNameUsage(RenameType Type) {

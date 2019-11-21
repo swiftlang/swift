@@ -16,11 +16,8 @@ EXPR_NODES = [
              Child('PoundColumn', kind='PoundColumnToken'),
          ]),
 
-    Node('FunctionCallArgumentList', kind='SyntaxCollection',
-         element='FunctionCallArgument'),
-
-    Node('TupleElementList', kind='SyntaxCollection',
-         element='TupleElement'),
+    Node('TupleExprElementList', kind='SyntaxCollection',
+         element='TupleExprElement'),
 
     Node('ArrayElementList', kind='SyntaxCollection',
          element='ArrayElement'),
@@ -115,7 +112,11 @@ EXPR_NODES = [
 
     Node('ExprList', kind='SyntaxCollection',
          element='Expr',
-         element_name='Expression'),
+         element_name='Expression',
+         description='''
+         A list of expressions connected by operators. This list is contained
+         by a `SequenceExprSyntax`.
+         '''),
 
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',
@@ -188,7 +189,7 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('ElementList', kind='TupleElementList',
+             Child('ElementList', kind='TupleExprElementList',
                    collection_element_name='Element'),
              Child('RightParen', kind='RightParenToken'),
          ]),
@@ -214,25 +215,16 @@ EXPR_NODES = [
              Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
-    # function-call-argument -> label? ':'? expression ','?
-    Node('FunctionCallArgument', kind='Syntax',
-         traits=['WithTrailingComma'],
-         children=[
-             Child('Label', kind='IdentifierToken',
-                   is_optional=True),
-             Child('Colon', kind='ColonToken',
-                   is_optional=True),
-             Child('Expression', kind='Expr'),
-             Child('TrailingComma', kind='CommaToken',
-                   is_optional=True),
-         ]),
-
     # An element inside a tuple element list
-    Node('TupleElement', kind='Syntax',
+    Node('TupleExprElement', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
-             Child('Label', kind='IdentifierToken',
-                   is_optional=True),
+             Child('Label', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
              Child('Colon', kind='ColonToken',
                    is_optional=True),
              Child('Expression', kind='Expr'),
@@ -403,7 +395,7 @@ EXPR_NODES = [
              Child('CalledExpression', kind='Expr'),
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
-             Child('ArgumentList', kind='FunctionCallArgumentList',
+             Child('ArgumentList', kind='TupleExprElementList',
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
@@ -416,7 +408,7 @@ EXPR_NODES = [
          children=[
              Child('CalledExpression', kind='Expr'),
              Child('LeftBracket', kind='LeftSquareBracketToken'),
-             Child('ArgumentList', kind='FunctionCallArgumentList',
+             Child('ArgumentList', kind='TupleExprElementList',
                    collection_element_name='Argument'),
              Child('RightBracket', kind='RightSquareBracketToken'),
              Child('TrailingClosure', kind='ClosureExpr',
@@ -467,7 +459,7 @@ EXPR_NODES = [
              Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
                    force_classification=True),
-             Child('Expressions', kind='FunctionCallArgumentList',
+             Child('Expressions', kind='TupleExprElementList',
                    collection_element_name='Expression'),
              Child('RightParen', kind='StringInterpolationAnchorToken'),
          ]),
@@ -564,7 +556,7 @@ EXPR_NODES = [
                        'PoundImageLiteralToken',
                    ]),
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Arguments', kind='FunctionCallArgumentList',
+             Child('Arguments', kind='TupleExprElementList',
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
          ]),

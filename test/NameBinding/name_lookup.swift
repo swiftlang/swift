@@ -224,7 +224,7 @@ class ThisDerived1 : ThisBase1 {
     self.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0() // expected-error {{instance member 'baseFunc0' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0(ThisBase1())() // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
-    
+
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{instance member 'baseFunc1' cannot be used on type 'ThisDerived1'}}
     self.baseFunc1(ThisBase1())(42) // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
@@ -482,7 +482,7 @@ struct MyStruct {
 // <rdar://problem/19935319> QoI: poor diagnostic initializing a variable with a non-class func
 class Test19935319 {
   let i = getFoo()  // expected-error {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
-  
+
   func getFoo() -> Int {}
 }
 
@@ -616,15 +616,26 @@ struct PatternBindingWithTwoVars1 { var x = 3, y = x }
 // expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
-// expected-error@-1 {{type 'PatternBindingWithTwoVars2' has no member 'y'}}
+// expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
 
-// This one should be accepted, but for now PatternBindingDecl validation
-// circularity detection is not fine grained enough.
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
+// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-2 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-3 {{circular reference}}
+// expected-note@-4 {{through reference here}}
+// expected-note@-5 {{through reference here}}
+// expected-note@-6 {{through reference here}}
+// expected-note@-7 {{through reference here}}
+// expected-note@-8 {{through reference here}}
+// expected-error@-9 {{circular reference}}
+// expected-note@-10 {{through reference here}}
+// expected-note@-11 {{through reference here}}
+// expected-note@-12 {{through reference here}}
+// expected-note@-13 {{through reference here}}
+// expected-note@-14 {{through reference here}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {
-  let closure1 = { closure2() } // expected-error {{let 'closure1' references itself}}
-  let closure2 = { closure1() }
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
 }

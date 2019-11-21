@@ -296,11 +296,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
   auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_interface_path);
+  auto moduleSourceInfoOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_source_info_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput) {
+      !moduleInterfaceOutput || !moduleSourceInfoOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -319,7 +321,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
-
+    sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -394,6 +396,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_SwiftModuleDocFile, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  auto moduleSourceInfoOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_source_info, pathsFromArguments.ModuleSourceInfoOutputPath,
+      file_types::TY_SwiftSourceInfoFile, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
   // There is no non-path form of -emit-interface-path
   auto ModuleInterfaceOutputPath =
       pathsFromArguments.ModuleInterfaceOutputPath;
@@ -420,6 +427,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
+  sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   return sop;
 }
 
@@ -489,6 +497,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
       {file_types::TY_SwiftModuleFile, paths.ModuleOutputPath},
       {file_types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
+      {file_types::TY_SwiftSourceInfoFile, paths.ModuleSourceInfoOutputPath},
       {file_types::TY_Dependencies, paths.DependenciesFilePath},
       {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
@@ -516,6 +525,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_serialize_diagnostics_path,
         options::OPT_emit_loaded_module_trace_path,
         options::OPT_emit_module_interface_path,
+        options::OPT_emit_module_source_info_path,
         options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,

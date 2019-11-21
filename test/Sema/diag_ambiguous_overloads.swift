@@ -71,14 +71,14 @@ _ = sr7918_Suit.foo(&myRNG) // expected-error {{cannot pass immutable value as i
 //=-------------- SR-7786 --------------=/
 struct sr7786 {
   func foo() -> UInt { return 0 }
-  func foo<T: UnsignedInteger>(bar: T) -> T {
+  func foo<T: UnsignedInteger>(bar: T) -> T { // expected-note {{where 'T' = 'Int'}}
     return bar
   }
 }
 
 let s = sr7786()
 let a = s.foo()
-let b = s.foo(bar: 123) // expected-error {{argument type 'Int' does not conform to expected type 'UnsignedInteger'}}
+let b = s.foo(bar: 123) // expected-error {{instance method 'foo(bar:)' requires that 'Int' conform to 'UnsignedInteger'}}
 let c: UInt = s.foo(bar: 123)
 let d = s.foo(bar: 123 as UInt)
 
@@ -114,7 +114,7 @@ struct Count { // expected-note {{'init(title:)' declared here}}
 func getCounts(_ scheduler: sr5154_Scheduler, _ handler: @escaping ([Count]) -> Void) {
   scheduler.inBackground(run: {
     return [Count()] // expected-error {{missing argument for parameter 'title' in call}}
-  }, completedBy: {
+  }, completedBy: { // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{20-20= _ in}}
   })
 }
 

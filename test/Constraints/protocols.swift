@@ -212,6 +212,7 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   // Instance member of existential metatype -- not allowed
   _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
   _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
+  // expected-error@-1 {{partial application of 'mutating' method is not allowed}}
 
   // Static member of metatype -- not allowed
   _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
@@ -413,4 +414,11 @@ func rdar_50512161() {
   func bar(_ item: Item) {
     foo(item: item) // expected-error {{generic parameter 'I' could not be inferred}}
   }
+}
+
+// SR-11609: Compiler crash on missing conformance for default param
+func test_sr_11609() {
+  func foo<T : Initable>(_ x: T = .init()) -> T { x } // expected-note {{where 'T' = 'String'}}
+  let _: String = foo()
+  // expected-error@-1 {{local function 'foo' requires that 'String' conform to 'Initable'}}
 }

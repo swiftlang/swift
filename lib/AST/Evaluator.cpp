@@ -99,7 +99,7 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
 
 void Evaluator::diagnoseCycle(const AnyRequest &request) {
   request.diagnoseCycle(diags);
-  for (const auto &step : reversed(activeRequests)) {
+  for (const auto &step : llvm::reverse(activeRequests)) {
     if (step == request) return;
 
     step.noteCycleStep(diags);

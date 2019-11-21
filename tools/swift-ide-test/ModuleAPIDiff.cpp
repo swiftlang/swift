@@ -736,7 +736,7 @@ public:
   }
 
   llvm::Optional<sma::GenericSignature>
-  convertToGenericSignature(GenericSignature *GS) {
+  convertToGenericSignature(GenericSignature GS) {
     if (!GS)
       return None;
     sma::GenericSignature ResultGS;

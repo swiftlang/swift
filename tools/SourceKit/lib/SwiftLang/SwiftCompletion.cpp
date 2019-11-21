@@ -172,6 +172,10 @@ static bool swiftCodeCompleteImpl(
     return false;
   }
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
   std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
       llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
@@ -200,7 +204,6 @@ static bool swiftCodeCompleteImpl(
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
     CI.getSourceMgr().setFileSystem(FileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CI.setup(Invocation)) {
@@ -213,7 +216,7 @@ static bool swiftCodeCompleteImpl(
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   SwiftConsumer.clearContext();
 
   return true;

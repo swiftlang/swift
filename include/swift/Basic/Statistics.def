@@ -153,9 +153,6 @@ FRONTEND_STATISTIC(AST, NumLookupInModule)
 /// Number of local lookups into a module.
 FRONTEND_STATISTIC(AST, NumModuleLookupValue)
 
-/// Number of unqualified lookups.
-FRONTEND_STATISTIC(AST, NumUnqualifiedLookup)
-
 /// Number of local lookups into a module's class members, for
 /// AnyObject lookup.
 FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
@@ -229,9 +226,6 @@ FRONTEND_STATISTIC(Sema, NumCyclicOneWayComponentsCollapsed)
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
-
-/// Number of declarations validated.
-FRONTEND_STATISTIC(Sema, NumDeclsValidated)
 
 /// Number of declarations type checked.
 FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)

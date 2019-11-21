@@ -13,7 +13,7 @@ struct S {
 
 protocol K { }
 
-func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> {
+func + <Object>(lhs: KeyPath<A, Object>, rhs: String) -> P<Object> { // expected-note {{where 'Object' = 'String'}}
     fatalError()
 }
 
@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{argument type 'String' does not conform to expected type 'K'}}
+    static let j = S(\A.id + "id") // expected-error {{operator function '+' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034

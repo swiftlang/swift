@@ -41,6 +41,16 @@ final class GenClass<T : P> : P {
   }
 }
 
+class Base<T> {
+  final var i: Int = 12
+}
+
+class DerivedClass<T> : Base<T> {
+}
+
+final class DerivedClass2 : DerivedClass<Int> {
+}
+
 final class SimpleClass : P {
   var i: Int
   static var numObjs = 0
@@ -94,6 +104,33 @@ func testGenStructWrite<T>(_ s: inout GenStruct<T>, _ t: T) {
 @_semantics("optimize.sil.specialize.generic.never")
 func testGenClassRead<T>(_ c: GenClass<T>) -> T {
   let kp = \GenClass<T>.ct
+  return c[keyPath: kp]
+}
+
+// CHECK-LABEL: sil {{.*}}testDerivedClassRead
+// CHECK: [[C:%[0-9]+]] = upcast %0
+// CHECK: [[E:%[0-9]+]] = ref_element_addr [[C]]
+// CHECK: [[A:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E]]
+// CHECK: [[V:%[0-9]+]] = load [[A]]
+// CHECK: end_access [[A]]
+// CHECK: return [[V]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testDerivedClassRead<T>(_ c: DerivedClass<T>) -> Int {
+  let kp = \DerivedClass<T>.i
+  return c[keyPath: kp]
+}
+
+// CHECK-LABEL: sil {{.*}}testDerivedClass2Read
+// CHECK: [[C:%[0-9]+]] = upcast %0
+// CHECK: [[E:%[0-9]+]] = ref_element_addr [[C]]
+// CHECK: [[A:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E]]
+// CHECK: [[V:%[0-9]+]] = load [[A]]
+// CHECK: end_access [[A]]
+// CHECK: return [[V]]
+@inline(never)
+func testDerivedClass2Read(_ c: DerivedClass2) -> Int {
+  let kp = \DerivedClass2.i
   return c[keyPath: kp]
 }
 
@@ -232,6 +269,12 @@ func testit() {
 
   // CHECK-OUTPUT: GenClassRead: 29
   print("GenClassRead: \(testGenClassRead(GenClass(SimpleClass(29))).i)")
+
+  // CHECK-OUTPUT: DerivedClassRead: 12
+  print("DerivedClassRead: \(testDerivedClassRead(DerivedClass<Int>())))")
+
+  // CHECK-OUTPUT: DerivedClass2Read: 12
+  print("DerivedClass2Read: \(testDerivedClass2Read(DerivedClass2())))")
 
   // CHECK-OUTPUT: GenClassWrite: 30
   let c = GenClass(SimpleClass(0))

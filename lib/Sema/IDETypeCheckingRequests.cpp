@@ -56,10 +56,8 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!ED->isConstrainedExtension())
     return true;
 
-  TypeChecker *TC = &TypeChecker::createForContext((DC->getASTContext()));
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
-  GenericSignature *genericSig = ED->getGenericSignature();
+  (void)swift::createTypeChecker(DC->getASTContext());
+  GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());
   return areGenericRequirementsSatisfied(DC, genericSig, substMap,
@@ -77,7 +75,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;
-  const GenericSignature *genericSig = genericDecl->getGenericSignature();
+  GenericSignature genericSig = genericDecl->getGenericSignature();
   if (!genericSig)
     return true;
 
@@ -109,16 +107,16 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
     break;
   }
   assert(CKind.hasValue());
-  return canSatisfy(Owner.Pair.FirstTy, Owner.Pair.SecondTy, Owner.OpenArchetypes,
-                    *CKind, Owner.DC);
+  return TypeChecker::typesSatisfyConstraint(Owner.Pair.FirstTy,
+                                             Owner.Pair.SecondTy,
+                                             Owner.OpenArchetypes,
+                                             *CKind, Owner.DC);
 }
 
 llvm::Expected<TypePair>
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  auto &TC = TypeChecker::createForContext(subscript->getASTContext());
-
-  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+  if (!isValidKeyPathDynamicMemberLookup(subscript))
     return TypePair();
 
   const auto *param = subscript->getIndices()->get(0);

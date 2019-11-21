@@ -197,7 +197,7 @@ class Serializer : public SerializerBase {
                        index_block::LOCAL_DECL_CONTEXT_OFFSETS>
   LocalDeclContextsToSerialize;
 
-  ASTBlockRecordKeeper<const GenericSignature *, GenericSignatureID,
+  ASTBlockRecordKeeper<GenericSignature, GenericSignatureID,
                        index_block::GENERIC_SIGNATURE_OFFSETS>
   GenericSignaturesToSerialize;
 
@@ -314,7 +314,7 @@ private:
   void writeASTBlockEntity(Type ty);
 
   /// Writes a generic signature.
-  void writeASTBlockEntity(const GenericSignature *sig);
+  void writeASTBlockEntity(GenericSignature sig);
 
   /// Writes a substitution map.
   void writeASTBlockEntity(const SubstitutionMap substitutions);
@@ -427,7 +427,7 @@ public:
   /// Records the use of the given generic signature.
   ///
   /// The GenericSignature will be scheduled for serialization if necessary.
-  GenericSignatureID addGenericSignatureRef(const GenericSignature *sig);
+  GenericSignatureID addGenericSignatureRef(GenericSignature sig);
 
   /// Records the use of the given substitution map.
   ///
@@ -486,6 +486,9 @@ public:
 /// Serialize module documentation to the given stream.
 void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
                       StringRef GroupInfoPath);
+
+/// Serialize module source info to the given stream.
+void writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC);
 } // end namespace serialization
 } // end namespace swift
 #endif

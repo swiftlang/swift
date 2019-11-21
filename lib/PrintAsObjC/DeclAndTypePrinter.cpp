@@ -278,6 +278,10 @@ private:
     if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
       os << "SWIFT_WEAK_IMPORT\n";
 
+    if (CD->getAttrs().hasAttribute<IBDesignableAttr>()) {
+      os << "IB_DESIGNABLE\n";
+    }
+
     bool hasResilientAncestry =
       CD->checkAncestry().contains(AncestryFlags::ResilientOther);
     if (hasResilientAncestry) {
@@ -393,12 +397,12 @@ private:
         os << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
 
-      if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
-        os << " = ";
-        if (ILE->isNegative())
-          os << "-";
-        os << ILE->getDigitsText();
-      }
+      // Print the raw values, even the ones that we synthesize.
+      auto *ILE = cast<IntegerLiteralExpr>(Elt->getStructuralRawValueExpr());
+      os << " = ";
+      if (ILE->isNegative())
+        os << "-";
+      os << ILE->getDigitsText();
       os << ",\n";
     }
     os << "};\n";
@@ -1189,6 +1193,10 @@ private:
     }
 
     os << ") ";
+    if (VD->getAttrs().hasAttribute<IBInspectableAttr>()) {
+      os << "IBInspectable ";
+    }
+
     if (VD->getAttrs().hasAttribute<IBOutletAttr>()) {
       if (!maybePrintIBOutletCollection(ty))
         os << "IBOutlet ";
@@ -1388,23 +1396,10 @@ private:
     // upper-bounded keys.
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
-      if (ModuleDecl *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
-        if (!owningPrinter.NSCopyingType) {
-          SmallVector<ValueDecl *, 1> decls;
-          M->lookupQualified(M, ctx.getIdentifier("NSCopying"),
-                             NL_OnlyTypes, decls);
-          if (decls.size() == 1 && isa<ProtocolDecl>(decls[0])) {
-            owningPrinter.NSCopyingType = cast<ProtocolDecl>(decls[0])
-              ->getDeclaredInterfaceType();
-          } else {
-            owningPrinter.NSCopyingType = Type();
-          }
-        }
-        if (*owningPrinter.NSCopyingType) {
-          rewrittenArgsBuf[0] = *owningPrinter.NSCopyingType;
-          rewrittenArgsBuf[1] = typeArgs[1];
-          typeArgs = rewrittenArgsBuf;
-        }
+      if (auto protoTy = ctx.getNSCopyingType()) {
+        rewrittenArgsBuf[0] = protoTy;
+        rewrittenArgsBuf[1] = typeArgs[1];
+        typeArgs = rewrittenArgsBuf;
       }
     }
 
@@ -2047,7 +2042,7 @@ void DeclAndTypePrinter::print(Type ty) {
 }
 
 void DeclAndTypePrinter::printAdHocCategory(
-    llvm::iterator_range<const ValueDecl * const *> members) {
+    iterator_range<const ValueDecl * const *> members) {
   getImpl().printAdHocCategory(members);
 }
 

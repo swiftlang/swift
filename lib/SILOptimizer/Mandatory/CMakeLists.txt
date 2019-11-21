@@ -23,4 +23,5 @@ silopt_register_sources(
   YieldOnceCheck.cpp
   MandatoryCombine.cpp
   OSLogOptimization.cpp
+  OwnershipModelEliminator.cpp
 )

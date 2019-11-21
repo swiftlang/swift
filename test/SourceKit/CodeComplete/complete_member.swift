@@ -32,7 +32,7 @@ class Base {
 }
 
 class Derived: Base {
-    func foo() {}
+    override func foo() {}
 }
 
 func testOverrideUSR() {

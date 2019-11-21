@@ -14,6 +14,7 @@
 #define SWIFT_AST_SOURCEFILE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/Basic/Debug.h"
 
 namespace swift {
 
@@ -117,6 +118,13 @@ private:
   /// The scope map that describes this source file.
   std::unique_ptr<ASTScope> Scope;
 
+  /// The set of validated opaque return type decls in the source file.
+  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
+  llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
+  /// The set of parsed decls with opaque return types that have not yet
+  /// been validated.
+  llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+
   friend ASTContext;
   friend Impl;
 public:
@@ -130,13 +138,6 @@ public:
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
-  /// The set of validated opaque return type decls in the source file.
-  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
-  llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of parsed decls with opaque return types that have not yet
-  /// been validated.
-  llvm::DenseSet<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
-
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation
   /// module is still not imported by the time type checking is
@@ -145,11 +146,6 @@ public:
 
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
-
-  /// We might perform type checking on the same source file more than once,
-  /// if its the main file or a REPL instance, so keep track of the last
-  /// checked synthesized declaration to avoid duplicating work.
-  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -276,6 +272,7 @@ public:
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
+  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
@@ -322,7 +319,7 @@ public:
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
   /// Pretty-print the contents of this source file.
@@ -430,14 +427,16 @@ public:
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
 
-  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
-                                         LazyResolver *resolver) override;
+  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
+  /// Do not call when inside an inactive clause (\c
+  /// InInactiveClauseEnvironment)) because it will later on result in a lookup
+  /// to something that won't be in the ASTScope tree.
   void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
     UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
   }
 
-  void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
+  ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
 
 private:
 

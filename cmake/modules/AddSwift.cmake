@@ -422,6 +422,10 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -1987,6 +1991,9 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
+    if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+      add_dependencies(${VARIANT_NAME} clang)
+    endif()
 
       if(sdk STREQUAL WINDOWS)
         if(SWIFT_COMPILER_IS_MSVC_LIKE)

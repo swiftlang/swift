@@ -100,8 +100,8 @@ func r21544303() {
   inSubcall = false
 
   var v2 : Bool = false
-  v2 = inSubcall
-  {  // expected-error {{cannot call value of non-function type 'Bool'}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
+  v2 = inSubcall // expected-error {{cannot call value of non-function type 'Bool'}}
+  {
   }
 }
 
@@ -114,56 +114,56 @@ func SR3671() {
   { consume($0) }(42)
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }} expected-error {{cannot call value of non-function type '()'}}
+  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
   // This is technically a valid call, so nothing goes wrong until (42)
 
-  { $0(3) }
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { $0(3) } // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   ;
-  ({ $0(42) })
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ({ $0(42) }) // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   ;
-  { $0(3) }
-  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { $0(3) } // expected-error {{cannot call value of non-function type '()'}}
+  { [n] in consume($0) }(42)
   ;
-  ({ $0(42) })
-  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ({ $0(42) }) // expected-error {{cannot call value of non-function type '()'}}
+  { [n] in consume($0) }(42)
   ;
 
   // Equivalent but more obviously unintended.
 
-  { $0(3) }  // expected-note {{callee is here}}
+  { $0(3) }  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
 
-  ({ $0(3) })  // expected-note {{callee is here}}
+  ({ $0(3) })  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  { consume($0) }(42)
   // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
@@ -249,10 +249,10 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-func callCC<U>(_ f: (CC) -> U) -> () {}
+func callCC<U>(_ f: (CC) -> U) -> () {} // expected-note {{in call to function 'callCC'}}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{11-11= () -> Int in }}
+  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
     _ = $0
     return 1
   }
@@ -273,6 +273,7 @@ func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
 // SR-1069 - Error diagnostic refers to wrong argument
 class SR1069_W<T> {
   func append<Key: AnyObject>(value: T, forKey key: Key) where Key: Hashable {}
+  // expected-note@-1 {{where 'Key' = 'Object?'}}
 }
 class SR1069_C<T> { let w: SR1069_W<(AnyObject, T) -> ()> = SR1069_W() }
 struct S<T> {
@@ -280,9 +281,8 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+3 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
-    // expected-note @+2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note @+1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error @+2 {{instance method 'append(value:forKey:)' requires that 'Object?' be a class type}}
+    // expected-note @+1 {{wrapped type 'Object' satisfies this requirement}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }
@@ -292,11 +292,11 @@ func simplified1069() {
   class C {}
   struct S {
     func genericallyNonOptional<T: AnyObject>(_ a: T, _ b: T, _ c: T) { }
+    // expected-note@-1 {{where 'T' = 'Optional<C>'}}
 
     func f(_ a: C?, _ b: C?, _ c: C) {
-      genericallyNonOptional(a, b, c) // expected-error 2{{value of optional type 'C?' must be unwrapped to a value of type 'C'}}
-      // expected-note @-1 2{{coalesce}}
-      // expected-note @-2 2{{force-unwrap}}
+      genericallyNonOptional(a, b, c) // expected-error {{instance method 'genericallyNonOptional' requires that 'Optional<C>' be a class type}}
+      // expected-note @-1 {{wrapped type 'C' satisfies this requirement}}
     }
   }
 }
@@ -304,7 +304,7 @@ func simplified1069() {
 // Make sure we cannot infer an () argument from an empty parameter list.
 func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
-  acceptNothingToInt({ac1($0)})
+  acceptNothingToInt({ac1($0)}) // expected-error@:27 {{argument passed to call that takes no arguments}}
   // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
 }
 
@@ -313,7 +313,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
+let things = Thing().map { thing in  // expected-error {{generic parameter 'U' could not be inferred}}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -345,12 +345,12 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' at position #0}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' at position #0}}
+func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1}}
+func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
@@ -360,7 +360,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> Int }}
+[0].map {  // expected-error {{generic parameter 'T' could not be inferred}}
   _ in
   let r =  (1,2).0
   return r
@@ -371,7 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -394,7 +394,7 @@ func rdar20868864(_ s: String) {
 func r22058555() {
   var firstChar: UInt8 = 0
   "abc".withCString { chars in
-    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
+    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}} {{17-17=UInt8(}} {{25-25=)}}
   }
 }
 
@@ -406,6 +406,7 @@ func r20789423() {
   
   let p: C
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
+  // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
   let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> String }}
     print("a")
@@ -495,7 +496,9 @@ struct S_3520 {
   var number1: Int
 }
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
-sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{generic parameter 'S' could not be inferred}}
+sr3520_set_via_closure({ $0.number1 = $1 })
+// expected-error@-1 {{generic parameter 'S' could not be inferred}}
+// expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -762,7 +765,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 func not_overloaded(_ handler: () -> Int) {}
 
 not_overloaded { } // empty body
-// expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
 
 not_overloaded { print("hi") } // single-expression closure
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -783,7 +786,7 @@ func test() -> Int? {
 }
 
 var fn: () -> [Int] = {}
-// expected-error@-1 {{cannot convert value of type '() -> ()' to specified type '() -> [Int]'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type '[Int]'}}
 
 fn = {}
 // expected-error@-1 {{cannot assign value of type '() -> ()' to type '() -> [Int]'}}
@@ -817,7 +820,7 @@ func rdar_40537960() {
   }
 
   var arr: [S] = []
-  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<Any>'}}
+  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<P>'}}
   // expected-error@-1 {{generic parameter 'P' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<[S], <#P: P_40537960#>>}}
 }
@@ -870,7 +873,7 @@ struct rdar30347997 {
 struct rdar43866352<Options> {
   func foo() {
     let callback: (inout Options) -> Void
-    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
+    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(Options) -> ()' to type '(inout Options) -> Void'}}
   }
 }
 
@@ -905,3 +908,10 @@ do {
 // via the 'T -> U => T -> ()' implicit conversion.
 let badResult = { (fn: () -> ()) in fn }
 // expected-error@-1 {{expression resolves to an unused function}}
+
+// rdar://problem/55102498 - closure's result type can't be inferred if the last parameter has a default value
+func test_trailing_closure_with_defaulted_last() {
+  func foo<T>(fn: () -> T, value: Int = 0) {}
+  foo { 42 } // Ok
+  foo(fn: { 42 }) // Ok
+}

@@ -2,9 +2,9 @@
 // RUN:   -sil-print-after=mandatory-inlining \
 // RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
 
-// CHECK: strong_release {{.*}} : $@callee_guaranteed () -> (), loc {{.*}}:21:5, scope 9
-// CHECK: strong_release {{.*}} : $@callee_guaranteed () -> @out (), loc {{.*}}:18:17, scope 9
-// CHECK: strong_release {{.*}} : $@callee_guaranteed () -> (), loc {{.*}}:21:5, scope 9
+// CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> (), loc {{.*}}:21:5, scope 9
+// CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> @out (), loc {{.*}}:18:17, scope 9
+// CHECK: destroy_value {{.*}} : $@callee_guaranteed () -> (), loc {{.*}}:21:5, scope 9
 
 func patatino<d, i>(_ function: @escaping (d) -> i, g: d...) -> () -> i {
     return { typealias h = ([d]) -> i

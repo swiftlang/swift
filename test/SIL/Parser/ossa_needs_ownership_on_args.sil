@@ -1,4 +1,4 @@
-// RUN: not %sil-opt -verify %s
+// RUN: not %target-sil-opt -verify %s
 
 // Make sure that we error if ossa functions do not parse unless the argument
 // has the proper ownership specifier on it.

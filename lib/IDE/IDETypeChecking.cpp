@@ -166,7 +166,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature *GenericSig,
+    void addRequirement(GenericSignature GenericSig,
                         Type First, Type Second, RequirementKind Kind) {
       CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
       CanType CanSecond;
@@ -280,7 +280,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     auto handleRequirements = [&](SubstitutionMap subMap,
-                                  GenericSignature *GenericSig,
+                                  GenericSignature GenericSig,
                                   ArrayRef<Requirement> Reqs) {
       for (auto Req : Reqs) {
         auto Kind = Req.getKind();
@@ -304,15 +304,16 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         switch (Kind) {
-        case RequirementKind::Conformance:
-          // FIXME: This could be more accurate; check
-          // conformance instead of subtyping
-          if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
+        case RequirementKind::Conformance: {
+          auto *M = DC->getParentModule();
+          auto *Proto = Second->castTo<ProtocolType>()->getDecl();
+          if (!First->isTypeParameter() && !First->is<ArchetypeType>() &&
+              M->conformsToProtocol(First, Proto).isInvalid())
             return true;
-          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
-                                    *DC))
+          if (M->conformsToProtocol(First, Proto).isInvalid())
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
+        }
 
         case RequirementKind::Superclass:
           if (!Second->isBindableToSuperclassOf(First)) {

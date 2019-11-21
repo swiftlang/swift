@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member -skip-unavailable > %t.printed.A.txt
-// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
+// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify -enable-invalid-ephemeralness-as-error
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
 // REQUIRES: objc_interop
@@ -111,3 +111,27 @@ let _ = mine.getCollisionNonProperty(1)
 // PRINT-NEXT:    init!(i i: Double)
 // PRINT-NEXT:    class func invert(_ iamOtherName: IAMOtherName!)
 // PRINT-NEXT:  }
+//
+// PRINT-LABEL: struct IAMPointerStruct {
+// PRINT-NEXT:   var ptr1: UnsafeMutablePointer<Double>!
+// PRINT-NEXT:   var ptr2: UnsafeMutablePointer<Double>!
+// PRINT-NEXT:   init()
+// PRINT-NEXT:   init(ptr1 ptr1: UnsafeMutablePointer<Double>!, ptr2 ptr2: UnsafeMutablePointer<Double>!)
+// PRINT-NEXT: }
+// PRINT-NEXT: extension IAMPointerStruct {
+// PRINT-NEXT:   init(otherPtr ptr: UnsafeMutablePointer<Double>!)
+// PRINT-NEXT: }
+
+func testNonEphemeralInitParams(x: Double) {
+  var x = x
+
+  _ = IAMPointerStruct(ptr1: &x, ptr2: &x)
+  // expected-error@-1 {{cannot use inout expression here; argument 'ptr1' must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-2 {{implicit argument conversion from 'Double' to 'UnsafeMutablePointer<Double>?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-3 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
+  // expected-error@-4 {{cannot use inout expression here; argument 'ptr2' must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-5 {{implicit argument conversion from 'Double' to 'UnsafeMutablePointer<Double>?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-6 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
+
+  _ = IAMPointerStruct(otherPtr: &x) // Okay.
+}

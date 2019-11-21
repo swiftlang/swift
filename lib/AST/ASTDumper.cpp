@@ -185,7 +185,7 @@ void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '>';
 }
 
-void GenericParamList::dump() {
+void GenericParamList::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
@@ -725,7 +725,7 @@ namespace {
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
-        if (var->hasType())
+        if (auto varTy = var->hasInterfaceType())
           var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         else
           PrintWithColorRAII(OS, TypeColor) << "<null type>";
@@ -895,20 +895,20 @@ namespace {
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
 
-      for (auto entry : PBD->getPatternList()) {
+      for (auto idx : range(PBD->getNumPatternEntries())) {
         OS << '\n';
-        printRec(entry.getPattern());
-        if (entry.getOriginalInit()) {
+        printRec(PBD->getPattern(idx));
+        if (PBD->getOriginalInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
           OS << "Original init:\n";
-          printRec(entry.getOriginalInit());
+          printRec(PBD->getOriginalInit(idx));
         }
-        if (entry.getInit()) {
+        if (PBD->getInit(idx)) {
           OS << '\n';
           OS.indent(Indent + 2);
           OS << "Processed init:\n";
-          printRec(entry.getInit());
+          printRec(PBD->getInit(idx));
         }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -954,32 +954,32 @@ namespace {
         PrintWithColorRAII(OS, IdentifierColor)
           << " apiName=" << P->getArgumentName();
 
-      if (P->hasType()) {
+      if (P->hasInterfaceType()) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
         P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         PrintWithColorRAII(OS, TypeColor) << "'";
-      }
 
-      if (P->hasInterfaceType()) {
         PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
         P->getInterfaceType().print(
             PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      switch (P->getSpecifier()) {
-      case ParamDecl::Specifier::Default:
-        /* nothing */
-        break;
-      case ParamDecl::Specifier::InOut:
-        OS << " inout";
-        break;
-      case ParamDecl::Specifier::Shared:
-        OS << " shared";
-        break;
-      case ParamDecl::Specifier::Owned:
-        OS << " owned";
-        break;
+      if (auto specifier = P->getCachedSpecifier()) {
+        switch (*specifier) {
+        case ParamDecl::Specifier::Default:
+          /* nothing */
+          break;
+        case ParamDecl::Specifier::InOut:
+          OS << " inout";
+          break;
+        case ParamDecl::Specifier::Shared:
+          OS << " shared";
+          break;
+        case ParamDecl::Specifier::Owned:
+          OS << " owned";
+          break;
+        }
       }
 
       if (P->isVariadic())
@@ -988,19 +988,22 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
+      if (P->isNonEphemeral())
+        OS << " nonEphemeral";
+
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
       }
 
-      if (P->getDefaultValue() &&
-        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+      if (P->hasDefaultExpr() &&
+          !P->getDefaultArgumentCaptureInfo().isTrivial()) {
         OS << " ";
         P->getDefaultArgumentCaptureInfo().print(
           PrintWithColorRAII(OS, CapturesColor).getOS());
       }
 
-      if (auto init = P->getDefaultValue()) {
+      if (auto init = P->getStructuralDefaultExpr()) {
         OS << " expression=\n";
         printRec(init);
       }
@@ -1259,15 +1262,6 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  llvm::Optional<llvm::SaveAndRestore<bool>> X;
-  
-  // Make sure to print type variables if we can get to ASTContext.
-  if (size() != 0 && get(0)) {
-    auto &ctx = get(0)->getASTContext();
-    X.emplace(llvm::SaveAndRestore<bool>(ctx.LangOpts.DebugConstraintSolver,
-                                         true));
-  }
-  
   PrintDecl(OS, Indent).printParameterList(this);
   llvm::errs() << '\n';
 }
@@ -1290,9 +1284,6 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  // Make sure to print type variables.
-  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
-                               true);
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
   OS << '\n';
 }
@@ -1404,8 +1395,6 @@ void SourceFile::dump() const {
 }
 
 void SourceFile::dump(llvm::raw_ostream &OS) const {
-  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
-                               true);
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
@@ -1823,13 +1812,17 @@ public:
   }
 
   raw_ostream &printCommon(Expr *E, const char *C) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
     PrintWithColorRAII(OS, ExprColor) << C;
 
     if (E->isImplicit())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
-    PrintWithColorRAII(OS, TypeColor) << " type='" << GetTypeOfExpr(E) << '\'';
+    PrintWithColorRAII(OS, TypeColor) << " type='";
+    PrintWithColorRAII(OS, TypeColor) << GetTypeOfExpr(E).getString(PO) << '\'';
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -2956,13 +2949,6 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitImplicitlyUnwrappedOptionalTypeRepr(
-      ImplicitlyUnwrappedOptionalTypeRepr *T) {
-    printCommon("implicitly_unwrapped_optional");
-    OS << "\n";
-    printRec(T->getBase());
-  }
-
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {
     printCommon("type_composite");
     for (auto elem : T->getTypes()) {
@@ -3175,7 +3161,7 @@ static void dumpSubstitutionMapRec(
     SubstitutionMap map, llvm::raw_ostream &out,
     SubstitutionMap::DumpStyle style, unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  auto *genericSig = map.getGenericSignature();
+  auto genericSig = map.getGenericSignature();
   out.indent(indent);
 
   auto printParen = [&](char p) {
@@ -3184,7 +3170,7 @@ static void dumpSubstitutionMapRec(
   printParen('(');
   SWIFT_DEFER { printParen(')'); };
   out << "substitution_map generic_signature=";
-  if (genericSig == nullptr) {
+  if (genericSig.isNull()) {
     out << "<nullptr>";
     return;
   }
@@ -3313,6 +3299,7 @@ namespace {
     void dumpParameterFlags(ParameterTypeFlags paramFlags) {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
+      printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;
@@ -3373,7 +3360,6 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
-    TRIVIAL_TYPE_PRINTER(BuiltinUnknownObject, builtin_unknown_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
@@ -3753,14 +3739,10 @@ namespace {
 } // end anonymous namespace
 
 void Type::dump() const {
-  // Make sure to print type variables.
   dump(llvm::errs());
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
-  // Make sure to print type variables.
-  llvm::SaveAndRestore<bool> X(getPointer()->getASTContext().LangOpts.
-                               DebugConstraintSolver, true);
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }
@@ -3771,11 +3753,11 @@ void TypeBase::dump() const {
 }
 
 void TypeBase::dump(raw_ostream &os, unsigned indent) const {
-  auto &ctx = const_cast<TypeBase*>(this)->getASTContext();
-  
-  // Make sure to print type variables.
-  llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
+}
+
+void GenericSignatureImpl::dump() const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).dump();
 }
 
 void GenericEnvironment::dump(raw_ostream &os) const {

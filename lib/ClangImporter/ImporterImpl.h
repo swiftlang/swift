@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "ClangAdapter.h"
+#include "ClangSourceBufferImporter.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -152,13 +153,6 @@ enum class ImportTypeKind {
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter,
 
-  /// Import the type pointed to by a pointer or reference.
-  ///
-  /// This provides special treatment for pointer-to-ObjC-pointer
-  /// types, which get imported as pointers to *checked* optional,
-  /// *Pointer<NSFoo?>, instead of implicitly unwrapped optional as usual.
-  Pointee,
-
   /// Import the type of an ObjC property.
   ///
   /// This enables the conversion of bridged types. Properties are always
@@ -178,19 +172,18 @@ enum class ImportTypeKind {
   Enum
 };
 
-/// Controls whether a typedef for \p type should name the fully-bridged Swift
-/// type or the original Clang type.
+/// Controls whether \p decl, when imported, should name the fully-bridged
+/// Swift type or the original Clang type.
 ///
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
-static inline Bridgeability getTypedefBridgeability(
-                                          const clang::TypedefNameDecl *decl,
-                                          clang::QualType type) {
-    return decl->hasAttr<clang::SwiftBridgedTypedefAttr>()
-      ? Bridgeability::Full
-        : type->isBlockPointerType()
-        ? Bridgeability::Full
-          : Bridgeability::None;
+static inline Bridgeability
+getTypedefBridgeability(const clang::TypedefNameDecl *decl) {
+  if (decl->hasAttr<clang::SwiftBridgedTypedefAttr>() ||
+      decl->getUnderlyingType()->isBlockPointerType()) {
+    return Bridgeability::Full;
+  }
+  return Bridgeability::None;
 }
 
 /// Describes the kind of the C type that can be mapped to a stdlib
@@ -227,8 +220,6 @@ enum class SpecialMethodKind {
   Constructor,
   NSDictionarySubscriptGetter
 };
-
-#define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
 
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
@@ -354,6 +345,13 @@ private:
   /// the underlying Clang instances that reference it
   /// (through the Swift name lookup module file extension).
   LookupTableMap LookupTables;
+
+  /// A helper class used to bring Clang buffers into Swift's SourceManager
+  /// for the purpose of emitting diagnostics.
+  ///
+  /// Listed early so that it gets torn down after the underlying Clang
+  /// instances that also use these buffers.
+  importer::ClangSourceBufferImporter BuffersForDiagnostics;
 
   /// The fake buffer used to import modules.
   ///
@@ -661,6 +659,10 @@ public:
     return Instance->getCodeGenOpts();
   }
 
+  importer::ClangSourceBufferImporter &getBufferImporterForDiagnostics() {
+    return BuffersForDiagnostics;
+  }
+
   /// Imports the given header contents into the Clang context.
   bool importHeader(ModuleDecl *adapter, StringRef headerName,
                     SourceLoc diagLoc, bool trackParsedSymbols,
@@ -799,7 +801,7 @@ public:
                            Version version, ProtocolDecl *proto);
 
   /// Utility function for building simple generic signatures.
-  GenericSignature *buildGenericSignature(GenericParamList *genericParams,
+  GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
 
   /// Import the given Clang declaration context into Swift.
@@ -924,27 +926,11 @@ public:
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
-  /// Retrieve a specialization of the named Swift type, e.g.,
-  /// UnsafeMutablePointer<T>.
-  ///
-  /// \param module The name of the module in which the type should occur.
-  ///
-  /// \param name The name of the type to find.
-  ///
-  /// \param args The arguments to use in the specialization.
-  ///
-  /// \returns The named type, or null if the type could not be found.
-  Type getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
-                                       ArrayRef<Type> args);
-
   /// Retrieve the NSObject type.
   Type getNSObjectType();
 
   /// Retrieve the NSObject protocol type.
   Type getNSObjectProtocolType();
-
-  /// Retrieve the NSCopying protocol type.
-  Type getNSCopyingType();
 
   /// Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
@@ -1049,11 +1035,13 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ImportedType importFunctionType(DeclContext *dc,
-                                  const clang::FunctionDecl *clangDecl,
-                                  ArrayRef<const clang::ParmVarDecl *> params,
-                                  bool isVariadic, bool isFromSystemModule,
-                                  DeclName name, ParameterList *&parameterList);
+  ImportedType
+  importFunctionParamsAndReturnType(DeclContext *dc,
+                                    const clang::FunctionDecl *clangDecl,
+                                    ArrayRef<const clang::ParmVarDecl *> params,
+                                    bool isVariadic, bool isFromSystemModule,
+                                    DeclName name,
+                                    ParameterList *&parameterList);
 
   /// Import the given function return type.
   ///
@@ -1094,9 +1082,9 @@ public:
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
   inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
-                       DeclBaseName baseName, unsigned numParams,
-                       StringRef argumentLabel, bool isFirstParameter,
-                       bool isLastParameter, importer::NameImporter &);
+                       DeclBaseName baseName, StringRef argumentLabel,
+                       bool isFirstParameter, bool isLastParameter,
+                       importer::NameImporter &nameImporter);
 
   /// Import the parameter and return types of an Objective-C method.
   ///
@@ -1104,7 +1092,7 @@ public:
   /// the return type of this method.
   ///
   /// Note that this is not appropriate to use for property accessor methods.
-  /// Use #importAccessorMethodType instead.
+  /// Use #importAccessorParamsAndReturnType instead.
   ///
   /// \param dc The context the method is being imported into.
   /// \param clangDecl The underlying declaration.
@@ -1115,20 +1103,22 @@ public:
   ///   to system APIs.
   /// \param[out] bodyParams The patterns visible inside the function body.
   /// \param importedName How to import the name of the method.
-  /// \param[out] errorConvention Whether and how the method throws NSErrors.
+  /// \param[out] errorConv Whether and how the method throws NSErrors.
   /// \param kind Controls whether we're building a type for a method that
   ///   needs special handling.
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
   ImportedType
-  importMethodType(const DeclContext *dc,
-                   const clang::ObjCMethodDecl *clangDecl,
-                   ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
-                   bool isFromSystemModule, ParameterList **bodyParams,
-                   importer::ImportedName importedName,
-                   Optional<ForeignErrorConvention> &errorConvention,
-                   SpecialMethodKind kind);
+  importMethodParamsAndReturnType(const DeclContext *dc,
+                                  const clang::ObjCMethodDecl *clangDecl,
+                                  ArrayRef<const clang::ParmVarDecl *> params,
+                                  bool isVariadic,
+                                  bool isFromSystemModule,
+                                  ParameterList **bodyParams,
+                                  importer::ImportedName importedName,
+                                  Optional<ForeignErrorConvention> &errorConv,
+                                  SpecialMethodKind kind);
 
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.
@@ -1148,12 +1138,13 @@ public:
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
-  ImportedType importAccessorMethodType(const DeclContext *dc,
-                                        const clang::ObjCPropertyDecl *property,
-                                        const clang::ObjCMethodDecl *clangDecl,
-                                        bool isFromSystemModule,
-                                        importer::ImportedName importedName,
-                                        ParameterList **params);
+  ImportedType
+  importAccessorParamsAndReturnType(const DeclContext *dc,
+                                    const clang::ObjCPropertyDecl *property,
+                                    const clang::ObjCMethodDecl *clangDecl,
+                                    bool isFromSystemModule,
+                                    importer::ImportedName importedName,
+                                    ParameterList **params);
 
   /// Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
@@ -1255,10 +1246,6 @@ public:
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
-    // All imported decls are constructed fully validated.
-    D->setValidationToChecked();
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
-      AFD->setNeedsNewVTableEntry(false);
     return D;
   }
 
@@ -1393,15 +1380,18 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
+  ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
+                           ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail, bool inferIAM)
       : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        availability(avail), inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
+        inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

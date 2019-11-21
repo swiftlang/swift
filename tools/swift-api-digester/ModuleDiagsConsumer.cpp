@@ -42,7 +42,6 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Renamed Decls */";
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
-  case LocalDiagID::var_let_changed:
   case LocalDiagID::func_self_access_change:
   case LocalDiagID::new_decl_without_intro:
     return "/* Decl Attribute changes */";
@@ -94,15 +93,10 @@ ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
 }
 
 void swift::ide::api::ModuleDifferDiagsConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    SourceManager &SM, const DiagnosticInfo &Info) {
   auto Category = getCategoryName((uint32_t)Info.ID);
   if (Category.empty()) {
-    PrintingDiagnosticConsumer::handleDiagnostic(
-        SM, Loc, Kind, FormatString, FormatArgs, Info,
-        bufferIndirectlyCausingDiagnostic);
+    PrintingDiagnosticConsumer::handleDiagnostic(SM, Info);
     return;
   }
   if (!DiagnoseModuleDiff)
@@ -110,7 +104,8 @@ void swift::ide::api::ModuleDifferDiagsConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
   AllDiags[Category].insert(Text.str().str());
 }
