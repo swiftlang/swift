@@ -3530,9 +3530,12 @@ namespace {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
 
-        sub = solution.coerceToType(sub, toType, cs.getConstraintLocator(sub));
-        if (!sub)
+        solution.setExprTypes(sub);
+
+        if (TypeChecker::convertToType(sub, toType, cs.DC))
           return nullptr;
+          
+        cs.cacheExprTypes(sub);
 
         expr->setSubExpr(sub);
         cs.setType(expr, toType);
@@ -3583,6 +3586,9 @@ namespace {
         return nullptr;
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
+        if (SuppressDiagnostics)
+          return nullptr;
+
         if (cs.getType(sub)->isEqual(toType)) {
           ctx.Diags.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
               .fixItRemove(SourceRange(
@@ -3596,9 +3602,14 @@ namespace {
                             "as");
         }
 
-        expr->setCastKind(castKind);
-        cs.setType(expr, toType);
-        return expr;
+        // Transmute the checked cast into a coercion expression.
+        auto *result =
+            new (ctx) CoerceExpr(sub, expr->getLoc(), expr->getCastTypeLoc());
+        cs.setType(result, toType);
+        cs.setType(result->getCastTypeLoc(), toType);
+        unsigned disjunctionChoice =
+          (castKind == CheckedCastKind::Coercion ? 0 : 1);
+        return visitCoerceExpr(result, disjunctionChoice);
       }
 
       // Valid casts.
@@ -3651,18 +3662,37 @@ namespace {
           fromType, toType, castContextKind, cs.DC, expr->getLoc(), sub,
           expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
-      // Invalid cast.
+        /// Invalid cast.
       case CheckedCastKind::Unresolved:
         expr->setCastKind(CheckedCastKind::ValueCast);
         break;
 
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
+        if (SuppressDiagnostics)
+          return nullptr;
+
         ctx.Diags.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
                            cs.getType(sub), toType);
-        expr->setCastKind(castKind);
-        cs.setType(expr, OptionalType::get(toType));
-        return expr;
+
+        // Transmute the checked cast into a coercion expression.
+        auto *coerce =
+            new (ctx) CoerceExpr(sub, expr->getLoc(), expr->getCastTypeLoc());
+        cs.setType(coerce, toType);
+        cs.setType(coerce->getCastTypeLoc(), toType);
+        unsigned disjunctionChoice =
+          (castKind == CheckedCastKind::Coercion ? 0 : 1);
+        Expr *result = visitCoerceExpr(coerce, disjunctionChoice);
+        if (!result)
+          return nullptr;
+
+        // Wrap the result in an optional. Mark the optional injection as
+        // explicit, because the user did in fact write the '?' as part of
+        // 'as?', even though it wasn't necessary.
+        result =
+            new (ctx) InjectIntoOptionalExpr(result, OptionalType::get(toType));
+        result->setImplicit(false);
+        return cs.cacheType(result);
       }
 
       // Valid casts.
