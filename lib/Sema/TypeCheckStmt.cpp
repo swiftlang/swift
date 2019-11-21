@@ -865,6 +865,8 @@ public:
 
     auto witness =
         genConformance.getWitnessByName(iteratorTy, getASTContext().Id_next);
+    if (!witness)
+      return nullptr;
     S->setIteratorNext(witness);
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
