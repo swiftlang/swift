@@ -330,10 +330,39 @@ public:
 //                        ConnectionGraph Implementation
 //===----------------------------------------------------------------------===//
 
-void EscapeAnalysis::CGNode::mergeProperties(CGNode *fromNode) {
-  if (!V)
-    V = fromNode->V;
+std::pair<const CGNode *, unsigned> EscapeAnalysis::CGNode::getRepNode(
+    SmallPtrSetImpl<const CGNode *> &visited) const {
+  if (!isContent() || mappedValue)
+    return {this, 0};
 
+  for (Predecessor pred : Preds) {
+    if (pred.getInt() != EdgeType::PointsTo)
+      continue;
+    if (!visited.insert(pred.getPointer()).second)
+      continue;
+    auto repNodeAndDepth = pred.getPointer()->getRepNode(visited);
+    if (repNodeAndDepth.first)
+      return {repNodeAndDepth.first, repNodeAndDepth.second + 1};
+    // If a representative node was not found on this pointsTo node, recursion
+    // must have hit a cycle. Try the next pointsTo edge.
+  }
+  return {nullptr, 0};
+}
+
+EscapeAnalysis::CGNode::RepValue EscapeAnalysis::CGNode::getRepValue() const {
+  // We don't use CGNodeWorklist because CGNode::dump() should be callable
+  // anywhere, even while another worklist is active, and getRepValue() itself
+  // is not on any critical path.
+  SmallPtrSet<const CGNode *, 4> visited({this});
+  const CGNode *repNode;
+  unsigned depth;
+  std::tie(repNode, depth) = getRepNode(visited);
+  return {{repNode ? SILValue(repNode->mappedValue) : SILValue(),
+           repNode && repNode->Type == EscapeAnalysis::NodeType::Return},
+          depth};
+}
+
+void EscapeAnalysis::CGNode::mergeProperties(CGNode *fromNode) {
   // TODO: Optimistically merge hasRC. 'this' node can only be merged with
   // `fromNode` if their pointer values are compatible. If `fromNode->hasRC` is
   // true, then it is guaranteed to represent the head of a heap object. Thus,
@@ -698,6 +727,16 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
 
     // Cleanup the merged node.
     From->isMerged = true;
+
+    if (From->mappedValue) {
+      if (To->mappedValue)
+        Values2Nodes.erase(From->mappedValue);
+      else {
+        To->mappedValue = From->mappedValue;
+        Values2Nodes[To->mappedValue] = To;
+      }
+      From->mappedValue = nullptr;
+    }
     From->Preds.clear();
     From->defersTo.clear();
     From->pointsTo = nullptr;
@@ -826,9 +865,8 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 }
 
 CGNode *EscapeAnalysis::ConnectionGraph::createContentNode(CGNode *addrNode,
-                                                           SILValue addrVal,
                                                            bool hasRC) {
-  CGNode *newContent = allocNode(addrVal, NodeType::Content, hasRC);
+  CGNode *newContent = allocNode(nullptr, NodeType::Content, hasRC);
   initializePointsToEdge(addrNode, newContent);
   assert(ToMerge.empty()
          && "Initially setting pointsTo should not require any node merges");
@@ -843,9 +881,7 @@ EscapeAnalysis::ConnectionGraph::createMergedContent(CGNode *destAddrNode,
   // destAddrNode may itself be a content node, so its value may be null. Since
   // we don't have the original pointer value, build a new content node based
   // on the source content.
-  //
-  // TODO: node properties will come from `srcContent` here...
-  return createContentNode(destAddrNode, destAddrNode->V, srcContent->hasRC);
+  return createContentNode(destAddrNode, srcContent->hasRC);
 }
 
 // Get a node representing the field data within the given reference-counted
@@ -857,7 +893,7 @@ CGNode *EscapeAnalysis::ConnectionGraph::getFieldContent(CGNode *rcNode) {
   if (rcNode->pointsTo)
     return rcNode->pointsTo;
 
-  return createContentNode(rcNode, rcNode->V, /*hasRC=*/false);
+  return createContentNode(rcNode, /*hasRC=*/false);
 }
 
 bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
@@ -1043,6 +1079,15 @@ bool EscapeAnalysis::ConnectionGraph::mayReach(CGNode *pointer,
   });
 }
 
+void EscapeAnalysis::ConnectionGraph::removeFromGraph(ValueBase *V) {
+  CGNode *node = Values2Nodes.lookup(V);
+  if (!node)
+    return;
+  Values2Nodes.erase(V);
+  if (node->mappedValue == V)
+    node->mappedValue = nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                      Dumping, Viewing and Verification
 //===----------------------------------------------------------------------===//
@@ -1117,43 +1162,43 @@ CGForDotView::CGForDotView(const EscapeAnalysis::ConnectionGraph *CG) :
   }
 }
 
+void CGNode::RepValue::print(
+    llvm::raw_ostream &stream,
+    const llvm::DenseMap<const SILNode *, unsigned> &instToIDMap) const {
+  if (auto v = getValue())
+    stream << '%' << instToIDMap.lookup(v);
+  else
+    stream << (isReturn() ? "return" : "deleted");
+  if (depth > 0)
+    stream << '.' << depth;
+}
+
 std::string CGForDotView::getNodeLabel(const Node *Node) const {
   std::string Label;
   llvm::raw_string_ostream O(Label);
-  if (ValueBase *V = Node->OrigNode->V)
-    O << '%' << InstToIDMap.lookup(V) << '\n';
-  
-  switch (Node->OrigNode->Type) {
-    case swift::EscapeAnalysis::NodeType::Content:
-      if (Node->OrigNode->hasRefCount())
-        O << "rc-";
-      O << "content";
-      break;
-    case swift::EscapeAnalysis::NodeType::Return:
-      O << "return";
-      break;
-    default: {
-      std::string Inst;
-      llvm::raw_string_ostream OI(Inst);
-      SILValue(Node->OrigNode->V)->print(OI);
-      size_t start = Inst.find(" = ");
-      if (start != std::string::npos) {
-        start += 3;
-      } else {
-        start = 2;
-      }
-      O << Inst.substr(start, 20);
-      break;
+  Node->OrigNode->getRepValue().print(O, InstToIDMap);
+  if (Node->OrigNode->Type == EscapeAnalysis::NodeType::Return)
+    O << "return";
+  O << '\n';
+  if (Node->OrigNode->mappedValue) {
+    std::string Inst;
+    llvm::raw_string_ostream OI(Inst);
+    SILValue(Node->OrigNode->mappedValue)->print(OI);
+    size_t start = Inst.find(" = ");
+    if (start != std::string::npos) {
+      start += 3;
+    } else {
+      start = 2;
     }
+    O << Inst.substr(start, 20);
+    O << '\n';
   }
   if (!Node->OrigNode->matchPointToOfDefers()) {
     O << "\nPT mismatch: ";
-    if (Node->OrigNode->pointsTo) {
-      if (ValueBase *V = Node->OrigNode->pointsTo->V)
-        O << '%' << Node->Graph->InstToIDMap[V];
-    } else {
+    if (Node->OrigNode->pointsTo)
+      Node->OrigNode->pointsTo->getRepValue().print(O, InstToIDMap);
+    else
       O << "null";
-    }
   }
   O.flush();
   return Label;
@@ -1163,36 +1208,36 @@ std::string CGForDotView::getNodeAttributes(const Node *Node) const {
   auto *Orig = Node->OrigNode;
   std::string attr;
   switch (Orig->Type) {
-    case swift::EscapeAnalysis::NodeType::Content:
-      attr = "style=\"rounded";
-      if (Orig->hasRefCount()) {
-        attr += ",filled";
-      }
-      attr += "\"";
-      break;
-    case swift::EscapeAnalysis::NodeType::Argument:
-    case swift::EscapeAnalysis::NodeType::Return:
-      attr = "style=\"bold\"";
-      break;
-    default:
-      break;
+  case EscapeAnalysis::NodeType::Content:
+    attr = "style=\"rounded";
+    if (Orig->hasRefCount()) {
+      attr += ",filled";
+    }
+    attr += "\"";
+    break;
+  case EscapeAnalysis::NodeType::Argument:
+  case EscapeAnalysis::NodeType::Return:
+    attr = "style=\"bold\"";
+    break;
+  default:
+    break;
   }
-  if (Orig->getEscapeState() != swift::EscapeAnalysis::EscapeState::None &&
-      !attr.empty())
+  if (Orig->getEscapeState() != EscapeAnalysis::EscapeState::None
+      && !attr.empty())
     attr += ',';
   
   switch (Orig->getEscapeState()) {
-    case swift::EscapeAnalysis::EscapeState::None:
-      break;
-    case swift::EscapeAnalysis::EscapeState::Return:
-      attr += "color=\"green\"";
-      break;
-    case swift::EscapeAnalysis::EscapeState::Arguments:
-      attr += "color=\"blue\"";
-      break;
-    case swift::EscapeAnalysis::EscapeState::Global:
-      attr += "color=\"red\"";
-      break;
+  case EscapeAnalysis::EscapeState::None:
+    break;
+  case EscapeAnalysis::EscapeState::Return:
+    attr += "color=\"green\"";
+    break;
+  case EscapeAnalysis::EscapeState::Arguments:
+    attr += "color=\"blue\"";
+    break;
+  case EscapeAnalysis::EscapeState::Global:
+    attr += "color=\"red\"";
+    break;
   }
   return attr;
 }
@@ -1290,10 +1335,14 @@ void EscapeAnalysis::CGNode::dump() const {
   if (hasRefCount())
     llvm::errs() << " [rc]";
 
-  if (V)
-    llvm::errs() << ": " << *V;
+  auto rep = getRepValue();
+  if (rep.depth > 0)
+    llvm::errs() << " ." << rep.depth;
+  llvm::errs() << ": ";
+  if (auto v = rep.getValue())
+    llvm::errs() << ": " << v;
   else
-    llvm::errs() << '\n';
+    llvm::errs() << (rep.isReturn() ? "return" : "deleted") << '\n';
 
   if (mergeTo) {
     llvm::errs() << "   -> merged to ";
@@ -1325,48 +1374,44 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
   InstToIDMap[nullptr] = (unsigned)-1;
   F->numberValues(InstToIDMap);
 
-  // Assign consecutive subindices for nodes which map to the same value.
-  llvm::DenseMap<const ValueBase *, unsigned> NumSubindicesPerValue;
-  llvm::DenseMap<CGNode *, unsigned> Node2Subindex;
-
-  // Sort by SILValue ID+Subindex. To make the output somehow consistent with
+  // Sort by SILValue ID+depth. To make the output somehow consistent with
   // the output of the function's SIL.
   auto sortNodes = [&](llvm::SmallVectorImpl<CGNode *> &Nodes) {
     std::sort(Nodes.begin(), Nodes.end(),
-      [&](CGNode *Nd1, CGNode *Nd2) -> bool {
-        unsigned VIdx1 = InstToIDMap[Nd1->V];
-        unsigned VIdx2 = InstToIDMap[Nd2->V];
-        if (VIdx1 != VIdx2)
-          return VIdx1 < VIdx2;
-        return Node2Subindex[Nd1] < Node2Subindex[Nd2];
-      });
+              [&](CGNode *Nd1, CGNode *Nd2) -> bool {
+                auto rep1 = Nd1->getRepValue();
+                auto rep2 = Nd2->getRepValue();
+                unsigned VIdx1 = -1;
+                if (auto v = rep1.getValue())
+                  VIdx1 = InstToIDMap[v];
+                unsigned VIdx2 = -1;
+                if (auto v = rep2.getValue())
+                  VIdx2 = InstToIDMap[v];
+                if (VIdx1 != VIdx2)
+                  return VIdx1 < VIdx2;
+                return rep1.depth < rep2.depth;
+              });
   };
 
-  auto NodeStr = [&](CGNode *Nd) -> std::string {
+  auto nodeStr = [&](CGNode *Nd) -> std::string {
     std::string Str;
-    if (Nd->V) {
-      llvm::raw_string_ostream OS(Str);
-      OS << '%' << InstToIDMap[Nd->V];
-      unsigned Idx = Node2Subindex[Nd];
-      if (Idx != 0)
-        OS << '.' << Idx;
-      OS.flush();
-    }
+    llvm::raw_string_ostream OS(Str);
+    if (Nd->hasRefCount())
+      OS << "[rc] ";
+    Nd->getRepValue().print(OS, InstToIDMap);
+    OS.flush();
     return Str;
   };
 
   llvm::SmallVector<CGNode *, 8> SortedNodes;
   for (CGNode *Nd : Nodes) {
-    if (!Nd->isMerged) {
-      unsigned &Idx = NumSubindicesPerValue[Nd->V];
-      Node2Subindex[Nd] = Idx++;
+    if (!Nd->isMerged)
       SortedNodes.push_back(Nd);
-    }
   }
   sortNodes(SortedNodes);
 
   for (CGNode *Nd : SortedNodes) {
-    OS << "  " << Nd->getTypeStr() << ' ' << NodeStr(Nd) << " Esc: ";
+    OS << "  " << Nd->getTypeStr() << ' ' << nodeStr(Nd) << " Esc: ";
     switch (Nd->getEscapeState()) {
       case EscapeState::None: {
         const char *Separator = "";
@@ -1391,18 +1436,15 @@ void EscapeAnalysis::ConnectionGraph::print(llvm::raw_ostream &OS) const {
     OS << ", Succ: ";
     const char *Separator = "";
     if (CGNode *PT = Nd->getPointsToEdge()) {
-      OS << '(' << NodeStr(PT) << ')';
+      OS << '(' << nodeStr(PT) << ')';
       Separator = ", ";
     }
     llvm::SmallVector<CGNode *, 8> SortedDefers = Nd->defersTo;
     sortNodes(SortedDefers);
     for (CGNode *Def : SortedDefers) {
-      OS << Separator << NodeStr(Def);
+      OS << Separator << nodeStr(Def);
       Separator = ", ";
     }
-    if (Nd->hasRefCount())
-      OS << " [rc]";
-
     OS << '\n';
   }
   OS << "End\n";
@@ -1428,7 +1470,7 @@ bool CGNode::matchPointToOfDefers(bool allowMerge) const {
 
 void EscapeAnalysis::ConnectionGraph::verify(bool allowMerge) const {
 #ifndef NDEBUG
-  verifyStructure();
+  verifyStructure(allowMerge);
 
   // Check graph invariants
   for (CGNode *Nd : Nodes) {
@@ -1436,17 +1478,21 @@ void EscapeAnalysis::ConnectionGraph::verify(bool allowMerge) const {
     // which consist of only defer-edges and a single trailing points-to edge
     // must lead to the same
     assert(Nd->matchPointToOfDefers(allowMerge));
-    if (Nd->isContent() && Nd->V) {
-      if (Nd->hasRefCount())
-        assert(mayContainReference(Nd->V->getType(), *F));
+    if (Nd->hasRefCount()) {
+      SILValue v = Nd->getRepValue().getValue();
+      (void)v;
+      assert(!v || mayContainReference(v->getType(), *F));
     }
   }
 #endif
 }
 
-void EscapeAnalysis::ConnectionGraph::verifyStructure() const {
+void EscapeAnalysis::ConnectionGraph::verifyStructure(bool allowMerge) const {
 #ifndef NDEBUG
   for (CGNode *Nd : Nodes) {
+    if (Nd->mappedValue && !(allowMerge && Nd->mergeTo))
+      assert(Nd == Values2Nodes.lookup(Nd->mappedValue));
+
     if (Nd->isMerged) {
       assert(Nd->mergeTo);
       assert(!Nd->pointsTo);
@@ -1513,36 +1559,34 @@ EscapeAnalysis::getValueContent(ConnectionGraph *conGraph, SILValue addrVal) {
   if (CGNode *content = addrNode->getPointsToEdge())
     return content;
 
-  SILValue addrNodeValue = addrNode->getValueOrNull();
-  SILValue baseAddr = getPointerRoot(addrVal);
-  if (addrNode->isContent()) {
-    // Try to maintain an invariant that a node with content is a pointer.
-    if (!isPointer(addrNodeValue) && isPointer(baseAddr))
-      addrNode->updateValue(baseAddr);
-  } else {
-    assert(isPointer(addrNodeValue));
-    assert(addrNodeValue == getPointerRoot(addrVal));
+#ifndef NDEBUG
+  if (!addrNode->isContent()) {
+    if (SILValue addrNodeValue = addrNode->getRepValue().getValue()) {
+      assert(isPointer(addrNodeValue));
+      assert(addrNodeValue == getPointerRoot(addrVal));
+    }
   }
+#endif
+  SILValue baseAddr = getPointerRoot(addrVal);
   auto *F = addrVal->getFunction();
-  bool hasRC = mustContainReference(baseAddr->getType(), *F)
-               || mustContainReference(addrVal->getType(), *F);
-
-  // Have we already merged a content node?
+  auto hasRC = [&](){
+    return mustContainReference(baseAddr->getType(), *F)
+      || mustContainReference(addrVal->getType(), *F);
+  };
+  // Have we already merged a content node for this address?
   if (CGNode *content = addrNode->getContentNodeOrNull()) {
-    // hasRC might not match if one of the values pointing to this content was
-    // cast to an unknown type. If any of the types must contain a reference,
-    // then the content should contain a reference.
-    if (content->hasRefCount())
-      assert(mayContainReference(baseAddr->getType(), *F));
-    else if (hasRC)
-      content->setRefCount();
+    // TODO: Optimistically merge hasRC content. The original content might not
+    // have an RC if one of the values pointing to this content was cast to an
+    // unknown type. If any of the types must contain a reference, then the
+    // content should contain a reference.
+    //
+    // For now, conservatively merge the RC flag instead.
+    if (content->hasRefCount() && !hasRC())
+      content->setRefCount(false);
 
     return content;
   }
-  if (!isPointer(baseAddr))
-    return nullptr;
-
-  return conGraph->createContentNode(addrNode, baseAddr, hasRC);
+  return conGraph->createContentNode(addrNode, hasRC());
 }
 
 void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
@@ -1747,13 +1791,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           // One content node for going from the array buffer pointer to
           // the element address (like ref_element_addr).
           CGNode *ArrayRefNode = ArrayStructValue->getContentNodeOrNull();
+          // TODO: If ArrayRefNode already exists, optimistically do
+          // ArrayRefNode->setRefCount(true).
           if (!ArrayRefNode) {
             ArrayRefNode = ConGraph->createContentNode(
-                ArrayStructValue, ArrayStructValue->getValueOrNull(),
-                /*hasRC=*/true);
-          } else
-            ArrayRefNode->setRefCount();
-
+                ArrayStructValue, /*hasRC=*/true);
+          }
           // Another content node for the element storage.
           CGNode *ArrayElementStorage = ConGraph->getFieldContent(ArrayRefNode);
           ArrayElementStorage->markEscaping();
